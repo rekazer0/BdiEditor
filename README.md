@@ -67,4 +67,4 @@ Windows 版本使用同一套业务代码，计划在 0.1 macOS 版本稳定后�
 
 ## License
 
-[MIT](LICENSE)
+[LICENSE](LICENSE)
