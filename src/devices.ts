@@ -16,6 +16,13 @@ export function deviceSpec(id: string): DeviceSpec | undefined {
   return DEVICES[id]
 }
 
+export function showsKeyboardAccessories(
+  device: DeviceSpec | undefined,
+  orientation: "port" | "land",
+): boolean {
+  return device?.family === "iphone" && orientation === "port"
+}
+
 export function keyboardPreviewGeometry(
   device: DeviceSpec,
   orientation: "port" | "land",

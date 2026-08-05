@@ -795,6 +795,10 @@ h2 {
   height: 27px;
 }
 
+.device-shell[data-accessories="hidden"] .keyboard-accessories {
+  display: none;
+}
+
 .device-shell[data-theme="dark"] .device-screen {
   background:
     radial-gradient(circle at 18% 72%, rgb(35 125 181 / 28%), transparent 30%),

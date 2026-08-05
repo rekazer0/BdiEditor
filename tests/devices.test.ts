@@ -1,6 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { deviceSpec, keyboardPreviewGeometry } from "../src/devices.ts"
+import {
+  deviceSpec,
+  keyboardPreviewGeometry,
+  showsKeyboardAccessories,
+} from "../src/devices.ts"
 
 test("uses verified physical display resolutions for common phones", () => {
   assert.deepEqual(deviceSpec("iphone-17-pro"), { width: 1206, height: 2622, family: "iphone" })
@@ -46,4 +50,24 @@ test("keeps the iPhone keyboard height fixed while composing", () => {
     true,
   )
   assert.deepEqual(composing, idle)
+})
+
+test("shows keyboard accessories only for an iPhone in portrait", () => {
+  assert.equal(showsKeyboardAccessories(deviceSpec("iphone-17-pro"), "port"), true)
+  assert.equal(showsKeyboardAccessories(deviceSpec("iphone-17-pro"), "land"), false)
+  assert.equal(showsKeyboardAccessories(deviceSpec("xiaomi-17"), "port"), false)
+  assert.equal(showsKeyboardAccessories(undefined, "port"), false)
+})
+
+test("Android and landscape geometries do not reserve a safe bottom area", () => {
+  assert.equal(
+    keyboardPreviewGeometry(deviceSpec("xiaomi-17")!, "port", 1125, 595, 133)
+      .safeBottomHeight,
+    0,
+  )
+  assert.equal(
+    keyboardPreviewGeometry(deviceSpec("iphone-17-pro")!, "land", 1125, 595, 133)
+      .safeBottomHeight,
+    0,
+  )
 })

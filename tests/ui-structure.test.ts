@@ -179,6 +179,16 @@ test("a full preview refresh shares one atlas resolver with the toolbar", () => 
   assert.doesNotMatch(main, /function refreshToolbarPreview[\s\S]*?toolbarPreview\.setResolver\(new AtlasResolver/)
 })
 
+test("device preview resolves component panels and hides unavailable accessories", () => {
+  assert.match(main, /resolvePanelConfig\(layoutDocument,\s*context\.gen,\s*context\.styles\)/)
+  assert.match(main, /keyboardPreviewGeometry\(\s*spec,\s*orientation\.value,/s)
+  assert.match(main, /updateDevicePreview\(\)\s*syncSegmentedControls\(\)\s*refreshPreview\(\)/s)
+  assert.match(
+    css,
+    /\.device-shell\[data-accessories="hidden"\] \.keyboard-accessories\s*\{[^}]*display:\s*none/s,
+  )
+})
+
 test("export menu exposes direct readable iOS and Android actions", () => {
   assert.match(html, /data-export-format="bdi"[^>]*>[^<]*导出 iOS 皮肤/)
   assert.match(html, /data-export-format="bds"[^>]*>[^<]*导出 Android 皮肤/)

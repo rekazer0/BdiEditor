@@ -13,7 +13,7 @@ import {
   type TextVisual,
   type Visual,
 } from "./atlas.ts"
-import { deviceSpec, keyboardPreviewGeometry } from "./devices.ts"
+import { deviceSpec, keyboardPreviewGeometry, showsKeyboardAccessories } from "./devices.ts"
 import {
   exportFormatFromPath,
   exportName,
@@ -25,6 +25,7 @@ import { highlightIni } from "./highlight.ts"
 import {
   backgroundStyleSections,
   keyboardConfig,
+  resolvePanelConfig,
   setKeyboardHeight,
   setStyleField,
 } from "./keyboard.ts"
@@ -97,7 +98,7 @@ const inspectorTabButtons = Array.from(
 const browserOpen = $("#browser-open") as HTMLInputElement
 const imageOpen = $("#image-open") as HTMLInputElement
 const theme = $("#theme") as HTMLSelectElement
-const orientation = $("#orientation") as HTMLSelectElement
+const orientation = $("#orientation") as HTMLSelectElement & { value: "port" | "land" }
 const layout = $("#layout") as HTMLSelectElement
 const mode = $("#mode") as HTMLSelectElement
 const device = $("#device") as HTMLSelectElement
@@ -134,6 +135,16 @@ let fileOperationRunning = false
 let firstCandidateTextVisual: TextVisual | undefined
 let candidateTextWidth = 1125
 let stylePreviewDrawID = 0
+
+const deviceGeometryProperties = [
+  "--keyboard-height-port",
+  "--keyboard-height-land",
+  "--candidate-row",
+  "--candidate-inset-row",
+  "--candidate-content-row",
+  "--panel-row",
+  "--safe-row",
+] as const
 
 const preview = new Preview(
   $("#preview") as HTMLCanvasElement,
@@ -423,8 +434,8 @@ function refreshPreview(): void {
   preview.setTheme(theme.value === "dark" ? "dark" : "light")
   preview.setTransparent(device.value !== "canvas")
   const context = keyboardContext()
-  if (context) {
-    const config = keyboardConfig(context.gen, context.styles)
+  if (context && layoutDocument) {
+    const config = resolvePanelConfig(layoutDocument, context.gen, context.styles)
     const inputVisual = resolveTextVisual(
       context.styles,
       context.gen.get("SCAND", "INPUT_STYLE") ?? context.gen.get("INPUT", "FORE_STYLE") ?? "",
@@ -466,26 +477,26 @@ function refreshPreview(): void {
     }
     preview.setPanel(config.styleID, config.width, config.height)
     const spec = deviceSpec(device.value)
-    if (spec && orientation.value === "port") {
+    if (spec) {
       const geometry = keyboardPreviewGeometry(
         spec,
-        "port",
+        orientation.value,
         config.width,
         config.height,
         toolbarSize?.height ?? 0,
         composing,
       )
-      deviceShell.style.setProperty("--keyboard-height-port", `${(geometry.totalHeight / spec.height) * 100}%`)
+      const screenHeight = orientation.value === "port" ? spec.height : spec.width
+      deviceShell.style.setProperty(
+        `--keyboard-height-${orientation.value}`,
+        `${(geometry.totalHeight / screenHeight) * 100}%`,
+      )
       deviceShell.style.setProperty("--candidate-row", `${geometry.candidateHeight}fr`)
       deviceShell.style.setProperty("--candidate-inset-row", `${geometry.candidateInsetHeight}fr`)
       deviceShell.style.setProperty("--candidate-content-row", `${geometry.candidateContentHeight}fr`)
       deviceShell.style.setProperty("--panel-row", `${geometry.panelHeight}fr`)
       deviceShell.style.setProperty("--safe-row", `${geometry.safeBottomHeight}fr`)
     }
-    deviceShell.style.setProperty(
-      "--keyboard-height-land",
-      `${Math.min(88, Math.max(38, (config.height / 648) * 64))}%`,
-    )
   }
   preview.setDocument(layoutDocument)
 }
@@ -496,6 +507,9 @@ function updateDevicePreview(): void {
   deviceShell.dataset.theme = theme.value
   deviceShell.classList.toggle("canvas-only", device.value === "canvas")
   const spec = deviceSpec(device.value)
+  deviceShell.dataset.accessories = showsKeyboardAccessories(spec, orientation.value)
+    ? "visible"
+    : "hidden"
   if (spec) {
     deviceShell.dataset.family = spec.family
     const portrait = orientation.value === "port"
@@ -505,6 +519,7 @@ function updateDevicePreview(): void {
   } else {
     delete deviceShell.dataset.family
     deviceShell.style.removeProperty("aspect-ratio")
+    for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
   }
   preview.setTransparent(device.value !== "canvas")
 }
@@ -1554,6 +1569,7 @@ for (const control of [theme, orientation, layout]) {
     }
     updateDevicePreview()
     syncSegmentedControls()
+    refreshPreview()
   })
 }
 mode.addEventListener("change", () => {
