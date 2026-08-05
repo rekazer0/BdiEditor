@@ -39,15 +39,22 @@ export function keyboardPreviewGeometry(
   totalHeight: number
 } {
   const screenWidth = orientation === "port" ? device.width : device.height
-  const scale = screenWidth / skinWidth
+  const screenHeight = orientation === "port" ? device.height : device.width
   const iphonePortrait = orientation === "port" && device.family === "iphone"
-  const candidateInsetHeight = (iphonePortrait ? 95 : 0) * scale
+  const candidateInsetLogicalHeight = iphonePortrait ? 95 : 0
+  const safeLogicalHeight = iphonePortrait
+    ? device.width * (236 / 1206)
+    : 0
+  const totalLogicalHeight =
+    candidateInsetLogicalHeight + candidateLogicalHeight + panelLogicalHeight
+  const widthScale = screenWidth / skinWidth
+  const heightScale = (screenHeight - safeLogicalHeight) / totalLogicalHeight
+  const scale = Math.min(widthScale, heightScale)
+  const candidateInsetHeight = candidateInsetLogicalHeight * scale
   const candidateContentHeight = candidateLogicalHeight * scale
   const candidateHeight = candidateInsetHeight + candidateContentHeight
   const panelHeight = panelLogicalHeight * scale
-  const safeBottomHeight = iphonePortrait
-    ? device.width * (236 / 1206)
-    : 0
+  const safeBottomHeight = safeLogicalHeight
   return {
     candidateHeight,
     candidateInsetHeight,

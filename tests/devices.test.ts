@@ -71,3 +71,34 @@ test("Android and landscape geometries do not reserve a safe bottom area", () =>
     0,
   )
 })
+
+test("never lets a landscape keyboard overflow the screen height", () => {
+  for (const id of [
+    "iphone-17-pro",
+    "iphone-17-pro-max",
+    "xiaomi-17",
+    "pixel-10-pro",
+    "galaxy-s25-ultra",
+  ]) {
+    const device = deviceSpec(id)!
+    const geometry = keyboardPreviewGeometry(device, "land", 1125, 595, 133)
+    assert.ok(
+      geometry.totalHeight <= device.width,
+      `${id} landscape keyboard ${geometry.totalHeight} exceeds screen height ${device.width}`,
+    )
+  }
+  const geometry = keyboardPreviewGeometry(
+    deviceSpec("iphone-17-pro")!,
+    "land",
+    1125,
+    595,
+    133,
+  )
+  assert.equal(Math.round(geometry.totalHeight), 1206)
+})
+
+test("keeps the keyboard within the portrait screen height", () => {
+  const device = deviceSpec("iphone-17-pro")!
+  const geometry = keyboardPreviewGeometry(device, "port", 1125, 595, 133)
+  assert.ok(geometry.totalHeight <= device.height)
+})
