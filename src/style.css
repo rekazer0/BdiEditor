@@ -70,20 +70,6 @@ button {
   stroke-linejoin: round;
 }
 
-.system-symbol-native {
-  background: currentColor;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-}
-
-.system-symbol-native .system-symbol-fallback {
-  display: none;
-}
-
 button:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
@@ -330,9 +316,10 @@ aside,
 
 aside {
   border-right: 1px solid var(--line);
-  background: var(--sidebar);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
+  background: rgb(255 255 255 / 68%);
+  box-shadow: inset -1px 0 rgb(255 255 255 / 72%);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
   overflow: auto;
 }
 
@@ -1037,7 +1024,10 @@ canvas {
   grid-template-rows: 48px minmax(0, 1fr);
   overflow: hidden;
   border-left: 1px solid var(--line);
-  background: var(--panel);
+  background: rgb(255 255 255 / 68%);
+  box-shadow: inset 1px 0 rgb(255 255 255 / 72%);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
 }
 
 .inspector-tabs {

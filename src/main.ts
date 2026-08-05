@@ -139,6 +139,7 @@ let fileOperationRunning = false
 let firstCandidateTextVisual: TextVisual | undefined
 let candidateTextWidth = 1125
 let stylePreviewDrawID = 0
+let selectedFileButton: HTMLButtonElement | undefined
 
 const deviceGeometryProperties = [
   "--keyboard-height-port",
@@ -214,7 +215,6 @@ function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window
 }
 
-const systemSymbolURLs = new Map<string, Promise<string>>()
 const svgNamespace = "http://www.w3.org/2000/svg"
 const fallbackSymbolPaths: Record<string, string[]> = {
   "info.circle": ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18", "M12 10v7", "M12 7h.01"],
@@ -225,34 +225,6 @@ const fallbackSymbolPaths: Record<string, string[]> = {
   "doc.text": ["M6 3h8l4 4v14H6z", "M14 3v5h5M9 12h6M9 16h6"],
   photo: ["M4 4h16v16H4z", "m6 16 4-5 3 3 2-2 3 4M9 9h.01"],
   doc: ["M6 3h8l4 4v14H6z", "M14 3v5h5"],
-}
-
-function systemSymbolURL(name: string): Promise<string> {
-  const cached = systemSymbolURLs.get(name)
-  if (cached) return cached
-  const request = invoke<number[]>("sf_symbol", { name }).then((bytes) =>
-    URL.createObjectURL(new Blob([Uint8Array.from(bytes)], { type: "image/png" })),
-  )
-  systemSymbolURLs.set(name, request)
-  return request
-}
-
-function loadSystemSymbol(symbol: HTMLElement): void {
-  const name = symbol.dataset.systemSymbol
-  if (!name || !isTauri()) return
-  void systemSymbolURL(name)
-    .then((url) => {
-      symbol.style.maskImage = `url("${url}")`
-      symbol.style.webkitMaskImage = `url("${url}")`
-      symbol.classList.add("system-symbol-native")
-    })
-    .catch(() => {})
-}
-
-function hydrateSystemSymbols(root: ParentNode = document): void {
-  for (const symbol of Array.from(root.querySelectorAll<HTMLElement>("[data-system-symbol]"))) {
-    loadSystemSymbol(symbol)
-  }
 }
 
 function createSystemSymbol(name: string): HTMLSpanElement {
@@ -269,7 +241,6 @@ function createSystemSymbol(name: string): HTMLSpanElement {
     fallback.append(path)
   }
   symbol.append(fallback)
-  loadSystemSymbol(symbol)
   return symbol
 }
 
@@ -1004,7 +975,7 @@ function populateKeyInspector(): void {
           : ""
         : describeAction(values[0])
   }
-  void updateStylePreviews()
+  if (hasSelection) void updateStylePreviews()
   applyModeState()
 }
 
@@ -1218,13 +1189,14 @@ function selectFile(path: string): void {
   }
   updateInspectorView()
   if (!quickInspector.hidden) populateKeyInspector()
-  files.querySelectorAll("button").forEach((button) => {
-    button.classList.toggle("selected", button.dataset.path === path)
-  })
+  selectedFileButton?.classList.remove("selected")
+  selectedFileButton = files.querySelector<HTMLButtonElement>(`button[data-path="${CSS.escape(path)}"]`) ?? undefined
+  selectedFileButton?.classList.add("selected")
 }
 
 function renderFiles(): void {
   files.replaceChildren()
+  selectedFileButton = undefined
   if (!archive) return
 
   const section = (title: string) => {
@@ -1671,7 +1643,6 @@ window.addEventListener("beforeunload", (event) => {
   event.preventDefault()
   event.returnValue = ""
 })
-hydrateSystemSymbols()
 if (isTauri()) {
   let destroyingWindow = false
   void getCurrentWindow().onCloseRequested(async (event) => {

@@ -59,15 +59,10 @@ test("static and dynamic system symbol elements are decorative and retain inline
   assert.match(main, /createElementNS\([^\n]+"svg"\)/)
 })
 
-test("native system symbol PNG masks are cached by name and hide browser fallbacks", () => {
-  assert.match(main, /new Map<string, Promise<string>>\(\)/)
-  assert.match(main, /systemSymbolURLs\.get\(name\)/)
-  assert.match(main, /invoke<number\[\]>\("sf_symbol", \{ name \}\)/)
-  assert.match(main, /URL\.createObjectURL\(new Blob/)
-  assert.match(main, /style\.maskImage = `url\("\$\{url\}"\)`/)
-  assert.match(main, /classList\.add\("system-symbol-native"\)/)
-  assert.match(css, /\.system-symbol-native\s*\{[^}]*background:\s*currentColor/s)
-  assert.match(css, /\.system-symbol-native \.system-symbol-fallback\s*\{[^}]*display:\s*none/s)
+test("system symbols remain inline SVG so they render at the display resolution", () => {
+  assert.doesNotMatch(main, /invoke<number\[\]>\("sf_symbol"/)
+  assert.doesNotMatch(main, /systemSymbolURLs/)
+  assert.doesNotMatch(css, /\.system-symbol-native/)
 })
 
 test("source tree assigns semantic system symbols to navigation, folders, and file kinds", () => {
