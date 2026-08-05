@@ -30,7 +30,6 @@ fn is_allowed_sf_symbol(name: &str) -> bool {
             | "cellularbars"
             | "wifi"
             | "battery.100"
-            | "minus"
     )
 }
 
@@ -149,7 +148,6 @@ mod tests {
             "cellularbars",
             "wifi",
             "battery.100",
-            "minus",
         ] {
             assert!(is_allowed_sf_symbol(name), "{name} should be allowed");
         }

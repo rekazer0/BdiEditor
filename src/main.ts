@@ -35,7 +35,7 @@ import {
   type LayoutAction,
   type LayoutRect,
 } from "./layout.ts"
-import { operationError } from "./operations.ts"
+import { loadBuiltInProjectTemplate, operationError } from "./operations.ts"
 import { Preview, previewItems, type PreviewEvent } from "./preview.ts"
 import { firstExistingPath } from "./resources.ts"
 import { candidatePreview, deleteBackward, insertText } from "./simulation.ts"
@@ -43,10 +43,11 @@ import { SkinArchive } from "./skin.ts"
 import { sourceFolderDescription } from "./source-tree.ts"
 import { resolveStylePropertySources, type StylePropertySource } from "./style-properties.ts"
 import { unsavedDecision } from "./unsaved.ts"
-import { clampZoom, stepZoom } from "./zoom.ts"
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 const newButton = $("#new") as HTMLButtonElement
+const newProjectDialog = $("#new-project-dialog") as HTMLDialogElement
+const newProjectForm = $("#new-project-form") as HTMLFormElement
 const openButton = $("#open") as HTMLButtonElement
 const saveButton = $("#save") as HTMLButtonElement
 const undoButton = $("#undo") as HTMLButtonElement
@@ -101,9 +102,6 @@ const layout = $("#layout") as HTMLSelectElement
 const mode = $("#mode") as HTMLSelectElement
 const device = $("#device") as HTMLSelectElement
 const deviceShell = $("#device-shell")
-const zoomOutButton = $("#zoom-out") as HTMLButtonElement
-const zoomValue = $("#zoom-value") as HTMLOutputElement
-const zoomInButton = $("#zoom-in") as HTMLButtonElement
 const simulatedOutput = $("#simulated-output") as HTMLTextAreaElement
 const clearSimulationButton = $("#clear-simulation") as HTMLButtonElement
 const toolbarStrip = $("#toolbar-strip") as HTMLDivElement
@@ -136,7 +134,6 @@ let fileOperationRunning = false
 let firstCandidateTextVisual: TextVisual | undefined
 let candidateTextWidth = 1125
 let stylePreviewDrawID = 0
-let zoom = 100
 
 const preview = new Preview(
   $("#preview") as HTMLCanvasElement,
@@ -275,15 +272,6 @@ function syncSegmentedControls(): void {
   for (const button of orientationChoiceButtons) {
     button.classList.toggle("active", button.dataset.orientationChoice === orientation.value)
   }
-}
-
-function applyZoom(): void {
-  zoom = clampZoom(zoom)
-  deviceShell.style.setProperty("--preview-zoom", `${zoom}%`)
-  zoomValue.value = String(zoom)
-  zoomValue.textContent = `${zoom}%`
-  zoomOutButton.disabled = zoom === 50
-  zoomInButton.disabled = zoom === 150
 }
 
 function applyModeState(): void {
@@ -1423,19 +1411,34 @@ function downloadArchive(format: ExportFormat): boolean {
   return true
 }
 
-async function loadBuiltInTemplate(): Promise<Uint8Array> {
-  const response = await fetch("/default-template.bdi")
-  if (!response.ok) throw new Error("无法加载内置默认皮肤模板")
-  return new Uint8Array(await response.arrayBuffer())
+function chooseProjectTemplate(): Promise<string | undefined> {
+  newProjectDialog.returnValue = ""
+  newProjectDialog.showModal()
+  return new Promise((resolve) => {
+    newProjectDialog.addEventListener(
+      "close",
+      () => {
+        const templateID = new FormData(newProjectForm).get("project-template")
+        resolve(
+          newProjectDialog.returnValue === "create" && typeof templateID === "string"
+            ? templateID
+            : undefined,
+        )
+      },
+      { once: true },
+    )
+  })
 }
 
 async function newDocument(): Promise<boolean> {
+  const templateID = await chooseProjectTemplate()
+  if (!templateID) return false
   if (!(await prepareDocumentReplacement())) return false
-  loadArchive(await loadBuiltInTemplate(), "", true)
+  loadArchive(await loadBuiltInProjectTemplate(templateID), "", true)
   return true
 }
 
-newButton.addEventListener("click", () => void runFileOperation("新建", newDocument))
+newButton.addEventListener("click", () => void runFileOperation("新建项目", newDocument))
 openButton.addEventListener("click", () => {
   if (isTauri()) void runFileOperation("打开", openNative)
   else {
@@ -1569,14 +1572,6 @@ for (const button of themeChoiceButtons) {
 for (const button of orientationChoiceButtons) {
   button.addEventListener("click", () => selectChoice(orientation, button.dataset.orientationChoice ?? "port"))
 }
-zoomOutButton.addEventListener("click", () => {
-  zoom = stepZoom(zoom, -1)
-  applyZoom()
-})
-zoomInButton.addEventListener("click", () => {
-  zoom = stepZoom(zoom, 1)
-  applyZoom()
-})
 toolbarStrip.addEventListener("click", () => {
   if (!isEditing()) return
   const path = toolbarStrip.dataset.path
@@ -1655,6 +1650,5 @@ if (isTauri()) {
 mode.value = "preview"
 applyModeState()
 updateDevicePreview()
-applyZoom()
 updateSourceHighlight()
 updateInspectorView()
