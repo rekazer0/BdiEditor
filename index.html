@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>BDI 皮肤编辑器</title>
+  </head>
+  <body>
+    <header class="titlebar">
+      <nav class="toolbar-group" aria-label="文件操作">
+        <button id="new" class="toolbar-button" title="新建" aria-label="新建">
+          <span class="icon"><svg viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" /></svg></span><span>新建</span>
+        </button>
+        <button id="open" class="toolbar-button" title="打开" aria-label="打开">
+          <span class="icon"><svg viewBox="0 0 20 20"><path d="M2.8 6.5h5l1.7 2h7.7l-1.4 7H4.2z"/><path d="M4 6.5V4.3h5l1.5 2.2" /></svg></span><span>打开</span>
+        </button>
+        <button id="save" class="toolbar-button" disabled title="保存" aria-label="保存">
+          <span class="icon"><svg viewBox="0 0 20 20"><path d="M10 2.8v9M6.5 9.5 10 13l3.5-3.5M3.5 15.8h13" /></svg></span><span>保存</span>
+        </button>
+        <span class="toolbar-divider"></span>
+        <button id="undo" class="toolbar-button" disabled title="撤销" aria-label="撤销"><span class="icon"><svg viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12"/><path d="M4 8.5h7.2a5 5 0 0 1 5 5"/></svg></span></button>
+        <button id="redo" class="toolbar-button" disabled title="重做" aria-label="重做"><span class="icon"><svg viewBox="0 0 20 20"><path d="m13 5 4 3.5-4 3.5"/><path d="M16 8.5H8.8a5 5 0 0 0-5 5"/></svg></span></button>
+      </nav>
+      <div class="document-title">
+        <strong id="document-name">未打开皮肤</strong>
+        <span id="dirty" hidden>已编辑</span>
+      </div>
+      <span class="spacer"></span>
+      <div class="mode-control glass-module" aria-label="工作模式">
+        <button class="active" data-mode-choice="preview">交互预览</button>
+        <button data-mode-choice="edit">编辑模式</button>
+        <select id="mode" hidden><option value="preview">交互预览</option><option value="edit">编辑模式</option></select>
+      </div>
+      <details class="toolbar-more">
+        <summary title="更多操作" aria-label="更多操作">•••</summary>
+        <div class="toolbar-menu export-actions" aria-label="导出皮肤">
+          <button class="export-action" data-export-format="bdi" disabled>导出 iOS 皮肤 (.bdi)…</button>
+          <button class="export-action" data-export-format="bds" disabled>导出 Android 皮肤 (.bds)…</button>
+        </div>
+      </details>
+    </header>
+
+    <main>
+      <aside class="sidebar">
+        <div class="pane-heading">
+          <h2>皮肤</h2>
+        </div>
+        <div id="files"></div>
+      </aside>
+
+      <section class="workspace">
+        <div class="preview-toolbar">
+          <div class="preview-heading">
+            <strong>画布</strong>
+            <span>实时预览</span>
+          </div>
+          <span class="spacer"></span>
+          <label class="field-control">
+            <span>设备</span>
+            <select id="device" aria-label="设备">
+              <option value="iphone-17-pro">iPhone 17 Pro · 1206×2622</option>
+              <option value="iphone-17-pro-max">iPhone 17 Pro Max · 1320×2868</option>
+              <option value="xiaomi-17">Xiaomi 17 · 1220×2656</option>
+              <option value="pixel-10-pro">Pixel 10 Pro · 1280×2856</option>
+              <option value="galaxy-s25-ultra">Galaxy S25 Ultra · 1440×3120</option>
+              <option value="canvas">仅画布</option>
+            </select>
+          </label>
+          <label class="field-control">
+            <span>方向</span>
+            <select id="orientation" aria-label="方向">
+              <option value="port">竖屏</option>
+              <option value="land">横屏</option>
+            </select>
+          </label>
+        </div>
+        <div class="canvas-wrap empty">
+          <div class="empty-state">
+            <span class="empty-icon">⌨</span>
+            <strong>打开一个输入法皮肤</strong>
+            <span>编辑九键与 26 键布局、外观和按键动作</span>
+            <button id="empty-open">选择皮肤…</button>
+          </div>
+          <div id="device-shell" class="device-shell" data-device="iphone-17-pro" data-orientation="port">
+            <div class="device-screen">
+              <div class="device-status"><span>9:41</span><span>● ᯤ ▰</span></div>
+              <div class="phone-navigation" aria-hidden="true">
+                <span class="phone-nav-round">‹</span>
+                <span class="phone-nav-actions">↶　↷</span>
+                <span class="phone-nav-actions">⇧　•••</span>
+                <span class="phone-nav-done">✓</span>
+              </div>
+              <div class="simulation">
+                <div class="simulation-heading">
+                  <span>模拟输入</span>
+                  <button id="clear-simulation">清除</button>
+                </div>
+                <textarea id="simulated-output" rows="2" aria-label="模拟输入内容" placeholder="在交互预览中点击按键，或直接输入"></textarea>
+              </div>
+              <div class="keyboard-dock">
+                <div id="candidate-area">
+                  <div id="candidate-composition" hidden aria-live="polite">
+                    <div id="candidate-input"></div>
+                    <div id="candidate-words"></div>
+                  </div>
+                  <div id="toolbar-strip" hidden title="在编辑模式下点击可打开工具栏配置"><canvas id="toolbar-preview" width="1125" height="133"></canvas></div>
+                </div>
+                <canvas id="preview" width="1125" height="650"></canvas>
+                <div class="keyboard-accessories" aria-hidden="true">
+                  <svg data-system-icon="globe" viewBox="0 0 32 32">
+                    <circle cx="16" cy="16" r="13" />
+                    <path d="M3 16h26M16 3c4 3.7 6 8 6 13s-2 9.3-6 13M16 3c-4 3.7-6 8-6 13s2 9.3 6 13" />
+                  </svg>
+                  <svg data-system-icon="microphone" viewBox="0 0 32 32">
+                    <rect x="11" y="3" width="10" height="18" rx="5" />
+                    <path d="M7 16v1a9 9 0 0 0 18 0v-1M16 26v4M11 30h10" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="event-log" aria-live="polite">打开皮肤后可预览按键。</div>
+      </section>
+
+      <section class="source">
+        <div class="pane-heading source-heading">
+          <div>
+            <h2>检查器</h2>
+            <span id="source-name">配置文本</span>
+          </div>
+          <div class="inspector-tabs" aria-label="检查器视图">
+            <button class="active" data-inspector-tab="properties">属性</button>
+            <button data-inspector-tab="source">源代码</button>
+          </div>
+        </div>
+        <div id="quick-inspector" hidden>
+          <div class="inspector-title">
+            <strong id="selected-key">选择画布中的按键</strong>
+            <span>按住 Command 点击可多选（Windows 使用 Ctrl）；修改会同步写回配置</span>
+          </div>
+          <div id="layout-context" class="layout-context glass-module" hidden>
+            <div>
+              <span>布局</span>
+              <div class="segmented-control">
+                <button class="active" data-layout-choice="py_9.ini">九键</button>
+                <button data-layout-choice="py_26.ini">26 键</button>
+              </div>
+            </div>
+            <div>
+              <span>外观</span>
+              <div class="segmented-control">
+                <button class="active" data-theme-choice="light">浅色</button>
+                <button data-theme-choice="dark">深色</button>
+              </div>
+            </div>
+            <select id="layout" hidden><option value="py_9.ini">九键</option><option value="py_26.ini">26 键</option></select>
+            <select id="theme" hidden><option value="light">浅色</option><option value="dark">深色</option></select>
+          </div>
+          <div class="inspector-group skin-fields" hidden>
+            <h3>皮肤信息</h3>
+            <div class="inspector-grid action-fields">
+              <label>名称 <input data-skin-field="Name" /></label>
+              <label>描述 <input data-skin-field="Description" /></label>
+              <label>作者 <input data-skin-field="Author" /></label>
+              <label>共同作者 <input data-skin-field="Authors" /></label>
+              <label>版本 <input data-skin-field="Version" /></label>
+              <label>最低输入法版本 <input data-skin-field="MinImeCode" /></label>
+              <label>支持平台 <input data-skin-field="SupportPlatform" /></label>
+              <label>支持深色模式 <input data-skin-field="SupportDarkMode" /></label>
+            </div>
+          </div>
+          <div class="inspector-group keyboard-fields" hidden>
+            <h3>整个键盘</h3>
+            <div class="inspector-grid action-fields">
+              <label>整体高度 <input data-keyboard-field="height" type="number" min="1" /></label>
+              <label>背景样式 <input data-keyboard-field="styleID" /></label>
+              <label>正常背景图片 <input data-keyboard-field="NM_IMG" placeholder="例如 panel,1" /></label>
+              <label>按下背景图片 <input data-keyboard-field="HL_IMG" placeholder="例如 panel,2" /></label>
+              <label>正常背景色 / 透明度 <input data-keyboard-field="NM_COLOR" placeholder="AARRGGBB" /></label>
+              <label>按下背景色 / 透明度 <input data-keyboard-field="HL_COLOR" placeholder="AARRGGBB" /></label>
+            </div>
+            <p class="inspector-note">整体高度写入 gen.ini 的 PANEL SIZE；颜色前两位是透明度。背景图片透明度由 PNG 决定。</p>
+          </div>
+          <div class="inspector-group key-only">
+            <h3>布局</h3>
+            <div class="inspector-grid geometry-fields">
+              <label>X <input data-key-field="x" type="number" /></label>
+              <label>Y <input data-key-field="y" type="number" /></label>
+              <label>宽 <input data-key-field="width" type="number" min="1" /></label>
+              <label>高 <input data-key-field="height" type="number" min="1" /></label>
+            </div>
+            <div class="inspector-grid gap-fields">
+              <label>水平间距 <input data-gap-field="horizontal" type="number" /></label>
+              <label>垂直间距 <input data-gap-field="vertical" type="number" /></label>
+            </div>
+            <div class="layout-actions" aria-label="对齐与分布">
+              <button data-layout-action="left" title="左对齐">左齐</button>
+              <button data-layout-action="top" title="顶对齐">顶齐</button>
+              <button data-layout-action="same-width" title="等宽">等宽</button>
+              <button data-layout-action="same-height" title="等高">等高</button>
+              <button data-layout-action="horizontal-gap" title="水平等间距">水平分布</button>
+              <button data-layout-action="vertical-gap" title="垂直等间距">垂直分布</button>
+            </div>
+          </div>
+          <div class="inspector-group key-only">
+            <h3>外观</h3>
+            <div class="inspector-grid appearance-fields">
+              <label>背景样式
+                <span class="style-field">
+                  <input data-key-field="BACK_STYLE" />
+                  <span class="style-preview-pair" aria-label="背景样式预览">
+                    <button class="style-preview-button" data-style-preview="back:normal" title="正常状态；Command 点击跳转到图片源文件"><canvas width="64" height="44" aria-label="背景正常状态预览"></canvas><span>常</span></button>
+                    <button class="style-preview-button" data-style-preview="back:highlighted" title="按下状态；Command 点击跳转到图片源文件"><canvas width="64" height="44" aria-label="背景按下状态预览"></canvas><span>按</span></button>
+                  </span>
+                </span>
+              </label>
+              <label>前景样式
+                <span class="style-field">
+                  <input data-key-field="FORE_STYLE" />
+                  <span class="style-preview-pair" aria-label="前景样式预览">
+                    <button class="style-preview-button" data-style-preview="fore:normal" title="正常状态；Command 点击跳转到图片源文件"><canvas width="64" height="44" aria-label="前景正常状态预览"></canvas><span>常</span></button>
+                    <button class="style-preview-button" data-style-preview="fore:highlighted" title="按下状态；Command 点击跳转到图片源文件"><canvas width="64" height="44" aria-label="前景按下状态预览"></canvas><span>按</span></button>
+                  </span>
+                </span>
+              </label>
+              <label>正常按键图片 <input data-background-style-field="NM_IMG" placeholder="例如 btn,1" /></label>
+              <label>按下按键图片 <input data-background-style-field="HL_IMG" placeholder="例如 btn,2" /></label>
+              <label>字体 <input data-style-field="FONT_NAME" /></label>
+              <label>字重 <input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
+              <label>字号 <input data-style-field="FONT_SIZE" type="number" /></label>
+              <label>文字正常颜色 <input data-style-field="NM_COLOR" /></label>
+              <label>文字按下颜色 <input data-style-field="HL_COLOR" /></label>
+            </div>
+            <p class="inspector-note">多选时图片会批量写入各按键引用的背景样式。共享样式也会影响其他引用它的按键。</p>
+          </div>
+          <div class="inspector-group key-only">
+            <h3>文字与动作</h3>
+            <div class="inspector-grid primary-actions">
+              <label>按键上显示 <input data-key-field="SHOW" /></label>
+              <label>点击后输入/执行 <input data-key-field="CENTER" /><small data-action-meaning="CENTER"></small></label>
+            </div>
+            <div class="direction-editor" aria-label="滑动与长按动作">
+              <label class="direction-up"><span>↑ 上滑</span><input data-key-field="UP" /><small data-action-meaning="UP"></small></label>
+              <label class="direction-left"><span>← 左滑</span><input data-key-field="LEFT" /><small data-action-meaning="LEFT"></small></label>
+              <label class="direction-hold"><span>● 长按</span><input data-key-field="HOLD" /><small data-action-meaning="HOLD"></small></label>
+              <label class="direction-right"><span>右滑 →</span><input data-key-field="RIGHT" /><small data-action-meaning="RIGHT"></small></label>
+              <label class="direction-down"><span>↓ 下滑</span><input data-key-field="DOWN" /><small data-action-meaning="DOWN"></small></label>
+            </div>
+          </div>
+        </div>
+        <div id="source-editor" hidden>
+          <pre id="source-highlight" aria-hidden="true"><code></code></pre>
+          <textarea id="source" spellcheck="false" disabled aria-label="配置源代码"></textarea>
+        </div>
+        <div id="asset" hidden>
+          <div class="asset-toolbar">
+            <button id="asset-back" title="返回之前的配置" aria-label="返回之前的配置">‹</button>
+            <span>图片资源</span>
+          </div>
+          <img id="asset-image" alt="皮肤资源预览" />
+          <button id="replace-asset">替换图片</button>
+        </div>
+      </section>
+    </main>
+
+    <input id="browser-open" type="file" accept=".bdi,.bds,.zip" hidden />
+    <input id="image-open" type="file" accept=".png" hidden />
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

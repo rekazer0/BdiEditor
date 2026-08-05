@@ -1,0 +1,11 @@
+import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
+import test from "node:test"
+
+test("desktop capability permits every dialog used by the editor", () => {
+  const capability = JSON.parse(readFileSync("src-tauri/capabilities/default.json", "utf8"))
+  assert.deepEqual(
+    [...capability.permissions].filter((permission: string) => permission.startsWith("dialog:")),
+    ["dialog:allow-open", "dialog:allow-save", "dialog:allow-message"],
+  )
+})

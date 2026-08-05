@@ -1,0 +1,49 @@
+import assert from "node:assert/strict"
+import test from "node:test"
+import { deviceSpec, keyboardPreviewGeometry } from "../src/devices.ts"
+
+test("uses verified physical display resolutions for common phones", () => {
+  assert.deepEqual(deviceSpec("iphone-17-pro"), { width: 1206, height: 2622, family: "iphone" })
+  assert.deepEqual(deviceSpec("iphone-17-pro-max"), { width: 1320, height: 2868, family: "iphone" })
+  assert.deepEqual(deviceSpec("xiaomi-17"), { width: 1220, height: 2656, family: "android" })
+  assert.deepEqual(deviceSpec("pixel-10-pro"), { width: 1280, height: 2856, family: "android" })
+  assert.deepEqual(deviceSpec("galaxy-s25-ultra"), {
+    width: 1440,
+    height: 3120,
+    family: "android",
+  })
+})
+
+test("maps Baidu skin coordinates to the iPhone 17 Pro bottom keyboard", () => {
+  const geometry = keyboardPreviewGeometry(
+    deviceSpec("iphone-17-pro")!,
+    "port",
+    1125,
+    595,
+    133,
+  )
+  assert.equal(Math.round(geometry.candidateHeight), 244)
+  assert.equal(Math.round(geometry.panelHeight), 638)
+  assert.equal(Math.round(geometry.safeBottomHeight), 236)
+  assert.equal(Math.round(geometry.totalHeight), 1118)
+})
+
+test("keeps the iPhone keyboard height fixed while composing", () => {
+  const idle = keyboardPreviewGeometry(
+    deviceSpec("iphone-17-pro")!,
+    "port",
+    1125,
+    595,
+    133,
+    false,
+  )
+  const composing = keyboardPreviewGeometry(
+    deviceSpec("iphone-17-pro")!,
+    "port",
+    1125,
+    595,
+    133,
+    true,
+  )
+  assert.deepEqual(composing, idle)
+})
