@@ -225,3 +225,25 @@ test("compound foreground inspector exposes weight and writes each property to i
   assert.match(main, /resolveStylePropertySources/)
   assert.match(main, /for \(const section of new Set\(context\.sources\.map\(\(source\) => source\.section\)\)\)/)
 })
+
+test("PNG resources share a central workspace preview and inspector preview", () => {
+  assert.match(
+    html,
+    /<figure id="workspace-image-figure" hidden>[\s\S]*?<img id="workspace-image" alt="皮肤资源预览" \/>[\s\S]*?<figcaption id="workspace-image-error" hidden>无法预览此 PNG<\/figcaption>[\s\S]*?<\/figure>/,
+  )
+  assert.match(html, /<img id="asset-image" alt="皮肤资源预览" \/>/)
+  assert.match(main, /workspaceImage\.src = assetURL/)
+  assert.match(main, /assetImage\.src = assetURL/)
+  assert.match(main, /workspaceImage\.addEventListener\("load", clearImagePreviewError\)/)
+  assert.match(main, /workspaceImage\.addEventListener\("error", showImagePreviewError\)/)
+  assert.match(css, /#workspace-image,\s*#asset-image\s*\{[^}]*object-fit:\s*contain/s)
+  assert.doesNotMatch(css, /#asset img\s*\{[^}]*image-rendering:\s*pixelated/s)
+})
+
+test("selecting a PNG opens Properties and disables Source", () => {
+  assert.match(main, /if \(archive\?\.isImage\(path\)\) \{\s*inspectorTab = "properties"\s*selectedDocument = undefined/s)
+  assert.match(
+    main,
+    /const available =\s*tab === "properties"\s*\? imageSelected \|\| propertiesAvailable\s*:\ !imageSelected && Boolean\(selectedPath\)/s,
+  )
+})

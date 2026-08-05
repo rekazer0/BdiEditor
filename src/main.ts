@@ -22,6 +22,7 @@ import {
 } from "./export.ts"
 import { IniDocument } from "./ini.ts"
 import { highlightIni } from "./highlight.ts"
+import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
 import {
   backgroundStyleSections,
   keyboardConfig,
@@ -103,6 +104,9 @@ const layout = $("#layout") as HTMLSelectElement
 const mode = $("#mode") as HTMLSelectElement
 const device = $("#device") as HTMLSelectElement
 const deviceShell = $("#device-shell")
+const workspaceImageFigure = $("#workspace-image-figure")
+const workspaceImage = $("#workspace-image") as HTMLImageElement
+const workspaceImageError = $("#workspace-image-error")
 const simulatedOutput = $("#simulated-output") as HTMLTextAreaElement
 const clearSimulationButton = $("#clear-simulation") as HTMLButtonElement
 const toolbarStrip = $("#toolbar-strip") as HTMLDivElement
@@ -566,16 +570,37 @@ async function runFileOperation(
 function showImage(path: string): void {
   const bytes = archive?.getBytes(path)
   if (!bytes) return
-  if (assetURL) URL.revokeObjectURL(assetURL)
-  const copy = new Uint8Array(bytes.byteLength)
-  copy.set(bytes)
-  assetURL = URL.createObjectURL(new Blob([copy.buffer], { type: "image/png" }))
+  assetURL = replaceImagePreviewURL(assetURL, bytes)
+  clearImagePreviewError()
+  workspaceImage.src = assetURL
   assetImage.src = assetURL
+  deviceShell.hidden = true
+  workspaceImageFigure.hidden = false
   sourceEditor.hidden = true
   asset.hidden = false
   sourceName.textContent = path
   assetBackButton.disabled = !assetReturnPath
 }
+
+function clearImagePreviewError(): void {
+  workspaceImage.hidden = false
+  assetImage.hidden = false
+  workspaceImageError.hidden = true
+}
+
+function showImagePreviewError(): void {
+  workspaceImage.hidden = true
+  assetImage.hidden = true
+  workspaceImageError.hidden = false
+}
+
+function hideImageWorkspace(): void {
+  workspaceImageFigure.hidden = true
+  deviceShell.hidden = false
+}
+
+workspaceImage.addEventListener("load", clearImagePreviewError)
+workspaceImage.addEventListener("error", showImagePreviewError)
 
 function updateInspectorView(): void {
   const imageSelected = Boolean(archive?.isImage(selectedPath))
@@ -585,7 +610,9 @@ function updateInspectorView(): void {
   for (const button of inspectorTabButtons) {
     const tab = button.dataset.inspectorTab
     const available =
-      !imageSelected && (tab === "properties" ? propertiesAvailable : Boolean(selectedPath))
+      tab === "properties"
+        ? imageSelected || propertiesAvailable
+        : !imageSelected && Boolean(selectedPath)
     button.disabled = !available
     button.classList.toggle("active", tab === inspectorTab && available)
   }
@@ -1162,9 +1189,11 @@ function selectFile(path: string): void {
   }
   selectedPath = path
   if (archive?.isImage(path)) {
+    inspectorTab = "properties"
     selectedDocument = undefined
     showImage(path)
   } else if (archive?.isText(path)) {
+    hideImageWorkspace()
     selectedDocument = IniDocument.parse(archive.getText(path))
     setSourceValue(selectedDocument.toString())
     source.disabled = false
@@ -1336,7 +1365,9 @@ function revealSourceFile(path: string): void {
 }
 
 function loadArchive(bytes: Uint8Array, path: string, isNew = false): void {
-  archive = SkinArchive.open(bytes)
+  const nextArchive = SkinArchive.open(bytes)
+  assetURL = releaseImagePreviewURL(assetURL)
+  archive = nextArchive
   const availableThemes = ["light", "dark"].filter((value) =>
     archive?.names().some((name) => name.startsWith(`${value}/skin/`)),
   )

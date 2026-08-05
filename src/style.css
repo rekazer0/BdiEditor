@@ -554,6 +554,23 @@ h2 {
   transition: width 180ms ease, height 180ms ease, aspect-ratio 180ms ease;
 }
 
+#workspace-image-figure {
+  width: min(100%, 1000px);
+  height: min(calc(100vh - 145px), 720px);
+  max-height: 720px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+}
+
+#workspace-image-figure[hidden] {
+  display: none;
+}
+
+#workspace-image-error {
+  color: var(--secondary);
+}
+
 .device-shell[data-family="android"] {
   border-radius: 34px;
   background: #222326;
@@ -1393,11 +1410,11 @@ canvas {
   line-height: 1;
 }
 
-#asset img {
+#workspace-image,
+#asset-image {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  image-rendering: pixelated;
 }
 
 .project-dialog {
