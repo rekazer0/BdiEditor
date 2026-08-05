@@ -12,8 +12,8 @@
   <body>
     <header class="titlebar">
       <nav class="toolbar-group" aria-label="文件操作">
-        <button id="new" class="toolbar-button" title="新建" aria-label="新建">
-          <span class="icon system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" /></svg></span><span>新建</span>
+        <button id="new" class="toolbar-button" title="新建项目" aria-label="新建项目">
+          <span class="icon system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" /></svg></span><span>新建项目</span>
         </button>
         <button id="open" class="toolbar-button" title="打开" aria-label="打开">
           <span class="icon system-symbol" data-system-symbol="folder" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M2.8 6.5h5l1.7 2h7.7l-1.4 7H4.2z"/><path d="M4 6.5V4.3h5l1.5 2.2" /></svg></span><span>打开</span>
@@ -67,7 +67,7 @@
               <option value="xiaomi-17">Xiaomi 17 · 1220×2656</option>
               <option value="pixel-10-pro">Pixel 10 Pro · 1280×2856</option>
               <option value="galaxy-s25-ultra">Galaxy S25 Ultra · 1440×3120</option>
-              <option value="canvas">仅画布</option>
+              <option value="canvas" selected>画布</option>
             </select>
           </label>
           <div class="preview-choice glass-module" aria-label="方向">
@@ -83,11 +83,6 @@
             <button data-theme-choice="dark">深色</button>
             <select id="theme" hidden><option value="light">浅色</option><option value="dark">深色</option></select>
           </div>
-          <div class="zoom-control glass-module" aria-label="预览缩放">
-            <button id="zoom-out" aria-label="缩小预览"><span class="system-symbol" data-system-symbol="minus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10h12"/></svg></span></button>
-            <output id="zoom-value" aria-live="polite">100%</output>
-            <button id="zoom-in" aria-label="放大预览"><span class="system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12"/></svg></span></button>
-          </div>
           <select id="layout" hidden><option value="py_9.ini">9键</option><option value="py_26.ini">26 键</option></select>
         </div>
         <div class="canvas-wrap empty">
@@ -97,7 +92,7 @@
             <span>编辑九键与 26 键布局、外观和按键动作</span>
             <button id="empty-open">选择皮肤…</button>
           </div>
-          <div id="device-shell" class="device-shell" data-device="iphone-17-pro" data-orientation="port">
+          <div id="device-shell" class="device-shell canvas-only" data-device="canvas" data-orientation="port">
             <div class="device-screen">
               <div class="device-status"><span>9:41</span><span class="device-status-icons"><span class="system-symbol" data-system-symbol="cellularbars" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 16v-2m4 2v-5m4 5V8m4 8V5"/></svg></span><span class="system-symbol" data-system-symbol="wifi" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 8a11 11 0 0 1 14 0M6 11a7 7 0 0 1 8 0m-5 3a2 2 0 0 1 2 0"/></svg></span><span class="system-symbol" data-system-symbol="battery.100" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 20"><rect x="2" y="5" width="18" height="10" rx="2"/><path d="M22 8v4M5 8h12v4H5z"/></svg></span></span></div>
               <div class="phone-navigation" aria-hidden="true">
@@ -129,6 +124,10 @@
               </div>
             </div>
           </div>
+          <figure id="workspace-image-figure" hidden>
+            <img id="workspace-image" alt="皮肤资源预览" />
+            <figcaption id="workspace-image-error" hidden>无法预览此 PNG</figcaption>
+          </figure>
         </div>
         <div id="event-log" aria-live="polite">打开皮肤后可预览按键。</div>
       </section>
@@ -155,7 +154,6 @@
               <label>名称 <input data-skin-field="Name" /></label>
               <label>描述 <input data-skin-field="Description" /></label>
               <label>作者 <input data-skin-field="Author" /></label>
-              <label>共同作者 <input data-skin-field="Authors" /></label>
               <label>版本 <input data-skin-field="Version" /></label>
               <label>最低输入法版本 <input data-skin-field="MinImeCode" /></label>
               <label>支持平台 <input data-skin-field="SupportPlatform" /></label>
@@ -255,6 +253,29 @@
         </div>
       </section>
     </main>
+
+    <dialog id="new-project-dialog" class="project-dialog" aria-labelledby="new-project-title">
+      <form id="new-project-form" method="dialog">
+        <header>
+          <h2 id="new-project-title">新建项目</h2>
+          <p>选择一个内置模板作为项目起点。</p>
+        </header>
+        <fieldset>
+          <legend>默认模板</legend>
+          <label class="project-template-option">
+            <input type="radio" name="project-template" value="default-ios" checked />
+            <span>
+              <strong>iOS 默认皮肤</strong>
+              <small>包含浅色与深色主题、竖屏与横屏布局</small>
+            </span>
+          </label>
+        </fieldset>
+        <footer>
+          <button value="cancel">取消</button>
+          <button class="primary" value="create">创建项目</button>
+        </footer>
+      </form>
+    </dialog>
 
     <input id="browser-open" type="file" accept=".bdi,.bds,.zip" hidden />
     <input id="image-open" type="file" accept=".png" hidden />

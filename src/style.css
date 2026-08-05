@@ -70,20 +70,6 @@ button {
   stroke-linejoin: round;
 }
 
-.system-symbol-native {
-  background: currentColor;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-}
-
-.system-symbol-native .system-symbol-fallback {
-  display: none;
-}
-
 button:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
@@ -98,7 +84,7 @@ summary:focus-visible {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 12px 6px 76px;
+  padding: 6px 12px;
   border-bottom: 1px solid var(--line);
   background: var(--toolbar);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -203,8 +189,7 @@ summary:focus-visible {
 }
 
 .mode-control,
-.preview-choice,
-.zoom-control {
+.preview-choice {
   display: flex;
   gap: 2px;
   padding: 2px;
@@ -213,8 +198,7 @@ summary:focus-visible {
 }
 
 .mode-control button,
-.preview-choice button,
-.zoom-control button {
+.preview-choice button {
   height: 25px;
   padding: 0 10px;
   border-radius: 6px;
@@ -332,9 +316,10 @@ aside,
 
 aside {
   border-right: 1px solid var(--line);
-  background: var(--sidebar);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
+  background: rgb(255 255 255 / 68%);
+  box-shadow: inset -1px 0 rgb(255 255 255 / 72%);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
   overflow: auto;
 }
 
@@ -544,7 +529,6 @@ h2 {
 }
 
 .device-shell {
-  zoom: var(--preview-zoom);
   place-self: center;
   height: min(calc(100vh - 145px), 720px);
   max-height: 720px;
@@ -555,6 +539,23 @@ h2 {
   background: #171719;
   box-shadow: 0 18px 44px rgb(0 0 0 / 22%);
   transition: width 180ms ease, height 180ms ease, aspect-ratio 180ms ease;
+}
+
+#workspace-image-figure {
+  width: min(100%, 1000px);
+  height: min(calc(100vh - 145px), 720px);
+  max-height: 720px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+}
+
+#workspace-image-figure[hidden] {
+  display: none;
+}
+
+#workspace-image-error {
+  color: var(--secondary);
 }
 
 .device-shell[data-family="android"] {
@@ -798,6 +799,10 @@ h2 {
   height: 27px;
 }
 
+.device-shell[data-accessories="hidden"] .keyboard-accessories {
+  display: none;
+}
+
 .device-shell[data-theme="dark"] .device-screen {
   background:
     radial-gradient(circle at 18% 72%, rgb(35 125 181 / 28%), transparent 30%),
@@ -1019,7 +1024,10 @@ canvas {
   grid-template-rows: 48px minmax(0, 1fr);
   overflow: hidden;
   border-left: 1px solid var(--line);
-  background: var(--panel);
+  background: rgb(255 255 255 / 68%);
+  box-shadow: inset 1px 0 rgb(255 255 255 / 72%);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
 }
 
 .inspector-tabs {
@@ -1054,22 +1062,6 @@ canvas {
   min-height: 0;
   padding: 14px 13px 24px;
   overflow: auto;
-}
-
-.zoom-control {
-  align-items: center;
-}
-
-.zoom-control button {
-  width: 25px;
-  padding: 0;
-}
-
-#zoom-value {
-  width: 34px;
-  color: var(--secondary);
-  font-size: 10px;
-  text-align: center;
 }
 
 .skin-fields[hidden],
@@ -1408,11 +1400,115 @@ canvas {
   line-height: 1;
 }
 
-#asset img {
+#workspace-image,
+#asset-image {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  image-rendering: pixelated;
+}
+
+.project-dialog {
+  width: min(440px, calc(100% - 32px));
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--panel);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 24%);
+}
+
+.project-dialog::backdrop {
+  background: rgb(0 0 0 / 24%);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.project-dialog form {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+
+.project-dialog header,
+.project-dialog fieldset {
+  margin: 0;
+}
+
+.project-dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.project-dialog header p {
+  margin: 5px 0 0;
+  color: var(--secondary);
+  font-size: 12px;
+}
+
+.project-dialog fieldset {
+  padding: 0;
+  border: 0;
+}
+
+.project-dialog legend {
+  margin-bottom: 8px;
+  color: var(--secondary);
+  font-size: 11px;
+}
+
+.project-template-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--control);
+}
+
+.project-template-option:has(input:checked) {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgb(10 127 245 / 12%);
+}
+
+.project-template-option input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.project-template-option span {
+  display: grid;
+  gap: 3px;
+}
+
+.project-template-option strong {
+  font-size: 13px;
+}
+
+.project-template-option small {
+  color: var(--secondary);
+  font-size: 11px;
+}
+
+.project-dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.project-dialog footer button {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--control);
+}
+
+.project-dialog footer .primary {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
 }
 
 @media (max-width: 1000px) {

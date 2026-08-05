@@ -3,6 +3,7 @@ import test from "node:test"
 import {
   backgroundStyleSections,
   keyboardConfig,
+  resolvePanelConfig,
   setKeyboardHeight,
   setStyleField,
 } from "../src/keyboard.ts"
@@ -26,6 +27,31 @@ test("keyboard config changes only the panel height", () => {
   const gen = IniDocument.parse("[PANEL]\nSIZE=1125,648\nBACK_STYLE=14\n")
   assert.equal(setKeyboardHeight(gen, 720), true)
   assert.equal(gen.get("PANEL", "SIZE"), "1125,720")
+})
+
+test("component panel size and style override the general keyboard panel", () => {
+  const layout = IniDocument.parse("[PANEL]\nSIZE=1125,728\nBACK_STYLE=1104\n")
+  const gen = IniDocument.parse("[PANEL]\nSIZE=1125,595\nBACK_STYLE=1103\n")
+  const styles = IniDocument.parse("[STYLE1104]\nNM_IMG=symbol,1\n")
+  assert.deepEqual(resolvePanelConfig(layout, gen, styles), {
+    width: 1125,
+    height: 728,
+    styleID: "1104",
+    normalImage: "symbol,1",
+    pressedImage: "",
+    normalColor: "",
+    pressedColor: "",
+  })
+})
+
+test("invalid component panel properties fall back independently", () => {
+  const layout = IniDocument.parse("[PANEL]\nSIZE=bad,0\n")
+  const gen = IniDocument.parse("[PANEL]\nSIZE=1125,595\nBACK_STYLE=1103\n")
+  const styles = IniDocument.parse("[STYLE1103]\nNM_COLOR=80112233\n")
+  const result = resolvePanelConfig(layout, gen, styles)
+  assert.equal(result.width, 1125)
+  assert.equal(result.height, 595)
+  assert.equal(result.styleID, "1103")
 })
 
 test("batch key images updates every unique background style", () => {

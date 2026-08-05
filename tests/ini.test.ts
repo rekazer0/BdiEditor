@@ -40,3 +40,13 @@ test("adds a missing sectionless skin information value", () => {
     "Name=示例\r\nAuthor=作者\r\nVersion=0.1\r\n[EXTRA]\r\nValue=1\r\n",
   )
 })
+
+test("preserves Authors while editing the singular Author metadata", () => {
+  const document = IniDocument.parse("Name=示例\r\nAuthor=原作者\r\nAuthors=共同作者\r\n")
+
+  assert.equal(document.set("", "Author", "新作者"), true)
+  assert.equal(
+    document.toString(),
+    "Name=示例\r\nAuthor=新作者\r\nAuthors=共同作者\r\n",
+  )
+})

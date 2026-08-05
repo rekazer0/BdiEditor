@@ -7,6 +7,23 @@ const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8")
 const main = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8")
 const preview = readFileSync(new URL("../src/preview.ts", import.meta.url), "utf8")
 
+test("new project command opens an accessible built-in template chooser", () => {
+  assert.match(
+    html,
+    /<button id="new"[^>]*title="新建项目"[^>]*aria-label="新建项目"[\s\S]*?<span>新建项目<\/span>/,
+  )
+  const dialog = html.slice(
+    html.indexOf('<dialog id="new-project-dialog"'),
+    html.indexOf("</dialog>", html.indexOf('<dialog id="new-project-dialog"')) + 9,
+  )
+  assert.match(dialog, /<h2[^>]*>新建项目<\/h2>/)
+  assert.match(dialog, /name="project-template"[^>]*value="default-ios"[^>]*checked/)
+  assert.match(dialog, /value="cancel"/)
+  assert.match(dialog, /value="create"/)
+  assert.match(main, /newProjectDialog\.showModal\(\)/)
+  assert.match(main, /loadBuiltInProjectTemplate\(templateID\)/)
+})
+
 test("visible static editor chrome declares the requested system symbols", () => {
   for (const name of [
     "plus",
@@ -24,7 +41,6 @@ test("visible static editor chrome declares the requested system symbols", () =>
     "checkmark",
     "globe",
     "mic",
-    "minus",
   ]) {
     assert.match(html, new RegExp(`data-system-symbol="${name.replaceAll(".", "\\.")}"`))
   }
@@ -43,15 +59,10 @@ test("static and dynamic system symbol elements are decorative and retain inline
   assert.match(main, /createElementNS\([^\n]+"svg"\)/)
 })
 
-test("native system symbol PNG masks are cached by name and hide browser fallbacks", () => {
-  assert.match(main, /new Map<string, Promise<string>>\(\)/)
-  assert.match(main, /systemSymbolURLs\.get\(name\)/)
-  assert.match(main, /invoke<number\[\]>\("sf_symbol", \{ name \}\)/)
-  assert.match(main, /URL\.createObjectURL\(new Blob/)
-  assert.match(main, /style\.maskImage = `url\("\$\{url\}"\)`/)
-  assert.match(main, /classList\.add\("system-symbol-native"\)/)
-  assert.match(css, /\.system-symbol-native\s*\{[^}]*background:\s*currentColor/s)
-  assert.match(css, /\.system-symbol-native \.system-symbol-fallback\s*\{[^}]*display:\s*none/s)
+test("system symbols remain inline SVG so they render at the display resolution", () => {
+  assert.doesNotMatch(main, /invoke<number\[\]>\("sf_symbol"/)
+  assert.doesNotMatch(main, /systemSymbolURLs/)
+  assert.doesNotMatch(css, /\.system-symbol-native/)
 })
 
 test("source tree assigns semantic system symbols to navigation, folders, and file kinds", () => {
@@ -87,7 +98,7 @@ test("placeholder icon glyphs are absent from editor chrome and CSS", () => {
   }
 })
 
-test("preview toolbar keeps device, orientation, theme, and zoom controls together", () => {
+test("preview toolbar defaults to a canvas shell without zoom controls", () => {
   const toolbar = html.slice(
     html.indexOf('<div class="preview-toolbar">'),
     html.indexOf('<div class="canvas-wrap empty">'),
@@ -95,14 +106,18 @@ test("preview toolbar keeps device, orientation, theme, and zoom controls togeth
 
   assert.ok(toolbar.indexOf('id="device"') < toolbar.indexOf('data-orientation-choice="port"'))
   assert.ok(toolbar.indexOf('data-orientation-choice="port"') < toolbar.indexOf('data-theme-choice="light"'))
-  assert.ok(toolbar.indexOf('data-theme-choice="light"') < toolbar.indexOf('id="zoom-out"'))
   assert.match(toolbar, /data-orientation-choice="port"[^>]*>竖屏/)
   assert.match(toolbar, /data-orientation-choice="land"[^>]*>横屏/)
   assert.match(toolbar, /data-theme-choice="light"[^>]*>浅色/)
   assert.match(toolbar, /data-theme-choice="dark"[^>]*>深色/)
-  assert.match(toolbar, /id="zoom-out"/)
-  assert.match(toolbar, /id="zoom-value"/)
-  assert.match(toolbar, /id="zoom-in"/)
+  assert.match(html, /<option value="canvas" selected>画布<\/option>/)
+  assert.doesNotMatch(html, /id="zoom-(?:out|in)"|id="zoom-value"/)
+  assert.doesNotMatch(main, /applyZoom|stepZoom|clampZoom|--preview-zoom/)
+  assert.doesNotMatch(css, /zoom:\s*var\(--preview-zoom\)/)
+  assert.match(html, /id="device-shell" class="device-shell canvas-only" data-device="canvas"/)
+  const titlebar = css.match(/\.titlebar\s*\{[^}]+\}/s)?.[0] ?? ""
+  assert.match(titlebar, /padding:\s*6px 12px/)
+  assert.doesNotMatch(html, /data-skin-field="Authors"/)
 })
 
 test("layout remains hidden state while preview controls replace inspector layout controls", () => {
@@ -112,12 +127,6 @@ test("layout remains hidden state while preview controls replace inspector layou
   assert.doesNotMatch(html, /id="layout-context"/)
   assert.doesNotMatch(html, /data-layout-choice/)
   assert.match(main, /addNavButton\(\s*files,\s*"9键",/s)
-})
-
-test("preview zoom is applied as CSS layout zoom without changing canvas dimensions", () => {
-  assert.match(css, /zoom:\s*var\(--preview-zoom\)/)
-  assert.match(main, /deviceShell\.style\.setProperty\("--preview-zoom",/)
-  assert.match(html, /<canvas id="preview" width="1125" height="650"><\/canvas>/)
 })
 
 test("phone keyboard surface clips its translucent material to rounded corners", () => {
@@ -165,6 +174,16 @@ test("a full preview refresh shares one atlas resolver with the toolbar", () => 
   assert.doesNotMatch(main, /function refreshToolbarPreview[\s\S]*?toolbarPreview\.setResolver\(new AtlasResolver/)
 })
 
+test("device preview resolves component panels and hides unavailable accessories", () => {
+  assert.match(main, /resolvePanelConfig\(layoutDocument,\s*context\.gen,\s*context\.styles\)/)
+  assert.match(main, /keyboardPreviewGeometry\(\s*spec,\s*orientation\.value,/s)
+  assert.match(main, /updateDevicePreview\(\)\s*syncSegmentedControls\(\)\s*refreshPreview\(\)/s)
+  assert.match(
+    css,
+    /\.device-shell\[data-accessories="hidden"\] \.keyboard-accessories\s*\{[^}]*display:\s*none/s,
+  )
+})
+
 test("export menu exposes direct readable iOS and Android actions", () => {
   assert.match(html, /data-export-format="bdi"[^>]*>[^<]*导出 iOS 皮肤/)
   assert.match(html, /data-export-format="bds"[^>]*>[^<]*导出 Android 皮肤/)
@@ -177,7 +196,6 @@ test("export menu exposes direct readable iOS and Android actions", () => {
 test("default template is built in and cannot be replaced from the interface", () => {
   assert.doesNotMatch(html, /id="set-default"/)
   assert.doesNotMatch(main, /defaultTemplate|setDefaultTemplate|setDefaultButton|browserTemplate/)
-  assert.match(main, /fetch\("\/default-template\.bdi"\)/)
 })
 
 test("inspector contains previews for resolved background and foreground styles", () => {
@@ -201,4 +219,26 @@ test("compound foreground inspector exposes weight and writes each property to i
   assert.match(html, /data-style-field="FONT_WEIGHT"/)
   assert.match(main, /resolveStylePropertySources/)
   assert.match(main, /for \(const section of new Set\(context\.sources\.map\(\(source\) => source\.section\)\)\)/)
+})
+
+test("PNG resources share a central workspace preview and inspector preview", () => {
+  assert.match(
+    html,
+    /<figure id="workspace-image-figure" hidden>[\s\S]*?<img id="workspace-image" alt="皮肤资源预览" \/>[\s\S]*?<figcaption id="workspace-image-error" hidden>无法预览此 PNG<\/figcaption>[\s\S]*?<\/figure>/,
+  )
+  assert.match(html, /<img id="asset-image" alt="皮肤资源预览" \/>/)
+  assert.match(main, /workspaceImage\.src = assetURL/)
+  assert.match(main, /assetImage\.src = assetURL/)
+  assert.match(main, /workspaceImage\.addEventListener\("load", clearImagePreviewError\)/)
+  assert.match(main, /workspaceImage\.addEventListener\("error", showImagePreviewError\)/)
+  assert.match(css, /#workspace-image,\s*#asset-image\s*\{[^}]*object-fit:\s*contain/s)
+  assert.doesNotMatch(css, /#asset img\s*\{[^}]*image-rendering:\s*pixelated/s)
+})
+
+test("selecting a PNG opens Properties and disables Source", () => {
+  assert.match(main, /if \(archive\?\.isImage\(path\)\) \{\s*inspectorTab = "properties"\s*selectedDocument = undefined/s)
+  assert.match(
+    main,
+    /const available =\s*tab === "properties"\s*\? imageSelected \|\| propertiesAvailable\s*:\ !imageSelected && Boolean\(selectedPath\)/s,
+  )
 })

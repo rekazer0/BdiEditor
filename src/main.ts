@@ -13,7 +13,7 @@ import {
   type TextVisual,
   type Visual,
 } from "./atlas.ts"
-import { deviceSpec, keyboardPreviewGeometry } from "./devices.ts"
+import { deviceSpec, keyboardPreviewGeometry, showsKeyboardAccessories } from "./devices.ts"
 import {
   exportFormatFromPath,
   exportName,
@@ -22,9 +22,11 @@ import {
 } from "./export.ts"
 import { IniDocument } from "./ini.ts"
 import { highlightIni } from "./highlight.ts"
+import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
 import {
   backgroundStyleSections,
   keyboardConfig,
+  resolvePanelConfig,
   setKeyboardHeight,
   setStyleField,
 } from "./keyboard.ts"
@@ -35,7 +37,7 @@ import {
   type LayoutAction,
   type LayoutRect,
 } from "./layout.ts"
-import { operationError } from "./operations.ts"
+import { loadBuiltInProjectTemplate, operationError } from "./operations.ts"
 import { Preview, previewItems, type PreviewEvent } from "./preview.ts"
 import { firstExistingPath } from "./resources.ts"
 import { candidatePreview, deleteBackward, insertText } from "./simulation.ts"
@@ -43,10 +45,11 @@ import { SkinArchive } from "./skin.ts"
 import { sourceFolderDescription } from "./source-tree.ts"
 import { resolveStylePropertySources, type StylePropertySource } from "./style-properties.ts"
 import { unsavedDecision } from "./unsaved.ts"
-import { clampZoom, stepZoom } from "./zoom.ts"
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 const newButton = $("#new") as HTMLButtonElement
+const newProjectDialog = $("#new-project-dialog") as HTMLDialogElement
+const newProjectForm = $("#new-project-form") as HTMLFormElement
 const openButton = $("#open") as HTMLButtonElement
 const saveButton = $("#save") as HTMLButtonElement
 const undoButton = $("#undo") as HTMLButtonElement
@@ -96,14 +99,14 @@ const inspectorTabButtons = Array.from(
 const browserOpen = $("#browser-open") as HTMLInputElement
 const imageOpen = $("#image-open") as HTMLInputElement
 const theme = $("#theme") as HTMLSelectElement
-const orientation = $("#orientation") as HTMLSelectElement
+const orientation = $("#orientation") as HTMLSelectElement & { value: "port" | "land" }
 const layout = $("#layout") as HTMLSelectElement
 const mode = $("#mode") as HTMLSelectElement
 const device = $("#device") as HTMLSelectElement
 const deviceShell = $("#device-shell")
-const zoomOutButton = $("#zoom-out") as HTMLButtonElement
-const zoomValue = $("#zoom-value") as HTMLOutputElement
-const zoomInButton = $("#zoom-in") as HTMLButtonElement
+const workspaceImageFigure = $("#workspace-image-figure")
+const workspaceImage = $("#workspace-image") as HTMLImageElement
+const workspaceImageError = $("#workspace-image-error")
 const simulatedOutput = $("#simulated-output") as HTMLTextAreaElement
 const clearSimulationButton = $("#clear-simulation") as HTMLButtonElement
 const toolbarStrip = $("#toolbar-strip") as HTMLDivElement
@@ -136,7 +139,17 @@ let fileOperationRunning = false
 let firstCandidateTextVisual: TextVisual | undefined
 let candidateTextWidth = 1125
 let stylePreviewDrawID = 0
-let zoom = 100
+let selectedFileButton: HTMLButtonElement | undefined
+
+const deviceGeometryProperties = [
+  "--keyboard-height-port",
+  "--keyboard-height-land",
+  "--candidate-row",
+  "--candidate-inset-row",
+  "--candidate-content-row",
+  "--panel-row",
+  "--safe-row",
+] as const
 
 const preview = new Preview(
   $("#preview") as HTMLCanvasElement,
@@ -202,7 +215,6 @@ function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window
 }
 
-const systemSymbolURLs = new Map<string, Promise<string>>()
 const svgNamespace = "http://www.w3.org/2000/svg"
 const fallbackSymbolPaths: Record<string, string[]> = {
   "info.circle": ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18", "M12 10v7", "M12 7h.01"],
@@ -213,34 +225,6 @@ const fallbackSymbolPaths: Record<string, string[]> = {
   "doc.text": ["M6 3h8l4 4v14H6z", "M14 3v5h5M9 12h6M9 16h6"],
   photo: ["M4 4h16v16H4z", "m6 16 4-5 3 3 2-2 3 4M9 9h.01"],
   doc: ["M6 3h8l4 4v14H6z", "M14 3v5h5"],
-}
-
-function systemSymbolURL(name: string): Promise<string> {
-  const cached = systemSymbolURLs.get(name)
-  if (cached) return cached
-  const request = invoke<number[]>("sf_symbol", { name }).then((bytes) =>
-    URL.createObjectURL(new Blob([Uint8Array.from(bytes)], { type: "image/png" })),
-  )
-  systemSymbolURLs.set(name, request)
-  return request
-}
-
-function loadSystemSymbol(symbol: HTMLElement): void {
-  const name = symbol.dataset.systemSymbol
-  if (!name || !isTauri()) return
-  void systemSymbolURL(name)
-    .then((url) => {
-      symbol.style.maskImage = `url("${url}")`
-      symbol.style.webkitMaskImage = `url("${url}")`
-      symbol.classList.add("system-symbol-native")
-    })
-    .catch(() => {})
-}
-
-function hydrateSystemSymbols(root: ParentNode = document): void {
-  for (const symbol of Array.from(root.querySelectorAll<HTMLElement>("[data-system-symbol]"))) {
-    loadSystemSymbol(symbol)
-  }
 }
 
 function createSystemSymbol(name: string): HTMLSpanElement {
@@ -257,7 +241,6 @@ function createSystemSymbol(name: string): HTMLSpanElement {
     fallback.append(path)
   }
   symbol.append(fallback)
-  loadSystemSymbol(symbol)
   return symbol
 }
 
@@ -275,15 +258,6 @@ function syncSegmentedControls(): void {
   for (const button of orientationChoiceButtons) {
     button.classList.toggle("active", button.dataset.orientationChoice === orientation.value)
   }
-}
-
-function applyZoom(): void {
-  zoom = clampZoom(zoom)
-  deviceShell.style.setProperty("--preview-zoom", `${zoom}%`)
-  zoomValue.value = String(zoom)
-  zoomValue.textContent = `${zoom}%`
-  zoomOutButton.disabled = zoom === 50
-  zoomInButton.disabled = zoom === 150
 }
 
 function applyModeState(): void {
@@ -435,8 +409,8 @@ function refreshPreview(): void {
   preview.setTheme(theme.value === "dark" ? "dark" : "light")
   preview.setTransparent(device.value !== "canvas")
   const context = keyboardContext()
-  if (context) {
-    const config = keyboardConfig(context.gen, context.styles)
+  if (context && layoutDocument) {
+    const config = resolvePanelConfig(layoutDocument, context.gen, context.styles)
     const inputVisual = resolveTextVisual(
       context.styles,
       context.gen.get("SCAND", "INPUT_STYLE") ?? context.gen.get("INPUT", "FORE_STYLE") ?? "",
@@ -478,26 +452,26 @@ function refreshPreview(): void {
     }
     preview.setPanel(config.styleID, config.width, config.height)
     const spec = deviceSpec(device.value)
-    if (spec && orientation.value === "port") {
+    if (spec) {
       const geometry = keyboardPreviewGeometry(
         spec,
-        "port",
+        orientation.value,
         config.width,
         config.height,
         toolbarSize?.height ?? 0,
         composing,
       )
-      deviceShell.style.setProperty("--keyboard-height-port", `${(geometry.totalHeight / spec.height) * 100}%`)
+      const screenHeight = orientation.value === "port" ? spec.height : spec.width
+      deviceShell.style.setProperty(
+        `--keyboard-height-${orientation.value}`,
+        `${(geometry.totalHeight / screenHeight) * 100}%`,
+      )
       deviceShell.style.setProperty("--candidate-row", `${geometry.candidateHeight}fr`)
       deviceShell.style.setProperty("--candidate-inset-row", `${geometry.candidateInsetHeight}fr`)
       deviceShell.style.setProperty("--candidate-content-row", `${geometry.candidateContentHeight}fr`)
       deviceShell.style.setProperty("--panel-row", `${geometry.panelHeight}fr`)
       deviceShell.style.setProperty("--safe-row", `${geometry.safeBottomHeight}fr`)
     }
-    deviceShell.style.setProperty(
-      "--keyboard-height-land",
-      `${Math.min(88, Math.max(38, (config.height / 648) * 64))}%`,
-    )
   }
   preview.setDocument(layoutDocument)
 }
@@ -508,6 +482,9 @@ function updateDevicePreview(): void {
   deviceShell.dataset.theme = theme.value
   deviceShell.classList.toggle("canvas-only", device.value === "canvas")
   const spec = deviceSpec(device.value)
+  deviceShell.dataset.accessories = showsKeyboardAccessories(spec, orientation.value)
+    ? "visible"
+    : "hidden"
   if (spec) {
     deviceShell.dataset.family = spec.family
     const portrait = orientation.value === "port"
@@ -517,6 +494,7 @@ function updateDevicePreview(): void {
   } else {
     delete deviceShell.dataset.family
     deviceShell.style.removeProperty("aspect-ratio")
+    for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
   }
   preview.setTransparent(device.value !== "canvas")
 }
@@ -563,16 +541,37 @@ async function runFileOperation(
 function showImage(path: string): void {
   const bytes = archive?.getBytes(path)
   if (!bytes) return
-  if (assetURL) URL.revokeObjectURL(assetURL)
-  const copy = new Uint8Array(bytes.byteLength)
-  copy.set(bytes)
-  assetURL = URL.createObjectURL(new Blob([copy.buffer], { type: "image/png" }))
+  assetURL = replaceImagePreviewURL(assetURL, bytes)
+  clearImagePreviewError()
+  workspaceImage.src = assetURL
   assetImage.src = assetURL
+  deviceShell.hidden = true
+  workspaceImageFigure.hidden = false
   sourceEditor.hidden = true
   asset.hidden = false
   sourceName.textContent = path
   assetBackButton.disabled = !assetReturnPath
 }
+
+function clearImagePreviewError(): void {
+  workspaceImage.hidden = false
+  assetImage.hidden = false
+  workspaceImageError.hidden = true
+}
+
+function showImagePreviewError(): void {
+  workspaceImage.hidden = true
+  assetImage.hidden = true
+  workspaceImageError.hidden = false
+}
+
+function hideImageWorkspace(): void {
+  workspaceImageFigure.hidden = true
+  deviceShell.hidden = false
+}
+
+workspaceImage.addEventListener("load", clearImagePreviewError)
+workspaceImage.addEventListener("error", showImagePreviewError)
 
 function updateInspectorView(): void {
   const imageSelected = Boolean(archive?.isImage(selectedPath))
@@ -582,7 +581,9 @@ function updateInspectorView(): void {
   for (const button of inspectorTabButtons) {
     const tab = button.dataset.inspectorTab
     const available =
-      !imageSelected && (tab === "properties" ? propertiesAvailable : Boolean(selectedPath))
+      tab === "properties"
+        ? imageSelected || propertiesAvailable
+        : !imageSelected && Boolean(selectedPath)
     button.disabled = !available
     button.classList.toggle("active", tab === inspectorTab && available)
   }
@@ -974,7 +975,7 @@ function populateKeyInspector(): void {
           : ""
         : describeAction(values[0])
   }
-  void updateStylePreviews()
+  if (hasSelection) void updateStylePreviews()
   applyModeState()
 }
 
@@ -1159,9 +1160,11 @@ function selectFile(path: string): void {
   }
   selectedPath = path
   if (archive?.isImage(path)) {
+    inspectorTab = "properties"
     selectedDocument = undefined
     showImage(path)
   } else if (archive?.isText(path)) {
+    hideImageWorkspace()
     selectedDocument = IniDocument.parse(archive.getText(path))
     setSourceValue(selectedDocument.toString())
     source.disabled = false
@@ -1186,13 +1189,14 @@ function selectFile(path: string): void {
   }
   updateInspectorView()
   if (!quickInspector.hidden) populateKeyInspector()
-  files.querySelectorAll("button").forEach((button) => {
-    button.classList.toggle("selected", button.dataset.path === path)
-  })
+  selectedFileButton?.classList.remove("selected")
+  selectedFileButton = files.querySelector<HTMLButtonElement>(`button[data-path="${CSS.escape(path)}"]`) ?? undefined
+  selectedFileButton?.classList.add("selected")
 }
 
 function renderFiles(): void {
   files.replaceChildren()
+  selectedFileButton = undefined
   if (!archive) return
 
   const section = (title: string) => {
@@ -1333,7 +1337,9 @@ function revealSourceFile(path: string): void {
 }
 
 function loadArchive(bytes: Uint8Array, path: string, isNew = false): void {
-  archive = SkinArchive.open(bytes)
+  const nextArchive = SkinArchive.open(bytes)
+  assetURL = releaseImagePreviewURL(assetURL)
+  archive = nextArchive
   const availableThemes = ["light", "dark"].filter((value) =>
     archive?.names().some((name) => name.startsWith(`${value}/skin/`)),
   )
@@ -1423,19 +1429,34 @@ function downloadArchive(format: ExportFormat): boolean {
   return true
 }
 
-async function loadBuiltInTemplate(): Promise<Uint8Array> {
-  const response = await fetch("/default-template.bdi")
-  if (!response.ok) throw new Error("无法加载内置默认皮肤模板")
-  return new Uint8Array(await response.arrayBuffer())
+function chooseProjectTemplate(): Promise<string | undefined> {
+  newProjectDialog.returnValue = ""
+  newProjectDialog.showModal()
+  return new Promise((resolve) => {
+    newProjectDialog.addEventListener(
+      "close",
+      () => {
+        const templateID = new FormData(newProjectForm).get("project-template")
+        resolve(
+          newProjectDialog.returnValue === "create" && typeof templateID === "string"
+            ? templateID
+            : undefined,
+        )
+      },
+      { once: true },
+    )
+  })
 }
 
 async function newDocument(): Promise<boolean> {
+  const templateID = await chooseProjectTemplate()
+  if (!templateID) return false
   if (!(await prepareDocumentReplacement())) return false
-  loadArchive(await loadBuiltInTemplate(), "", true)
+  loadArchive(await loadBuiltInProjectTemplate(templateID), "", true)
   return true
 }
 
-newButton.addEventListener("click", () => void runFileOperation("新建", newDocument))
+newButton.addEventListener("click", () => void runFileOperation("新建项目", newDocument))
 openButton.addEventListener("click", () => {
   if (isTauri()) void runFileOperation("打开", openNative)
   else {
@@ -1551,6 +1572,7 @@ for (const control of [theme, orientation, layout]) {
     }
     updateDevicePreview()
     syncSegmentedControls()
+    refreshPreview()
   })
 }
 mode.addEventListener("change", () => {
@@ -1569,14 +1591,6 @@ for (const button of themeChoiceButtons) {
 for (const button of orientationChoiceButtons) {
   button.addEventListener("click", () => selectChoice(orientation, button.dataset.orientationChoice ?? "port"))
 }
-zoomOutButton.addEventListener("click", () => {
-  zoom = stepZoom(zoom, -1)
-  applyZoom()
-})
-zoomInButton.addEventListener("click", () => {
-  zoom = stepZoom(zoom, 1)
-  applyZoom()
-})
 toolbarStrip.addEventListener("click", () => {
   if (!isEditing()) return
   const path = toolbarStrip.dataset.path
@@ -1629,7 +1643,6 @@ window.addEventListener("beforeunload", (event) => {
   event.preventDefault()
   event.returnValue = ""
 })
-hydrateSystemSymbols()
 if (isTauri()) {
   let destroyingWindow = false
   void getCurrentWindow().onCloseRequested(async (event) => {
@@ -1655,6 +1668,5 @@ if (isTauri()) {
 mode.value = "preview"
 applyModeState()
 updateDevicePreview()
-applyZoom()
 updateSourceHighlight()
 updateInspectorView()
