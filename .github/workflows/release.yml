@@ -21,10 +21,9 @@ jobs:
             --repo "${{ github.repository }}" \
             --title "BDI 皮肤编辑器 ${{ github.ref_name }}" \
             --notes "百度 iOS 输入法皮肤可视化编辑器。
-
-- 支持 iPhone 17 Pro / Pro Max、Xiaomi 17、Pixel 10 Pro、Galaxy S25 Ultra 预览
-- 横竖屏与深浅色主题实时预览
-- 新建 / 打开 / 编辑 / 导出 .bdi / .bds 皮肤"
+          支持 iPhone 17 Pro / Pro Max、Xiaomi 17、Pixel 10 Pro、Galaxy S25 Ultra 预览
+          横竖屏与深浅色主题实时预览
+          新建 / 打开 / 编辑 / 导出 .bdi / .bds 皮肤"
 
   build-tauri:
     needs: create-release
