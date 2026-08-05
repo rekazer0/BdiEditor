@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { gestureDirection, rectToString } from "../src/layout.ts"
 import { IniDocument } from "../src/ini.ts"
-import { isAdditiveSelection, previewBackground, previewItems, previewSelectionVisible, previewSurfaceColor, shouldDrawFallbackKeyChrome, shouldDrawItemBackground } from "../src/preview.ts"
+import { isAdditiveSelection, previewBackground, previewFallbackText, previewItems, previewSelectionVisible, previewSurfaceColor, shouldDrawFallbackKeyChrome, shouldDrawItemBackground } from "../src/preview.ts"
 
 test("classifies click, hold and directional gestures", () => {
   assert.equal(gestureDirection(2, 3, 100, true), "center")
@@ -102,6 +102,70 @@ test("places the second foreground image at the phone key's upper-right slot", a
   assert.deepEqual(
     module.foregroundLayerRect?.({ x: 178, y: 12, width: 187, height: 143 }, [0, 0, 50, 50], 1),
     { x: 307, y: 18, width: 50, height: 50 },
+  )
+})
+
+test("does not draw a color-only phone foreground visual", async () => {
+  const module = await import("../src/preview.ts") as typeof import("../src/preview.ts") & {
+    phoneForegroundVisual?: (visual: { color?: string }) => unknown
+  }
+  assert.equal(typeof module.phoneForegroundVisual, "function")
+  assert.equal(module.phoneForegroundVisual?.({ color: "#333333" }), undefined)
+})
+
+test("keeps a phone foreground image while removing its rectangular color", async () => {
+  const module = await import("../src/preview.ts") as typeof import("../src/preview.ts") & {
+    phoneForegroundVisual?: (visual: {
+      image?: ImageBitmap
+      imagePath?: string
+      source?: [number, number, number, number]
+      inner?: [number, number, number, number]
+      color?: string
+    }) => unknown
+  }
+  const image = {} as ImageBitmap
+  assert.equal(typeof module.phoneForegroundVisual, "function")
+  assert.deepEqual(
+    module.phoneForegroundVisual?.({
+      image,
+      imagePath: "skin/res/foreground.png",
+      source: [1, 2, 30, 40],
+      inner: [3, 4, 5, 6],
+      color: "#333333",
+    }),
+    {
+      image,
+      imagePath: "skin/res/foreground.png",
+      source: [1, 2, 30, 40],
+      inner: [3, 4, 5, 6],
+    },
+  )
+})
+
+test("uses only drawable phone foregrounds to suppress fallback text", async () => {
+  const module = await import("../src/preview.ts") as typeof import("../src/preview.ts") & {
+    phoneForegroundLayers?: (visuals: Array<{
+      image?: ImageBitmap
+      source?: [number, number, number, number]
+      color?: string
+    } | undefined>) => Array<unknown>
+  }
+  const show = previewItems(IniDocument.parse("[KEY1]\nVIEW_RECT=0,0,100,100\nSHOW=q\n"))[0]
+  const center = previewItems(IniDocument.parse("[KEY2]\nVIEW_RECT=0,0,100,100\nCENTER=空格\n"))[0]
+  const image = {} as ImageBitmap
+
+  assert.equal(typeof module.phoneForegroundLayers, "function")
+  assert.equal(
+    previewFallbackText(show, "preview", module.phoneForegroundLayers?.([{ color: "#333333" }]).some(Boolean) ?? true),
+    "q",
+  )
+  assert.equal(
+    previewFallbackText(center, "edit", module.phoneForegroundLayers?.([{ color: "#333333" }]).some(Boolean) ?? true),
+    "空格",
+  )
+  assert.equal(
+    previewFallbackText(show, "preview", module.phoneForegroundLayers?.([{ image, source: [0, 0, 20, 20] }]).some(Boolean) ?? false),
+    "",
   )
 })
 

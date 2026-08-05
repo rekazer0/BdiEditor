@@ -9,3 +9,8 @@ test("desktop capability permits every dialog used by the editor", () => {
     ["dialog:allow-open", "dialog:allow-save", "dialog:allow-message"],
   )
 })
+
+test("macOS bundle deployment floor supports the SF Symbols runtime API", () => {
+  const config = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"))
+  assert.equal(config.bundle.macOS.minimumSystemVersion, "11.0")
+})

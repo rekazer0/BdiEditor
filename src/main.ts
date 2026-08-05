@@ -43,6 +43,7 @@ import { SkinArchive } from "./skin.ts"
 import { sourceFolderDescription } from "./source-tree.ts"
 import { resolveStylePropertySources, type StylePropertySource } from "./style-properties.ts"
 import { unsavedDecision } from "./unsaved.ts"
+import { clampZoom, stepZoom } from "./zoom.ts"
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 const newButton = $("#new") as HTMLButtonElement
@@ -100,6 +101,9 @@ const layout = $("#layout") as HTMLSelectElement
 const mode = $("#mode") as HTMLSelectElement
 const device = $("#device") as HTMLSelectElement
 const deviceShell = $("#device-shell")
+const zoomOutButton = $("#zoom-out") as HTMLButtonElement
+const zoomValue = $("#zoom-value") as HTMLOutputElement
+const zoomInButton = $("#zoom-in") as HTMLButtonElement
 const simulatedOutput = $("#simulated-output") as HTMLTextAreaElement
 const clearSimulationButton = $("#clear-simulation") as HTMLButtonElement
 const toolbarStrip = $("#toolbar-strip") as HTMLDivElement
@@ -107,10 +111,9 @@ const toolbarCanvas = $("#toolbar-preview") as HTMLCanvasElement
 const candidateComposition = $("#candidate-composition")
 const candidateInput = $("#candidate-input")
 const candidateWords = $("#candidate-words")
-const layoutContext = $("#layout-context")
 const modeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mode-choice]"))
 const themeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-theme-choice]"))
-const layoutChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-layout-choice]"))
+const orientationChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-orientation-choice]"))
 const stylePreviewButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-style-preview]"),
 )
@@ -133,6 +136,7 @@ let fileOperationRunning = false
 let firstCandidateTextVisual: TextVisual | undefined
 let candidateTextWidth = 1125
 let stylePreviewDrawID = 0
+let zoom = 100
 
 const preview = new Preview(
   $("#preview") as HTMLCanvasElement,
@@ -198,6 +202,65 @@ function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window
 }
 
+const systemSymbolURLs = new Map<string, Promise<string>>()
+const svgNamespace = "http://www.w3.org/2000/svg"
+const fallbackSymbolPaths: Record<string, string[]> = {
+  "info.circle": ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18", "M12 10v7", "M12 7h.01"],
+  keyboard: ["M3 6h18v12H3z", "M6 10h2m2 0h2m2 0h2m2 0h1M7 14h10"],
+  "square.grid.2x2": ["M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"],
+  paintpalette: ["M12 3a9 9 0 1 0 0 18h2a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h9a9 9 0 0 0-6-14", "M7 9h.01M10 6h.01M15 7h.01M18 11h.01"],
+  folder: ["M3 6h7l2 2h9l-2 10H5z", "M5 6V4h6l2 2"],
+  "doc.text": ["M6 3h8l4 4v14H6z", "M14 3v5h5M9 12h6M9 16h6"],
+  photo: ["M4 4h16v16H4z", "m6 16 4-5 3 3 2-2 3 4M9 9h.01"],
+  doc: ["M6 3h8l4 4v14H6z", "M14 3v5h5"],
+}
+
+function systemSymbolURL(name: string): Promise<string> {
+  const cached = systemSymbolURLs.get(name)
+  if (cached) return cached
+  const request = invoke<number[]>("sf_symbol", { name }).then((bytes) =>
+    URL.createObjectURL(new Blob([Uint8Array.from(bytes)], { type: "image/png" })),
+  )
+  systemSymbolURLs.set(name, request)
+  return request
+}
+
+function loadSystemSymbol(symbol: HTMLElement): void {
+  const name = symbol.dataset.systemSymbol
+  if (!name || !isTauri()) return
+  void systemSymbolURL(name)
+    .then((url) => {
+      symbol.style.maskImage = `url("${url}")`
+      symbol.style.webkitMaskImage = `url("${url}")`
+      symbol.classList.add("system-symbol-native")
+    })
+    .catch(() => {})
+}
+
+function hydrateSystemSymbols(root: ParentNode = document): void {
+  for (const symbol of Array.from(root.querySelectorAll<HTMLElement>("[data-system-symbol]"))) {
+    loadSystemSymbol(symbol)
+  }
+}
+
+function createSystemSymbol(name: string): HTMLSpanElement {
+  const symbol = document.createElement("span")
+  symbol.className = "system-symbol"
+  symbol.dataset.systemSymbol = name
+  symbol.ariaHidden = "true"
+  const fallback = document.createElementNS(svgNamespace, "svg")
+  fallback.classList.add("system-symbol-fallback")
+  fallback.setAttribute("viewBox", "0 0 24 24")
+  for (const pathData of fallbackSymbolPaths[name] ?? fallbackSymbolPaths.doc) {
+    const path = document.createElementNS(svgNamespace, "path")
+    path.setAttribute("d", pathData)
+    fallback.append(path)
+  }
+  symbol.append(fallback)
+  loadSystemSymbol(symbol)
+  return symbol
+}
+
 function isEditing(): boolean {
   return mode.value === "edit"
 }
@@ -209,9 +272,18 @@ function syncSegmentedControls(): void {
   for (const button of themeChoiceButtons) {
     button.classList.toggle("active", button.dataset.themeChoice === theme.value)
   }
-  for (const button of layoutChoiceButtons) {
-    button.classList.toggle("active", button.dataset.layoutChoice === layout.value)
+  for (const button of orientationChoiceButtons) {
+    button.classList.toggle("active", button.dataset.orientationChoice === orientation.value)
   }
+}
+
+function applyZoom(): void {
+  zoom = clampZoom(zoom)
+  deviceShell.style.setProperty("--preview-zoom", `${zoom}%`)
+  zoomValue.value = String(zoom)
+  zoomValue.textContent = `${zoom}%`
+  zoomOutButton.disabled = zoom === 50
+  zoomInButton.disabled = zoom === 150
 }
 
 function applyModeState(): void {
@@ -764,6 +836,13 @@ function addNavButton(
   const button = document.createElement("button")
   button.className = className
   button.dataset.path = path
+  const navigationSystemSymbols: Record<string, string> = {
+    "nav-overview": "info.circle",
+    "nav-layout": "keyboard",
+    "nav-component": "square.grid.2x2",
+    "nav-style": "paintpalette",
+  }
+  button.append(createSystemSymbol(navigationSystemSymbols[className] ?? "doc"))
   const labelNode = document.createElement("span")
   labelNode.className = "nav-label"
   labelNode.textContent = label
@@ -790,7 +869,6 @@ function populateKeyInspector(): void {
   const skinSelected = isSkinInfoPath(selectedPath)
   skinFieldsGroup.hidden = !skinSelected
   keyboardFieldsGroup.hidden = skinSelected || selectedPath !== layoutPath || hasSelection
-  layoutContext.hidden = skinSelected || selectedPath !== layoutPath
   for (const group of keyOnlyGroups) group.hidden = skinSelected || !hasSelection
   selectedKeyName.textContent = skinSelected
     ? "皮肤信息"
@@ -1135,7 +1213,7 @@ function renderFiles(): void {
   const nineCount = layoutKeyCount(ninePath)
   addNavButton(
     files,
-    "九键",
+    "9键",
     nineCount && nineCount !== 9 ? `九键基础 · 自定义 ${nineCount} 字母键` : `${nineCount || 9} 个字母键`,
     ninePath,
     "nav-layout",
@@ -1214,14 +1292,23 @@ function renderFiles(): void {
       title.textContent = name
       const description = document.createElement("small")
       description.textContent = sourceFolderDescription(path)
-      folderSummary.append(title, description)
+      folderSummary.append(createSystemSymbol("folder"), title, description)
       folder.append(folderSummary)
       appendNode(folder, child, path)
       parent.append(folder)
     }
     for (const path of node.paths) {
       const button = document.createElement("button")
-      button.textContent = path.split("/").pop() ?? path
+      const sourceSymbol = archive?.isText(path)
+        ? "doc.text"
+        : archive?.isImage(path)
+          ? "photo"
+          : "doc"
+      button.append(createSystemSymbol(sourceSymbol))
+      const label = document.createElement("span")
+      label.className = "nav-label"
+      label.textContent = path.split("/").pop() ?? path
+      button.append(label)
       button.title = path
       button.dataset.path = path
       button.disabled = !archive?.isText(path) && !archive?.isImage(path)
@@ -1479,9 +1566,17 @@ for (const button of modeChoiceButtons) {
 for (const button of themeChoiceButtons) {
   button.addEventListener("click", () => selectChoice(theme, button.dataset.themeChoice ?? "light"))
 }
-for (const button of layoutChoiceButtons) {
-  button.addEventListener("click", () => selectChoice(layout, button.dataset.layoutChoice ?? "py_9.ini"))
+for (const button of orientationChoiceButtons) {
+  button.addEventListener("click", () => selectChoice(orientation, button.dataset.orientationChoice ?? "port"))
 }
+zoomOutButton.addEventListener("click", () => {
+  zoom = stepZoom(zoom, -1)
+  applyZoom()
+})
+zoomInButton.addEventListener("click", () => {
+  zoom = stepZoom(zoom, 1)
+  applyZoom()
+})
 toolbarStrip.addEventListener("click", () => {
   if (!isEditing()) return
   const path = toolbarStrip.dataset.path
@@ -1534,6 +1629,7 @@ window.addEventListener("beforeunload", (event) => {
   event.preventDefault()
   event.returnValue = ""
 })
+hydrateSystemSymbols()
 if (isTauri()) {
   let destroyingWindow = false
   void getCurrentWindow().onCloseRequested(async (event) => {
@@ -1559,5 +1655,6 @@ if (isTauri()) {
 mode.value = "preview"
 applyModeState()
 updateDevicePreview()
+applyZoom()
 updateSourceHighlight()
 updateInspectorView()

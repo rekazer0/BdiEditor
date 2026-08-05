@@ -1,5 +1,5 @@
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #202124;
   color-scheme: light;
   background: #fff;
@@ -35,6 +35,7 @@ body {
 }
 
 button,
+input,
 select,
 textarea {
   font: inherit;
@@ -47,6 +48,40 @@ select {
 
 button {
   border: 0;
+}
+
+.system-symbol {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  flex: none;
+  color: inherit;
+}
+
+.system-symbol-fallback {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.system-symbol-native {
+  background: currentColor;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.system-symbol-native .system-symbol-fallback {
+  display: none;
 }
 
 button:focus-visible,
@@ -167,7 +202,9 @@ summary:focus-visible {
   flex: 1;
 }
 
-.mode-control {
+.mode-control,
+.preview-choice,
+.zoom-control {
   display: flex;
   gap: 2px;
   padding: 2px;
@@ -176,7 +213,8 @@ summary:focus-visible {
 }
 
 .mode-control button,
-.segmented-control button {
+.preview-choice button,
+.zoom-control button {
   height: 25px;
   padding: 0 10px;
   border-radius: 6px;
@@ -186,7 +224,7 @@ summary:focus-visible {
 }
 
 .mode-control button.active,
-.segmented-control button.active {
+.preview-choice button.active {
   color: var(--text);
   background: rgb(255 255 255 / 90%);
   box-shadow: 0 1px 4px rgb(0 0 0 / 10%);
@@ -218,9 +256,13 @@ select {
   place-items: center;
   border-radius: 7px;
   cursor: default;
-  font-size: 13px;
-  letter-spacing: 1px;
+  font-size: 18px;
   list-style: none;
+}
+
+.system-symbol-fallback .fallback-dot {
+  fill: currentColor;
+  stroke: none;
 }
 
 .toolbar-more summary::-webkit-details-marker {
@@ -362,8 +404,18 @@ h2 {
   display: grid;
   align-content: center;
   gap: 1px;
-  padding-left: 4px;
+  position: relative;
+  padding-left: 24px;
   list-style-position: outside;
+}
+
+.raw-folder > summary > .system-symbol {
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  color: var(--tertiary);
+  font-size: 14px;
+  transform: translateY(-50%);
 }
 
 .raw-folder > summary span {
@@ -395,12 +447,13 @@ h2 {
   font-size: 11px;
 }
 
-#files button::before {
+#files button > .system-symbol {
   position: absolute;
+  top: 50%;
   left: 9px;
-  content: "▧";
   color: var(--tertiary);
-  font-size: 10px;
+  font-size: 13px;
+  transform: translateY(-50%);
 }
 
 #files button.nav-layout {
@@ -408,24 +461,10 @@ h2 {
   padding-left: 35px;
 }
 
-#files button.nav-layout::before {
-  top: 11px;
+#files button.nav-layout > .system-symbol {
   left: 10px;
-  content: "⌨";
   color: var(--secondary);
   font-size: 15px;
-}
-
-#files button.nav-component::before {
-  content: "◇";
-}
-
-#files button.nav-style::before {
-  content: "◐";
-}
-
-#files button.nav-overview::before {
-  content: "◎";
 }
 
 .nav-label,
@@ -454,7 +493,7 @@ h2 {
   background: var(--accent);
 }
 
-#files button.selected::before,
+#files button.selected > .system-symbol,
 #files button.selected .nav-meta {
   color: rgb(255 255 255 / 78%);
 }
@@ -505,6 +544,7 @@ h2 {
 }
 
 .device-shell {
+  zoom: var(--preview-zoom);
   place-self: center;
   height: min(calc(100vh - 145px), 720px);
   max-height: 720px;
@@ -579,6 +619,17 @@ h2 {
   font-weight: 600;
 }
 
+.device-status-icons {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+}
+
+.device-status-icons .system-symbol:last-child {
+  width: 1.25em;
+}
+
 .phone-navigation {
   height: 34px;
   flex: none;
@@ -606,8 +657,10 @@ h2 {
 
 .phone-nav-actions {
   height: 26px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
   padding: 0 9px;
   border: 1px solid rgb(0 0 0 / 9%);
   border-radius: 14px;
@@ -619,6 +672,15 @@ h2 {
   color: #fff;
   background: #ebb900;
   font-size: 14px;
+}
+
+.phone-nav-round .system-symbol,
+.phone-nav-done .system-symbol {
+  font-size: 14px;
+}
+
+.phone-nav-actions .system-symbol {
+  font-size: 12px;
 }
 
 .simulation {
@@ -675,8 +737,7 @@ h2 {
   overflow: hidden;
   border-radius: 6.65cqw 6.65cqw 0 0;
   background: rgb(209 212 218 / 62%);
-  -webkit-backdrop-filter: saturate(150%) blur(18px);
-  backdrop-filter: saturate(150%) blur(18px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 46%);
 }
 
 #candidate-area {
@@ -732,15 +793,9 @@ h2 {
   background: transparent;
 }
 
-.keyboard-accessories svg {
+.keyboard-accessories > .system-symbol {
   width: 27px;
   height: 27px;
-  overflow: visible;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 .device-shell[data-theme="dark"] .device-screen {
@@ -748,7 +803,7 @@ h2 {
     radial-gradient(circle at 18% 72%, rgb(35 125 181 / 28%), transparent 30%),
     radial-gradient(circle at 78% 68%, rgb(43 130 82 / 22%), transparent 30%),
     radial-gradient(circle at 55% 55%, rgb(151 77 48 / 20%), transparent 34%),
-    #101012;
+    #2c2c30;
 }
 
 .device-shell[data-theme="dark"] .device-status,
@@ -910,8 +965,9 @@ canvas {
 }
 
 .empty-icon {
+  width: 30px;
+  height: 30px;
   color: var(--tertiary);
-  font-size: 30px;
 }
 
 .empty-state strong {
@@ -1000,37 +1056,20 @@ canvas {
   overflow: auto;
 }
 
-.layout-context {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin: 0 0 15px;
-  padding: 9px;
-  border-radius: 11px;
+.zoom-control {
+  align-items: center;
 }
 
-.layout-context[hidden] {
-  display: none;
+.zoom-control button {
+  width: 25px;
+  padding: 0;
 }
 
-.layout-context > div {
-  display: grid;
-  gap: 5px;
-}
-
-.layout-context > div > span {
-  padding-left: 2px;
+#zoom-value {
+  width: 34px;
   color: var(--secondary);
-  font-size: 8px;
-}
-
-.segmented-control {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 8px;
-  background: rgb(0 0 0 / 5%);
+  font-size: 10px;
+  text-align: center;
 }
 
 .skin-fields[hidden],
@@ -1220,7 +1259,8 @@ canvas {
   border-radius: 6px;
   color: var(--text);
   background: var(--control);
-  font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: inherit;
+  font-size: 11px;
   user-select: text;
 }
 

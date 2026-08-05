@@ -88,6 +88,16 @@ export function foregroundLayerRect(
   }
 }
 
+export function phoneForegroundVisual(visual: Visual | undefined): Visual | undefined {
+  if (!visual?.image || !visual.source) return
+  const { color: _, ...imageVisual } = visual
+  return imageVisual
+}
+
+export function phoneForegroundLayers(visuals: Array<Visual | undefined>): Array<Visual | undefined> {
+  return visuals.map(phoneForegroundVisual)
+}
+
 export function isAdditiveSelection(
   event: Pick<MouseEvent, "metaKey" | "ctrlKey" | "shiftKey">,
 ): boolean {
@@ -530,6 +540,7 @@ export class Preview {
     for (const [index, key] of this.keys.entries()) {
       const active = this.active?.key === key
       const selected = previewSelectionVisible(this.mode, this.selected.has(key.section))
+      const foregrounds = phoneForegroundLayers(visuals[index].fore)
       if (shouldDrawFallbackKeyChrome(key.editable, Boolean(visuals[index].back))) {
         context.fillStyle = active ? "#8eb7f2" : "#f7f7f8"
         context.strokeStyle = active || selected ? "#087ff5" : "#8c929b"
@@ -548,7 +559,7 @@ export class Preview {
       if (shouldDrawItemBackground(key, this.panelStyle, this.panelWidth, this.panelHeight)) {
         this.drawVisual(context, visuals[index].back, key.rect, true)
       }
-      for (const [layer, fore] of visuals[index].fore.entries()) {
+      for (const [layer, fore] of foregrounds.entries()) {
         const destination = key.foreRect ?? foregroundLayerRect(key.rect, fore?.source, layer)
         this.drawVisual(context, fore, destination, false)
       }
@@ -567,7 +578,7 @@ export class Preview {
       context.font = `${fontWeight}${fontSize}px ${canvasFontFamily(textVisual?.fontName)}`
       context.textAlign = "center"
       context.textBaseline = "middle"
-      const hasForeground = visuals[index].fore.some(Boolean)
+      const hasForeground = foregrounds.some(Boolean)
       const fallbackText = previewFallbackText(key, this.mode, hasForeground)
       if (fallbackText) {
         context.fillText(
