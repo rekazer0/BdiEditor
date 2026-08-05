@@ -67,7 +67,8 @@ jobs:
               "macos/BDI 皮肤编辑器-0.1.0-macos.app.zip" \
               --repo "${{ github.repository }}" --clobber
           else
+            shopt -s nullglob
             gh release upload "${{ github.ref_name }}" \
-              nsis/*.exe msi/*.msi \
+              nsis/*.exe \
               --repo "${{ github.repository }}" --clobber
           fi
