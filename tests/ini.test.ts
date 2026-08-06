@@ -50,3 +50,12 @@ test("preserves Authors while editing the singular Author metadata", () => {
     "Name=示例\r\nAuthor=新作者\r\nAuthors=共同作者\r\n",
   )
 })
+
+test("appends and removes key sections for context-menu editing", () => {
+  const document = IniDocument.parse("[KEY1]\nVIEW_RECT=0,0,10,10\nCENTER=a\n")
+  document.appendSection("KEY2", [{ key: "VIEW_RECT", value: "18,0,10,10" }, { key: "CENTER", value: "a" }])
+  assert.equal(document.get("KEY2", "CENTER"), "a")
+  assert.equal(document.removeSections(["KEY1"]), true)
+  assert.equal(document.sections().includes("KEY1"), false)
+  assert.equal(document.sections().includes("KEY2"), true)
+})

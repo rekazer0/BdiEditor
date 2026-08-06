@@ -59,11 +59,14 @@ test("shows keyboard accessories only for an iPhone in portrait", () => {
   assert.equal(showsKeyboardAccessories(undefined, "port"), false)
 })
 
-test("Android and landscape geometries do not reserve a safe bottom area", () => {
+test("Android portrait geometry reserves a gesture-navigation bottom inset", () => {
   assert.equal(
-    keyboardPreviewGeometry(deviceSpec("xiaomi-17")!, "port", 1125, 595, 133)
-      .safeBottomHeight,
-    0,
+    Math.round(keyboardPreviewGeometry(deviceSpec("xiaomi-17")!, "port", 1125, 595, 133).safeBottomHeight),
+    73,
+  )
+  assert.equal(
+    Math.round(keyboardPreviewGeometry(deviceSpec("pixel-10-pro")!, "port", 1125, 595, 133).safeBottomHeight),
+    77,
   )
   assert.equal(
     keyboardPreviewGeometry(deviceSpec("iphone-17-pro")!, "land", 1125, 595, 133)

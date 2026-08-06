@@ -41,10 +41,13 @@ export function keyboardPreviewGeometry(
   const screenWidth = orientation === "port" ? device.width : device.height
   const screenHeight = orientation === "port" ? device.height : device.width
   const iphonePortrait = orientation === "port" && device.family === "iphone"
+  const androidPortrait = orientation === "port" && device.family === "android"
   const candidateInsetLogicalHeight = iphonePortrait ? 95 : 0
   const safeLogicalHeight = iphonePortrait
     ? device.width * (236 / 1206)
-    : 0
+    : androidPortrait
+      ? device.width * 0.06
+      : 0
   const totalLogicalHeight =
     candidateInsetLogicalHeight + candidateLogicalHeight + panelLogicalHeight
   const widthScale = screenWidth / skinWidth

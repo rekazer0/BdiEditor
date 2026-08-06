@@ -17,3 +17,8 @@ test("highlights INI sections, keys, comments, numbers and action codes", () => 
 test("escapes source text before highlighting", () => {
   assert.match(highlightIni("CENTER=<script>"), /&lt;script&gt;/)
 })
+
+test("marks every line in the selected section", () => {
+  const html = highlightIni("[KEY1]\nCENTER=a\nUP=b\n[KEY2]\nCENTER=c", ["KEY1"])
+  assert.equal((html.match(/class="token-selected"/g) ?? []).length, 3)
+})

@@ -22,6 +22,11 @@ test("loads only the selected built-in project template", async () => {
 
   assert.deepEqual(requested, ["/default-template.bdi"])
   assert.deepEqual(bytes, Uint8Array.from([1, 2, 3]))
+  await loadBuiltInProjectTemplate("dust-ios-14", async (path) => {
+    requested.push(path)
+    return { ok: true, async arrayBuffer() { return new ArrayBuffer(0) } }
+  })
+  assert.equal(requested.at(-1), "/templates/dust-ios-14.bdi")
   await assert.rejects(
     () =>
       loadBuiltInProjectTemplate("default-ios", async () => ({

@@ -17,13 +17,23 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          cat > release-notes.md <<'EOF'
+          BdiEdito v0.2.0
+
+          ## 新功能
+          - 候选栏、工具栏、整体键盘和按键样式检查器，支持处理后图片预览
+          - RGBA 颜色选择器、画布背景设置、右键复制/删除、Shift 连续范围选择
+          - 源代码整行高亮与自动定位
+          - 4 套尘埃内置皮肤模板
+
+          ## 修复
+          - 修复画布交互预览错位、撤销/返回预览闪烁、导出菜单遮挡和工具栏尺寸问题
+          - 修复编辑器光标错位、图标模糊、手机预览布局及源码高亮显示问题
+          EOF
           gh release create "${{ github.ref_name }}" \
             --repo "${{ github.repository }}" \
-            --title "BDI 皮肤编辑器 ${{ github.ref_name }}" \
-            --notes "百度 iOS 输入法皮肤可视化编辑器。
-          支持 iPhone 17 Pro / Pro Max、Xiaomi 17、Pixel 10 Pro、Galaxy S25 Ultra 预览
-          横竖屏与深浅色主题实时预览
-          新建 / 打开 / 编辑 / 导出 .bdi / .bds 皮肤"
+            --title "BdiEdito v0.2.0" \
+            --notes-file release-notes.md
 
   build-tauri:
     needs: create-release
@@ -54,7 +64,7 @@ jobs:
         shell: bash
         run: |
           cd src-tauri/target/release/bundle/macos
-          ditto -c -k --keepParent "BDI 皮肤编辑器.app" "BDI 皮肤编辑器-0.1.0-macos.app.zip"
+          ditto -c -k --keepParent "BdiEdito v0.2.0.app" "BdiEdito-v0.2.0-macos.app.zip"
       - name: Upload release assets
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
@@ -64,7 +74,7 @@ jobs:
           cd src-tauri/target/release/bundle
           if [ "$RUNNER_OS" = "macOS" ]; then
             gh release upload "${{ github.ref_name }}" \
-              "macos/BDI 皮肤编辑器-0.1.0-macos.app.zip" \
+              "macos/BdiEdito-v0.2.0-macos.app.zip" \
               --repo "${{ github.repository }}" --clobber
           else
             shopt -s nullglob

@@ -80,6 +80,8 @@ summary:focus-visible {
 }
 
 .titlebar {
+  position: relative;
+  z-index: 20;
   height: 52px;
   display: flex;
   align-items: center;
@@ -255,7 +257,7 @@ select {
 
 .toolbar-menu {
   position: absolute;
-  z-index: 10;
+  z-index: 100;
   top: 37px;
   right: 0;
   width: 214px;
@@ -266,6 +268,15 @@ select {
   box-shadow: 0 8px 24px rgb(0 0 0 / 16%);
 }
 
+.export-menu {
+  z-index: 101;
+}
+
+.export-menu .toolbar-menu {
+  right: auto;
+  left: 0;
+}
+
 .toolbar-menu button {
   width: 100%;
   height: 29px;
@@ -274,6 +285,11 @@ select {
   background: transparent;
   text-align: left;
   font-size: 12px;
+}
+
+.app-actions {
+  display: grid;
+  gap: 2px;
 }
 
 .export-actions {
@@ -478,6 +494,10 @@ h2 {
   background: var(--accent);
 }
 
+#files button.selected:hover {
+  background: var(--accent);
+}
+
 #files button.selected > .system-symbol,
 #files button.selected .nav-meta {
   color: rgb(255 255 255 / 78%);
@@ -526,6 +546,18 @@ h2 {
   padding: 18px;
   overflow: auto;
   background: var(--content);
+}
+
+.canvas-wrap[data-background="checkerboard"] {
+  background: repeating-conic-gradient(#dfe1e5 0 25%, #f7f7f8 0 50%) 50% / 24px 24px;
+}
+
+.canvas-wrap[data-background="white"] {
+  background: #fff;
+}
+
+.canvas-wrap[data-background="dark"] {
+  background: #242529;
 }
 
 .device-shell {
@@ -906,13 +938,20 @@ h2 {
 }
 
 .device-shell.canvas-only .keyboard-dock {
-  display: block;
+  display: grid;
+  grid-template-rows: 133px auto;
   width: 100%;
   height: auto;
   margin: 0;
   overflow: visible;
   border-radius: 0;
   background: transparent;
+}
+
+.device-shell.canvas-only #candidate-area {
+  height: 133px;
+  grid-template-rows: 40px 93px;
+  overflow: hidden;
 }
 
 .keyboard-dock #preview {
@@ -923,7 +962,7 @@ h2 {
   max-width: 100%;
   max-height: 100%;
   margin: auto;
-  aspect-ratio: 1125 / 648;
+  aspect-ratio: 1125 / 650;
 }
 
 canvas {
@@ -943,6 +982,10 @@ canvas {
   overflow: hidden;
   border-bottom: 0;
   background: transparent;
+}
+
+.device-shell:not(.canvas-only)[data-mode="edit"] #candidate-area {
+  cursor: pointer;
 }
 
 #toolbar-strip[hidden] {
@@ -1245,6 +1288,147 @@ canvas {
   line-height: 9px;
 }
 
+.image-preview-button {
+  flex: none;
+}
+
+.style-image-dialog {
+  width: min(560px, calc(100vw - 32px));
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 22%);
+}
+
+.style-image-dialog::backdrop {
+  background: rgb(0 0 0 / 20%);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.style-image-dialog form {
+  display: grid;
+  gap: 12px;
+}
+
+.app-dialog {
+  width: min(420px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 22%);
+}
+
+.app-dialog::backdrop {
+  background: rgb(0 0 0 / 20%);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.app-dialog form {
+  display: grid;
+  gap: 14px;
+}
+
+.app-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-dialog header button {
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--control);
+  font-size: 10px;
+}
+
+.app-dialog label {
+  display: grid;
+  gap: 5px;
+  color: var(--secondary);
+  font-size: 10px;
+}
+
+.app-dialog select {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--control);
+}
+
+.app-dialog p {
+  margin: 0;
+  color: var(--secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.app-dialog a {
+  width: fit-content;
+  color: var(--accent);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.app-dialog a:hover {
+  text-decoration: underline;
+}
+
+.edit-context-menu {
+  position: fixed;
+  z-index: 300;
+  width: 140px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 20%);
+}
+
+.edit-context-menu[hidden] {
+  display: none;
+}
+
+.edit-context-menu button {
+  width: 100%;
+  height: 29px;
+  padding: 0 9px;
+  border-radius: 5px;
+  background: transparent;
+  text-align: left;
+}
+
+.edit-context-menu button:hover {
+  background: var(--hover);
+}
+
+.style-image-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.style-image-dialog header button {
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--control);
+  font-size: 10px;
+}
+
+#style-image-preview {
+  width: 100%;
+  height: auto;
+  background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 50% / 16px 16px;
+}
+
 #quick-inspector[data-readonly="true"] {
   opacity: 0.82;
 }
@@ -1256,6 +1440,53 @@ canvas {
   color: var(--secondary);
   font-size: 9px;
 }
+
+.color-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 4px;
+  align-items: center;
+}
+
+.color-control input[type="color"] {
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--control);
+}
+
+.color-control input[type="number"] {
+  display: none;
+}
+
+.color-dialog {
+  width: min(360px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.color-dialog::backdrop { background: rgb(0 0 0 / 28%); }
+
+.color-dialog form { display: grid; gap: 14px; padding: 18px; }
+.color-dialog h2 { margin: 0; font-size: 15px; }
+.rgba-preview {
+  height: 72px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background-color: transparent;
+  background-image: repeating-conic-gradient(#ddd 0 25%, #fff 0 50%);
+  background-size: 16px 16px;
+}
+.color-dialog > form > input[type="color"] { width: 100%; height: 44px; }
+.rgba-fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.rgba-fields label { display: grid; gap: 4px; color: var(--secondary); font-size: 10px; }
+.rgba-fields input { width: 100%; min-width: 0; height: 30px; }
+.color-dialog menu { display: flex; justify-content: flex-end; gap: 8px; margin: 0; padding: 0; }
 
 .inspector-grid input {
   width: 100%;
@@ -1340,6 +1571,11 @@ canvas {
   background: #fff;
 }
 
+#source-highlight code {
+  font: inherit;
+  letter-spacing: 0;
+}
+
 #source {
   position: absolute;
   inset: 0;
@@ -1350,6 +1586,7 @@ canvas {
   caret-color: var(--text);
   background: transparent;
   -webkit-text-fill-color: transparent;
+  letter-spacing: 0;
   user-select: text;
 }
 
@@ -1363,7 +1600,6 @@ canvas {
 
 .token-section {
   color: #7d3f98;
-  font-weight: 600;
 }
 
 .token-key {
@@ -1380,6 +1616,23 @@ canvas {
 
 .token-number {
   color: #087f8c;
+}
+
+.token-selected {
+  position: relative;
+  z-index: 0;
+}
+
+.token-selected::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: -0.2em;
+  bottom: -0.2em;
+  left: -16px;
+  width: calc(100vw + 16px);
+  background: rgb(10 127 245 / 16%);
+  box-shadow: inset 3px 0 var(--accent);
 }
 
 #asset {

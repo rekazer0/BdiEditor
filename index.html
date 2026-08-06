@@ -7,7 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     />
-    <title>BDI 皮肤编辑器</title>
+    <title>BdiEdito v0.2.0</title>
   </head>
   <body>
     <header class="titlebar">
@@ -19,8 +19,15 @@
           <span class="icon system-symbol" data-system-symbol="folder" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M2.8 6.5h5l1.7 2h7.7l-1.4 7H4.2z"/><path d="M4 6.5V4.3h5l1.5 2.2" /></svg></span><span>打开</span>
         </button>
         <button id="save" class="toolbar-button" disabled title="保存" aria-label="保存">
-          <span class="icon system-symbol" data-system-symbol="square.and.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 2.8v9M6.5 9.5 10 13l3.5-3.5M3.5 15.8h13" /></svg></span><span>保存</span>
+          <span class="icon system-symbol" data-system-symbol="externaldrive" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M6 3v6h8V3M7 14h6" /></svg></span><span>保存</span>
         </button>
+        <details class="toolbar-more export-menu">
+          <summary title="导出" aria-label="导出"><span class="system-symbol" data-system-symbol="square.and.arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 13V3m-4 4 4-4 4 4M4 10v6h12v-6" /></svg></span></summary>
+          <div class="toolbar-menu export-actions" aria-label="导出皮肤">
+            <button class="export-action" data-export-format="bdi" disabled>导出 iOS 皮肤 (.bdi)…</button>
+            <button class="export-action" data-export-format="bds" disabled>导出 Android 皮肤 (.bds)…</button>
+          </div>
+        </details>
         <span class="toolbar-divider"></span>
         <button id="undo" class="toolbar-button" disabled title="撤销" aria-label="撤销"><span class="icon system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12"/><path d="M4 8.5h7.2a5 5 0 0 1 5 5"/></svg></span></button>
         <button id="redo" class="toolbar-button" disabled title="重做" aria-label="重做"><span class="icon system-symbol" data-system-symbol="arrow.uturn.forward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m13 5 4 3.5-4 3.5"/><path d="M16 8.5H8.8a5 5 0 0 0-5 5"/></svg></span></button>
@@ -37,9 +44,9 @@
       </div>
       <details class="toolbar-more">
         <summary title="更多操作" aria-label="更多操作"><span class="system-symbol" data-system-symbol="ellipsis" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><circle class="fallback-dot" cx="4" cy="10" r="1"/><circle class="fallback-dot" cx="10" cy="10" r="1"/><circle class="fallback-dot" cx="16" cy="10" r="1"/></svg></span></summary>
-        <div class="toolbar-menu export-actions" aria-label="导出皮肤">
-          <button class="export-action" data-export-format="bdi" disabled>导出 iOS 皮肤 (.bdi)…</button>
-          <button class="export-action" data-export-format="bds" disabled>导出 Android 皮肤 (.bds)…</button>
+        <div class="toolbar-menu app-actions" aria-label="更多操作">
+          <button data-app-dialog="settings">设置</button>
+          <button data-app-dialog="about">关于</button>
         </div>
       </details>
     </header>
@@ -164,13 +171,27 @@
             <h3>整个键盘</h3>
             <div class="inspector-grid action-fields">
               <label>整体高度 <input data-keyboard-field="height" type="number" min="1" /></label>
-              <label>背景样式 <input data-keyboard-field="styleID" /></label>
+              <label>背景样式 <span class="style-field"><input data-keyboard-field="styleID" /><button class="style-preview-button compact-style-preview" data-style-preview-field="keyboard:styleID" title="查看背景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
               <label>正常背景图片 <input data-keyboard-field="NM_IMG" placeholder="例如 panel,1" /></label>
               <label>按下背景图片 <input data-keyboard-field="HL_IMG" placeholder="例如 panel,2" /></label>
-              <label>正常背景色 / 透明度 <input data-keyboard-field="NM_COLOR" placeholder="AARRGGBB" /></label>
-              <label>按下背景色 / 透明度 <input data-keyboard-field="HL_COLOR" placeholder="AARRGGBB" /></label>
+              <label>正常背景色 / 透明度 <span class="color-control"><input data-keyboard-field="NM_COLOR" placeholder="AARRGGBB" /><input type="color" data-color-picker-for="keyboard-NM_COLOR" value="#ffffff" aria-label="正常背景色"><input type="number" data-color-alpha-for="keyboard-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="正常背景透明度"></span></label>
+              <label>按下背景色 / 透明度 <span class="color-control"><input data-keyboard-field="HL_COLOR" placeholder="AARRGGBB" /><input type="color" data-color-picker-for="keyboard-HL_COLOR" value="#ffffff" aria-label="按下背景色"><input type="number" data-color-alpha-for="keyboard-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="按下背景透明度"></span></label>
             </div>
             <p class="inspector-note">整体高度写入 gen.ini 的 PANEL SIZE；颜色前两位是透明度。背景图片透明度由 PNG 决定。</p>
+          </div>
+          <div class="inspector-group toolbar-fields" hidden>
+            <h3>候选栏与工具栏</h3>
+            <div class="inspector-grid action-fields">
+              <label>显示区域 <input data-toolbar-field="VIEW_RECT" /></label>
+              <label>背景样式 <span class="style-field"><input data-toolbar-field="BACK_STYLE" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:BACK_STYLE" title="查看背景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
+              <label>前景样式 <span class="style-field"><input data-toolbar-field="FORE_STYLE" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:FORE_STYLE" data-preview-foreground title="查看前景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
+              <label>内边距 <input data-toolbar-field="PADDING" /></label>
+              <label>首个候选前景 <span class="style-field"><input data-toolbar-field="FIRST_FORE" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:FIRST_FORE" data-preview-foreground title="查看前景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
+              <label>首个候选背景 <span class="style-field"><input data-toolbar-field="FIRST_BACK" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:FIRST_BACK" title="查看背景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
+              <label>工具按钮 1 <span class="style-field"><input data-toolbar-field="ICON1.FORE_STYLE" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:ICON1.FORE_STYLE" data-preview-foreground title="查看前景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
+              <label>工具按钮 2 <span class="style-field"><input data-toolbar-field="ICON2.FORE_STYLE" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:ICON2.FORE_STYLE" data-preview-foreground title="查看前景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
+              <label>工具按钮 3 <span class="style-field"><input data-toolbar-field="ICON3.FORE_STYLE" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:ICON3.FORE_STYLE" data-preview-foreground title="查看前景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
+            </div>
           </div>
           <div class="inspector-group key-only">
             <h3>布局</h3>
@@ -214,13 +235,13 @@
                   </span>
                 </span>
               </label>
-              <label>正常按键图片 <input data-background-style-field="NM_IMG" placeholder="例如 btn,1" /></label>
-              <label>按下按键图片 <input data-background-style-field="HL_IMG" placeholder="例如 btn,2" /></label>
+              <label>正常按键图片 <span class="style-field"><input data-background-style-field="NM_IMG" placeholder="例如 btn,1" /><button class="style-preview-button image-preview-button" data-image-preview="normal" title="查看按键图片预览" aria-label="查看正常按键图片预览"><canvas width="64" height="44"></canvas></button></span></label>
+              <label>按下按键图片 <span class="style-field"><input data-background-style-field="HL_IMG" placeholder="例如 btn,2" /><button class="style-preview-button image-preview-button" data-image-preview="highlighted" title="查看按键图片预览" aria-label="查看按下按键图片预览"><canvas width="64" height="44"></canvas></button></span></label>
               <label>字体 <input data-style-field="FONT_NAME" /></label>
               <label>字重 <input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
               <label>字号 <input data-style-field="FONT_SIZE" type="number" /></label>
-              <label>文字正常颜色 <input data-style-field="NM_COLOR" /></label>
-              <label>文字按下颜色 <input data-style-field="HL_COLOR" /></label>
+              <label>文字正常颜色 <span class="color-control"><input data-style-field="NM_COLOR" /><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色"><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度"></span></label>
+              <label>文字按下颜色 <span class="color-control"><input data-style-field="HL_COLOR" /><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色"><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度"></span></label>
             </div>
             <p class="inspector-note">多选时图片会批量写入各按键引用的背景样式。共享样式也会影响其他引用它的按键。</p>
           </div>
@@ -269,11 +290,61 @@
               <small>包含浅色与深色主题、竖屏与横屏布局</small>
             </span>
           </label>
+          <label class="project-template-option"><input type="radio" name="project-template" value="dust-ios-14" /><span><strong>尘埃 · iOS 26 · 14 键无筛选</strong><small>14 键 iOS 26 适配模板</small></span></label>
+          <label class="project-template-option"><input type="radio" name="project-template" value="dust-android-26-9" /><span><strong>尘埃 · Android 智能双色</strong><small>26 键与 9 键 Android 模板</small></span></label>
+          <label class="project-template-option"><input type="radio" name="project-template" value="dust-ios-26-9" /><span><strong>尘埃 · iOS 26 · 26+9 键</strong><small>26 键与 9 键 iOS 26 模板</small></span></label>
+          <label class="project-template-option"><input type="radio" name="project-template" value="dust-ios-18" /><span><strong>尘埃 · iOS 26 · 18 键</strong><small>18 键 iOS 26 模板</small></span></label>
         </fieldset>
         <footer>
           <button value="cancel">取消</button>
           <button class="primary" value="create">创建项目</button>
         </footer>
+      </form>
+    </dialog>
+
+    <dialog id="color-dialog" class="color-dialog" aria-labelledby="color-dialog-title">
+      <form method="dialog" id="color-form">
+        <h2 id="color-dialog-title">RGBA 颜色</h2>
+        <div class="rgba-preview" id="rgba-preview"></div>
+        <input id="rgba-picker" type="color" value="#ffffff" aria-label="颜色">
+        <div class="rgba-fields">
+          <label>R <input id="rgba-r" type="number" min="0" max="255"></label>
+          <label>G <input id="rgba-g" type="number" min="0" max="255"></label>
+          <label>B <input id="rgba-b" type="number" min="0" max="255"></label>
+          <label>A <input id="rgba-a" type="number" min="0" max="255"></label>
+        </div>
+        <menu><button value="cancel">取消</button><button value="ok">确定</button></menu>
+      </form>
+    </dialog>
+
+    <dialog id="style-image-dialog" class="style-image-dialog" aria-labelledby="style-image-title">
+      <form method="dialog">
+        <header><h2 id="style-image-title">图片预览</h2></header>
+        <canvas id="style-image-preview" width="480" height="260"></canvas>
+      </form>
+    </dialog>
+
+    <dialog id="settings-dialog" class="app-dialog" aria-labelledby="settings-title">
+      <form method="dialog">
+        <header><h2 id="settings-title">设置</h2><button aria-label="关闭">关闭</button></header>
+        <label>默认预览设备 <select id="default-device"><option value="canvas">画布</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
+        <label>画布背景 <select id="canvas-background"><option value="default">默认</option><option value="checkerboard">马赛克</option><option value="white">白色</option><option value="dark">深色</option></select></label>
+        <p>新打开的皮肤将使用此预览设备。</p>
+      </form>
+    </dialog>
+
+    <div id="edit-context-menu" class="edit-context-menu" hidden role="menu">
+      <button data-context-action="copy" role="menuitem">复制按键</button>
+      <button data-context-action="delete" role="menuitem">删除按键</button>
+    </div>
+
+    <dialog id="about-dialog" class="app-dialog" aria-labelledby="about-title">
+      <form method="dialog">
+        <header><h2 id="about-title">关于 BdiEdito v0.2.0</h2><button aria-label="关闭">关闭</button></header>
+        <p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
+        <p>版本 0.2.0</p>
+        <p>支持读取、编辑和导出 BDI、BDS 皮肤包。</p>
+        <a href="https://github.com/rekazer0/BdiEdito" target="_blank" rel="noreferrer">GitHub · rekazer0/BdiEdito</a>
       </form>
     </dialog>
 

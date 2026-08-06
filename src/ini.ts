@@ -114,6 +114,37 @@ export class IniDocument {
     ]
   }
 
+  appendSection(section: string, entries: readonly { key: string; value: string }[]): void {
+    const ending = this.lines.find((line) => line.ending)?.ending ?? "\n"
+    if (this.lines.length && this.lines.at(-1)?.ending === "") {
+      const previous = this.lines.at(-1)!
+      previous.ending = ending
+      previous.raw += ending
+    }
+    this.lines.push({ raw: `[${section}]${ending}`, ending, section })
+    for (const entry of entries) {
+      this.lines.push({
+        raw: `${entry.key}=${entry.value}${ending}`,
+        ending,
+        section,
+        key: entry.key,
+        prefix: `${entry.key}=`,
+        value: entry.value,
+      })
+    }
+  }
+
+  removeSections(sections: readonly string[]): boolean {
+    const selected = new Set(sections)
+    const before = this.lines.length
+    let section = ""
+    this.lines = this.lines.filter((line) => {
+      if (line.section !== undefined && line.key === undefined) section = line.section
+      return !selected.has(section)
+    })
+    return this.lines.length !== before
+  }
+
   toString(): string {
     return this.lines.map((line) => line.raw).join("")
   }

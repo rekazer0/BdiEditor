@@ -55,6 +55,12 @@ const saveButton = $("#save") as HTMLButtonElement
 const undoButton = $("#undo") as HTMLButtonElement
 const redoButton = $("#redo") as HTMLButtonElement
 const toolbarMore = $(".toolbar-more") as HTMLDetailsElement
+const appDialogButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-app-dialog]"))
+const settingsDialog = $("#settings-dialog") as HTMLDialogElement
+const aboutDialog = $("#about-dialog") as HTMLDialogElement
+const editContextMenu = $("#edit-context-menu") as HTMLDivElement
+const defaultDevice = $("#default-device") as HTMLSelectElement
+const canvasBackground = $("#canvas-background") as HTMLSelectElement
 const exportButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-export-format]"),
 )
@@ -84,7 +90,11 @@ const keyboardFields = Array.from(
 )
 const skinFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-skin-field]"))
 const keyboardFieldsGroup = $(".keyboard-fields")
+const toolbarFieldsGroup = $(".toolbar-fields")
+const toolbarFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-toolbar-field]"))
 const skinFieldsGroup = $(".skin-fields")
+const colorPickers = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-picker-for]"))
+const colorAlphas = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-alpha-for]"))
 const keyOnlyGroups = Array.from(document.querySelectorAll<HTMLElement>(".key-only"))
 const gapFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-gap-field]"))
 const layoutActionButtons = Array.from(
@@ -110,6 +120,7 @@ const workspaceImageError = $("#workspace-image-error")
 const simulatedOutput = $("#simulated-output") as HTMLTextAreaElement
 const clearSimulationButton = $("#clear-simulation") as HTMLButtonElement
 const toolbarStrip = $("#toolbar-strip") as HTMLDivElement
+const candidateArea = $("#candidate-area")
 const toolbarCanvas = $("#toolbar-preview") as HTMLCanvasElement
 const candidateComposition = $("#candidate-composition")
 const candidateInput = $("#candidate-input")
@@ -118,8 +129,22 @@ const modeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement
 const themeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-theme-choice]"))
 const orientationChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-orientation-choice]"))
 const stylePreviewButtons = Array.from(
-  document.querySelectorAll<HTMLButtonElement>("[data-style-preview]"),
+  document.querySelectorAll<HTMLButtonElement>("[data-style-preview], [data-style-preview-field]"),
 )
+const imagePreviewButtons = Array.from(
+  document.querySelectorAll<HTMLButtonElement>("[data-image-preview]"),
+)
+const styleImageDialog = $("#style-image-dialog") as HTMLDialogElement
+const styleImagePreview = $("#style-image-preview") as HTMLCanvasElement
+const colorDialog = $("#color-dialog") as HTMLDialogElement
+const rgbaPicker = $("#rgba-picker") as HTMLInputElement
+const rgbaPreview = $("#rgba-preview")
+const rgbaFields = {
+  r: $("#rgba-r") as HTMLInputElement,
+  g: $("#rgba-g") as HTMLInputElement,
+  b: $("#rgba-b") as HTMLInputElement,
+  a: $("#rgba-a") as HTMLInputElement,
+}
 
 let archive: SkinArchive | undefined
 let currentPath = ""
@@ -139,6 +164,9 @@ let fileOperationRunning = false
 let firstCandidateTextVisual: TextVisual | undefined
 let candidateTextWidth = 1125
 let stylePreviewDrawID = 0
+let imagePreviewDrawID = 0
+const imagePreviewVisuals = new Map<string, Visual[]>()
+const processedPreviewVisuals = new Map<HTMLButtonElement, Visual[]>()
 let selectedFileButton: HTMLButtonElement | undefined
 
 const deviceGeometryProperties = [
@@ -159,7 +187,11 @@ const preview = new Preview(
   (sections) => {
     selectedKeySections = sections
     populateKeyInspector()
+    updateSourceHighlight()
+    scrollSelectedSource()
   },
+  false,
+  (section, event) => showEditContextMenu(section, event),
 )
 
 const toolbarPreview = new Preview(toolbarCanvas, () => {}, () => {}, true)
@@ -196,6 +228,67 @@ function handlePreviewEvent(event: PreviewEvent): void {
   }
   if (!code || /^(F\d+|S\d+|Z\+)/.test(code)) return
   insertSimulatedText(code)
+}
+
+function showEditContextMenu(section: string, event: MouseEvent): void {
+  if (!isEditing()) return
+  if (!selectedKeySections.includes(section)) {
+    selectedKeySections = [section]
+    preview.setSelected(selectedKeySections)
+    populateKeyInspector()
+    updateSourceHighlight()
+  }
+  editContextMenu.hidden = false
+  editContextMenu.style.left = `${Math.min(event.clientX, window.innerWidth - 150)}px`
+  editContextMenu.style.top = `${Math.min(event.clientY, window.innerHeight - 74)}px`
+}
+
+function copySelectedKeys(): void {
+  if (!archive || !layoutDocument || !selectedKeySections.length) return
+  const before = layoutDocument.toString()
+  const occupied = new Set(layoutDocument.sections())
+  let number = Math.max(0, ...[...occupied].flatMap((section) => {
+    const value = section.match(/^KEY(\d+)$/)?.[1]
+    return value ? [Number(value)] : []
+  })) + 1
+  const copies: string[] = []
+  for (const section of selectedKeySections) {
+    while (occupied.has(`KEY${number}`)) number += 1
+    const target = `KEY${number++}`
+    const entries = layoutDocument.entries(section).map(({ key, value }) => {
+      if (key !== "VIEW_RECT") return { key, value }
+      const rect = value.split(",").map(Number)
+      if (rect.length === 4 && rect.every(Number.isFinite)) rect[0] += 18
+      return { key, value: rect.join(",") }
+    })
+    layoutDocument.appendSection(target, entries)
+    occupied.add(target)
+    copies.push(target)
+  }
+  const text = layoutDocument.toString()
+  commitText(layoutPath, before, text)
+  if (selectedPath === layoutPath) setSourceValue(text)
+  selectedKeySections = copies
+  preview.setDocument(layoutDocument)
+  preview.setSelected(copies)
+  populateKeyInspector()
+  updateSourceHighlight()
+  updateDirty()
+}
+
+function deleteSelectedKeys(): void {
+  if (!archive || !layoutDocument || !selectedKeySections.length) return
+  const before = layoutDocument.toString()
+  if (!layoutDocument.removeSections(selectedKeySections)) return
+  const text = layoutDocument.toString()
+  commitText(layoutPath, before, text)
+  if (selectedPath === layoutPath) setSourceValue(text)
+  selectedKeySections = []
+  preview.setDocument(layoutDocument)
+  preview.setSelected([])
+  populateKeyInspector()
+  updateSourceHighlight()
+  updateDirty()
 }
 
 function insertSimulatedText(text: string): void {
@@ -262,12 +355,13 @@ function syncSegmentedControls(): void {
 
 function applyModeState(): void {
   const editing = isEditing()
+  deviceShell.dataset.mode = editing ? "edit" : "preview"
   preview.setMode(editing ? "edit" : "preview")
   source.readOnly = !editing
   replaceAssetButton.disabled = !editing
   quickInspector.dataset.readonly = editing ? "false" : "true"
   if (!editing) {
-    for (const field of [...keyFields, ...styleFields, ...backgroundStyleFields, ...keyboardFields, ...skinFields, ...gapFields]) {
+    for (const field of [...keyFields, ...styleFields, ...backgroundStyleFields, ...keyboardFields, ...toolbarFields, ...skinFields, ...gapFields]) {
       field.disabled = true
     }
     for (const button of layoutActionButtons) button.disabled = true
@@ -576,7 +670,7 @@ workspaceImage.addEventListener("error", showImagePreviewError)
 function updateInspectorView(): void {
   const imageSelected = Boolean(archive?.isImage(selectedPath))
   const propertiesAvailable = Boolean(
-    selectedPath && (selectedPath === layoutPath || isSkinInfoPath(selectedPath)) && !imageSelected,
+    selectedPath && (selectedPath === layoutPath || isSkinInfoPath(selectedPath) || isToolbarPath(selectedPath)) && !imageSelected,
   )
   for (const button of inspectorTabButtons) {
     const tab = button.dataset.inspectorTab
@@ -596,10 +690,26 @@ function updateInspectorView(): void {
   asset.hidden = true
   quickInspector.hidden = inspectorTab !== "properties" || !propertiesAvailable
   sourceEditor.hidden = inspectorTab !== "source"
+  if (!sourceEditor.hidden) requestAnimationFrame(scrollSelectedSource)
 }
 
 function updateSourceHighlight(): void {
-  sourceHighlight.innerHTML = `${highlightIni(source.value)}\n`
+  sourceHighlight.innerHTML = `${highlightIni(source.value, selectedPath === layoutPath ? selectedKeySections : [])}\n`
+}
+
+function scrollSelectedSource(): void {
+  if (sourceEditor.hidden || selectedPath !== layoutPath || !selectedKeySections.length) return
+  const selected = new Set(selectedKeySections)
+  const line = source.value.split(/\r\n|\n|\r/).findIndex((value) => {
+    const section = value.match(/^\s*\[([^\]]+)]\s*$/)?.[1]
+    return Boolean(section && selected.has(section))
+  })
+  if (line < 0) return
+  const style = getComputedStyle(source)
+  const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.6
+  source.scrollTop = Math.max(0, line * lineHeight - source.clientHeight / 3)
+  const highlight = $("#source-highlight")
+  highlight.scrollTop = source.scrollTop
 }
 
 function setSourceValue(text: string): void {
@@ -635,6 +745,42 @@ function genConfigPath(): string {
 
 function isSkinInfoPath(path: string): boolean {
   return /(^|\/)Info\.txt$/i.test(path)
+}
+
+function isToolbarPath(path: string): boolean {
+  return /\.cnd$/i.test(path)
+}
+
+function colorControlKey(field: HTMLInputElement): string {
+  return `${field.hasAttribute("data-keyboard-field") ? "keyboard" : "style"}-${field.dataset.keyboardField ?? field.dataset.styleField ?? ""}`
+}
+
+function syncColorControl(field: HTMLInputElement): void {
+  const value = field.value.trim().replace(/^#/, "")
+  if (!/^[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(value)) return
+  const hex = value.length === 6 ? `FF${value}` : value.toUpperCase()
+  const picker = colorPickers.find((item) => item.dataset.colorPickerFor === colorControlKey(field))
+  const alpha = colorAlphas.find((item) => item.dataset.colorAlphaFor === colorControlKey(field))
+  if (picker) {
+    picker.value = `#${hex.slice(2)}`
+    picker.disabled = field.disabled
+  }
+  if (alpha) {
+    alpha.value = String(Number((Number.parseInt(hex.slice(0, 2), 16) / 255).toFixed(2)))
+    alpha.disabled = field.disabled
+  }
+}
+
+function writeColorControl(control: HTMLInputElement, alphaValue: number): void {
+  const key = control.dataset.colorPickerFor ?? control.dataset.colorAlphaFor ?? ""
+  const field = document.querySelector<HTMLInputElement>(
+    `[data-${key.startsWith("keyboard-") ? "keyboard" : "style"}-field="${CSS.escape(key.replace(/^(keyboard|style)-/, ""))}"]`,
+  )
+  if (!field) return
+  const rgb = control.type === "color" ? control.value.slice(1).toUpperCase() : colorPickers.find((item) => item.dataset.colorPickerFor === key)?.value.slice(1).toUpperCase()
+  if (!rgb || rgb.length !== 6) return
+  field.value = `${Math.round(Math.max(0, Math.min(1, alphaValue)) * 255).toString(16).padStart(2, "0")}${rgb}`.toUpperCase()
+  field.dispatchEvent(new Event(field.hasAttribute("data-keyboard-field") ? "change" : "input", { bubbles: true }))
 }
 
 function keyboardContext():
@@ -730,21 +876,10 @@ function previewDestination(
     : { x: canvas.width - width - 2, y: 2, width, height }
 }
 
-function drawStylePreview(
-  button: HTMLButtonElement,
-  visuals: Array<Visual | undefined>,
-  foreground: boolean,
-): void {
-  const canvas = button.querySelector("canvas")
-  const context = canvas?.getContext("2d")
-  if (!canvas || !context) return
+function drawVisualPreview(canvas: HTMLCanvasElement, visuals: Array<Visual | undefined>, foreground: boolean): void {
+  const context = canvas.getContext("2d")
+  if (!context) return
   context.clearRect(0, 0, canvas.width, canvas.height)
-  delete button.dataset.path
-  const firstResource = visuals.find((visual) => visual?.imagePath)?.imagePath
-  if (firstResource) button.dataset.path = firstResource
-  const hasVisual = visuals.some((visual) => Boolean(visual?.image || visual?.color))
-  button.disabled = !hasVisual
-  button.setAttribute("aria-disabled", String(!hasVisual))
   visuals.forEach((visual, layer) => {
     if (!visual) return
     const destination = previewDestination(canvas, visual, foreground, layer)
@@ -754,6 +889,22 @@ function drawStylePreview(
     }
     drawVisualSource(context, visual, destination)
   })
+}
+
+function drawStylePreview(
+  button: HTMLButtonElement,
+  visuals: Array<Visual | undefined>,
+  foreground: boolean,
+): void {
+  const canvas = button.querySelector("canvas")
+  if (!canvas) return
+  delete button.dataset.path
+  const firstResource = visuals.find((visual) => visual?.imagePath)?.imagePath
+  if (firstResource) button.dataset.path = firstResource
+  const hasVisual = visuals.some((visual) => Boolean(visual?.image || visual?.color))
+  button.disabled = !hasVisual
+  button.setAttribute("aria-disabled", String(!hasVisual))
+  drawVisualPreview(canvas, visuals, foreground)
 }
 
 async function updateStylePreviews(): Promise<void> {
@@ -770,18 +921,60 @@ async function updateStylePreviews(): Promise<void> {
   const resolver = new AtlasResolver(archive, theme.value, orientation.value)
   const requests = stylePreviewButtons.map(async (button) => {
     const [group, state] = (button.dataset.stylePreview ?? "").split(":")
-    const styleIDs = group === "fore" ? foreStyles : backStyle ? [backStyle] : []
+    const [scope, fieldName] = (button.dataset.stylePreviewField ?? "").split(":")
+    const field = scope === "keyboard"
+      ? keyboardFields.find((item) => item.dataset.keyboardField === fieldName)
+      : toolbarFields.find((item) => item.dataset.toolbarField === fieldName)
+    const fieldStyles = field?.value.split(",").map((value) => value.trim()).filter(Boolean) ?? []
+    const styleIDs = field
+      ? fieldStyles
+      : group === "fore"
+        ? foreStyles
+        : backStyle
+          ? [backStyle]
+          : []
     const highlighted = state === "highlighted"
     const visuals = await Promise.all(
       styleIDs.map((styleID) => resolver.resolve(styleID, highlighted).catch(() => undefined)),
     )
-    return { button, foreground: group === "fore", styleIDs, visuals }
+    return { button, foreground: group === "fore" || button.hasAttribute("data-preview-foreground"), styleIDs, visuals }
   })
   const results = await Promise.all(requests)
   if (drawID !== stylePreviewDrawID) return
   for (const { button, foreground, styleIDs, visuals } of results) {
     button.hidden = styleIDs.length === 0
-    drawStylePreview(button, visuals, foreground)
+    const drawable = visuals.filter((visual): visual is Visual => Boolean(visual))
+    processedPreviewVisuals.set(button, drawable)
+    drawStylePreview(button, drawable, foreground)
+  }
+}
+
+async function updateImagePreviews(): Promise<void> {
+  const drawID = ++imagePreviewDrawID
+  const background = selectedBackgroundStyleContext()
+  if (!archive || !background) {
+    imagePreviewVisuals.clear()
+    for (const button of imagePreviewButtons) button.hidden = true
+    return
+  }
+  const resolver = new AtlasResolver(archive, theme.value, orientation.value)
+  const styleIDs = background.sections.map((section) => section.replace(/^STYLE/, ""))
+  const results = await Promise.all(
+    imagePreviewButtons.map(async (button) => ({
+      button,
+      state: button.dataset.imagePreview ?? "normal",
+      visuals: await Promise.all(
+        styleIDs.map((styleID) => resolver.resolve(styleID, button.dataset.imagePreview === "highlighted").catch(() => undefined)),
+      ),
+    })),
+  )
+  if (drawID !== imagePreviewDrawID) return
+  for (const { button, state, visuals } of results) {
+    const drawable = visuals.filter((visual): visual is Visual => Boolean(visual))
+    imagePreviewVisuals.set(state, drawable)
+    processedPreviewVisuals.set(button, drawable)
+    button.hidden = drawable.length === 0
+    drawStylePreview(button, drawable, false)
   }
 }
 
@@ -868,11 +1061,15 @@ function populateKeyInspector(): void {
   const sections = selectedKeySections
   const hasSelection = Boolean(document && sections.length)
   const skinSelected = isSkinInfoPath(selectedPath)
+  const toolbarSelected = isToolbarPath(selectedPath)
   skinFieldsGroup.hidden = !skinSelected
-  keyboardFieldsGroup.hidden = skinSelected || selectedPath !== layoutPath || hasSelection
+  toolbarFieldsGroup.hidden = !toolbarSelected
+  keyboardFieldsGroup.hidden = skinSelected || toolbarSelected || selectedPath !== layoutPath || hasSelection
   for (const group of keyOnlyGroups) group.hidden = skinSelected || !hasSelection
   selectedKeyName.textContent = skinSelected
     ? "皮肤信息"
+    : toolbarSelected
+      ? "候选栏与工具栏"
     : !hasSelection
       ? `${layout.value === "py_26.ini" ? "26 键" : "九键"} · 整体设置`
     : sections.length === 1
@@ -881,6 +1078,16 @@ function populateKeyInspector(): void {
   for (const field of skinFields) {
     field.value = skinSelected ? selectedDocument?.get("", field.dataset.skinField ?? "") ?? "" : ""
     field.disabled = !skinSelected
+  }
+  const toolbarGen = toolbarSelected && archive?.isText(genConfigPath())
+    ? IniDocument.parse(archive.getText(genConfigPath()))
+    : undefined
+  for (const field of toolbarFields) {
+    const [section, key] = (field.dataset.toolbarField ?? "").split(".")
+    field.value = toolbarSelected
+      ? selectedDocument?.get(key ? section : "CAND", key || section) ?? toolbarGen?.get("CAND", key || section) ?? ""
+      : ""
+    field.disabled = !toolbarSelected || !isEditing()
   }
   const keyboard = keyboardContext()
   const config = keyboard ? keyboardConfig(keyboard.gen, keyboard.styles) : undefined
@@ -899,6 +1106,7 @@ function populateKeyInspector(): void {
               : name === "NM_COLOR"
                 ? config?.normalColor ?? ""
                 : config?.pressedColor ?? ""
+    if (field.dataset.keyboardField?.endsWith("COLOR")) syncColorControl(field)
   }
   for (const field of keyFields) {
     const name = field.dataset.keyField ?? ""
@@ -932,6 +1140,7 @@ function populateKeyInspector(): void {
           ? "未配置"
           : ""
     field.value = common ?? ""
+    if (property.endsWith("COLOR")) syncColorControl(field)
   }
   const background = selectedBackgroundStyleContext()
   for (const field of backgroundStyleFields) {
@@ -975,7 +1184,8 @@ function populateKeyInspector(): void {
           : ""
         : describeAction(values[0])
   }
-  if (hasSelection) void updateStylePreviews()
+  void updateStylePreviews()
+  if (hasSelection) void updateImagePreviews()
   applyModeState()
 }
 
@@ -1009,6 +1219,24 @@ function updateKeyboard(field: HTMLInputElement): void {
     context.styles.set(`STYLE${styleID}`, name, field.value)
     commitText(context.stylePath, before, context.styles.toString())
   }
+  refreshPreview()
+  populateKeyInspector()
+  updateDirty()
+}
+
+function updateToolbar(field: HTMLInputElement): void {
+  if (!archive || !selectedDocument || !isToolbarPath(selectedPath) || !isEditing()) return
+  const [section, key] = (field.dataset.toolbarField ?? "").split(".")
+  const property = key || section
+  const targetSection = key ? section : "CAND"
+  const path = property === "VIEW_RECT" ? genConfigPath() : selectedPath
+  if (!archive.isText(path)) return
+  const document = path === selectedPath ? selectedDocument : IniDocument.parse(archive.getText(path))
+  const before = document.toString()
+  if (!document.set(targetSection, property, field.value)) return
+  const text = document.toString()
+  commitText(path, before, text)
+  if (path === selectedPath) setSourceValue(text)
   refreshPreview()
   populateKeyInspector()
   updateDirty()
@@ -1175,7 +1403,7 @@ function selectFile(path: string): void {
       selectedKeySections = []
       inspectorTab = "properties"
       refreshPreview()
-    } else if (isSkinInfoPath(path)) {
+    } else if (isSkinInfoPath(path) || isToolbarPath(path)) {
       inspectorTab = "properties"
     } else if (path !== layoutPath) {
       inspectorTab = "source"
@@ -1344,6 +1572,10 @@ function loadArchive(bytes: Uint8Array, path: string, isNew = false): void {
     archive?.names().some((name) => name.startsWith(`${value}/skin/`)),
   )
   if (!availableThemes.includes(theme.value)) theme.value = availableThemes[0] ?? "light"
+  const preferredDevice = localStorage.getItem("default-device")
+  if (preferredDevice && Array.from(device.options).some((option) => option.value === preferredDevice)) {
+    device.value = preferredDevice
+  }
   canvasWrap.classList.remove("empty")
   currentPath = path
   unsavedNew = isNew
@@ -1484,6 +1716,22 @@ for (const button of exportButtons) {
     )
   })
 }
+for (const button of appDialogButtons) {
+  button.addEventListener("click", () => {
+    const dialog = button.dataset.appDialog === "settings" ? settingsDialog : aboutDialog
+    dialog.showModal()
+  })
+}
+defaultDevice.value = localStorage.getItem("default-device") ?? device.value
+defaultDevice.addEventListener("change", () => {
+  localStorage.setItem("default-device", defaultDevice.value)
+})
+canvasBackground.value = localStorage.getItem("canvas-background") ?? "default"
+canvasWrap.dataset.background = canvasBackground.value
+canvasBackground.addEventListener("change", () => {
+  localStorage.setItem("canvas-background", canvasBackground.value)
+  canvasWrap.dataset.background = canvasBackground.value
+})
 undoButton.addEventListener("click", undo)
 redoButton.addEventListener("click", redo)
 browserOpen.addEventListener("change", async () => {
@@ -1539,17 +1787,80 @@ for (const field of keyFields) {
 for (const field of styleFields) {
   field.addEventListener("input", () => updateSelectedStyle(field))
 }
+for (const field of [...keyboardFields, ...styleFields]) {
+  if (!field.dataset.keyboardField?.endsWith("COLOR") && !field.dataset.styleField?.endsWith("COLOR")) continue
+  field.addEventListener("input", () => syncColorControl(field))
+  field.addEventListener("change", () => syncColorControl(field))
+}
 for (const field of backgroundStyleFields) {
   field.addEventListener("input", () => updateSelectedBackgroundStyle(field))
 }
 for (const field of keyboardFields) {
   field.addEventListener("change", () => updateKeyboard(field))
 }
+for (const field of toolbarFields) {
+  field.addEventListener("change", () => updateToolbar(field))
+}
 for (const field of skinFields) {
   field.addEventListener("input", () => updateSkinInfo(field))
 }
 for (const field of gapFields) {
   field.addEventListener("change", () => applyExactGap(field))
+}
+for (const picker of colorPickers) {
+  picker.addEventListener("click", (event) => {
+    event.preventDefault()
+    const key = picker.dataset.colorPickerFor ?? ""
+    const field = document.querySelector<HTMLInputElement>(
+      `[data-${key.startsWith("keyboard-") ? "keyboard" : "style"}-field="${CSS.escape(key.replace(/^(keyboard|style)-/, ""))}"]`,
+    )
+    if (!field) return
+    const value = field.value.trim().replace(/^#/, "")
+    const hex = value.length === 6 ? `FF${value}` : /^[0-9a-f]{8}$/i.test(value) ? value : "FFFFFFFF"
+    rgbaFields.r.value = String(Number.parseInt(hex.slice(2, 4), 16))
+    rgbaFields.g.value = String(Number.parseInt(hex.slice(4, 6), 16))
+    rgbaFields.b.value = String(Number.parseInt(hex.slice(6, 8), 16))
+    rgbaFields.a.value = String(Number.parseInt(hex.slice(0, 2), 16))
+    rgbaPicker.value = `#${hex.slice(2)}`
+    colorDialog.dataset.fieldKey = key
+    updateRgbaPreview()
+    colorDialog.showModal()
+  })
+  picker.addEventListener("input", () => {
+    const alpha = colorAlphas.find((item) => item.dataset.colorAlphaFor === picker.dataset.colorPickerFor)
+    writeColorControl(picker, Number(alpha?.value ?? 100))
+  })
+}
+function updateRgbaPreview(): void {
+  const r = Number(rgbaFields.r.value) || 0
+  const g = Number(rgbaFields.g.value) || 0
+  const b = Number(rgbaFields.b.value) || 0
+  const a = Number(rgbaFields.a.value) || 0
+  rgbaPicker.value = `#${[r, g, b].map((value) => Math.max(0, Math.min(255, value)).toString(16).padStart(2, "0")).join("")}`
+  rgbaPreview.style.backgroundColor = `rgba(${r}, ${g}, ${b}, ${a / 255})`
+}
+for (const field of Object.values(rgbaFields)) field.addEventListener("input", updateRgbaPreview)
+rgbaPicker.addEventListener("input", () => {
+  const hex = rgbaPicker.value.slice(1)
+  rgbaFields.r.value = String(Number.parseInt(hex.slice(0, 2), 16))
+  rgbaFields.g.value = String(Number.parseInt(hex.slice(2, 4), 16))
+  rgbaFields.b.value = String(Number.parseInt(hex.slice(4, 6), 16))
+  updateRgbaPreview()
+})
+colorDialog.querySelector("form")?.addEventListener("submit", (event) => {
+  if ((event.submitter as HTMLButtonElement | null)?.value !== "ok") return
+  const key = colorDialog.dataset.fieldKey ?? ""
+  const field = document.querySelector<HTMLInputElement>(
+    `[data-${key.startsWith("keyboard-") ? "keyboard" : "style"}-field="${CSS.escape(key.replace(/^(keyboard|style)-/, ""))}"]`,
+  )
+  if (!field) return
+  field.value = [rgbaFields.a, rgbaFields.r, rgbaFields.g, rgbaFields.b]
+    .map((item) => Math.max(0, Math.min(255, Number(item.value) || 0)).toString(16).padStart(2, "0"))
+    .join("").toUpperCase()
+  field.dispatchEvent(new Event(field.hasAttribute("data-keyboard-field") ? "change" : "input", { bubbles: true }))
+})
+for (const alpha of colorAlphas) {
+  alpha.addEventListener("input", () => writeColorControl(alpha, Number(alpha.value)))
 }
 for (const button of layoutActionButtons) {
   button.addEventListener("click", () => applyLayoutAction(button.dataset.layoutAction ?? ""))
@@ -1591,18 +1902,42 @@ for (const button of themeChoiceButtons) {
 for (const button of orientationChoiceButtons) {
   button.addEventListener("click", () => selectChoice(orientation, button.dataset.orientationChoice ?? "port"))
 }
-toolbarStrip.addEventListener("click", () => {
+candidateArea.addEventListener("click", () => {
   if (!isEditing()) return
   const path = toolbarStrip.dataset.path
   if (path) selectFile(path)
 })
 for (const button of stylePreviewButtons) {
   button.addEventListener("click", (event) => {
-    if (!(event.metaKey || event.ctrlKey)) return
+    if (!(event.metaKey || event.ctrlKey)) {
+      const visuals = processedPreviewVisuals.get(button)
+      if (!visuals?.length) return
+      drawVisualPreview(styleImagePreview, visuals, button.dataset.stylePreview?.startsWith("fore:") || button.hasAttribute("data-preview-foreground"))
+      styleImageDialog.showModal()
+      return
+    }
     const path = button.dataset.path
     if (!path) return
     selectFile(path)
     revealSourceFile(path)
+  })
+}
+for (const button of imagePreviewButtons) {
+  button.addEventListener("click", () => {
+    const visuals = imagePreviewVisuals.get(button.dataset.imagePreview ?? "")
+    if (!visuals?.length) return
+    drawVisualPreview(styleImagePreview, visuals, false)
+    styleImageDialog.showModal()
+  })
+}
+styleImageDialog.addEventListener("click", (event) => {
+  if (event.target === styleImageDialog) styleImageDialog.close()
+})
+for (const button of Array.from(editContextMenu.querySelectorAll<HTMLButtonElement>("[data-context-action]"))) {
+  button.addEventListener("click", () => {
+    if (button.dataset.contextAction === "copy") copySelectedKeys()
+    else deleteSelectedKeys()
+    editContextMenu.hidden = true
   })
 }
 device.addEventListener("change", () => {
@@ -1637,6 +1972,10 @@ window.addEventListener("keydown", (event) => {
 })
 window.addEventListener("pointerdown", (event) => {
   if (toolbarMore.open && !toolbarMore.contains(event.target as Node)) toolbarMore.open = false
+  if (!editContextMenu.hidden && !editContextMenu.contains(event.target as Node)) editContextMenu.hidden = true
+})
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") editContextMenu.hidden = true
 })
 window.addEventListener("beforeunload", (event) => {
   if (isTauri() || !hasUnsavedChanges()) return

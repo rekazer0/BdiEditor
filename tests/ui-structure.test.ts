@@ -28,7 +28,7 @@ test("visible static editor chrome declares the requested system symbols", () =>
   for (const name of [
     "plus",
     "folder",
-    "square.and.arrow.down",
+    "externaldrive",
     "arrow.uturn.backward",
     "arrow.uturn.forward",
     "ellipsis",
@@ -193,6 +193,61 @@ test("export menu exposes direct readable iOS and Android actions", () => {
   assert.match(main, /saveNative\(false, currentExportFormat\(\)\)/)
 })
 
+test("toolbar configurations expose parsed inspector fields", () => {
+  assert.match(html, /class="inspector-group toolbar-fields" hidden/)
+  for (const field of ["VIEW_RECT", "BACK_STYLE", "FORE_STYLE", "PADDING", "FIRST_FORE", "FIRST_BACK", "ICON1.FORE_STYLE", "ICON2.FORE_STYLE", "ICON3.FORE_STYLE"]) {
+    assert.match(html, new RegExp(`data-toolbar-field="${field.replace(".", "\\.")}"`))
+  }
+  assert.match(main, /isToolbarPath\(selectedPath\)/)
+  assert.match(main, /selectedDocument\?\.get\(key \? section : "CAND"/)
+  assert.match(main, /field\.addEventListener\("change", \(\) => updateToolbar\(field\)\)/)
+  assert.match(main, /candidateArea\.addEventListener\("click"/)
+})
+
+test("color controls preserve ARGB alpha while using native color inputs", () => {
+  assert.equal((html.match(/data-color-picker-for=/g) ?? []).length, 4)
+  assert.equal((html.match(/data-color-alpha-for=/g) ?? []).length, 4)
+  assert.match(main, /field\.value = `\$\{Math\.round\(Math\.max\(0, Math\.min\(1, alphaValue\)\) \* 255\)/)
+  assert.match(main, /syncColorControl\(field\)/)
+})
+
+test("key image fields preview processed atlas slices in a dialog", () => {
+  assert.match(html, /data-image-preview="normal"/)
+  assert.match(html, /data-image-preview="highlighted"/)
+  assert.match(html, /id="style-image-dialog"/)
+  assert.match(main, /updateImagePreviews\(\)/)
+  assert.match(main, /drawVisualPreview\(styleImagePreview, visuals, false\)/)
+})
+
+test("selected key source is highlighted only in the source view", () => {
+  assert.doesNotMatch(html, /id="selected-key-source"/)
+  assert.match(main, /highlightIni\(source\.value, selectedPath === layoutPath \? selectedKeySections/)
+})
+
+test("export moved left and more menu opens settings and about dialogs", () => {
+  assert.match(html, /data-app-dialog="settings"/)
+  assert.match(html, /data-app-dialog="about"/)
+  assert.match(html, /id="settings-dialog"/)
+  assert.match(html, /id="about-dialog"/)
+  assert.match(main, /dialog\.showModal\(\)/)
+  assert.match(html, /https:\/\/github\.com\/rekazer0\/BdiEdito/)
+})
+
+test("image preview closes from its backdrop without a close button", () => {
+  const dialog = html.slice(html.indexOf('<dialog id="style-image-dialog"'), html.indexOf("</dialog>", html.indexOf('<dialog id="style-image-dialog"')))
+  assert.doesNotMatch(dialog, /<button/)
+  assert.match(main, /event\.target === styleImageDialog\) styleImageDialog\.close\(\)/)
+})
+
+test("export menu stays above the workspace and source cursor uses matching font metrics", () => {
+  const titlebar = css.match(/\.titlebar\s*\{[^}]+\}/s)?.[0] ?? ""
+  const menu = css.match(/\.toolbar-menu\s*\{[^}]+\}/s)?.[0] ?? ""
+  assert.match(titlebar, /z-index:\s*20/)
+  assert.match(menu, /z-index:\s*100/)
+  assert.match(css, /#source-highlight code\s*\{[^}]*font:\s*inherit/s)
+  assert.doesNotMatch(css, /\.token-section\s*\{[^}]*font-weight/s)
+})
+
 test("default template is built in and cannot be replaced from the interface", () => {
   assert.doesNotMatch(html, /id="set-default"/)
   assert.doesNotMatch(main, /defaultTemplate|setDefaultTemplate|setDefaultButton|browserTemplate/)
@@ -205,6 +260,49 @@ test("inspector contains previews for resolved background and foreground styles"
   assert.match(html, /data-style-preview="fore:highlighted"/)
   assert.equal((html.match(/data-style-preview="[^"]+"[^>]*>\s*<canvas/g) ?? []).length, 4)
   assert.match(css, /\.style-preview-button\s*\{[^}]*width:\s*36px/s)
+})
+
+test("interaction preview starts a press instead of returning after selection", () => {
+  assert.doesNotMatch(preview, /this\.mode === "edit" \|\| !this\.selected\.has\(key\.section\)/)
+  assert.match(preview, /this\.active = \{\s*key,/)
+})
+
+test("Shift selects the complete key range from the anchor", () => {
+  assert.match(preview, /event\.shiftKey && this\.selectionAnchor/)
+  assert.match(preview, /sections\.slice\(Math\.min\(from, to\), Math\.max\(from, to\) \+ 1\)/)
+})
+
+test("canvas mode keeps candidate and toolbar above the keyboard", () => {
+  assert.match(css, /\.device-shell\.canvas-only #candidate-area\s*\{[^}]*height:\s*133px/s)
+  assert.match(css, /\.device-shell\.canvas-only \.keyboard-dock\s*\{[^}]*grid-template-rows:\s*133px auto/s)
+})
+
+test("selected source scrolls to a full-row highlight", () => {
+  assert.match(main, /function scrollSelectedSource\(\)/)
+  assert.match(main, /line \* lineHeight - source\.clientHeight \/ 3/)
+  assert.match(css, /\.token-selected::before\s*\{[^}]*width:\s*calc\(100vw \+ 16px\)/s)
+  assert.match(css, /\.token-selected::before\s*\{[^}]*box-shadow:\s*inset 3px 0/s)
+  assert.doesNotMatch(css, /\.token-selected(?:\s|::before)*\s*\{[^}]*text-decoration/s)
+})
+
+test("settings expose canvas backgrounds and edit mode exposes key context actions", () => {
+  assert.match(html, /id="canvas-background"/)
+  assert.match(html, /value="checkerboard">马赛克/)
+  assert.match(html, /data-context-action="copy"/)
+  assert.match(html, /data-context-action="delete"/)
+  assert.match(main, /function copySelectedKeys\(\)/)
+  assert.match(main, /function deleteSelectedKeys\(\)/)
+})
+
+test("window and about names match the GitHub project and include the version", () => {
+  assert.match(html, /<title>BdiEdito v0\.2\.0<\/title>/)
+  assert.match(html, /关于 BdiEdito v0\.2\.0/)
+})
+
+test("new-project chooser includes the four dust templates", () => {
+  for (const id of ["dust-ios-14", "dust-android-26-9", "dust-ios-26-9", "dust-ios-18"]) {
+    assert.match(html, new RegExp(`value="${id}"`))
+  }
 })
 
 test("candidate DOM and key canvas apply the merged skin font family and weight", () => {

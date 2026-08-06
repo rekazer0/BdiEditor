@@ -283,6 +283,7 @@ export class Preview {
     startedAt: number
   }
   private selected = new Set<string>()
+  private selectionAnchor?: string
   private drawID = 0
 
   constructor(
@@ -290,6 +291,7 @@ export class Preview {
     onEvent: (event: PreviewEvent) => void,
     onSelect: (sections: string[]) => void,
     toolbarSlots = false,
+    onContextMenu?: (section: string, event: MouseEvent) => void,
   ) {
     this.canvas = canvas
     this.onEvent = onEvent
@@ -297,6 +299,12 @@ export class Preview {
     this.toolbarSlots = toolbarSlots
     canvas.addEventListener("pointerdown", (event) => this.pointerDown(event))
     canvas.addEventListener("pointerup", (event) => this.pointerUp(event))
+    canvas.addEventListener("contextmenu", (event) => {
+      const key = this.hit(this.point(event))
+      if (!key || !onContextMenu) return
+      event.preventDefault()
+      onContextMenu(key.section, event)
+    })
     canvas.addEventListener("pointercancel", () => {
       this.active = undefined
       void this.draw()
@@ -307,6 +315,11 @@ export class Preview {
     this.mode = mode
     this.active = undefined
     this.canvas.style.cursor = mode === "edit" ? "default" : "pointer"
+    void this.draw()
+  }
+
+  setSelected(sections: readonly string[]): void {
+    this.selected = new Set(sections)
     void this.draw()
   }
 
@@ -343,7 +356,7 @@ export class Preview {
     void this.draw()
   }
 
-  private point(event: PointerEvent): { x: number; y: number } {
+  private point(event: Pick<MouseEvent, "clientX" | "clientY">): { x: number; y: number } {
     const bounds = this.canvas.getBoundingClientRect()
     return {
       x: ((event.clientX - bounds.left) / bounds.width) * this.canvas.width,
@@ -374,14 +387,22 @@ export class Preview {
       }
       return
     }
-    if (this.mode === "edit" && isAdditiveSelection(event)) {
+    if (this.mode === "edit" && event.shiftKey && this.selectionAnchor) {
+      const sections = this.keys.filter((item) => item.editable).map((item) => item.section)
+      const from = sections.indexOf(this.selectionAnchor)
+      const to = sections.indexOf(key.section)
+      if (from >= 0 && to >= 0) {
+        this.selected = new Set(sections.slice(Math.min(from, to), Math.max(from, to) + 1))
+      }
+    } else if (this.mode === "edit" && isAdditiveSelection(event)) {
       if (this.selected.has(key.section)) this.selected.delete(key.section)
       else this.selected.add(key.section)
     } else if (!this.selected.has(key.section) || this.mode === "preview") {
       this.selected = new Set([key.section])
     }
+    if (this.mode === "edit" && !event.shiftKey) this.selectionAnchor = key.section
     this.onSelect([...this.selected])
-    if (this.mode === "edit" || !this.selected.has(key.section)) {
+    if (this.mode === "edit") {
       void this.draw()
       return
     }
@@ -411,8 +432,10 @@ export class Preview {
   private fitCanvas(): void {
     const maxX = Math.max(this.panelWidth, ...this.keys.map((key) => key.rect.x + key.rect.width))
     const maxY = Math.max(this.panelHeight, ...this.keys.map((key) => key.rect.y + key.rect.height))
-    this.canvas.width = Math.ceil(maxX)
-    this.canvas.height = Math.ceil(maxY)
+    const width = Math.ceil(maxX)
+    const height = Math.ceil(maxY)
+    if (this.canvas.width !== width) this.canvas.width = width
+    if (this.canvas.height !== height) this.canvas.height = height
   }
 
   private drawNineSlice(

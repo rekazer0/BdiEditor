@@ -32,9 +32,17 @@ function highlightLine(line: string): string {
   return `${escapeHTML(entry[1])}<span class="token-key">${escapeHTML(entry[2])}</span><span class="token-operator">${escapeHTML(entry[3])}</span>${highlightValue(entry[4])}`
 }
 
-export function highlightIni(source: string): string {
+export function highlightIni(source: string, selectedSections: readonly string[] = []): string {
+  const selected = new Set(selectedSections)
+  let section = ""
   return source
     .split(/(\r\n|\n|\r)/)
-    .map((part) => (/^\r?\n$|^\r$/.test(part) ? part : highlightLine(part)))
+    .map((part) => {
+      if (/^\r?\n$|^\r$/.test(part)) return part
+      const match = part.match(/^\s*\[([^\]]+)]\s*$/)
+      if (match) section = match[1]
+      const line = highlightLine(part)
+      return selected.has(section) ? `<span class="token-selected">${line}</span>` : line
+    })
     .join("")
 }
