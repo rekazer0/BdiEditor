@@ -13,26 +13,20 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cat > release-notes.md <<'EOF'
-          BdiEdito v0.2.0
-
-          ## 新功能
-          - 候选栏、工具栏、整体键盘和按键样式检查器，支持处理后图片预览
-          - RGBA 颜色选择器、画布背景设置、右键复制/删除、Shift 连续范围选择
-          - 源代码整行高亮与自动定位
-          - 4 套尘埃内置皮肤模板
-
-          ## 修复
-          - 修复画布交互预览错位、撤销/返回预览闪烁、导出菜单遮挡和工具栏尺寸问题
-          - 修复编辑器光标错位、图标模糊、手机预览布局及源码高亮显示问题
-          EOF
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v version="$VERSION" '
+            $0 ~ "^## " version "([[:space:]]|$)" { printing = 1 }
+            printing && $0 ~ "^## " && $0 !~ "^## " version "([[:space:]]|$)" { exit }
+            printing { print }
+          ' CHANGELOG.md > release-notes.md
           gh release create "${{ github.ref_name }}" \
             --repo "${{ github.repository }}" \
-            --title "BdiEdito v0.2.0" \
+            --title "BdiEdito ${{ github.ref_name }}" \
             --notes-file release-notes.md
 
   build-tauri:
@@ -42,7 +36,7 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            args: --bundles app
+            args: --bundles dmg
           - platform: windows-latest
             args: --bundles nsis
     runs-on: ${{ matrix.platform }}
@@ -59,12 +53,6 @@ jobs:
         run: npm ci
       - name: Build bundles
         run: npm run tauri build -- ${{ matrix.args }}
-      - name: Package macOS .app
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          cd src-tauri/target/release/bundle/macos
-          ditto -c -k --keepParent "BdiEdito v0.2.0.app" "BdiEdito-v0.2.0-macos.app.zip"
       - name: Upload release assets
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
@@ -72,12 +60,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd src-tauri/target/release/bundle
+          shopt -s nullglob
           if [ "$RUNNER_OS" = "macOS" ]; then
             gh release upload "${{ github.ref_name }}" \
-              "macos/BdiEdito-v0.2.0-macos.app.zip" \
+              dmg/*.dmg \
               --repo "${{ github.repository }}" --clobber
           else
-            shopt -s nullglob
             gh release upload "${{ github.ref_name }}" \
               nsis/*.exe \
               --repo "${{ github.repository }}" --clobber

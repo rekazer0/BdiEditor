@@ -85,7 +85,7 @@ CI=true npm run tauri build -- --bundles app
 npm run tauri build -- --bundles nsis
 ```
 
-构建结果位于 `src-tauri/target/release/bundle/nsis/`。推送 `v*` 标签会由 GitHub Actions 同时构建并上传 macOS `.app.zip` 与 Windows `.exe`。
+构建结果位于 `src-tauri/target/release/bundle/nsis/`。推送 `v*` 标签会由 GitHub Actions 同时构建并上传 macOS `.dmg` 与 Windows `.exe` 到 GitHub Release。
 
 ## 兼容性
 
