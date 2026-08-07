@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { message, open, save } from "@tauri-apps/plugin-dialog"
 import "./style.css"
-import { layoutLetterKeyCount, previewPageTarget } from "./actions.ts"
+import { previewPageTarget } from "./actions.ts"
 import {
   AtlasResolver,
   canvasFontFamily,
@@ -314,6 +314,13 @@ const fallbackSymbolPaths: Record<string, string[]> = {
   "info.circle": ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18", "M12 10v7", "M12 7h.01"],
   keyboard: ["M3 6h18v12H3z", "M6 10h2m2 0h2m2 0h2m2 0h1M7 14h10"],
   "square.grid.2x2": ["M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"],
+  asterisk: ["M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"],
+  pencil: ["m4 20 4.5-1 11-11-3.5-3.5-11 11z", "m14.5 6 3.5 3.5"],
+  "list.bullet": ["M9 6h11M9 12h11M9 18h11", "M4 6h.01M4 12h.01M4 18h.01"],
+  gearshape: ["M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8", "M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"],
+  "text.bubble": ["M4 4h16v12H9l-5 4z", "M8 8h8M8 12h5"],
+  app: ["M4 4h16v16H4z", "M8 8h8v8H8z"],
+  "rectangle.and.hand.point": ["M3 4h18v14H3z", "M8 8h8M12 8v6m0 0 3-3m-3 3-3-3"],
   paintpalette: ["M12 3a9 9 0 1 0 0 18h2a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h9a9 9 0 0 0-6-14", "M7 9h.01M10 6h.01M15 7h.01M18 11h.01"],
   folder: ["M3 6h7l2 2h9l-2 10H5z", "M5 6V4h6l2 2"],
   "doc.text": ["M6 3h8l4 4v14H6z", "M14 3v5h5M9 12h6M9 16h6"],
@@ -718,11 +725,6 @@ function setSourceValue(text: string): void {
   updateSourceHighlight()
 }
 
-function layoutKeyCount(path: string): number {
-  if (!archive?.isText(path)) return 0
-  return layoutLetterKeyCount(IniDocument.parse(archive.getText(path)))
-}
-
 function currentConfigPath(name: string): string {
   return `${theme.value}/skin/${orientation.value}/${name}`
 }
@@ -1018,13 +1020,13 @@ function describeAction(value: string): string {
 function addNavButton(
   parent: HTMLElement,
   label: string,
-  meta: string,
   path: string,
   className: string,
+  icon?: string,
 ): void {
   if (!archive?.names().includes(path)) return
   const button = document.createElement("button")
-  button.className = className
+  button.className = `nav-item ${className}`
   button.dataset.path = path
   const navigationSystemSymbols: Record<string, string> = {
     "nav-overview": "info.circle",
@@ -1032,17 +1034,15 @@ function addNavButton(
     "nav-component": "square.grid.2x2",
     "nav-style": "paintpalette",
   }
-  button.append(createSystemSymbol(navigationSystemSymbols[className] ?? "doc"))
+  button.append(createSystemSymbol(icon ?? navigationSystemSymbols[className] ?? "doc"))
   const labelNode = document.createElement("span")
   labelNode.className = "nav-label"
   labelNode.textContent = label
   button.append(labelNode)
-  if (meta) {
-    const metaNode = document.createElement("span")
-    metaNode.className = "nav-meta"
-    metaNode.textContent = meta
-    button.append(metaNode)
-  }
+  const metaNode = document.createElement("span")
+  metaNode.className = "nav-meta"
+  metaNode.textContent = path.split("/").pop() ?? path
+  button.append(metaNode)
   button.addEventListener("click", () => {
     if (path.endsWith("py_9.ini") || path.endsWith("py_26.ini")) {
       layout.value = path.endsWith("_9.ini") ? "py_9.ini" : "py_26.ini"
@@ -1450,78 +1450,64 @@ function renderFiles(): void {
     overview.append(heading)
   }
 
-  section("皮肤")
+  type NavEntry = { group: string; label: string; path: string; className: string; icon: string }
+  const entries: NavEntry[] = []
   const overviewPath = archive.names().includes(`${theme.value}/skin/Info.txt`)
     ? `${theme.value}/skin/Info.txt`
     : "Info.txt"
-  addNavButton(overview, "皮肤信息", "名称、作者和版本", overviewPath, "nav-overview")
+  entries.push({ group: "皮肤", label: "皮肤信息", path: overviewPath, className: "nav-overview", icon: "info.circle" })
 
-  section("键盘布局")
-  const ninePath = currentConfigPath("py_9.ini")
-  const nineCount = layoutKeyCount(ninePath)
-  addNavButton(
-    overview,
-    "9键",
-    nineCount && nineCount !== 9 ? `九键基础 · 自定义 ${nineCount} 字母键` : `${nineCount || 9} 个字母键`,
-    ninePath,
-    "nav-layout",
-  )
-  const twentySixPath = currentConfigPath("py_26.ini")
-  addNavButton(
-    overview,
-    "26 键",
-    `${layoutKeyCount(twentySixPath) || 26} 个字母键`,
-    twentySixPath,
-    "nav-layout",
-  )
-
-  section("键盘组件")
-  const candidatePath = toolbarConfigPath()
-  if (candidatePath) addNavButton(overview, "候选栏与工具栏", candidatePath.split("/").pop() ?? "", candidatePath, "nav-component")
-  const components = [
-    ["数字键盘", "num_9.ini"],
-    ["符号面板", "symbol.ini"],
-    ["手写面板", "hw_grid.ini"],
-    ["输入法标识", "logo.ini"],
-  ]
-  for (const [label, name] of components) {
-    addNavButton(overview, label, name, currentConfigPath(name), "nav-component")
+  const iniTypes: Record<string, Omit<NavEntry, "path">> = {
+    "py_9.ini": { group: "键盘布局", label: "中文 9 键", className: "nav-layout", icon: "keyboard" },
+    "py_26.ini": { group: "键盘布局", label: "中文 26 键", className: "nav-layout", icon: "keyboard" },
+    "def_9.ini": { group: "键盘布局", label: "默认 9 键", className: "nav-layout", icon: "keyboard" },
+    "def_26.ini": { group: "键盘布局", label: "默认 26 键", className: "nav-layout", icon: "keyboard" },
+    "en_9.ini": { group: "键盘布局", label: "英文 9 键", className: "nav-layout", icon: "keyboard" },
+    "en_9s.ini": { group: "键盘布局", label: "英文 9 键 Shift", className: "nav-layout", icon: "keyboard" },
+    "en_26.ini": { group: "键盘布局", label: "英文 26 键", className: "nav-layout", icon: "keyboard" },
+    "en_26s.ini": { group: "键盘布局", label: "英文 26 键 Shift", className: "nav-layout", icon: "keyboard" },
+    "bh.ini": { group: "键盘布局", label: "笔画键盘", className: "nav-layout", icon: "pencil" },
+    "num_9.ini": { group: "数字与符号", label: "数字键盘", className: "nav-component", icon: "square.grid.2x2" },
+    "num_26.ini": { group: "数字与符号", label: "26 键数字键盘", className: "nav-component", icon: "square.grid.2x2" },
+    "num2.ini": { group: "数字与符号", label: "数字键盘 2", className: "nav-component", icon: "square.grid.2x2" },
+    "symbol.ini": { group: "数字与符号", label: "符号面板", className: "nav-component", icon: "asterisk" },
+    "sym_26_cn.ini": { group: "数字与符号", label: "中文 26 键符号", className: "nav-component", icon: "asterisk" },
+    "hw_grid.ini": { group: "手写与选择", label: "手写面板", className: "nav-component", icon: "pencil" },
+    "hw_full.ini": { group: "手写与选择", label: "全屏手写", className: "nav-component", icon: "pencil" },
+    "sel_ch.ini": { group: "手写与选择", label: "中文选择栏", className: "nav-component", icon: "list.bullet" },
+    "sel_en.ini": { group: "手写与选择", label: "英文选择栏", className: "nav-component", icon: "list.bullet" },
+    "help.ini": { group: "手写与选择", label: "帮助面板", className: "nav-component", icon: "list.bullet" },
+    "logo.ini": { group: "键盘组件", label: "输入法标识", className: "nav-component", icon: "app" },
+    "gen.ini": { group: "配置与资源", label: "键盘基础配置", className: "nav-style", icon: "gearshape" },
   }
-  const hintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
-  if (hintPath) addNavButton(overview, "按键气泡", hintPath.split("/").pop() ?? "", hintPath, "nav-component")
-
-  const overviewPaths = new Set(
-    Array.from(overview.querySelectorAll<HTMLButtonElement>("button[data-path]"), (button) => button.dataset.path ?? ""),
-  )
-  const extraLayouts = archive.names().sort().flatMap((path) => {
-    if (!path.startsWith(`${theme.value}/skin/${orientation.value}/`) || !/\.ini$/i.test(path) || overviewPaths.has(path) || !archive?.isText(path)) return []
-    const document = IniDocument.parse(archive.getText(path))
-    const items = previewItems(document)
-    return items.some((item) => item.editable) ? [{ path, count: items.filter((item) => item.editable).length }] : []
-  })
-  if (extraLayouts.length) {
-    section("其他布局")
-    for (const item of extraLayouts) {
-      const name = item.path.split("/").pop() ?? item.path
-      addNavButton(overview, name.replace(/\.ini$/i, ""), `${item.count} 个按键`, item.path, "nav-layout")
+  const configPrefix = `${theme.value}/skin/${orientation.value}/`
+  for (const path of archive.names().sort()) {
+    if (!path.startsWith(configPrefix) || path.slice(configPrefix.length).includes("/") || !/\.ini$/i.test(path)) continue
+    const name = path.split("/").pop() ?? path
+    const info = iniTypes[name] ?? {
+      group: "扩展布局",
+      label: name.replace(/\.ini$/i, "").replaceAll("_", " "),
+      className: "nav-layout",
+      icon: "keyboard",
     }
+    entries.push({ ...info, path })
   }
 
-  section("外观与资源")
-  addNavButton(
-    overview,
-    "按键样式",
-    "颜色、图片和按下状态",
-    styleConfigPath(),
-    "nav-style",
+  const candidatePath = toolbarConfigPath()
+  if (candidatePath) entries.push({ group: "键盘组件", label: "候选栏与工具栏", path: candidatePath, className: "nav-component", icon: "text.bubble" })
+  const hintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
+  if (hintPath) entries.push({ group: "键盘组件", label: "按键气泡", path: hintPath, className: "nav-component", icon: "rectangle.and.hand.point" })
+  entries.push(
+    { group: "配置与资源", label: "按键样式", path: styleConfigPath(), className: "nav-style", icon: "paintpalette" },
+    { group: "配置与资源", label: "图片资源", path: `${theme.value}/skin/res/btn.png`, className: "nav-style", icon: "photo" },
   )
-  addNavButton(
-    overview,
-    "图片资源",
-    "按键图集",
-    `${theme.value}/skin/res/btn.png`,
-    "nav-style",
-  )
+
+  for (const group of ["皮肤", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "配置与资源", "扩展布局"]) {
+    const grouped = entries.filter((entry) => entry.group === group && archive?.names().includes(entry.path))
+    if (!grouped.length) continue
+    section(group)
+    for (const entry of grouped) addNavButton(overview, entry.label, entry.path, entry.className, entry.icon)
+  }
 
   const sourceFiles = document.createElement("div")
   sourceFiles.className = "raw-files"

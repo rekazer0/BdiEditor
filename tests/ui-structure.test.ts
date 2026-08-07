@@ -126,7 +126,8 @@ test("layout remains hidden state while preview controls replace inspector layou
   assert.match(html, /<select id="layout" hidden>/)
   assert.doesNotMatch(html, /id="layout-context"/)
   assert.doesNotMatch(html, /data-layout-choice/)
-  assert.match(main, /addNavButton\(\s*overview,\s*"9键",/s)
+  assert.match(main, /"py_9\.ini": \{ group: "键盘布局"/)
+  assert.match(main, /"py_26\.ini": \{ group: "键盘布局"/)
 })
 
 test("phone keyboard surface clips its translucent material to rounded corners", () => {
@@ -358,10 +359,15 @@ test("app dialogs close only when their backdrop is clicked", () => {
   assert.match(main, /if \(event\.target === dialog\) dialog\.close\(\)/)
 })
 
-test("overview includes every previewable ini layout without duplicating curated entries", () => {
-  assert.match(main, /const overviewPaths = new Set/)
-  assert.match(main, /const items = previewItems\(document\)[\s\S]*?items\.some\(\(item\) => item\.editable\)/)
-  assert.match(main, /section\("其他布局"\)/)
+test("overview classifies ini files and uses a consistent filename row", () => {
+  for (const category of ["键盘布局", "数字与符号", "手写与选择", "键盘组件", "配置与资源"]) {
+    assert.match(main, new RegExp(`group: "${category}"`))
+  }
+  for (const icon of ["keyboard", "square.grid.2x2", "asterisk", "pencil", "list.bullet", "gearshape"]) {
+    assert.match(main, new RegExp(`icon: "${icon.replaceAll(".", "\\.")}"`))
+  }
+  assert.match(main, /metaNode\.textContent = path\.split\("\/"\)\.pop\(\) \?\? path/)
+  assert.match(main, /button\.className = `nav-item \$\{className\}`/)
 })
 
 test("source file clicks open text files in the source inspector", () => {
@@ -370,7 +376,7 @@ test("source file clicks open text files in the source inspector", () => {
 })
 
 test("preview toolbar centers the device selector and toggles canvas guides", () => {
-  assert.match(html, /id="toggle-guides"[^>]*aria-pressed="false"/)
+  assert.match(html, /id="toggle-guides"[^>]*aria-label="辅助线"[^>]*title="辅助线"[^>]*aria-pressed="false"[^>]*>[\s\S]*?data-system-symbol="ruler"/)
   assert.match(main, /preview\.setGuides\(guidesVisible\)/)
   assert.match(main, /toolbarPreview\.setGuides\(guidesVisible\)/)
   assert.match(preview, /setGuides\(enabled: boolean\)/)

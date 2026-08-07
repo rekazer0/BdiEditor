@@ -507,15 +507,21 @@ h2 {
   transform: translateY(-50%);
 }
 
-#files button.nav-layout {
-  min-height: 40px;
-  padding-left: 35px;
+.sidebar-overview button.nav-item {
+  min-height: 42px;
+  padding: 5px 8px 5px 38px;
 }
 
-#files button.nav-layout > .system-symbol {
-  left: 10px;
+.sidebar-overview button.nav-item > .system-symbol {
+  left: 11px;
   color: var(--secondary);
-  font-size: 15px;
+  font-size: 17px;
+}
+
+.sidebar-overview button.nav-item .nav-label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .nav-label,
@@ -530,9 +536,10 @@ h2 {
 }
 
 .nav-meta {
-  margin-top: 1px;
+  margin-top: 2px;
   color: var(--secondary);
-  font-size: 9px;
+  font-size: 10px;
+  line-height: 1.2;
 }
 
 #files button:hover:not(:disabled) {
@@ -593,12 +600,13 @@ h2 {
 }
 
 .preview-tool-toggle {
+  width: 27px;
   height: 27px;
   margin-right: auto;
-  padding: 0 10px;
+  padding: 0;
   border-radius: 7px;
   color: var(--secondary);
-  font-size: 10px;
+  font-size: 15px;
   transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
 }
 
