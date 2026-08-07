@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { message, open, save } from "@tauri-apps/plugin-dialog"
 import "./style.css"
-import { previewPageTarget } from "./actions.ts"
+import { layoutLetterKeyCount, previewPageTarget } from "./actions.ts"
 import {
   AtlasResolver,
   canvasFontFamily,
@@ -74,6 +74,7 @@ const assetImage = $("#asset-image") as HTMLImageElement
 const replaceAssetButton = $("#replace-asset") as HTMLButtonElement
 const assetBackButton = $("#asset-back") as HTMLButtonElement
 const files = $("#files")
+const sidebarViewButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-sidebar-view]"))
 const documentName = $("#document-name")
 const sourceName = $("#source-name")
 const dirty = $("#dirty")
@@ -168,6 +169,7 @@ let imagePreviewDrawID = 0
 const imagePreviewVisuals = new Map<string, Visual[]>()
 const processedPreviewVisuals = new Map<HTMLButtonElement, Visual[]>()
 let selectedFileButton: HTMLButtonElement | undefined
+let sidebarView: "overview" | "source" = "overview"
 
 const deviceGeometryProperties = [
   "--keyboard-height-port",
@@ -185,6 +187,7 @@ const preview = new Preview(
     handlePreviewEvent(event)
   },
   (sections) => {
+    if (selectedPath !== layoutPath) selectFile(layoutPath, "overview")
     selectedKeySections = sections
     populateKeyInspector()
     updateSourceHighlight()
@@ -205,11 +208,7 @@ function handlePreviewEvent(event: PreviewEvent): void {
   if (target) {
     const path = currentConfigPath(target)
     if (archive?.isText(path)) {
-      layoutPath = path
-      layoutDocument = IniDocument.parse(archive.getText(path))
-      selectedKeySections = []
-      refreshPreview()
-      populateKeyInspector()
+      selectFile(path, "overview")
       eventLog.textContent += ` → 已切换预览到 ${target}`
       return
     }
@@ -719,12 +718,7 @@ function setSourceValue(text: string): void {
 
 function layoutKeyCount(path: string): number {
   if (!archive?.isText(path)) return 0
-  const document = IniDocument.parse(archive.getText(path))
-  return document.sections().filter((section) => {
-    if (!/^KEY\d+$/.test(section)) return false
-    const center = document.get(section, "CENTER")?.trim() ?? ""
-    return center !== "" && !/^F\d+$/.test(center)
-  }).length
+  return layoutLetterKeyCount(IniDocument.parse(archive.getText(path)))
 }
 
 function currentConfigPath(name: string): string {
@@ -1382,7 +1376,16 @@ function isTextEditingTarget(target: EventTarget | null): boolean {
   return Boolean(target.closest("input, textarea, select, button, [contenteditable]"))
 }
 
-function selectFile(path: string): void {
+function setSidebarView(view: "overview" | "source"): void {
+  sidebarView = view
+  for (const button of sidebarViewButtons) {
+    button.classList.toggle("active", button.dataset.sidebarView === view)
+  }
+  files.querySelector<HTMLElement>(".sidebar-overview")?.toggleAttribute("hidden", view !== "overview")
+  files.querySelector<HTMLElement>(".raw-files")?.toggleAttribute("hidden", view !== "source")
+}
+
+function selectFile(path: string, preferredSidebarView = sidebarView): void {
   if (archive?.isImage(path) && selectedPath && !archive.isImage(selectedPath)) {
     assetReturnPath = selectedPath
   }
@@ -1418,7 +1421,13 @@ function selectFile(path: string): void {
   updateInspectorView()
   if (!quickInspector.hidden) populateKeyInspector()
   selectedFileButton?.classList.remove("selected")
-  selectedFileButton = files.querySelector<HTMLButtonElement>(`button[data-path="${CSS.escape(path)}"]`) ?? undefined
+  const preferredContainer = files.querySelector(preferredSidebarView === "overview" ? ".sidebar-overview" : ".raw-files")
+  selectedFileButton = preferredContainer?.querySelector<HTMLButtonElement>(`button[data-path="${CSS.escape(path)}"]`)
+    ?? files.querySelector<HTMLButtonElement>(`button[data-path="${CSS.escape(path)}"]`)
+    ?? undefined
+  if (selectedFileButton) {
+    setSidebarView(selectedFileButton.closest(".raw-files") ? "source" : "overview")
+  }
   selectedFileButton?.classList.add("selected")
 }
 
@@ -1427,24 +1436,28 @@ function renderFiles(): void {
   selectedFileButton = undefined
   if (!archive) return
 
+  const overview = document.createElement("div")
+  overview.className = "sidebar-overview"
+  files.append(overview)
+
   const section = (title: string) => {
     const heading = document.createElement("div")
     heading.className = "nav-section"
     heading.textContent = title
-    files.append(heading)
+    overview.append(heading)
   }
 
   section("皮肤")
   const overviewPath = archive.names().includes(`${theme.value}/skin/Info.txt`)
     ? `${theme.value}/skin/Info.txt`
     : "Info.txt"
-  addNavButton(files, "皮肤信息", "名称、作者和版本", overviewPath, "nav-overview")
+  addNavButton(overview, "皮肤信息", "名称、作者和版本", overviewPath, "nav-overview")
 
   section("键盘布局")
   const ninePath = currentConfigPath("py_9.ini")
   const nineCount = layoutKeyCount(ninePath)
   addNavButton(
-    files,
+    overview,
     "9键",
     nineCount && nineCount !== 9 ? `九键基础 · 自定义 ${nineCount} 字母键` : `${nineCount || 9} 个字母键`,
     ninePath,
@@ -1452,7 +1465,7 @@ function renderFiles(): void {
   )
   const twentySixPath = currentConfigPath("py_26.ini")
   addNavButton(
-    files,
+    overview,
     "26 键",
     `${layoutKeyCount(twentySixPath) || 26} 个字母键`,
     twentySixPath,
@@ -1461,7 +1474,7 @@ function renderFiles(): void {
 
   section("键盘组件")
   const candidatePath = toolbarConfigPath()
-  if (candidatePath) addNavButton(files, "候选栏与工具栏", candidatePath.split("/").pop() ?? "", candidatePath, "nav-component")
+  if (candidatePath) addNavButton(overview, "候选栏与工具栏", candidatePath.split("/").pop() ?? "", candidatePath, "nav-component")
   const components = [
     ["数字键盘", "num_9.ini"],
     ["符号面板", "symbol.ini"],
@@ -1469,35 +1482,29 @@ function renderFiles(): void {
     ["输入法标识", "logo.ini"],
   ]
   for (const [label, name] of components) {
-    addNavButton(files, label, name, currentConfigPath(name), "nav-component")
+    addNavButton(overview, label, name, currentConfigPath(name), "nav-component")
   }
   const hintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
-  if (hintPath) addNavButton(files, "按键气泡", hintPath.split("/").pop() ?? "", hintPath, "nav-component")
+  if (hintPath) addNavButton(overview, "按键气泡", hintPath.split("/").pop() ?? "", hintPath, "nav-component")
 
   section("外观与资源")
   addNavButton(
-    files,
+    overview,
     "按键样式",
     "颜色、图片和按下状态",
     styleConfigPath(),
     "nav-style",
   )
   addNavButton(
-    files,
+    overview,
     "图片资源",
     "按键图集",
     `${theme.value}/skin/res/btn.png`,
     "nav-style",
   )
 
-  const divider = document.createElement("div")
-  divider.className = "nav-divider"
-  files.append(divider)
-  const details = document.createElement("details")
-  details.className = "raw-files"
-  const summary = document.createElement("summary")
-  summary.textContent = `高级 · 源文件 (${archive.names().filter((name) => !name.endsWith("/")).length})`
-  details.append(summary)
+  const sourceFiles = document.createElement("div")
+  sourceFiles.className = "raw-files"
   type SourceNode = { folders: Map<string, SourceNode>; paths: string[] }
   const root: SourceNode = { folders: new Map(), paths: [] }
   for (const path of archive.names().filter((name) => !name.endsWith("/"))) {
@@ -1548,8 +1555,9 @@ function renderFiles(): void {
       parent.append(button)
     }
   }
-  appendNode(details, root)
-  files.append(details)
+  appendNode(sourceFiles, root)
+  files.append(sourceFiles)
+  setSidebarView(sidebarView)
 }
 
 function revealSourceFile(path: string): void {
@@ -1721,6 +1729,14 @@ for (const button of appDialogButtons) {
     const dialog = button.dataset.appDialog === "settings" ? settingsDialog : aboutDialog
     dialog.showModal()
   })
+}
+for (const dialog of [settingsDialog, aboutDialog]) {
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close()
+  })
+}
+for (const button of sidebarViewButtons) {
+  button.addEventListener("click", () => setSidebarView(button.dataset.sidebarView === "source" ? "source" : "overview"))
 }
 defaultDevice.value = localStorage.getItem("default-device") ?? device.value
 defaultDevice.addEventListener("change", () => {

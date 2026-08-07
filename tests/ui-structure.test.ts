@@ -126,7 +126,7 @@ test("layout remains hidden state while preview controls replace inspector layou
   assert.match(html, /<select id="layout" hidden>/)
   assert.doesNotMatch(html, /id="layout-context"/)
   assert.doesNotMatch(html, /data-layout-choice/)
-  assert.match(main, /addNavButton\(\s*files,\s*"9键",/s)
+  assert.match(main, /addNavButton\(\s*overview,\s*"9键",/s)
 })
 
 test("phone keyboard surface clips its translucent material to rounded corners", () => {
@@ -339,4 +339,21 @@ test("selecting a PNG opens Properties and disables Source", () => {
     main,
     /const available =\s*tab === "properties"\s*\? imageSelected \|\| propertiesAvailable\s*:\ !imageSelected && Boolean\(selectedPath\)/s,
   )
+})
+
+test("preview interactions keep the sidebar on the rendered keyboard file", () => {
+  assert.match(main, /if \(selectedPath !== layoutPath\) selectFile\(layoutPath,\s*"overview"\)/)
+  assert.match(main, /if \(target\)[\s\S]*?selectFile\(path\)/)
+})
+
+test("sidebar heading switches between overview and source files", () => {
+  assert.match(html, /class="sidebar-view-control[^"]*"[^>]*aria-label="左侧视图"/)
+  assert.match(html, /data-sidebar-view="overview"[^>]*>概览/)
+  assert.match(html, /data-sidebar-view="source"[^>]*>源文件/)
+  assert.match(main, /function setSidebarView\(/)
+})
+
+test("app dialogs close only when their backdrop is clicked", () => {
+  assert.match(main, /for \(const dialog of \[settingsDialog, aboutDialog\]\)/)
+  assert.match(main, /if \(event\.target === dialog\) dialog\.close\(\)/)
 })

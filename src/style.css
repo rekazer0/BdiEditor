@@ -348,6 +348,29 @@ aside {
   border-bottom: 1px solid var(--line-soft);
 }
 
+.sidebar-view-control {
+  width: 100%;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+}
+
+.sidebar-view-control button {
+  height: 25px;
+  flex: 1;
+  border-radius: 6px;
+  color: var(--secondary);
+  background: transparent;
+  font-size: 10px;
+}
+
+.sidebar-view-control button.active {
+  color: var(--text);
+  background: rgb(255 255 255 / 90%);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 10%);
+}
+
 h2 {
   margin: 0;
   font-size: 13px;
@@ -387,13 +410,6 @@ h2 {
   height: 1px;
   margin: 9px;
   background: var(--line-soft);
-}
-
-.raw-files summary {
-  margin: 9px;
-  color: var(--secondary);
-  cursor: default;
-  font-size: 10px;
 }
 
 .raw-folder {
