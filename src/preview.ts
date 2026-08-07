@@ -284,6 +284,7 @@ export class Preview {
   }
   private selected = new Set<string>()
   private selectionAnchor?: string
+  private guides = false
   private drawID = 0
 
   constructor(
@@ -335,6 +336,11 @@ export class Preview {
 
   setTransparent(transparent: boolean): void {
     this.transparent = transparent
+    void this.draw()
+  }
+
+  setGuides(enabled: boolean): void {
+    this.guides = enabled
     void this.draw()
   }
 
@@ -637,6 +643,22 @@ export class Preview {
           height: toolbarRect.height,
         }, false)
       })
+    }
+
+    if (this.guides) {
+      context.save()
+      context.setLineDash([7, 5])
+      context.lineWidth = 1.5
+      context.font = "15px system-ui"
+      context.textAlign = "left"
+      context.textBaseline = "top"
+      for (const key of this.keys) {
+        context.strokeStyle = this.selected.has(key.section) ? "#087ff5" : "#ef3e52"
+        context.fillStyle = context.strokeStyle
+        context.strokeRect(key.rect.x + 0.75, key.rect.y + 0.75, key.rect.width - 1.5, key.rect.height - 1.5)
+        context.fillText(key.section, key.rect.x + 4, key.rect.y + 4)
+      }
+      context.restore()
     }
   }
 }

@@ -114,6 +114,7 @@ const orientation = $("#orientation") as HTMLSelectElement & { value: "port" | "
 const layout = $("#layout") as HTMLSelectElement
 const mode = $("#mode") as HTMLSelectElement
 const device = $("#device") as HTMLSelectElement
+const toggleGuides = $("#toggle-guides") as HTMLButtonElement
 const deviceShell = $("#device-shell")
 const workspaceImageFigure = $("#workspace-image-figure")
 const workspaceImage = $("#workspace-image") as HTMLImageElement
@@ -170,6 +171,7 @@ const imagePreviewVisuals = new Map<string, Visual[]>()
 const processedPreviewVisuals = new Map<HTMLButtonElement, Visual[]>()
 let selectedFileButton: HTMLButtonElement | undefined
 let sidebarView: "overview" | "source" = "overview"
+let guidesVisible = false
 
 const deviceGeometryProperties = [
   "--keyboard-height-port",
@@ -1418,6 +1420,7 @@ function selectFile(path: string, preferredSidebarView = sidebarView): void {
     layoutDocument = selectedDocument
     refreshPreview()
   }
+  if (preferredSidebarView === "source" && archive?.isText(path)) inspectorTab = "source"
   updateInspectorView()
   if (!quickInspector.hidden) populateKeyInspector()
   selectedFileButton?.classList.remove("selected")
@@ -1487,6 +1490,23 @@ function renderFiles(): void {
   const hintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
   if (hintPath) addNavButton(overview, "按键气泡", hintPath.split("/").pop() ?? "", hintPath, "nav-component")
 
+  const overviewPaths = new Set(
+    Array.from(overview.querySelectorAll<HTMLButtonElement>("button[data-path]"), (button) => button.dataset.path ?? ""),
+  )
+  const extraLayouts = archive.names().sort().flatMap((path) => {
+    if (!path.startsWith(`${theme.value}/skin/${orientation.value}/`) || !/\.ini$/i.test(path) || overviewPaths.has(path) || !archive?.isText(path)) return []
+    const document = IniDocument.parse(archive.getText(path))
+    const items = previewItems(document)
+    return items.some((item) => item.editable) ? [{ path, count: items.filter((item) => item.editable).length }] : []
+  })
+  if (extraLayouts.length) {
+    section("其他布局")
+    for (const item of extraLayouts) {
+      const name = item.path.split("/").pop() ?? item.path
+      addNavButton(overview, name.replace(/\.ini$/i, ""), `${item.count} 个按键`, item.path, "nav-layout")
+    }
+  }
+
   section("外观与资源")
   addNavButton(
     overview,
@@ -1551,7 +1571,7 @@ function renderFiles(): void {
       button.title = path
       button.dataset.path = path
       button.disabled = !archive?.isText(path) && !archive?.isImage(path)
-      button.addEventListener("click", () => selectFile(path))
+      button.addEventListener("click", () => selectFile(path, "source"))
       parent.append(button)
     }
   }
@@ -1918,6 +1938,13 @@ for (const button of themeChoiceButtons) {
 for (const button of orientationChoiceButtons) {
   button.addEventListener("click", () => selectChoice(orientation, button.dataset.orientationChoice ?? "port"))
 }
+toggleGuides.addEventListener("click", () => {
+  guidesVisible = !guidesVisible
+  toggleGuides.classList.toggle("active", guidesVisible)
+  toggleGuides.setAttribute("aria-pressed", String(guidesVisible))
+  preview.setGuides(guidesVisible)
+  toolbarPreview.setGuides(guidesVisible)
+})
 candidateArea.addEventListener("click", () => {
   if (!isEditing()) return
   const path = toolbarStrip.dataset.path

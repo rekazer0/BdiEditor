@@ -357,3 +357,30 @@ test("app dialogs close only when their backdrop is clicked", () => {
   assert.match(main, /for \(const dialog of \[settingsDialog, aboutDialog\]\)/)
   assert.match(main, /if \(event\.target === dialog\) dialog\.close\(\)/)
 })
+
+test("overview includes every previewable ini layout without duplicating curated entries", () => {
+  assert.match(main, /const overviewPaths = new Set/)
+  assert.match(main, /const items = previewItems\(document\)[\s\S]*?items\.some\(\(item\) => item\.editable\)/)
+  assert.match(main, /section\("其他布局"\)/)
+})
+
+test("source file clicks open text files in the source inspector", () => {
+  assert.match(main, /button\.addEventListener\("click", \(\) => selectFile\(path, "source"\)\)/)
+  assert.match(main, /preferredSidebarView === "source" && archive\?\.isText\(path\)/)
+})
+
+test("preview toolbar centers the device selector and toggles canvas guides", () => {
+  assert.match(html, /id="toggle-guides"[^>]*aria-pressed="false"/)
+  assert.match(main, /preview\.setGuides\(guidesVisible\)/)
+  assert.match(main, /toolbarPreview\.setGuides\(guidesVisible\)/)
+  assert.match(preview, /setGuides\(enabled: boolean\)/)
+  assert.match(css, /\.preview-toolbar\s*\{[^}]*position:\s*relative/s)
+  assert.match(css, /\.field-control\s*\{[^}]*left:\s*50%[^}]*translateX\(-50%\)/s)
+})
+
+test("scrollbars and segmented controls use compact animated glass styling", () => {
+  assert.match(css, /scrollbar-width:\s*thin/)
+  assert.match(css, /::-webkit-scrollbar\s*\{[^}]*width:\s*6px[^}]*height:\s*6px/s)
+  assert.match(css, /::-webkit-scrollbar-thumb\s*\{[^}]*background:\s*rgb\(255 255 255 \/ 48%\)/s)
+  assert.match(css, /\.mode-control button,[\s\S]*?\.inspector-tabs button\s*\{[^}]*transition:/s)
+})
