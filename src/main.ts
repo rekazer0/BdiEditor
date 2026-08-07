@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { message, open, save } from "@tauri-apps/plugin-dialog"
 import "./style.css"
-import { previewPageTarget } from "./actions.ts"
+import { previewPageTransition } from "./actions.ts"
 import {
   AtlasResolver,
   canvasFontFamily,
@@ -42,7 +42,6 @@ import { Preview, previewItems, type PreviewEvent } from "./preview.ts"
 import { firstExistingPath } from "./resources.ts"
 import { candidatePreview, deleteBackward, insertText } from "./simulation.ts"
 import { SkinArchive } from "./skin.ts"
-import { sourceFolderDescription } from "./source-tree.ts"
 import { resolveStylePropertySources, type StylePropertySource } from "./style-properties.ts"
 import { unsavedDecision } from "./unsaved.ts"
 
@@ -55,12 +54,14 @@ const saveButton = $("#save") as HTMLButtonElement
 const undoButton = $("#undo") as HTMLButtonElement
 const redoButton = $("#redo") as HTMLButtonElement
 const toolbarMore = $(".toolbar-more") as HTMLDetailsElement
+const toolbarMenus = Array.from(document.querySelectorAll<HTMLDetailsElement>(".toolbar-more"))
 const appDialogButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-app-dialog]"))
 const settingsDialog = $("#settings-dialog") as HTMLDialogElement
 const aboutDialog = $("#about-dialog") as HTMLDialogElement
 const editContextMenu = $("#edit-context-menu") as HTMLDivElement
 const defaultDevice = $("#default-device") as HTMLSelectElement
 const canvasBackground = $("#canvas-background") as HTMLSelectElement
+const appTheme = $("#app-theme") as HTMLSelectElement
 const exportButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-export-format]"),
 )
@@ -94,6 +95,8 @@ const keyboardFieldsGroup = $(".keyboard-fields")
 const toolbarFieldsGroup = $(".toolbar-fields")
 const toolbarFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-toolbar-field]"))
 const skinFieldsGroup = $(".skin-fields")
+const documentFieldsGroup = $(".document-fields")
+const documentFields = $("#document-fields")
 const colorPickers = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-picker-for]"))
 const colorAlphas = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-alpha-for]"))
 const keyOnlyGroups = Array.from(document.querySelectorAll<HTMLElement>(".key-only"))
@@ -169,9 +172,10 @@ let stylePreviewDrawID = 0
 let imagePreviewDrawID = 0
 const imagePreviewVisuals = new Map<string, Visual[]>()
 const processedPreviewVisuals = new Map<HTMLButtonElement, Visual[]>()
-let selectedFileButton: HTMLButtonElement | undefined
+let selectedFileButton: HTMLElement | undefined
 let sidebarView: "overview" | "source" = "overview"
 let guidesVisible = false
+let previewReturnName = "py_9.ini"
 
 const deviceGeometryProperties = [
   "--keyboard-height-port",
@@ -206,10 +210,12 @@ function handlePreviewEvent(event: PreviewEvent): void {
     `${event.section} · ${event.direction.toUpperCase()} · ${event.code || "未配置"}`
   const code = event.code.trim()
   const currentName = layoutPath.split("/").pop() ?? ""
-  const target = previewPageTarget(code, currentName, layout.value)
+  const transition = previewPageTransition(code, currentName, previewReturnName)
+  const target = transition.target
   if (target) {
     const path = currentConfigPath(target)
     if (archive?.isText(path)) {
+      previewReturnName = transition.returnName
       selectFile(path, "overview")
       eventLog.textContent += ` → 已切换预览到 ${target}`
       return
@@ -677,8 +683,11 @@ workspaceImage.addEventListener("error", showImagePreviewError)
 
 function updateInspectorView(): void {
   const imageSelected = Boolean(archive?.isImage(selectedPath))
+  const overviewSelected = Boolean(
+    files.querySelector(`.sidebar-overview button[data-path="${CSS.escape(selectedPath)}"]`),
+  )
   const propertiesAvailable = Boolean(
-    selectedPath && (selectedPath === layoutPath || isSkinInfoPath(selectedPath) || isToolbarPath(selectedPath)) && !imageSelected,
+    selectedPath && archive?.isText(selectedPath) && overviewSelected && !imageSelected,
   )
   for (const button of inspectorTabButtons) {
     const tab = button.dataset.inspectorTab
@@ -1017,6 +1026,91 @@ function describeAction(value: string): string {
   return `输入“${value}”`
 }
 
+const documentFieldLabels: Record<string, string> = {
+  BACK_STYLE: "背景样式",
+  FORE_STYLE: "前景样式",
+  CELL_STYLE: "单元格样式",
+  VIEW_RECT: "显示区域",
+  PADDING: "内边距",
+  SIZE: "尺寸",
+  TYPE: "类型",
+  LAYOUT_NAME: "布局名称",
+  KEY_NUM: "按键数量",
+  TIP_NUM: "气泡数量",
+  LIST_NUM: "列表数量",
+  LIST_ORDER: "列表顺序",
+  CELL_SIZE: "单元格尺寸",
+  GRID: "网格",
+  POS: "位置",
+  NO_BLUR: "禁用模糊",
+  OFFSET_NUM: "偏移数量",
+}
+
+function populateDocumentInspector(): void {
+  documentFields.replaceChildren()
+  const hasSelection = selectedPath === layoutPath && selectedKeySections.length > 0
+  if (!selectedDocument || hasSelection || !archive?.isText(selectedPath)) {
+    documentFieldsGroup.hidden = true
+    return
+  }
+  const specialized = new Set<string>()
+  if (isSkinInfoPath(selectedPath)) {
+    for (const field of skinFields) specialized.add(`\u0000${field.dataset.skinField ?? ""}`)
+  }
+  if (isToolbarPath(selectedPath)) {
+    for (const field of toolbarFields) {
+      const [section, key] = (field.dataset.toolbarField ?? "").split(".")
+      specialized.add(`${key ? section : "CAND"}\u0000${key || section}`)
+    }
+  }
+  const entries = selectedDocument.entries().filter((entry) =>
+    !/^KEY\d+$/.test(entry.section) && !specialized.has(`${entry.section}\u0000${entry.key}`),
+  )
+  documentFieldsGroup.hidden = entries.length === 0
+  if (!entries.length) return
+
+  const sections = [...new Set(entries.map((entry) => entry.section))]
+  for (const [sectionIndex, section] of sections.entries()) {
+    const disclosure = document.createElement("details")
+    disclosure.className = "document-property-section"
+    disclosure.open = sections.length <= 4 || sectionIndex === 0
+    const summary = document.createElement("summary")
+    summary.textContent = section || "基本信息"
+    const grid = document.createElement("div")
+    grid.className = "document-property-grid"
+    for (const entry of entries.filter((item) => item.section === section)) {
+      const label = document.createElement("label")
+      label.className = "document-property-field"
+      if (entry.value.length > 18 || /(?:RECT|IMG|PADDING|ORDER|LIST|SOURCE|FONT_NAME)/.test(entry.key)) {
+        label.classList.add("wide")
+      }
+      const caption = document.createElement("span")
+      caption.textContent = documentFieldLabels[entry.key] ?? entry.key
+      caption.title = entry.key
+      const input = document.createElement("input")
+      input.value = entry.value
+      input.disabled = !isEditing()
+      input.addEventListener("change", () => {
+        if (!selectedDocument || selectedPath !== input.closest<HTMLElement>(".document-fields")?.dataset.path) return
+        const before = selectedDocument.toString()
+        const key = entry.key
+        if (!selectedDocument.set(section, key, input.value)) return
+        const text = selectedDocument.toString()
+        commitText(selectedPath, before, text)
+        setSourceValue(text)
+        if (selectedPath === layoutPath) layoutDocument = selectedDocument
+        refreshPreview()
+        updateDirty()
+      })
+      label.append(caption, input)
+      grid.append(label)
+    }
+    disclosure.append(summary, grid)
+    documentFields.append(disclosure)
+  }
+  documentFieldsGroup.dataset.path = selectedPath
+}
+
 function addNavButton(
   parent: HTMLElement,
   label: string,
@@ -1046,8 +1140,9 @@ function addNavButton(
   button.addEventListener("click", () => {
     if (path.endsWith("py_9.ini") || path.endsWith("py_26.ini")) {
       layout.value = path.endsWith("_9.ini") ? "py_9.ini" : "py_26.ini"
+      previewReturnName = path.split("/").pop() ?? layout.value
     }
-    selectFile(path)
+    selectFile(path, "overview")
   })
   parent.append(button)
 }
@@ -1066,6 +1161,8 @@ function populateKeyInspector(): void {
     ? "皮肤信息"
     : toolbarSelected
       ? "候选栏与工具栏"
+    : selectedPath !== layoutPath && !toolbarSelected
+      ? selectedPath.split("/").pop() ?? "文档配置"
     : !hasSelection
       ? `${layout.value === "py_26.ini" ? "26 键" : "九键"} · 整体设置`
     : sections.length === 1
@@ -1182,6 +1279,7 @@ function populateKeyInspector(): void {
   }
   void updateStylePreviews()
   if (hasSelection) void updateImagePreviews()
+  populateDocumentInspector()
   applyModeState()
 }
 
@@ -1402,13 +1500,17 @@ function selectFile(path: string, preferredSidebarView = sidebarView): void {
     setSourceValue(selectedDocument.toString())
     source.disabled = false
     sourceName.textContent = path
-    if (/\.(ini)$/i.test(path) && previewItems(selectedDocument).some((item) => item.editable)) {
+    const previewLayout =
+      /\.ini$/i.test(path) &&
+      !/(^|\/)gen\.ini$/i.test(path) &&
+      previewItems(selectedDocument).some((item) => item.editable)
+    if (previewLayout) {
       layoutPath = path
       layoutDocument = selectedDocument
       selectedKeySections = []
       inspectorTab = "properties"
       refreshPreview()
-    } else if (isSkinInfoPath(path) || isToolbarPath(path)) {
+    } else if (preferredSidebarView === "overview") {
       inspectorTab = "properties"
     } else if (path !== layoutPath) {
       inspectorTab = "source"
@@ -1425,8 +1527,8 @@ function selectFile(path: string, preferredSidebarView = sidebarView): void {
   if (!quickInspector.hidden) populateKeyInspector()
   selectedFileButton?.classList.remove("selected")
   const preferredContainer = files.querySelector(preferredSidebarView === "overview" ? ".sidebar-overview" : ".raw-files")
-  selectedFileButton = preferredContainer?.querySelector<HTMLButtonElement>(`button[data-path="${CSS.escape(path)}"]`)
-    ?? files.querySelector<HTMLButtonElement>(`button[data-path="${CSS.escape(path)}"]`)
+  selectedFileButton = preferredContainer?.querySelector<HTMLElement>(`button[data-path="${CSS.escape(path)}"]`)
+    ?? files.querySelector<HTMLElement>(`button[data-path="${CSS.escape(path)}"]`)
     ?? undefined
   if (selectedFileButton) {
     setSidebarView(selectedFileButton.closest(".raw-files") ? "source" : "overview")
@@ -1511,6 +1613,9 @@ function renderFiles(): void {
 
   const sourceFiles = document.createElement("div")
   sourceFiles.className = "raw-files"
+  sourceFiles.setAttribute("role", "tree")
+  sourceFiles.setAttribute("aria-label", "源文件")
+  const sourceNameCompare = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" }).compare
   type SourceNode = { folders: Map<string, SourceNode>; paths: string[] }
   const root: SourceNode = { folders: new Map(), paths: [] }
   for (const path of archive.names().filter((name) => !name.endsWith("/"))) {
@@ -1526,24 +1631,61 @@ function renderFiles(): void {
     }
     node.paths.push(path)
   }
+  const selectSourceRow = (row: HTMLElement) => {
+    selectedFileButton?.classList.remove("selected")
+    selectedFileButton = row
+    row.classList.add("selected")
+    for (const item of sourceFiles.querySelectorAll<HTMLElement>(".source-tree-row")) {
+      item.tabIndex = item === row ? 0 : -1
+    }
+    row.focus()
+  }
   const appendNode = (parent: HTMLElement, node: SourceNode, parentPath = "") => {
-    for (const [name, child] of node.folders) {
+    for (const [name, child] of [...node.folders].sort(([a], [b]) => sourceNameCompare(a, b))) {
       const path = parentPath ? `${parentPath}/${name}` : name
       const folder = document.createElement("details")
       folder.className = "raw-folder"
       folder.dataset.folderPath = path
       const folderSummary = document.createElement("summary")
+      folderSummary.className = "source-tree-row source-folder-row"
+      folderSummary.setAttribute("role", "treeitem")
+      folderSummary.setAttribute("aria-expanded", "false")
+      folderSummary.tabIndex = -1
+      const disclosure = document.createElement("span")
+      disclosure.className = "source-disclosure"
+      disclosure.ariaHidden = "true"
       const title = document.createElement("span")
+      title.className = "nav-label"
       title.textContent = name
-      const description = document.createElement("small")
-      description.textContent = sourceFolderDescription(path)
-      folderSummary.append(createSystemSymbol("folder"), title, description)
-      folder.append(folderSummary)
-      appendNode(folder, child, path)
+      folderSummary.append(disclosure, createSystemSymbol("folder"), title)
+      const children = document.createElement("div")
+      children.className = "source-tree-group"
+      children.setAttribute("role", "group")
+      folder.append(folderSummary, children)
+      appendNode(children, child, path)
+      disclosure.addEventListener("click", (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        folder.open = !folder.open
+      })
+      folderSummary.addEventListener("click", (event) => {
+        event.preventDefault()
+        selectSourceRow(folderSummary)
+      })
+      folderSummary.addEventListener("dblclick", (event) => {
+        event.preventDefault()
+        folder.open = !folder.open
+      })
+      folder.addEventListener("toggle", () => {
+        folderSummary.setAttribute("aria-expanded", String(folder.open))
+      })
       parent.append(folder)
     }
-    for (const path of node.paths) {
+    for (const path of [...node.paths].sort(sourceNameCompare)) {
       const button = document.createElement("button")
+      button.className = "source-tree-row source-file-row"
+      button.setAttribute("role", "treeitem")
+      button.tabIndex = -1
       const sourceSymbol = archive?.isText(path)
         ? "doc.text"
         : archive?.isImage(path)
@@ -1562,6 +1704,47 @@ function renderFiles(): void {
     }
   }
   appendNode(sourceFiles, root)
+  sourceFiles.querySelector<HTMLElement>(".source-tree-row")?.setAttribute("tabindex", "0")
+  sourceFiles.addEventListener("keydown", (event) => {
+    const current = (event.target as Element | null)?.closest<HTMLElement>(".source-tree-row")
+    if (!current) return
+    const rows = Array.from(sourceFiles.querySelectorAll<HTMLElement>(".source-tree-row"))
+      .filter((row) => row.getClientRects().length > 0)
+    const index = rows.indexOf(current)
+    let next: HTMLElement | undefined
+    switch (event.key) {
+      case "ArrowDown":
+        next = rows[index + 1]
+        break
+      case "ArrowUp":
+        next = rows[index - 1]
+        break
+      case "ArrowRight": {
+        const folder = current.closest<HTMLDetailsElement>("details.raw-folder")
+        if (current.matches("summary") && folder && !folder.open) folder.open = true
+        else if (current.matches("summary") && folder?.open) next = rows[index + 1]
+        break
+      }
+      case "ArrowLeft": {
+        const folder = current.closest<HTMLDetailsElement>("details.raw-folder")
+        if (current.matches("summary") && folder?.open) folder.open = false
+        else if (current.matches("summary")) {
+          next = folder?.parentElement?.closest<HTMLDetailsElement>("details.raw-folder")?.querySelector<HTMLElement>(":scope > summary") ?? undefined
+        } else {
+          next = folder?.querySelector<HTMLElement>(":scope > summary") ?? undefined
+        }
+        break
+      }
+      case "Enter":
+      case " ":
+        current.dispatchEvent(new MouseEvent(current.matches("summary") ? "dblclick" : "click", { bubbles: true }))
+        break
+      default:
+        return
+    }
+    event.preventDefault()
+    if (next) selectSourceRow(next)
+  })
   files.append(sourceFiles)
   setSidebarView(sidebarView)
 }
@@ -1603,6 +1786,7 @@ function loadArchive(bytes: Uint8Array, path: string, isNew = false): void {
   for (const button of exportButtons) button.disabled = false
   renderFiles()
   layoutPath = preferredPath()
+  previewReturnName = layoutPath.split("/").pop() ?? layout.value
   const initial = archive.names().includes(layoutPath)
     ? layoutPath
     : archive.names().find((name) => archive?.isText(name))
@@ -1734,6 +1918,7 @@ for (const button of appDialogButtons) {
   button.addEventListener("click", () => {
     const dialog = button.dataset.appDialog === "settings" ? settingsDialog : aboutDialog
     dialog.showModal()
+    for (const menu of toolbarMenus) menu.open = false
   })
 }
 for (const dialog of [settingsDialog, aboutDialog]) {
@@ -1754,6 +1939,21 @@ canvasBackground.addEventListener("change", () => {
   localStorage.setItem("canvas-background", canvasBackground.value)
   canvasWrap.dataset.background = canvasBackground.value
 })
+const systemTheme = matchMedia("(prefers-color-scheme: dark)")
+function applyAppTheme(): void {
+  const preference = appTheme.value === "light" || appTheme.value === "dark" ? appTheme.value : "system"
+  const resolved = preference === "system" ? (systemTheme.matches ? "dark" : "light") : preference
+  document.documentElement.dataset.appTheme = resolved
+  document.documentElement.style.colorScheme = resolved
+  if (isTauri()) void getCurrentWindow().setTheme(preference === "system" ? null : preference)
+}
+appTheme.value = localStorage.getItem("app-theme") ?? "system"
+applyAppTheme()
+appTheme.addEventListener("change", () => {
+  localStorage.setItem("app-theme", appTheme.value)
+  applyAppTheme()
+})
+systemTheme.addEventListener("change", applyAppTheme)
 undoButton.addEventListener("click", undo)
 redoButton.addEventListener("click", redo)
 browserOpen.addEventListener("change", async () => {
@@ -2000,7 +2200,9 @@ window.addEventListener("keydown", (event) => {
   else undo()
 })
 window.addEventListener("pointerdown", (event) => {
-  if (toolbarMore.open && !toolbarMore.contains(event.target as Node)) toolbarMore.open = false
+  for (const menu of toolbarMenus) {
+    if (menu.open && !menu.contains(event.target as Node)) menu.open = false
+  }
   if (!editContextMenu.hidden && !editContextMenu.contains(event.target as Node)) editContextMenu.hidden = true
 })
 window.addEventListener("keydown", (event) => {

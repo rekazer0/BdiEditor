@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { previewPageTarget } from "../src/actions.ts"
+import { previewPageTarget, previewPageTransition } from "../src/actions.ts"
 import { IniDocument } from "../src/ini.ts"
 
 test("preview page resolves explicit and supported keyboard actions", () => {
@@ -12,6 +12,22 @@ test("preview page resolves explicit and supported keyboard actions", () => {
   assert.equal(previewPageTarget("F16", "py_9.ini", "py_9.ini"), "en_26.ini")
   assert.equal(previewPageTarget("F15", "en_26.ini", "py_9.ini"), "py_9.ini")
   assert.equal(previewPageTarget("F99", "py_9.ini", "py_9.ini"), undefined)
+})
+
+test("preview page returns to the keyboard layout that opened a transient page", () => {
+  const english = previewPageTransition("F16", "py_9.ini", "py_26.ini")
+  assert.deepEqual(english, { target: "en_26.ini", returnName: "py_9.ini" })
+  assert.deepEqual(previewPageTransition("F16", english.target!, english.returnName), {
+    target: "py_9.ini",
+    returnName: "py_9.ini",
+  })
+
+  const symbols = previewPageTransition("F1", "py_26.ini", "py_9.ini")
+  assert.deepEqual(symbols, { target: "symbol.ini", returnName: "py_26.ini" })
+  assert.deepEqual(previewPageTransition("F4", symbols.target!, symbols.returnName), {
+    target: "py_26.ini",
+    returnName: "py_26.ini",
+  })
 })
 
 test("9-key summary counts grouped letter keys but excludes state and delete keys", async () => {

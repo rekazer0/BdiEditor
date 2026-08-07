@@ -14,3 +14,9 @@ test("macOS bundle deployment floor supports the SF Symbols runtime API", () => 
   const config = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"))
   assert.equal(config.bundle.macOS.minimumSystemVersion, "11.0")
 })
+
+test("Windows uses a transparent system Mica material instead of a black title frame", () => {
+  const config = JSON.parse(readFileSync("src-tauri/tauri.windows.conf.json", "utf8"))
+  assert.equal(config.app.windows[0].transparent, true)
+  assert.deepEqual(config.app.windows[0].windowEffects.effects, ["mica"])
+})

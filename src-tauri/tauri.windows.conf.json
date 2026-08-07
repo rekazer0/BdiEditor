@@ -1,0 +1,17 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "BdiEdito v0.3.2",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600,
+        "transparent": true,
+        "windowEffects": {
+          "effects": ["mica"]
+        }
+      }
+    ]
+  }
+}

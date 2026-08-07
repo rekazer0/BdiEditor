@@ -296,8 +296,8 @@ test("settings expose canvas backgrounds and edit mode exposes key context actio
 })
 
 test("window and about names match the GitHub project and include the version", () => {
-  assert.match(html, /<title>BdiEdito v0\.2\.0<\/title>/)
-  assert.match(html, /关于 BdiEdito v0\.2\.0/)
+  assert.match(html, /<title>BdiEdito v0\.3\.2<\/title>/)
+  assert.match(html, /关于 BdiEdito v0\.3\.2/)
 })
 
 test("new-project chooser includes the four dust templates", () => {
@@ -375,6 +375,31 @@ test("source file clicks open text files in the source inspector", () => {
   assert.match(main, /preferredSidebarView === "source" && archive\?\.isText\(path\)/)
 })
 
+test("every overview text document exposes editable non-key properties", () => {
+  assert.match(html, /class="inspector-group document-fields" hidden/)
+  assert.match(html, /id="document-fields"/)
+  assert.match(main, /function populateDocumentInspector\(\)/)
+  assert.match(main, /!\/\^KEY\\d\+\$\/\.test\(entry\.section\)/)
+  assert.match(main, /selectedDocument\.set\(section, key, input\.value\)/)
+  assert.match(main, /preferredSidebarView === "overview"[\s\S]*?inspectorTab = "properties"/)
+  assert.match(css, /\.document-property-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s)
+  assert.match(css, /\.document-property-field\.wide\s*\{[^}]*grid-column:\s*1 \/ -1/s)
+  assert.match(main, /!\/\(\^\|\\\/\)gen\\\.ini\$\/i\.test\(path\)/)
+})
+
+test("source files use Finder-style rows and keyboard navigation", () => {
+  assert.match(main, /sourceFiles\.setAttribute\("role", "tree"\)/)
+  assert.match(main, /folderSummary\.className = "source-tree-row source-folder-row"/)
+  assert.match(main, /button\.className = "source-tree-row source-file-row"/)
+  assert.match(main, /folderSummary\.addEventListener\("dblclick"/)
+  assert.match(main, /sourceFiles\.addEventListener\("keydown"/)
+  assert.match(main, /case "ArrowDown"/)
+  assert.match(main, /case "ArrowRight"/)
+  assert.doesNotMatch(main, /description\.textContent = sourceFolderDescription/)
+  assert.match(css, /\.source-tree-row\s*\{[^}]*min-height:\s*26px/s)
+  assert.match(css, /\.source-tree-row\.selected\s*\{[^}]*background:/s)
+})
+
 test("preview toolbar centers the device selector and toggles canvas guides", () => {
   assert.match(html, /id="toggle-guides"[^>]*aria-label="辅助线"[^>]*title="辅助线"[^>]*aria-pressed="false"[^>]*>[\s\S]*?data-system-symbol="ruler"/)
   assert.match(main, /preview\.setGuides\(guidesVisible\)/)
@@ -389,4 +414,28 @@ test("scrollbars and segmented controls use compact animated glass styling", () 
   assert.match(css, /::-webkit-scrollbar\s*\{[^}]*width:\s*6px[^}]*height:\s*6px/s)
   assert.match(css, /::-webkit-scrollbar-thumb\s*\{[^}]*background:\s*rgb\(255 255 255 \/ 48%\)/s)
   assert.match(css, /\.mode-control button,[\s\S]*?\.inspector-tabs button\s*\{[^}]*transition:/s)
+})
+
+test("settings provide a persistent system-aware application theme", () => {
+  assert.match(html, /<select id="app-theme">[\s\S]*?value="system">跟随系统[\s\S]*?value="light">浅色[\s\S]*?value="dark">深色/)
+  assert.match(main, /const appTheme = \$\("#app-theme"\)/)
+  assert.match(main, /localStorage\.getItem\("app-theme"\)/)
+  assert.match(main, /document\.documentElement\.dataset\.appTheme = resolved/)
+  assert.match(main, /matchMedia\("\(prefers-color-scheme: dark\)"\)/)
+  assert.match(main, /systemTheme\.addEventListener\("change", applyAppTheme\)/)
+  assert.match(css, /:root\[data-app-theme="dark"\]\s*\{/)
+})
+
+test("every toolbar menu closes when clicking elsewhere", () => {
+  assert.match(main, /const toolbarMenus = Array\.from\(document\.querySelectorAll<HTMLDetailsElement>\("\.toolbar-more"\)\)/)
+  assert.match(main, /for \(const menu of toolbarMenus\)[\s\S]*?!menu\.contains\(event\.target as Node\)[\s\S]*?menu\.open = false/)
+  assert.match(main, /dialog\.showModal\(\)[\s\S]*?menu\.open = false/)
+})
+
+test("top, sidebar, menus and segmented controls share animated glass materials", () => {
+  for (const selector of [".titlebar", "aside", ".toolbar-menu", ".glass-module"]) {
+    assert.match(css, new RegExp(`${selector.replace(".", "\\.")}\\s*\\{[^}]*backdrop-filter:`, "s"))
+  }
+  assert.match(css, /\.mode-control button\.active,[\s\S]*?\.inspector-tabs button\.active\s*\{[^}]*box-shadow:/s)
+  assert.match(css, /@keyframes glass-select/)
 })

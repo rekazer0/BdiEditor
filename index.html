@@ -7,7 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     />
-    <title>BdiEdito v0.2.0</title>
+    <title>BdiEdito v0.3.2</title>
   </head>
   <body>
     <header class="titlebar">
@@ -197,6 +197,10 @@
               <label>工具按钮 3 <span class="style-field"><input data-toolbar-field="ICON3.FORE_STYLE" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:ICON3.FORE_STYLE" data-preview-foreground title="查看前景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
             </div>
           </div>
+          <div class="inspector-group document-fields" hidden>
+            <h3>文档配置</h3>
+            <div id="document-fields"></div>
+          </div>
           <div class="inspector-group key-only">
             <h3>布局</h3>
             <div class="inspector-grid geometry-fields">
@@ -331,6 +335,7 @@
     <dialog id="settings-dialog" class="app-dialog" aria-labelledby="settings-title">
       <form method="dialog">
         <header><h2 id="settings-title">设置</h2><button aria-label="关闭">关闭</button></header>
+        <label>软件外观 <select id="app-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
         <label>默认预览设备 <select id="default-device"><option value="canvas">画布</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
         <label>画布背景 <select id="canvas-background"><option value="default">默认</option><option value="checkerboard">马赛克</option><option value="white">白色</option><option value="dark">深色</option></select></label>
         <p>新打开的皮肤将使用此预览设备。</p>
@@ -344,9 +349,9 @@
 
     <dialog id="about-dialog" class="app-dialog" aria-labelledby="about-title">
       <form method="dialog">
-        <header><h2 id="about-title">关于 BdiEdito v0.2.0</h2><button aria-label="关闭">关闭</button></header>
+        <header><h2 id="about-title">关于 BdiEdito v0.3.2</h2><button aria-label="关闭">关闭</button></header>
         <p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
-        <p>版本 0.2.0</p>
+        <p>版本 0.3.2</p>
         <p>支持读取、编辑和导出 BDI、BDS 皮肤包。</p>
         <a href="https://github.com/rekazer0/BdiEdito" target="_blank" rel="noreferrer">GitHub · rekazer0/BdiEdito</a>
       </form>
