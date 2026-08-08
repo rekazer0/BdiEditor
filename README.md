@@ -96,6 +96,8 @@ npm run tauri build -- --bundles nsis
 ## 隐私
 
 编辑器在本地处理皮肤文件，不上传皮肤、配置或图片。
+## 技术交流与反馈
+QQ：228040912
 
 ## License
 
