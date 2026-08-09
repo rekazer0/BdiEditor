@@ -34,3 +34,8 @@ test("Windows uses a transparent system Acrylic material instead of exposing the
   assert.equal(config.app.windows[0].transparent, true)
   assert.deepEqual(config.app.windows[0].windowEffects.effects, ["acrylic"])
 })
+
+test("Windows installer uses the system WebView2 runtime", () => {
+  const config = JSON.parse(readFileSync("src-tauri/tauri.windows.conf.json", "utf8"))
+  assert.deepEqual(config.bundle.windows.webviewInstallMode, { type: "skip" })
+})
