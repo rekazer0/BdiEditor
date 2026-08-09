@@ -49,6 +49,13 @@ export type BdaAppearance = {
   colorStyles: Map<number, BdaColorStyle>
   panels: Map<string, BdaPanel>
 }
+export type BdaAnimationFrame = { resourceID: string; duration: number }
+export type BdaAnimationSequence = { name: string; frames: BdaAnimationFrame[] }
+export type BdaAnimation = {
+  targets: string[]
+  sequences: Map<string, BdaAnimationSequence>
+}
+export type BdaConfigKind = "appearance" | "animation" | "lightAnimation" | "sound" | "switch"
 
 const STYLE_BASE = { image: 1_000_000, color: 2_000_000, text: 3_000_000 } as const
 
@@ -70,8 +77,18 @@ export function bdaAppearancePath(
   theme: string,
   orientation: string,
 ): string | undefined {
+  return bdaConfigPath(archive, theme, orientation, "appearance")
+}
+
+export function bdaConfigPath(
+  archive: SkinArchive,
+  theme: string,
+  orientation: string,
+  kind: BdaConfigKind,
+): string | undefined {
   const prefix = `${theme}/skin/${orientation}/`
-  return archive.names().find((path) => path.startsWith(prefix) && /^\d*appearanceConfig$/.test(path.slice(prefix.length)))
+  const config = new RegExp(`^\\d*${kind}Config$`)
+  return archive.names().find((path) => path.startsWith(prefix) && config.test(path.slice(prefix.length)))
 }
 
 export function bdaPanelKeyName(action: string): string {
@@ -290,6 +307,26 @@ export function decodeBdaAppearance(bytes: Uint8Array): BdaAppearance {
       string(first(entry, 1)),
       panel(first(entry, 2)),
     ])),
+  }
+}
+
+export function decodeBdaAnimation(bytes: Uint8Array): BdaAnimation {
+  const root = fields(bytes)
+  const sequences = mapEntries(root, 9).map((entry) => {
+    const name = string(first(entry, 1))
+    const sequence = message(first(entry, 2))
+    const frames = sequence.filter((field) => field.number === 5).map((field) => {
+      const frame = message(field)
+      return {
+        resourceID: string(first(message(first(frame, 1)), 2)),
+        duration: first(frame, 2)?.varint ?? 0,
+      }
+    })
+    return [name, { name, frames }] as const
+  })
+  return {
+    targets: mapEntries(root, 1).map((entry) => string(first(entry, 1))).filter(Boolean),
+    sequences: new Map(sequences.filter(([name]) => Boolean(name))),
   }
 }
 
@@ -520,6 +557,57 @@ function updateMapValue(
   return join([bytes.slice(0, field.start), encodedField(fieldNumber, 2, entry), bytes.slice(field.end)])
 }
 
+function rawString(field: RawField | undefined): string {
+  if (!field?.bytes) return ""
+  try {
+    return decoder.decode(field.bytes)
+  } catch {
+    return ""
+  }
+}
+
+export function updateBdaAnimationFrame(
+  bytes: Uint8Array,
+  sequenceName: string,
+  frameIndex: number,
+  property: "resourceID" | "duration",
+  value: string | number,
+): Uint8Array {
+  const entryField = rawFields(bytes).find((field) => {
+    if (field.number !== 9 || !field.bytes) return false
+    return rawString(rawFields(field.bytes).find((item) => item.number === 1)) === sequenceName
+  })
+  if (!entryField?.bytes) throw new Error(`BDA 动画序列不存在：${sequenceName}`)
+  const entryFields = rawFields(entryField.bytes)
+  const sequenceField = entryFields.find((field) => field.number === 2)
+  if (!sequenceField?.bytes) throw new Error(`BDA 动画序列缺少值：${sequenceName}`)
+  const frames = rawFields(sequenceField.bytes).filter((field) => field.number === 5)
+  const frameField = frames[frameIndex]
+  if (!frameField?.bytes) throw new Error(`BDA 动画帧不存在：${frameIndex}`)
+
+  let frame = frameField.bytes
+  if (property === "resourceID") {
+    const resource = rawFields(frame).find((field) => field.number === 1)?.bytes ?? new Uint8Array()
+    frame = replaceField(frame, 1, 2, replaceField(resource, 2, 2, new TextEncoder().encode(String(value))))
+  } else {
+    const duration = Number(value)
+    if (!Number.isInteger(duration) || duration < 0) throw new Error("BDA 动画帧时长无效")
+    frame = replaceField(frame, 2, 0, encodeVarint(duration))
+  }
+
+  const sequence = join([
+    sequenceField.bytes.slice(0, frameField.start),
+    encodedField(5, 2, frame),
+    sequenceField.bytes.slice(frameField.end),
+  ])
+  const entry = replaceField(entryField.bytes, 2, 2, sequence)
+  return join([
+    bytes.slice(0, entryField.start),
+    encodedField(9, 2, entry),
+    bytes.slice(entryField.end),
+  ])
+}
+
 function colorValue(value: string): number {
   const hex = value.trim().replace(/^#/, "")
   if (!/^[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(hex)) throw new Error("颜色应为 RRGGBB 或 AARRGGBB")
@@ -559,7 +647,28 @@ export function updateBdaStyle(
 export function describeBdaConfig(path: string, bytes: Uint8Array): string {
   const name = path.split("/").pop() ?? path
   const header = `${name} · BDA Protocol Buffers · ${bytes.length} 字节`
-  if (!/^\d*appearanceConfig$/.test(name)) return `${header}\n\n二进制配置将按原字节保存。`
+  if (/^\d*animationConfig$/.test(name)) {
+    const animation = decodeBdaAnimation(bytes)
+    const frames = [...animation.sequences.values()].reduce((sum, sequence) => sum + sequence.frames.length, 0)
+    return [
+      header,
+      "",
+      `动画目标：${animation.targets.length}`,
+      `动画序列：${animation.sequences.size}`,
+      `序列帧：${frames}`,
+      ...[...animation.sequences.values()].map((sequence) => `- ${sequence.name}（${sequence.frames.length} 帧）`),
+      "",
+      "保存时保留原始配置和未知字段。",
+    ].join("\n")
+  }
+  if (!/^\d*appearanceConfig$/.test(name)) {
+    const values = fields(bytes).flatMap((field) => {
+      if (field.varint !== undefined) return [`字段 ${field.number}：${field.varint}`]
+      const value = string(field)
+      return value ? [`字段 ${field.number}：${value}`] : []
+    })
+    return [header, "", ...values, "", "保存时保留原始配置和未知字段。"].join("\n")
+  }
   const appearance = decodeBdaAppearance(bytes)
   const resources = bdaResourceIDs(bytes)
   return [

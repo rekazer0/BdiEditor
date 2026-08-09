@@ -1355,6 +1355,14 @@ canvas {
   gap: 8px;
 }
 
+.bda-config-summary {
+  grid-column: 1 / -1;
+  margin: 0;
+  white-space: pre-wrap;
+  font: inherit;
+  color: var(--muted);
+}
+
 .geometry-fields {
   grid-template-columns: repeat(4, 1fr);
   margin-bottom: 9px;
