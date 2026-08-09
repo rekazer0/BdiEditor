@@ -43,3 +43,12 @@ test("native window material can be changed without restarting", () => {
   assert.match(rust, /Effect::Acrylic/)
   assert.match(rust, /set_window_material[\s\S]*?tauri::generate_handler!/)
 })
+
+test("Windows installer tolerates WebView2 already-existing after a missed detection", () => {
+  const config = JSON.parse(readFileSync("src-tauri/tauri.windows.conf.json", "utf8"))
+  assert.deepEqual(config.bundle.windows.webviewInstallMode, { type: "downloadBootstrapper" })
+  assert.equal(config.bundle.windows.nsis.template, "./windows/installer.nsi")
+
+  const template = readFileSync("src-tauri/windows/installer.nsi", "utf8")
+  assert.match(template, /\$1 = -2147024713/)
+})
