@@ -1,7 +1,5 @@
 # 百度 iOS 皮肤编辑器 Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** 构建一个 macOS 首发、Windows 可移植的桌面编辑器，对目标版本百度 iOS `.bdi/.bds` 皮肤包进行可视化与文本双向编辑。
 
 **Architecture:** 使用 Tauri 作为最薄桌面壳，原生 HTML/CSS/TypeScript 负责 ZIP、保格式配置文档、编辑状态和 Canvas 预览。Rust 仅负责窗口、文件对话框和受控文件读写；不使用前端框架、状态库、自有工程格式或双份领域模型。

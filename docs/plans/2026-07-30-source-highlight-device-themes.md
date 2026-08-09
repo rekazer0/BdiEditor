@@ -1,7 +1,5 @@
 # Source Highlight and Device Themes Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Add dependency-free INI syntax highlighting, verified phone-resolution templates, correct dark device preview, and a brighter macOS UI with restrained sidebar/toolbar blur.
 
 **Architecture:** Keep the editable source as a native textarea and place a synchronized highlighted `<pre>` beneath it so editing and caret behavior remain stable. Store verified device pixels in a small pure data module, drive the device aspect ratio from that data, and use a preview theme attribute for all phone chrome colors.

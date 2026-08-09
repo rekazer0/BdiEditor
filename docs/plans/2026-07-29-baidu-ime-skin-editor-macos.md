@@ -3,8 +3,6 @@
 > 本文基于早期“macOS 桌面输入法皮肤”假设，已被
 > `docs/plans/2026-07-29-bdi-editor-tauri.md` 取代，请勿据此实施。
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** 构建一款 macOS 原生可视化编辑器，让用户创建、预览、校验并导出可被目标版本百度输入法使用的皮肤。
 
 **Architecture:** 采用 SwiftUI + AppKit 的模块化单体：SwiftUI 负责窗口、属性面板和文档流程，AppKit/Core Graphics 负责像素级画布、缩放、命中测试和渲染。应用内部使用公开、自有的 `.bdiskin` 工程包；百度 `.bps` 仅通过隔离的适配器导入/导出，避免把未经验证的私有格式扩散到编辑器核心。

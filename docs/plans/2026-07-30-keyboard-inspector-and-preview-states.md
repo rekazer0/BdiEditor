@@ -1,7 +1,5 @@
 # Keyboard Inspector and Preview States Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Make the device preview match the supplied iPhone references and expose real skin, keyboard, batch-image, height, scrolling, and swipe-page configuration in the inspector.
 
 **Architecture:** Keep the existing dependency-free TypeScript UI and map every editor control to the existing INI/style files. Add small pure helpers for keyboard metadata and preview page targets, then let `main.ts` coordinate archive writes and `Preview` render the resolved panel background and page state.

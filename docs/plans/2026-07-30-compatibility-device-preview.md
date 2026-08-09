@@ -1,7 +1,5 @@
 # Compatibility, Device Preview, and Editing Interaction Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** 修复百度输入法导入兼容性、组件预览、编辑/交互模式与窗口关闭问题，并加入手机模板、横竖屏联动、模拟输入和 Command 多选。
 
 **Architecture:** 保持现有 Tauri 2 + 原生 HTML/CSS/TypeScript 架构，不增加运行时依赖。归档层负责兼容地保留 ZIP 元数据，预览层统一渲染带 `VIEW_RECT` 的配置组件，应用层只编排设备外框、模式、选区与模拟输入。

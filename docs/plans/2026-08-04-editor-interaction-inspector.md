@@ -1,7 +1,5 @@
 # Editor Interaction and Inspector Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Make preview and editing modes unambiguous, improve key-action and image editing, restore keyboard toolbar visibility, add structured source navigation, and protect unsaved work during New/Open.
 
 **Architecture:** Keep the dependency-free Tauri + DOM + Canvas architecture. The main keyboard canvas remains the selectable editing surface, a second read-only canvas renders the configured candidate/toolbar strip, and pure helpers own page navigation, source-folder metadata, image-path resolution, and unsaved-action decisions so behavior is testable without controlling the desktop.
