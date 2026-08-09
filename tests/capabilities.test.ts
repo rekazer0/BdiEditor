@@ -35,7 +35,11 @@ test("Windows uses a transparent system Acrylic material instead of exposing the
   assert.deepEqual(config.app.windows[0].windowEffects.effects, ["acrylic"])
 })
 
-test("Windows installer uses the system WebView2 runtime", () => {
+test("Windows installer tolerates WebView2 already-existing after a missed detection", () => {
   const config = JSON.parse(readFileSync("src-tauri/tauri.windows.conf.json", "utf8"))
-  assert.deepEqual(config.bundle.windows.webviewInstallMode, { type: "skip" })
+  assert.deepEqual(config.bundle.windows.webviewInstallMode, { type: "downloadBootstrapper" })
+  assert.equal(config.bundle.windows.nsis.template, "./windows/installer.nsi")
+
+  const template = readFileSync("src-tauri/windows/installer.nsi", "utf8")
+  assert.match(template, /\$1 = -2147024713/)
 })
