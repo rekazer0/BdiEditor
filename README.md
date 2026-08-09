@@ -6,7 +6,7 @@
 
 ![BdiEditor v0.3.2 编辑界面](docs/screenshots/bdiedito-v0.3.2-overview.png)
 
-## v0.4.7 更新
+## v0.4.8 更新
 
 - BDA 候选栏和工具框改为读取百度输入法安装包中的官方基础配置，并兼容其原始样式 ID；
 - 修复 macOS 侧边栏毛玻璃被整窗底色遮挡的问题；
