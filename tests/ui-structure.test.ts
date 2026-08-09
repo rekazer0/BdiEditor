@@ -130,6 +130,11 @@ test("layout remains hidden state while preview controls replace inspector layou
   assert.match(main, /"py_26\.ini": \{ group: "键盘布局"/)
 })
 
+test("single-theme skins disable unavailable theme choices", () => {
+  assert.match(main, /button\.disabled = Boolean\(archive\).*button\.dataset\.themeChoice/s)
+  assert.match(main, /if \(!availableThemes\.includes\(theme\.value\)\)[^\n]+\n\s*syncSegmentedControls\(\)/)
+})
+
 test("phone keyboard surface clips its translucent material to rounded corners", () => {
   const dockRule = css.match(/\.keyboard-dock\s*\{[^}]+\}/s)?.[0] ?? ""
   assert.match(dockRule, /border-radius:/)

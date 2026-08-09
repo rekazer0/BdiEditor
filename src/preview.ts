@@ -55,8 +55,13 @@ export function previewSelectionVisible(mode: "edit" | "preview", selected: bool
   return mode === "edit" && selected
 }
 
-export function shouldDrawFallbackKeyChrome(editable: boolean, hasBackVisual: boolean): boolean {
-  return editable && !hasBackVisual
+export function shouldDrawFallbackKeyChrome(
+  mode: "edit" | "preview",
+  editable: boolean,
+  hasBackVisual: boolean,
+  hasForeground: boolean,
+): boolean {
+  return mode === "edit" && editable && !hasBackVisual && !hasForeground
 }
 
 export function previewFallbackText(
@@ -77,9 +82,19 @@ export function foregroundLayerRect(
   key: Rect,
   source: [number, number, number, number] | undefined,
   layer: number,
+  offset?: [number, number],
 ): Rect {
-  if (layer === 0 || !source) return key
+  if (!source) return key
   const [, , width, height] = source
+  if (offset) {
+    return {
+      x: key.x + (key.width - width) / 2 + offset[0],
+      y: key.y + (key.height - height) / 2 + offset[1],
+      width,
+      height,
+    }
+  }
+  if (layer === 0) return key
   return {
     x: key.x + key.width - width - 8,
     y: key.y + 6,
@@ -109,6 +124,12 @@ function parseRect(value: string | undefined): Rect | undefined {
   if (!parts || parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) return
   const [x, y, width, height] = parts
   return { x, y, width, height }
+}
+
+function parseOffset(value: string | undefined): [number, number] | undefined {
+  const parts = value?.split(",").map(Number)
+  if (!parts || parts.length !== 2 || parts.some((part) => !Number.isFinite(part))) return
+  return parts as [number, number]
 }
 
 function itemFromSection(document: IniDocument, section: string): PreviewItem | undefined {
@@ -268,6 +289,7 @@ export class Preview {
   private readonly onSelect: (sections: string[]) => void
   private readonly toolbarSlots: boolean
   private document?: IniDocument
+  private offsets?: IniDocument
   private resolver?: AtlasResolver
   private panelStyle = ""
   private panelWidth = 1125
@@ -326,6 +348,11 @@ export class Preview {
 
   setResolver(resolver?: AtlasResolver): void {
     this.resolver = resolver
+    void this.draw()
+  }
+
+  setOffsets(offsets?: IniDocument): void {
+    this.offsets = offsets
     void this.draw()
   }
 
@@ -570,7 +597,8 @@ export class Preview {
       const active = this.active?.key === key
       const selected = previewSelectionVisible(this.mode, this.selected.has(key.section))
       const foregrounds = phoneForegroundLayers(visuals[index].fore)
-      if (shouldDrawFallbackKeyChrome(key.editable, Boolean(visuals[index].back))) {
+      const hasForeground = foregrounds.some(Boolean)
+      if (shouldDrawFallbackKeyChrome(this.mode, key.editable, Boolean(visuals[index].back), hasForeground)) {
         context.fillStyle = active ? "#8eb7f2" : "#f7f7f8"
         context.strokeStyle = active || selected ? "#087ff5" : "#8c929b"
         context.lineWidth = active || selected ? 4 : 2
@@ -589,7 +617,10 @@ export class Preview {
         this.drawVisual(context, visuals[index].back, key.rect, true)
       }
       for (const [layer, fore] of foregrounds.entries()) {
-        const destination = key.foreRect ?? foregroundLayerRect(key.rect, fore?.source, layer)
+        const offset = parseOffset(
+          this.offsets?.get(`OFFSET${key.positionTypes[layer] ?? ""}`, "POS"),
+        )
+        const destination = key.foreRect ?? foregroundLayerRect(key.rect, fore?.source, layer, offset)
         this.drawVisual(context, fore, destination, false)
       }
 
@@ -607,7 +638,6 @@ export class Preview {
       context.font = `${fontWeight}${fontSize}px ${canvasFontFamily(textVisual?.fontName)}`
       context.textAlign = "center"
       context.textBaseline = "middle"
-      const hasForeground = foregrounds.some(Boolean)
       const fallbackText = previewFallbackText(key, this.mode, hasForeground)
       if (fallbackText) {
         context.fillText(

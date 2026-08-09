@@ -96,12 +96,17 @@ test("places the second foreground image at the phone key's upper-right slot", a
       key: { x: number; y: number; width: number; height: number },
       source: [number, number, number, number] | undefined,
       layer: number,
+      offset?: [number, number],
     ) => { x: number; y: number; width: number; height: number }
   }
   assert.equal(typeof module.foregroundLayerRect, "function")
   assert.deepEqual(
     module.foregroundLayerRect?.({ x: 178, y: 12, width: 187, height: 143 }, [0, 0, 50, 50], 1),
     { x: 307, y: 18, width: 50, height: 50 },
+  )
+  assert.deepEqual(
+    module.foregroundLayerRect?.({ x: 0, y: 0, width: 110, height: 140 }, [0, 0, 50, 40], 0, [-6, 16]),
+    { x: 24, y: 66, width: 50, height: 40 },
   )
 })
 
@@ -212,10 +217,11 @@ test("does not composite a full-panel skin background twice", () => {
   assert.equal(shouldDrawItemBackground(item, "1102", 1125, 595), true)
 })
 
-test("uses fallback key chrome only when a key has no resolved background", () => {
-  assert.equal(shouldDrawFallbackKeyChrome(true, false), true)
-  assert.equal(shouldDrawFallbackKeyChrome(true, true), false)
-  assert.equal(shouldDrawFallbackKeyChrome(false, false), false)
+test("uses fallback key chrome only for a completely blank key while editing", () => {
+  assert.equal(shouldDrawFallbackKeyChrome("edit", true, false, false), true)
+  assert.equal(shouldDrawFallbackKeyChrome("preview", true, false, false), false)
+  assert.equal(shouldDrawFallbackKeyChrome("edit", true, false, true), false)
+  assert.equal(shouldDrawFallbackKeyChrome("edit", true, true, false), false)
 })
 
 test("hides editor selection outlines in interaction preview", () => {

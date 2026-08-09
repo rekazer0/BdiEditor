@@ -117,6 +117,7 @@ export function resolveVisualSpec(
   const id = styleID.trim()
   if (!/^\d+$/.test(id)) return
   const section = `STYLE${id}`
+  if (!styles.sections().includes(section)) return
   const imageValue =
     (highlighted ? styles.get(section, "HL_IMG") : undefined) ?? styles.get(section, "NM_IMG")
   const [imageName, tileValue] = imageValue?.split(",").map((part) => part.trim()) ?? []
@@ -124,7 +125,6 @@ export function resolveVisualSpec(
     (highlighted ? styles.get(section, "HL_COLOR") : undefined) ??
     styles.get(section, "NM_COLOR")
   const color = parseColor(colorValue)
-  if (!imageName && !color) return
   return {
     imageName: imageName || undefined,
     tile: tileValue ? Number(tileValue) : undefined,

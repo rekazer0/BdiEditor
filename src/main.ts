@@ -361,6 +361,9 @@ function syncSegmentedControls(): void {
   }
   for (const button of themeChoiceButtons) {
     button.classList.toggle("active", button.dataset.themeChoice === theme.value)
+    button.disabled = Boolean(archive) && !archive.names().some((name) =>
+      name.startsWith(`${button.dataset.themeChoice}/skin/`),
+    )
   }
   for (const button of orientationChoiceButtons) {
     button.classList.toggle("active", button.dataset.orientationChoice === orientation.value)
@@ -512,11 +515,12 @@ function refreshPreview(): void {
   if (!archive) return
   const composing = refreshSimulationState()
   const resolver = new AtlasResolver(archive, theme.value, orientation.value)
+  const context = keyboardContext()
   const toolbarSize = refreshToolbarPreview(composing, resolver)
   preview.setResolver(resolver)
+  preview.setOffsets(context?.gen)
   preview.setTheme(theme.value === "dark" ? "dark" : "light")
   preview.setTransparent(device.value !== "canvas")
-  const context = keyboardContext()
   if (context && layoutDocument) {
     const config = resolvePanelConfig(layoutDocument, context.gen, context.styles)
     const inputVisual = resolveTextVisual(
@@ -837,6 +841,7 @@ function refreshToolbarPreview(
   toolbarStrip.hidden = composing
   toolbarStrip.dataset.path = path
   toolbarPreview.setResolver(resolver)
+  toolbarPreview.setOffsets(gen)
   toolbarPreview.setTheme(theme.value === "dark" ? "dark" : "light")
   toolbarPreview.setTransparent(device.value !== "canvas")
   const width = size?.length === 4 && Number.isFinite(size[2]) ? size[2] : 1125
@@ -1769,6 +1774,7 @@ function loadArchive(bytes: Uint8Array, path: string, isNew = false): void {
     archive?.names().some((name) => name.startsWith(`${value}/skin/`)),
   )
   if (!availableThemes.includes(theme.value)) theme.value = availableThemes[0] ?? "light"
+  syncSegmentedControls()
   const preferredDevice = localStorage.getItem("default-device")
   if (preferredDevice && Array.from(device.options).some((option) => option.value === preferredDevice)) {
     device.value = preferredDevice

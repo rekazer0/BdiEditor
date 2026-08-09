@@ -43,7 +43,15 @@ NM_COLOR=80010203
 })
 
 test("ignores unknown style identifiers", () => {
-  assert.equal(resolveVisualSpec(IniDocument.parse(""), "S11_3", false), undefined)
+  const styles = IniDocument.parse("[STYLE1161]\nINFO=transparent key\n")
+
+  assert.deepEqual(resolveVisualSpec(styles, "1161", false), {
+    imageName: undefined,
+    tile: undefined,
+    color: undefined,
+  })
+  assert.equal(resolveVisualSpec(styles, "9999", false), undefined)
+  assert.equal(resolveVisualSpec(styles, "S11_3", false), undefined)
 })
 
 test("resolves encoded foreground style text properties", () => {
