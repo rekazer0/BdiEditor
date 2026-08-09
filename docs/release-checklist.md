@@ -47,7 +47,7 @@
 - [x] 仅构建 release `.app`；
 - [x] 内置模板 SHA-256；
 - [x] Git 工作区只包含源代码和文档；
-- [ ] 推送 `rekazer0/bdi-edit`；
+- [ ] 推送 `rekazer0/BdiEditor`；
 - [ ] 创建标签 `0.1`；
 - [ ] 创建 GitHub Release `0.1`；
 - [ ] 上传 `.app` 发布产物；

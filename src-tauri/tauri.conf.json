@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "BdiEdito v0.3.2",
+  "productName": "BdiEditor v0.3.2",
   "version": "0.3.2",
   "identifier": "io.github.rekazer0.bdiedit",
   "build": {
@@ -15,7 +15,7 @@
     },
     "windows": [
       {
-        "title": "BdiEdito v0.3.2",
+        "title": "BdiEditor v0.3.2",
         "width": 1440,
         "height": 900,
         "minWidth": 900,
@@ -60,6 +60,17 @@
         "rank": "Owner",
         "exportedType": {
           "identifier": "io.github.rekazer0.bdiedit.bds",
+          "conformsTo": ["public.data"]
+        }
+      },
+      {
+        "ext": ["bda"],
+        "name": "百度输入法新版 Android 皮肤",
+        "mimeType": "application/octet-stream",
+        "role": "Editor",
+        "rank": "Owner",
+        "exportedType": {
+          "identifier": "io.github.rekazer0.bdiedit.bda",
           "conformsTo": ["public.data"]
         }
       }

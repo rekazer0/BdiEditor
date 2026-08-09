@@ -188,7 +188,7 @@ assert.equal(doc.toString(), "; keep\n[KEY1]\nVIEW_RECT=5,6,7,8\n")
 1. 确认 `npm test`、`npm run build` 和 Tauri release build 全部通过。
 2. 确认两个真实样本可打开、修改和重新打包。
 3. 初始化 Git，检查全部待提交文件，不提交样本皮肤或构建产物。
-4. 配置远端 `https://github.com/rekazer0/bdi-edit.git`。
+4. 配置远端 `https://github.com/rekazer0/BdiEditor.git`。
 5. 提交 0.1 源码并推送。
 6. 创建标签 `0.1`。
 7. 创建 GitHub Release `0.1`，附带 macOS 安装产物和校验值。
@@ -258,4 +258,4 @@ assert.equal(doc.toString(), "; keep\n[KEY1]\nVIEW_RECT=5,6,7,8\n")
 3. 用原生 macOS 应用完整操作新建、打开、主题、方向、布局、选键、多选、拖动、缩放、动作预览、图片替换和另存为。
 4. 构建 release `.app` 与 `.dmg`，记录 SHA-256。
 5. 初始化 Git，仅提交源代码与文档。
-6. 推送 `rekazer0/bdi-edit`，创建标签和 GitHub Release `0.1`。
+6. 推送 `rekazer0/BdiEditor`，创建标签和 GitHub Release `0.1`。

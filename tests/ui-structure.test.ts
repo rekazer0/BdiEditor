@@ -71,7 +71,7 @@ test("source tree assigns semantic system symbols to navigation, folders, and fi
   assert.match(main, /"nav-component":\s*"square\.grid\.2x2"/)
   assert.match(main, /"nav-style":\s*"paintpalette"/)
   assert.match(main, /createSystemSymbol\("folder"\)/)
-  assert.match(main, /archive\?\.isText\(path\)\s*\?\s*"doc\.text"/s)
+  assert.match(main, /archive\?\.isText\(path\) \|\| archive\?\.isBdaConfig\(path\)\s*\?\s*"doc\.text"/s)
   assert.match(main, /archive\?\.isImage\(path\)\s*\?\s*"photo"/s)
   assert.match(main, /:\s*"doc"/)
 })
@@ -190,13 +190,19 @@ test("device preview resolves component panels and hides unavailable accessories
   )
 })
 
-test("export menu exposes direct readable iOS and Android actions", () => {
+test("export menu exposes direct readable BDI, BDS and BDA actions", () => {
   assert.match(html, /data-export-format="bdi"[^>]*>[^<]*导出 iOS 皮肤/)
   assert.match(html, /data-export-format="bds"[^>]*>[^<]*导出 Android 皮肤/)
+  assert.match(html, /data-export-format="bda"[^>]*>[^<]*导出新版 Android 皮肤/)
   assert.doesNotMatch(html, /id="export-format"/)
   assert.doesNotMatch(html, /id="save-as"/)
   assert.match(main, /saveNative\(true, format\)/)
   assert.match(main, /saveNative\(false, currentExportFormat\(\)\)/)
+})
+
+test("BDA files are accepted by browser and native open flows", () => {
+  assert.match(html, /accept="[^"]*\.bda/)
+  assert.match(main, /extensions: \["bdi", "bds", "bda", "zip"\]/)
 })
 
 test("toolbar configurations expose parsed inspector fields", () => {
@@ -236,7 +242,7 @@ test("export moved left and more menu opens settings and about dialogs", () => {
   assert.match(html, /id="settings-dialog"/)
   assert.match(html, /id="about-dialog"/)
   assert.match(main, /dialog\.showModal\(\)/)
-  assert.match(html, /https:\/\/github\.com\/rekazer0\/BdiEdito/)
+  assert.match(html, /https:\/\/github\.com\/rekazer0\/BdiEditor/)
 })
 
 test("image preview closes from its backdrop without a close button", () => {
@@ -301,8 +307,8 @@ test("settings expose canvas backgrounds and edit mode exposes key context actio
 })
 
 test("window and about names match the GitHub project and include the version", () => {
-  assert.match(html, /<title>BdiEdito v0\.3\.2<\/title>/)
-  assert.match(html, /关于 BdiEdito v0\.3\.2/)
+  assert.match(html, /<title>BdiEditor v0\.3\.2<\/title>/)
+  assert.match(html, /关于 BdiEditor v0\.3\.2/)
 })
 
 test("new-project chooser includes the four dust templates", () => {
@@ -377,7 +383,7 @@ test("overview classifies ini files and uses a consistent filename row", () => {
 
 test("source file clicks open text files in the source inspector", () => {
   assert.match(main, /button\.addEventListener\("click", \(\) => selectFile\(path, "source"\)\)/)
-  assert.match(main, /preferredSidebarView === "source" && archive\?\.isText\(path\)/)
+  assert.match(main, /preferredSidebarView === "source" && \(archive\?\.isText\(path\) \|\| archive\?\.isBdaConfig\(path\)\)/)
 })
 
 test("every overview text document exposes editable non-key properties", () => {

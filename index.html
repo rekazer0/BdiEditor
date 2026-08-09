@@ -7,7 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     />
-    <title>BdiEdito v0.3.2</title>
+    <title>BdiEditor v0.3.2</title>
   </head>
   <body>
     <header class="titlebar">
@@ -26,6 +26,7 @@
           <div class="toolbar-menu export-actions" aria-label="导出皮肤">
             <button class="export-action" data-export-format="bdi" disabled>导出 iOS 皮肤 (.bdi)…</button>
             <button class="export-action" data-export-format="bds" disabled>导出 Android 皮肤 (.bds)…</button>
+            <button class="export-action" data-export-format="bda" disabled>导出新版 Android 皮肤 (.bda)…</button>
           </div>
         </details>
         <span class="toolbar-divider"></span>
@@ -349,15 +350,15 @@
 
     <dialog id="about-dialog" class="app-dialog" aria-labelledby="about-title">
       <form method="dialog">
-        <header><h2 id="about-title">关于 BdiEdito v0.3.2</h2><button aria-label="关闭">关闭</button></header>
+        <header><h2 id="about-title">关于 BdiEditor v0.3.2</h2><button aria-label="关闭">关闭</button></header>
         <p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
         <p>版本 0.3.2</p>
-        <p>支持读取、编辑和导出 BDI、BDS 皮肤包。</p>
-        <a href="https://github.com/rekazer0/BdiEdito" target="_blank" rel="noreferrer">GitHub · rekazer0/BdiEdito</a>
+        <p>支持读取、编辑和导出 BDI、BDS、BDA 皮肤包。</p>
+        <a href="https://github.com/rekazer0/BdiEditor" target="_blank" rel="noreferrer">GitHub · rekazer0/BdiEditor</a>
       </form>
     </dialog>
 
-    <input id="browser-open" type="file" accept=".bdi,.bds,.zip" hidden />
+    <input id="browser-open" type="file" accept=".bdi,.bds,.bda,.zip" hidden />
     <input id="image-open" type="file" accept=".png" hidden />
     <script type="module" src="/src/main.ts"></script>
   </body>

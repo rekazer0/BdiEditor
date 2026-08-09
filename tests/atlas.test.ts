@@ -111,6 +111,31 @@ test("atlas resolver exposes the resolved resource path and tile source rectangl
   }
 })
 
+test("prefers orientation-local BDS/BDI atlas resources over shared resources", async () => {
+  const archive = SkinArchive.open(zipSync({
+    "light/skin/port/res/default.css": strToU8("[STYLE211]\nNM_IMG=btn,1\n"),
+    "light/skin/port/res/btn.png": new Uint8Array([1]),
+    "light/skin/port/res/btn.til": strToU8("[IMG1]\nSOURCE_RECT=1,2,30,40\n"),
+    "light/skin/res/btn.png": new Uint8Array([2]),
+    "light/skin/res/btn.til": strToU8("[IMG1]\nSOURCE_RECT=9,8,70,60\n"),
+  }))
+  const previous = globalThis.createImageBitmap
+  Object.defineProperty(globalThis, "createImageBitmap", {
+    configurable: true,
+    value: async () => ({ width: 64, height: 64 }),
+  })
+  try {
+    const visual = await new AtlasResolver(archive, "light", "port").resolve("211", false)
+    assert.equal(visual?.imagePath, "light/skin/port/res/btn.png")
+    assert.deepEqual(visual?.source, [1, 2, 30, 40])
+  } finally {
+    Object.defineProperty(globalThis, "createImageBitmap", {
+      configurable: true,
+      value: previous,
+    })
+  }
+})
+
 test("draws a resolved atlas visual from its SOURCE_RECT instead of the whole image", async () => {
   const module = await import("../src/atlas.ts") as typeof import("../src/atlas.ts") & {
     drawVisualSource?: (

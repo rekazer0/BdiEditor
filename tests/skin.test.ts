@@ -120,6 +120,40 @@ test("normalizes an Android BDS package for editing", () => {
   assert.equal(archive.getText("light/skin/port/py_9.ini"), "[KEY1]\nCENTER=q\n")
 })
 
+test("recognizes and preserves the protobuf-based Android BDA layout", () => {
+  const appearance = new Uint8Array([0x08, 0x01])
+  const image = new Uint8Array([1, 2, 3, 4])
+  const bytes = zipSync({
+    "Info.txt": strToU8("Name=Test\r\nSkinType=1\r\n"),
+    "light/port/appearanceConfig": appearance,
+    "light/port/switchConfig": new Uint8Array([0x08, 0x01]),
+    "light/res/key.png": image,
+  })
+  const archive = SkinArchive.open(bytes)
+
+  assert.equal(archive.format, "bda")
+  assert.equal(archive.isBdaConfig("light/skin/port/appearanceConfig"), true)
+  assert.equal(archive.isBdaConfig("light/skin/port/lightAnimationConfig"), true)
+  assert.equal(archive.isBdaConfig("light/skin/port/switchConfig.json"), false)
+  assert.deepEqual(archive.getBytes("light/skin/port/appearanceConfig"), appearance)
+  assert.deepEqual(archive.getBytes("light/skin/res/key.png"), image)
+  assert.deepEqual(archive.toBytes("bda"), bytes)
+  assert.throws(() => archive.toBytes("bds"), /不能转换/)
+})
+
+test("writes a changed BDA resource back to its original package path", () => {
+  const archive = SkinArchive.open(zipSync({
+    "Info.txt": strToU8("SkinType=1\n"),
+    "dark/land/appearanceConfig": new Uint8Array([0x08, 0x01]),
+    "dark/res/key.png": new Uint8Array([1]),
+  }))
+  archive.setBytes("dark/skin/res/key.png", new Uint8Array([9, 8]))
+  const output = unzipSync(archive.toBytes("bda"))
+
+  assert.deepEqual(output["dark/res/key.png"], new Uint8Array([9, 8]))
+  assert.equal(output["dark/skin/res/key.png"], undefined)
+})
+
 test("keeps platform directories when editing current BDI and BDS packages", () => {
   const bdi = SkinArchive.open(zipSync({
     "skin/Info.txt": strToU8("SupportPlatform=I\r\n"),

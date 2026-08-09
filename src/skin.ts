@@ -19,7 +19,14 @@ type ZipEntry = {
   uncompressedSize: number
 }
 
-type PackageLayout = "bdi-dual" | "bdi-single" | "bds-dual" | "bds-single" | "legacy-ios"
+type PackageLayout =
+  | "bdi-dual"
+  | "bdi-single"
+  | "bds-dual"
+  | "bds-single"
+  | "bda-dual"
+  | "bda-single"
+  | "legacy-ios"
 
 const view = (bytes: Uint8Array) =>
   new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
@@ -161,6 +168,12 @@ function validateArchiveLimits(bytes: Uint8Array): void {
 
 function packageLayout(files: Map<string, Uint8Array>): PackageLayout {
   const names = [...files.keys()]
+  if (names.some((name) => /^(?:dark|light)\/(?:land|port)\/\d*appearanceConfig$/.test(name))) {
+    return "bda-dual"
+  }
+  if (names.some((name) => /^(?:land|port)\/\d*appearanceConfig$/.test(name))) {
+    return "bda-single"
+  }
   if (names.some((name) => /^skin\/(?:dark|light)\/skin\//.test(name))) return "bdi-dual"
   if (names.some((name) => /^skin\/(?:land|port|res)\//.test(name))) return "bdi-single"
   if (names.some((name) => /^(?:dark|light)\/(?:land|port|res)\//.test(name))) return "bds-dual"
@@ -185,11 +198,11 @@ function canonicalPath(path: string, layout: PackageLayout): string {
     if (path === "skin/demo.png") return "demo.png"
     return path.startsWith("skin/") ? `light/skin/${path.slice(5)}` : path
   }
-  if (layout === "bds-dual") {
+  if (layout === "bds-dual" || layout === "bda-dual") {
     const themed = path.match(/^(dark|light)(?:\/(.*))?$/)
     if (themed) return `${themed[1]}/skin/${themed[2] ?? ""}`
   }
-  if (layout === "bds-single") {
+  if (layout === "bds-single" || layout === "bda-single") {
     if (path === "Info.txt" || path === "demo.png") return path
     return `light/skin/${path}`
   }
@@ -255,6 +268,7 @@ export class SkinArchive {
   }
 
   get format(): ExportFormat {
+    if (this.layout.startsWith("bda")) return "bda"
     return this.layout.startsWith("bds") ? "bds" : "bdi"
   }
 
@@ -286,6 +300,10 @@ export class SkinArchive {
 
   isImage(path: string): boolean {
     return this.getBytes(path) !== undefined && path.toLowerCase().endsWith(".png")
+  }
+
+  isBdaConfig(path: string): boolean {
+    return this.format === "bda" && /\/\d*(?:appearance|animation|lightAnimation|sound|switch|sticker|scene)Config$/.test(path)
   }
 
   getBytes(path: string): Uint8Array | undefined {
@@ -382,6 +400,9 @@ export class SkinArchive {
   }
 
   toBytes(format?: ExportFormat): Uint8Array {
+    if (format && (format === "bda" || this.format === "bda") && format !== this.format) {
+      throw new Error("BDA 与 BDI/BDS 使用不同配置格式，不能转换")
+    }
     if (format && (format !== this.format || this.layout === "legacy-ios")) {
       return this.packagedBytes(format)
     }

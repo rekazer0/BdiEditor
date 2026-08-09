@@ -1,10 +1,10 @@
-# BdiEdito
+# BdiEditor
 
-一个面向百度输入法 iOS `.bdi` 与 Android `.bds` 皮肤的可视化桌面编辑器。BdiEdito 让皮肤布局、按键样式与资源编辑回到可实时预览的桌面工作流。
+一个面向百度输入法 iOS `.bdi` 与 Android `.bds`、`.bda` 皮肤的可视化桌面编辑器。BdiEditor 让皮肤布局、按键样式与资源编辑回到可实时预览的桌面工作流。
 
 支持 macOS 与 Windows，采用轻量的 Tauri 2 + 原生 HTML/CSS/TypeScript 技术栈。
 
-![BdiEdito v0.3.2 编辑界面](docs/screenshots/bdiedito-v0.3.2-overview.png)
+![BdiEditor v0.3.2 编辑界面](docs/screenshots/bdiedito-v0.3.2-overview.png)
 
 ## v0.3.2 更新
 
@@ -21,21 +21,22 @@
 
 ## 快速上手
 
-1. 点击左上角“打开”选择现有 `.bdi` 或 `.bds` 文件；也可点击“新建项目”，从默认模板或内置“尘埃”模板开始。
+1. 点击左上角“打开”选择现有 `.bdi`、`.bds` 或 `.bda` 文件；也可点击“新建项目”，从默认模板或内置“尘埃”模板开始。
 2. 在左侧“概览”中选择键盘布局、候选栏、工具栏或其他组件；切到“源文件”可像 Finder 一样浏览项目文件。
 3. 使用画布上方控件切换设备、横竖屏、皮肤明暗和辅助线。选择手机时会按对应屏幕与安全区预览。
 4. 切换到“编辑模式”后点击按键，在右侧检查器修改尺寸、位置、动作、颜色和图片。点击图片缩略图可查看处理后的实际效果。
 5. 多选时，macOS 使用 `Command + 单击`，Windows 使用 `Ctrl + 单击`；使用 `Shift + 单击`可连续选择两个按键之间的全部按键。
 6. 右键选中的按键可复制或删除；右侧“源代码”会定位并整行高亮对应配置。
-7. 完成后点击“保存”，或通过左上角“导出”生成 iOS `.bdi` / Android `.bds` 文件。
+7. 完成后点击“保存”；旧格式还可通过左上角“导出”生成 iOS `.bdi` / Android `.bds` 文件，BDA 保持 protobuf 格式保存。
 
 在右上角“更多 → 设置”中可切换软件外观、默认预览设备和画布背景。
 
-![BdiEdito v0.3.2 深色设置](docs/screenshots/bdiedito-v0.3.2-dark-settings.png)
+![BdiEditor v0.3.2 深色设置](docs/screenshots/bdiedito-v0.3.2-dark-settings.png)
 
 ## 主要特性
 
-- 打开、创建、保存 `.bdi/.bds` 皮肤；导出时会转换平台目录和 `SupportPlatform`，而非仅改扩展名；
+- 打开、创建、保存 `.bdi/.bds` 皮肤，并打开、保存 `.bda` 皮肤；旧格式导出时会转换平台目录和 `SupportPlatform`，而非仅改扩展名；
+- 按百度官方 protobuf 描述符解析 BDA 样式、面板、按键引用和资源 ID，保留未知字段并支持替换包内图片；
 - 自动识别九键、魔改九键和 26 键布局；
 - 浅色/深色、竖屏/横屏实时预览；内置 iPhone 17 Pro、iPhone 17 Pro Max、Xiaomi 17、Pixel 10 Pro 与 Galaxy S25 Ultra 的厂商公布分辨率模板；
 - 普通、按下/高亮、滑动方向和长按事件预览；
@@ -54,7 +55,7 @@
 - 默认皮肤模板、4 套“尘埃”内置模板、新建皮肤、撤销/重做和未保存保护；
 - 可选择默认、马赛克、白色或深色画布背景；
 - 新建、打开、保存、另存为和图片替换具有统一的进行中/成功/取消/失败反馈；文件错误会显示原生错误对话框；
-- `.bdi/.bds` 文件关联，可从 Finder 双击打开。
+- `.bdi/.bds/.bda` 文件关联，可从 Finder 双击打开。
 
 ## 范围
 

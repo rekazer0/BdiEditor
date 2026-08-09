@@ -167,6 +167,7 @@ export function toolbarImagePaths(plist: string, limit = 3): string[] {
 export class AtlasResolver {
   private readonly archive: SkinArchive
   private readonly theme: string
+  private readonly resourceRoots: string[]
   private readonly styles?: IniDocument
   private readonly images = new Map<string, Promise<ImageBitmap>>()
   private readonly tiles = new Map<string, IniDocument>()
@@ -174,9 +175,12 @@ export class AtlasResolver {
   constructor(archive: SkinArchive, theme: string, orientation: string) {
     this.archive = archive
     this.theme = theme
+    this.resourceRoots = [
+      `${theme}/skin/${orientation}/res`,
+      `${theme}/skin/res`,
+    ]
     const path = [
-      `${theme}/skin/${orientation}/res/default.css`,
-      `${theme}/skin/res/default.css`,
+      ...this.resourceRoots.map((root) => `${root}/default.css`),
     ].find((candidate) => archive.names().includes(candidate))
     if (path) this.styles = IniDocument.parse(archive.getText(path))
   }
@@ -198,7 +202,13 @@ export class AtlasResolver {
     if (!spec) return
     if (!spec.imageName || !spec.tile) return { color: spec.color }
 
-    const base = `${this.theme}/skin/res/${spec.imageName}`
+    const base = this.resourceRoots
+      .map((root) => `${root}/${spec.imageName}`)
+      .find((candidate) =>
+        this.archive.names().includes(`${candidate}.png`) &&
+        this.archive.names().includes(`${candidate}.til`),
+      )
+    if (!base) return { color: spec.color }
     const imagePath = `${base}.png`
     const tilePath = `${base}.til`
     const image = this.bitmap(imagePath)

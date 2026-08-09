@@ -20,6 +20,7 @@ import {
   exportPath,
   type ExportFormat,
 } from "./export.ts"
+import { describeBdaConfig } from "./bda.ts"
 import { IniDocument } from "./ini.ts"
 import { highlightIni } from "./highlight.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
@@ -616,7 +617,10 @@ function setFileOperationBusy(busy: boolean): void {
   newButton.disabled = busy
   openButton.disabled = busy
   saveButton.disabled = busy || !archive
-  for (const button of exportButtons) button.disabled = busy || !archive
+  for (const button of exportButtons) {
+    const format = button.dataset.exportFormat as ExportFormat
+    button.disabled = busy || !archive || (archive.format === "bda" ? format !== "bda" : format === "bda")
+  }
 }
 
 function showStatus(text: string, kind: "progress" | "success" = "success"): void {
@@ -1520,6 +1524,13 @@ function selectFile(path: string, preferredSidebarView = sidebarView): void {
     } else if (path !== layoutPath) {
       inspectorTab = "source"
     }
+  } else if (archive?.isBdaConfig(path)) {
+    hideImageWorkspace()
+    selectedDocument = undefined
+    setSourceValue(describeBdaConfig(path, archive.getBytes(path)!))
+    source.disabled = true
+    sourceName.textContent = path
+    inspectorTab = "source"
   } else {
     return
   }
@@ -1527,7 +1538,9 @@ function selectFile(path: string, preferredSidebarView = sidebarView): void {
     layoutDocument = selectedDocument
     refreshPreview()
   }
-  if (preferredSidebarView === "source" && archive?.isText(path)) inspectorTab = "source"
+  if (preferredSidebarView === "source" && (archive?.isText(path) || archive?.isBdaConfig(path))) {
+    inspectorTab = "source"
+  }
   updateInspectorView()
   if (!quickInspector.hidden) populateKeyInspector()
   selectedFileButton?.classList.remove("selected")
@@ -1563,6 +1576,9 @@ function renderFiles(): void {
     ? `${theme.value}/skin/Info.txt`
     : "Info.txt"
   entries.push({ group: "皮肤", label: "皮肤信息", path: overviewPath, className: "nav-overview", icon: "info.circle" })
+  if (archive.format === "bda") {
+    entries.push({ group: "皮肤", label: "效果预览", path: `${theme.value}/skin/demo.png`, className: "nav-overview", icon: "photo" })
+  }
 
   const iniTypes: Record<string, Omit<NavEntry, "path">> = {
     "py_9.ini": { group: "键盘布局", label: "中文 9 键", className: "nav-layout", icon: "keyboard" },
@@ -1691,7 +1707,7 @@ function renderFiles(): void {
       button.className = "source-tree-row source-file-row"
       button.setAttribute("role", "treeitem")
       button.tabIndex = -1
-      const sourceSymbol = archive?.isText(path)
+      const sourceSymbol = archive?.isText(path) || archive?.isBdaConfig(path)
         ? "doc.text"
         : archive?.isImage(path)
           ? "photo"
@@ -1703,7 +1719,7 @@ function renderFiles(): void {
       button.append(label)
       button.title = path
       button.dataset.path = path
-      button.disabled = !archive?.isText(path) && !archive?.isImage(path)
+      button.disabled = !archive?.isText(path) && !archive?.isImage(path) && !archive?.isBdaConfig(path)
       button.addEventListener("click", () => selectFile(path, "source"))
       parent.append(button)
     }
@@ -1789,13 +1805,19 @@ function loadArchive(bytes: Uint8Array, path: string, isNew = false): void {
     ? exportName("未命名", archive.format)
     : path.split(/[\\/]/).pop() || "未命名皮肤"
   saveButton.disabled = false
-  for (const button of exportButtons) button.disabled = false
+  for (const button of exportButtons) {
+    const format = button.dataset.exportFormat as ExportFormat
+    button.disabled = archive.format === "bda" ? format !== "bda" : format === "bda"
+  }
   renderFiles()
   layoutPath = preferredPath()
   previewReturnName = layoutPath.split("/").pop() ?? layout.value
-  const initial = archive.names().includes(layoutPath)
-    ? layoutPath
-    : archive.names().find((name) => archive?.isText(name))
+  const bdaDemo = `${theme.value}/skin/demo.png`
+  const initial = archive.format === "bda" && archive.names().includes(bdaDemo)
+    ? bdaDemo
+    : archive.names().includes(layoutPath)
+      ? layoutPath
+      : archive.names().find((name) => archive?.isText(name))
   if (initial) {
     layoutPath = initial
     selectFile(initial)
@@ -1807,7 +1829,7 @@ async function openNative(): Promise<boolean> {
   if (!(await prepareDocumentReplacement())) return false
   const path = await open({
     multiple: false,
-    filters: [{ name: "百度输入法皮肤", extensions: ["bdi", "bds", "zip"] }],
+    filters: [{ name: "百度输入法皮肤", extensions: ["bdi", "bds", "bda", "zip"] }],
   })
   if (typeof path !== "string") return false
   await loadNativePath(path)
@@ -1832,7 +1854,11 @@ async function saveNative(saveAs: boolean, format: ExportFormat): Promise<boolea
       defaultPath: exportName(documentName.textContent ?? "skin", format),
       filters: [
         {
-          name: format === "bdi" ? "百度输入法 iOS 皮肤" : "百度输入法 Android 皮肤",
+          name: format === "bdi"
+            ? "百度输入法 iOS 皮肤"
+            : format === "bda"
+              ? "百度输入法新版 Android 皮肤"
+              : "百度输入法 Android 皮肤",
           extensions: [format],
         },
       ],
@@ -2102,7 +2128,11 @@ for (const button of inspectorTabButtons) {
 for (const control of [theme, orientation, layout]) {
   control.addEventListener("change", () => {
     const path = preferredPath()
-    if (archive?.names().includes(path)) {
+    if (archive?.format === "bda") {
+      renderFiles()
+      const demo = `${theme.value}/skin/demo.png`
+      if (archive.names().includes(demo)) selectFile(demo)
+    } else if (archive?.names().includes(path)) {
       layoutPath = path
       layoutDocument = IniDocument.parse(archive.getText(path))
       selectedKeySections = []
