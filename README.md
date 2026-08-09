@@ -6,8 +6,9 @@
 
 ![BdiEditor v0.3.2 编辑界面](docs/screenshots/bdiedito-v0.3.2-overview.png)
 
-## v0.4.7 更新
+## v0.4.8 更新
 
+- Windows 窗口改用原生 Acrylic 材质，降低桌面直透感；
 - BDA 候选栏和工具框改为读取百度输入法安装包中的官方基础配置，并兼容其原始样式 ID；
 - 修复 macOS 侧边栏毛玻璃被整窗底色遮挡的问题；
 - 新增 `npm run version:feature` 与 `npm run version:bugfix`，分别自动递增功能位与补丁位并同步所有版本文件；

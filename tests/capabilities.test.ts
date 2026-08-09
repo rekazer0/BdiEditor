@@ -29,8 +29,8 @@ test("macOS uses a transparent native frosted window background", () => {
   assert.deepEqual(config.app.windows[0].windowEffects.effects, ["sidebar"])
 })
 
-test("Windows uses a transparent system Mica material instead of a black title frame", () => {
+test("Windows uses a transparent system Acrylic material instead of exposing the desktop", () => {
   const config = JSON.parse(readFileSync("src-tauri/tauri.windows.conf.json", "utf8"))
   assert.equal(config.app.windows[0].transparent, true)
-  assert.deepEqual(config.app.windows[0].windowEffects.effects, ["mica"])
+  assert.deepEqual(config.app.windows[0].windowEffects.effects, ["acrylic"])
 })
