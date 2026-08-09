@@ -344,8 +344,8 @@ test("settings expose canvas backgrounds and edit mode exposes key context actio
 })
 
 test("window and about names match the GitHub project and include the version", () => {
-  assert.match(html, /<title>BdiEditor v0\.4\.8<\/title>/)
-  assert.match(html, /关于 BdiEditor v0\.4\.8/)
+  assert.match(html, /<title>BdiEditor v0\.5\.4<\/title>/)
+  assert.match(html, /关于 BdiEditor v0\.5\.4/)
   assert.match(html, /<strong>技术交流与反馈<\/strong><br>QQ群：228040912/)
 })
 
@@ -458,6 +458,45 @@ test("preview toolbar centers the device selector and toggles canvas guides", ()
   assert.match(css, /\.field-control\s*\{[^}]*left:\s*50%[^}]*translateX\(-50%\)/s)
 })
 
+test("platform materials and toolbar status surfaces stay visually consistent", () => {
+  assert.match(main, /document\.documentElement\.classList\.toggle\("windows", navigator\.userAgent\.includes\("Windows"\)\)/)
+  assert.match(css, /#skin-state-control\s*\{[^}]*left:\s*45px[^}]*transform:\s*none/s)
+  assert.match(css, /#skin-state-control\[hidden\]\s*\{[^}]*display:\s*none\s*!important/s)
+  assert.match(css, /\.source\s*\{[^}]*background:\s*var\(--sidebar\)[^}]*blur\(28px\)/s)
+  assert.match(css, /\.workspace-status\s*\{[^}]*border-top:[^}]*background:\s*var\(--toolbar\)[^}]*font:\s*10px/s)
+  assert.match(css, /#event-log\s*\{[^}]*background:\s*transparent[^}]*font:\s*inherit/s)
+  assert.match(css, /#panel-status\s*\{[^}]*color:\s*inherit[^}]*font:\s*inherit/s)
+  assert.match(css, /:root\.macos\[data-window-material="on"\][\s\S]*?\.app-dialog[\s\S]*?backdrop-filter:/)
+  assert.match(css, /:root\.windows\[data-window-material="on"\]\s+\*\s*\{[^}]*backdrop-filter:\s*none\s*!important/s)
+})
+
+test("panel tools expose S-state, resolution and portrait-to-landscape conversion", () => {
+  assert.match(html, /id="panel-scale"[^>]*title="面板缩放与竖转横"/)
+  assert.match(html, /id="skin-state"[^>]*aria-label="皮肤 S 状态"/)
+  assert.match(html, /id="panel-status"[^>]*>面板：-- × -- · 预览缩放：--%/)
+  assert.match(html, /id="panel-scale-dialog"/)
+  assert.match(main, /availableSkinStates\(\.\.\.skinStateDocuments\(\)\)/)
+  assert.match(main, /panelConversionPaths\(/)
+  assert.match(main, /scaleIniDocument\(/)
+  assert.match(main, /window\.confirm\([^)]*覆盖/s)
+})
+
+test("panel tools keep their toolbar order and each layout's native aspect ratio", () => {
+  assert.ok(html.indexOf('id="panel-scale"') < html.indexOf('class="toolbar-divider"'))
+  assert.match(main, /availableSkinStates\(\.\.\.skinStateDocuments\(\)\)/)
+  assert.doesNotMatch(css, /#preview\s*\{[^}]*aspect-ratio:\s*1125\s*\/\s*650/s)
+})
+
+test("toolbar menus use a readable frosted surface", () => {
+  assert.match(css, /\.toolbar-menu\s*\{[^}]*background:\s*var\(--panel\)/s)
+})
+
+test("checkerboard canvas has no compositing seam", () => {
+  const checkerboard = css.match(/\.canvas-wrap\[data-background="checkerboard"\]\s*\{[^}]+\}/s)?.[0] ?? ""
+  assert.match(checkerboard, /background-image:\s*linear-gradient/)
+  assert.doesNotMatch(checkerboard, /repeating-conic-gradient/)
+})
+
 test("scrollbars and segmented controls use compact animated glass styling", () => {
   assert.match(css, /scrollbar-width:\s*thin/)
   assert.match(css, /::-webkit-scrollbar\s*\{[^}]*width:\s*6px[^}]*height:\s*6px/s)
@@ -473,6 +512,19 @@ test("settings provide a persistent system-aware application theme", () => {
   assert.match(main, /matchMedia\("\(prefers-color-scheme: dark\)"\)/)
   assert.match(main, /systemTheme\.addEventListener\("change", applyAppTheme\)/)
   assert.match(css, /:root\[data-app-theme="dark"\]\s*\{/)
+})
+
+test("settings can persistently disable native and CSS window materials", () => {
+  assert.match(html, /<input id="window-material" type="checkbox"[^>]*role="switch"[^>]*checked/)
+  assert.match(main, /const windowMaterial = \$\("#window-material"\)/)
+  assert.match(main, /localStorage\.getItem\("window-material"\)/)
+  assert.match(main, /localStorage\.setItem\("window-material", windowMaterial\.checked \? "on" : "off"\)/)
+  assert.match(main, /document\.documentElement\.dataset\.windowMaterial = enabled \? "on" : "off"/)
+  assert.match(main, /invoke\("set_window_material", \{ enabled \}\)/)
+  assert.match(css, /:root\[data-window-material="off"\][\s\S]*?background:\s*#f4f5f6/)
+  assert.match(css, /:root\[data-window-material="off"\]\s+\*\s*\{[^}]*backdrop-filter:\s*none\s*!important/s)
+  assert.match(css, /\.settings-switch input\s*\{[^}]*appearance:\s*none[^}]*border-radius:\s*999px/s)
+  assert.match(css, /\.settings-switch input:checked\s*\{[^}]*background:\s*var\(--accent\)/s)
 })
 
 test("every toolbar menu closes when clicking elsewhere", () => {

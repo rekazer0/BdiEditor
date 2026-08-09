@@ -12,6 +12,7 @@ import {
   decodeBdaAppearance,
   describeBdaConfig,
   updateBdaAnimationFrame,
+  updateBdaDesignWidth,
   updateBdaStyle,
 } from "../src/bda.ts"
 import { IniDocument } from "../src/ini.ts"
@@ -100,6 +101,12 @@ test("maps official layout actions to BDA semantic keys", () => {
 test("updates a BDA protobuf style without dropping unknown fields", () => {
   const updated = updateBdaStyle(bytes, { type: "text", key: 8 }, "FONT_SIZE", "72")
   assert.equal(decodeBdaAppearance(updated).textStyles.get(8)?.fontSize, 72)
+  assert.notEqual(Buffer.from(updated).indexOf(Buffer.from(scalar(99, 42))), -1)
+})
+
+test("updates BDA design width for a scaled target panel", () => {
+  const updated = updateBdaDesignWidth(bytes, 1920)
+  assert.equal(decodeBdaAppearance(updated).designWidth, 1920)
   assert.notEqual(Buffer.from(updated).indexOf(Buffer.from(scalar(99, 42))), -1)
 })
 

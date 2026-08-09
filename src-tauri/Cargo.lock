@@ -96,7 +96,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "bdi-edit"
-version = "0.4.8"
+version = "0.5.4"
 dependencies = [
  "objc2",
  "objc2-app-kit",

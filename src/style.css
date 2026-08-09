@@ -54,6 +54,30 @@
   --glass-shadow: 0 10px 32px rgb(0 0 0 / 28%), inset 0 1px rgb(255 255 255 / 12%);
 }
 
+:root[data-window-material="off"] {
+  background: #f4f5f6;
+  --window: #f4f5f6;
+  --toolbar: #ffffff;
+  --sidebar: #f1f3f5;
+  --inspector: #f7f8f9;
+  --panel: #ffffff;
+  --content: #f5f7f9;
+  --control: #ffffff;
+  --glass-surface: #ffffff;
+}
+
+:root[data-app-theme="dark"][data-window-material="off"] {
+  background: #202225;
+  --window: #202225;
+  --toolbar: #282b2e;
+  --sidebar: #25282b;
+  --inspector: #24272a;
+  --panel: #2b2e31;
+  --content: #232629;
+  --control: #34373b;
+  --glass-surface: #303337;
+}
+
 * {
   box-sizing: border-box;
   scrollbar-width: thin;
@@ -81,6 +105,36 @@
 html,
 body {
   background: transparent;
+}
+
+:root[data-window-material="off"] body {
+  background: var(--window);
+}
+
+:root[data-window-material="off"] * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+:root.windows[data-window-material="on"] * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+:root.macos[data-window-material="on"] :is(
+  .titlebar,
+  aside,
+  .source,
+  .preview-toolbar,
+  .workspace-status,
+  .toolbar-menu,
+  .glass-module,
+  .app-dialog,
+  .project-dialog,
+  .color-dialog
+) {
+  -webkit-backdrop-filter: saturate(180%) blur(28px);
+  backdrop-filter: saturate(180%) blur(28px);
 }
 
 body {
@@ -341,7 +395,7 @@ select {
   padding: 5px;
   border: 1px solid var(--line);
   border-radius: 9px;
-  background: var(--glass-surface);
+  background: var(--panel);
   box-shadow: 0 16px 40px rgb(0 0 0 / 18%), inset 0 1px rgb(255 255 255 / 48%);
   -webkit-backdrop-filter: saturate(180%) blur(28px);
   backdrop-filter: saturate(180%) blur(28px);
@@ -685,6 +739,15 @@ h2 {
   transform: translateX(-50%);
 }
 
+#skin-state-control {
+  left: 45px;
+  transform: none;
+}
+
+#skin-state-control[hidden] {
+  display: none !important;
+}
+
 .preview-tool-toggle {
   width: 27px;
   height: 27px;
@@ -719,7 +782,12 @@ h2 {
 }
 
 .canvas-wrap[data-background="checkerboard"] {
-  background: repeating-conic-gradient(#dfe1e5 0 25%, #f7f7f8 0 50%) 50% / 24px 24px;
+  background-color: #f7f7f8;
+  background-image:
+    linear-gradient(45deg, #dfe1e5 25%, transparent 25%, transparent 75%, #dfe1e5 75%),
+    linear-gradient(45deg, #dfe1e5 25%, transparent 25%, transparent 75%, #dfe1e5 75%);
+  background-position: 0 0, 12px 12px;
+  background-size: 24px 24px;
 }
 
 .canvas-wrap[data-background="white"] {
@@ -1132,7 +1200,6 @@ h2 {
   max-width: 100%;
   max-height: 100%;
   margin: auto;
-  aspect-ratio: 1125 / 650;
 }
 
 canvas {
@@ -1222,26 +1289,14 @@ canvas {
 }
 
 #event-log {
-  padding: 7px 11px;
+  min-width: 0;
+  padding: 7px 0;
   overflow: hidden;
-  border-top: 1px solid var(--line);
-  background: var(--toolbar);
-  color: var(--secondary);
-  font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-#event-log[data-kind="progress"] {
-  color: var(--accent);
-}
-
-#event-log[data-kind="success"] {
-  color: #287a43;
-}
-
-#event-log[data-kind="error"] {
-  color: #c62828;
 }
 
 .source {
@@ -1250,10 +1305,10 @@ canvas {
   grid-template-rows: 48px minmax(0, 1fr);
   overflow: hidden;
   border-left: 1px solid var(--line);
-  background: var(--inspector);
+  background: var(--sidebar);
   box-shadow: inset 1px 0 var(--glass-border);
-  -webkit-backdrop-filter: saturate(170%) blur(24px);
-  backdrop-filter: saturate(170%) blur(24px);
+  -webkit-backdrop-filter: saturate(170%) blur(28px);
+  backdrop-filter: saturate(170%) blur(28px);
 }
 
 .inspector-tabs {
@@ -1592,6 +1647,45 @@ canvas {
   gap: 5px;
   color: var(--secondary);
   font-size: 10px;
+}
+
+.app-dialog .settings-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-switch input {
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  position: relative;
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--control);
+  transition: background 160ms ease;
+}
+
+.settings-switch input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 24%);
+  transition: transform 160ms ease;
+}
+
+.settings-switch input:checked {
+  background: var(--accent);
+}
+
+.settings-switch input:checked::after {
+  transform: translateX(14px);
 }
 
 .app-dialog select {
@@ -1953,6 +2047,45 @@ canvas {
   gap: 18px;
   padding: 22px;
 }
+
+.panel-scale-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.panel-scale-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--secondary);
+  font-size: 12px;
+}
+
+.workspace-status {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 11px;
+  border-top: 1px solid var(--line);
+  color: var(--secondary);
+  background: var(--toolbar);
+  font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+#panel-status {
+  flex: none;
+  padding: 7px 0;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace-status:has(#event-log[data-kind="progress"]) { color: var(--accent); }
+.workspace-status:has(#event-log[data-kind="success"]) { color: #287a43; }
+.workspace-status:has(#event-log[data-kind="error"]) { color: #c62828; }
 
 .project-dialog header,
 .project-dialog fieldset {

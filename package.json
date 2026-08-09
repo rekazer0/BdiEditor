@@ -1,7 +1,7 @@
 {
   "name": "bdi-edit",
   "private": true,
-  "version": "0.4.8",
+  "version": "0.5.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
