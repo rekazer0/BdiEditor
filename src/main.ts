@@ -25,15 +25,20 @@ import {
   BdaResolver,
   bdaAppearancePath,
   bdaColorHex,
+  bdaConfigPath,
   bdaLayoutDocument,
+  bdaLayoutNames,
   bdaStyleID,
   bdaStyleRef,
+  decodeBdaAnimation,
   decodeBdaAppearance,
   describeBdaConfig,
+  updateBdaAnimationFrame,
   updateBdaStyle,
   type BdaAppearance,
   type BdaStyleRef,
 } from "./bda.ts"
+import { convertBdaArchive } from "./bda-convert.ts"
 import { IniDocument } from "./ini.ts"
 import { highlightIni } from "./highlight.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
@@ -113,6 +118,8 @@ const toolbarFields = Array.from(document.querySelectorAll<HTMLInputElement>("[d
 const skinFieldsGroup = $(".skin-fields")
 const documentFieldsGroup = $(".document-fields")
 const documentFields = $("#document-fields")
+const bdaConfigFieldsGroup = $(".bda-config-fields")
+const bdaConfigFields = $("#bda-config-fields")
 const colorPickers = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-picker-for]"))
 const colorAlphas = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-alpha-for]"))
 const keyOnlyGroups = Array.from(document.querySelectorAll<HTMLElement>(".key-only"))
@@ -518,6 +525,17 @@ function currentBdaAppearance(): { path: string; bytes: Uint8Array; appearance: 
   return path && bytes ? { path, bytes, appearance: decodeBdaAppearance(bytes) } : undefined
 }
 
+function bdaAvailableLayoutPaths(): string[] {
+  if (!archive || archive.format !== "bda") return []
+  const path = bdaAppearancePath(archive, theme.value, orientation.value)
+  const appearanceBytes = path && archive.getBytes(path)
+  if (!appearanceBytes) return []
+  const prefix = `${theme.value}/skin/${orientation.value}/`
+  return bdaLayoutNames(appearanceBytes)
+    .map((name) => `${prefix}${name.replace(/\.ini$/i, "")}.ini`)
+    .filter((name) => bdaBase?.isText(bdaBasePath(name)))
+}
+
 function isBdaVirtualTextPath(path: string): boolean {
   return Boolean(archive?.format === "bda" && bdaBase?.isText(bdaBasePath(path)))
 }
@@ -730,7 +748,7 @@ function setFileOperationBusy(busy: boolean): void {
   saveButton.disabled = busy || !archive
   for (const button of exportButtons) {
     const format = button.dataset.exportFormat as ExportFormat
-    button.disabled = busy || !archive || (archive.format === "bda" ? format !== "bda" : format === "bda")
+    button.disabled = busy || !archive || (archive.format !== "bda" && format === "bda")
   }
 }
 
@@ -806,7 +824,7 @@ function updateInspectorView(): void {
     files.querySelector(`.sidebar-overview button[data-path="${CSS.escape(selectedPath)}"]`),
   )
   const propertiesAvailable = Boolean(
-    selectedPath && (archive?.isText(selectedPath) || isBdaLayoutPath(selectedPath)) && overviewSelected && !imageSelected,
+    selectedPath && (archive?.isText(selectedPath) || archive?.isBdaConfig(selectedPath) || isBdaLayoutPath(selectedPath)) && overviewSelected && !imageSelected,
   )
   for (const button of inspectorTabButtons) {
     const tab = button.dataset.inspectorTab
@@ -1285,6 +1303,60 @@ function populateDocumentInspector(): void {
   documentFieldsGroup.dataset.path = selectedPath
 }
 
+function populateBdaConfigInspector(): void {
+  bdaConfigFields.replaceChildren()
+  const bytes = archive?.isBdaConfig(selectedPath) ? archive.getBytes(selectedPath) : undefined
+  bdaConfigFieldsGroup.hidden = !bytes
+  if (!bytes) return
+  if (!/^\d*animationConfig$/.test(selectedPath.split("/").pop() ?? "")) {
+    const summary = document.createElement("pre")
+    summary.className = "bda-config-summary"
+    summary.textContent = describeBdaConfig(selectedPath, bytes)
+    bdaConfigFields.append(summary)
+    return
+  }
+
+  const animation = decodeBdaAnimation(bytes)
+  const targets = document.createElement("label")
+  targets.textContent = "动画目标"
+  const targetInput = document.createElement("input")
+  targetInput.value = animation.targets.join(", ")
+  targetInput.readOnly = true
+  targets.append(targetInput)
+  bdaConfigFields.append(targets)
+  for (const sequence of animation.sequences.values()) {
+    for (const [frameIndex, frame] of sequence.frames.entries()) {
+      const resourceLabel = document.createElement("label")
+      resourceLabel.textContent = `${sequence.name} · 第 ${frameIndex + 1} 帧资源`
+      const resourceInput = document.createElement("input")
+      resourceInput.value = frame.resourceID
+      resourceInput.disabled = !isEditing()
+      const durationLabel = document.createElement("label")
+      durationLabel.textContent = `${sequence.name} · 第 ${frameIndex + 1} 帧时长`
+      const durationInput = document.createElement("input")
+      durationInput.type = "number"
+      durationInput.min = "0"
+      durationInput.value = String(frame.duration)
+      durationInput.disabled = !isEditing()
+      const update = (property: "resourceID" | "duration", value: string | number) => {
+        const before = archive?.getBytes(selectedPath)
+        if (!before) return
+        const after = updateBdaAnimationFrame(before, sequence.name, frameIndex, property, value)
+        commitBytes(selectedPath, before, after)
+        setSourceValue(describeBdaConfig(selectedPath, after))
+        populateBdaConfigInspector()
+        refreshPreview()
+        updateDirty()
+      }
+      resourceInput.addEventListener("change", () => update("resourceID", resourceInput.value))
+      durationInput.addEventListener("change", () => update("duration", Number(durationInput.value)))
+      resourceLabel.append(resourceInput)
+      durationLabel.append(durationInput)
+      bdaConfigFields.append(resourceLabel, durationLabel)
+    }
+  }
+}
+
 function addNavButton(
   parent: HTMLElement,
   label: string,
@@ -1327,12 +1399,15 @@ function populateKeyInspector(): void {
   const hasSelection = Boolean(document && sections.length)
   const skinSelected = isSkinInfoPath(selectedPath)
   const toolbarSelected = isToolbarPath(selectedPath)
+  const bdaConfigSelected = Boolean(archive?.isBdaConfig(selectedPath))
   skinFieldsGroup.hidden = !skinSelected
   toolbarFieldsGroup.hidden = !toolbarSelected
-  keyboardFieldsGroup.hidden = skinSelected || toolbarSelected || selectedPath !== layoutPath || hasSelection
-  for (const group of keyOnlyGroups) group.hidden = skinSelected || !hasSelection
+  keyboardFieldsGroup.hidden = skinSelected || toolbarSelected || bdaConfigSelected || selectedPath !== layoutPath || hasSelection
+  for (const group of keyOnlyGroups) group.hidden = skinSelected || bdaConfigSelected || !hasSelection
   selectedKeyName.textContent = skinSelected
     ? "皮肤信息"
+    : bdaConfigSelected
+      ? selectedPath.split("/").pop() ?? "BDA 专属配置"
     : toolbarSelected
       ? "候选栏与工具栏"
     : selectedPath !== layoutPath && !toolbarSelected
@@ -1475,6 +1550,7 @@ function populateKeyInspector(): void {
   void updateStylePreviews()
   if (hasSelection) void updateImagePreviews()
   populateDocumentInspector()
+  populateBdaConfigInspector()
   applyModeState()
 }
 
@@ -1736,7 +1812,7 @@ function selectFile(path: string, preferredSidebarView = sidebarView): void {
     setSourceValue(describeBdaConfig(path, archive.getBytes(path)!))
     source.disabled = true
     sourceName.textContent = path
-    inspectorTab = "source"
+    inspectorTab = "properties"
   } else {
     return
   }
@@ -1810,11 +1886,14 @@ function renderFiles(): void {
     "gen.ini": { group: "配置与资源", label: "键盘基础配置", className: "nav-style", icon: "gearshape" },
   }
   const configPrefix = `${theme.value}/skin/${orientation.value}/`
-  const layoutNames = archive.format === "bda" ? bdaBase?.names() ?? [] : archive.names()
-  const layoutPrefix = archive.format === "bda" ? bdaBasePath(configPrefix) : configPrefix
-  for (const basePath of layoutNames.sort()) {
-    if (!basePath.startsWith(layoutPrefix) || basePath.slice(layoutPrefix.length).includes("/") || !/\.ini$/i.test(basePath)) continue
-    const path = archive.format === "bda" ? `${configPrefix}${basePath.slice(layoutPrefix.length)}` : basePath
+  const appearancePath = bdaAppearancePath(archive, theme.value, orientation.value)
+  const layoutPaths = archive.format === "bda"
+    ? bdaAvailableLayoutPaths()
+    : archive.names()
+  for (const path of layoutPaths.sort()) {
+    const basePath = archive.format === "bda" ? bdaBasePath(path) : path
+    if (!path.startsWith(configPrefix) || path.slice(configPrefix.length).includes("/") || !/\.ini$/i.test(path)) continue
+    if (archive.format === "bda" && !bdaBase?.isText(basePath)) continue
     const name = path.split("/").pop() ?? path
     const info = iniTypes[name] ?? {
       group: "扩展布局",
@@ -1829,11 +1908,21 @@ function renderFiles(): void {
   if (candidatePath) entries.push({ group: "键盘组件", label: "候选栏与工具栏", path: candidatePath, className: "nav-component", icon: "text.bubble" })
   const hintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
   if (hintPath) entries.push({ group: "键盘组件", label: "按键气泡", path: hintPath, className: "nav-component", icon: "rectangle.and.hand.point" })
-  const appearancePath = bdaAppearancePath(archive, theme.value, orientation.value)
-  entries.push(
-    { group: "配置与资源", label: "按键样式", path: appearancePath ?? styleConfigPath(), className: "nav-style", icon: "paintpalette" },
-    { group: "配置与资源", label: "图片资源", path: archive.names().find((path) => path.startsWith(`${theme.value}/skin/res/`) && archive?.isImage(path)) ?? `${theme.value}/skin/res/btn.png`, className: "nav-style", icon: "photo" },
-  )
+  const stylePath = appearancePath ?? (archive.format === "bda" ? undefined : styleConfigPath())
+  if (stylePath) entries.push({ group: "配置与资源", label: "按键样式", path: stylePath, className: "nav-style", icon: "paintpalette" })
+  if (archive.format === "bda") {
+    for (const [kind, label] of [
+      ["animation", "序列帧动画"],
+      ["lightAnimation", "轻量动画"],
+      ["sound", "声音配置"],
+      ["switch", "开关配置"],
+    ] as const) {
+      const path = bdaConfigPath(archive, theme.value, orientation.value, kind)
+      if (path) entries.push({ group: "配置与资源", label, path, className: "nav-style", icon: "gearshape" })
+    }
+  }
+  const imagePath = archive.names().find((path) => path.startsWith(`${theme.value}/skin/res/`) && archive?.isImage(path))
+  if (imagePath) entries.push({ group: "配置与资源", label: "图片资源", path: imagePath, className: "nav-style", icon: "photo" })
 
   for (const group of ["皮肤", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "配置与资源", "扩展布局"]) {
     const grouped = entries.filter((entry) => entry.group === group && (
@@ -2025,10 +2114,13 @@ async function loadArchive(bytes: Uint8Array, path: string, isNew = false): Prom
   saveButton.disabled = false
   for (const button of exportButtons) {
     const format = button.dataset.exportFormat as ExportFormat
-    button.disabled = archive.format === "bda" ? format !== "bda" : format === "bda"
+    button.disabled = archive.format !== "bda" && format === "bda"
   }
   renderFiles()
-  layoutPath = preferredPath()
+  const bdaLayouts = bdaAvailableLayoutPaths()
+  layoutPath = archive.format === "bda" && !bdaLayouts.includes(preferredPath())
+    ? bdaLayouts[0] ?? preferredPath()
+    : preferredPath()
   previewReturnName = layoutPath.split("/").pop() ?? layout.value
   const initial = archive.format === "bda" && isBdaLayoutPath(layoutPath)
     ? layoutPath
@@ -2063,6 +2155,23 @@ function currentExportFormat(): ExportFormat {
   return exportFormatFromPath(currentPath) ?? archive?.format ?? "bdi"
 }
 
+function exportArchive(format: ExportFormat): {
+  bytes: Uint8Array
+  converted: boolean
+  warnings: string[]
+} | undefined {
+  if (!archive) throw new Error("当前没有可保存的皮肤")
+  if (archive.format !== "bda" || format === "bda") {
+    return { bytes: archive.toBytes(format), converted: false, warnings: [] }
+  }
+  if (!bdaBase) throw new Error("无法加载 BDA 官方基础布局")
+  const result = convertBdaArchive(archive, bdaBase)
+  if (result.warnings.length && !window.confirm(
+    `BDA 转换为 ${format.toUpperCase()} 时将降级以下内容：\n\n${result.warnings.join("\n")}\n\n继续导出吗？`,
+  )) return
+  return { bytes: result.archive.toBytes(format), converted: true, warnings: result.warnings }
+}
+
 async function saveNative(saveAs: boolean, format: ExportFormat): Promise<boolean> {
   if (!archive) throw new Error("当前没有可保存的皮肤")
   let path = currentPath
@@ -2083,28 +2192,34 @@ async function saveNative(saveAs: boolean, format: ExportFormat): Promise<boolea
     if (!picked) return false
     path = exportPath(picked, format)
   }
-  const bytes = archive.toBytes(format)
-  await invoke("write_file", { path, data: Array.from(bytes) })
-  currentPath = path
-  unsavedNew = false
-  archive.markSaved(bytes)
-  documentName.textContent = path.split(/[\\/]/).pop() || "未命名皮肤"
-  updateDirty()
+  const exported = exportArchive(format)
+  if (!exported) return false
+  await invoke("write_file", { path, data: Array.from(exported.bytes) })
+  if (!exported.converted) {
+    currentPath = path
+    unsavedNew = false
+    archive.markSaved(exported.bytes)
+    documentName.textContent = path.split(/[\\/]/).pop() || "未命名皮肤"
+    updateDirty()
+  }
   return true
 }
 
 function downloadArchive(format: ExportFormat): boolean {
   if (!archive) throw new Error("当前没有可保存的皮肤")
-  const bytes = archive.toBytes(format)
-  const blob = new Blob([bytes as BlobPart], { type: "application/zip" })
+  const exported = exportArchive(format)
+  if (!exported) return false
+  const blob = new Blob([exported.bytes as BlobPart], { type: "application/zip" })
   const link = document.createElement("a")
   link.href = URL.createObjectURL(blob)
   link.download = exportName(documentName.textContent || "skin", format)
   link.click()
   URL.revokeObjectURL(link.href)
-  archive.markSaved(bytes)
-  unsavedNew = false
-  updateDirty()
+  if (!exported.converted) {
+    archive.markSaved(exported.bytes)
+    unsavedNew = false
+    updateDirty()
+  }
   return true
 }
 
@@ -2348,7 +2463,7 @@ for (const control of [theme, orientation, layout]) {
     const path = preferredPath()
     if (archive?.format === "bda") {
       renderFiles()
-      if (isBdaLayoutPath(path)) selectFile(path)
+      if (bdaAvailableLayoutPaths().includes(path)) selectFile(path)
     } else if (archive?.names().includes(path)) {
       layoutPath = path
       layoutDocument = IniDocument.parse(archive.getText(path))

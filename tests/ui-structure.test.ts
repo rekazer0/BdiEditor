@@ -209,6 +209,27 @@ test("export menu exposes direct readable BDI, BDS and BDA actions", () => {
   assert.match(main, /saveNative\(false, currentExportFormat\(\)\)/)
 })
 
+test("BDA exports reuse one conversion path without disabling BDI or BDS", () => {
+  assert.match(main, /import \{ convertBdaArchive \} from "\.\/bda-convert\.ts"/)
+  assert.match(main, /function exportArchive\(format: ExportFormat\)/)
+  assert.match(main, /convertBdaArchive\(archive, bdaBase\)/)
+  assert.doesNotMatch(main, /archive\.format === "bda" \? format !== "bda"/)
+})
+
+test("BDA overview derives layouts and special configs from the actual archive", () => {
+  assert.match(main, /bdaLayoutNames\(appearanceBytes\)/)
+  assert.match(main, /\["animation", "序列帧动画"\]/)
+  assert.match(main, /bdaConfigPath\(archive, theme\.value, orientation\.value, kind\)/)
+  assert.doesNotMatch(main, /const layoutNames = archive\.format === "bda" \? bdaBase\?\.names\(\)/)
+})
+
+test("BDA animation frames have a minimal native inspector", () => {
+  assert.match(html, /class="inspector-group bda-config-fields" hidden/)
+  assert.match(html, /id="bda-config-fields"/)
+  assert.match(main, /decodeBdaAnimation\(/)
+  assert.match(main, /updateBdaAnimationFrame\(/)
+})
+
 test("BDA files are accepted by browser and native open flows", () => {
   assert.match(html, /accept="[^"]*\.bda/)
   assert.match(main, /extensions: \["bdi", "bds", "bda", "zip"\]/)
