@@ -50,6 +50,52 @@ export type BdaAppearance = {
   panels: Map<string, BdaPanel>
 }
 
+const STYLE_BASE = { image: 1_000_000, color: 2_000_000, text: 3_000_000 } as const
+
+export function bdaStyleID(style: BdaStyleRef | undefined): string {
+  return style ? String(STYLE_BASE[style.type] + style.key) : ""
+}
+
+export function bdaStyleRef(styleID: string): BdaStyleRef | undefined {
+  const value = Number(styleID)
+  if (!Number.isInteger(value)) return
+  for (const type of ["image", "color", "text"] as const) {
+    const key = value - STYLE_BASE[type]
+    if (key >= 0 && key < 1_000_000) return { type, key }
+  }
+}
+
+export function bdaAppearancePath(
+  archive: SkinArchive,
+  theme: string,
+  orientation: string,
+): string | undefined {
+  const prefix = `${theme}/skin/${orientation}/`
+  return archive.names().find((path) => path.startsWith(prefix) && /^\d*appearanceConfig$/.test(path.slice(prefix.length)))
+}
+
+export function bdaPanelKeyName(action: string): string {
+  return `KEY_${action.trim().toUpperCase()}`
+}
+
+export function bdaLayoutDocument(base: IniDocument, appearance: BdaAppearance, layout: string): IniDocument {
+  const document = IniDocument.parse(base.toString())
+  const panel = appearance.panels.get(layout.replace(/\.ini$/i, ""))
+  if (!panel) return document
+  for (const section of document.sections().filter((name) => /^KEY\d+$/.test(name))) {
+    const actions = [document.get(section, "CENTER"), document.get(section, "DOWN")]
+      .filter((value): value is string => Boolean(value))
+    const key = actions.map(bdaPanelKeyName).map((name) => panel.keys.get(name)).find(Boolean)
+    if (!key) continue
+    document.set(section, "BACK_STYLE", bdaStyleID(key.backStyle))
+    document.set(section, "FORE_STYLE", key.foreStyles.map(bdaStyleID).join(","))
+    if (key.foreStyleOffsets.length) {
+      document.set(section, "FORE_OFFSET", key.foreStyleOffsets.map(({ x, y }) => `${x},${y}`).join(";"))
+    }
+  }
+  return document
+}
+
 const decoder = new TextDecoder("utf-8", { fatal: true })
 
 function fields(bytes: Uint8Array): ProtoField[] {
@@ -262,6 +308,254 @@ export function bdaResourceIDs(bytes: Uint8Array): string[] {
   ].filter((value): value is string => Boolean(value)))]
 }
 
+export function bdaColorHex(value: number): string {
+  return (value >>> 0).toString(16).padStart(8, "0").toUpperCase()
+}
+
+function bdaCssColor(value: number): string | undefined {
+  if (!value) return
+  const hex = bdaColorHex(value)
+  const alpha = Number.parseInt(hex.slice(0, 2), 16) / 255
+  const red = Number.parseInt(hex.slice(2, 4), 16)
+  const green = Number.parseInt(hex.slice(4, 6), 16)
+  const blue = Number.parseInt(hex.slice(6, 8), 16)
+  return `rgba(${red}, ${green}, ${blue}, ${Number(alpha.toFixed(3))})`
+}
+
+function pngBlob(bytes: Uint8Array): Blob {
+  const copy = new Uint8Array(bytes)
+  return new Blob([copy.buffer], { type: "image/png" })
+}
+
+export class BdaResolver implements VisualResolver {
+  private readonly appearance: BdaAppearance
+  private readonly images = new Map<string, Promise<ImageBitmap>>()
+  private readonly archive: SkinArchive
+  private readonly fallback?: SkinArchive
+  private readonly theme: string
+  private readonly orientation: string
+
+  constructor(
+    archive: SkinArchive,
+    appearanceBytes: Uint8Array,
+    fallback?: SkinArchive,
+    theme = "light",
+    orientation = "port",
+  ) {
+    this.archive = archive
+    this.fallback = fallback
+    this.theme = theme
+    this.orientation = orientation
+    this.appearance = decodeBdaAppearance(appearanceBytes)
+  }
+
+  private resource(resourceID: string): { archive: SkinArchive; path: string } | undefined {
+    const paths = [
+      `${this.theme}/skin/${this.orientation}/res/${resourceID}.png`,
+      `${this.theme}/skin/res/${resourceID}.png`,
+      `light/skin/res/${resourceID}.png`,
+    ]
+    for (const archive of [this.archive, this.fallback]) {
+      if (!archive) continue
+      const path = paths.find((candidate) => archive.isImage(candidate))
+      if (path) return { archive, path }
+    }
+  }
+
+  private bitmap(archive: SkinArchive, path: string): Promise<ImageBitmap> {
+    let image = this.images.get(path)
+    if (!image) {
+      image = createImageBitmap(pngBlob(archive.getBytes(path)!))
+      this.images.set(path, image)
+    }
+    return image
+  }
+
+  async resolve(styleID: string, highlighted: boolean): Promise<Visual | undefined> {
+    const rawKey = Number(styleID)
+    const ref = bdaStyleRef(styleID) ?? (
+      Number.isInteger(rawKey)
+        ? this.appearance.imageStyles.has(rawKey)
+          ? { type: "image" as const, key: rawKey }
+          : this.appearance.colorStyles.has(rawKey)
+            ? { type: "color" as const, key: rawKey }
+            : undefined
+        : undefined
+    )
+    if (!ref) return
+    if (ref.type === "color") {
+      const style = this.appearance.colorStyles.get(ref.key)
+      return style ? { color: bdaCssColor(highlighted ? style.highlightColor || style.normalColor : style.normalColor) } : undefined
+    }
+    if (ref.type === "text") return
+    const style = this.appearance.imageStyles.get(ref.key)
+    const atom = highlighted ? style?.highlightImage ?? style?.normalImage : style?.normalImage
+    const found = atom?.resource?.resourceID ? this.resource(atom.resource.resourceID) : undefined
+    if (!found) return { color: bdaCssColor(atom?.filterColor ?? 0) }
+    const image = await this.bitmap(found.archive, found.path)
+    return {
+      image,
+      imagePath: found.archive === this.archive ? found.path : undefined,
+      source: [0, 0, image.width, image.height],
+      inner: atom?.innerRect
+        ? [atom.innerRect.x, atom.innerRect.y, atom.innerRect.width, atom.innerRect.height]
+        : undefined,
+      color: bdaCssColor(atom?.filterColor ?? 0),
+    }
+  }
+
+  resolveText(foreground: string, highlighted: boolean): TextVisual | undefined {
+    const ref = foreground.split(",").map((value) => {
+      const encoded = bdaStyleRef(value)
+      if (encoded?.type === "text") return encoded
+      const key = Number(value)
+      return Number.isInteger(key) && this.appearance.textStyles.has(key)
+        ? { type: "text" as const, key }
+        : undefined
+    }).find(Boolean)
+    if (!ref) return
+    const style = this.appearance.textStyles.get(ref.key)
+    return style ? {
+      fontName: style.fontName || undefined,
+      fontSize: style.fontSize || undefined,
+      color: bdaCssColor(highlighted ? style.highlightColor || style.normalColor : style.normalColor),
+    } : undefined
+  }
+
+  async resolveToolbarImages(): Promise<Visual[]> {
+    return []
+  }
+}
+
+type RawField = ProtoField & { start: number; end: number; payloadStart: number; payloadEnd: number }
+
+function rawFields(bytes: Uint8Array): RawField[] {
+  const result: RawField[] = []
+  let offset = 0
+  const varint = () => {
+    let value = 0n
+    let shift = 0n
+    for (let count = 0; offset < bytes.length && count < 10; count++) {
+      const byte = bytes[offset++]
+      value |= BigInt(byte & 0x7f) << shift
+      if (!(byte & 0x80)) return Number(value)
+      shift += 7n
+    }
+    throw new Error("无效的 protobuf varint")
+  }
+  while (offset < bytes.length) {
+    const start = offset
+    const tag = varint()
+    const number = Math.floor(tag / 8)
+    const wire = tag & 7
+    let payloadStart = offset
+    let payloadEnd = offset
+    let value: Pick<ProtoField, "varint" | "fixed32" | "bytes"> = {}
+    if (wire === 0) {
+      const varintValue = varint()
+      payloadEnd = offset
+      value.varint = varintValue
+    } else if (wire === 1) payloadEnd = offset += 8
+    else if (wire === 2) {
+      const length = varint()
+      payloadStart = offset
+      payloadEnd = offset += length
+      value.bytes = bytes.slice(payloadStart, payloadEnd)
+    } else if (wire === 5) payloadEnd = offset += 4
+    else throw new Error(`不支持的 protobuf wire type：${wire}`)
+    if (offset > bytes.length) throw new Error("不完整的 protobuf 字段")
+    result.push({ number, wire, start, end: offset, payloadStart, payloadEnd, ...value })
+  }
+  return result
+}
+
+function encodeVarint(value: number): Uint8Array {
+  let current = BigInt(value >>> 0)
+  const output: number[] = []
+  do {
+    let byte = Number(current & 0x7fn)
+    current >>= 7n
+    if (current) byte |= 0x80
+    output.push(byte)
+  } while (current)
+  return Uint8Array.from(output)
+}
+
+function join(parts: Uint8Array[]): Uint8Array {
+  const output = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0))
+  let offset = 0
+  for (const part of parts) {
+    output.set(part, offset)
+    offset += part.length
+  }
+  return output
+}
+
+function encodedField(number: number, wire: 0 | 2, payload: Uint8Array): Uint8Array {
+  return join([encodeVarint(number * 8 + wire), ...(wire === 2 ? [encodeVarint(payload.length)] : []), payload])
+}
+
+function replaceField(bytes: Uint8Array, number: number, wire: 0 | 2, payload: Uint8Array): Uint8Array {
+  const field = rawFields(bytes).find((item) => item.number === number)
+  const replacement = encodedField(number, wire, payload)
+  return field
+    ? join([bytes.slice(0, field.start), replacement, bytes.slice(field.end)])
+    : join([bytes, replacement])
+}
+
+function updateMapValue(
+  bytes: Uint8Array,
+  fieldNumber: number,
+  key: number,
+  update: (value: Uint8Array) => Uint8Array,
+): Uint8Array {
+  const field = rawFields(bytes).find((item) => {
+    if (item.number !== fieldNumber || !item.bytes) return false
+    return rawFields(item.bytes).find((entry) => entry.number === 1)?.varint === key
+  })
+  if (!field?.bytes) throw new Error(`BDA 样式不存在：${key}`)
+  const entryValue = rawFields(field.bytes).find((item) => item.number === 2)?.bytes
+  if (!entryValue) throw new Error(`BDA 样式缺少值：${key}`)
+  const entry = replaceField(field.bytes, 2, 2, update(entryValue))
+  return join([bytes.slice(0, field.start), encodedField(fieldNumber, 2, entry), bytes.slice(field.end)])
+}
+
+function colorValue(value: string): number {
+  const hex = value.trim().replace(/^#/, "")
+  if (!/^[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(hex)) throw new Error("颜色应为 RRGGBB 或 AARRGGBB")
+  return Number.parseInt(hex.length === 6 ? `FF${hex}` : hex, 16) >>> 0
+}
+
+export function updateBdaStyle(
+  bytes: Uint8Array,
+  ref: BdaStyleRef,
+  property: string,
+  value: string,
+): Uint8Array {
+  const rootField = { image: 1, text: 2, color: 3 }[ref.type]
+  return updateMapValue(bytes, rootField, ref.key, (style) => {
+    if (ref.type === "image") {
+      const state = property === "HL_IMG" ? 2 : property === "NM_IMG" ? 1 : 0
+      if (!state) throw new Error(`BDA 图片样式不支持：${property}`)
+      const atom = rawFields(style).find((item) => item.number === state)?.bytes ?? new Uint8Array()
+      const resource = rawFields(atom).find((item) => item.number === 1)?.bytes ?? new Uint8Array()
+      const nextResource = replaceField(resource, 2, 2, new TextEncoder().encode(value.split(",")[0].trim()))
+      return replaceField(style, state, 2, replaceField(atom, 1, 2, nextResource))
+    }
+    if (ref.type === "color") {
+      const field = property === "HL_COLOR" ? 2 : property === "NM_COLOR" ? 1 : 0
+      if (!field) throw new Error(`BDA 颜色样式不支持：${property}`)
+      return replaceField(style, field, 0, encodeVarint(colorValue(value)))
+    }
+    const field = { FONT_NAME: 2, FONT_SIZE: 3, NM_COLOR: 4, HL_COLOR: 5 }[property]
+    if (!field) throw new Error(`BDA 文字样式不支持：${property}`)
+    if (property === "FONT_NAME") return replaceField(style, field, 2, new TextEncoder().encode(value))
+    const numeric = property === "FONT_SIZE" ? Number(value) : colorValue(value)
+    if (!Number.isFinite(numeric) || numeric < 0) throw new Error("BDA 数值无效")
+    return replaceField(style, field, 0, encodeVarint(numeric))
+  })
+}
+
 export function describeBdaConfig(path: string, bytes: Uint8Array): string {
   const name = path.split("/").pop() ?? path
   const header = `${name} · BDA Protocol Buffers · ${bytes.length} 字节`
@@ -282,3 +576,6 @@ export function describeBdaConfig(path: string, bytes: Uint8Array): string {
     "已按百度官方 protobuf 字段解析；保存时保留原始配置和未知字段。",
   ].join("\n")
 }
+import type { TextVisual, Visual, VisualResolver } from "./atlas.ts"
+import { IniDocument } from "./ini.ts"
+import { SkinArchive } from "./skin.ts"

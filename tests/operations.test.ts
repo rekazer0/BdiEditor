@@ -10,7 +10,7 @@ test("file operation errors include the action and useful detail", () => {
 
 test("loads only the selected built-in project template", async () => {
   const requested: string[] = []
-  const bytes = await loadBuiltInProjectTemplate("default-ios", async (path) => {
+  const bytes = await loadBuiltInProjectTemplate("default-android", async (path) => {
     requested.push(path)
     return {
       ok: true,
@@ -20,8 +20,18 @@ test("loads only the selected built-in project template", async () => {
     }
   })
 
-  assert.deepEqual(requested, ["/default-template.bdi"])
+  assert.deepEqual(requested, ["/default-template.bda"])
   assert.deepEqual(bytes, Uint8Array.from([1, 2, 3]))
+  await loadBuiltInProjectTemplate("imitation-ios-15", async (path) => {
+    requested.push(path)
+    return { ok: true, async arrayBuffer() { return new ArrayBuffer(0) } }
+  })
+  assert.equal(requested.at(-1), "/templates/imitation-ios-15.bdi")
+  await loadBuiltInProjectTemplate("official-android-bds", async (path) => {
+    requested.push(path)
+    return { ok: true, async arrayBuffer() { return new ArrayBuffer(0) } }
+  })
+  assert.equal(requested.at(-1), "/default-template.bds")
   await loadBuiltInProjectTemplate("dust-ios-14", async (path) => {
     requested.push(path)
     return { ok: true, async arrayBuffer() { return new ArrayBuffer(0) } }
@@ -29,7 +39,7 @@ test("loads only the selected built-in project template", async () => {
   assert.equal(requested.at(-1), "/templates/dust-ios-14.bdi")
   await assert.rejects(
     () =>
-      loadBuiltInProjectTemplate("default-ios", async () => ({
+      loadBuiltInProjectTemplate("default-android", async () => ({
         ok: false,
         async arrayBuffer() {
           return new ArrayBuffer(0)

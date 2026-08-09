@@ -16,6 +16,12 @@ export type TextVisual = {
   color?: string
 }
 
+export type VisualResolver = {
+  resolve(styleID: string, highlighted: boolean): Promise<Visual | undefined>
+  resolveText(foreground: string, highlighted: boolean): TextVisual | undefined
+  resolveToolbarImages(limit?: number): Promise<Visual[]>
+}
+
 type VisualSpec = {
   imageName?: string
   tile?: number

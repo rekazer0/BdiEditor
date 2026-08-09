@@ -1,6 +1,6 @@
 [package]
 name = "bdi-edit"
-version = "0.3.2"
+version = "0.4.7"
 description = "百度 iOS 输入法皮肤编辑器"
 edition = "2021"
 
@@ -12,7 +12,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-dialog = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]

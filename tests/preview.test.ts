@@ -44,6 +44,14 @@ test("lays out vertically centred candidate toolbar anchors", () => {
   assert.deepEqual(items[2].rect, { x: 925, y: 0, width: 200, height: 100 })
 })
 
+test("candidate toolbar renders only its default mutually exclusive state", () => {
+  const document = IniDocument.parse(
+    "[CAND]\nBACK_STYLE=1\n[ICON3]\nFORE_STYLE=2\nSIZE=100,100\nPERSIST=1\n" +
+    "[ICON4]\nFORE_STYLE=3\nSIZE=100,100\nPERSIST=2\n[TIP1]\nFORE_STYLE=4\nSIZE=100,100\n",
+  )
+  assert.deepEqual(previewItems(document).map((item) => item.section), ["CAND", "ICON3"])
+})
+
 test("keeps every configured foreground layer for phone rendering", () => {
   const document = IniDocument.parse(
     "[KEY5]\nVIEW_RECT=178,12,187,143\nFORE_STYLE=731,401\nPOS_TYPE=140,142,143\nSHOW=q\n",

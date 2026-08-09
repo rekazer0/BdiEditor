@@ -7,10 +7,10 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     />
-    <title>BdiEditor v0.3.2</title>
+    <title>BdiEditor v0.4.7</title>
   </head>
   <body>
-    <header class="titlebar">
+    <header class="titlebar" data-tauri-drag-region>
       <nav class="toolbar-group" aria-label="文件操作">
         <button id="new" class="toolbar-button" title="新建项目" aria-label="新建项目">
           <span class="icon system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" /></svg></span><span>新建项目</span>
@@ -33,11 +33,11 @@
         <button id="undo" class="toolbar-button" disabled title="撤销" aria-label="撤销"><span class="icon system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12"/><path d="M4 8.5h7.2a5 5 0 0 1 5 5"/></svg></span></button>
         <button id="redo" class="toolbar-button" disabled title="重做" aria-label="重做"><span class="icon system-symbol" data-system-symbol="arrow.uturn.forward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m13 5 4 3.5-4 3.5"/><path d="M16 8.5H8.8a5 5 0 0 0-5 5"/></svg></span></button>
       </nav>
-      <div class="document-title">
+      <div class="document-title" data-tauri-drag-region>
         <strong id="document-name">未打开皮肤</strong>
         <span id="dirty" hidden>已编辑</span>
       </div>
-      <span class="spacer"></span>
+      <span class="spacer" data-tauri-drag-region></span>
       <div class="mode-control glass-module" aria-label="工作模式">
         <button class="active" data-mode-choice="preview">交互预览</button>
         <button data-mode-choice="edit">编辑模式</button>
@@ -293,12 +293,14 @@
         <fieldset>
           <legend>默认模板</legend>
           <label class="project-template-option">
-            <input type="radio" name="project-template" value="default-ios" checked />
+            <input type="radio" name="project-template" value="default-android" checked />
             <span>
-              <strong>iOS 默认皮肤</strong>
-              <small>包含浅色与深色主题、竖屏与横屏布局</small>
+              <strong>百度官方 Android BDA 默认皮肤</strong>
+              <small>官方 1080p 横竖屏样式与资源</small>
             </span>
           </label>
+          <label class="project-template-option"><input type="radio" name="project-template" value="official-android-bds" /><span><strong>百度官方 Android BDS 默认皮肤</strong><small>官方旧格式 480px 横竖屏布局</small></span></label>
+          <label class="project-template-option"><input type="radio" name="project-template" value="imitation-ios-15" /><span><strong>仿ios15键</strong><small>原内置 iOS 浅色与深色模板</small></span></label>
           <label class="project-template-option"><input type="radio" name="project-template" value="dust-ios-14" /><span><strong>尘埃 · iOS 26 · 14 键无筛选</strong><small>14 键 iOS 26 适配模板</small></span></label>
           <label class="project-template-option"><input type="radio" name="project-template" value="dust-android-26-9" /><span><strong>尘埃 · Android 智能双色</strong><small>26 键与 9 键 Android 模板</small></span></label>
           <label class="project-template-option"><input type="radio" name="project-template" value="dust-ios-26-9" /><span><strong>尘埃 · iOS 26 · 26+9 键</strong><small>26 键与 9 键 iOS 26 模板</small></span></label>
@@ -338,7 +340,7 @@
         <header><h2 id="settings-title">设置</h2><button aria-label="关闭">关闭</button></header>
         <label>软件外观 <select id="app-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
         <label>默认预览设备 <select id="default-device"><option value="canvas">画布</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
-        <label>画布背景 <select id="canvas-background"><option value="default">默认</option><option value="checkerboard">马赛克</option><option value="white">白色</option><option value="dark">深色</option></select></label>
+        <label>画布背景 <select id="canvas-background"><option value="glass">玻璃</option><option value="checkerboard">马赛克</option><option value="white" selected>白色</option><option value="dark">深色</option></select></label>
         <p>新打开的皮肤将使用此预览设备。</p>
       </form>
     </dialog>
@@ -350,10 +352,11 @@
 
     <dialog id="about-dialog" class="app-dialog" aria-labelledby="about-title">
       <form method="dialog">
-        <header><h2 id="about-title">关于 BdiEditor v0.3.2</h2><button aria-label="关闭">关闭</button></header>
+        <header><h2 id="about-title">关于 BdiEditor v0.4.7</h2><button aria-label="关闭">关闭</button></header>
         <p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
-        <p>版本 0.3.2</p>
+        <p>版本 0.4.7</p>
         <p>支持读取、编辑和导出 BDI、BDS、BDA 皮肤包。</p>
+        <p><strong>技术交流与反馈</strong><br>QQ群：228040912</p>
         <a href="https://github.com/rekazer0/BdiEditor" target="_blank" rel="noreferrer">GitHub · rekazer0/BdiEditor</a>
       </form>
     </dialog>

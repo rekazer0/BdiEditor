@@ -12,6 +12,7 @@ import {
   resolveTextVisual,
   type TextVisual,
   type Visual,
+  type VisualResolver,
 } from "./atlas.ts"
 import { deviceSpec, keyboardPreviewGeometry, showsKeyboardAccessories } from "./devices.ts"
 import {
@@ -20,7 +21,19 @@ import {
   exportPath,
   type ExportFormat,
 } from "./export.ts"
-import { describeBdaConfig } from "./bda.ts"
+import {
+  BdaResolver,
+  bdaAppearancePath,
+  bdaColorHex,
+  bdaLayoutDocument,
+  bdaStyleID,
+  bdaStyleRef,
+  decodeBdaAppearance,
+  describeBdaConfig,
+  updateBdaStyle,
+  type BdaAppearance,
+  type BdaStyleRef,
+} from "./bda.ts"
 import { IniDocument } from "./ini.ts"
 import { highlightIni } from "./highlight.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
@@ -45,6 +58,8 @@ import { candidatePreview, deleteBackward, insertText } from "./simulation.ts"
 import { SkinArchive } from "./skin.ts"
 import { resolveStylePropertySources, type StylePropertySource } from "./style-properties.ts"
 import { unsavedDecision } from "./unsaved.ts"
+
+document.documentElement.classList.toggle("macos", navigator.userAgent.includes("Macintosh"))
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 const newButton = $("#new") as HTMLButtonElement
@@ -153,6 +168,7 @@ const rgbaFields = {
 }
 
 let archive: SkinArchive | undefined
+let bdaBase: SkinArchive | undefined
 let currentPath = ""
 let selectedPath = ""
 let selectedDocument: IniDocument | undefined
@@ -163,9 +179,11 @@ let unsavedNew = false
 let assetURL = ""
 let assetReturnPath = ""
 let inspectorTab: "properties" | "source" = "properties"
-type TextChange = { path: string; before: string; after: string }
-let undoStack: TextChange[] = []
-let redoStack: TextChange[] = []
+type Change =
+  | { kind: "text"; path: string; before: string; after: string }
+  | { kind: "bytes"; path: string; before: Uint8Array; after: Uint8Array }
+let undoStack: Change[] = []
+let redoStack: Change[] = []
 let fileOperationRunning = false
 let firstCandidateTextVisual: TextVisual | undefined
 let candidateTextWidth = 1125
@@ -215,7 +233,7 @@ function handlePreviewEvent(event: PreviewEvent): void {
   const target = transition.target
   if (target) {
     const path = currentConfigPath(target)
-    if (archive?.isText(path)) {
+    if (archive?.isText(path) || isBdaLayoutPath(path)) {
       previewReturnName = transition.returnName
       selectFile(path, "overview")
       eventLog.textContent += ` → 已切换预览到 ${target}`
@@ -239,7 +257,7 @@ function handlePreviewEvent(event: PreviewEvent): void {
 }
 
 function showEditContextMenu(section: string, event: MouseEvent): void {
-  if (!isEditing()) return
+  if (!isEditing() || archive?.format === "bda") return
   if (!selectedKeySections.includes(section)) {
     selectedKeySections = [section]
     preview.setSelected(selectedKeySections)
@@ -431,7 +449,15 @@ function updateHistoryButtons(): void {
 function commitText(path: string, before: string, after: string): void {
   if (!archive || before === after) return
   archive.setText(path, after)
-  undoStack.push({ path, before, after })
+  undoStack.push({ kind: "text", path, before, after })
+  redoStack = []
+  updateHistoryButtons()
+}
+
+function commitBytes(path: string, before: Uint8Array, after: Uint8Array): void {
+  if (!archive || before.length === after.length && before.every((byte, index) => byte === after[index])) return
+  archive.setBytes(path, after)
+  undoStack.push({ kind: "bytes", path, before, after })
   redoStack = []
   updateHistoryButtons()
 }
@@ -453,7 +479,8 @@ function undo(): void {
   const change = undoStack.pop()
   if (!change) return
   redoStack.push(change)
-  applyTextSnapshot(change.path, change.before)
+  if (change.kind === "text") applyTextSnapshot(change.path, change.before)
+  else applyBytesSnapshot(change.path, change.before)
   updateHistoryButtons()
 }
 
@@ -461,12 +488,68 @@ function redo(): void {
   const change = redoStack.pop()
   if (!change) return
   undoStack.push(change)
-  applyTextSnapshot(change.path, change.after)
+  if (change.kind === "text") applyTextSnapshot(change.path, change.after)
+  else applyBytesSnapshot(change.path, change.after)
   updateHistoryButtons()
+}
+
+function applyBytesSnapshot(path: string, bytes: Uint8Array): void {
+  if (!archive) return
+  archive.setBytes(path, bytes)
+  refreshBdaLayout()
+  if (selectedPath === path) setSourceValue(describeBdaConfig(path, bytes))
+  refreshPreview()
+  populateKeyInspector()
+  updateDirty()
 }
 
 function preferredPath(): string {
   return `${theme.value}/skin/${orientation.value}/${layout.value}`
+}
+
+function bdaBasePath(path = preferredPath()): string {
+  return path.replace(/^(?:dark|light)\/skin\//, "light/skin/")
+}
+
+function currentBdaAppearance(): { path: string; bytes: Uint8Array; appearance: BdaAppearance } | undefined {
+  if (!archive || archive.format !== "bda") return
+  const path = bdaAppearancePath(archive, theme.value, orientation.value)
+  const bytes = path && archive.getBytes(path)
+  return path && bytes ? { path, bytes, appearance: decodeBdaAppearance(bytes) } : undefined
+}
+
+function isBdaVirtualTextPath(path: string): boolean {
+  return Boolean(archive?.format === "bda" && bdaBase?.isText(bdaBasePath(path)))
+}
+
+function isBdaLayoutPath(path: string): boolean {
+  return isBdaVirtualTextPath(path) && /\.ini$/i.test(path)
+}
+
+function textDocument(path: string): IniDocument | undefined {
+  if (archive?.isText(path)) return IniDocument.parse(archive.getText(path))
+  if (isBdaVirtualTextPath(path)) return IniDocument.parse(bdaBase!.getText(bdaBasePath(path)))
+}
+
+function refreshBdaLayout(path = preferredPath()): boolean {
+  const info = currentBdaAppearance()
+  const basePath = bdaBasePath(path)
+  if (!info || !bdaBase?.isText(basePath)) return false
+  layoutPath = path
+  layoutDocument = bdaLayoutDocument(
+    IniDocument.parse(bdaBase.getText(basePath)),
+    info.appearance,
+    path.split("/").pop() ?? layout.value,
+  )
+  return true
+}
+
+function visualResolver(): VisualResolver | undefined {
+  if (!archive) return
+  const info = currentBdaAppearance()
+  return info
+    ? new BdaResolver(archive, info.bytes, bdaBase, theme.value, orientation.value)
+    : new AtlasResolver(archive, theme.value, orientation.value)
 }
 
 function simulationLanguage(): "zh" | "en" {
@@ -515,11 +598,15 @@ function refreshSimulationState(): boolean {
 function refreshPreview(): void {
   if (!archive) return
   const composing = refreshSimulationState()
-  const resolver = new AtlasResolver(archive, theme.value, orientation.value)
+  const resolver = visualResolver()
   const context = keyboardContext()
-  const toolbarSize = refreshToolbarPreview(composing, resolver)
+  const toolbarSize = resolver ? refreshToolbarPreview(composing, resolver) : undefined
   preview.setResolver(resolver)
-  preview.setOffsets(context?.gen)
+  const bdaGenPath = bdaBasePath(genConfigPath())
+  const bdaGen = archive.format === "bda" && bdaBase?.isText(bdaGenPath)
+    ? IniDocument.parse(bdaBase.getText(bdaGenPath))
+    : undefined
+  preview.setOffsets(context?.gen ?? bdaGen)
   preview.setTheme(theme.value === "dark" ? "dark" : "light")
   preview.setTransparent(device.value !== "canvas")
   if (context && layoutDocument) {
@@ -585,6 +672,30 @@ function refreshPreview(): void {
       deviceShell.style.setProperty("--panel-row", `${geometry.panelHeight}fr`)
       deviceShell.style.setProperty("--safe-row", `${geometry.safeBottomHeight}fr`)
     }
+  } else if (bdaGen && layoutDocument) {
+    const size = bdaGen.get("PANEL", "SIZE")?.split(",").map(Number)
+    const panel = currentBdaAppearance()?.appearance.panels.get(layout.value.replace(/\.ini$/i, ""))
+    const candidateDocument = toolbarConfigPath() ? textDocument(toolbarConfigPath()!) : undefined
+    const inputVisual = resolver?.resolveText(
+      bdaGen.get("SCAND", "INPUT_STYLE") ?? bdaGen.get("INPUT", "FORE_STYLE") ?? "",
+      false,
+    )
+    const candidateVisual = resolver?.resolveText(
+      candidateDocument?.get("CAND", "FORE_STYLE") ?? bdaGen.get("SCAND", "SCAND_STYLE") ?? "",
+      false,
+    )
+    const firstVisual = resolver?.resolveText(candidateDocument?.get("CAND", "FIRST_FORE") ?? "", false)
+    candidateTextWidth = size?.[0] || 1080
+    firstCandidateTextVisual = firstVisual
+    applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth)
+    applyCandidateTextVisual(candidateWords, candidateVisual, candidateTextWidth)
+    const firstCandidate = candidateWords.firstElementChild as HTMLElement | null
+    if (firstCandidate) applyCandidateTextVisual(firstCandidate, firstVisual, candidateTextWidth)
+    preview.setPanel(
+      bdaStyleID(panel?.wholeBackStyle ?? panel?.backStyle),
+      size?.[0] || 1080,
+      size?.[1] || 641,
+    )
   }
   preview.setDocument(layoutDocument)
 }
@@ -695,7 +806,7 @@ function updateInspectorView(): void {
     files.querySelector(`.sidebar-overview button[data-path="${CSS.escape(selectedPath)}"]`),
   )
   const propertiesAvailable = Boolean(
-    selectedPath && archive?.isText(selectedPath) && overviewSelected && !imageSelected,
+    selectedPath && (archive?.isText(selectedPath) || isBdaLayoutPath(selectedPath)) && overviewSelected && !imageSelected,
   )
   for (const button of inspectorTabButtons) {
     const tab = button.dataset.inspectorTab
@@ -817,30 +928,34 @@ function toolbarConfigPath(): string | undefined {
   if (!archive) return
   const directory = `${theme.value}/skin/${orientation.value}`
   const genPath = genConfigPath()
-  const configured = archive.isText(genPath)
-    ? IniDocument.parse(archive.getText(genPath)).get("CAND", "LAYOUT_NAME")?.trim()
+  const source = archive.format === "bda" ? bdaBase : archive
+  const sourceGenPath = archive.format === "bda" ? bdaBasePath(genPath) : genPath
+  const configured = source?.isText(sourceGenPath)
+    ? IniDocument.parse(source.getText(sourceGenPath)).get("CAND", "LAYOUT_NAME")?.trim()
     : undefined
-  return firstExistingPath(archive.names(), directory, [
+  const sourceDirectory = archive.format === "bda" ? bdaBasePath(directory) : directory
+  const found = source && firstExistingPath(source.names(), sourceDirectory, [
     ...(configured ? [`${configured}.cnd`] : []),
     "cand1.cnd",
     "cand.cnd",
   ])
+  return found && (archive.format === "bda"
+    ? `${directory}/${found.split("/").pop()}`
+    : found)
 }
 
 function refreshToolbarPreview(
   composing: boolean,
-  resolver: AtlasResolver,
+  resolver: VisualResolver,
 ): { width: number; height: number } | undefined {
   const path = toolbarConfigPath()
-  if (!archive || !path || !archive.isText(path)) {
+  const document = path ? textDocument(path) : undefined
+  if (!archive || !path || !document) {
     delete toolbarStrip.dataset.path
     toolbarStrip.hidden = true
     return
   }
-  const document = IniDocument.parse(archive.getText(path))
-  const gen = archive.isText(genConfigPath())
-    ? IniDocument.parse(archive.getText(genConfigPath()))
-    : undefined
+  const gen = textDocument(genConfigPath())
   const size = gen?.get("CAND", "VIEW_RECT")?.split(",").map(Number)
   toolbarStrip.hidden = composing
   toolbarStrip.dataset.path = path
@@ -934,7 +1049,8 @@ async function updateStylePreviews(): Promise<void> {
     for (const button of stylePreviewButtons) button.hidden = true
     return
   }
-  const resolver = new AtlasResolver(archive, theme.value, orientation.value)
+  const resolver = visualResolver()
+  if (!resolver) return
   const requests = stylePreviewButtons.map(async (button) => {
     const [group, state] = (button.dataset.stylePreview ?? "").split(":")
     const [scope, fieldName] = (button.dataset.stylePreviewField ?? "").split(":")
@@ -968,13 +1084,17 @@ async function updateStylePreviews(): Promise<void> {
 async function updateImagePreviews(): Promise<void> {
   const drawID = ++imagePreviewDrawID
   const background = selectedBackgroundStyleContext()
-  if (!archive || !background) {
+  const bdaStyleIDs = selectedBdaRefs("BACK_STYLE", "image").map(bdaStyleID)
+  if (!archive || !background && !bdaStyleIDs.length) {
     imagePreviewVisuals.clear()
     for (const button of imagePreviewButtons) button.hidden = true
     return
   }
-  const resolver = new AtlasResolver(archive, theme.value, orientation.value)
-  const styleIDs = background.sections.map((section) => section.replace(/^STYLE/, ""))
+  const resolver = visualResolver()
+  if (!resolver) return
+  const styleIDs = background
+    ? background.sections.map((section) => section.replace(/^STYLE/, ""))
+    : bdaStyleIDs
   const results = await Promise.all(
     imagePreviewButtons.map(async (button) => ({
       button,
@@ -1018,6 +1138,51 @@ function selectedBackgroundStyleContext():
   const sections = backgroundStyleSections(layoutDocument, selectedKeySections)
   if (!sections.length) return
   return { document: IniDocument.parse(archive.getText(path)), path, sections }
+}
+
+function selectedBdaRefs(source: "BACK_STYLE" | "FORE_STYLE", type: BdaStyleRef["type"]): BdaStyleRef[] {
+  if (archive?.format !== "bda" || !layoutDocument) return []
+  return selectedKeySections.flatMap((section) => {
+    const ref = (layoutDocument?.get(section, source) ?? "")
+      .split(",")
+      .map(bdaStyleRef)
+      .find((item) => item?.type === type)
+    return ref ? [ref] : []
+  })
+}
+
+function bdaStyleValue(appearance: BdaAppearance, ref: BdaStyleRef, property: string): string {
+  if (ref.type === "image") {
+    const style = appearance.imageStyles.get(ref.key)
+    return (property === "HL_IMG" ? style?.highlightImage : style?.normalImage)?.resource?.resourceID ?? ""
+  }
+  if (ref.type === "color") {
+    const style = appearance.colorStyles.get(ref.key)
+    const value = property === "HL_COLOR" ? style?.highlightColor : style?.normalColor
+    return value === undefined ? "" : bdaColorHex(value)
+  }
+  const style = appearance.textStyles.get(ref.key)
+  if (!style) return ""
+  if (property === "FONT_NAME") return style.fontName
+  if (property === "FONT_SIZE") return String(style.fontSize)
+  if (property === "NM_COLOR") return bdaColorHex(style.normalColor)
+  if (property === "HL_COLOR") return bdaColorHex(style.highlightColor)
+  return ""
+}
+
+function updateBdaRefs(refs: BdaStyleRef[], property: string, value: string): boolean {
+  const info = currentBdaAppearance()
+  if (!info || !refs.length) return false
+  let bytes = info.bytes
+  for (const ref of new Map(refs.map((item) => [`${item.type}:${item.key}`, item])).values()) {
+    bytes = updateBdaStyle(bytes, ref, property, value)
+  }
+  commitBytes(info.path, info.bytes, bytes)
+  refreshBdaLayout(layoutPath)
+  refreshPreview()
+  populateKeyInspector()
+  updateDirty()
+  return true
 }
 
 function describeAction(value: string): string {
@@ -1127,7 +1292,7 @@ function addNavButton(
   className: string,
   icon?: string,
 ): void {
-  if (!archive?.names().includes(path)) return
+  if (!archive?.names().includes(path) && !isBdaVirtualTextPath(path)) return
   const button = document.createElement("button")
   button.className = `nav-item ${className}`
   button.dataset.path = path
@@ -1212,7 +1377,7 @@ function populateKeyInspector(): void {
   }
   for (const field of keyFields) {
     const name = field.dataset.keyField ?? ""
-    field.disabled = !hasSelection
+    field.disabled = !hasSelection || archive?.format === "bda"
     field.placeholder = ""
     if (!hasSelection) {
       field.value = ""
@@ -1230,6 +1395,17 @@ function populateKeyInspector(): void {
   }
   for (const field of styleFields) {
     const property = field.dataset.styleField ?? ""
+    if (archive?.format === "bda") {
+      const info = currentBdaAppearance()
+      const refs = selectedBdaRefs("FORE_STYLE", "text")
+      const values = info ? refs.map((ref) => bdaStyleValue(info.appearance, ref, property)) : []
+      const common = values.length && values.every((value) => value === values[0]) ? values[0] : ""
+      field.disabled = !refs.length || property === "FONT_WEIGHT"
+      field.placeholder = refs.length && !common && new Set(values).size > 1 ? "混合" : field.disabled ? "未配置" : ""
+      field.value = common
+      if (property.endsWith("COLOR")) syncColorControl(field)
+      continue
+    }
     const context = selectedStylePropertyContext(property)
     const values = context?.sources.map((source) => source.value)
     const common = values?.every((value) => value === values[0]) ? values[0] : ""
@@ -1247,6 +1423,16 @@ function populateKeyInspector(): void {
   const background = selectedBackgroundStyleContext()
   for (const field of backgroundStyleFields) {
     const name = field.dataset.backgroundStyleField ?? ""
+    if (archive?.format === "bda") {
+      const info = currentBdaAppearance()
+      const refs = selectedBdaRefs("BACK_STYLE", "image")
+      const values = info ? refs.map((ref) => bdaStyleValue(info.appearance, ref, name)) : []
+      const common = values.length && values.every((value) => value === values[0]) ? values[0] : ""
+      field.disabled = !refs.length
+      field.value = common
+      field.placeholder = refs.length && !common && new Set(values).size > 1 ? "混合" : ""
+      continue
+    }
     const values = background?.sections.map((section) => background.document.get(section, name) ?? "")
     const common = values?.every((value) => value === values[0]) ? values[0] : ""
     field.disabled = !background
@@ -1254,11 +1440,11 @@ function populateKeyInspector(): void {
     field.placeholder = background && !common && new Set(values).size > 1 ? "混合" : ""
   }
   for (const button of layoutActionButtons) {
-    button.disabled = selectedKeySections.length < 2
+    button.disabled = selectedKeySections.length < 2 || archive?.format === "bda"
   }
   const rects = selectedRects()
   for (const field of gapFields) {
-    field.disabled = rects.length < 2
+    field.disabled = rects.length < 2 || archive?.format === "bda"
     field.placeholder = ""
     if (rects.length < 2) {
       field.value = ""
@@ -1346,7 +1532,7 @@ function updateToolbar(field: HTMLInputElement): void {
 }
 
 function updateSelectedKey(field: HTMLInputElement): void {
-  if (!archive || !layoutDocument || !selectedKeySections.length) return
+  if (!archive || archive.format === "bda" || !layoutDocument || !selectedKeySections.length) return
   const before = layoutDocument.toString()
   const name = field.dataset.keyField ?? ""
   const rectNames = ["x", "y", "width", "height"]
@@ -1372,6 +1558,10 @@ function updateSelectedKey(field: HTMLInputElement): void {
 
 function updateSelectedStyle(field: HTMLInputElement): void {
   const property = field.dataset.styleField ?? ""
+  if (archive?.format === "bda") {
+    updateBdaRefs(selectedBdaRefs("FORE_STYLE", "text"), property, field.value)
+    return
+  }
   const context = selectedStylePropertyContext(property)
   if (!archive || !context) return
   const before = context.document.toString()
@@ -1387,6 +1577,10 @@ function updateSelectedStyle(field: HTMLInputElement): void {
 }
 
 function updateSelectedBackgroundStyle(field: HTMLInputElement): void {
+  if (archive?.format === "bda") {
+    updateBdaRefs(selectedBdaRefs("BACK_STYLE", "image"), field.dataset.backgroundStyleField ?? "", field.value)
+    return
+  }
   const context = selectedBackgroundStyleContext()
   if (!archive || !context) return
   const before = context.document.toString()
@@ -1499,7 +1693,19 @@ function selectFile(path: string, preferredSidebarView = sidebarView): void {
     assetReturnPath = selectedPath
   }
   selectedPath = path
-  if (archive?.isImage(path)) {
+  if (isBdaVirtualTextPath(path)) {
+    hideImageWorkspace()
+    const base = IniDocument.parse(bdaBase!.getText(bdaBasePath(path)))
+    const previewLayout = isBdaLayoutPath(path) && previewItems(base).some((item) => item.editable)
+    if (previewLayout && !refreshBdaLayout(path)) return
+    selectedDocument = previewLayout ? layoutDocument : base
+    if (previewLayout) selectedKeySections = []
+    setSourceValue(`# BDA 官方基础布局（只读几何）\n\n${selectedDocument?.toString() ?? ""}`)
+    source.disabled = true
+    sourceName.textContent = `${path} · 几何来自百度输入法安装包`
+    inspectorTab = "properties"
+    if (previewLayout) refreshPreview()
+  } else if (archive?.isImage(path)) {
     inspectorTab = "properties"
     selectedDocument = undefined
     showImage(path)
@@ -1604,8 +1810,11 @@ function renderFiles(): void {
     "gen.ini": { group: "配置与资源", label: "键盘基础配置", className: "nav-style", icon: "gearshape" },
   }
   const configPrefix = `${theme.value}/skin/${orientation.value}/`
-  for (const path of archive.names().sort()) {
-    if (!path.startsWith(configPrefix) || path.slice(configPrefix.length).includes("/") || !/\.ini$/i.test(path)) continue
+  const layoutNames = archive.format === "bda" ? bdaBase?.names() ?? [] : archive.names()
+  const layoutPrefix = archive.format === "bda" ? bdaBasePath(configPrefix) : configPrefix
+  for (const basePath of layoutNames.sort()) {
+    if (!basePath.startsWith(layoutPrefix) || basePath.slice(layoutPrefix.length).includes("/") || !/\.ini$/i.test(basePath)) continue
+    const path = archive.format === "bda" ? `${configPrefix}${basePath.slice(layoutPrefix.length)}` : basePath
     const name = path.split("/").pop() ?? path
     const info = iniTypes[name] ?? {
       group: "扩展布局",
@@ -1620,13 +1829,17 @@ function renderFiles(): void {
   if (candidatePath) entries.push({ group: "键盘组件", label: "候选栏与工具栏", path: candidatePath, className: "nav-component", icon: "text.bubble" })
   const hintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
   if (hintPath) entries.push({ group: "键盘组件", label: "按键气泡", path: hintPath, className: "nav-component", icon: "rectangle.and.hand.point" })
+  const appearancePath = bdaAppearancePath(archive, theme.value, orientation.value)
   entries.push(
-    { group: "配置与资源", label: "按键样式", path: styleConfigPath(), className: "nav-style", icon: "paintpalette" },
-    { group: "配置与资源", label: "图片资源", path: `${theme.value}/skin/res/btn.png`, className: "nav-style", icon: "photo" },
+    { group: "配置与资源", label: "按键样式", path: appearancePath ?? styleConfigPath(), className: "nav-style", icon: "paintpalette" },
+    { group: "配置与资源", label: "图片资源", path: archive.names().find((path) => path.startsWith(`${theme.value}/skin/res/`) && archive?.isImage(path)) ?? `${theme.value}/skin/res/btn.png`, className: "nav-style", icon: "photo" },
   )
 
   for (const group of ["皮肤", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "配置与资源", "扩展布局"]) {
-    const grouped = entries.filter((entry) => entry.group === group && archive?.names().includes(entry.path))
+    const grouped = entries.filter((entry) => entry.group === group && (
+      archive?.names().includes(entry.path) ||
+      archive?.format === "bda" && Boolean(bdaBase?.isText(bdaBasePath(entry.path)))
+    ))
     if (!grouped.length) continue
     section(group)
     for (const entry of grouped) addNavButton(overview, entry.label, entry.path, entry.className, entry.icon)
@@ -1782,8 +1995,13 @@ function revealSourceFile(path: string): void {
   button.scrollIntoView({ block: "nearest" })
 }
 
-function loadArchive(bytes: Uint8Array, path: string, isNew = false): void {
+async function loadArchive(bytes: Uint8Array, path: string, isNew = false): Promise<void> {
   const nextArchive = SkinArchive.open(bytes)
+  if (nextArchive.format === "bda" && !bdaBase) {
+    const response = await fetch("/bda-base.bds")
+    if (!response.ok) throw new Error("无法加载 BDA 官方基础布局")
+    bdaBase = SkinArchive.open(new Uint8Array(await response.arrayBuffer()))
+  }
   assetURL = releaseImagePreviewURL(assetURL)
   archive = nextArchive
   const availableThemes = ["light", "dark"].filter((value) =>
@@ -1812,9 +2030,8 @@ function loadArchive(bytes: Uint8Array, path: string, isNew = false): void {
   renderFiles()
   layoutPath = preferredPath()
   previewReturnName = layoutPath.split("/").pop() ?? layout.value
-  const bdaDemo = `${theme.value}/skin/demo.png`
-  const initial = archive.format === "bda" && archive.names().includes(bdaDemo)
-    ? bdaDemo
+  const initial = archive.format === "bda" && isBdaLayoutPath(layoutPath)
+    ? layoutPath
     : archive.names().includes(layoutPath)
       ? layoutPath
       : archive.names().find((name) => archive?.isText(name))
@@ -1838,7 +2055,7 @@ async function openNative(): Promise<boolean> {
 
 async function loadNativePath(path: string): Promise<boolean> {
   const bytes = await invoke<number[]>("read_file", { path })
-  loadArchive(new Uint8Array(bytes), path)
+  await loadArchive(new Uint8Array(bytes), path)
   return true
 }
 
@@ -1914,7 +2131,7 @@ async function newDocument(): Promise<boolean> {
   const templateID = await chooseProjectTemplate()
   if (!templateID) return false
   if (!(await prepareDocumentReplacement())) return false
-  loadArchive(await loadBuiltInProjectTemplate(templateID), "", true)
+  await loadArchive(await loadBuiltInProjectTemplate(templateID), "", true)
   return true
 }
 
@@ -1965,7 +2182,8 @@ defaultDevice.value = localStorage.getItem("default-device") ?? device.value
 defaultDevice.addEventListener("change", () => {
   localStorage.setItem("default-device", defaultDevice.value)
 })
-canvasBackground.value = localStorage.getItem("canvas-background") ?? "default"
+const savedCanvasBackground = localStorage.getItem("canvas-background")
+canvasBackground.value = savedCanvasBackground === "default" ? "glass" : savedCanvasBackground ?? "white"
 canvasWrap.dataset.background = canvasBackground.value
 canvasBackground.addEventListener("change", () => {
   localStorage.setItem("canvas-background", canvasBackground.value)
@@ -1992,7 +2210,7 @@ browserOpen.addEventListener("change", async () => {
   const file = browserOpen.files?.[0]
   if (file) {
     await runFileOperation("打开", async () => {
-      loadArchive(new Uint8Array(await file.arrayBuffer()), file.name)
+      await loadArchive(new Uint8Array(await file.arrayBuffer()), file.name)
       return true
     })
   }
@@ -2130,8 +2348,7 @@ for (const control of [theme, orientation, layout]) {
     const path = preferredPath()
     if (archive?.format === "bda") {
       renderFiles()
-      const demo = `${theme.value}/skin/demo.png`
-      if (archive.names().includes(demo)) selectFile(demo)
+      if (isBdaLayoutPath(path)) selectFile(path)
     } else if (archive?.names().includes(path)) {
       layoutPath = path
       layoutDocument = IniDocument.parse(archive.getText(path))

@@ -17,7 +17,11 @@ test("new project command opens an accessible built-in template chooser", () => 
     html.indexOf("</dialog>", html.indexOf('<dialog id="new-project-dialog"')) + 9,
   )
   assert.match(dialog, /<h2[^>]*>新建项目<\/h2>/)
-  assert.match(dialog, /name="project-template"[^>]*value="default-ios"[^>]*checked/)
+  assert.match(dialog, /name="project-template"[^>]*value="default-android"[^>]*checked/)
+  assert.match(dialog, /百度官方 Android BDA 默认皮肤/)
+  assert.match(dialog, /value="official-android-bds"/)
+  assert.match(dialog, /value="imitation-ios-15"/)
+  assert.match(dialog, /仿ios15键/)
   assert.match(dialog, /value="cancel"/)
   assert.match(dialog, /value="create"/)
   assert.match(main, /newProjectDialog\.showModal\(\)/)
@@ -169,12 +173,17 @@ test("typing updates simulation state without rebuilding the complete skin previ
 test("toolbar availability is invalidated before lightweight typing refreshes", () => {
   assert.match(
     main,
-    /if \(!archive \|\| !path \|\| !archive\.isText\(path\)\) \{\s*delete toolbarStrip\.dataset\.path\s*toolbarStrip\.hidden = true/s,
+    /const document = path \? textDocument\(path\) : undefined\s*if \(!archive \|\| !path \|\| !document\) \{\s*delete toolbarStrip\.dataset\.path\s*toolbarStrip\.hidden = true/s,
   )
 })
 
-test("a full preview refresh shares one atlas resolver with the toolbar", () => {
-  assert.match(main, /const resolver = new AtlasResolver\(archive, theme\.value, orientation\.value\)/)
+test("BDA candidate toolbar reads its virtual official configuration", () => {
+  assert.match(main, /const source = archive\.format === "bda" \? bdaBase : archive/)
+  assert.match(main, /const document = path \? textDocument\(path\) : undefined/)
+})
+
+test("a full preview refresh shares one format-aware resolver with the toolbar", () => {
+  assert.match(main, /const resolver = visualResolver\(\)/)
   assert.match(main, /refreshToolbarPreview\(composing, resolver\)/)
   assert.match(main, /preview\.setResolver\(resolver\)/)
   assert.doesNotMatch(main, /function refreshToolbarPreview[\s\S]*?toolbarPreview\.setResolver\(new AtlasResolver/)
@@ -299,7 +308,14 @@ test("selected source scrolls to a full-row highlight", () => {
 
 test("settings expose canvas backgrounds and edit mode exposes key context actions", () => {
   assert.match(html, /id="canvas-background"/)
+  assert.match(html, /value="glass">玻璃/)
   assert.match(html, /value="checkerboard">马赛克/)
+  assert.match(html, /value="white" selected>白色/)
+  assert.doesNotMatch(html, /value="default">默认/)
+  assert.match(main, /savedCanvasBackground === "default" \? "glass" : savedCanvasBackground \?\? "white"/)
+  assert.match(css, /\.canvas-wrap\[data-background="glass"\]\s*\{[^}]*backdrop-filter:/s)
+  assert.match(css, /\.color-dialog menu button\s*\{[^}]*border-radius:/s)
+  assert.match(css, /\.color-dialog menu button\[value="ok"\]\s*\{[^}]*background:\s*var\(--accent\)/s)
   assert.match(html, /data-context-action="copy"/)
   assert.match(html, /data-context-action="delete"/)
   assert.match(main, /function copySelectedKeys\(\)/)
@@ -307,8 +323,9 @@ test("settings expose canvas backgrounds and edit mode exposes key context actio
 })
 
 test("window and about names match the GitHub project and include the version", () => {
-  assert.match(html, /<title>BdiEditor v0\.3\.2<\/title>/)
-  assert.match(html, /关于 BdiEditor v0\.3\.2/)
+  assert.match(html, /<title>BdiEditor v0\.4\.7<\/title>/)
+  assert.match(html, /关于 BdiEditor v0\.4\.7/)
+  assert.match(html, /<strong>技术交流与反馈<\/strong><br>QQ群：228040912/)
 })
 
 test("new-project chooser includes the four dust templates", () => {
@@ -444,9 +461,16 @@ test("every toolbar menu closes when clicking elsewhere", () => {
 })
 
 test("top, sidebar, menus and segmented controls share animated glass materials", () => {
-  for (const selector of [".titlebar", "aside", ".toolbar-menu", ".glass-module"]) {
+  for (const selector of [".titlebar", "aside", ".source", ".preview-toolbar", ".toolbar-menu", ".glass-module"]) {
     assert.match(css, new RegExp(`${selector.replace(".", "\\.")}\\s*\\{[^}]*backdrop-filter:`, "s"))
   }
   assert.match(css, /\.mode-control button\.active,[\s\S]*?\.inspector-tabs button\.active\s*\{[^}]*box-shadow:/s)
+  assert.match(css, /\.canvas-wrap\s*\{[^}]*background:\s*var\(--canvas\)/s)
+  assert.doesNotMatch(css.match(/\.canvas-only canvas\s*\{[^}]*\}/s)?.[0] ?? "", /border:|box-shadow:/)
   assert.match(css, /@keyframes glass-select/)
+  assert.match(main, /document\.documentElement\.classList\.toggle\("macos", navigator\.userAgent\.includes\("Macintosh"\)\)/)
+  assert.match(css, /:root\.macos\s*\{[^}]*--titlebar-height:\s*86px/s)
+  assert.match(html, /<header class="titlebar" data-tauri-drag-region>/)
+  assert.match(html, /<div class="document-title" data-tauri-drag-region>/)
+  assert.match(html, /<span class="spacer" data-tauri-drag-region><\/span>/)
 })

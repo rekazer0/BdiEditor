@@ -1,11 +1,16 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  BdaResolver,
+  bdaLayoutDocument,
   bdaLayoutNames,
   bdaResourceIDs,
+  bdaStyleID,
   decodeBdaAppearance,
   describeBdaConfig,
+  updateBdaStyle,
 } from "../src/bda.ts"
+import { IniDocument } from "../src/ini.ts"
 
 const concat = (...parts: Uint8Array[]) => {
   const output = new Uint8Array(parts.reduce((size, part) => size + part.length, 0))
@@ -32,13 +37,16 @@ const string = (number: number, value: string) => message(number, new TextEncode
 const resource = string(2, "key/normal.png")
 const imageStyle = message(1, message(1, resource))
 const imageMap = concat(scalar(1, 7), message(2, imageStyle))
+const textStyle = concat(string(2, "Old"), scalar(3, 60), scalar(4, 0xff112233), scalar(99, 42))
+const textMap = concat(scalar(1, 8), message(2, textStyle))
 const styleRef = scalar(2, 7)
 const key = message(1, styleRef)
-const keyMap = concat(string(1, "KEY1"), message(2, key))
+const keyMap = concat(string(1, "KEY_B"), message(2, key))
 const panel = message(3, keyMap)
 const panelMap = (name: string, value: Uint8Array) => concat(string(1, name), message(2, value))
 const bytes = concat(
   message(1, imageMap),
+  message(2, textMap),
   message(4, panelMap("py_9", panel)),
   message(4, panelMap("en_26", new Uint8Array())),
   scalar(6, 1080),
@@ -52,12 +60,28 @@ test("decodes official BDA appearance style, panel and resource fields", () => {
   const appearance = decodeBdaAppearance(bytes)
   assert.equal(appearance.designWidth, 1080)
   assert.equal(appearance.imageStyles.get(7)?.normalImage?.resource?.resourceID, "key/normal.png")
-  assert.deepEqual(appearance.panels.get("py_9")?.keys.get("KEY1")?.backStyle, {
+  assert.deepEqual(appearance.panels.get("py_9")?.keys.get("KEY_B")?.backStyle, {
     type: "image",
     key: 7,
   })
-  assert.deepEqual(appearance.panels.get("py_9")?.keys.get("KEY1")?.foreStyleOffsets, [])
+  assert.deepEqual(appearance.panels.get("py_9")?.keys.get("KEY_B")?.foreStyleOffsets, [])
   assert.deepEqual(bdaResourceIDs(bytes), ["key/normal.png"])
+})
+
+test("maps official layout actions to BDA semantic keys", () => {
+  const layout = bdaLayoutDocument(
+    IniDocument.parse("[KEY1]\nVIEW_RECT=1,2,3,4\nCENTER=b\n"),
+    decodeBdaAppearance(bytes),
+    "py_9.ini",
+  )
+  assert.equal(layout.get("KEY1", "BACK_STYLE"), bdaStyleID({ type: "image", key: 7 }))
+  assert.equal(layout.get("KEY1", "VIEW_RECT"), "1,2,3,4")
+})
+
+test("updates a BDA protobuf style without dropping unknown fields", () => {
+  const updated = updateBdaStyle(bytes, { type: "text", key: 8 }, "FONT_SIZE", "72")
+  assert.equal(decodeBdaAppearance(updated).textStyles.get(8)?.fontSize, 72)
+  assert.notEqual(Buffer.from(updated).indexOf(Buffer.from(scalar(99, 42))), -1)
 })
 
 test("describes BDA protobuf configuration without exposing editable binary text", () => {
@@ -66,4 +90,9 @@ test("describes BDA protobuf configuration without exposing editable binary text
   assert.match(summary, /设计宽度：1080/)
   assert.match(summary, /- py_9（1 个按键）/)
   assert.match(summary, /官方 protobuf 字段/)
+})
+
+test("resolves raw style IDs used by the official BDA candidate configuration", () => {
+  const resolver = new BdaResolver({} as never, bytes)
+  assert.equal(resolver.resolveText("8", false)?.fontName, "Old")
 })

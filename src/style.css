@@ -2,43 +2,50 @@
   font-family: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #202124;
   color-scheme: light;
-  background: #fff;
+  background: transparent;
+  --titlebar-height: 52px;
   --line: rgb(0 0 0 / 10%);
   --line-soft: rgb(0 0 0 / 6%);
   --text: #202124;
   --secondary: #74747b;
   --tertiary: #95959c;
   --accent: #0a7ff5;
-  --window: #fff;
-  --toolbar: rgb(255 255 255 / 82%);
-  --sidebar: rgb(255 255 255 / 76%);
-  --inspector: rgb(255 255 255 / 72%);
-  --panel: #fff;
-  --content: #f7f8fa;
-  --control: #fff;
+  --window: rgb(255 255 255 / 64%);
+  --toolbar: rgb(255 255 255 / 44%);
+  --sidebar: rgb(238 244 250 / 36%);
+  --inspector: rgb(255 255 255 / 42%);
+  --panel: rgb(255 255 255 / 72%);
+  --content: rgb(245 247 249 / 32%);
+  --canvas: #eef1f3;
+  --control: rgb(255 255 255 / 66%);
   --hover: rgb(0 0 0 / 5%);
-  --glass-surface: rgb(255 255 255 / 58%);
-  --glass-border: rgb(255 255 255 / 76%);
-  --glass-highlight: rgb(255 255 255 / 88%);
+  --glass-surface: rgb(255 255 255 / 30%);
+  --glass-border: rgb(255 255 255 / 62%);
+  --glass-highlight: rgb(255 255 255 / 64%);
   --glass-shadow: 0 8px 28px rgb(30 45 52 / 10%), inset 0 1px rgb(255 255 255 / 78%);
+}
+
+:root.macos {
+  --titlebar-height: 86px;
 }
 
 :root[data-app-theme="dark"] {
   color: #f2f3f4;
   color-scheme: dark;
-  background: #17191b;
+  background: transparent;
   --line: rgb(255 255 255 / 12%);
   --line-soft: rgb(255 255 255 / 7%);
   --text: #f2f3f4;
   --secondary: #a6a9ae;
   --tertiary: #858991;
   --accent: #3395ff;
-  --window: #17191b;
-  --toolbar: rgb(28 31 34 / 78%);
-  --sidebar: rgb(27 32 34 / 76%);
-  --inspector: rgb(25 28 31 / 78%);
-  --panel: rgb(36 39 42 / 94%);
-  --content: #202327;
+  --window: rgb(23 25 27 / 66%);
+  --toolbar: rgb(28 31 34 / 46%);
+  --sidebar: rgb(27 32 34 / 38%);
+  --inspector: rgb(25 28 31 / 46%);
+  --panel: rgb(36 39 42 / 76%);
+  --content: rgb(25 28 31 / 34%);
+  --canvas: #202225;
   --control: rgb(255 255 255 / 8%);
   --hover: rgb(255 255 255 / 9%);
   --glass-surface: rgb(255 255 255 / 7%);
@@ -73,7 +80,7 @@
 
 html,
 body {
-  background: var(--window);
+  background: transparent;
 }
 
 body {
@@ -132,7 +139,7 @@ summary:focus-visible {
 .titlebar {
   position: relative;
   z-index: 20;
-  height: 52px;
+  height: var(--titlebar-height);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -143,6 +150,10 @@ summary:focus-visible {
   -webkit-backdrop-filter: saturate(170%) blur(28px);
   backdrop-filter: saturate(170%) blur(28px);
   -webkit-app-region: drag;
+}
+
+:root.macos .titlebar {
+  padding-top: 40px;
 }
 
 .toolbar-group {
@@ -219,6 +230,7 @@ summary:focus-visible {
   left: 50%;
   display: grid;
   justify-items: center;
+  bottom: 9px;
   transform: translateX(-50%);
   pointer-events: none;
 }
@@ -389,9 +401,10 @@ select {
 }
 
 main {
-  height: calc(100vh - 52px);
+  height: calc(100vh - var(--titlebar-height));
   display: grid;
   grid-template-columns: 220px minmax(500px, 1fr) minmax(340px, 28%);
+  background: transparent;
 }
 
 aside,
@@ -696,7 +709,13 @@ h2 {
   position: relative;
   padding: 18px;
   overflow: auto;
+  background: var(--canvas);
+}
+
+.canvas-wrap[data-background="glass"] {
   background: var(--content);
+  -webkit-backdrop-filter: saturate(170%) blur(28px);
+  backdrop-filter: saturate(170%) blur(28px);
 }
 
 .canvas-wrap[data-background="checkerboard"] {
@@ -1151,9 +1170,7 @@ canvas {
 
 .canvas-only canvas {
   height: auto;
-  border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 12px 32px rgb(0 0 0 / 13%);
 }
 
 .empty-state {
@@ -1702,6 +1719,23 @@ canvas {
 .rgba-fields label { display: grid; gap: 4px; color: var(--secondary); font-size: 10px; }
 .rgba-fields input { width: 100%; min-width: 0; height: 30px; }
 .color-dialog menu { display: flex; justify-content: flex-end; gap: 8px; margin: 0; padding: 0; }
+.color-dialog menu button {
+  min-width: 64px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  backdrop-filter: saturate(180%) blur(14px);
+}
+.color-dialog menu button[value="ok"] {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
+  box-shadow: 0 6px 18px rgb(10 127 245 / 24%);
+}
 
 .inspector-grid input {
   width: 100%;

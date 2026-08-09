@@ -1,4 +1,4 @@
-import { canvasFontFamily, isTransparentColor, type AtlasResolver, type TextVisual, type Visual } from "./atlas.ts"
+import { canvasFontFamily, isTransparentColor, type TextVisual, type Visual, type VisualResolver } from "./atlas.ts"
 import { IniDocument } from "./ini.ts"
 import { gestureDirection } from "./layout.ts"
 
@@ -25,6 +25,7 @@ export type PreviewItem = {
   backStyle: string
   foreStyle: string
   foreStyles: string[]
+  foreOffsets: Array<[number, number] | undefined>
   positionTypes: string[]
 }
 
@@ -151,6 +152,7 @@ function itemFromSection(document: IniDocument, section: string): PreviewItem | 
     backStyle: value("BACK_STYLE").split(",")[0],
     foreStyle: foreStyles[0] ?? "",
     foreStyles,
+    foreOffsets: value("FORE_OFFSET").split(";").map(parseOffset),
     positionTypes: value("POS_TYPE").split(",").map((token) => token.trim()).filter(Boolean),
   }
 }
@@ -185,6 +187,7 @@ function listItems(document: IniDocument): PreviewItem[] {
     backStyle: "",
     foreStyle: "",
     foreStyles: [],
+    foreOffsets: [],
     positionTypes: [],
   }))
 }
@@ -227,6 +230,7 @@ export function previewItems(
   )
   if (!sections.length) return []
   return sections.flatMap((section) => {
+    if (/^TIP\d+$/.test(section) || document.get(section, "PERSIST") === "2") return []
     const backStyle = document.get(section, "BACK_STYLE")?.split(",")[0] ?? ""
     const foreStyles = document.get(section, "FORE_STYLE")?.split(",").map((token) => token.trim()).filter(Boolean) ?? []
     const foreStyle = foreStyles[0] ?? ""
@@ -278,6 +282,7 @@ export function previewItems(
       backStyle,
       foreStyle,
       foreStyles,
+      foreOffsets: [],
       positionTypes: document.get(section, "POS_TYPE")?.split(",").map((token) => token.trim()).filter(Boolean) ?? [],
     }]
   })
@@ -290,7 +295,7 @@ export class Preview {
   private readonly toolbarSlots: boolean
   private document?: IniDocument
   private offsets?: IniDocument
-  private resolver?: AtlasResolver
+  private resolver?: VisualResolver
   private panelStyle = ""
   private panelWidth = 1125
   private panelHeight = 650
@@ -346,7 +351,7 @@ export class Preview {
     void this.draw()
   }
 
-  setResolver(resolver?: AtlasResolver): void {
+  setResolver(resolver?: VisualResolver): void {
     this.resolver = resolver
     void this.draw()
   }
@@ -617,7 +622,7 @@ export class Preview {
         this.drawVisual(context, visuals[index].back, key.rect, true)
       }
       for (const [layer, fore] of foregrounds.entries()) {
-        const offset = parseOffset(
+        const offset = key.foreOffsets[layer] ?? parseOffset(
           this.offsets?.get(`OFFSET${key.positionTypes[layer] ?? ""}`, "POS"),
         )
         const destination = key.foreRect ?? foregroundLayerRect(key.rect, fore?.source, layer, offset)

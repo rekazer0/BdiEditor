@@ -4,14 +4,28 @@ import test from "node:test"
 import { strToU8, unzipSync, zipSync } from "fflate"
 import { SkinArchive } from "../src/skin.ts"
 
-test("ships a valid fixed built-in iOS template", () => {
-  const url = new URL("../public/default-template.bdi", import.meta.url)
-  assert.equal(existsSync(url), true, "public/default-template.bdi must be bundled")
+test("ships the official Baidu BDA skin as the built-in default template", () => {
+  const url = new URL("../public/default-template.bda", import.meta.url)
+  assert.equal(existsSync(url), true, "public/default-template.bda must be bundled")
+  const archive = SkinArchive.open(new Uint8Array(readFileSync(url)))
+  assert.equal(archive.format, "bda")
+  assert.ok(archive.names().some((name) => /(^|\/)Info\.txt$/i.test(name)))
+  assert.ok(archive.names().includes("light/skin/port/appearanceConfig"))
+  assert.ok(archive.names().some((name) => name.startsWith("light/skin/res/") && name.endsWith(".png")))
+})
+
+test("keeps the official BDS default as an alternative template", () => {
+  const archive = SkinArchive.open(new Uint8Array(readFileSync(new URL("../public/default-template.bds", import.meta.url))))
+  assert.equal(archive.format, "bds")
+  assert.ok(archive.names().includes("light/skin/port/py_9.ini"))
+})
+
+test("keeps the former iOS default as the imitation iOS 15-key template", () => {
+  const url = new URL("../public/templates/imitation-ios-15.bdi", import.meta.url)
+  assert.equal(existsSync(url), true)
   const archive = SkinArchive.open(new Uint8Array(readFileSync(url)))
   assert.equal(archive.format, "bdi")
-  assert.ok(archive.names().some((name) => /(^|\/)Info\.txt$/i.test(name)))
   assert.ok(archive.names().includes("light/skin/port/py_9.ini"))
-  assert.ok(archive.names().some((name) => name.startsWith("light/skin/res/") && name.endsWith(".png")))
 })
 
 test("changes one config while preserving other entry bytes", () => {

@@ -1,12 +1,14 @@
 {
   "name": "bdi-edit",
   "private": true,
-  "version": "0.3.2",
+  "version": "0.4.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "test": "node --test tests/*.test.ts",
+    "version:feature": "node scripts/bump-version.mjs feature",
+    "version:bugfix": "node scripts/bump-version.mjs bugfix",
     "verify:samples": "node scripts/verify-samples.ts",
     "tauri": "tauri"
   },
