@@ -1,6 +1,8 @@
 import { canvasFontFamily, isTransparentColor, type TextVisual, type Visual, type VisualResolver } from "./atlas.ts"
 import { IniDocument } from "./ini.ts"
 import { gestureDirection } from "./layout.ts"
+import { stateStyleValue } from "./panel-tools.ts"
+import type { BdaAnimation, BdaAnimationSequence } from "./bda.ts"
 
 export type PreviewEvent = {
   section: string
@@ -27,6 +29,23 @@ export type PreviewItem = {
   foreStyles: string[]
   foreOffsets: Array<[number, number] | undefined>
   positionTypes: string[]
+  statStyle: string
+}
+
+export function previewStateActive(item: PreviewItem, state: number | undefined): boolean {
+  return state !== undefined && stateStyleValue(item.statStyle, state) !== undefined
+}
+
+export function animationSequenceForKey(
+  animation: BdaAnimation | undefined,
+  item: PreviewItem,
+): BdaAnimationSequence | undefined {
+  if (!animation) return
+  const candidates = [item.section, item.center, item.down, `KEY_${item.center}`]
+    .map((value) => value.trim().toUpperCase()).filter(Boolean)
+  const target = animation.targets.find((value) => candidates.includes(value.toUpperCase()))
+  if (target) return animation.sequences.get(target) ?? animation.sequences.get(target.replace(/^KEY_/, ""))
+  if (animation.sequences.size === 1) return animation.sequences.values().next().value
 }
 
 export function previewBackground(theme: "light" | "dark"): string {
@@ -154,6 +173,7 @@ function itemFromSection(document: IniDocument, section: string): PreviewItem | 
     foreStyles,
     foreOffsets: value("FORE_OFFSET").split(";").map(parseOffset),
     positionTypes: value("POS_TYPE").split(",").map((token) => token.trim()).filter(Boolean),
+    statStyle: value("STAT_STYLE"),
   }
 }
 
@@ -189,6 +209,7 @@ function listItems(document: IniDocument): PreviewItem[] {
     foreStyles: [],
     foreOffsets: [],
     positionTypes: [],
+    statStyle: "",
   }))
 }
 
@@ -284,6 +305,7 @@ export function previewItems(
       foreStyles,
       foreOffsets: [],
       positionTypes: document.get(section, "POS_TYPE")?.split(",").map((token) => token.trim()).filter(Boolean) ?? [],
+      statStyle: value("STAT_STYLE"),
     }]
   })
 }
@@ -312,6 +334,10 @@ export class Preview {
   private selected = new Set<string>()
   private selectionAnchor?: string
   private guides = false
+  private skinState?: number
+  private animation?: BdaAnimation
+  private animationVisual?: { key: PreviewItem; visual: Visual }
+  private animationTimer?: number
   private drawID = 0
 
   constructor(
@@ -373,6 +399,18 @@ export class Preview {
 
   setGuides(enabled: boolean): void {
     this.guides = enabled
+    void this.draw()
+  }
+
+  setSkinState(state?: number): void {
+    this.skinState = state
+    void this.draw()
+  }
+
+  setAnimation(animation?: BdaAnimation): void {
+    this.animation = animation
+    this.animationVisual = undefined
+    if (this.animationTimer) window.clearTimeout(this.animationTimer)
     void this.draw()
   }
 
@@ -451,7 +489,28 @@ export class Preview {
       startY: point.y,
       startedAt: Date.now(),
     }
+    void this.playAnimation(key)
     void this.draw()
+  }
+
+  private async playAnimation(key: PreviewItem): Promise<void> {
+    const sequence = animationSequenceForKey(this.animation, key)
+    if (!sequence?.frames.length || !this.resolver?.resolveResource) return
+    if (this.animationTimer) window.clearTimeout(this.animationTimer)
+    const play = async (index: number) => {
+      const frame = sequence.frames[index]
+      if (!frame) {
+        this.animationVisual = undefined
+        void this.draw()
+        return
+      }
+      const visual = await this.resolver?.resolveResource?.(frame.resourceID)
+      if (!visual) return
+      this.animationVisual = { key, visual }
+      void this.draw()
+      this.animationTimer = window.setTimeout(() => void play(index + 1), Math.max(16, frame.duration))
+    }
+    await play(0)
   }
 
   private pointerUp(event: PointerEvent): void {
@@ -569,7 +628,7 @@ export class Preview {
     const [panel, visuals, toolbarImages] = await Promise.all([
       this.resolver?.resolve(this.panelStyle, false),
       Promise.all(this.keys.map(async (key) => {
-        const highlighted = this.active?.key === key
+        const highlighted = this.active?.key === key || previewStateActive(key, this.skinState)
         return {
           back: await this.resolver?.resolve(key.backStyle, highlighted),
           fore: await Promise.all(
@@ -599,7 +658,7 @@ export class Preview {
     )
 
     for (const [index, key] of this.keys.entries()) {
-      const active = this.active?.key === key
+      const active = this.active?.key === key || previewStateActive(key, this.skinState)
       const selected = previewSelectionVisible(this.mode, this.selected.has(key.section))
       const foregrounds = phoneForegroundLayers(visuals[index].fore)
       const hasForeground = foregrounds.some(Boolean)
@@ -663,6 +722,10 @@ export class Preview {
       if (key.down) {
         context.fillText(key.down, key.rect.x + key.rect.width / 2, key.rect.y + key.rect.height - 18)
       }
+    }
+
+    if (this.animationVisual) {
+      this.drawVisual(context, this.animationVisual.visual, this.animationVisual.key.rect, false)
     }
 
     const toolbarRect = this.document

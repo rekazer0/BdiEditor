@@ -206,6 +206,21 @@ test("normalizes and preserves single-theme BDI and BDS layouts", () => {
   assert.ok(unzipSync(bds.toBytes("bds"))["port/py_9.ini"])
 })
 
+test("stores newly generated canonical landscape files in the package's native paths", () => {
+  const bda = SkinArchive.open(zipSync({
+    "port/appearanceConfig": new Uint8Array([8, 1]),
+  }))
+  bda.setBytes("light/skin/land/appearanceConfig", new Uint8Array([8, 2]))
+  assert.ok(unzipSync(bda.toBytes())["land/appearanceConfig"])
+  assert.equal(unzipSync(bda.toBytes())["light/skin/land/appearanceConfig"], undefined)
+
+  const bds = SkinArchive.open(zipSync({
+    "light/port/gen.ini": strToU8("[PANEL]\nSIZE=1080,600\n"),
+  }))
+  bds.setText("light/skin/land/gen.ini", "[PANEL]\nSIZE=1920,600\n")
+  assert.ok(unzipSync(bds.toBytes())["light/land/gen.ini"])
+})
+
 test("exports legacy iOS structure as an importable BDI package", () => {
   const archive = SkinArchive.open(zipSync({
     "Info.txt": strToU8("Name=Test\r\nSupportPlatform=I\r\n"),

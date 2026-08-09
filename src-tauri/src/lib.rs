@@ -1,6 +1,6 @@
 use std::fs;
 use std::sync::Mutex;
-use tauri::Manager;
+use tauri::{window::{Effect, EffectsBuilder}, Manager};
 
 struct OpenedFiles(Mutex<Vec<String>>);
 
@@ -30,6 +30,28 @@ fn take_opened_files(app: tauri::AppHandle) -> Vec<String> {
 #[tauri::command]
 fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
+}
+
+#[tauri::command]
+fn set_window_material(window: tauri::WebviewWindow, enabled: bool) -> Result<(), String> {
+    if !enabled {
+        return window.set_effects(None).map_err(|error| error.to_string());
+    }
+    #[cfg(target_os = "macos")]
+    return window
+        .set_effects(EffectsBuilder::new().effect(Effect::Sidebar).build())
+        .map_err(|error| error.to_string());
+    #[cfg(target_os = "windows")]
+    return window
+        .set_effects(
+            EffectsBuilder::new()
+                .effect(Effect::Acrylic)
+                .color(tauri::window::Color(32, 34, 38, 210))
+                .build(),
+        )
+        .map_err(|error| error.to_string());
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    Ok(())
 }
 
 #[cfg(test)]
@@ -80,14 +102,16 @@ pub fn run() {
         read_file,
         write_file,
         take_opened_files,
-        quit_app
+        quit_app,
+        set_window_material
     ]);
     #[cfg(not(target_os = "macos"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         read_file,
         write_file,
         take_opened_files,
-        quit_app
+        quit_app,
+        set_window_material
     ]);
     builder
         .build(tauri::generate_context!())

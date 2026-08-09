@@ -387,6 +387,7 @@ export class BdaResolver implements VisualResolver {
   }
 
   private resource(resourceID: string): { archive: SkinArchive; path: string } | undefined {
+    resourceID = resourceID.replace(/\.png$/i, "")
     const paths = [
       `${this.theme}/skin/${this.orientation}/res/${resourceID}.png`,
       `${this.theme}/skin/res/${resourceID}.png`,
@@ -439,6 +440,13 @@ export class BdaResolver implements VisualResolver {
         : undefined,
       color: bdaCssColor(atom?.filterColor ?? 0),
     }
+  }
+
+  async resolveResource(resourceID: string): Promise<Visual | undefined> {
+    const found = this.resource(resourceID)
+    if (!found) return
+    const image = await this.bitmap(found.archive, found.path)
+    return { image, imagePath: found.path, source: [0, 0, image.width, image.height] }
   }
 
   resolveText(foreground: string, highlighted: boolean): TextVisual | undefined {
@@ -538,6 +546,11 @@ function replaceField(bytes: Uint8Array, number: number, wire: 0 | 2, payload: U
   return field
     ? join([bytes.slice(0, field.start), replacement, bytes.slice(field.end)])
     : join([bytes, replacement])
+}
+
+export function updateBdaDesignWidth(bytes: Uint8Array, width: number): Uint8Array {
+  if (!Number.isFinite(width) || width <= 0) throw new Error("BDA 设计宽度必须是正数")
+  return replaceField(bytes, 6, 0, encodeVarint(Math.round(width)))
 }
 
 function updateMapValue(

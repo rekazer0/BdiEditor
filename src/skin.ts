@@ -209,6 +209,24 @@ function canonicalPath(path: string, layout: PackageLayout): string {
   return path
 }
 
+function rawPath(path: string, layout: PackageLayout): string {
+  if (layout === "bdi-dual") {
+    if (path === "Info.txt" || path === "demo.png") return `skin/${path}`
+    return path.replace(/^(dark|light)\/skin\//, "skin/$1/skin/")
+  }
+  if (layout === "bdi-single") {
+    if (path === "Info.txt" || path === "demo.png") return `skin/${path}`
+    return path.replace(/^light\/skin\//, "skin/")
+  }
+  if (layout === "bds-dual" || layout === "bda-dual") {
+    return path.replace(/^(dark|light)\/skin\//, "$1/")
+  }
+  if (layout === "bds-single" || layout === "bda-single") {
+    return path.replace(/^light\/skin\//, "")
+  }
+  return path
+}
+
 function setInfoField(bytes: Uint8Array, key: string, value: string): Uint8Array {
   let text = strFromU8(bytes)
   const eol = text.includes("\r\n") ? "\r\n" : "\n"
@@ -321,7 +339,7 @@ export class SkinArchive {
   }
 
   setBytes(path: string, bytes: Uint8Array): void {
-    const raw = this.canonicalToRaw.get(path) ?? path
+    const raw = this.canonicalToRaw.get(path) ?? rawPath(path, this.layout)
     const current = this.files.get(raw)
     if (current && current.length === bytes.length && current.every((byte, index) => byte === bytes[index])) {
       return

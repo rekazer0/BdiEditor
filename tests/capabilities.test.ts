@@ -35,6 +35,15 @@ test("Windows uses a transparent system Acrylic material instead of exposing the
   assert.deepEqual(config.app.windows[0].windowEffects.effects, ["acrylic"])
 })
 
+test("native window material can be changed without restarting", () => {
+  const rust = readFileSync("src-tauri/src/lib.rs", "utf8")
+  assert.match(rust, /fn set_window_material\(window: tauri::WebviewWindow, enabled: bool\)/)
+  assert.match(rust, /window\.set_effects\(None\)/)
+  assert.match(rust, /Effect::Sidebar/)
+  assert.match(rust, /Effect::Acrylic/)
+  assert.match(rust, /set_window_material[\s\S]*?tauri::generate_handler!/)
+})
+
 test("Windows installer tolerates WebView2 already-existing after a missed detection", () => {
   const config = JSON.parse(readFileSync("src-tauri/tauri.windows.conf.json", "utf8"))
   assert.deepEqual(config.bundle.windows.webviewInstallMode, { type: "downloadBootstrapper" })

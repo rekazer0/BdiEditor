@@ -7,7 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     />
-    <title>BdiEditor v0.4.9</title>
+    <title>BdiEditor v0.5.4</title>
   </head>
   <body>
     <header class="titlebar" data-tauri-drag-region>
@@ -29,6 +29,7 @@
             <button class="export-action" data-export-format="bda" disabled>导出新版 Android 皮肤 (.bda)…</button>
           </div>
         </details>
+        <button id="panel-scale" class="toolbar-button" disabled title="面板缩放与竖转横" aria-label="面板缩放与竖转横"><span class="icon system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 6h14M3 6l3-3M3 6l3 3M17 14H3m14 0-3-3m3 3-3 3"/></svg></span></button>
         <span class="toolbar-divider"></span>
         <button id="undo" class="toolbar-button" disabled title="撤销" aria-label="撤销"><span class="icon system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12"/><path d="M4 8.5h7.2a5 5 0 0 1 5 5"/></svg></span></button>
         <button id="redo" class="toolbar-button" disabled title="重做" aria-label="重做"><span class="icon system-symbol" data-system-symbol="arrow.uturn.forward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m13 5 4 3.5-4 3.5"/><path d="M16 8.5H8.8a5 5 0 0 0-5 5"/></svg></span></button>
@@ -71,6 +72,10 @@
           </div>
           <span class="spacer"></span>
           <button id="toggle-guides" class="preview-tool-toggle glass-module" aria-label="辅助线" title="辅助线" aria-pressed="false"><span class="system-symbol" data-system-symbol="ruler" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="10" rx="2"/><path d="M7 7v5m4-5v3m4-3v5m4-5v3"/></svg></span></button>
+          <label id="skin-state-control" class="field-control" hidden>
+            <span>状态</span>
+            <select id="skin-state" aria-label="皮肤 S 状态"><option value="">默认</option></select>
+          </label>
           <label class="field-control">
             <span>设备</span>
             <select id="device" aria-label="设备">
@@ -141,7 +146,7 @@
             <figcaption id="workspace-image-error" hidden>无法预览此 PNG</figcaption>
           </figure>
         </div>
-        <div id="event-log" aria-live="polite">打开皮肤后可预览按键。</div>
+        <div class="workspace-status"><div id="event-log" aria-live="polite">打开皮肤后可预览按键。</div><div id="panel-status">面板：-- × -- · 预览缩放：--%</div></div>
       </section>
 
       <section class="source">
@@ -317,6 +322,21 @@
       </form>
     </dialog>
 
+    <dialog id="panel-scale-dialog" class="project-dialog" aria-labelledby="panel-scale-title">
+      <form id="panel-scale-form" method="dialog">
+        <header><h2 id="panel-scale-title">面板缩放与竖转横</h2><p>复制完整竖屏主题到横屏，并按目标面板分辨率缩放布局与资源。</p></header>
+        <div class="panel-scale-grid">
+          <label>源宽度 <input id="panel-source-width" type="number" min="1" readonly></label>
+          <label>源高度 <input id="panel-source-height" type="number" min="1" readonly></label>
+          <label>目标宽度 <input id="panel-target-width" type="number" min="1" required></label>
+          <label>目标高度 <input id="panel-target-height" type="number" min="1" required></label>
+        </div>
+        <label class="project-template-option"><input id="panel-all-themes" type="checkbox"><span><strong>同时转换浅色与深色</strong><small>仅处理皮肤中实际存在的主题</small></span></label>
+        <p id="panel-scale-summary"></p>
+        <footer><button value="cancel">取消</button><button class="primary" value="convert">转换</button></footer>
+      </form>
+    </dialog>
+
     <dialog id="color-dialog" class="color-dialog" aria-labelledby="color-dialog-title">
       <form method="dialog" id="color-form">
         <h2 id="color-dialog-title">RGBA 颜色</h2>
@@ -343,6 +363,7 @@
       <form method="dialog">
         <header><h2 id="settings-title">设置</h2><button aria-label="关闭">关闭</button></header>
         <label>软件外观 <select id="app-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
+        <label class="settings-switch">窗口玻璃与亚克力材质 <input id="window-material" type="checkbox" role="switch" checked></label>
         <label>默认预览设备 <select id="default-device"><option value="canvas">画布</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
         <label>画布背景 <select id="canvas-background"><option value="glass">玻璃</option><option value="checkerboard">马赛克</option><option value="white" selected>白色</option><option value="dark">深色</option></select></label>
         <p>新打开的皮肤将使用此预览设备。</p>
@@ -356,9 +377,9 @@
 
     <dialog id="about-dialog" class="app-dialog" aria-labelledby="about-title">
       <form method="dialog">
-        <header><h2 id="about-title">关于 BdiEditor v0.4.9</h2><button aria-label="关闭">关闭</button></header>
+        <header><h2 id="about-title">关于 BdiEditor v0.5.4</h2><button aria-label="关闭">关闭</button></header>
         <p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
-        <p>版本 0.4.9</p>
+        <p>版本 0.5.4</p>
         <p>支持读取、编辑和导出 BDI、BDS、BDA 皮肤包。</p>
         <p><strong>技术交流与反馈</strong><br>QQ群：228040912</p>
         <a href="https://github.com/rekazer0/BdiEditor" target="_blank" rel="noreferrer">GitHub · rekazer0/BdiEditor</a>

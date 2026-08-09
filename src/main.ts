@@ -34,6 +34,7 @@ import {
   decodeBdaAppearance,
   describeBdaConfig,
   updateBdaAnimationFrame,
+  updateBdaDesignWidth,
   updateBdaStyle,
   type BdaAppearance,
   type BdaStyleRef,
@@ -57,6 +58,12 @@ import {
   type LayoutRect,
 } from "./layout.ts"
 import { loadBuiltInProjectTemplate, operationError } from "./operations.ts"
+import {
+  availableSkinStates,
+  panelConversionPaths,
+  previewScalePercent,
+  scaleIniDocument,
+} from "./panel-tools.ts"
 import { Preview, previewItems, type PreviewEvent } from "./preview.ts"
 import { firstExistingPath } from "./resources.ts"
 import { candidatePreview, deleteBackward, insertText } from "./simulation.ts"
@@ -65,6 +72,7 @@ import { resolveStylePropertySources, type StylePropertySource } from "./style-p
 import { unsavedDecision } from "./unsaved.ts"
 
 document.documentElement.classList.toggle("macos", navigator.userAgent.includes("Macintosh"))
+document.documentElement.classList.toggle("windows", navigator.userAgent.includes("Windows"))
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 const newButton = $("#new") as HTMLButtonElement
@@ -83,6 +91,7 @@ const editContextMenu = $("#edit-context-menu") as HTMLDivElement
 const defaultDevice = $("#default-device") as HTMLSelectElement
 const canvasBackground = $("#canvas-background") as HTMLSelectElement
 const appTheme = $("#app-theme") as HTMLSelectElement
+const windowMaterial = $("#window-material") as HTMLInputElement
 const exportButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-export-format]"),
 )
@@ -101,6 +110,16 @@ const documentName = $("#document-name")
 const sourceName = $("#source-name")
 const dirty = $("#dirty")
 const eventLog = $("#event-log")
+const panelStatus = $("#panel-status")
+const panelScaleButton = $("#panel-scale") as HTMLButtonElement
+const panelScaleDialog = $("#panel-scale-dialog") as HTMLDialogElement
+const panelScaleForm = $("#panel-scale-form") as HTMLFormElement
+const panelSourceWidth = $("#panel-source-width") as HTMLInputElement
+const panelSourceHeight = $("#panel-source-height") as HTMLInputElement
+const panelTargetWidth = $("#panel-target-width") as HTMLInputElement
+const panelTargetHeight = $("#panel-target-height") as HTMLInputElement
+const panelAllThemes = $("#panel-all-themes") as HTMLInputElement
+const panelScaleSummary = $("#panel-scale-summary")
 const quickInspector = $("#quick-inspector")
 const selectedKeyName = $("#selected-key")
 const keyFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-key-field]"))
@@ -141,6 +160,8 @@ const layout = $("#layout") as HTMLSelectElement
 const mode = $("#mode") as HTMLSelectElement
 const device = $("#device") as HTMLSelectElement
 const toggleGuides = $("#toggle-guides") as HTMLButtonElement
+const skinStateControl = $("#skin-state-control")
+const skinState = $("#skin-state") as HTMLSelectElement
 const deviceShell = $("#device-shell")
 const workspaceImageFigure = $("#workspace-image-figure")
 const workspaceImage = $("#workspace-image") as HTMLImageElement
@@ -620,6 +641,11 @@ function refreshPreview(): void {
   const context = keyboardContext()
   const toolbarSize = resolver ? refreshToolbarPreview(composing, resolver) : undefined
   preview.setResolver(resolver)
+  const animationPath = archive.format === "bda"
+    ? bdaConfigPath(archive, theme.value, orientation.value, "animation")
+    : undefined
+  const animationBytes = animationPath && archive.getBytes(animationPath)
+  preview.setAnimation(animationBytes ? decodeBdaAnimation(animationBytes) : undefined)
   const bdaGenPath = bdaBasePath(genConfigPath())
   const bdaGen = archive.format === "bda" && bdaBase?.isText(bdaGenPath)
     ? IniDocument.parse(bdaBase.getText(bdaGenPath))
@@ -669,6 +695,7 @@ function refreshPreview(): void {
       applyCandidateTextVisual(firstCandidate, firstCandidateTextVisual, candidateTextWidth)
     }
     preview.setPanel(config.styleID, config.width, config.height)
+    updatePanelTools(config.width, config.height)
     const spec = deviceSpec(device.value)
     if (spec) {
       const geometry = keyboardPreviewGeometry(
@@ -714,8 +741,34 @@ function refreshPreview(): void {
       size?.[0] || 1080,
       size?.[1] || 641,
     )
+    updatePanelTools(size?.[0] || 1080, size?.[1] || 641)
   }
   preview.setDocument(layoutDocument)
+}
+
+function skinStateDocuments(): IniDocument[] {
+  if (!archive) return []
+  const prefix = `${theme.value}/skin/${orientation.value}/`
+  const paths = archive.format === "bda"
+    ? bdaAvailableLayoutPaths()
+    : archive.names().filter((path) => path.startsWith(prefix) && path.endsWith(".ini") && archive?.isText(path))
+  return paths.flatMap((path) => {
+    const document = textDocument(path)
+    return document ? [document] : []
+  })
+}
+
+function updatePanelTools(width: number, height: number): void {
+  const states = availableSkinStates(...skinStateDocuments())
+  const selected = skinState.value
+  skinState.replaceChildren(new Option("默认", ""), ...states.map((state) => new Option(`S${state}`, String(state))))
+  skinState.value = states.includes(Number(selected)) ? selected : ""
+  skinStateControl.hidden = states.length === 0
+  preview.setSkinState(skinState.value ? Number(skinState.value) : undefined)
+  requestAnimationFrame(() => {
+    const bounds = ($("#preview") as HTMLCanvasElement).getBoundingClientRect()
+    panelStatus.textContent = `面板：${Math.round(width)} × ${Math.round(height)} · 预览缩放：${previewScalePercent(bounds.width, bounds.height, width, height)}%`
+  })
 }
 
 function updateDevicePreview(): void {
@@ -741,11 +794,106 @@ function updateDevicePreview(): void {
   preview.setTransparent(device.value !== "canvas")
 }
 
+function panelSizeFrom(document: IniDocument | undefined): [number, number] | undefined {
+  const size = document?.get("PANEL", "SIZE")?.split(",").map(Number)
+  return size?.length === 2 && size.every((value) => Number.isFinite(value) && value > 0)
+    ? size as [number, number]
+    : undefined
+}
+
+function conversionPanelSize(themeName: string, direction: "port" | "land"): [number, number] | undefined {
+  if (!archive) return
+  const prefix = `${themeName}/skin/${direction}/`
+  const layoutDoc = textDocument(`${prefix}${layout.value}`)
+  const genDoc = textDocument(`${prefix}gen.ini`)
+  return panelSizeFrom(layoutDoc) ?? panelSizeFrom(genDoc)
+}
+
+async function resizePng(bytes: Uint8Array, xRatio: number, yRatio: number): Promise<Uint8Array> {
+  const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes).buffer], { type: "image/png" }))
+  const canvas = document.createElement("canvas")
+  canvas.width = Math.max(1, Math.round(bitmap.width * xRatio))
+  canvas.height = Math.max(1, Math.round(bitmap.height * yRatio))
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((value) => value ? resolve(value) : reject(new Error("PNG 缩放失败")), "image/png")
+  })
+  return new Uint8Array(await blob.arrayBuffer())
+}
+
+function openPanelScaleDialog(): void {
+  if (!archive) return
+  const source = conversionPanelSize(theme.value, "port")
+  if (!source) {
+    showError(new Error("当前主题没有可识别的竖屏 PANEL SIZE"), "打开面板缩放")
+    return
+  }
+  const existing = conversionPanelSize(theme.value, "land")
+  panelSourceWidth.value = String(source[0])
+  panelSourceHeight.value = String(source[1])
+  panelTargetWidth.value = String(existing?.[0] ?? Math.round(source[0] * 16 / 9))
+  panelTargetHeight.value = String(existing?.[1] ?? source[1])
+  panelAllThemes.checked = false
+  panelScaleSummary.textContent = `当前主题：${theme.value === "light" ? "浅色" : "深色"}`
+  panelScaleDialog.showModal()
+}
+
+async function convertPortraitPanels(): Promise<boolean> {
+  if (!archive) return false
+  const sourceWidth = Number(panelSourceWidth.value)
+  const sourceHeight = Number(panelSourceHeight.value)
+  const targetWidth = Number(panelTargetWidth.value)
+  const targetHeight = Number(panelTargetHeight.value)
+  if (![sourceWidth, sourceHeight, targetWidth, targetHeight].every((value) => Number.isFinite(value) && value > 0)) {
+    throw new Error("面板分辨率必须是正数")
+  }
+  const availableThemes = ["light", "dark"].filter((name) =>
+    archive?.names().some((path) => path.startsWith(`${name}/skin/port/`)),
+  )
+  const themes = panelAllThemes.checked ? availableThemes : [theme.value]
+  const paths = panelConversionPaths(archive.names(), themes)
+  if (!paths.length) throw new Error("当前范围没有竖屏资源")
+  const existing = paths.filter(({ target }) => archive?.getBytes(target)).length
+  if (existing && !window.confirm(`检测到 ${existing} 个横屏文件，是否覆盖并继续转换？`)) return false
+  const xRatio = targetWidth / sourceWidth
+  const yRatio = targetHeight / sourceHeight
+  for (const { source: sourcePath, target } of paths) {
+    const bytes = archive.getBytes(sourcePath)
+    if (!bytes) continue
+    if (archive.isImage(sourcePath)) {
+      archive.setBytes(target, await resizePng(bytes, xRatio, yRatio))
+    } else if (archive.format === "bda" && /appearanceConfig$/.test(sourcePath)) {
+      archive.setBytes(target, updateBdaDesignWidth(bytes, targetWidth))
+    } else if (archive.isText(sourcePath)) {
+      archive.setText(target, scaleIniDocument(IniDocument.parse(archive.getText(sourcePath)), xRatio, yRatio).toString())
+    } else {
+      archive.setBytes(target, bytes.slice())
+    }
+  }
+  orientation.value = "land"
+  syncSegmentedControls()
+  renderFiles()
+  const path = preferredPath()
+  if (archive.format === "bda") refreshBdaLayout(path)
+  else if (archive.isText(path)) {
+    layoutPath = path
+    layoutDocument = IniDocument.parse(archive.getText(path))
+  }
+  if (layoutDocument) selectFile(path)
+  updateDirty()
+  updateDevicePreview()
+  refreshPreview()
+  showStatus(`已转换 ${paths.length} 个文件（${Math.round(xRatio * 100)}% × ${Math.round(yRatio * 100)}%）。`)
+  return true
+}
+
 function setFileOperationBusy(busy: boolean): void {
   fileOperationRunning = busy
   newButton.disabled = busy
   openButton.disabled = busy
   saveButton.disabled = busy || !archive
+  panelScaleButton.disabled = busy || !archive
   for (const button of exportButtons) {
     const format = button.dataset.exportFormat as ExportFormat
     button.disabled = busy || !archive || (archive.format !== "bda" && format === "bda")
@@ -2319,6 +2467,25 @@ appTheme.addEventListener("change", () => {
   applyAppTheme()
 })
 systemTheme.addEventListener("change", applyAppTheme)
+async function applyWindowMaterial(): Promise<void> {
+  const enabled = windowMaterial.checked
+  document.documentElement.dataset.windowMaterial = enabled ? "on" : "off"
+  if (!isTauri()) return
+  try {
+    await invoke("set_window_material", { enabled })
+  } catch (error) {
+    windowMaterial.checked = false
+    document.documentElement.dataset.windowMaterial = "off"
+    localStorage.setItem("window-material", "off")
+    showError(error, "切换窗口材质")
+  }
+}
+windowMaterial.checked = localStorage.getItem("window-material") !== "off"
+void applyWindowMaterial()
+windowMaterial.addEventListener("change", () => {
+  localStorage.setItem("window-material", windowMaterial.checked ? "on" : "off")
+  void applyWindowMaterial()
+})
 undoButton.addEventListener("click", undo)
 redoButton.addEventListener("click", redo)
 browserOpen.addEventListener("change", async () => {
@@ -2498,6 +2665,17 @@ toggleGuides.addEventListener("click", () => {
   toggleGuides.setAttribute("aria-pressed", String(guidesVisible))
   preview.setGuides(guidesVisible)
   toolbarPreview.setGuides(guidesVisible)
+})
+skinState.addEventListener("change", () => {
+  preview.setSkinState(skinState.value ? Number(skinState.value) : undefined)
+  eventLog.textContent = skinState.value ? `皮肤状态：S${skinState.value}` : "皮肤状态：默认"
+})
+panelScaleButton.addEventListener("click", openPanelScaleDialog)
+panelScaleForm.addEventListener("submit", (event) => {
+  if ((event.submitter as HTMLButtonElement | null)?.value !== "convert") return
+  event.preventDefault()
+  panelScaleDialog.close()
+  void runFileOperation("转换横屏面板", convertPortraitPanels)
 })
 candidateArea.addEventListener("click", () => {
   if (!isEditing()) return

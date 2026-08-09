@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { gestureDirection, rectToString } from "../src/layout.ts"
 import { IniDocument } from "../src/ini.ts"
-import { isAdditiveSelection, previewBackground, previewFallbackText, previewItems, previewSelectionVisible, previewSurfaceColor, shouldDrawFallbackKeyChrome, shouldDrawItemBackground } from "../src/preview.ts"
+import { animationSequenceForKey, isAdditiveSelection, previewBackground, previewFallbackText, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawFallbackKeyChrome, shouldDrawItemBackground } from "../src/preview.ts"
 
 test("classifies click, hold and directional gestures", () => {
   assert.equal(gestureDirection(2, 3, 100, true), "center")
@@ -62,6 +62,26 @@ test("keeps every configured foreground layer for phone rendering", () => {
   }
   assert.deepEqual(item.foreStyles, ["731", "401"])
   assert.deepEqual(item.positionTypes, ["140", "142", "143"])
+})
+
+test("activates a key only when its official STAT_STYLE contains the selected S state", () => {
+  const item = previewItems(IniDocument.parse(
+    "[KEY35]\nVIEW_RECT=0,0,100,100\nSTAT_STYLE=S11_4|S17_1|S23_2\n",
+  ))[0]
+  assert.equal(previewStateActive(item, 17), true)
+  assert.equal(previewStateActive(item, 4), false)
+  assert.equal(previewStateActive(item, undefined), false)
+})
+
+test("binds a BDA frame animation to its semantic key target", () => {
+  const item = previewItems(IniDocument.parse(
+    "[KEY1]\nVIEW_RECT=0,0,100,100\nCENTER=b\n",
+  ))[0]
+  const sequence = { name: "press", frames: [{ resourceID: "frame_1", duration: 16 }] }
+  assert.equal(animationSequenceForKey({
+    targets: ["KEY_B"],
+    sequences: new Map([["KEY_B", sequence], ["press", sequence]]),
+  }, item), sequence)
 })
 
 test("expands the LIST definition into the four phone punctuation cells", () => {

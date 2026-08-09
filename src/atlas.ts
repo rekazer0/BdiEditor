@@ -18,6 +18,7 @@ export type TextVisual = {
 
 export type VisualResolver = {
   resolve(styleID: string, highlighted: boolean): Promise<Visual | undefined>
+  resolveResource?(resourceID: string): Promise<Visual | undefined>
   resolveText(foreground: string, highlighted: boolean): TextVisual | undefined
   resolveToolbarImages(limit?: number): Promise<Visual[]>
 }
