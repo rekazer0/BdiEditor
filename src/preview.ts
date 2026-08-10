@@ -204,17 +204,19 @@ function itemFromSection(document: IniDocument, section: string): PreviewItem | 
   }
 }
 
-function listItems(document: IniDocument): PreviewItem[] {
-  const cell = document.get("LIST", "CELL_SIZE")?.split(",").map(Number)
-  const position = document.get("LIST", "POS")?.split(",").map(Number)
-  const count = Number(document.get("LIST", "LIST_NUM"))
-  const names = document.get("LIST", "NAMES")?.trim().split(/\s+/) ?? []
+function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[] {
+  const value = (name: string) => document.get("LIST", name) ?? defaults?.get("LIST", name)
+  const cell = value("CELL_SIZE")?.split(",").map(Number)
+  const position = value("POS")?.split(",").map(Number)
+  const count = Number(value("LIST_NUM"))
+  const names = value("NAMES")?.trim().split(/\s+/) ?? []
   if (
     !cell || cell.length !== 2 || cell.some((value) => !Number.isFinite(value) || value <= 0) ||
     !position || position.length !== 2 || position.some((value) => !Number.isFinite(value)) ||
     !Number.isFinite(count) || count <= 0
   ) return []
-  return names.slice(0, count).map((show, index) => ({
+  const foreStyles = value("FORE_STYLE")?.split(",").map((token) => token.trim()).filter(Boolean) ?? []
+  const cells: PreviewItem[] = names.slice(0, count).map((show, index) => ({
     section: `LIST:${index + 1}`,
     rect: {
       x: position[0],
@@ -231,13 +233,30 @@ function listItems(document: IniDocument): PreviewItem[] {
     left: "",
     right: "",
     hold: "",
-    backStyle: "",
-    foreStyle: "",
-    foreStyles: [],
+    backStyle: value("CELL_STYLE")?.split(",")[0] ?? "",
+    foreStyle: foreStyles[0] ?? "",
+    foreStyles,
     foreOffsets: [],
     positionTypes: [],
     statStyle: "",
   }))
+  if (!cells.length) return []
+  const backStyle = value("BACK_STYLE")?.split(",")[0]
+  if (!backStyle) return cells
+  return [{
+    ...cells[0],
+    section: "LIST:SURFACE",
+    rect: {
+      x: position[0],
+      y: position[1],
+      width: cell[0],
+      height: cell[1] * count,
+    },
+    show: "",
+    backStyle,
+    foreStyle: "",
+    foreStyles: [],
+  }, ...cells]
 }
 
 export function dynamicToolbarRect(
@@ -266,18 +285,20 @@ export function previewItems(
   document: IniDocument,
   panelWidth = 1125,
   panelHeight = 133,
+  defaults?: IniDocument,
 ): PreviewItem[] {
+  const list = listItems(document, defaults)
   const real = document.sections().flatMap((section) => {
     const item = itemFromSection(document, section)
     return item ? [item] : []
   })
-  if (real.length) return [...real, ...listItems(document)]
+  if (real.length) return [...real, ...list]
 
   const sections = document.sections().filter((section) =>
     /^(CAND|SWITCH|PANEL|LIST|MORE|ICON\d+|TIP\d+)$/.test(section),
   )
-  if (!sections.length) return []
-  return sections.flatMap((section) => {
+  if (!sections.length) return list
+  return [...sections.flatMap((section) => {
     if (/^TIP\d+$/.test(section) || document.get(section, "PERSIST") === "2") return []
     const backStyle = document.get(section, "BACK_STYLE")?.split(",")[0] ?? ""
     const foreStyles = document.get(section, "FORE_STYLE")?.split(",").map((token) => token.trim()).filter(Boolean) ?? []
@@ -334,7 +355,7 @@ export function previewItems(
       positionTypes: document.get(section, "POS_TYPE")?.split(",").map((token) => token.trim()).filter(Boolean) ?? [],
       statStyle: value("STAT_STYLE"),
     }]
-  })
+  }), ...list]
 }
 
 export class Preview {
@@ -343,6 +364,7 @@ export class Preview {
   private readonly onSelect: (sections: string[]) => void
   private readonly toolbarSlots: boolean
   private document?: IniDocument
+  private defaults?: IniDocument
   private offsets?: IniDocument
   private resolver?: VisualResolver
   private panelStyle = ""
@@ -414,6 +436,15 @@ export class Preview {
     void this.draw()
   }
 
+  setDefaults(defaults?: IniDocument): void {
+    this.defaults = defaults
+    this.keys = this.document
+      ? previewItems(this.document, this.panelWidth, this.panelHeight, defaults)
+      : []
+    this.fitCanvas()
+    void this.draw()
+  }
+
   setTheme(theme: "light" | "dark"): void {
     this.theme = theme
     void this.draw()
@@ -445,14 +476,14 @@ export class Preview {
     this.panelStyle = styleID
     this.panelWidth = width
     this.panelHeight = height
-    this.keys = this.document ? previewItems(this.document, width, height) : []
+    this.keys = this.document ? previewItems(this.document, width, height, this.defaults) : []
     this.fitCanvas()
     void this.draw()
   }
 
   setDocument(document?: IniDocument): void {
     this.document = document
-    this.keys = document ? previewItems(document, this.panelWidth, this.panelHeight) : []
+    this.keys = document ? previewItems(document, this.panelWidth, this.panelHeight, this.defaults) : []
     const available = new Set(this.keys.map((key) => key.section))
     this.selected = new Set([...this.selected].filter((section) => available.has(section)))
     this.fitCanvas()

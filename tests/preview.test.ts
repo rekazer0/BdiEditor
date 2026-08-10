@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { gestureDirection, rectToString } from "../src/layout.ts"
 import { IniDocument } from "../src/ini.ts"
-import { animationSequenceForKey, isAdditiveSelection, previewBackground, previewFallbackText, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawFallbackKeyChrome, shouldDrawItemBackground } from "../src/preview.ts"
+import { animationSequenceForKey, effectivePreviewItem, isAdditiveSelection, previewBackground, previewFallbackText, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawFallbackKeyChrome, shouldDrawItemBackground } from "../src/preview.ts"
 
 test("classifies click, hold and directional gestures", () => {
   assert.equal(gestureDirection(2, 3, 100, true), "center")
@@ -125,6 +125,26 @@ test("expands the LIST definition into the four phone punctuation cells", () => 
     { x: 23, y: 225, width: 147, height: 103 },
     { x: 23, y: 328, width: 147, height: 103 },
   ])
+})
+
+test("uses gen LIST styles when the layout only supplies list content", () => {
+  const defaults = IniDocument.parse("[LIST]\nBACK_STYLE=476\nFORE_STYLE=130\nCELL_STYLE=247\n")
+  const layout = IniDocument.parse(
+    "[LIST]\nCELL_SIZE=150,124\nPOS=0,0\nLIST_NUM=2\nNAMES=a b\n",
+  )
+  const list = previewItems(layout, 300, 248, defaults).filter((item) => item.section.startsWith("LIST:"))
+  const cell = list.find((item) => item.section === "LIST:1")!
+  assert.equal(cell.backStyle, "247")
+  assert.deepEqual(cell.foreStyles, ["130"])
+})
+
+test("candidate icons use TIP overrides for the selected state", () => {
+  const document = IniDocument.parse(
+    "[CAND]\nBACK_STYLE=1\n[ICON1]\nBACK_STYLE=2\nFORE_STYLE=3\nSIZE=100,100\nSTAT_STYLE=S4_5\n" +
+    "[TIP5]\nBACK_STYLE=7\nFORE_STYLE=8\n",
+  )
+  const icon = previewItems(document, 300, 100).find((item) => item.section === "ICON1")!
+  assert.equal(effectivePreviewItem(document, icon, 4).backStyle, "7")
 })
 
 test("interaction preview hides editor-only labels and gesture annotations", async () => {

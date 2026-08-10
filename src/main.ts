@@ -651,6 +651,7 @@ function refreshPreview(): void {
     ? IniDocument.parse(bdaBase.getText(bdaGenPath))
     : undefined
   preview.setOffsets(context?.gen ?? bdaGen)
+  preview.setDefaults(context?.gen ?? bdaGen)
   preview.setTheme(theme.value === "dark" ? "dark" : "light")
   preview.setTransparent(device.value !== "canvas")
   if (context && layoutDocument) {
@@ -1110,6 +1111,34 @@ function toolbarConfigPath(): string | undefined {
     : found)
 }
 
+function candidateCssLength(value: string | undefined, width: number): string | undefined {
+  const number = Number(value)
+  return Number.isFinite(number) ? `${(number / width) * 100}cqw` : undefined
+}
+
+function applyCandidateGeometry(document: IniDocument, width: number): void {
+  const padding = document.get("CAND", "PADDING")?.split(",").map((value) => candidateCssLength(value, width))
+  if (padding?.every(Boolean)) {
+    const css = padding.length === 4
+      ? [padding[1], padding[2], padding[3], padding[0]]
+      : padding.length === 2
+        ? [padding[1], padding[0]]
+        : padding
+    candidateArea.style.setProperty("--candidate-padding", css.join(" "))
+  } else {
+    candidateArea.style.removeProperty("--candidate-padding")
+  }
+  const firstGap = candidateCssLength(document.get("CAND", "FIRST_GAP"), width)
+  const cellWidth = candidateCssLength(document.get("CAND", "CELL_W"), width)
+  const moreWidth = candidateCssLength(document.get("CAND", "MORE_W"), width)
+  if (firstGap) candidateArea.style.setProperty("--candidate-first-gap", firstGap)
+  else candidateArea.style.removeProperty("--candidate-first-gap")
+  if (cellWidth) candidateArea.style.setProperty("--candidate-cell-width", cellWidth)
+  else candidateArea.style.removeProperty("--candidate-cell-width")
+  if (moreWidth) candidateArea.style.setProperty("--candidate-more-width", moreWidth)
+  else candidateArea.style.removeProperty("--candidate-more-width")
+}
+
 function refreshToolbarPreview(
   composing: boolean,
   resolver: VisualResolver,
@@ -1127,10 +1156,12 @@ function refreshToolbarPreview(
   toolbarStrip.dataset.path = path
   toolbarPreview.setResolver(resolver)
   toolbarPreview.setOffsets(gen)
+  toolbarPreview.setDefaults(gen)
   toolbarPreview.setTheme(theme.value === "dark" ? "dark" : "light")
   toolbarPreview.setTransparent(device.value !== "canvas")
   const width = size?.length === 4 && Number.isFinite(size[2]) ? size[2] : 1125
   const height = size?.length === 4 && Number.isFinite(size[3]) ? size[3] : 133
+  applyCandidateGeometry(document, width)
   toolbarPreview.setPanel(
     document.get("CAND", "BACK_STYLE")?.split(",")[0] ?? "",
     width,

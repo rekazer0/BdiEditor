@@ -189,6 +189,15 @@ test("a full preview refresh shares one format-aware resolver with the toolbar",
   assert.doesNotMatch(main, /function refreshToolbarPreview[\s\S]*?toolbarPreview\.setResolver\(new AtlasResolver/)
 })
 
+test("legacy LIST defaults and candidate geometry reach the existing preview surfaces", () => {
+  assert.match(main, /preview\.setDefaults\(context\?\.gen \?\? bdaGen\)/)
+  assert.match(main, /toolbarPreview\.setDefaults\(gen\)/)
+  for (const property of ["--candidate-padding", "--candidate-first-gap", "--candidate-cell-width", "--candidate-more-width"]) {
+    assert.match(main, new RegExp(`setProperty\\("${property}"`))
+    assert.match(css, new RegExp(`var\\(${property}`))
+  }
+})
+
 test("device preview resolves component panels and hides unavailable accessories", () => {
   assert.match(main, /resolvePanelConfig\(layoutDocument,\s*context\.gen,\s*context\.styles\)/)
   assert.match(main, /keyboardPreviewGeometry\(\s*spec,\s*orientation\.value,/s)

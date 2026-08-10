@@ -1049,10 +1049,19 @@ h2 {
   display: flex;
   align-items: flex-start;
   gap: 4.8cqw;
-  padding: 1cqw 3.2cqw 0;
+  padding: var(--candidate-padding, 1cqw 3.2cqw 0);
+  padding-inline-end: var(--candidate-more-width, 3.2cqw);
   overflow: hidden;
   line-height: 1.15;
   white-space: nowrap;
+}
+
+#candidate-words > span {
+  flex: 0 0 var(--candidate-cell-width, auto);
+}
+
+#candidate-words > span:first-child {
+  margin-inline-start: var(--candidate-first-gap, 0);
 }
 
 .keyboard-accessories {
