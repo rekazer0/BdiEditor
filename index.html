@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+      content="default-src 'self'; connect-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     />
-    <title>BdiEditor v0.5.5</title>
+    <title>BdiEditor v0.5.10</title>
   </head>
   <body>
     <header class="titlebar" data-tauri-drag-region>
@@ -377,11 +377,16 @@
 
     <dialog id="about-dialog" class="app-dialog" aria-labelledby="about-title">
       <form method="dialog">
-        <header><h2 id="about-title">关于 BdiEditor v0.5.5</h2><button aria-label="关闭">关闭</button></header>
+        <header><h2 id="about-title">关于 BdiEditor v0.5.10</h2><button aria-label="关闭">关闭</button></header>
         <p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
-        <p>版本 0.5.5</p>
+        <p>版本 0.5.10</p>
         <p>支持读取、编辑和导出 BDI、BDS、BDA 皮肤包。</p>
-        <p><strong>技术交流与反馈</strong><br>QQ群：228040912</p>
+        <section id="about-update" class="about-update" data-current-version="0.5.10">
+          <div><strong>版本更新</strong><button id="check-update" type="button">检查更新</button></div>
+          <p id="update-status" aria-live="polite">正在检查更新…</p>
+          <a id="download-update" href="https://github.com/rekazer0/BdiEditor/releases" target="_blank" rel="noreferrer" hidden>查看最新版本</a>
+        </section>
+        <p><strong>技术交流与反馈</strong><br><button id="copy-qq-group" class="qq-group-copy" type="button">QQ群：228040912</button></p>
         <a href="https://github.com/rekazer0/BdiEditor" target="_blank" rel="noreferrer">GitHub · rekazer0/BdiEditor</a>
       </form>
     </dialog>

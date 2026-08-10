@@ -20,6 +20,13 @@ test("macOS bundle deployment floor supports the SF Symbols runtime API", () => 
   assert.equal(config.bundle.macOS.minimumSystemVersion, "11.0")
 })
 
+test("bundle identity stays stable across application updates", () => {
+  const config = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"))
+  assert.equal(config.productName, "BdiEditor")
+  assert.equal(config.identifier, "io.github.rekazer0.bdiedit")
+  assert.doesNotMatch(config.productName, /\d+\.\d+\.\d+/)
+})
+
 test("macOS uses a transparent native frosted window background", () => {
   const config = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"))
   assert.equal(config.app.macOSPrivateApi, true)
@@ -51,4 +58,9 @@ test("Windows installer tolerates WebView2 already-existing after a missed detec
 
   const template = readFileSync("src-tauri/windows/installer.nsi", "utf8")
   assert.match(template, /\$1 = -2147024713/)
+})
+
+test("Windows release entrypoint hides the console subsystem", () => {
+  const entrypoint = readFileSync("src-tauri/src/main.rs", "utf8")
+  assert.match(entrypoint, /#!\[cfg_attr\(not\(debug_assertions\), windows_subsystem = "windows"\)\]/)
 })

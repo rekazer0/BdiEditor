@@ -353,9 +353,51 @@ test("settings expose canvas backgrounds and edit mode exposes key context actio
 })
 
 test("window and about names match the GitHub project and include the version", () => {
-  assert.match(html, /<title>BdiEditor v0\.5\.5<\/title>/)
-  assert.match(html, /关于 BdiEditor v0\.5\.5/)
-  assert.match(html, /<strong>技术交流与反馈<\/strong><br>QQ群：228040912/)
+  assert.match(html, /<title>BdiEditor v0\.5\.10<\/title>/)
+  assert.match(html, /关于 BdiEditor v0\.5\.10/)
+  assert.match(html, /<strong>技术交流与反馈<\/strong><br><button id="copy-qq-group"[^>]*>QQ群：228040912<\/button>/)
+})
+
+test("application dialogs share one compact typography scale", () => {
+  assert.match(css, /font-family:\s*"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC"/)
+  assert.match(css, /\.app-dialog h2\s*\{[^}]*font-size:\s*15px[^}]*font-weight:\s*600/s)
+  assert.match(css, /\.app-dialog header button\s*\{[^}]*font-size:\s*11px/s)
+  assert.match(css, /\.app-dialog label\s*\{[^}]*font-size:\s*11px/s)
+  assert.match(css, /\.app-dialog select\s*\{[^}]*font-size:\s*12px/s)
+  assert.match(css, /\.about-update button\s*\{[^}]*font-size:\s*11px/s)
+})
+
+test("deleting a mixed inspector value clears every selected key through its input handler", () => {
+  assert.match(main, /quickInspector\.addEventListener\("keydown"/)
+  assert.match(main, /shouldClearMixedInput\(event\.key, field\.placeholder, field\.disabled\)/)
+  assert.match(main, /field\.value = ""[\s\S]*?field\.dispatchEvent\(new Event\("input", \{ bubbles: true \}\)\)/)
+})
+
+test("about dialog automatically checks the canonical GitHub project for updates", () => {
+  assert.match(html, /id="about-update"[^>]*data-current-version="0\.5\.10"/)
+  assert.match(html, /id="check-update"/)
+  assert.match(html, /id="update-status"[^>]*aria-live="polite"/)
+  assert.match(html, /id="download-update"[^>]*https:\/\/github\.com\/rekazer0\/BdiEditor\/releases["']/)
+  assert.match(main, /checkForUpdate\(aboutUpdate\.dataset\.currentVersion/)
+  assert.match(main, /invoke<string>\("fetch_release_page"\)/)
+  assert.match(main, /fetch\("\/__github_releases"\)/)
+  assert.match(main, /if \(dialog === aboutDialog\) void refreshUpdateStatus\(\)/)
+  assert.match(main, /void refreshUpdateStatus\(\)/)
+})
+
+test("QQ group control copies its number without navigating away", () => {
+  assert.match(html, /id="copy-qq-group"[^>]*type="button"/)
+  assert.match(main, /copyQqGroupButton\.addEventListener\("click"/)
+  assert.match(main, /navigator\.clipboard\.writeText\(value\)/)
+})
+
+test("canvas accepts native and browser skin file drops", () => {
+  assert.match(main, /canvasWrap\.addEventListener\("dragover"/)
+  assert.match(main, /canvasWrap\.addEventListener\("drop"/)
+  assert.match(main, /loadDroppedFile\(file\)/)
+  assert.match(main, /listen<\{ paths\?: string\[\] \} \| string\[\]>\("tauri:\/\/drag-drop"/)
+  assert.match(main, /return \/\\\.\(bdi\|bds\|bda\)\$\/i\.test\(path\)/)
+  assert.match(css, /\.canvas-wrap\.drop-target\s*\{[^}]*box-shadow:/s)
 })
 
 test("new-project chooser includes the four dust templates", () => {
@@ -456,6 +498,8 @@ test("source files use Finder-style rows and keyboard navigation", () => {
   assert.doesNotMatch(main, /description\.textContent = sourceFolderDescription/)
   assert.match(css, /\.source-tree-row\s*\{[^}]*min-height:\s*26px/s)
   assert.match(css, /\.source-tree-row\.selected\s*\{[^}]*background:/s)
+  assert.match(css, /\.source-file-row\s*\{[^}]*gap:\s*10px/s)
+  assert.match(css, /#files \.source-file-row > \.system-symbol\s*\{[^}]*position:\s*static/s)
 })
 
 test("preview toolbar centers the device selector and toggles canvas guides", () => {

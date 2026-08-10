@@ -5,6 +5,7 @@ use tauri::{window::{Effect, EffectsBuilder}, Manager};
 struct OpenedFiles(Mutex<Vec<String>>);
 
 const MAX_ARCHIVE_BYTES: u64 = 64 * 1024 * 1024;
+const RELEASES_URL: &str = "https://github.com/rekazer0/BdiEditor/releases";
 
 #[tauri::command]
 fn read_file(path: String) -> Result<Vec<u8>, String> {
@@ -52,6 +53,23 @@ fn set_window_material(window: tauri::WebviewWindow, enabled: bool) -> Result<()
         .map_err(|error| error.to_string());
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     Ok(())
+}
+
+#[tauri::command]
+async fn fetch_release_page() -> Result<String, String> {
+    reqwest::Client::builder()
+        .user_agent("BdiEditor update checker")
+        .build()
+        .map_err(|error| error.to_string())?
+        .get(RELEASES_URL)
+        .send()
+        .await
+        .map_err(|error| error.to_string())?
+        .error_for_status()
+        .map_err(|error| error.to_string())?
+        .text()
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]
@@ -103,7 +121,8 @@ pub fn run() {
         write_file,
         take_opened_files,
         quit_app,
-        set_window_material
+        set_window_material,
+        fetch_release_page
     ]);
     #[cfg(not(target_os = "macos"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
@@ -111,7 +130,8 @@ pub fn run() {
         write_file,
         take_opened_files,
         quit_app,
-        set_window_material
+        set_window_material,
+        fetch_release_page
     ]);
     builder
         .build(tauri::generate_context!())

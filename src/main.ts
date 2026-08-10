@@ -57,6 +57,7 @@ import {
   type LayoutAction,
   type LayoutRect,
 } from "./layout.ts"
+import { shouldClearMixedInput } from "./mixed-input.ts"
 import { loadBuiltInProjectTemplate, operationError } from "./operations.ts"
 import {
   availableSkinStates,
@@ -70,6 +71,7 @@ import { candidatePreview, deleteBackward, insertText } from "./simulation.ts"
 import { SkinArchive } from "./skin.ts"
 import { resolveStylePropertySources, type StylePropertySource } from "./style-properties.ts"
 import { unsavedDecision } from "./unsaved.ts"
+import { checkForUpdate } from "./update.ts"
 
 document.documentElement.classList.toggle("macos", navigator.userAgent.includes("Macintosh"))
 document.documentElement.classList.toggle("windows", navigator.userAgent.includes("Windows"))
@@ -87,6 +89,11 @@ const toolbarMenus = Array.from(document.querySelectorAll<HTMLDetailsElement>(".
 const appDialogButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-app-dialog]"))
 const settingsDialog = $("#settings-dialog") as HTMLDialogElement
 const aboutDialog = $("#about-dialog") as HTMLDialogElement
+const copyQqGroupButton = $("#copy-qq-group") as HTMLButtonElement
+const aboutUpdate = $("#about-update")
+const checkUpdateButton = $("#check-update") as HTMLButtonElement
+const updateStatus = $("#update-status")
+const downloadUpdate = $("#download-update") as HTMLAnchorElement
 const editContextMenu = $("#edit-context-menu") as HTMLDivElement
 const defaultDevice = $("#default-device") as HTMLSelectElement
 const canvasBackground = $("#canvas-background") as HTMLSelectElement
@@ -2345,6 +2352,23 @@ async function loadNativePath(path: string): Promise<boolean> {
   return true
 }
 
+function isSupportedSkinPath(path: string): boolean {
+  return /\.(bdi|bds|bda)$/i.test(path)
+}
+
+async function loadDroppedFile(file: File): Promise<boolean> {
+  if (!isSupportedSkinPath(file.name)) return false
+  if (!(await prepareDocumentReplacement())) return false
+  await loadArchive(new Uint8Array(await file.arrayBuffer()), file.name)
+  return true
+}
+
+async function loadDroppedPath(path: string): Promise<boolean> {
+  if (!isSupportedSkinPath(path)) return false
+  if (!(await prepareDocumentReplacement())) return false
+  return loadNativePath(path)
+}
+
 function currentExportFormat(): ExportFormat {
   return exportFormatFromPath(currentPath) ?? archive?.format ?? "bdi"
 }
@@ -2472,10 +2496,55 @@ for (const button of exportButtons) {
     )
   })
 }
+async function refreshUpdateStatus(): Promise<void> {
+  checkUpdateButton.disabled = true
+  updateStatus.textContent = "正在检查更新…"
+  downloadUpdate.hidden = true
+  try {
+    const fetcher = isTauri()
+      ? async () => new Response(await invoke<string>("fetch_release_page"), { status: 200 })
+      : () => fetch("/__github_releases")
+    const result = await checkForUpdate(aboutUpdate.dataset.currentVersion ?? "0.0.0", fetcher)
+    if (result.status === "latest") {
+      updateStatus.textContent = `当前已是最新版本（v${result.currentVersion}）`
+      return
+    }
+    updateStatus.textContent = `发现新版本 v${result.latestVersion}`
+    downloadUpdate.href = result.url
+    downloadUpdate.textContent = `前往下载 v${result.latestVersion}`
+    downloadUpdate.hidden = false
+  } catch (error) {
+    updateStatus.textContent = `检查更新失败：${error instanceof Error ? error.message : String(error)}`
+  } finally {
+    checkUpdateButton.disabled = false
+  }
+}
+
+checkUpdateButton.addEventListener("click", () => void refreshUpdateStatus())
+copyQqGroupButton.addEventListener("click", async () => {
+  const value = "228040912"
+  try {
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(value)
+    else throw new Error("clipboard unavailable")
+  } catch {
+    const fallback = document.createElement("textarea")
+    fallback.value = value
+    fallback.style.position = "fixed"
+    fallback.style.opacity = "0"
+    document.body.append(fallback)
+    fallback.select()
+    document.execCommand("copy")
+    fallback.remove()
+  }
+  const label = copyQqGroupButton.textContent ?? "QQ群：228040912"
+  copyQqGroupButton.textContent = "QQ群号已复制"
+  window.setTimeout(() => { copyQqGroupButton.textContent = label }, 1400)
+})
 for (const button of appDialogButtons) {
   button.addEventListener("click", () => {
     const dialog = button.dataset.appDialog === "settings" ? settingsDialog : aboutDialog
     dialog.showModal()
+    if (dialog === aboutDialog) void refreshUpdateStatus()
     for (const menu of toolbarMenus) menu.open = false
   })
 }
@@ -2544,6 +2613,31 @@ browserOpen.addEventListener("change", async () => {
   }
   browserOpen.value = ""
 })
+let canvasDragDepth = 0
+function setCanvasDropState(active: boolean): void {
+  canvasWrap.classList.toggle("drop-target", active)
+}
+canvasWrap.addEventListener("dragenter", (event) => {
+  event.preventDefault()
+  canvasDragDepth += 1
+  setCanvasDropState(true)
+})
+canvasWrap.addEventListener("dragover", (event) => {
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"
+})
+canvasWrap.addEventListener("dragleave", (event) => {
+  event.preventDefault()
+  canvasDragDepth = Math.max(0, canvasDragDepth - 1)
+  if (!canvasDragDepth) setCanvasDropState(false)
+})
+canvasWrap.addEventListener("drop", (event) => {
+  event.preventDefault()
+  canvasDragDepth = 0
+  setCanvasDropState(false)
+  const file = event.dataTransfer?.files[0]
+  if (file) void runFileOperation("打开", () => loadDroppedFile(file))
+})
 replaceAssetButton.addEventListener("click", () => imageOpen.click())
 assetBackButton.addEventListener("click", () => {
   const path = assetReturnPath
@@ -2607,6 +2701,15 @@ for (const field of skinFields) {
 for (const field of gapFields) {
   field.addEventListener("change", () => applyExactGap(field))
 }
+quickInspector.addEventListener("keydown", (event) => {
+  const field = event.target
+  if (!(field instanceof HTMLInputElement)) return
+  if (!shouldClearMixedInput(event.key, field.placeholder, field.disabled)) return
+  event.preventDefault()
+  field.value = ""
+  field.placeholder = ""
+  field.dispatchEvent(new Event("input", { bubbles: true }))
+})
 for (const picker of colorPickers) {
   picker.addEventListener("click", (event) => {
     event.preventDefault()
@@ -2815,6 +2918,11 @@ if (isTauri()) {
     destroyingWindow = true
     void invoke("quit_app")
   })
+  void listen<{ paths?: string[] } | string[]>("tauri://drag-drop", (event) => {
+    const paths = Array.isArray(event.payload) ? event.payload : event.payload.paths ?? []
+    const path = paths.find(isSupportedSkinPath)
+    if (path) void runFileOperation("打开", () => loadDroppedPath(path))
+  })
   void listen<string[]>("opened", async (event) => {
     const path = event.payload[0]
     if (path && (await prepareDocumentReplacement())) {
@@ -2832,3 +2940,4 @@ applyModeState()
 updateDevicePreview()
 updateSourceHighlight()
 updateInspectorView()
+void refreshUpdateStatus()

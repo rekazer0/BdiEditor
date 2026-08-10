@@ -1,5 +1,5 @@
 :root {
-  font-family: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #202124;
   color-scheme: light;
   background: transparent;
@@ -621,7 +621,13 @@ h2 {
 }
 
 .source-file-row {
+  gap: 10px !important;
   padding-left: 20px !important;
+}
+
+#files .source-file-row > .system-symbol {
+  position: static;
+  transform: none;
 }
 
 #files button {
@@ -1373,6 +1379,10 @@ canvas {
   overflow: auto;
 }
 
+.canvas-wrap.drop-target {
+  box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 24px rgb(10 127 245 / 14%);
+}
+
 .skin-fields[hidden],
 .keyboard-fields[hidden],
 .document-fields[hidden],
@@ -1619,6 +1629,7 @@ canvas {
 .app-dialog {
   width: min(420px, calc(100vw - 32px));
   padding: 16px;
+  font-size: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -1642,20 +1653,29 @@ canvas {
   justify-content: space-between;
 }
 
+.app-dialog h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
 .app-dialog header button {
   height: 28px;
   padding: 0 9px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--control);
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1.2;
 }
 
 .app-dialog label {
   display: grid;
   gap: 5px;
   color: var(--secondary);
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1.3;
 }
 
 .app-dialog .settings-switch {
@@ -1703,6 +1723,8 @@ canvas {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--control);
+  font-size: 12px;
+  line-height: 1.2;
 }
 
 .app-dialog p {
@@ -1710,6 +1732,38 @@ canvas {
   color: var(--secondary);
   font-size: 11px;
   line-height: 1.5;
+}
+
+.about-update {
+  display: grid;
+  gap: 8px;
+  padding-block: 12px;
+  border-block: 1px solid var(--line);
+}
+
+.about-update > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.about-update button {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--control);
+  color: inherit;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.about-update button:disabled {
+  opacity: 0.55;
+}
+
+.about-update a[hidden] {
+  display: none;
 }
 
 .app-dialog a {
@@ -1720,6 +1774,18 @@ canvas {
 }
 
 .app-dialog a:hover {
+  text-decoration: underline;
+}
+
+.qq-group-copy {
+  padding: 0;
+  color: var(--accent);
+  background: transparent;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.qq-group-copy:hover {
   text-decoration: underline;
 }
 
