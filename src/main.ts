@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { message, open, save } from "@tauri-apps/plugin-dialog"
 import "./style.css"
-import { previewPageTransition } from "./actions.ts"
+import { previewPageTransition, previewStateFromAction } from "./actions.ts"
 import {
   AtlasResolver,
   canvasFontFamily,
@@ -252,10 +252,25 @@ const preview = new Preview(
 
 const toolbarPreview = new Preview(toolbarCanvas, () => {}, () => {}, true)
 
+function applySkinState(state?: number, message?: string): void {
+  skinState.value = state === undefined ? "" : String(state)
+  preview.setSkinState(state)
+  toolbarPreview.setSkinState(state)
+  if (message) eventLog.textContent = message
+}
+
 function handlePreviewEvent(event: PreviewEvent): void {
   eventLog.textContent =
     `${event.section} · ${event.direction.toUpperCase()} · ${event.code || "未配置"}`
   const code = event.code.trim()
+  const state = previewStateFromAction(code)
+  if (state !== undefined) {
+    applySkinState(
+      state || undefined,
+      `${eventLog.textContent} → ${state ? `皮肤状态：S${state}` : "皮肤状态：默认"}`,
+    )
+    return
+  }
   const currentName = layoutPath.split("/").pop() ?? ""
   const transition = previewPageTransition(code, currentName, previewReturnName)
   const target = transition.target
@@ -765,7 +780,7 @@ function updatePanelTools(width: number, height: number): void {
   skinState.replaceChildren(new Option("默认", ""), ...states.map((state) => new Option(`S${state}`, String(state))))
   skinState.value = states.includes(Number(selected)) ? selected : ""
   skinStateControl.hidden = states.length === 0
-  preview.setSkinState(skinState.value ? Number(skinState.value) : undefined)
+  applySkinState(skinState.value ? Number(skinState.value) : undefined)
   requestAnimationFrame(() => {
     const bounds = ($("#preview") as HTMLCanvasElement).getBoundingClientRect()
     panelStatus.textContent = `面板：${Math.round(width)} × ${Math.round(height)} · 预览缩放：${previewScalePercent(bounds.width, bounds.height, width, height)}%`
@@ -2698,8 +2713,8 @@ toggleGuides.addEventListener("click", () => {
   toolbarPreview.setGuides(guidesVisible)
 })
 skinState.addEventListener("change", () => {
-  preview.setSkinState(skinState.value ? Number(skinState.value) : undefined)
-  eventLog.textContent = skinState.value ? `皮肤状态：S${skinState.value}` : "皮肤状态：默认"
+  const state = skinState.value ? Number(skinState.value) : undefined
+  applySkinState(state, state ? `皮肤状态：S${state}` : "皮肤状态：默认")
 })
 panelScaleButton.addEventListener("click", openPanelScaleDialog)
 panelScaleForm.addEventListener("submit", (event) => {

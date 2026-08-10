@@ -34,9 +34,11 @@ test("resolves TIP sections only for supported active states", async () => {
 })
 
 test("combines S states from every layout in the current skin", () => {
-  const keyboard = IniDocument.parse("[KEY1]\nSTAT_STYLE=S1_2|S4_3\n")
-  const symbols = IniDocument.parse("[KEY1]\nSTAT_STYLE=S6_2|S8_3\n")
-  assert.deepEqual(availableSkinStates(keyboard, symbols), [1, 4, 6, 8])
+  const keyboard = IniDocument.parse(
+    "[KEY1]\nSTAT_STYLE=S1_2|S4_3|S100_7\nCENTER=S9_2\n[KEY2]\nCENTER=S0\n",
+  )
+  const symbols = IniDocument.parse("[KEY1]\nSTAT_STYLE=S6_2|S8_3\nCENTER=S99\n")
+  assert.deepEqual(availableSkinStates(keyboard, symbols), [1, 4, 6, 8, 9, 99])
 })
 
 test("reports the actual panel-to-canvas scale", () => {

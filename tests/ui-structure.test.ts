@@ -490,6 +490,15 @@ test("panel tools expose S-state, resolution and portrait-to-landscape conversio
   assert.match(main, /window\.confirm\([^)]*覆盖/s)
 })
 
+test("preview S actions route through one shared state setter for both canvases", () => {
+  assert.match(main, /import \{[^}]*previewPageTransition[^}]*previewStateFromAction[^}]*\} from "\.\/actions\.ts"/s)
+  assert.match(main, /function applySkinState\(state\?: number, message\?: string\)/)
+  assert.match(main, /const state = previewStateFromAction\(code\)/)
+  assert.match(main, /applySkinState\(\s*state \|\| undefined,/)
+  assert.match(main, /preview\.setSkinState\(state\)/)
+  assert.match(main, /toolbarPreview\.setSkinState\(state\)/)
+})
+
 test("panel tools keep their toolbar order and each layout's native aspect ratio", () => {
   assert.ok(html.indexOf('id="panel-scale"') < html.indexOf('class="toolbar-divider"'))
   assert.match(main, /availableSkinStates\(\.\.\.skinStateDocuments\(\)\)/)

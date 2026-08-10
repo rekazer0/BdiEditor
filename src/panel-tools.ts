@@ -14,10 +14,13 @@ function scaled(value: string, xRatio: number, yRatio: number): string {
 
 export function availableSkinStates(...documents: IniDocument[]): number[] {
   const states = documents.flatMap((document) => document.entries()).flatMap(({ key, value }) => {
-    if (key !== "STAT_STYLE") return []
-    return [...value.matchAll(/(?:^|\|)S(\d+)_/g)].map((match) => Number(match[1]))
+    const styleStates = key === "STAT_STYLE"
+      ? [...value.matchAll(/(?:^|\|)S(\d+)_/g)].map((match) => Number(match[1]))
+      : []
+    const actionState = value.trim().match(/^S(\d{1,2})(?:_\d+)?$/)
+    return [...styleStates, ...(actionState ? [Number(actionState[1])] : [])]
   })
-  return [...new Set(states)].sort((a, b) => a - b)
+  return [...new Set(states.filter((state) => state >= 1 && state <= 99))].sort((a, b) => a - b)
 }
 
 export function stateStyleValue(value: string | undefined, state: number): number | undefined {
