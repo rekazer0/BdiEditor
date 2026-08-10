@@ -353,8 +353,8 @@ test("settings expose canvas backgrounds and edit mode exposes key context actio
 })
 
 test("window and about names match the GitHub project and include the version", () => {
-  assert.match(html, /<title>BdiEditor v0\.5\.4<\/title>/)
-  assert.match(html, /关于 BdiEditor v0\.5\.4/)
+  assert.match(html, /<title>BdiEditor v0\.5\.5<\/title>/)
+  assert.match(html, /关于 BdiEditor v0\.5\.5/)
   assert.match(html, /<strong>技术交流与反馈<\/strong><br>QQ群：228040912/)
 })
 

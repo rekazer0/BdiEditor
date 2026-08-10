@@ -6,13 +6,9 @@
 
 ![BdiEditor v0.3.2 编辑界面](docs/screenshots/bdiedito-v0.3.2-overview.png)
 
-## v0.5.4 更新
+## v0.5.5 更新
 
-- 新增 S 状态预览、按键动效预览、面板分辨率/缩放显示和竖屏转横屏缩放工具；
-- 完善 BDA protobuf 配置、动画与资源解析，可原生编辑保存并导出为 BDI/BDS；
-- 各布局按自身 `PANEL SIZE` 渲染，修复候选栏、符号、全屏手写和九键面板比例异常；
-- macOS 界面统一使用毛玻璃，Windows 统一使用 Acrylic，并可在设置中关闭窗口材质；
-- 修复 Windows WebView2 已安装时安装器误报失败、标题栏拖动、菜单透明度和画布接缝等问题。
+- 修复预览文字错误解析 `CENTER` 动作字段的问题；预览文字现在只读取 `SHOW` 字段。
 
 完整记录见 [CHANGELOG.md](CHANGELOG.md)。
 
