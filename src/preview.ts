@@ -116,8 +116,7 @@ export function previewFallbackText(
   hasForeground: boolean,
 ): string {
   if (hasForeground) return ""
-  if (!item.editable) return item.show
-  return item.show || item.center
+  return item.show
 }
 
 export function previewAnnotationsVisible(mode: "edit" | "preview"): boolean {

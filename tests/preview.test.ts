@@ -167,6 +167,14 @@ test("interaction preview hides editor-only labels and gesture annotations", asy
   assert.equal(module.previewAnnotationsVisible?.("edit"), true)
 })
 
+test("preview text never falls back from missing SHOW to CENTER action text", () => {
+  const item = previewItems(IniDocument.parse(
+    "[KEY3]\nVIEW_RECT=0,0,100,100\nCENTER=e\n",
+  ))[0]
+
+  assert.equal(previewFallbackText(item, "preview", false), "")
+})
+
 test("places the second foreground image at the phone key's upper-right slot", async () => {
   const module = await import("../src/preview.ts") as typeof import("../src/preview.ts") & {
     foregroundLayerRect?: (
@@ -224,7 +232,7 @@ test("keeps a phone foreground image while removing its rectangular color", asyn
   )
 })
 
-test("uses only drawable phone foregrounds to suppress fallback text", async () => {
+test("uses only SHOW for fallback text and drawable foregrounds suppress it", async () => {
   const module = await import("../src/preview.ts") as typeof import("../src/preview.ts") & {
     phoneForegroundLayers?: (visuals: Array<{
       image?: ImageBitmap
@@ -243,7 +251,7 @@ test("uses only drawable phone foregrounds to suppress fallback text", async () 
   )
   assert.equal(
     previewFallbackText(center, "edit", module.phoneForegroundLayers?.([{ color: "#333333" }]).some(Boolean) ?? true),
-    "空格",
+    "",
   )
   assert.equal(
     previewFallbackText(show, "preview", module.phoneForegroundLayers?.([{ image, source: [0, 0, 20, 20] }]).some(Boolean) ?? false),
