@@ -30,6 +30,20 @@ test("preview page returns to the keyboard layout that opened a transient page",
   })
 })
 
+test("parses only supported S0-S99 preview state actions", async () => {
+  const actions = await import("../src/actions.ts") as typeof import("../src/actions.ts") & {
+    previewStateFromAction?: (code: string) => number | undefined
+  }
+
+  assert.equal(actions.previewStateFromAction?.("S0"), 0)
+  assert.equal(actions.previewStateFromAction?.("S4"), 4)
+  assert.equal(actions.previewStateFromAction?.("S4_2"), 4)
+  assert.equal(actions.previewStateFromAction?.("S99_12"), 99)
+  assert.equal(actions.previewStateFromAction?.("S100"), undefined)
+  assert.equal(actions.previewStateFromAction?.("S4_extra"), undefined)
+  assert.equal(actions.previewStateFromAction?.("F4"), undefined)
+})
+
 test("9-key summary counts grouped letter keys but excludes state and delete keys", async () => {
   const actions = await import("../src/actions.ts") as typeof import("../src/actions.ts") & {
     layoutLetterKeyCount?: (document: IniDocument) => number

@@ -1,5 +1,12 @@
 import { IniDocument } from "./ini.ts"
 
+export function previewStateFromAction(code: string): number | undefined {
+  const match = code.trim().match(/^S(\d{1,2})(?:_\d+)?$/)
+  if (!match) return
+  const state = Number(match[1])
+  return state <= 99 ? state : undefined
+}
+
 export function previewPageTarget(
   code: string,
   currentName: string,
