@@ -21,6 +21,18 @@ test("reads the S states used by official Baidu layouts", () => {
   assert.equal(stateStyleValue("S11_4|S17_1", 4), undefined)
 })
 
+test("resolves TIP sections only for supported active states", async () => {
+  const tools = await import("../src/panel-tools.ts") as typeof import("../src/panel-tools.ts") & {
+    stateTipSection?: (value: string | undefined, state: number | undefined) => number | undefined
+  }
+
+  assert.equal(tools.stateTipSection?.("S4_2|S17_5", 4), 2)
+  assert.equal(tools.stateTipSection?.("S4_2|S17_5", 17), 5)
+  assert.equal(tools.stateTipSection?.("S4_2", 0), undefined)
+  assert.equal(tools.stateTipSection?.("S4_2", 100), undefined)
+  assert.equal(tools.stateTipSection?.("S4_2", undefined), undefined)
+})
+
 test("combines S states from every layout in the current skin", () => {
   const keyboard = IniDocument.parse("[KEY1]\nSTAT_STYLE=S1_2|S4_3\n")
   const symbols = IniDocument.parse("[KEY1]\nSTAT_STYLE=S6_2|S8_3\n")
@@ -38,6 +50,7 @@ test("scales official panel geometry with independent horizontal and vertical ra
     "SIZE=1080,600",
     "[KEY1]",
     "VIEW_RECT=100,50,200,100",
+    "TOUCH_RECT=90,40,220,120",
     "FORE_OFFSET=-10,20;30,-40",
     "[LIST]",
     "CELL_SIZE=120,80",
@@ -45,6 +58,7 @@ test("scales official panel geometry with independent horizontal and vertical ra
   ].join("\n")), 16 / 9, 1.2)
   assert.equal(scaled.get("PANEL", "SIZE"), "1920,720")
   assert.equal(scaled.get("KEY1", "VIEW_RECT"), "178,60,356,120")
+  assert.equal(scaled.get("KEY1", "TOUCH_RECT"), "160,48,391,144")
   assert.equal(scaled.get("KEY1", "FORE_OFFSET"), "-18,24;53,-48")
   assert.equal(scaled.get("LIST", "CELL_SIZE"), "213,96")
   assert.equal(scaled.get("LIST", "PADDING"), "18,24,53,48")

@@ -73,6 +73,35 @@ test("activates a key only when its official STAT_STYLE contains the selected S 
   assert.equal(previewStateActive(item, undefined), false)
 })
 
+test("resolves a matching TIP section without changing absent properties", async () => {
+  const module = await import("../src/preview.ts") as typeof import("../src/preview.ts") & {
+    effectivePreviewItem?: (
+      document: IniDocument,
+      item: ReturnType<typeof previewItems>[number],
+      state?: number,
+    ) => ReturnType<typeof previewItems>[number]
+  }
+  const document = IniDocument.parse(
+    "[KEY1]\nVIEW_RECT=0,0,100,100\nBACK_STYLE=211\nFORE_STYLE=81,180\nPOS_TYPE=2,3\nSTAT_STYLE=S4_2\n" +
+    "[TIP2]\nBACK_STYLE=214\nFORE_STYLE=252\n",
+  )
+  const item = previewItems(document)[0]
+  const effective = module.effectivePreviewItem?.(document, item, 4)
+
+  assert.equal(effective?.backStyle, "214")
+  assert.deepEqual(effective?.foreStyles, ["252"])
+  assert.deepEqual(effective?.positionTypes, ["2", "3"])
+})
+
+test("keeps TOUCH_RECT separate from the visible key rectangle", () => {
+  const item = previewItems(IniDocument.parse(
+    "[KEY1]\nVIEW_RECT=20,20,20,20\nTOUCH_RECT=0,0,100,100\n",
+  ))[0]
+
+  assert.deepEqual(item.rect, { x: 20, y: 20, width: 20, height: 20 })
+  assert.deepEqual(item.touchRect, { x: 0, y: 0, width: 100, height: 100 })
+})
+
 test("binds a BDA frame animation to its semantic key target", () => {
   const item = previewItems(IniDocument.parse(
     "[KEY1]\nVIEW_RECT=0,0,100,100\nCENTER=b\n",

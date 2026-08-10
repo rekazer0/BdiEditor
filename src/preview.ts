@@ -1,7 +1,7 @@
 import { canvasFontFamily, isTransparentColor, type TextVisual, type Visual, type VisualResolver } from "./atlas.ts"
 import { IniDocument } from "./ini.ts"
 import { gestureDirection } from "./layout.ts"
-import { stateStyleValue } from "./panel-tools.ts"
+import { stateStyleValue, stateTipSection } from "./panel-tools.ts"
 import type { BdaAnimation, BdaAnimationSequence } from "./bda.ts"
 
 export type PreviewEvent = {
@@ -14,6 +14,7 @@ type Rect = { x: number; y: number; width: number; height: number }
 export type PreviewItem = {
   section: string
   rect: Rect
+  touchRect?: Rect
   foreRect?: Rect
   fontSize?: number
   editable: boolean
@@ -34,6 +35,31 @@ export type PreviewItem = {
 
 export function previewStateActive(item: PreviewItem, state: number | undefined): boolean {
   return state !== undefined && stateStyleValue(item.statStyle, state) !== undefined
+}
+
+export function effectivePreviewItem(
+  document: IniDocument,
+  item: PreviewItem,
+  state?: number,
+): PreviewItem {
+  const tip = stateTipSection(item.statStyle, state)
+  if (tip === undefined) return item
+  const section = `TIP${tip}`
+  const backStyle = document.get(section, "BACK_STYLE")
+  const foreStyle = document.get(section, "FORE_STYLE")
+  const positionType = document.get(section, "POS_TYPE")
+  const foreStyles = foreStyle === undefined
+    ? item.foreStyles
+    : foreStyle.split(",").map((token) => token.trim()).filter(Boolean)
+  return {
+    ...item,
+    backStyle: backStyle === undefined ? item.backStyle : backStyle.split(",")[0],
+    foreStyle: foreStyles[0] ?? "",
+    foreStyles,
+    positionTypes: positionType === undefined
+      ? item.positionTypes
+      : positionType.split(",").map((token) => token.trim()).filter(Boolean),
+  }
 }
 
 export function animationSequenceForKey(
@@ -160,6 +186,7 @@ function itemFromSection(document: IniDocument, section: string): PreviewItem | 
   return {
     section,
     rect,
+    touchRect: parseRect(document.get(section, "TOUCH_RECT")),
     editable: true,
     show: value("SHOW"),
     center: value("CENTER"),
@@ -441,13 +468,14 @@ export class Preview {
   }
 
   private hit(point: { x: number; y: number }): PreviewItem | undefined {
-    return [...this.keys].reverse().find(({ editable, rect }) => {
+    return [...this.keys].reverse().find(({ editable, rect, touchRect }) => {
+      const target = touchRect ?? rect
       return (
         editable &&
-        point.x >= rect.x &&
-        point.x <= rect.x + rect.width &&
-        point.y >= rect.y &&
-        point.y <= rect.y + rect.height
+        point.x >= target.x &&
+        point.x <= target.x + target.width &&
+        point.y >= target.y &&
+        point.y <= target.y + target.height
       )
     })
   }
@@ -625,10 +653,13 @@ export class Preview {
 
   private async draw(): Promise<void> {
     const drawID = ++this.drawID
+    const keys = this.keys.map((key) =>
+      this.document ? effectivePreviewItem(this.document, key, this.skinState) : key,
+    )
     const [panel, visuals, toolbarImages] = await Promise.all([
       this.resolver?.resolve(this.panelStyle, false),
-      Promise.all(this.keys.map(async (key) => {
-        const highlighted = this.active?.key === key || previewStateActive(key, this.skinState)
+      Promise.all(keys.map(async (key) => {
+        const highlighted = this.active?.key.section === key.section
         return {
           back: await this.resolver?.resolve(key.backStyle, highlighted),
           fore: await Promise.all(
@@ -657,8 +688,8 @@ export class Preview {
       true,
     )
 
-    for (const [index, key] of this.keys.entries()) {
-      const active = this.active?.key === key || previewStateActive(key, this.skinState)
+    for (const [index, key] of keys.entries()) {
+      const active = this.active?.key.section === key.section
       const selected = previewSelectionVisible(this.mode, this.selected.has(key.section))
       const foregrounds = phoneForegroundLayers(visuals[index].fore)
       const hasForeground = foregrounds.some(Boolean)

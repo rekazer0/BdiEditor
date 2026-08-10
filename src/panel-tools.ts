@@ -1,7 +1,7 @@
 import { IniDocument } from "./ini.ts"
 
 const pairKeys = new Set(["SIZE", "POS", "CELL_SIZE", "FIX_SIZE"])
-const rectKeys = new Set(["VIEW_RECT", "SOURCE_RECT", "INNER_RECT"])
+const rectKeys = new Set(["VIEW_RECT", "TOUCH_RECT", "SOURCE_RECT", "INNER_RECT"])
 
 function scaled(value: string, xRatio: number, yRatio: number): string {
   return value.split(",").map((token, index) => {
@@ -23,6 +23,14 @@ export function availableSkinStates(...documents: IniDocument[]): number[] {
 export function stateStyleValue(value: string | undefined, state: number): number | undefined {
   const match = value?.match(new RegExp(`(?:^|\\|)S${state}_(\\d+)(?:\\||$)`))
   return match ? Number(match[1]) : undefined
+}
+
+export function stateTipSection(
+  value: string | undefined,
+  state: number | undefined,
+): number | undefined {
+  if (state === undefined || state < 1 || state > 99) return
+  return stateStyleValue(value, state)
 }
 
 export function previewScalePercent(
