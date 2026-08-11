@@ -20,7 +20,18 @@ test("new project command opens an accessible built-in template chooser", () => 
   assert.match(dialog, /name="project-template"[^>]*value="default-android"[^>]*checked/)
   assert.match(dialog, /百度官方 Android BDA 默认皮肤/)
   assert.match(dialog, /value="official-android-bds"/)
-  assert.equal((dialog.match(/name="project-template"/g) ?? []).length, 2)
+  assert.equal((dialog.match(/name="project-template"/g) ?? []).length, 7)
+  assert.match(dialog, /内置皮肤为互联网下载整理，如有侵权请联系作者下架。/)
+  for (const [id, label] of [
+    ["oppo-swipe-down", "OPPO皮肤加下滑功能"],
+    ["oppo-dual-color", "OPPO默认双色皮肤"],
+    ["iqoo-rounded-black", "IQOO提取圆角黑色"],
+    ["xiaomi-unified-rounded-blur", "小米默认皮肤\\(统一颜色键盘版3\\)_适配圆角模糊"],
+    ["huawei-swipe-symbols-1080", "华为提取上滑符号1080"],
+  ] as const) {
+    assert.match(dialog, new RegExp(`value="${id}"`))
+    assert.match(dialog, new RegExp(label))
+  }
   assert.doesNotMatch(dialog, /imitation-ios-15|dust-|仿ios|尘埃/)
   assert.match(dialog, /value="cancel"/)
   assert.match(dialog, /value="create"/)
@@ -424,7 +435,7 @@ test("canvas accepts native and browser skin file drops", () => {
   assert.match(css, /\.canvas-wrap\.drop-target\s*\{[^}]*box-shadow:/s)
 })
 
-test("new-project chooser contains only Baidu official templates", () => {
+test("new-project chooser excludes removed legacy templates", () => {
   assert.doesNotMatch(html, /imitation-ios-15|dust-|仿ios|尘埃/)
 })
 

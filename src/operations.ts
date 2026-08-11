@@ -15,6 +15,11 @@ type ProjectTemplateFetcher = (
 const builtInProjectTemplatePaths: Record<string, string> = {
   "default-android": "/default-template.bda",
   "official-android-bds": "/default-template.bds",
+  "oppo-swipe-down": "/templates/oppo-swipe-down.bds",
+  "oppo-dual-color": "/templates/oppo-dual-color.bds",
+  "iqoo-rounded-black": "/templates/iqoo-rounded-black.bds",
+  "xiaomi-unified-rounded-blur": "/templates/xiaomi-unified-rounded-blur.bds",
+  "huawei-swipe-symbols-1080": "/templates/huawei-swipe-symbols-1080.bds",
 }
 
 export async function loadBuiltInProjectTemplate(

@@ -20,8 +20,18 @@ test("keeps the official BDS default as an alternative template", () => {
   assert.ok(archive.names().includes("light/skin/port/py_9.ini"))
 })
 
-test("does not bundle non-official skin templates", () => {
-  assert.equal(existsSync(new URL("../public/templates", import.meta.url)), false)
+test("bundles the five downloaded BDS skin templates", () => {
+  for (const name of [
+    "oppo-swipe-down.bds",
+    "oppo-dual-color.bds",
+    "iqoo-rounded-black.bds",
+    "xiaomi-unified-rounded-blur.bds",
+    "huawei-swipe-symbols-1080.bds",
+  ]) {
+    const url = new URL(`../public/templates/${name}`, import.meta.url)
+    assert.equal(existsSync(url), true, `${name} must be bundled`)
+    assert.equal(SkinArchive.open(new Uint8Array(readFileSync(url))).format, "bds")
+  }
 })
 
 test("changes one config while preserving other entry bytes", () => {

@@ -27,6 +27,19 @@ test("loads only the selected built-in project template", async () => {
     return { ok: true, async arrayBuffer() { return new ArrayBuffer(0) } }
   })
   assert.equal(requested.at(-1), "/default-template.bds")
+  const templates = {
+    "oppo-swipe-down": "/templates/oppo-swipe-down.bds",
+    "oppo-dual-color": "/templates/oppo-dual-color.bds",
+    "iqoo-rounded-black": "/templates/iqoo-rounded-black.bds",
+    "xiaomi-unified-rounded-blur": "/templates/xiaomi-unified-rounded-blur.bds",
+    "huawei-swipe-symbols-1080": "/templates/huawei-swipe-symbols-1080.bds",
+  }
+  for (const [id, expectedPath] of Object.entries(templates)) {
+    await loadBuiltInProjectTemplate(id, async (path) => {
+      assert.equal(path, expectedPath)
+      return { ok: true, async arrayBuffer() { return new ArrayBuffer(0) } }
+    })
+  }
   await assert.rejects(
     () => loadBuiltInProjectTemplate("imitation-ios-15"),
     /未知的内置项目模板/,
