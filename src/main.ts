@@ -77,6 +77,7 @@ import {
   nextTileIndex,
   removeTileSlice,
   tileSliceAt,
+  tilePreviewDestination,
   tileSlices,
   updateTileSlice,
   type TilePoint,
@@ -583,6 +584,7 @@ function applyTextSnapshot(path: string, text: string): void {
     setSourceValue(text)
     sourceName.textContent = tilePath
     if (!slices.some((slice) => slice.index === selectedTileIndex)) selectedTileIndex = undefined
+    updateSourceHighlight()
     populateTileInspector()
     drawAtlas()
   }
@@ -1079,17 +1081,12 @@ function drawTilePreview(): void {
   context.clearRect(0, 0, tilePreview.width, tilePreview.height)
   if (!slice || !workspaceImage.complete || !workspaceImage.naturalWidth) return
   const [x, y, width, height] = slice.source
-  const scale = Math.min(tilePreview.width / width, tilePreview.height / height)
-  const targetWidth = width * scale
-  const targetHeight = height * scale
+  const destination = tilePreviewDestination(width, height, tilePreview.width)
   context.imageSmoothingEnabled = false
   context.drawImage(
     workspaceImage,
     x, y, width, height,
-    (tilePreview.width - targetWidth) / 2,
-    (tilePreview.height - targetHeight) / 2,
-    targetWidth,
-    targetHeight,
+    destination.x, destination.y, destination.width, destination.height,
   )
 }
 
@@ -1120,6 +1117,7 @@ function loadTiles(path: string): void {
   sourceName.textContent = tilePath
   source.disabled = false
   selectedTileIndex = undefined
+  updateSourceHighlight()
   tileDraft = undefined
   movingTile = undefined
   moveStart = undefined
@@ -1258,12 +1256,20 @@ function updateInspectorView(): void {
 }
 
 function updateSourceHighlight(): void {
-  sourceHighlight.innerHTML = `${highlightIni(source.value, selectedPath === layoutPath ? selectedKeySections : [])}\n`
+  sourceHighlight.innerHTML = `${highlightIni(source.value, selectedSourceSections())}\n`
+}
+
+function selectedSourceSections(): string[] {
+  if (resourceConfigActive && selectedResourcePath) {
+    return selectedTileIndex === undefined ? [] : [`IMG${selectedTileIndex}`]
+  }
+  return selectedPath === layoutPath ? selectedKeySections : []
 }
 
 function scrollSelectedSource(): void {
-  if (sourceEditor.hidden || selectedPath !== layoutPath || !selectedKeySections.length) return
-  const selected = new Set(selectedKeySections)
+  const sections = selectedSourceSections()
+  if (sourceEditor.hidden || !sections.length) return
+  const selected = new Set(sections)
   const line = source.value.split(/\r\n|\n|\r/).findIndex((value) => {
     const section = value.match(/^\s*\[([^\]]+)]\s*$/)?.[1]
     return Boolean(section && selected.has(section))
@@ -2321,6 +2327,7 @@ function commitTile(slice: TileSlice): void {
   setSourceValue(tileDocument.toString())
   slices = tileSlices(tileDocument)
   selectedTileIndex = slice.index
+  updateSourceHighlight()
   populateTileInspector()
   drawAtlas()
   updateDirty()
@@ -2372,6 +2379,7 @@ function deleteSelectedTile(): void {
   setSourceValue(tileDocument.toString())
   slices = tileSlices(tileDocument)
   selectedTileIndex = undefined
+  updateSourceHighlight()
   populateTileInspector()
   drawAtlas()
   updateDirty()
@@ -2401,6 +2409,7 @@ function selectFile(path: string, preferredSidebarView = sidebarView, resourceMo
   resourceConfigActive = resourceMode
   toggleGuides.title = resourceMode ? "切片网格" : "辅助线"
   toggleGuides.setAttribute("aria-label", resourceMode ? "切片网格" : "辅助线")
+  if (resourceMode) setGuidesVisible(true)
   if (!resourceMode) {
     selectedResourcePath = ""
     drawingTile = false
@@ -3267,17 +3276,19 @@ for (const button of themeChoiceButtons) {
 for (const button of orientationChoiceButtons) {
   button.addEventListener("click", () => selectChoice(orientation, button.dataset.orientationChoice ?? "port"))
 }
-toggleGuides.addEventListener("click", () => {
-  guidesVisible = !guidesVisible
+function setGuidesVisible(enabled: boolean): void {
+  guidesVisible = enabled
   toggleGuides.classList.toggle("active", guidesVisible)
   toggleGuides.setAttribute("aria-pressed", String(guidesVisible))
   preview.setGuides(guidesVisible)
   toolbarPreview.setGuides(guidesVisible)
   drawAtlas()
-})
+}
+
+toggleGuides.addEventListener("click", () => setGuidesVisible(!guidesVisible))
 newTileButton.addEventListener("click", () => {
   if (!selectedResourcePath || !isEditing()) return
-  if (!guidesVisible) toggleGuides.click()
+  if (!guidesVisible) setGuidesVisible(true)
   setDrawingTile(!drawingTile)
 })
 deleteTileButton.addEventListener("click", deleteSelectedTile)
@@ -3300,6 +3311,14 @@ atlasCanvas.addEventListener("pointerdown", (event) => {
   }
   const hit = tileSliceAt(slices, point)
   selectedTileIndex = hit?.index
+  if (hit) {
+    inspectorTab = "source"
+    updateInspectorView()
+    updateSourceHighlight()
+    requestAnimationFrame(scrollSelectedSource)
+  } else {
+    updateSourceHighlight()
+  }
   if (tileMode === "move" && hit && isEditing()) {
     movingTile = hit
     moveStart = point

@@ -8,6 +8,7 @@ import {
   nextTileIndex,
   removeTileSlice,
   tileSliceAt,
+  tilePreviewDestination,
   tileSlices,
   updateTileSlice,
 } from "../src/tiles.ts"
@@ -84,5 +85,14 @@ test("duplicates source and inner rectangles under a new index", () => {
     index: 5,
     source: [1, 2, 30, 40],
     inner: [3, 4, 20, 30],
+  })
+})
+
+test("fits a selected slice into 80 percent of a square preview", () => {
+  assert.deepEqual(tilePreviewDestination(100, 50, 240), {
+    x: 24, y: 72, width: 192, height: 96,
+  })
+  assert.deepEqual(tilePreviewDestination(50, 100, 240), {
+    x: 72, y: 24, width: 96, height: 192,
   })
 })

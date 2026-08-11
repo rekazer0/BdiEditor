@@ -272,7 +272,7 @@ test("key image fields preview processed atlas slices in a dialog", () => {
 
 test("selected key source is highlighted only in the source view", () => {
   assert.doesNotMatch(html, /id="selected-key-source"/)
-  assert.match(main, /highlightIni\(source\.value, selectedPath === layoutPath \? selectedKeySections/)
+  assert.match(main, /highlightIni\(source\.value, selectedSourceSections\(\)\)/)
 })
 
 test("export moved left and more menu opens settings and about dialogs", () => {
@@ -465,6 +465,16 @@ test("resource detail uses icon tools and previews the selected slice", () => {
     assert.match(html, new RegExp(`<button id="${id}"[^>]*aria-label=`))
   }
   assert.match(main, /function drawTilePreview\(/)
+})
+
+test("resource slices keep guides and source selection in sync", () => {
+  assert.match(main, /function setGuidesVisible\(enabled: boolean\)/)
+  assert.match(main, /resourceMode[\s\S]*?setGuidesVisible\(true\)/)
+  assert.match(main, /function selectedSourceSections\(\): string\[\]/)
+  assert.match(main, /selectedTileIndex === undefined \? \[\] : \[`IMG\$\{selectedTileIndex\}`\]/)
+  assert.match(main, /if \(hit\)[\s\S]*?inspectorTab = "source"[\s\S]*?updateInspectorView\(\)/)
+  assert.match(html, /id="tile-preview" width="240" height="240"/)
+  assert.match(css, /#tile-preview-wrap\s*\{[^}]*aspect-ratio:\s*1[^}]*box-sizing:\s*border-box/s)
 })
 
 test("image style properties use large previews and text styles can be hidden", () => {

@@ -1569,7 +1569,10 @@ canvas {
 #tile-preview-wrap {
   display: grid;
   place-items: center;
-  height: 132px;
+  width: min(100%, 240px);
+  height: auto;
+  aspect-ratio: 1;
+  box-sizing: border-box;
   margin-bottom: 12px;
   overflow: hidden;
   border: 1px solid var(--line);

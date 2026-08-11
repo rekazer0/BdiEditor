@@ -10,6 +10,13 @@ export type TileSlice = {
 
 export type TilePoint = { x: number; y: number }
 
+export function tilePreviewDestination(sourceWidth: number, sourceHeight: number, canvasSize: number) {
+  const scale = Math.min(canvasSize / sourceWidth, canvasSize / sourceHeight) * 0.8
+  const width = sourceWidth * scale
+  const height = sourceHeight * scale
+  return { x: (canvasSize - width) / 2, y: (canvasSize - height) / 2, width, height }
+}
+
 function rect(value: string | undefined): TileRect | undefined {
   const values = value?.split(",").map(Number)
   if (!values || values.length !== 4 || values.some((item) => !Number.isFinite(item))) return
