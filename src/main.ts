@@ -2893,7 +2893,7 @@ function revealSourceFile(path: string): void {
 async function loadArchive(bytes: Uint8Array, path: string, isNew = false): Promise<void> {
   const nextArchive = SkinArchive.open(bytes)
   if (nextArchive.format === "bda" && !bdaBase) {
-    const response = await fetch("/bda-base.bds")
+    const response = await fetch(new URL("bda-base.bds", document.baseURI))
     if (!response.ok) throw new Error("无法加载 BDA 官方基础布局")
     bdaBase = SkinArchive.open(new Uint8Array(await response.arrayBuffer()))
   }
@@ -3109,7 +3109,7 @@ async function refreshUpdateStatus(): Promise<void> {
   try {
     const fetcher = isTauri()
       ? async () => new Response(await invoke<string>("fetch_release_page"), { status: 200 })
-      : () => fetch("/__github_releases")
+      : fetch
     const result = await checkForUpdate(aboutUpdate.dataset.currentVersion ?? "0.0.0", fetcher)
     if (result.status === "latest") {
       updateStatus.textContent = `当前已是最新版本（v${result.currentVersion}）`

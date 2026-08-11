@@ -6,6 +6,7 @@ const html = readFileSync(new URL("../index.html", import.meta.url), "utf8")
 const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8")
 const main = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8")
 const preview = readFileSync(new URL("../src/preview.ts", import.meta.url), "utf8")
+const vite = readFileSync(new URL("../vite.config.ts", import.meta.url), "utf8")
 
 test("new project command opens an accessible built-in template chooser", () => {
   assert.match(
@@ -442,9 +443,13 @@ test("about dialog automatically checks the canonical GitHub project for updates
   assert.match(html, /id="download-update"[^>]*https:\/\/github\.com\/rekazer0\/BdiEditor\/releases["']/)
   assert.match(main, /checkForUpdate\(aboutUpdate\.dataset\.currentVersion/)
   assert.match(main, /invoke<string>\("fetch_release_page"\)/)
-  assert.match(main, /fetch\("\/__github_releases"\)/)
+  assert.match(main, /:\s*fetch\s*\n/)
   assert.match(main, /if \(dialog === aboutDialog\) void refreshUpdateStatus\(\)/)
   assert.match(main, /void refreshUpdateStatus\(\)/)
+})
+
+test("production assets use a relative base for repository subpath hosting", () => {
+  assert.match(vite, /base:\s*"\.\/"/)
 })
 
 test("QQ group control copies its number without navigating away", () => {
