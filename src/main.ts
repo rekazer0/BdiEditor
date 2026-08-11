@@ -3282,6 +3282,7 @@ function setGuidesVisible(enabled: boolean): void {
   toggleGuides.setAttribute("aria-pressed", String(guidesVisible))
   preview.setGuides(guidesVisible)
   toolbarPreview.setGuides(guidesVisible)
+  if (!enabled) setDrawingTile(false)
   drawAtlas()
 }
 

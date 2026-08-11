@@ -484,6 +484,11 @@ test("atlas slice selection does not depend on visible guides", () => {
   assert.doesNotMatch(entryGuard, /guidesVisible/)
 })
 
+test("hiding guides cancels active slice drawing", () => {
+  const setter = main.match(/function setGuidesVisible\(enabled: boolean\): void \{\n([\s\S]*?)\n}/)?.[1] ?? ""
+  assert.match(setter, /if \(!enabled\) setDrawingTile\(false\)/)
+})
+
 test("image style properties use large previews and text styles can be hidden", () => {
   assert.match(html, /data-background-style-field="NM_IMG"[^>]*\/>/)
   assert.match(html, /data-background-style-field="HL_IMG"[^>]*\/>/)
