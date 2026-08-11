@@ -150,6 +150,7 @@
         <div class="workspace-status"><div id="event-log" aria-live="polite">打开皮肤后可预览按键。</div><div id="panel-status">面板：-- × -- · 预览缩放：--%</div></div>
       </section>
 
+      <div class="inspector-resize-handle" id="inspector-resize-handle" aria-hidden="true"></div>
       <section class="source">
         <div class="pane-heading source-heading">
           <div>
@@ -214,8 +215,15 @@
             <h3>BDA 专属配置</h3>
             <div id="bda-config-fields" class="inspector-grid action-fields"></div>
           </div>
-          <div class="inspector-group key-only">
-            <h3>布局</h3>
+          <div class="inspector-group key-only primary-key-fields">
+            <h3>常用</h3>
+            <div class="inspector-grid primary-actions">
+              <label>显示内容 <input data-key-field="SHOW" /></label>
+              <label>点击动作 <input data-key-field="CENTER" list="baidu-action-codes" /><small data-action-meaning="CENTER"></small></label>
+            </div>
+          </div>
+          <details class="inspector-group inspector-disclosure key-only">
+            <summary>布局</summary>
             <div class="inspector-grid geometry-fields">
               <label>X <input data-key-field="x" type="number" /></label>
               <label>Y <input data-key-field="y" type="number" /></label>
@@ -234,11 +242,11 @@
               <button data-layout-action="horizontal-gap" title="水平等间距">水平分布</button>
               <button data-layout-action="vertical-gap" title="垂直等间距">垂直分布</button>
             </div>
-          </div>
-          <div class="inspector-group key-only">
-            <h3>外观</h3>
+          </details>
+          <details class="inspector-group inspector-disclosure key-only">
+            <summary>样式引用、文字与图片</summary>
             <div class="inspector-grid appearance-fields">
-              <label>背景样式
+              <label title="按键引用的共享背景样式编号">背景样式引用
                 <span class="style-field">
                   <input data-key-field="BACK_STYLE" />
                   <span class="style-preview-pair" aria-label="背景样式预览">
@@ -247,7 +255,7 @@
                   </span>
                 </span>
               </label>
-              <label>前景样式
+              <label title="按键引用的共享前景样式编号">前景样式引用
                 <span class="style-field">
                   <input data-key-field="FORE_STYLE" />
                   <span class="style-preview-pair" aria-label="前景样式预览">
@@ -256,8 +264,6 @@
                   </span>
                 </span>
               </label>
-              <label class="image-resource-field">正常按键图片 <span class="style-field"><input data-background-style-field="NM_IMG" placeholder="例如 btn,1" /><button class="style-preview-button image-preview-button" data-image-preview="normal" title="查看按键图片预览" aria-label="查看正常按键图片预览"><canvas width="240" height="120"></canvas></button></span></label>
-              <label class="image-resource-field">按下按键图片 <span class="style-field"><input data-background-style-field="HL_IMG" placeholder="例如 btn,2" /><button class="style-preview-button image-preview-button" data-image-preview="highlighted" title="查看按键图片预览" aria-label="查看按下按键图片预览"><canvas width="240" height="120"></canvas></button></span></label>
               <label data-text-style>字体 <input data-style-field="FONT_NAME" /></label>
               <label data-text-style>字重 <input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
               <label data-text-style>字号 <input data-style-field="FONT_SIZE" type="number" /></label>
@@ -267,28 +273,31 @@
               </div>
             </div>
             <p class="inspector-note">多选时图片会批量写入各按键引用的背景样式。共享样式也会影响其他引用它的按键。</p>
-          </div>
-          <div class="inspector-group key-only">
-            <h3>文字与动作</h3>
-            <div class="inspector-grid primary-actions">
-              <label>按键上显示 <input data-key-field="SHOW" /></label>
-              <label>点击后输入/执行 <input data-key-field="CENTER" /><small data-action-meaning="CENTER"></small></label>
-            </div>
+          </details>
+          <details class="inspector-group inspector-disclosure key-only">
+            <summary>滑动与长按</summary>
             <div class="direction-editor" aria-label="滑动与长按动作">
-              <label class="direction-up"><span>↑ 上滑</span><input data-key-field="UP" /><small data-action-meaning="UP"></small></label>
-              <label class="direction-left"><span>← 左滑</span><input data-key-field="LEFT" /><small data-action-meaning="LEFT"></small></label>
-              <label class="direction-hold"><span>● 长按</span><input data-key-field="HOLD" /><small data-action-meaning="HOLD"></small></label>
-              <label class="direction-right"><span>右滑 →</span><input data-key-field="RIGHT" /><small data-action-meaning="RIGHT"></small></label>
-              <label class="direction-down"><span>↓ 下滑</span><input data-key-field="DOWN" /><small data-action-meaning="DOWN"></small></label>
+              <label class="direction-up"><span>↑ 上滑</span><input data-key-field="UP" list="baidu-action-codes" /><small data-action-meaning="UP"></small></label>
+              <label class="direction-left"><span>← 左滑</span><input data-key-field="LEFT" list="baidu-action-codes" /><small data-action-meaning="LEFT"></small></label>
+              <label class="direction-hold"><span>● 长按</span><input data-key-field="HOLD" list="baidu-action-codes" /><small data-action-meaning="HOLD"></small></label>
+              <label class="direction-right"><span>右滑 →</span><input data-key-field="RIGHT" list="baidu-action-codes" /><small data-action-meaning="RIGHT"></small></label>
+              <label class="direction-down"><span>↓ 下滑</span><input data-key-field="DOWN" list="baidu-action-codes" /><small data-action-meaning="DOWN"></small></label>
             </div>
-          </div>
+          </details>
         </div>
         <div id="resource-inspector" hidden>
           <div id="resource-list-view">
             <div class="inspector-title">
               <strong>皮肤图片</strong>
               <span id="resource-count"></span>
+              <input id="resource-search" type="search" placeholder="搜索图片" aria-label="搜索图片">
+              <div class="resource-actions">
+                <button id="resource-upload" class="toolbar-button" type="button" title="上传图片" aria-label="上传图片"><span class="icon system-symbol" data-system-symbol="arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 13V4m-4 4 4-4 4 4M4 16h12"/></svg></span></button>
+                <button id="resource-download" class="toolbar-button" type="button" title="下载选中图片" aria-label="下载选中图片" disabled><span class="icon system-symbol" data-system-symbol="arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 4v9m-4-4 4 4 4-4M4 16h12"/></svg></span></button>
+                <button id="resource-delete" class="toolbar-button" type="button" title="删除选中图片" aria-label="删除选中图片" disabled><span class="icon system-symbol" data-system-symbol="trash" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 6h12M8 3h4l1 3H7zm-2 3 1 9h8l1-9M8 9v6m4-6v6"/></svg></span></button>
+              </div>
             </div>
+            <input id="resource-upload-input" type="file" accept=".png,image/png" hidden>
             <div id="resource-gallery" class="resource-gallery"></div>
           </div>
           <div id="resource-detail" hidden>
@@ -302,6 +311,7 @@
                 <button id="move-tile" class="toolbar-button" type="button" data-tile-mode="move" title="移动切片" aria-label="移动切片"><span class="icon system-symbol" data-system-symbol="arrow.up.and.down.and.arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 2v16m0-16L7 5m3-3 3 3M2 10h16m-16 0 3-3m-3 3 3 3m13-3-3-3m3 3-3 3m-5 5-3-3m3 3 3-3"/></svg></span></button>
               </div>
               <button id="new-tile" class="toolbar-button" type="button" title="新建切片" aria-label="新建切片"><span class="icon system-symbol" data-system-symbol="plus.rectangle" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M10 7v6M7 10h6"/></svg></span></button>
+              <button id="duplicate-tile" class="toolbar-button" type="button" title="复制选中切片" aria-label="复制选中切片"><span class="icon system-symbol" data-system-symbol="plus.square.on.square" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2.5" y="5.5" width="12" height="12" rx="2"/><rect x="5.5" y="2.5" width="12" height="12" rx="2"/><path d="M11.5 6v5m-2.5-2.5h5"/></svg></span></button>
               <button id="delete-tile" class="toolbar-button" type="button" title="删除选中切片" aria-label="删除选中切片"><span class="icon system-symbol" data-system-symbol="trash" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 6h12M8 3h4l1 3H7zm-2 3 1 9h8l1-9M8 9v6m4-6v6"/></svg></span></button>
             </div>
           <div id="tile-inspector" class="inspector-group">
@@ -340,12 +350,14 @@
       </section>
     </main>
 
+    <datalist id="baidu-action-codes"></datalist>
+
     <dialog id="new-project-dialog" class="project-dialog" aria-labelledby="new-project-title">
       <form id="new-project-form" method="dialog">
         <header>
           <h2 id="new-project-title">新建项目</h2>
           <p>选择一个内置模板作为项目起点。</p>
-          <p>内置皮肤为互联网下载整理，如有侵权请联系作者下架。</p>
+          <p>内置皮肤为互联网搜集整理，仅限技术交流请勿用于商业用途。如有侵权请联系作者下架。</p>
         </header>
         <fieldset>
           <legend>默认模板</legend>
@@ -394,16 +406,21 @@
       </form>
     </dialog>
 
-    <dialog id="style-image-dialog" class="style-image-dialog" aria-labelledby="style-image-title">
-      <form method="dialog">
-        <header><h2 id="style-image-title">图片预览</h2><button id="style-image-close" type="button" aria-label="关闭图片预览">关闭</button></header>
-        <canvas id="style-image-preview" width="480" height="260"></canvas>
-        <div id="style-image-picker" hidden>
-          <canvas id="style-image-picker-canvas" width="720" height="420" aria-label="原始图片切片选择器"></canvas>
-          <small id="style-image-picker-meta">点击图片中的切片以修改引用</small>
+    <div id="style-image-dialog" class="style-image-dialog" hidden role="dialog" aria-labelledby="style-image-title">
+      <header class="style-image-header" id="style-image-drag-handle">
+        <div class="style-image-title-wrap">
+          <button id="style-image-title" class="style-image-name-btn" type="button" aria-label="选择图片">图片预览</button>
+          <span class="style-image-subtitle" id="style-image-subtitle"></span>
         </div>
-      </form>
-    </dialog>
+        <button id="style-image-close" type="button" aria-label="关闭">关闭</button>
+      </header>
+      <div id="style-image-img-list" class="style-image-img-list" hidden></div>
+      <canvas id="style-image-preview" width="480" height="260"></canvas>
+      <div id="style-image-picker" hidden>
+        <canvas id="style-image-picker-canvas" width="720" height="420" aria-label="原始图片切片选择器"></canvas>
+        <small id="style-image-picker-meta">点击图片中的切片以修改引用</small>
+      </div>
+    </div>
 
     <dialog id="settings-dialog" class="app-dialog" aria-labelledby="settings-title">
       <form method="dialog">

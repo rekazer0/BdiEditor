@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'" />
+    <link rel="stylesheet" href="/src/picker.css" />
+    <title>图片选择</title>
+  </head>
+  <body>
+    <header class="picker-toolbar">
+      <div class="picker-heading">
+        <strong id="picker-title">图片选择</strong>
+        <span id="picker-subtitle"></span>
+      </div>
+      <button id="choose-resource" type="button">选择图片资源</button>
+      <input id="resource-search" type="search" placeholder="搜索图片资源" aria-label="搜索图片资源" hidden />
+    </header>
+    <main>
+      <section id="image-picker-view" class="image-picker-view">
+        <div class="picker-canvas-stage"><canvas id="picker-canvas" width="720" height="420" aria-label="原始图片切片选择器"></canvas></div>
+        <p id="picker-meta">点击图片中的切片以修改引用</p>
+      </section>
+      <section id="resource-picker-view" class="resource-picker-view" hidden>
+        <div id="resource-picker-grid" class="resource-picker-grid"></div>
+        <p id="resource-empty" hidden>没有匹配的图片资源</p>
+      </section>
+    </main>
+    <script type="module" src="/src/picker-window.ts"></script>
+  </body>
+</html>
