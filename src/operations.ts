@@ -15,11 +15,6 @@ type ProjectTemplateFetcher = (
 const builtInProjectTemplatePaths: Record<string, string> = {
   "default-android": "/default-template.bda",
   "official-android-bds": "/default-template.bds",
-  "imitation-ios-15": "/templates/imitation-ios-15.bdi",
-  "dust-ios-14": "/templates/dust-ios-14.bdi",
-  "dust-android-26-9": "/templates/dust-android-26-9.bds",
-  "dust-ios-26-9": "/templates/dust-ios-26-9.bdi",
-  "dust-ios-18": "/templates/dust-ios-18.bdi",
 }
 
 export async function loadBuiltInProjectTemplate(

@@ -76,9 +76,9 @@ Run: `node --test tests/ui-structure.test.ts tests/operations.test.ts tests/skin
 
 Expected: all focused tests pass.
 
-Run: `rg -n "imitation-ios-15|dust-|仿ios|尘埃" index.html src tests public README.md`
+Run: `rg -n "imitation-ios-15|dust-|仿ios|尘埃" index.html src public README.md`
 
-Expected: no output.
+Expected: no production or bundled-resource references. Tests retain removed IDs only as negative regression cases.
 
 Run: `test ! -e public/templates`
 

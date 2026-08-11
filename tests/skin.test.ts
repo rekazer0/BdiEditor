@@ -20,12 +20,8 @@ test("keeps the official BDS default as an alternative template", () => {
   assert.ok(archive.names().includes("light/skin/port/py_9.ini"))
 })
 
-test("keeps the former iOS default as the imitation iOS 15-key template", () => {
-  const url = new URL("../public/templates/imitation-ios-15.bdi", import.meta.url)
-  assert.equal(existsSync(url), true)
-  const archive = SkinArchive.open(new Uint8Array(readFileSync(url)))
-  assert.equal(archive.format, "bdi")
-  assert.ok(archive.names().includes("light/skin/port/py_9.ini"))
+test("does not bundle non-official skin templates", () => {
+  assert.equal(existsSync(new URL("../public/templates", import.meta.url)), false)
 })
 
 test("changes one config while preserving other entry bytes", () => {

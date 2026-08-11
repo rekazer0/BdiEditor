@@ -20,8 +20,8 @@ test("new project command opens an accessible built-in template chooser", () => 
   assert.match(dialog, /name="project-template"[^>]*value="default-android"[^>]*checked/)
   assert.match(dialog, /百度官方 Android BDA 默认皮肤/)
   assert.match(dialog, /value="official-android-bds"/)
-  assert.match(dialog, /value="imitation-ios-15"/)
-  assert.match(dialog, /仿ios15键/)
+  assert.equal((dialog.match(/name="project-template"/g) ?? []).length, 2)
+  assert.doesNotMatch(dialog, /imitation-ios-15|dust-|仿ios|尘埃/)
   assert.match(dialog, /value="cancel"/)
   assert.match(dialog, /value="create"/)
   assert.match(main, /newProjectDialog\.showModal\(\)/)
@@ -424,10 +424,8 @@ test("canvas accepts native and browser skin file drops", () => {
   assert.match(css, /\.canvas-wrap\.drop-target\s*\{[^}]*box-shadow:/s)
 })
 
-test("new-project chooser includes the four dust templates", () => {
-  for (const id of ["dust-ios-14", "dust-android-26-9", "dust-ios-26-9", "dust-ios-18"]) {
-    assert.match(html, new RegExp(`value="${id}"`))
-  }
+test("new-project chooser contains only Baidu official templates", () => {
+  assert.doesNotMatch(html, /imitation-ios-15|dust-|仿ios|尘埃/)
 })
 
 test("candidate DOM and key canvas apply the merged skin font family and weight", () => {
