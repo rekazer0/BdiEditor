@@ -59,6 +59,7 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
       - name: Build bundles
+        shell: bash
         run: |
           ARGS="--bundles ${{ matrix.bundles }}"
           if [ -n "${{ matrix.target }}" ]; then ARGS="$ARGS --target ${{ matrix.target }}"; fi
