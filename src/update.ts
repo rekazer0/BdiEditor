@@ -3,6 +3,7 @@ export type UpdateResult =
   | { status: "available"; currentVersion: string; latestVersion: string; url: string }
 
 export const releaseUrl = "https://github.com/rekazer0/BdiEditor/releases"
+export const releaseApiUrl = "https://api.github.com/repos/rekazer0/BdiEditor/releases/latest"
 
 function versionParts(value: string): number[] | undefined {
   const match = value.trim().replace(/^v/i, "").match(/^(\d+)\.(\d+)\.(\d+)/)
@@ -19,12 +20,23 @@ export function compareVersions(left: string, right: string): number {
 }
 
 export async function checkForUpdate(currentVersion: string, fetcher = fetch): Promise<UpdateResult> {
-  const response = await fetcher(releaseUrl)
+  const response = await fetcher(releaseApiUrl)
   if (!response.ok) throw new Error(`GitHub 返回 ${response.status}`)
-  const html = await response.text()
-  const versions = [...html.matchAll(/\/rekazer0\/BdiEditor\/releases\/tag\/(v?\d+\.\d+\.\d+)(?=["'/?#])/g)]
-    .map((match) => match[1].replace(/^v/i, ""))
-    .filter((version, index, values) => values.indexOf(version) === index)
+  const body = await response.text()
+  let apiVersion: string | undefined
+  try {
+    const payload = JSON.parse(body) as { tag_name?: unknown }
+    if (typeof payload.tag_name === "string") apiVersion = payload.tag_name
+  } catch {
+    // The desktop bridge returns the releases HTML instead of GitHub API JSON.
+  }
+  const versions = [
+    ...(apiVersion ? [apiVersion] : []),
+    ...[...body.matchAll(/\/rekazer0\/BdiEditor\/releases\/tag\/(v?\d+\.\d+\.\d+)(?=["'/?#])/g)]
+      .map((match) => match[1].replace(/^v/i, "")),
+  ]
+    .map((version) => version.replace(/^v/i, ""))
+    .filter((version, index, values) => values.indexOf(version) === index && Boolean(versionParts(version)))
   const latestVersion = versions.sort((left, right) => compareVersions(right, left))[0]
   if (!latestVersion) throw new Error("GitHub Release 数据无效")
   const release = `https://github.com/rekazer0/BdiEditor/releases/tag/v${latestVersion}`

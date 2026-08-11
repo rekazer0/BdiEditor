@@ -23,6 +23,20 @@ test("reports a newer GitHub release with its download page", async () => {
   })
 })
 
+test("reads the latest release from the public GitHub API used by the web build", async () => {
+  const result = await checkForUpdate("0.6.1", async () => new Response(
+    JSON.stringify({ tag_name: "v0.7.0" }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  ))
+
+  assert.deepEqual(result, {
+    status: "available",
+    currentVersion: "0.6.1",
+    latestVersion: "0.7.0",
+    url: "https://github.com/rekazer0/BdiEditor/releases/tag/v0.7.0",
+  })
+})
+
 test("reports the installed release as current", async () => {
   const result = await checkForUpdate("0.5.10", async () => new Response(
     '<a href="/rekazer0/BdiEditor/releases/tag/v0.5.10">v0.5.10</a>',

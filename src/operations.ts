@@ -12,6 +12,10 @@ type ProjectTemplateFetcher = (
   path: string,
 ) => Promise<{ readonly ok: boolean; arrayBuffer(): Promise<ArrayBuffer> }>
 
+function fetchPublicAsset(path: string): ReturnType<typeof fetch> {
+  return fetch(new URL(path.replace(/^\//, ""), document.baseURI))
+}
+
 const builtInProjectTemplatePaths: Record<string, string> = {
   "default-android": "/default-template.bda",
   "official-android-bds": "/default-template.bds",
@@ -24,7 +28,7 @@ const builtInProjectTemplatePaths: Record<string, string> = {
 
 export async function loadBuiltInProjectTemplate(
   id: string,
-  fetcher: ProjectTemplateFetcher = (path) => fetch(path),
+  fetcher: ProjectTemplateFetcher = fetchPublicAsset,
 ): Promise<Uint8Array> {
   const path = builtInProjectTemplatePaths[id]
   if (!path) throw new Error(`未知的内置项目模板：${id}`)
