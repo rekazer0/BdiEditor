@@ -71,7 +71,7 @@ import {
   scalePanelDocument,
   validPanelFilename,
 } from "./panel-tools.ts"
-import { Preview, previewItems, type PreviewEvent } from "./preview.ts"
+import { Preview, previewContentVerticalBounds, previewItems, type PreviewEvent } from "./preview.ts"
 import { firstExistingPath, resourceImagePaths } from "./resources.ts"
 import { candidatePreview, deleteBackward, insertText } from "./simulation.ts"
 import { SkinArchive } from "./skin.ts"
@@ -262,7 +262,7 @@ let redoStack: Change[] = []
 let fileOperationRunning = false
 let firstCandidateTextVisual: TextVisual | undefined
 let candidateTextWidth = 1125
-let canvasLogicalSize: { width: number; height: number } | undefined
+let canvasLogicalSize: { width: number; height: number; panelHeight: number } | undefined
 let stylePreviewDrawID = 0
 let imagePreviewDrawID = 0
 const imagePreviewVisuals = new Map<string, Visual[]>()
@@ -879,13 +879,26 @@ function fitCanvasPreview(): void {
     canvasLogicalSize.height,
   )
   deviceShell.style.setProperty("--canvas-fit-width", `${width}px`)
+  if (device.value === "canvas") updateCanvasPanelStatus(width)
+}
+
+function updateCanvasPanelStatus(renderedWidth: number): void {
+  if (!canvasLogicalSize) return
+  panelStatus.textContent = `面板：${Math.round(canvasLogicalSize.width)} × ${Math.round(canvasLogicalSize.panelHeight)} · 预览缩放：${Math.round(renderedWidth / canvasLogicalSize.width * 100)}%`
 }
 
 new ResizeObserver(fitCanvasPreview).observe(canvasWrap)
 
 function updatePanelTools(width: number, height: number, candidateHeight = 0): void {
+  const content = previewContentVerticalBounds(
+    layoutDocument ? previewItems(layoutDocument, width, height) : [],
+    width,
+    height,
+  )
   deviceShell.style.setProperty("--canvas-width", `${width}px`)
-  canvasLogicalSize = { width, height: height + candidateHeight }
+  deviceShell.style.setProperty("--panel-visible-height", String(content.height))
+  deviceShell.style.setProperty("--panel-crop-offset", `${-(content.top / height) * 100}%`)
+  canvasLogicalSize = { width, height: content.height + candidateHeight, panelHeight: height }
   fitCanvasPreview()
   const states = availableSkinStates(...skinStateDocuments())
   const selected = skinState.value
@@ -894,6 +907,7 @@ function updatePanelTools(width: number, height: number, candidateHeight = 0): v
   skinStateControl.hidden = states.length === 0
   applySkinState(skinState.value ? Number(skinState.value) : undefined)
   requestAnimationFrame(() => {
+    if (device.value === "canvas") return
     const bounds = ($("#preview") as HTMLCanvasElement).getBoundingClientRect()
     panelStatus.textContent = `面板：${Math.round(width)} × ${Math.round(height)} · 预览缩放：${previewScalePercent(bounds.width, bounds.height, width, height)}%`
   })

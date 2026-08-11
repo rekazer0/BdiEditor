@@ -327,6 +327,8 @@ test("export menu stays above the workspace and source cursor uses matching font
   const menu = css.match(/\.toolbar-menu\s*\{[^}]+\}/s)?.[0] ?? ""
   assert.match(titlebar, /z-index:\s*20/)
   assert.match(menu, /z-index:\s*100/)
+  assert.match(menu, /background:\s*var\(--menu\)/)
+  assert.match(css, /--menu:\s*rgb\(255 255 255 \/ 92%\)/)
   assert.match(css, /#source-highlight code\s*\{[^}]*font:\s*inherit/s)
   assert.doesNotMatch(css, /\.token-section\s*\{[^}]*font-weight/s)
 })
@@ -359,6 +361,8 @@ test("canvas mode shrinks below parsed panel width but never enlarges past it", 
   assert.match(main, /toolbarCanvas\.style\.setProperty\("--toolbar-width", String\(width\)\)/)
   assert.match(main, /toolbarCanvas\.style\.setProperty\("--toolbar-height", String\(height\)\)/)
   assert.match(main, /deviceShell\.style\.setProperty\("--canvas-width", `\$\{width\}px`\)/)
+  assert.doesNotMatch(main, /canvasMaximumWidth/)
+  assert.match(main, /function updateCanvasPanelStatus\(/)
   assert.match(css, /\.device-shell\.canvas-only\s*\{[^}]*width:\s*min\(100%, var\(--canvas-fit-width, var\(--canvas-width, 1080px\)\)\)/s)
   assert.doesNotMatch(css, /\.device-shell\.canvas-only\s*\{[^}]*920px/s)
   assert.match(
@@ -369,6 +373,12 @@ test("canvas mode shrinks below parsed panel width but never enlarges past it", 
     css,
     /\.device-shell\.canvas-only #preview\s*\{[^}]*width:\s*100%[^}]*max-height:\s*none/s,
   )
+  assert.match(html, /<div id="panel-viewport">\s*<canvas id="preview"/)
+  assert.match(
+    css,
+    /\.device-shell\.canvas-only #panel-viewport\s*\{[^}]*aspect-ratio:\s*var\(--canvas-width\)\s*\/\s*var\(--panel-visible-height\)[^}]*overflow:\s*hidden/s,
+  )
+  assert.match(css, /\.device-shell\.canvas-only #preview\s*\{[^}]*transform:\s*translateY\(var\(--panel-crop-offset\)\)/s)
   assert.match(
     css,
     /\.device-shell\.canvas-only \.device-screen\s*\{[^}]*height:\s*auto[^}]*overflow:\s*visible/s,
@@ -513,6 +523,7 @@ test("resource detail uses icon tools and previews the selected slice", () => {
   assert.match(html, /<canvas id="tile-preview"/)
   for (const id of ["resource-back", "select-tile", "move-tile", "new-tile", "delete-tile"]) {
     assert.match(html, new RegExp(`<button id="${id}" class="[^"]*toolbar-button[^"]*"[^>]*aria-label=`))
+    assert.match(html, new RegExp(`<button id="${id}"[\\s\\S]*?<span class="[^"]*icon[^"]*system-symbol`))
   }
   assert.match(main, /function drawTilePreview\(/)
   assert.match(css, /#tile-preview-wrap\s*\{[^}]*width:\s*100%/s)
@@ -717,7 +728,7 @@ test("panel tools keep their toolbar order and each layout's native aspect ratio
 })
 
 test("toolbar menus use a readable frosted surface", () => {
-  assert.match(css, /\.toolbar-menu\s*\{[^}]*background:\s*var\(--panel\)/s)
+  assert.match(css, /\.toolbar-menu\s*\{[^}]*background:\s*var\(--menu\)/s)
 })
 
 test("checkerboard canvas has no compositing seam", () => {

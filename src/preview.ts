@@ -351,6 +351,21 @@ export function previewItems(
   }), ...list]
 }
 
+export function previewContentVerticalBounds(
+  items: readonly Pick<PreviewItem, "rect">[],
+  panelWidth: number,
+  panelHeight: number,
+): { top: number; height: number } {
+  const content = items.filter(({ rect }) =>
+    rect.width > 0 && rect.height > 0 &&
+    !(rect.x <= 0 && rect.y <= 0 && rect.width >= panelWidth && rect.height >= panelHeight),
+  )
+  if (!content.length) return { top: 0, height: panelHeight }
+  const top = Math.max(0, Math.min(...content.map(({ rect }) => rect.y)))
+  const bottom = Math.max(...content.map(({ rect }) => rect.y + rect.height))
+  return { top, height: Math.max(1, bottom - top) }
+}
+
 export class Preview {
   private readonly canvas: HTMLCanvasElement
   private readonly onEvent: (event: PreviewEvent) => void

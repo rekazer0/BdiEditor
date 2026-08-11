@@ -133,7 +133,7 @@
                   </div>
                   <div id="toolbar-strip" hidden title="在编辑模式下点击可打开工具栏配置"><canvas id="toolbar-preview" width="1125" height="133"></canvas></div>
                 </div>
-                <canvas id="preview" width="1125" height="650"></canvas>
+                <div id="panel-viewport"><canvas id="preview" width="1125" height="650"></canvas></div>
                 <div class="keyboard-accessories" aria-hidden="true">
                   <span class="system-symbol" data-system-symbol="globe" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13"/><path d="M3 16h26M16 3c4 3.7 6 8 6 13s-2 9.3-6 13M16 3c-4 3.7-6 8-6 13s2 9.3 6 13"/></svg></span>
                   <span class="system-symbol" data-system-symbol="mic" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 32 32"><rect x="11" y="3" width="10" height="18" rx="5"/><path d="M7 16v1a9 9 0 0 0 18 0v-1M16 26v4M11 30h10"/></svg></span>
@@ -293,16 +293,16 @@
           </div>
           <div id="resource-detail" hidden>
             <div class="resource-detail-heading">
-              <button id="resource-back" class="toolbar-button" type="button" title="返回图片列表" aria-label="返回图片列表"><span class="system-symbol" data-system-symbol="chevron.left" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m12 4-6 6 6 6"/></svg></span></button>
+              <button id="resource-back" class="toolbar-button" type="button" title="返回图片列表" aria-label="返回图片列表"><span class="icon system-symbol" data-system-symbol="chevron.left" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m12 4-6 6 6 6"/></svg></span></button>
               <div><strong id="resource-name">图片</strong><small id="resource-meta"></small></div>
             </div>
             <div class="tile-toolbar">
               <div class="tile-mode-control" aria-label="切片操作模式">
-                <button id="select-tile" class="toolbar-button active" type="button" data-tile-mode="select" title="选择切片" aria-label="选择切片"><span class="system-symbol" data-system-symbol="cursorarrow" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 2.5 15.5 11l-5 .8 2.8 5-2.5 1.4-2.7-5L4 16z"/></svg></span></button>
-                <button id="move-tile" class="toolbar-button" type="button" data-tile-mode="move" title="移动切片" aria-label="移动切片"><span class="system-symbol" data-system-symbol="arrow.up.and.down.and.arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 2v16m0-16L7 5m3-3 3 3M2 10h16m-16 0 3-3m-3 3 3 3m13-3-3-3m3 3-3 3m-5 5-3-3m3 3 3-3"/></svg></span></button>
+                <button id="select-tile" class="toolbar-button active" type="button" data-tile-mode="select" title="选择切片" aria-label="选择切片"><span class="icon system-symbol" data-system-symbol="cursorarrow" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 2.5 15.5 11l-5 .8 2.8 5-2.5 1.4-2.7-5L4 16z"/></svg></span></button>
+                <button id="move-tile" class="toolbar-button" type="button" data-tile-mode="move" title="移动切片" aria-label="移动切片"><span class="icon system-symbol" data-system-symbol="arrow.up.and.down.and.arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 2v16m0-16L7 5m3-3 3 3M2 10h16m-16 0 3-3m-3 3 3 3m13-3-3-3m3 3-3 3m-5 5-3-3m3 3 3-3"/></svg></span></button>
               </div>
-              <button id="new-tile" class="toolbar-button" type="button" title="新建切片" aria-label="新建切片"><span class="system-symbol" data-system-symbol="plus.rectangle" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M10 7v6M7 10h6"/></svg></span></button>
-              <button id="delete-tile" class="toolbar-button" type="button" title="删除选中切片" aria-label="删除选中切片"><span class="system-symbol" data-system-symbol="trash" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 6h12M8 3h4l1 3H7zm-2 3 1 9h8l1-9M8 9v6m4-6v6"/></svg></span></button>
+              <button id="new-tile" class="toolbar-button" type="button" title="新建切片" aria-label="新建切片"><span class="icon system-symbol" data-system-symbol="plus.rectangle" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M10 7v6M7 10h6"/></svg></span></button>
+              <button id="delete-tile" class="toolbar-button" type="button" title="删除选中切片" aria-label="删除选中切片"><span class="icon system-symbol" data-system-symbol="trash" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 6h12M8 3h4l1 3H7zm-2 3 1 9h8l1-9M8 9v6m4-6v6"/></svg></span></button>
             </div>
           <div id="tile-inspector" class="inspector-group">
             <div class="tile-heading">

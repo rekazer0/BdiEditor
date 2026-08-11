@@ -17,6 +17,7 @@ import {
   stateStyleValue,
   validPanelFilename,
 } from "../src/panel-tools.ts"
+import { previewContentVerticalBounds } from "../src/preview.ts"
 
 test("reads the S states used by official Baidu layouts", () => {
   const document = IniDocument.parse([
@@ -59,6 +60,15 @@ test("fits the candidate toolbar and panel with one shared scale", () => {
   assert.equal(canvasFitWidth(1200, 900, 1080, 704), 1080)
   assert.equal(canvasFitWidth(900, 900, 1080, 704), 900)
   assert.equal(canvasFitWidth(1200, 528, 1080, 704), 810)
+})
+
+test("crops empty panel space while preserving every keyboard row", () => {
+  assert.deepEqual(previewContentVerticalBounds([
+    { rect: { x: 0, y: 143, width: 180, height: 430 } },
+    { rect: { x: 180, y: 143, width: 200, height: 120 } },
+    { rect: { x: 180, y: 580, width: 200, height: 120 } },
+  ], 1080, 573), { top: 143, height: 557 })
+  assert.deepEqual(previewContentVerticalBounds([], 1080, 573), { top: 0, height: 573 })
 })
 
 test("scales official panel geometry with independent horizontal and vertical ratios", () => {
