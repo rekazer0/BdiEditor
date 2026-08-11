@@ -7,6 +7,10 @@ const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8")
 const main = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8")
 const preview = readFileSync(new URL("../src/preview.ts", import.meta.url), "utf8")
 const vite = readFileSync(new URL("../vite.config.ts", import.meta.url), "utf8")
+const pickerHtml = readFileSync(new URL("../picker.html", import.meta.url), "utf8")
+const pickerMain = readFileSync(new URL("../src/picker-window.ts", import.meta.url), "utf8")
+const pickerCss = readFileSync(new URL("../src/picker.css", import.meta.url), "utf8")
+const capabilities = readFileSync(new URL("../src-tauri/capabilities/default.json", import.meta.url), "utf8")
 
 test("new project command opens an accessible built-in template chooser", () => {
   assert.match(
@@ -22,7 +26,7 @@ test("new project command opens an accessible built-in template chooser", () => 
   assert.match(dialog, /百度官方 Android BDA 默认皮肤/)
   assert.match(dialog, /value="official-android-bds"/)
   assert.equal((dialog.match(/name="project-template"/g) ?? []).length, 7)
-  assert.match(dialog, /内置皮肤为互联网下载整理，如有侵权请联系作者下架。/)
+  assert.match(dialog, /内置皮肤为互联网搜集整理，仅限技术交流请勿用于商业用途。如有侵权请联系作者下架。/)
   for (const [id, label] of [
     ["oppo-swipe-down", "OPPO皮肤加下滑功能"],
     ["oppo-dual-color", "OPPO默认双色皮肤"],
@@ -146,6 +150,22 @@ test("layout remains hidden state while preview controls replace inspector layou
   assert.match(main, /"py_26\.ini": \{ group: "键盘布局"/)
 })
 
+test("desktop editor grid keeps the inspector beside the workspace", () => {
+  const editor = html.slice(html.indexOf("<main>"), html.indexOf("</main>") + 7)
+  assert.match(
+    editor,
+    /<aside class="sidebar">[\s\S]*?<section class="workspace">[\s\S]*?<div class="inspector-resize-handle"[\s\S]*?<section class="source">/,
+  )
+  assert.match(
+    css,
+    /main\s*\{[^}]*grid-template-columns:\s*220px minmax\(500px, 1fr\) 4px var\(--inspector-width, 340px\)/s,
+  )
+  assert.match(
+    css,
+    /@media \(max-width: 1060px\)[\s\S]*?\.inspector-resize-handle,\s*\.source\s*\{[^}]*display:\s*none/s,
+  )
+})
+
 test("single-theme skins disable unavailable theme choices", () => {
   assert.match(main, /button\.disabled = Boolean\(archive\).*button\.dataset\.themeChoice/s)
   assert.match(main, /if \(!availableThemes\.includes\(theme\.value\)\)[^\n]+\n\s*syncSegmentedControls\(\)/)
@@ -180,6 +200,10 @@ test("transparent candidate preview is not painted by a native button", () => {
 test("typing updates simulation state without rebuilding the complete skin preview", () => {
   assert.match(main, /simulatedOutput\.addEventListener\("input", refreshSimulationState\)/)
   assert.doesNotMatch(main, /simulatedOutput\.addEventListener\("input", \(\) => refreshPreview\(\)\)/)
+})
+
+test("canvas typing preserves the scaled candidate row height", () => {
+  assert.match(css, /\.device-shell\.canvas-only #candidate-area:has\(#candidate-composition:not\(\[hidden\]\)\)\s*\{[^}]*height:\s*var\(--toolbar-viewport-height, 133px\)[^}]*grid-template-rows:\s*40fr 93fr/s)
 })
 
 test("toolbar availability is invalidated before lightweight typing refreshes", () => {
@@ -292,14 +316,15 @@ test("color controls preserve ARGB alpha while using native color inputs", () =>
   assert.match(css, /\.color-control input\[type="color"\]\s*\{[^}]*width:\s*28px[^}]*height:\s*28px/s)
 })
 
-test("key image fields preview processed atlas slices in a dialog", () => {
-  assert.match(html, /data-image-preview="normal"/)
-  assert.match(html, /data-image-preview="highlighted"/)
-  assert.match(html, /id="style-image-dialog"/)
-  assert.match(main, /updateImagePreviews\(\)/)
-  assert.match(main, /drawVisualPreview\(styleImagePreview, visuals, false\)/)
-  assert.doesNotMatch(main, /styleImageDialog\.showModal\(\)/)
-  assert.match(main, /styleImageDialog\.show\(\)/)
+test("background style previews open processed atlas slices in a native window", () => {
+  assert.match(html, /data-style-preview="back:normal"/)
+  assert.match(html, /data-style-preview="back:highlighted"/)
+  assert.doesNotMatch(html, /data-image-preview=/)
+  assert.match(main, /new WebviewWindow\(label,/)
+  assert.match(main, /showPickerWindow\("image-picker", "image", "图片切片"/)
+  assert.match(pickerHtml, /id="picker-canvas"/)
+  assert.match(pickerHtml, /href="\/src\/picker\.css"/)
+  assert.match(capabilities, /"image-picker"/)
 })
 
 test("selected key source is highlighted only in the source view", () => {
@@ -316,11 +341,14 @@ test("export moved left and more menu opens settings and about dialogs", () => {
   assert.match(html, /https:\/\/github\.com\/rekazer0\/BdiEditor/)
 })
 
-test("image preview is a non-modal panel closed by an explicit control", () => {
-  const dialog = html.slice(html.indexOf('<dialog id="style-image-dialog"'), html.indexOf("</dialog>", html.indexOf('<dialog id="style-image-dialog"')))
-  assert.match(dialog, /id="style-image-close"[^>]*aria-label="关闭图片预览"/)
-  assert.match(main, /styleImageClose\.addEventListener\("click", \(\) => styleImageDialog\.close\(\)\)/)
-  assert.doesNotMatch(css, /\.style-image-dialog::backdrop\s*\{[^}]*background:/s)
+test("image and resource pickers are peer native windows", () => {
+  const showPicker = main.slice(main.indexOf("async function showPickerWindow"), main.indexOf("function openResourcePickerWindow"))
+  assert.match(main, /showPickerWindow\("image-picker", "image"/)
+  assert.match(main, /showPickerWindow\("resource-picker", "resource"/)
+  assert.match(showPicker, /url: `picker\.html\?mode=\$\{mode\}`/)
+  assert.doesNotMatch(showPicker, /parent:/)
+  assert.match(pickerMain, /emitTo\("main", "resource-picker-open"\)/)
+  assert.match(pickerMain, /emitTo\("main", "resource-picker-select"/)
 })
 
 test("export menu stays above the workspace and source cursor uses matching font metrics", () => {
@@ -363,15 +391,14 @@ test("canvas mode shrinks below parsed panel width but never enlarges past it", 
   assert.match(main, /toolbarCanvas\.style\.setProperty\("--toolbar-height", String\(height\)\)/)
   assert.match(main, /deviceShell\.style\.setProperty\("--canvas-width", `\$\{width\}px`\)/)
   assert.match(main, /deviceShell\.style\.setProperty\("--canvas-ratio-width", String\(width\)\)/)
-  assert.match(main, /window\.addEventListener\("resize", scheduleFitCanvasPreview\)/)
-  assert.match(main, /window\.visualViewport\?\.addEventListener\("resize", scheduleFitCanvasPreview\)/)
+  assert.match(main, /new ResizeObserver\(scheduleFitCanvasPreview\)\.observe\(canvasWrap\)/)
   assert.doesNotMatch(main, /canvasMaximumWidth/)
   assert.match(main, /function updateCanvasPanelStatus\(/)
   assert.match(css, /\.device-shell\.canvas-only\s*\{[^}]*width:\s*min\(100%, var\(--canvas-fit-width, var\(--canvas-width, 1080px\)\)\)/s)
   assert.doesNotMatch(css, /\.device-shell\.canvas-only\s*\{[^}]*920px/s)
   assert.match(
     css,
-    /\.device-shell\.canvas-only #toolbar-preview\s*\{[^}]*aspect-ratio:\s*var\(--toolbar-width\)\s*\/\s*var\(--toolbar-height\)[^}]*height:\s*auto/s,
+    /\.device-shell\.canvas-only #toolbar-preview\s*\{[^}]*height:\s*var\(--toolbar-viewport-height, auto\)/s,
   )
   assert.match(
     css,
@@ -380,10 +407,10 @@ test("canvas mode shrinks below parsed panel width but never enlarges past it", 
   assert.match(html, /<div id="panel-viewport">\s*<canvas id="preview"/)
   assert.match(
     css,
-    /\.device-shell\.canvas-only #panel-viewport\s*\{[^}]*aspect-ratio:\s*var\(--canvas-ratio-width, 1080\)\s*\/\s*var\(--panel-visible-height, 608\)[^}]*overflow:\s*hidden/s,
+    /\.device-shell\.canvas-only #panel-viewport\s*\{[^}]*height:\s*var\(--panel-viewport-height, auto\)[^}]*overflow:\s*hidden/s,
   )
   assert.match(css, /\.device-shell\.canvas-only\s*\{[^}]*transition:\s*none/s)
-  assert.match(css, /\.device-shell\.canvas-only #preview\s*\{[^}]*transform:\s*translateY\(var\(--panel-crop-offset\)\)/s)
+  assert.match(css, /\.device-shell\.canvas-only #preview\s*\{[^}]*transform:\s*none/s)
   assert.match(
     css,
     /\.device-shell\.canvas-only \.device-screen\s*\{[^}]*height:\s*auto[^}]*overflow:\s*visible/s,
@@ -512,11 +539,13 @@ test("selecting a PNG opens Properties and disables Source", () => {
 test("resource detail exposes slice navigation and editing controls", () => {
   assert.match(html, /id="resource-back"/)
   assert.match(html, /id="new-tile"/)
+  assert.match(html, /id="duplicate-tile"/)
   assert.match(html, /id="delete-tile"/)
   assert.match(html, /data-tile-mode="select"/)
   assert.match(html, /data-tile-mode="move"/)
   assert.match(main, /function moveSelectedTile\(/)
   assert.match(main, /duplicateTileSlice\(/)
+  assert.match(main, /function duplicateSelectedTile\(\)[\s\S]*?commitTile\(duplicateTileSlice\(existing, nextTileIndex\(tileDocument\)\)\)/)
   assert.match(main, /deleteSelectedTile\(/)
 })
 
@@ -530,12 +559,32 @@ test("resource editing keeps mode switching and TIL source context working", () 
 
 test("resource detail uses icon tools and previews the selected slice", () => {
   assert.match(html, /<canvas id="tile-preview"/)
-  for (const id of ["resource-back", "select-tile", "move-tile", "new-tile", "delete-tile"]) {
+  for (const id of ["resource-back", "select-tile", "move-tile", "new-tile", "duplicate-tile", "delete-tile"]) {
     assert.match(html, new RegExp(`<button id="${id}" class="[^"]*toolbar-button[^"]*"[^>]*aria-label=`))
     assert.match(html, new RegExp(`<button id="${id}"[\\s\\S]*?<span class="[^"]*icon[^"]*system-symbol`))
   }
   assert.match(main, /function drawTilePreview\(/)
+  assert.match(main, /strokeRect\(destination\.x \+ 1, destination\.y \+ 1, destination\.width - 2, destination\.height - 2\)/)
   assert.match(css, /#tile-preview-wrap\s*\{[^}]*width:\s*100%/s)
+})
+
+test("action fields offer every Baidu function code while remaining editable", () => {
+  assert.equal((html.match(/list="baidu-action-codes"/g) ?? []).length, 6)
+  assert.match(html, /<datalist id="baidu-action-codes"><\/datalist>/)
+  assert.match(main, /Array\.from\(\{ length: 99 \}/)
+  assert.match(main, /new Option\(describeAction\(value\), value\)/)
+})
+
+test("resource gallery adds columns with inspector width and starts at a useful proportion", () => {
+  assert.match(css, /\.resource-gallery\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit, minmax\(140px, 170px\)\)/s)
+  assert.match(css, /\.resource-item\s*\{[^}]*max-width:\s*170px/s)
+  assert.match(css, /\.resource-item\s*\{[^}]*grid-template-rows:\s*60px auto auto/s)
+  assert.match(html, /id="resource-search"[^>]*type="search"/)
+  assert.match(main, /resourceSearch\.value\.trim\(\)\.toLowerCase\(\)/)
+  assert.match(css, /#resource-list-view \.inspector-title\s*\{[^}]*grid-template-columns:\s*auto minmax\(160px, 1fr\) auto/s)
+  assert.match(css, /#resource-list-view \.inspector-title #resource-search:focus\s*\{[^}]*border-color:\s*var\(--accent\)/s)
+  assert.match(main, /Math\.round\(window\.innerWidth \* 0\.28\)/)
+  assert.match(main, /inspectorWidthV3/)
 })
 
 test("resource slices keep guides and source selection in sync", () => {
@@ -563,30 +612,30 @@ test("hiding guides cancels active slice drawing", () => {
   assert.match(setter, /if \(!enabled\) setDrawingTile\(false\)/)
 })
 
-test("image style properties use large previews and text styles can be hidden", () => {
-  assert.match(html, /data-background-style-field="NM_IMG"[^>]*\/>/)
-  assert.match(html, /data-background-style-field="HL_IMG"[^>]*\/>/)
+test("key inspector keeps style references together and text styles can be hidden", () => {
+  const advanced = html.match(/<summary>样式引用、文字与图片<\/summary>([\s\S]*?)<\/details>/)?.[1] ?? ""
+  assert.doesNotMatch(advanced, /正常状态图片|按下状态图片|data-background-style-field=/)
+  assert.match(advanced, /背景样式引用[\s\S]*前景样式引用/)
+  assert.match(css, /\.appearance-fields\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/s)
   assert.match(html, /data-text-style/)
   assert.match(main, /textStyleLabels/)
-  assert.match(css, /\.image-resource-field[\s\S]*\.image-preview-button/)
   assert.match(css, /\.style-field\s*\{[^}]*grid-template-columns:\s*30% minmax\(0, 70%\)/s)
   assert.match(css, /\.compact-style-preview\s*\{[^}]*width:\s*100%[^}]*height:\s*44px/s)
   assert.match(css, /\.style-preview-pair \.style-preview-button\s*\{[^}]*flex:\s*1/s)
-  assert.doesNotMatch(css, /\.image-resource-field \.style-field\s*\{[^}]*grid-template-columns:/s)
 })
 
 test("image previews preserve aspect ratio and open the TIL slice picker", () => {
   assert.match(main, /function openImageSlicePicker\(/)
   assert.match(main, /tileSliceAt\(pickerSlices/)
-  assert.match(main, /styleImagePickerCanvas/)
+  assert.match(pickerMain, /const selected = tileSliceAt\(imagePayload\.slices, point\)/)
   assert.match(main, /const scale = Math\.min\(canvas\.width \/ sourceWidth, canvas\.height \/ sourceHeight\)/)
   assert.match(main, /styleImagePickerCanvas\.height = Math\.max\(1, Math\.round\(pickerImage\.naturalHeight \* scale\)\)/)
-  assert.match(css, /#style-image-picker-canvas/)
-  assert.match(css, /#style-image-picker-canvas\s*\{[^}]*width:\s*auto[^}]*max-width:\s*80%/s)
-  assert.match(css, /\.style-image-dialog\s*\{[^}]*width:\s*min\(80vw, 1200px\)/s)
+  assert.match(pickerCss, /#picker-canvas/)
+  assert.match(pickerCss, /#picker-canvas\s*\{[^}]*width:\s*auto[^}]*max-width:\s*100%/s)
+  assert.match(main, /width: 1100, 760|"图片切片", 1100, 760/)
   assert.match(main, /Math\.min\(960 \/ pickerImage\.naturalWidth, 640 \/ pickerImage\.naturalHeight\)/)
   assert.match(css, /#style-image-preview\[hidden\],[\s\S]*#style-image-picker\[hidden\]\s*\{\s*display:\s*none/s)
-  assert.match(css, /\.style-image-dialog\s*\{[^}]*z-index:\s*200/s)
+  assert.match(capabilities, /core:webview:allow-create-webview-window/)
 })
 
 test("interaction preview cannot change an image slice reference", () => {
@@ -606,9 +655,23 @@ test("loading another archive closes and fully resets the image slice picker", (
   assert.match(cleanup, /pickerSelectedIndex = undefined/)
   assert.match(cleanup, /styleImagePicker\.hidden = true/)
   assert.match(cleanup, /styleImagePreview\.hidden = false/)
-  assert.match(cleanup, /if \(styleImageDialog\.open\) styleImageDialog\.close\(\)/)
+  assert.match(cleanup, /WebviewWindow\.getByLabel\(label\).*pickerWindow\?\.close\(\)/s)
   assert.match(main, /async function loadArchive[\s\S]*?clearImageSlicePicker\(\)\s*archive = nextArchive/)
-  assert.match(main, /styleImageDialog\.addEventListener\("close", clearImageSlicePicker\)/)
+})
+
+test("key inspector keeps common fields visible and collapses advanced controls", () => {
+  const common = html.slice(html.indexOf('class="inspector-group key-only primary-key-fields"'), html.indexOf("</div>\n          </div>", html.indexOf('class="inspector-group key-only primary-key-fields"')))
+  assert.match(common, /data-key-field="SHOW"[\s\S]*?data-key-field="CENTER"/)
+  assert.match(html, /<details class="inspector-group inspector-disclosure key-only">\s*<summary>布局<\/summary>/)
+  assert.match(html, /<summary>样式引用、文字与图片<\/summary>/)
+  assert.match(html, /<summary>滑动与长按<\/summary>/)
+  assert.match(css, /\.inspector-disclosure > summary/)
+})
+
+test("visible Chinese UI text contains no replacement characters", () => {
+  assert.doesNotMatch(`${html}\n${main}\n${pickerHtml}\n${pickerMain}`, /�/)
+  assert.match(html, /皮肤图片/)
+  assert.match(main, /naturalWidth} × \$\{image\.naturalHeight}/)
 })
 
 test("preview interactions keep the sidebar on the rendered keyboard file", () => {

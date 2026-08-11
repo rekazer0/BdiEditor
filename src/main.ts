@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core"
-import { listen } from "@tauri-apps/api/event"
+import { emitTo, listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { message, open, save } from "@tauri-apps/plugin-dialog"
 import "./style.css"
 import { previewPageTransition, previewStateFromAction } from "./actions.ts"
@@ -157,9 +158,6 @@ const quickInspector = $("#quick-inspector")
 const selectedKeyName = $("#selected-key")
 const keyFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-key-field]"))
 const styleFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-style-field]"))
-const backgroundStyleFields = Array.from(
-  document.querySelectorAll<HTMLInputElement>("[data-background-style-field]"),
-)
 const keyboardFields = Array.from(
   document.querySelectorAll<HTMLInputElement>("[data-keyboard-field]"),
 )
@@ -182,6 +180,7 @@ const layoutActionButtons = Array.from(
 const actionMeaningNodes = Array.from(
   document.querySelectorAll<HTMLElement>("[data-action-meaning]"),
 )
+const baiduActionCodes = $("#baidu-action-codes") as HTMLDataListElement
 const inspectorTabButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-inspector-tab]"),
 )
@@ -207,12 +206,19 @@ const resourceBackButton = $("#resource-back") as HTMLButtonElement
 const resourceName = $("#resource-name")
 const resourceMeta = $("#resource-meta")
 const resourceCount = $("#resource-count")
+const resourceSearch = $("#resource-search") as HTMLInputElement
 const resourceGallery = $("#resource-gallery")
+const resourceUploadButton = $("#resource-upload") as HTMLButtonElement
+const resourceDownloadButton = $("#resource-download") as HTMLButtonElement
+const resourceDeleteButton = $("#resource-delete") as HTMLButtonElement
+const resourceUploadInput = $("#resource-upload-input") as HTMLInputElement
+const inspectorResizeHandle = $("#inspector-resize-handle") as HTMLDivElement
 const tileInspector = $("#tile-inspector")
 const tileTitle = $("#tile-title")
 const tilePreviewWrap = $("#tile-preview-wrap")
 const tilePreview = $("#tile-preview") as HTMLCanvasElement
 const newTileButton = $("#new-tile") as HTMLButtonElement
+const duplicateTileButton = $("#duplicate-tile") as HTMLButtonElement
 const deleteTileButton = $("#delete-tile") as HTMLButtonElement
 const tileModeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-tile-mode]"))
 const tileSourceFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-tile-source]"))
@@ -232,11 +238,11 @@ const orientationChoiceButtons = Array.from(document.querySelectorAll<HTMLButton
 const stylePreviewButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-style-preview], [data-style-preview-field]"),
 )
-const imagePreviewButtons = Array.from(
-  document.querySelectorAll<HTMLButtonElement>("[data-image-preview]"),
-)
-const styleImageDialog = $("#style-image-dialog") as HTMLDialogElement
+const styleImageDialog = $("#style-image-dialog") as HTMLDivElement
 const styleImageClose = $("#style-image-close") as HTMLButtonElement
+const styleImageTitle = $("#style-image-title") as HTMLButtonElement
+const styleImageSubtitle = $("#style-image-subtitle") as HTMLSpanElement
+const styleImageImgList = $("#style-image-img-list") as HTMLDivElement
 const styleImagePreview = $("#style-image-preview") as HTMLCanvasElement
 const styleImagePicker = $("#style-image-picker")
 const styleImagePickerCanvas = $("#style-image-picker-canvas") as HTMLCanvasElement
@@ -264,8 +270,6 @@ let firstCandidateTextVisual: TextVisual | undefined
 let candidateTextWidth = 1125
 let canvasLogicalSize: { width: number; height: number; panelHeight: number } | undefined
 let stylePreviewDrawID = 0
-let imagePreviewDrawID = 0
-const imagePreviewVisuals = new Map<string, Visual[]>()
 let pickerURL = ""
 let pickerImage: HTMLImageElement | undefined
 let pickerPath = ""
@@ -273,6 +277,16 @@ let pickerSlices: TileSlice[] = []
 let pickerScale = 1
 let pickerOffset: TilePoint = { x: 0, y: 0 }
 let pickerTarget: { source: "BACK_STYLE" | "FORE_STYLE"; property: "NM_IMG" | "HL_IMG" } | undefined
+type NativeImagePickerPayload = {
+  path: string
+  dataURL: string
+  slices: TileSlice[]
+  selectedIndex?: number
+  editable: boolean
+}
+type NativeResourcePickerPayload = { path: string; dataURL: string }[]
+let nativeImagePickerPayload: NativeImagePickerPayload | undefined
+let nativeResourcePickerPayload: NativeResourcePickerPayload = []
 const processedPreviewVisuals = new Map<HTMLButtonElement, Visual[]>()
 let selectedFileButton: HTMLElement | undefined
 let sidebarView: "overview" | "source" = "overview"
@@ -510,7 +524,7 @@ function applyModeState(): void {
   replaceAssetButton.disabled = !editing
   quickInspector.dataset.readonly = editing ? "false" : "true"
   if (!editing) {
-    for (const field of [...keyFields, ...styleFields, ...backgroundStyleFields, ...keyboardFields, ...toolbarFields, ...skinFields, ...gapFields]) {
+    for (const field of [...keyFields, ...styleFields, ...keyboardFields, ...toolbarFields, ...skinFields, ...gapFields]) {
       field.disabled = true
     }
     for (const button of layoutActionButtons) button.disabled = true
@@ -881,7 +895,15 @@ function fitCanvasPreview(): void {
     canvasLogicalSize.width,
     canvasLogicalSize.height,
   )
+  const scale = width / canvasLogicalSize.width
+  const panelViewportHeight = Math.round(canvasLogicalSize.panelHeight * scale)
   deviceShell.style.setProperty("--canvas-fit-width", `${width}px`)
+  deviceShell.style.setProperty("--panel-viewport-height", `${panelViewportHeight}px`)
+  const toolbarHeight = Number(toolbarCanvas.style.getPropertyValue("--toolbar-height") || "0")
+  const toolbarWidth = Number(toolbarCanvas.style.getPropertyValue("--toolbar-width") || "0")
+  if (toolbarWidth > 0 && toolbarHeight > 0) {
+    deviceShell.style.setProperty("--toolbar-viewport-height", `${Math.round(toolbarHeight * scale)}px`)
+  }
   if (device.value === "canvas") updateCanvasPanelStatus(width)
 }
 
@@ -891,10 +913,12 @@ function updateCanvasPanelStatus(renderedWidth: number): void {
 }
 
 let fitCanvasDebounce: ReturnType<typeof setTimeout> | undefined
+let canvasFitFrozen = false
 
 function scheduleFitCanvasPreview(): void {
+  if (canvasFitFrozen) return
   clearTimeout(fitCanvasDebounce)
-  fitCanvasDebounce = setTimeout(fitCanvasPreview, 200)
+  fitCanvasDebounce = setTimeout(fitCanvasPreview, 50)
 }
 
 new ResizeObserver(scheduleFitCanvasPreview).observe(canvasWrap)
@@ -908,7 +932,7 @@ function updatePanelTools(width: number, height: number, candidateHeight = 0): v
   deviceShell.style.setProperty("--canvas-width", `${width}px`)
   deviceShell.style.setProperty("--canvas-ratio-width", String(width))
   deviceShell.style.setProperty("--panel-visible-height", String(content.height))
-  deviceShell.style.setProperty("--panel-crop-offset", `${-(content.top / height) * 100}%`)
+  deviceShell.style.removeProperty("--panel-crop-offset")
   canvasLogicalSize = { width, height: content.height + candidateHeight, panelHeight: height }
   fitCanvasPreview()
   const states = availableSkinStates(...skinStateDocuments())
@@ -1235,12 +1259,16 @@ function drawTilePreview(): void {
     x, y, width, height,
     destination.x, destination.y, destination.width, destination.height,
   )
+  context.lineWidth = 2
+  context.strokeStyle = "#ff3b30"
+  context.strokeRect(destination.x + 1, destination.y + 1, destination.width - 2, destination.height - 2)
 }
 
 function populateTileInspector(): void {
   const slice = slices.find((item) => item.index === selectedTileIndex)
   tileInspector.hidden = !selectedResourcePath
   newTileButton.disabled = !selectedResourcePath || !isEditing()
+  duplicateTileButton.disabled = !slice || !isEditing()
   deleteTileButton.disabled = !slice || !isEditing()
   tileTitle.textContent = slice ? `IMG${slice.index}` : "切片"
   for (const field of tileSourceFields) {
@@ -1299,7 +1327,9 @@ function renderResourceInspector(): void {
   if (!archive) return
   releaseResourceURLs()
   resourceGallery.replaceChildren()
+  const query = resourceSearch.value.trim().toLowerCase()
   const paths = resourceImagePaths(archive.names(), theme.value, orientation.value)
+    .filter((path) => !query || path.toLowerCase().includes(query))
   resourceCount.textContent = `${paths.length} 张图片`
   resourceListView.hidden = Boolean(selectedResourcePath)
   resourceDetail.hidden = !selectedResourcePath
@@ -1325,9 +1355,27 @@ function renderResourceInspector(): void {
       meta.textContent = `${image.naturalWidth} × ${image.naturalHeight} · ${meta.textContent}`
     })
     button.append(image, name, meta)
-    button.addEventListener("click", () => selectResourceImage(path))
+    let clickTimer: ReturnType<typeof setTimeout> | undefined
+    button.addEventListener("click", () => {
+      clearTimeout(clickTimer)
+      clickTimer = setTimeout(() => {
+        selectGalleryItem(path, resourceGallery)
+      }, 200)
+    })
+    button.addEventListener("dblclick", () => {
+      clearTimeout(clickTimer)
+      selectGalleryItem(path, resourceGallery)
+      selectResourceImage(path)
+    })
     resourceGallery.append(button)
   }
+  // Restore selection state after re-render
+  if (selectedResourceGalleryPath) {
+    for (const item of resourceGallery.querySelectorAll<HTMLElement>(".resource-item")) {
+      item.classList.toggle("selected", item.dataset.path === selectedResourceGalleryPath)
+    }
+  }
+  updateResourceActionButtons()
 }
 
 function showResourceList(): void {
@@ -1700,39 +1748,6 @@ async function updateStylePreviews(): Promise<void> {
   }
 }
 
-async function updateImagePreviews(): Promise<void> {
-  const drawID = ++imagePreviewDrawID
-  const background = selectedBackgroundStyleContext()
-  const bdaStyleIDs = selectedBdaRefs("BACK_STYLE", "image").map(bdaStyleID)
-  if (!archive || !background && !bdaStyleIDs.length) {
-    imagePreviewVisuals.clear()
-    for (const button of imagePreviewButtons) button.hidden = true
-    return
-  }
-  const resolver = visualResolver()
-  if (!resolver) return
-  const styleIDs = background
-    ? background.sections.map((section) => section.replace(/^STYLE/, ""))
-    : bdaStyleIDs
-  const results = await Promise.all(
-    imagePreviewButtons.map(async (button) => ({
-      button,
-      state: button.dataset.imagePreview ?? "normal",
-      visuals: await Promise.all(
-        styleIDs.map((styleID) => resolver.resolve(styleID, button.dataset.imagePreview === "highlighted").catch(() => undefined)),
-      ),
-    })),
-  )
-  if (drawID !== imagePreviewDrawID) return
-  for (const { button, state, visuals } of results) {
-    const drawable = visuals.filter((visual): visual is Visual => Boolean(visual))
-    imagePreviewVisuals.set(state, drawable)
-    processedPreviewVisuals.set(button, drawable)
-    button.hidden = drawable.length === 0
-    drawStylePreview(button, drawable, false)
-  }
-}
-
 function selectedStylePropertyContext(property: string):
   | { document: IniDocument; path: string; sources: StylePropertySource[] }
   | undefined {
@@ -1746,17 +1761,6 @@ function selectedStylePropertyContext(property: string):
     property,
   )
   return sources ? { document, path, sources } : undefined
-}
-
-function selectedBackgroundStyleContext():
-  | { document: IniDocument; path: string; sections: string[] }
-  | undefined {
-  if (!archive || !layoutDocument || !selectedKeySections.length) return
-  const path = styleConfigPath()
-  if (!archive.isText(path)) return
-  const sections = backgroundStyleSections(layoutDocument, selectedKeySections)
-  if (!sections.length) return
-  return { document: IniDocument.parse(archive.getText(path)), path, sections }
 }
 
 function selectedBdaRefs(source: "BACK_STYLE" | "FORE_STYLE", type: BdaStyleRef["type"]): BdaStyleRef[] {
@@ -1818,6 +1822,11 @@ function describeAction(value: string): string {
   if (/^S\d+/.test(value)) return `百度状态码 ${value}`
   return `输入“${value}”`
 }
+
+baiduActionCodes.replaceChildren(...Array.from({ length: 99 }, (_, index) => {
+  const value = `F${index + 1}`
+  return new Option(describeAction(value), value)
+}))
 
 const documentFieldLabels: Record<string, string> = {
   BACK_STYLE: "背景样式",
@@ -2101,25 +2110,6 @@ function populateKeyInspector(): void {
     ? selectedBdaRefs("FORE_STYLE", "text").length > 0
     : styleFields.some((field) => Boolean(selectedStylePropertyContext(field.dataset.styleField ?? "")))
   for (const label of textStyleLabels) label.hidden = !hasSelection || !hasTextStyle
-  const background = selectedBackgroundStyleContext()
-  for (const field of backgroundStyleFields) {
-    const name = field.dataset.backgroundStyleField ?? ""
-    if (archive?.format === "bda") {
-      const info = currentBdaAppearance()
-      const refs = selectedBdaRefs("BACK_STYLE", "image")
-      const values = info ? refs.map((ref) => bdaStyleValue(info.appearance, ref, name)) : []
-      const common = values.length && values.every((value) => value === values[0]) ? values[0] : ""
-      field.disabled = !refs.length
-      field.value = common
-      field.placeholder = refs.length && !common && new Set(values).size > 1 ? "混合" : ""
-      continue
-    }
-    const values = background?.sections.map((section) => background.document.get(section, name) ?? "")
-    const common = values?.every((value) => value === values[0]) ? values[0] : ""
-    field.disabled = !background
-    field.value = common ?? ""
-    field.placeholder = background && !common && new Set(values).size > 1 ? "混合" : ""
-  }
   for (const button of layoutActionButtons) {
     button.disabled = selectedKeySections.length < 2 || archive?.format === "bda"
   }
@@ -2154,7 +2144,6 @@ function populateKeyInspector(): void {
         : describeAction(values[0])
   }
   void updateStylePreviews()
-  if (hasSelection) void updateImagePreviews()
   populateDocumentInspector()
   populateBdaConfigInspector()
   applyModeState()
@@ -2258,28 +2247,6 @@ function updateSelectedStyle(field: HTMLInputElement): void {
   updateDirty()
 }
 
-function updateSelectedBackgroundStyle(field: HTMLInputElement): void {
-  if (archive?.format === "bda") {
-    updateBdaRefs(selectedBdaRefs("BACK_STYLE", "image"), field.dataset.backgroundStyleField ?? "", field.value)
-    return
-  }
-  const context = selectedBackgroundStyleContext()
-  if (!archive || !context) return
-  const before = context.document.toString()
-  setStyleField(
-    context.document,
-    context.sections,
-    field.dataset.backgroundStyleField ?? "",
-    field.value,
-  )
-  const text = context.document.toString()
-  commitText(context.path, before, text)
-  if (selectedPath === context.path) setSourceValue(text)
-  refreshPreview()
-  populateKeyInspector()
-  updateDirty()
-}
-
 function selectedStyleImageSections(source: "BACK_STYLE" | "FORE_STYLE"): { document: IniDocument; path: string; sections: string[] } | undefined {
   if (!archive || !layoutDocument || !selectedKeySections.length) return
   const path = styleConfigPath()
@@ -2315,6 +2282,49 @@ function updateSelectedImageReference(source: "BACK_STYLE" | "FORE_STYLE", prope
 
 let pickerSelectedIndex: number | undefined
 
+function imageDataURL(bytes: Uint8Array): string {
+  let binary = ""
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000))
+  }
+  return `data:image/png;base64,${btoa(binary)}`
+}
+
+async function showPickerWindow(
+  label: "image-picker" | "resource-picker",
+  mode: "image" | "resource",
+  title: string,
+  width: number,
+  height: number,
+): Promise<void> {
+  const existing = await WebviewWindow.getByLabel(label)
+  if (existing) {
+    await emitTo(label, `${label}-data`, mode === "image" ? nativeImagePickerPayload : nativeResourcePickerPayload)
+    await existing.setFocus()
+    return
+  }
+  new WebviewWindow(label, {
+    url: `picker.html?mode=${mode}`,
+    title,
+    width,
+    height,
+    minWidth: mode === "image" ? 720 : 560,
+    minHeight: 480,
+    center: true,
+    decorations: true,
+    resizable: true,
+  })
+}
+
+function openResourcePickerWindow(): void {
+  if (!archive || !pickerTarget) return
+  nativeResourcePickerPayload = resourceImagePaths(archive.names(), theme.value, orientation.value).flatMap((path) => {
+    const bytes = archive?.getBytes(path)
+    return bytes ? [{ path, dataURL: imageDataURL(bytes) }] : []
+  })
+  void showPickerWindow("resource-picker", "resource", "选择图片资源", 860, 640)
+}
+
 function clearImageSlicePicker(): void {
   if (pickerURL) URL.revokeObjectURL(pickerURL)
   pickerURL = ""
@@ -2325,7 +2335,12 @@ function clearImageSlicePicker(): void {
   pickerSelectedIndex = undefined
   styleImagePicker.hidden = true
   styleImagePreview.hidden = false
-  if (styleImageDialog.open) styleImageDialog.close()
+  styleImageDialog.hidden = true
+  nativeImagePickerPayload = undefined
+  nativeResourcePickerPayload = []
+  for (const label of ["image-picker", "resource-picker"]) {
+    void WebviewWindow.getByLabel(label).then((pickerWindow) => pickerWindow?.close())
+  }
 }
 
 function drawImageSlicePicker(): void {
@@ -2371,6 +2386,18 @@ function openImageSlicePicker(path: string, source: "BACK_STYLE" | "FORE_STYLE",
   const tilePathForPicker = path.replace(/\.png$/i, ".til")
   pickerSlices = archive.isText(tilePathForPicker) ? tileSlices(IniDocument.parse(archive.getText(tilePathForPicker))) : []
   pickerSelectedIndex = pickerSlices.find((slice) => selectedSource && slice.source.join(",") === selectedSource.join(","))?.index
+  nativeImagePickerPayload = {
+    path,
+    dataURL: imageDataURL(bytes),
+    slices: pickerSlices,
+    selectedIndex: pickerSelectedIndex,
+    editable: isEditing(),
+  }
+  if ("__TAURI_INTERNALS__" in window) {
+    styleImageDialog.hidden = true
+    void showPickerWindow("image-picker", "image", "图片切片", 1100, 760)
+    return
+  }
   pickerImage = new Image()
   pickerImage.onload = () => {
     if (!pickerImage) return
@@ -2382,9 +2409,10 @@ function openImageSlicePicker(path: string, source: "BACK_STYLE" | "FORE_STYLE",
   pickerImage.src = pickerURL
   styleImagePreview.hidden = true
   styleImagePicker.hidden = false
-  styleImageDialog.querySelector("h2")!.textContent = `${path.split("/").pop() ?? path} · 选择切片`
+  styleImageTitle.textContent = path.split("/").pop() ?? path
+  styleImageSubtitle.textContent = " · 选择切片"
   styleImagePickerMeta.textContent = pickerSlices.length ? "点击图片中的切片以修改引用" : "此图片没有可用的 TIL 切片"
-  if (!styleImageDialog.open) styleImageDialog.show()
+  styleImageDialog.hidden = false
 }
 
 function selectedRects(): LayoutRect[] {
@@ -2545,6 +2573,12 @@ function deleteSelectedTile(): void {
   populateTileInspector()
   drawAtlas()
   updateDirty()
+}
+
+function duplicateSelectedTile(): void {
+  const existing = slices.find((slice) => slice.index === selectedTileIndex)
+  if (!existing || !isEditing()) return
+  commitTile(duplicateTileSlice(existing, nextTileIndex(tileDocument)))
 }
 
 function updateSelectedTile(): void {
@@ -3315,9 +3349,6 @@ for (const field of [...keyboardFields, ...styleFields]) {
   field.addEventListener("input", () => syncColorControl(field))
   field.addEventListener("change", () => syncColorControl(field))
 }
-for (const field of backgroundStyleFields) {
-  field.addEventListener("input", () => updateSelectedBackgroundStyle(field))
-}
 for (const field of keyboardFields) {
   field.addEventListener("change", () => updateKeyboard(field))
 }
@@ -3409,8 +3440,10 @@ newTileButton.addEventListener("click", () => {
   if (!guidesVisible) setGuidesVisible(true)
   setDrawingTile(!drawingTile)
 })
+duplicateTileButton.addEventListener("click", duplicateSelectedTile)
 deleteTileButton.addEventListener("click", deleteSelectedTile)
 resourceBackButton.addEventListener("click", showResourceList)
+resourceSearch.addEventListener("input", renderResourceInspector)
 for (const button of tileModeButtons) {
   button.addEventListener("click", () => {
     tileMode = button.dataset.tileMode === "move" ? "move" : "select"
@@ -3524,28 +3557,16 @@ for (const button of stylePreviewButtons) {
       drawVisualPreview(styleImagePreview, visuals, button.dataset.stylePreview?.startsWith("fore:") || button.hasAttribute("data-preview-foreground"))
       styleImagePicker.hidden = true
       styleImagePreview.hidden = false
-      if (!styleImageDialog.open) styleImageDialog.show()
+      styleImageImgList.hidden = true
+      styleImageTitle.textContent = "图片预览"
+      styleImageSubtitle.textContent = ""
+      styleImageDialog.hidden = false
       return
     }
     const path = button.dataset.path
     if (!path) return
     selectFile(path)
     revealSourceFile(path)
-  })
-}
-for (const button of imagePreviewButtons) {
-  button.addEventListener("click", () => {
-    const visuals = imagePreviewVisuals.get(button.dataset.imagePreview ?? "")
-    if (!visuals?.length) return
-    const visual = visuals.find((item) => item.imagePath)
-    if (visual?.imagePath) {
-      openImageSlicePicker(visual.imagePath, "BACK_STYLE", button.dataset.imagePreview === "highlighted" ? "HL_IMG" : "NM_IMG", visual.source)
-      return
-    }
-    drawVisualPreview(styleImagePreview, visuals, false)
-    styleImagePicker.hidden = true
-    styleImagePreview.hidden = false
-    if (!styleImageDialog.open) styleImageDialog.show()
   })
 }
 styleImagePickerCanvas.addEventListener("click", (event) => {
@@ -3564,8 +3585,176 @@ styleImagePickerCanvas.addEventListener("click", (event) => {
   updateSelectedImageReference(pickerTarget.source, pickerTarget.property, `${name},${selected.index}`)
   drawImageSlicePicker()
 })
-styleImageClose.addEventListener("click", () => styleImageDialog.close())
-styleImageDialog.addEventListener("close", clearImageSlicePicker)
+styleImageClose.addEventListener("click", clearImageSlicePicker)
+
+void listen<{ mode: "image" | "resource" }>("picker-window-ready", (event) => {
+  const label = event.payload.mode === "image" ? "image-picker" : "resource-picker"
+  const payload = event.payload.mode === "image" ? nativeImagePickerPayload : nativeResourcePickerPayload
+  if (payload) void emitTo(label, `${label}-data`, payload)
+})
+void listen<{ index: number }>("image-picker-select", (event) => {
+  if (!isEditing() || !pickerTarget) return
+  const selected = pickerSlices.find((slice) => slice.index === event.payload.index)
+  if (!selected) return
+  pickerSelectedIndex = selected.index
+  const name = pickerPath.split("/").pop()?.replace(/\.png$/i, "") ?? pickerPath
+  updateSelectedImageReference(pickerTarget.source, pickerTarget.property, `${name},${selected.index}`)
+})
+void listen("resource-picker-open", openResourcePickerWindow)
+void listen<{ path: string }>("resource-picker-select", (event) => {
+  if (pickerTarget) openImageSlicePicker(event.payload.path, pickerTarget.source, pickerTarget.property)
+})
+
+// Inspector resize handle
+{
+  const MIN_W = 220
+  const MAX_W = Math.max(700, window.innerWidth - 720)
+  const DEFAULT_W = Math.max(420, Math.round(window.innerWidth * 0.28))
+  const storageKey = "inspectorWidthV3"
+  const stored = Number(localStorage.getItem(storageKey) || DEFAULT_W)
+  const initialW = Math.max(MIN_W, Math.min(MAX_W, stored))
+  document.documentElement.style.setProperty("--inspector-width", `${initialW}px`)
+
+  let dragging = false
+  let startX = 0
+  let startW = initialW
+
+  inspectorResizeHandle.addEventListener("pointerdown", (e) => {
+    dragging = true
+    startX = e.clientX
+    startW = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--inspector-width") || String(DEFAULT_W), 10)
+    inspectorResizeHandle.classList.add("dragging")
+    inspectorResizeHandle.setPointerCapture(e.pointerId)
+    e.preventDefault()
+  })
+
+  inspectorResizeHandle.addEventListener("pointermove", (e) => {
+    if (!dragging) return
+    const delta = startX - e.clientX
+    const newW = Math.max(MIN_W, Math.min(MAX_W, startW + delta))
+    document.documentElement.style.setProperty("--inspector-width", `${newW}px`)
+  })
+
+  inspectorResizeHandle.addEventListener("pointerup", () => {
+    if (!dragging) return
+    dragging = false
+    inspectorResizeHandle.classList.remove("dragging")
+    const w = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--inspector-width") || String(DEFAULT_W), 10)
+    localStorage.setItem(storageKey, String(w))
+  })
+}
+
+// Resource image actions
+let selectedResourceGalleryPath = ""
+
+function updateResourceActionButtons(): void {
+  const hasSelection = Boolean(selectedResourceGalleryPath)
+  resourceDownloadButton.disabled = !hasSelection
+  resourceDeleteButton.disabled = !hasSelection || !isEditing()
+}
+
+function selectGalleryItem(path: string, container: HTMLElement): void {
+  selectedResourceGalleryPath = path
+  for (const item of container.querySelectorAll<HTMLElement>(".resource-item")) {
+    item.classList.toggle("selected", item.dataset.path === path)
+  }
+  updateResourceActionButtons()
+}
+
+resourceUploadButton.addEventListener("click", () => {
+  if (!archive || !isEditing()) return
+  resourceUploadInput.value = ""
+  resourceUploadInput.click()
+})
+
+resourceUploadInput.addEventListener("change", () => {
+  const file = resourceUploadInput.files?.[0]
+  if (!file || !archive) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    if (!archive) return
+    const bytes = new Uint8Array(reader.result as ArrayBuffer)
+    const paths = resourceImagePaths(archive.names(), theme.value, orientation.value)
+    const base = paths[0]?.split("/").slice(0, -1).join("/") ?? `${theme.value}/skin/${orientation.value}/res`
+    const targetPath = `${base}/${file.name}`
+    const before = archive.getBytes(targetPath)
+    if (before) {
+      if (!window.confirm(`图片 ${file.name} 已存在，是否替换？`)) return
+    }
+    commitBytes(targetPath, before ?? new Uint8Array(0), bytes)
+    renderResourceInspector()
+    updateDirty()
+    selectedResourceGalleryPath = targetPath
+    updateResourceActionButtons()
+  }
+  reader.readAsArrayBuffer(file)
+})
+
+resourceDownloadButton.addEventListener("click", () => {
+  if (!archive || !selectedResourceGalleryPath) return
+  const bytes = archive.getBytes(selectedResourceGalleryPath)
+  if (!bytes) return
+  const url = URL.createObjectURL(new Blob([bytes], { type: "image/png" }))
+  const a = document.createElement("a")
+  a.href = url
+  a.download = selectedResourceGalleryPath.split("/").pop() ?? "image.png"
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+})
+
+resourceDeleteButton.addEventListener("click", () => {
+  if (!archive || !selectedResourceGalleryPath || !isEditing()) return
+  const name = selectedResourceGalleryPath.split("/").pop() ?? selectedResourceGalleryPath
+  if (!window.confirm(`确定要删除图片 ${name} 吗？此操作可撤销。`)) return
+  const before = archive.getBytes(selectedResourceGalleryPath)
+  if (!before) return
+  commitBytes(selectedResourceGalleryPath, before, new Uint8Array(0))
+  selectedResourceGalleryPath = ""
+  updateResourceActionButtons()
+  renderResourceInspector()
+  updateDirty()
+})
+
+// Patch renderResourceInspector to use single-click select, double-click open
+const _origRenderResourceInspector = renderResourceInspector
+;(window as any).__resourceGalleryClickHandler = (path: string, container: HTMLElement) => {
+  selectGalleryItem(path, container)
+}
+;(window as any).__resourceGalleryDblClickHandler = (path: string) => {
+  selectResourceImage(path)
+}
+
+// Web fallback: the image name button opens the resource list inline.
+styleImageTitle.addEventListener("click", () => {
+  if (!archive) return
+  const paths = resourceImagePaths(archive.names(), theme.value, orientation.value)
+  styleImageImgList.hidden = !styleImageImgList.hidden
+  if (styleImageImgList.hidden) return
+  styleImageImgList.replaceChildren()
+  for (const path of paths) {
+    const bytes = archive.getBytes(path)
+    if (!bytes) continue
+    const url = URL.createObjectURL(new Blob([bytes], { type: "image/png" }))
+    const btn = document.createElement("button")
+    btn.type = "button"
+    btn.title = path
+    const img = document.createElement("img")
+    img.src = url
+    img.alt = ""
+    img.addEventListener("load", () => URL.revokeObjectURL(url))
+    const name = document.createElement("span")
+    name.textContent = path.split("/").pop()?.replace(/\.png$/i, "") ?? path
+    btn.append(img, name)
+    btn.classList.toggle("active", path === pickerPath)
+    btn.addEventListener("click", () => {
+      styleImageImgList.hidden = true
+      if (pickerTarget) {
+        openImageSlicePicker(path, pickerTarget.source, pickerTarget.property)
+      }
+    })
+    styleImageImgList.append(btn)
+  }
+})
 for (const button of Array.from(editContextMenu.querySelectorAll<HTMLButtonElement>("[data-context-action]"))) {
   button.addEventListener("click", () => {
     if (button.dataset.contextAction === "copy") copySelectedKeys()
@@ -3651,6 +3840,12 @@ window.addEventListener("beforeunload", (event) => {
   event.returnValue = ""
 })
 if (isTauri()) {
+  let movingDebounce: ReturnType<typeof setTimeout> | undefined
+  void getCurrentWindow().onMoved(() => {
+    clearTimeout(movingDebounce)
+    clearTimeout(fitCanvasDebounce)
+    movingDebounce = setTimeout(() => { fitCanvasPreview() }, 300)
+  })
   let destroyingWindow = false
   void getCurrentWindow().onCloseRequested(async (event) => {
     if (destroyingWindow) return
