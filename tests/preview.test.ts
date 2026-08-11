@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { gestureDirection, rectToString } from "../src/layout.ts"
 import { IniDocument } from "../src/ini.ts"
-import { animationSequenceForKey, effectivePreviewItem, isAdditiveSelection, previewBackground, previewFallbackText, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawFallbackKeyChrome, shouldDrawItemBackground } from "../src/preview.ts"
+import { animationSequenceForKey, effectivePreviewItem, foregroundTextPoint, isAdditiveSelection, previewBackground, previewFallbackText, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawFallbackKeyChrome, shouldDrawItemBackground } from "../src/preview.ts"
 
 test("classifies click, hold and directional gestures", () => {
   assert.equal(gestureDirection(2, 3, 100, true), "center")
@@ -192,6 +192,13 @@ test("places the second foreground image at the phone key's upper-right slot", a
   assert.deepEqual(
     module.foregroundLayerRect?.({ x: 0, y: 0, width: 110, height: 140 }, [0, 0, 50, 40], 0, [-6, 16]),
     { x: 24, y: 66, width: 50, height: 40 },
+  )
+})
+
+test("positions text-only foreground layers with the configured style offset", () => {
+  assert.deepEqual(
+    foregroundTextPoint({ x: 12, y: 0, width: 100, height: 127 }, [0, -42]),
+    { x: 62, y: 21.5 },
   )
 })
 

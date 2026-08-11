@@ -4,6 +4,7 @@ import {
   AtlasResolver,
   canvasFontFamily,
   isTransparentColor,
+  resolveStyleTextVisual,
   resolveTextVisual,
   resolveVisualSpec,
 } from "../src/atlas.ts"
@@ -86,6 +87,26 @@ FONT_WEIGHT=550
     fontWeight: 550,
   })
   assert.equal(resolveTextVisual(styles, "", false), undefined)
+})
+
+test("resolves text-only foreground styles used by Android 26-key layouts", () => {
+  const styles = IniDocument.parse(`
+[STYLE43]
+SHOW=q
+NM_COLOR=232323
+FONT_SIZE=57
+[STYLE369]
+SHOW=1
+NM_COLOR=99737980
+FONT_SIZE=31
+`)
+
+  assert.deepEqual(resolveStyleTextVisual(styles, "43", false), {
+    text: "q",
+    fontSize: 57,
+    color: "#232323",
+  })
+  assert.equal(resolveStyleTextVisual(styles, "999", false), undefined)
 })
 
 test("atlas resolver exposes the resolved resource path and tile source rectangle", async () => {

@@ -16,10 +16,13 @@ export type TextVisual = {
   color?: string
 }
 
+export type StyleTextVisual = TextVisual & { text: string }
+
 export type VisualResolver = {
   resolve(styleID: string, highlighted: boolean): Promise<Visual | undefined>
   resolveResource?(resourceID: string): Promise<Visual | undefined>
   resolveText(foreground: string, highlighted: boolean): TextVisual | undefined
+  resolveStyleText?(styleID: string, highlighted: boolean): StyleTextVisual | undefined
   resolveToolbarImages(limit?: number): Promise<Visual[]>
 }
 
@@ -114,6 +117,16 @@ export function resolveTextVisual(
     }
   }
   return Object.keys(result).length ? result : undefined
+}
+
+export function resolveStyleTextVisual(
+  styles: IniDocument,
+  styleID: string,
+  highlighted: boolean,
+): StyleTextVisual | undefined {
+  const text = styles.get(`STYLE${styleID.trim()}`, "SHOW")
+  if (!text) return
+  return { text, ...resolveTextVisual(styles, styleID, highlighted) }
 }
 
 export function resolveVisualSpec(
@@ -264,5 +277,10 @@ export class AtlasResolver {
   resolveText(foreground: string, highlighted: boolean): TextVisual | undefined {
     if (!this.styles) return
     return resolveTextVisual(this.styles, foreground, highlighted)
+  }
+
+  resolveStyleText(styleID: string, highlighted: boolean): StyleTextVisual | undefined {
+    if (!this.styles) return
+    return resolveStyleTextVisual(this.styles, styleID, highlighted)
   }
 }

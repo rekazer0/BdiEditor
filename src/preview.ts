@@ -1,4 +1,4 @@
-import { canvasFontFamily, isTransparentColor, type TextVisual, type Visual, type VisualResolver } from "./atlas.ts"
+import { canvasFontFamily, isTransparentColor, type StyleTextVisual, type TextVisual, type Visual, type VisualResolver } from "./atlas.ts"
 import { IniDocument } from "./ini.ts"
 import { gestureDirection } from "./layout.ts"
 import { stateStyleValue, stateTipSection } from "./panel-tools.ts"
@@ -145,6 +145,13 @@ export function foregroundLayerRect(
     y: key.y + 6,
     width,
     height,
+  }
+}
+
+export function foregroundTextPoint(rect: Rect, offset?: [number, number]): { x: number; y: number } {
+  return {
+    x: rect.x + rect.width / 2 + (offset?.[0] ?? 0),
+    y: rect.y + rect.height / 2 + (offset?.[1] ?? 0),
   }
 }
 
@@ -696,6 +703,9 @@ export class Preview {
             key.foreStyles.map((style) => this.resolver?.resolve(style, highlighted)),
           ),
           text: this.resolver?.resolveText(key.foreStyles.join(","), highlighted),
+          styleTexts: key.foreStyles.map((style) =>
+            this.resolver?.resolveStyleText?.(style, highlighted)
+          ),
         }
       })),
       this.toolbarSlots
@@ -722,7 +732,8 @@ export class Preview {
       const active = this.active?.key.section === key.section
       const selected = previewSelectionVisible(this.mode, this.selected.has(key.section))
       const foregrounds = phoneForegroundLayers(visuals[index].fore)
-      const hasForeground = foregrounds.some(Boolean)
+      const styleTexts = visuals[index].styleTexts
+      const hasForeground = foregrounds.some(Boolean) || styleTexts.some(Boolean)
       if (shouldDrawFallbackKeyChrome(this.mode, key.editable, Boolean(visuals[index].back), hasForeground)) {
         context.fillStyle = active ? "#8eb7f2" : "#f7f7f8"
         context.strokeStyle = active || selected ? "#087ff5" : "#8c929b"
@@ -747,6 +758,15 @@ export class Preview {
         )
         const destination = key.foreRect ?? foregroundLayerRect(key.rect, fore?.source, layer, offset)
         this.drawVisual(context, fore, destination, false)
+      }
+
+      for (const [layer, styleText] of styleTexts.entries()) {
+        if (!styleText || foregrounds[layer]) continue
+        const offset = key.foreOffsets[layer] ?? parseOffset(
+          this.offsets?.get(`OFFSET${key.positionTypes[layer] ?? ""}`, "POS"),
+        )
+        const point = foregroundTextPoint(key.foreRect ?? key.rect, offset)
+        this.drawStyleText(context, styleText, point)
       }
 
       if (selected && visuals[index].back) {
@@ -819,5 +839,18 @@ export class Preview {
       }
       context.restore()
     }
+  }
+
+  private drawStyleText(
+    context: CanvasRenderingContext2D,
+    visual: StyleTextVisual,
+    point: { x: number; y: number },
+  ): void {
+    context.fillStyle = visual.color ?? (this.theme === "dark" ? "#f5f5f7" : "#17191c")
+    const weight = visual.fontWeight ? `${visual.fontWeight} ` : ""
+    context.font = `${weight}${visual.fontSize ?? 24}px ${canvasFontFamily(visual.fontName)}`
+    context.textAlign = "center"
+    context.textBaseline = "middle"
+    context.fillText(visual.text, point.x, point.y)
   }
 }
