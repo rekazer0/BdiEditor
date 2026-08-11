@@ -781,7 +781,8 @@ h2 {
   place-items: center;
   position: relative;
   padding: 18px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--canvas);
 }
 
@@ -1188,6 +1189,7 @@ h2 {
 
 .device-shell.canvas-only {
   width: min(100%, var(--canvas-fit-width, var(--canvas-width, 1080px)));
+  transition: none;
   height: auto;
   aspect-ratio: auto;
   padding: 0;
@@ -1243,8 +1245,7 @@ h2 {
 
 .device-shell.canvas-only #panel-viewport {
   width: 100%;
-  /* ponytail: --canvas-width carries px; ratio needs unitless numbers */
-  aspect-ratio: calc(var(--canvas-width) / 1px) / var(--panel-visible-height);
+  aspect-ratio: var(--canvas-ratio-width, 1080) / var(--panel-visible-height, 608);
   overflow: hidden;
 }
 

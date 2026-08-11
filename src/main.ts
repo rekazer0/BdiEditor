@@ -872,9 +872,12 @@ function skinStateDocuments(): IniDocument[] {
 
 function fitCanvasPreview(): void {
   if (!canvasLogicalSize) return
+  const availableWidth = canvasWrap.clientWidth - 36
+  const availableHeight = canvasWrap.clientHeight - 36
+  if (availableWidth <= 0 || availableHeight <= 0) return
   const width = canvasFitWidth(
-    canvasWrap.clientWidth - 36,
-    canvasWrap.clientHeight - 36,
+    availableWidth,
+    availableHeight,
     canvasLogicalSize.width,
     canvasLogicalSize.height,
   )
@@ -887,7 +890,14 @@ function updateCanvasPanelStatus(renderedWidth: number): void {
   panelStatus.textContent = `面板：${Math.round(canvasLogicalSize.width)} × ${Math.round(canvasLogicalSize.panelHeight)} · 预览缩放：${Math.round(renderedWidth / canvasLogicalSize.width * 100)}%`
 }
 
-new ResizeObserver(fitCanvasPreview).observe(canvasWrap)
+let fitCanvasDebounce: ReturnType<typeof setTimeout> | undefined
+
+function scheduleFitCanvasPreview(): void {
+  clearTimeout(fitCanvasDebounce)
+  fitCanvasDebounce = setTimeout(fitCanvasPreview, 200)
+}
+
+new ResizeObserver(scheduleFitCanvasPreview).observe(canvasWrap)
 
 function updatePanelTools(width: number, height: number, candidateHeight = 0): void {
   const content = previewContentVerticalBounds(
@@ -896,6 +906,7 @@ function updatePanelTools(width: number, height: number, candidateHeight = 0): v
     height,
   )
   deviceShell.style.setProperty("--canvas-width", `${width}px`)
+  deviceShell.style.setProperty("--canvas-ratio-width", String(width))
   deviceShell.style.setProperty("--panel-visible-height", String(content.height))
   deviceShell.style.setProperty("--panel-crop-offset", `${-(content.top / height) * 100}%`)
   canvasLogicalSize = { width, height: content.height + candidateHeight, panelHeight: height }
