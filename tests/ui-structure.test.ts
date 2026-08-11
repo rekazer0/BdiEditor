@@ -258,8 +258,10 @@ test("toolbar configurations expose parsed inspector fields", () => {
 test("color controls preserve ARGB alpha while using native color inputs", () => {
   assert.equal((html.match(/data-color-picker-for=/g) ?? []).length, 4)
   assert.equal((html.match(/data-color-alpha-for=/g) ?? []).length, 4)
+  assert.match(main, /alpha\.value = String\(Number\.parseInt\(hex\.slice\(0, 2\), 16\) \/ 255\)/)
   assert.match(main, /field\.value = `\$\{Math\.round\(Math\.max\(0, Math\.min\(1, alphaValue\)\) \* 255\)/)
   assert.match(main, /syncColorControl\(field\)/)
+  assert.doesNotMatch(main, /colorDialog\.showModal\(\)/)
 })
 
 test("key image fields preview processed atlas slices in a dialog", () => {
@@ -268,6 +270,8 @@ test("key image fields preview processed atlas slices in a dialog", () => {
   assert.match(html, /id="style-image-dialog"/)
   assert.match(main, /updateImagePreviews\(\)/)
   assert.match(main, /drawVisualPreview\(styleImagePreview, visuals, false\)/)
+  assert.doesNotMatch(main, /styleImageDialog\.showModal\(\)/)
+  assert.match(main, /styleImageDialog\.show\(\)/)
 })
 
 test("selected key source is highlighted only in the source view", () => {
@@ -284,10 +288,11 @@ test("export moved left and more menu opens settings and about dialogs", () => {
   assert.match(html, /https:\/\/github\.com\/rekazer0\/BdiEditor/)
 })
 
-test("image preview closes from its backdrop without a close button", () => {
+test("image preview is a non-modal panel closed by an explicit control", () => {
   const dialog = html.slice(html.indexOf('<dialog id="style-image-dialog"'), html.indexOf("</dialog>", html.indexOf('<dialog id="style-image-dialog"')))
-  assert.doesNotMatch(dialog, /<button/)
-  assert.match(main, /event\.target === styleImageDialog\)[\s\S]*?styleImageDialog\.close\(\)/)
+  assert.match(dialog, /id="style-image-close"[^>]*aria-label="关闭图片预览"/)
+  assert.match(main, /styleImageClose\.addEventListener\("click", \(\) => styleImageDialog\.close\(\)\)/)
+  assert.doesNotMatch(css, /\.style-image-dialog::backdrop\s*\{[^}]*background:/s)
 })
 
 test("export menu stays above the workspace and source cursor uses matching font metrics", () => {
@@ -344,8 +349,6 @@ test("settings expose canvas backgrounds and edit mode exposes key context actio
   assert.doesNotMatch(html, /value="default">默认/)
   assert.match(main, /savedCanvasBackground === "default" \? "glass" : savedCanvasBackground \?\? "white"/)
   assert.match(css, /\.canvas-wrap\[data-background="glass"\]\s*\{[^}]*backdrop-filter:/s)
-  assert.match(css, /\.color-dialog menu button\s*\{[^}]*border-radius:/s)
-  assert.match(css, /\.color-dialog menu button\[value="ok"\]\s*\{[^}]*background:\s*var\(--accent\)/s)
   assert.match(html, /data-context-action="copy"/)
   assert.match(html, /data-context-action="delete"/)
   assert.match(main, /function copySelectedKeys\(\)/)

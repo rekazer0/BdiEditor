@@ -224,19 +224,11 @@ const imagePreviewButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-image-preview]"),
 )
 const styleImageDialog = $("#style-image-dialog") as HTMLDialogElement
+const styleImageClose = $("#style-image-close") as HTMLButtonElement
 const styleImagePreview = $("#style-image-preview") as HTMLCanvasElement
 const styleImagePicker = $("#style-image-picker")
 const styleImagePickerCanvas = $("#style-image-picker-canvas") as HTMLCanvasElement
 const styleImagePickerMeta = $("#style-image-picker-meta")
-const colorDialog = $("#color-dialog") as HTMLDialogElement
-const rgbaPicker = $("#rgba-picker") as HTMLInputElement
-const rgbaPreview = $("#rgba-preview")
-const rgbaFields = {
-  r: $("#rgba-r") as HTMLInputElement,
-  g: $("#rgba-g") as HTMLInputElement,
-  b: $("#rgba-b") as HTMLInputElement,
-  a: $("#rgba-a") as HTMLInputElement,
-}
 
 let archive: SkinArchive | undefined
 let bdaBase: SkinArchive | undefined
@@ -1326,7 +1318,7 @@ function syncColorControl(field: HTMLInputElement): void {
     picker.disabled = field.disabled
   }
   if (alpha) {
-    alpha.value = String(Number((Number.parseInt(hex.slice(0, 2), 16) / 255).toFixed(2)))
+    alpha.value = String(Number.parseInt(hex.slice(0, 2), 16) / 255)
     alpha.disabled = field.disabled
   }
 }
@@ -2222,7 +2214,7 @@ function openImageSlicePicker(path: string, source: "BACK_STYLE" | "FORE_STYLE",
   styleImagePicker.hidden = false
   styleImageDialog.querySelector("h2")!.textContent = `${path.split("/").pop() ?? path} · 选择切片`
   styleImagePickerMeta.textContent = pickerSlices.length ? "点击图片中的切片以修改引用" : "此图片没有可用的 TIL 切片"
-  styleImageDialog.showModal()
+  if (!styleImageDialog.open) styleImageDialog.show()
 }
 
 function selectedRects(): LayoutRect[] {
@@ -3177,57 +3169,11 @@ quickInspector.addEventListener("keydown", (event) => {
   field.dispatchEvent(new Event("input", { bubbles: true }))
 })
 for (const picker of colorPickers) {
-  picker.addEventListener("click", (event) => {
-    event.preventDefault()
-    const key = picker.dataset.colorPickerFor ?? ""
-    const field = document.querySelector<HTMLInputElement>(
-      `[data-${key.startsWith("keyboard-") ? "keyboard" : "style"}-field="${CSS.escape(key.replace(/^(keyboard|style)-/, ""))}"]`,
-    )
-    if (!field) return
-    const value = field.value.trim().replace(/^#/, "")
-    const hex = value.length === 6 ? `FF${value}` : /^[0-9a-f]{8}$/i.test(value) ? value : "FFFFFFFF"
-    rgbaFields.r.value = String(Number.parseInt(hex.slice(2, 4), 16))
-    rgbaFields.g.value = String(Number.parseInt(hex.slice(4, 6), 16))
-    rgbaFields.b.value = String(Number.parseInt(hex.slice(6, 8), 16))
-    rgbaFields.a.value = String(Number.parseInt(hex.slice(0, 2), 16))
-    rgbaPicker.value = `#${hex.slice(2)}`
-    colorDialog.dataset.fieldKey = key
-    updateRgbaPreview()
-    colorDialog.showModal()
-  })
   picker.addEventListener("input", () => {
     const alpha = colorAlphas.find((item) => item.dataset.colorAlphaFor === picker.dataset.colorPickerFor)
     writeColorControl(picker, Number(alpha?.value ?? 100))
   })
 }
-function updateRgbaPreview(): void {
-  const r = Number(rgbaFields.r.value) || 0
-  const g = Number(rgbaFields.g.value) || 0
-  const b = Number(rgbaFields.b.value) || 0
-  const a = Number(rgbaFields.a.value) || 0
-  rgbaPicker.value = `#${[r, g, b].map((value) => Math.max(0, Math.min(255, value)).toString(16).padStart(2, "0")).join("")}`
-  rgbaPreview.style.backgroundColor = `rgba(${r}, ${g}, ${b}, ${a / 255})`
-}
-for (const field of Object.values(rgbaFields)) field.addEventListener("input", updateRgbaPreview)
-rgbaPicker.addEventListener("input", () => {
-  const hex = rgbaPicker.value.slice(1)
-  rgbaFields.r.value = String(Number.parseInt(hex.slice(0, 2), 16))
-  rgbaFields.g.value = String(Number.parseInt(hex.slice(2, 4), 16))
-  rgbaFields.b.value = String(Number.parseInt(hex.slice(4, 6), 16))
-  updateRgbaPreview()
-})
-colorDialog.querySelector("form")?.addEventListener("submit", (event) => {
-  if ((event.submitter as HTMLButtonElement | null)?.value !== "ok") return
-  const key = colorDialog.dataset.fieldKey ?? ""
-  const field = document.querySelector<HTMLInputElement>(
-    `[data-${key.startsWith("keyboard-") ? "keyboard" : "style"}-field="${CSS.escape(key.replace(/^(keyboard|style)-/, ""))}"]`,
-  )
-  if (!field) return
-  field.value = [rgbaFields.a, rgbaFields.r, rgbaFields.g, rgbaFields.b]
-    .map((item) => Math.max(0, Math.min(255, Number(item.value) || 0)).toString(16).padStart(2, "0"))
-    .join("").toUpperCase()
-  field.dispatchEvent(new Event(field.hasAttribute("data-keyboard-field") ? "change" : "input", { bubbles: true }))
-})
 for (const alpha of colorAlphas) {
   alpha.addEventListener("input", () => writeColorControl(alpha, Number(alpha.value)))
 }
@@ -3399,7 +3345,7 @@ for (const button of stylePreviewButtons) {
       drawVisualPreview(styleImagePreview, visuals, button.dataset.stylePreview?.startsWith("fore:") || button.hasAttribute("data-preview-foreground"))
       styleImagePicker.hidden = true
       styleImagePreview.hidden = false
-      styleImageDialog.showModal()
+      if (!styleImageDialog.open) styleImageDialog.show()
       return
     }
     const path = button.dataset.path
@@ -3420,7 +3366,7 @@ for (const button of imagePreviewButtons) {
     drawVisualPreview(styleImagePreview, visuals, false)
     styleImagePicker.hidden = true
     styleImagePreview.hidden = false
-    styleImageDialog.showModal()
+    if (!styleImageDialog.open) styleImageDialog.show()
   })
 }
 styleImagePickerCanvas.addEventListener("click", (event) => {
@@ -3438,11 +3384,7 @@ styleImagePickerCanvas.addEventListener("click", (event) => {
   updateSelectedImageReference(pickerTarget.source, pickerTarget.property, `${name},${selected.index}`)
   drawImageSlicePicker()
 })
-styleImageDialog.addEventListener("click", (event) => {
-  if (event.target === styleImageDialog) {
-    styleImageDialog.close()
-  }
-})
+styleImageClose.addEventListener("click", () => styleImageDialog.close())
 styleImageDialog.addEventListener("close", () => {
   if (pickerURL) URL.revokeObjectURL(pickerURL)
   pickerURL = ""

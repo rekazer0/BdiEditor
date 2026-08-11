@@ -380,24 +380,9 @@
       </form>
     </dialog>
 
-    <dialog id="color-dialog" class="color-dialog" aria-labelledby="color-dialog-title">
-      <form method="dialog" id="color-form">
-        <h2 id="color-dialog-title">RGBA 颜色</h2>
-        <div class="rgba-preview" id="rgba-preview"></div>
-        <input id="rgba-picker" type="color" value="#ffffff" aria-label="颜色">
-        <div class="rgba-fields">
-          <label>R <input id="rgba-r" type="number" min="0" max="255"></label>
-          <label>G <input id="rgba-g" type="number" min="0" max="255"></label>
-          <label>B <input id="rgba-b" type="number" min="0" max="255"></label>
-          <label>A <input id="rgba-a" type="number" min="0" max="255"></label>
-        </div>
-        <menu><button value="cancel">取消</button><button value="ok">确定</button></menu>
-      </form>
-    </dialog>
-
     <dialog id="style-image-dialog" class="style-image-dialog" aria-labelledby="style-image-title">
       <form method="dialog">
-        <header><h2 id="style-image-title">图片预览</h2></header>
+        <header><h2 id="style-image-title">图片预览</h2><button id="style-image-close" type="button" aria-label="关闭图片预览">关闭</button></header>
         <canvas id="style-image-preview" width="480" height="260"></canvas>
         <div id="style-image-picker" hidden>
           <canvas id="style-image-picker-canvas" width="720" height="420" aria-label="原始图片切片选择器"></canvas>

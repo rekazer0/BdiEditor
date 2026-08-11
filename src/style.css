@@ -130,8 +130,7 @@ body {
   .toolbar-menu,
   .glass-module,
   .app-dialog,
-  .project-dialog,
-  .color-dialog
+  .project-dialog
 ) {
   -webkit-backdrop-filter: saturate(180%) blur(28px);
   backdrop-filter: saturate(180%) blur(28px);
@@ -1864,18 +1863,15 @@ canvas {
 }
 
 .style-image-dialog {
+  position: fixed;
+  top: calc(var(--titlebar-height) + 12px);
+  right: 12px;
   width: min(560px, calc(100vw - 32px));
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
   box-shadow: 0 18px 48px rgb(0 0 0 / 22%);
-}
-
-.style-image-dialog::backdrop {
-  background: rgb(0 0 0 / 20%);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
 }
 
 .style-image-dialog form {
@@ -2125,50 +2121,6 @@ canvas {
 
 .color-control input[type="number"] {
   display: none;
-}
-
-.color-dialog {
-  width: min(360px, calc(100vw - 32px));
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
-  color: var(--text);
-}
-
-.color-dialog::backdrop { background: rgb(0 0 0 / 28%); }
-
-.color-dialog form { display: grid; gap: 14px; padding: 18px; }
-.color-dialog h2 { margin: 0; font-size: 15px; }
-.rgba-preview {
-  height: 72px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background-color: transparent;
-  background-image: repeating-conic-gradient(#ddd 0 25%, #fff 0 50%);
-  background-size: 16px 16px;
-}
-.color-dialog > form > input[type="color"] { width: 100%; height: 44px; }
-.rgba-fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.rgba-fields label { display: grid; gap: 4px; color: var(--secondary); font-size: 10px; }
-.rgba-fields input { width: 100%; min-width: 0; height: 30px; }
-.color-dialog menu { display: flex; justify-content: flex-end; gap: 8px; margin: 0; padding: 0; }
-.color-dialog menu button {
-  min-width: 64px;
-  height: 32px;
-  padding: 0 14px;
-  border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  background: var(--glass-surface);
-  box-shadow: var(--glass-shadow);
-  -webkit-backdrop-filter: saturate(180%) blur(14px);
-  backdrop-filter: saturate(180%) blur(14px);
-}
-.color-dialog menu button[value="ok"] {
-  border-color: var(--accent);
-  color: #fff;
-  background: var(--accent);
-  box-shadow: 0 6px 18px rgb(10 127 245 / 24%);
 }
 
 .inspector-grid input {
