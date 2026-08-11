@@ -716,6 +716,37 @@ function refreshSimulationState(): boolean {
   return composing
 }
 
+function applyDeviceKeyboardGeometry(
+  panelWidth: number,
+  panelHeight: number,
+  candidateHeight: number,
+  composing: boolean,
+): void {
+  const spec = deviceSpec(device.value)
+  if (!spec) {
+    for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
+    return
+  }
+  const geometry = keyboardPreviewGeometry(
+    spec,
+    orientation.value,
+    panelWidth,
+    panelHeight,
+    candidateHeight,
+    composing,
+  )
+  const screenHeight = orientation.value === "port" ? spec.height : spec.width
+  deviceShell.style.setProperty(
+    `--keyboard-height-${orientation.value}`,
+    `${(geometry.totalHeight / screenHeight) * 100}%`,
+  )
+  deviceShell.style.setProperty("--candidate-row", `${geometry.candidateHeight}fr`)
+  deviceShell.style.setProperty("--candidate-inset-row", `${geometry.candidateInsetHeight}fr`)
+  deviceShell.style.setProperty("--candidate-content-row", `${geometry.candidateContentHeight}fr`)
+  deviceShell.style.setProperty("--panel-row", `${geometry.panelHeight}fr`)
+  deviceShell.style.setProperty("--safe-row", `${geometry.safeBottomHeight}fr`)
+}
+
 function refreshPreview(): void {
   if (!archive) return
   const composing = refreshSimulationState()
@@ -779,29 +810,11 @@ function refreshPreview(): void {
     }
     preview.setPanel(config.styleID, config.width, config.height)
     updatePanelTools(config.width, config.height)
-    const spec = deviceSpec(device.value)
-    if (spec) {
-      const geometry = keyboardPreviewGeometry(
-        spec,
-        orientation.value,
-        config.width,
-        config.height,
-        toolbarSize?.height ?? 0,
-        composing,
-      )
-      const screenHeight = orientation.value === "port" ? spec.height : spec.width
-      deviceShell.style.setProperty(
-        `--keyboard-height-${orientation.value}`,
-        `${(geometry.totalHeight / screenHeight) * 100}%`,
-      )
-      deviceShell.style.setProperty("--candidate-row", `${geometry.candidateHeight}fr`)
-      deviceShell.style.setProperty("--candidate-inset-row", `${geometry.candidateInsetHeight}fr`)
-      deviceShell.style.setProperty("--candidate-content-row", `${geometry.candidateContentHeight}fr`)
-      deviceShell.style.setProperty("--panel-row", `${geometry.panelHeight}fr`)
-      deviceShell.style.setProperty("--safe-row", `${geometry.safeBottomHeight}fr`)
-    }
+    applyDeviceKeyboardGeometry(config.width, config.height, toolbarSize?.height ?? 0, composing)
   } else if (bdaGen && layoutDocument) {
     const size = bdaGen.get("PANEL", "SIZE")?.split(",").map(Number)
+    const panelWidth = size?.[0] || 1080
+    const panelHeight = size?.[1] || 641
     const panel = currentBdaAppearance()?.appearance.panels.get(layout.value.replace(/\.ini$/i, ""))
     const candidateDocument = toolbarConfigPath() ? textDocument(toolbarConfigPath()!) : undefined
     const inputVisual = resolver?.resolveText(
@@ -813,7 +826,7 @@ function refreshPreview(): void {
       false,
     )
     const firstVisual = resolver?.resolveText(candidateDocument?.get("CAND", "FIRST_FORE") ?? "", false)
-    candidateTextWidth = size?.[0] || 1080
+    candidateTextWidth = panelWidth
     firstCandidateTextVisual = firstVisual
     applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth)
     applyCandidateTextVisual(candidateWords, candidateVisual, candidateTextWidth)
@@ -821,10 +834,13 @@ function refreshPreview(): void {
     if (firstCandidate) applyCandidateTextVisual(firstCandidate, firstVisual, candidateTextWidth)
     preview.setPanel(
       bdaStyleID(panel?.wholeBackStyle ?? panel?.backStyle),
-      size?.[0] || 1080,
-      size?.[1] || 641,
+      panelWidth,
+      panelHeight,
     )
-    updatePanelTools(size?.[0] || 1080, size?.[1] || 641)
+    updatePanelTools(panelWidth, panelHeight)
+    applyDeviceKeyboardGeometry(panelWidth, panelHeight, toolbarSize?.height ?? 0, composing)
+  } else {
+    for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
   }
   preview.setDocument(layoutDocument)
 }
@@ -1420,6 +1436,8 @@ function refreshToolbarPreview(
   toolbarPreview.setTransparent(device.value !== "canvas")
   const width = size?.length === 4 && Number.isFinite(size[2]) ? size[2] : 1125
   const height = size?.length === 4 && Number.isFinite(size[3]) ? size[3] : 133
+  toolbarCanvas.style.setProperty("--toolbar-width", String(width))
+  toolbarCanvas.style.setProperty("--toolbar-height", String(height))
   applyCandidateGeometry(document, width)
   toolbarPreview.setPanel(
     document.get("CAND", "BACK_STYLE")?.split(",")[0] ?? "",

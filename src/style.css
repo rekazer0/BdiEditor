@@ -1207,7 +1207,7 @@ h2 {
 
 .device-shell.canvas-only .keyboard-dock {
   display: grid;
-  grid-template-rows: 133px auto;
+  grid-template-rows: auto auto;
   width: 100%;
   height: auto;
   margin: 0;
@@ -1217,9 +1217,14 @@ h2 {
 }
 
 .device-shell.canvas-only #candidate-area {
+  height: auto;
+  grid-template-rows: auto;
+  overflow: hidden;
+}
+
+.device-shell.canvas-only #candidate-area:has(#candidate-composition:not([hidden])) {
   height: 133px;
   grid-template-rows: 40px 93px;
-  overflow: hidden;
 }
 
 .keyboard-dock #preview {
@@ -1263,6 +1268,12 @@ canvas {
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+
+.device-shell.canvas-only #toolbar-preview {
+  width: 100%;
+  aspect-ratio: var(--toolbar-width) / var(--toolbar-height);
+  height: auto;
 }
 
 .canvas-only canvas {
@@ -2453,7 +2464,7 @@ canvas {
   background: var(--accent);
 }
 
-@media (max-width: 1000px) {
+@media (max-width: 1060px) {
   main {
     grid-template-columns: 190px 1fr;
   }

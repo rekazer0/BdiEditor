@@ -198,9 +198,21 @@ test("legacy LIST defaults and candidate geometry reach the existing preview sur
   }
 })
 
-test("device preview resolves component panels and hides unavailable accessories", () => {
+test("device preview preserves resolved candidate geometry across formats", () => {
   assert.match(main, /resolvePanelConfig\(layoutDocument,\s*context\.gen,\s*context\.styles\)/)
-  assert.match(main, /keyboardPreviewGeometry\(\s*spec,\s*orientation\.value,/s)
+  assert.match(main, /function applyDeviceKeyboardGeometry\(/)
+  assert.match(
+    main,
+    /applyDeviceKeyboardGeometry\(config\.width, config\.height, toolbarSize\?\.height \?\? 0, composing\)/,
+  )
+  assert.match(
+    main,
+    /applyDeviceKeyboardGeometry\(panelWidth, panelHeight, toolbarSize\?\.height \?\? 0, composing\)/,
+  )
+  assert.match(
+    main,
+    /if \(!spec[^)]*\) \{\s*for \(const property of deviceGeometryProperties\) deviceShell\.style\.removeProperty\(property\)/s,
+  )
   assert.match(main, /updateDevicePreview\(\)\s*syncSegmentedControls\(\)\s*refreshPreview\(\)/s)
   assert.match(
     css,
@@ -328,9 +340,18 @@ test("Shift selects the complete key range from the anchor", () => {
   assert.match(preview, /sections\.slice\(Math\.min\(from, to\), Math\.max\(from, to\) \+ 1\)/)
 })
 
-test("canvas mode keeps candidate and toolbar above the keyboard", () => {
-  assert.match(css, /\.device-shell\.canvas-only #candidate-area\s*\{[^}]*height:\s*133px/s)
-  assert.match(css, /\.device-shell\.canvas-only \.keyboard-dock\s*\{[^}]*grid-template-rows:\s*133px auto/s)
+test("canvas mode preserves configured toolbar proportions at responsive widths", () => {
+  assert.match(main, /toolbarCanvas\.style\.setProperty\("--toolbar-width", String\(width\)\)/)
+  assert.match(main, /toolbarCanvas\.style\.setProperty\("--toolbar-height", String\(height\)\)/)
+  assert.match(
+    css,
+    /\.device-shell\.canvas-only #toolbar-preview\s*\{[^}]*aspect-ratio:\s*var\(--toolbar-width\)\s*\/\s*var\(--toolbar-height\)[^}]*height:\s*auto/s,
+  )
+  assert.doesNotMatch(
+    css,
+    /\.device-shell\.canvas-only #candidate-area\s*\{[^}]*grid-template-rows:\s*40px 93px/s,
+  )
+  assert.match(css, /@media \(max-width:\s*1060px\)/)
 })
 
 test("selected source scrolls to a full-row highlight", () => {
