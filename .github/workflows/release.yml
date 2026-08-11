@@ -36,9 +36,13 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            args: --bundles dmg
+            target: aarch64-apple-darwin
+            bundles: dmg
+          - platform: macos-15-intel
+            target: x86_64-apple-darwin
+            bundles: dmg
           - platform: windows-latest
-            args: --bundles nsis
+            bundles: nsis
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -49,17 +53,28 @@ jobs:
           cache: npm
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust target
+        if: matrix.target != ''
+        run: rustup target add ${{ matrix.target }}
       - name: Install frontend dependencies
         run: npm ci
       - name: Build bundles
-        run: npm run tauri build -- ${{ matrix.args }}
+        run: |
+          ARGS="--bundles ${{ matrix.bundles }}"
+          if [ -n "${{ matrix.target }}" ]; then ARGS="$ARGS --target ${{ matrix.target }}"; fi
+          npm run tauri build -- $ARGS
       - name: Upload release assets
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET: ${{ matrix.target }}
         run: |
-          cd src-tauri/target/release/bundle
+          if [ -n "$TARGET" ]; then
+            cd "src-tauri/target/$TARGET/release/bundle"
+          else
+            cd src-tauri/target/release/bundle
+          fi
           shopt -s nullglob
           if [ "$RUNNER_OS" = "macOS" ]; then
             gh release upload "${{ github.ref_name }}" \
