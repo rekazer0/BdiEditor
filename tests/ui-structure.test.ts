@@ -287,7 +287,7 @@ test("export moved left and more menu opens settings and about dialogs", () => {
 test("image preview closes from its backdrop without a close button", () => {
   const dialog = html.slice(html.indexOf('<dialog id="style-image-dialog"'), html.indexOf("</dialog>", html.indexOf('<dialog id="style-image-dialog"')))
   assert.doesNotMatch(dialog, /<button/)
-  assert.match(main, /event\.target === styleImageDialog\) styleImageDialog\.close\(\)/)
+  assert.match(main, /event\.target === styleImageDialog\)[\s\S]*?styleImageDialog\.close\(\)/)
 })
 
 test("export menu stays above the workspace and source cursor uses matching font metrics", () => {
@@ -420,26 +420,68 @@ test("compound foreground inspector exposes weight and writes each property to i
   assert.match(main, /for \(const section of new Set\(context\.sources\.map\(\(source\) => source\.section\)\)\)/)
 })
 
-test("PNG resources share a central workspace preview and inspector preview", () => {
+test("PNG resources share a central atlas canvas and inspector preview", () => {
   assert.match(
     html,
-    /<figure id="workspace-image-figure" hidden>[\s\S]*?<img id="workspace-image" alt="皮肤资源预览" \/>[\s\S]*?<figcaption id="workspace-image-error" hidden>无法预览此 PNG<\/figcaption>[\s\S]*?<\/figure>/,
+    /<figure id="workspace-image-figure" hidden>[\s\S]*?<img id="workspace-image" alt="" hidden \/>[\s\S]*?<canvas id="atlas-canvas"[^>]*>[\s\S]*?<figcaption id="workspace-image-error" hidden>无法预览此 PNG<\/figcaption>[\s\S]*?<\/figure>/,
   )
   assert.match(html, /<img id="asset-image" alt="皮肤资源预览" \/>/)
   assert.match(main, /workspaceImage\.src = assetURL/)
   assert.match(main, /assetImage\.src = assetURL/)
   assert.match(main, /workspaceImage\.addEventListener\("load", clearImagePreviewError\)/)
   assert.match(main, /workspaceImage\.addEventListener\("error", showImagePreviewError\)/)
-  assert.match(css, /#workspace-image,\s*#asset-image\s*\{[^}]*object-fit:\s*contain/s)
+  assert.match(css, /#atlas-canvas\s*\{[^}]*object-fit:\s*contain/s)
   assert.doesNotMatch(css, /#asset img\s*\{[^}]*image-rendering:\s*pixelated/s)
 })
 
 test("selecting a PNG opens Properties and disables Source", () => {
   assert.match(main, /if \(archive\?\.isImage\(path\)\) \{\s*inspectorTab = "properties"\s*selectedDocument = undefined/s)
-  assert.match(
-    main,
-    /const available =\s*tab === "properties"\s*\? imageSelected \|\| propertiesAvailable\s*:\ !imageSelected && Boolean\(selectedPath\)/s,
-  )
+  assert.match(main, /resourceConfigActive[\s\S]*?tab === "properties" \|\| tab === "source"/)
+  assert.match(main, /:\s*!imageSelected && Boolean\(selectedPath\)/)
+})
+
+test("resource detail exposes slice navigation and editing controls", () => {
+  assert.match(html, /id="resource-back"/)
+  assert.match(html, /id="new-tile"/)
+  assert.match(html, /id="delete-tile"/)
+  assert.match(html, /data-tile-mode="select"/)
+  assert.match(html, /data-tile-mode="move"/)
+  assert.match(main, /function moveSelectedTile\(/)
+  assert.match(main, /duplicateTileSlice\(/)
+  assert.match(main, /deleteSelectedTile\(/)
+})
+
+test("resource editing keeps mode switching and TIL source context working", () => {
+  assert.match(main, /mode\.addEventListener\("change", \(\) => \{\s*applyModeState\(\)/)
+  assert.match(main, /sourceName\.textContent = tilePath/)
+  assert.match(main, /setSourceValue\(tileDocument\.toString\(\)\)/)
+  assert.match(main, /function selectResourceImage[\s\S]*?showImage\(path\)\s*loadTiles\(path\)/)
+  assert.match(main, /sourceName\.textContent = inspectorTab === "source" && selectedResourcePath \? tilePath : selectedResourcePath \|\| selectedPath/)
+})
+
+test("resource detail uses icon tools and previews the selected slice", () => {
+  assert.match(html, /<canvas id="tile-preview"/)
+  for (const id of ["select-tile", "move-tile", "new-tile", "delete-tile"]) {
+    assert.match(html, new RegExp(`<button id="${id}"[^>]*aria-label=`))
+  }
+  assert.match(main, /function drawTilePreview\(/)
+})
+
+test("image style properties use large previews and text styles can be hidden", () => {
+  assert.match(html, /data-background-style-field="NM_IMG"[^>]*\/>/)
+  assert.match(html, /data-background-style-field="HL_IMG"[^>]*\/>/)
+  assert.match(html, /data-text-style/)
+  assert.match(main, /textStyleLabels/)
+  assert.match(css, /\.image-resource-field[\s\S]*\.image-preview-button/)
+})
+
+test("image previews preserve aspect ratio and open the TIL slice picker", () => {
+  assert.match(main, /function openImageSlicePicker\(/)
+  assert.match(main, /tileSliceAt\(pickerSlices/)
+  assert.match(main, /styleImagePickerCanvas/)
+  assert.match(main, /const scale = Math\.min\(canvas\.width \/ sourceWidth, canvas\.height \/ sourceHeight\)/)
+  assert.match(main, /styleImagePickerCanvas\.height = Math\.max\(1, Math\.round\(pickerImage\.naturalHeight \* scale\)\)/)
+  assert.match(css, /#style-image-picker-canvas/)
 })
 
 test("preview interactions keep the sidebar on the rendered keyboard file", () => {
@@ -460,7 +502,7 @@ test("app dialogs close only when their backdrop is clicked", () => {
 })
 
 test("overview classifies ini files and uses a consistent filename row", () => {
-  for (const category of ["键盘布局", "数字与符号", "手写与选择", "键盘组件", "配置与资源"]) {
+  for (const category of ["键盘布局", "数字与符号", "手写与选择", "键盘组件", "资源配置"]) {
     assert.match(main, new RegExp(`group: "${category}"`))
   }
   for (const icon of ["keyboard", "square.grid.2x2", "asterisk", "pencil", "list.bullet", "gearshape"]) {

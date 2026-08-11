@@ -66,10 +66,23 @@ import {
   scaleIniDocument,
 } from "./panel-tools.ts"
 import { Preview, previewItems, type PreviewEvent } from "./preview.ts"
-import { firstExistingPath } from "./resources.ts"
+import { firstExistingPath, resourceImagePaths } from "./resources.ts"
 import { candidatePreview, deleteBackward, insertText } from "./simulation.ts"
 import { SkinArchive } from "./skin.ts"
 import { resolveStylePropertySources, type StylePropertySource } from "./style-properties.ts"
+import {
+  boundedTileRect,
+  duplicateTileSlice,
+  moveTileRect,
+  nextTileIndex,
+  removeTileSlice,
+  tileSliceAt,
+  tileSlices,
+  updateTileSlice,
+  type TilePoint,
+  type TileRect,
+  type TileSlice,
+} from "./tiles.ts"
 import { unsavedDecision } from "./unsaved.ts"
 import { checkForUpdate } from "./update.ts"
 
@@ -172,7 +185,26 @@ const skinState = $("#skin-state") as HTMLSelectElement
 const deviceShell = $("#device-shell")
 const workspaceImageFigure = $("#workspace-image-figure")
 const workspaceImage = $("#workspace-image") as HTMLImageElement
+const atlasCanvas = $("#atlas-canvas") as HTMLCanvasElement
 const workspaceImageError = $("#workspace-image-error")
+const resourceInspector = $("#resource-inspector")
+const resourceListView = $("#resource-list-view")
+const resourceDetail = $("#resource-detail")
+const resourceBackButton = $("#resource-back") as HTMLButtonElement
+const resourceName = $("#resource-name")
+const resourceMeta = $("#resource-meta")
+const resourceCount = $("#resource-count")
+const resourceGallery = $("#resource-gallery")
+const tileInspector = $("#tile-inspector")
+const tileTitle = $("#tile-title")
+const tilePreviewWrap = $("#tile-preview-wrap")
+const tilePreview = $("#tile-preview") as HTMLCanvasElement
+const newTileButton = $("#new-tile") as HTMLButtonElement
+const deleteTileButton = $("#delete-tile") as HTMLButtonElement
+const tileModeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-tile-mode]"))
+const tileSourceFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-tile-source]"))
+const tileInnerFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-tile-inner]"))
+const textStyleLabels = Array.from(document.querySelectorAll<HTMLElement>("[data-text-style]"))
 const simulatedOutput = $("#simulated-output") as HTMLTextAreaElement
 const clearSimulationButton = $("#clear-simulation") as HTMLButtonElement
 const toolbarStrip = $("#toolbar-strip") as HTMLDivElement
@@ -192,6 +224,9 @@ const imagePreviewButtons = Array.from(
 )
 const styleImageDialog = $("#style-image-dialog") as HTMLDialogElement
 const styleImagePreview = $("#style-image-preview") as HTMLCanvasElement
+const styleImagePicker = $("#style-image-picker")
+const styleImagePickerCanvas = $("#style-image-picker-canvas") as HTMLCanvasElement
+const styleImagePickerMeta = $("#style-image-picker-meta")
 const colorDialog = $("#color-dialog") as HTMLDialogElement
 const rgbaPicker = $("#rgba-picker") as HTMLInputElement
 const rgbaPreview = $("#rgba-preview")
@@ -225,11 +260,33 @@ let candidateTextWidth = 1125
 let stylePreviewDrawID = 0
 let imagePreviewDrawID = 0
 const imagePreviewVisuals = new Map<string, Visual[]>()
+let pickerURL = ""
+let pickerImage: HTMLImageElement | undefined
+let pickerPath = ""
+let pickerSlices: TileSlice[] = []
+let pickerScale = 1
+let pickerOffset: TilePoint = { x: 0, y: 0 }
+let pickerTarget: { source: "BACK_STYLE" | "FORE_STYLE"; property: "NM_IMG" | "HL_IMG" } | undefined
 const processedPreviewVisuals = new Map<HTMLButtonElement, Visual[]>()
 let selectedFileButton: HTMLElement | undefined
 let sidebarView: "overview" | "source" = "overview"
 let guidesVisible = false
 let previewReturnName = "py_9.ini"
+let resourceConfigActive = false
+let selectedResourcePath = ""
+let resourceURLs: string[] = []
+let tilePath = ""
+let tileDocument = IniDocument.parse("")
+let slices: TileSlice[] = []
+let selectedTileIndex: number | undefined
+let drawingTile = false
+let tileDragStart: TilePoint | undefined
+let tileDraft: TileRect | undefined
+let tileMode: "select" | "move" = "select"
+let movingTile: TileSlice | undefined
+let moveStart: TilePoint | undefined
+let moveSource: TileRect | undefined
+let copiedTile: TileSlice | undefined
 
 const deviceGeometryProperties = [
   "--keyboard-height-port",
@@ -519,6 +576,15 @@ function applyTextSnapshot(path: string, text: string): void {
   if (path === selectedPath) {
     selectedDocument = IniDocument.parse(text)
     setSourceValue(text)
+  }
+  if (resourceConfigActive && path === tilePath) {
+    tileDocument = IniDocument.parse(text)
+    slices = tileSlices(tileDocument)
+    setSourceValue(text)
+    sourceName.textContent = tilePath
+    if (!slices.some((slice) => slice.index === selectedTileIndex)) selectedTileIndex = undefined
+    populateTileInspector()
+    drawAtlas()
   }
   refreshPreview()
   populateKeyInspector()
@@ -964,19 +1030,181 @@ function showImage(path: string): void {
   deviceShell.hidden = true
   workspaceImageFigure.hidden = false
   sourceEditor.hidden = true
-  asset.hidden = false
+  asset.hidden = resourceConfigActive
   sourceName.textContent = path
   assetBackButton.disabled = !assetReturnPath
 }
 
+function drawAtlas(): void {
+  if (!workspaceImage.complete || !workspaceImage.naturalWidth) return
+  if (atlasCanvas.width !== workspaceImage.naturalWidth) atlasCanvas.width = workspaceImage.naturalWidth
+  if (atlasCanvas.height !== workspaceImage.naturalHeight) atlasCanvas.height = workspaceImage.naturalHeight
+  const context = atlasCanvas.getContext("2d")
+  if (!context) return
+  context.clearRect(0, 0, atlasCanvas.width, atlasCanvas.height)
+  context.drawImage(workspaceImage, 0, 0)
+  drawTilePreview()
+  if (!resourceConfigActive || !guidesVisible) return
+
+  const visible = tileDraft
+    ? [...slices, { index: nextTileIndex(tileDocument), source: tileDraft }]
+    : movingTile
+      ? slices.map((slice) => slice.index === movingTile?.index ? movingTile : slice)
+      : slices
+  const lineWidth = Math.max(1, Math.round(Math.min(atlasCanvas.width, atlasCanvas.height) / 500))
+  context.font = `${Math.max(11, lineWidth * 7)}px ui-monospace, monospace`
+  context.textBaseline = "top"
+  for (const slice of visible) {
+    const [x, y, width, height] = slice.source
+    const selected = slice.index === selectedTileIndex || slice.source === tileDraft
+    context.lineWidth = selected ? lineWidth * 2 : lineWidth
+    context.strokeStyle = selected ? "#ff3b30" : "#0a7ff5"
+    context.strokeRect(x + context.lineWidth / 2, y + context.lineWidth / 2, width - context.lineWidth, height - context.lineWidth)
+    const label = `IMG${slice.index}`
+    const labelWidth = context.measureText(label).width + 6
+    context.fillStyle = selected ? "#ff3b30" : "#0a7ff5"
+    context.fillRect(x, y, labelWidth, Math.max(15, lineWidth * 9))
+    context.fillStyle = "#fff"
+    context.fillText(label, x + 3, y + 2)
+  }
+}
+
+function drawTilePreview(): void {
+  const slice = movingTile?.index === selectedTileIndex
+    ? movingTile
+    : slices.find((item) => item.index === selectedTileIndex)
+  tilePreviewWrap.hidden = !slice
+  const context = tilePreview.getContext("2d")
+  if (!context) return
+  context.clearRect(0, 0, tilePreview.width, tilePreview.height)
+  if (!slice || !workspaceImage.complete || !workspaceImage.naturalWidth) return
+  const [x, y, width, height] = slice.source
+  const scale = Math.min(tilePreview.width / width, tilePreview.height / height)
+  const targetWidth = width * scale
+  const targetHeight = height * scale
+  context.imageSmoothingEnabled = false
+  context.drawImage(
+    workspaceImage,
+    x, y, width, height,
+    (tilePreview.width - targetWidth) / 2,
+    (tilePreview.height - targetHeight) / 2,
+    targetWidth,
+    targetHeight,
+  )
+}
+
+function populateTileInspector(): void {
+  const slice = slices.find((item) => item.index === selectedTileIndex)
+  tileInspector.hidden = !selectedResourcePath
+  newTileButton.disabled = !selectedResourcePath || !isEditing()
+  deleteTileButton.disabled = !slice || !isEditing()
+  tileTitle.textContent = slice ? `IMG${slice.index}` : "切片"
+  for (const field of tileSourceFields) {
+    const index = Number(field.dataset.tileSource)
+    field.value = slice ? String(slice.source[index]) : ""
+    field.disabled = !slice || !isEditing()
+  }
+  for (const field of tileInnerFields) {
+    const index = Number(field.dataset.tileInner)
+    field.value = slice?.inner ? String(slice.inner[index]) : ""
+    field.disabled = !slice || !isEditing()
+  }
+  drawTilePreview()
+}
+
+function loadTiles(path: string): void {
+  tilePath = path.replace(/\.png$/i, ".til")
+  tileDocument = archive?.isText(tilePath) ? IniDocument.parse(archive.getText(tilePath)) : IniDocument.parse("")
+  slices = tileSlices(tileDocument)
+  setSourceValue(tileDocument.toString())
+  sourceName.textContent = tilePath
+  source.disabled = false
+  selectedTileIndex = undefined
+  tileDraft = undefined
+  movingTile = undefined
+  moveStart = undefined
+  moveSource = undefined
+  populateTileInspector()
+  drawAtlas()
+}
+
+function selectResourceImage(path: string): void {
+  if (!archive?.isImage(path)) return
+  selectedResourcePath = path
+  resourceListView.hidden = true
+  resourceDetail.hidden = false
+  resourceName.textContent = path.split("/").pop() ?? path
+  resourceMeta.textContent = path
+  tileMode = "select"
+  tileModeButtons.forEach((button) => button.classList.toggle("active", button.dataset.tileMode === tileMode))
+  showImage(path)
+  loadTiles(path)
+  for (const item of resourceGallery.querySelectorAll<HTMLElement>(".resource-item")) {
+    item.classList.toggle("selected", item.dataset.path === path)
+  }
+  resourceGallery.querySelector<HTMLElement>(`.resource-item[data-path="${CSS.escape(path)}"]`)?.scrollIntoView({ block: "nearest" })
+}
+
+function releaseResourceURLs(): void {
+  for (const url of resourceURLs) URL.revokeObjectURL(url)
+  resourceURLs = []
+}
+
+function renderResourceInspector(): void {
+  if (!archive) return
+  releaseResourceURLs()
+  resourceGallery.replaceChildren()
+  const paths = resourceImagePaths(archive.names(), theme.value, orientation.value)
+  resourceCount.textContent = `${paths.length} 张图片`
+  resourceListView.hidden = Boolean(selectedResourcePath)
+  resourceDetail.hidden = !selectedResourcePath
+  for (const path of paths) {
+    const bytes = archive.getBytes(path)
+    if (!bytes) continue
+    const copy = new Uint8Array(bytes.byteLength)
+    copy.set(bytes)
+    const url = URL.createObjectURL(new Blob([copy.buffer], { type: "image/png" }))
+    resourceURLs.push(url)
+    const button = document.createElement("button")
+    button.className = "resource-item"
+    button.dataset.path = path
+    button.title = path
+    const image = document.createElement("img")
+    image.src = url
+    image.alt = ""
+    const name = document.createElement("strong")
+    name.textContent = path.split("/").pop() ?? path
+    const meta = document.createElement("small")
+    meta.textContent = archive.isText(path.replace(/\.png$/i, ".til")) ? "TIL" : "无 TIL"
+    image.addEventListener("load", () => {
+      meta.textContent = `${image.naturalWidth} × ${image.naturalHeight} · ${meta.textContent}`
+    })
+    button.append(image, name, meta)
+    button.addEventListener("click", () => selectResourceImage(path))
+    resourceGallery.append(button)
+  }
+}
+
+function showResourceList(): void {
+  resourceListView.hidden = false
+  resourceDetail.hidden = true
+  setDrawingTile(false)
+  movingTile = undefined
+  selectedTileIndex = undefined
+  if (selectedDocument) setSourceValue(selectedDocument.toString())
+  sourceName.textContent = selectedPath
+  populateTileInspector()
+}
+
 function clearImagePreviewError(): void {
-  workspaceImage.hidden = false
+  atlasCanvas.hidden = false
   assetImage.hidden = false
   workspaceImageError.hidden = true
+  drawAtlas()
 }
 
 function showImagePreviewError(): void {
-  workspaceImage.hidden = true
+  atlasCanvas.hidden = true
   assetImage.hidden = true
   workspaceImageError.hidden = false
 }
@@ -999,13 +1227,24 @@ function updateInspectorView(): void {
   )
   for (const button of inspectorTabButtons) {
     const tab = button.dataset.inspectorTab
-    const available =
+    const available = resourceConfigActive
+      ? tab === "properties" || tab === "source" && Boolean(selectedPath)
+      :
       tab === "properties"
         ? imageSelected || propertiesAvailable
         : !imageSelected && Boolean(selectedPath)
     button.disabled = !available
     button.classList.toggle("active", tab === inspectorTab && available)
   }
+  if (resourceConfigActive) {
+    sourceName.textContent = inspectorTab === "source" && selectedResourcePath ? tilePath : selectedResourcePath || selectedPath
+    quickInspector.hidden = true
+    asset.hidden = true
+    resourceInspector.hidden = inspectorTab !== "properties"
+    sourceEditor.hidden = inspectorTab !== "source"
+    return
+  }
+  resourceInspector.hidden = true
   if (imageSelected) {
     quickInspector.hidden = true
     sourceEditor.hidden = true
@@ -1206,10 +1445,16 @@ function previewDestination(
   foreground: boolean,
   layer: number,
 ): { x: number; y: number; width: number; height: number } {
-  if (!foreground || !visual.source) {
+  if (!visual.source) {
     return { x: 0, y: 0, width: canvas.width, height: canvas.height }
   }
   const [, , sourceWidth, sourceHeight] = visual.source
+  if (!foreground) {
+    const scale = Math.min(canvas.width / sourceWidth, canvas.height / sourceHeight)
+    const width = sourceWidth * scale
+    const height = sourceHeight * scale
+    return { x: (canvas.width - width) / 2, y: (canvas.height - height) / 2, width, height }
+  }
   const scale = Math.min(
     (canvas.width * (layer === 0 ? 0.78 : 0.48)) / sourceWidth,
     (canvas.height * (layer === 0 ? 0.78 : 0.55)) / sourceHeight,
@@ -1574,6 +1819,7 @@ function addNavButton(
     "nav-layout": "keyboard",
     "nav-component": "square.grid.2x2",
     "nav-style": "paintpalette",
+    "nav-resource": "photo",
   }
   button.append(createSystemSymbol(icon ?? navigationSystemSymbols[className] ?? "doc"))
   const labelNode = document.createElement("span")
@@ -1589,7 +1835,7 @@ function addNavButton(
       layout.value = path.endsWith("_9.ini") ? "py_9.ini" : "py_26.ini"
       previewReturnName = path.split("/").pop() ?? layout.value
     }
-    selectFile(path, "overview")
+    selectFile(path, "overview", className === "nav-resource")
   })
   parent.append(button)
 }
@@ -1696,6 +1942,10 @@ function populateKeyInspector(): void {
     field.value = common ?? ""
     if (property.endsWith("COLOR")) syncColorControl(field)
   }
+  const hasTextStyle = archive?.format === "bda"
+    ? selectedBdaRefs("FORE_STYLE", "text").length > 0
+    : styleFields.some((field) => Boolean(selectedStylePropertyContext(field.dataset.styleField ?? "")))
+  for (const label of textStyleLabels) label.hidden = !hasSelection || !hasTextStyle
   const background = selectedBackgroundStyleContext()
   for (const field of backgroundStyleFields) {
     const name = field.dataset.backgroundStyleField ?? ""
@@ -1875,6 +2125,100 @@ function updateSelectedBackgroundStyle(field: HTMLInputElement): void {
   updateDirty()
 }
 
+function selectedStyleImageSections(source: "BACK_STYLE" | "FORE_STYLE"): { document: IniDocument; path: string; sections: string[] } | undefined {
+  if (!archive || !layoutDocument || !selectedKeySections.length) return
+  const path = styleConfigPath()
+  if (!archive.isText(path)) return
+  const document = IniDocument.parse(archive.getText(path))
+  const sections = source === "BACK_STYLE"
+    ? backgroundStyleSections(layoutDocument, selectedKeySections)
+    : [...new Set(selectedKeySections.flatMap((key) =>
+        (layoutDocument?.get(key, source) ?? "").split(",").map((token) => token.trim()).flatMap((token) => {
+          const value = Number(token)
+          return [`STYLE${token}`, Number.isFinite(value) ? `STYLE${Math.floor(value / 100)}` : ""]
+        }).filter((section) => section && document.sections().includes(section)),
+      ))]
+  return sections.length ? { document, path, sections } : undefined
+}
+
+function updateSelectedImageReference(source: "BACK_STYLE" | "FORE_STYLE", property: "NM_IMG" | "HL_IMG", value: string): void {
+  if (archive?.format === "bda") {
+    updateBdaRefs(selectedBdaRefs(source, "image"), property, value)
+    return
+  }
+  const context = selectedStyleImageSections(source)
+  if (!archive || !context) return
+  const before = context.document.toString()
+  setStyleField(context.document, context.sections, property, value)
+  const text = context.document.toString()
+  commitText(context.path, before, text)
+  if (selectedPath === context.path) setSourceValue(text)
+  refreshPreview()
+  populateKeyInspector()
+  updateDirty()
+}
+
+let pickerSelectedIndex: number | undefined
+
+function drawImageSlicePicker(): void {
+  const context = styleImagePickerCanvas.getContext("2d")
+  if (!context || !pickerImage?.naturalWidth) return
+  const width = pickerImage.naturalWidth
+  const height = pickerImage.naturalHeight
+  pickerScale = Math.min(styleImagePickerCanvas.width / width, styleImagePickerCanvas.height / height)
+  const targetWidth = width * pickerScale
+  const targetHeight = height * pickerScale
+  pickerOffset = { x: (styleImagePickerCanvas.width - targetWidth) / 2, y: (styleImagePickerCanvas.height - targetHeight) / 2 }
+  context.clearRect(0, 0, styleImagePickerCanvas.width, styleImagePickerCanvas.height)
+  context.drawImage(pickerImage, pickerOffset.x, pickerOffset.y, targetWidth, targetHeight)
+  const lineWidth = Math.max(1, Math.round(Math.min(targetWidth, targetHeight) / 350))
+  context.font = `${Math.max(11, lineWidth * 7)}px ui-monospace, monospace`
+  context.textBaseline = "top"
+  for (const slice of pickerSlices) {
+    const [x, y, sliceWidth, sliceHeight] = slice.source
+    const selected = slice.index === pickerSelectedIndex
+    context.lineWidth = selected ? lineWidth * 2 : lineWidth
+    context.strokeStyle = selected ? "#ff3b30" : "#0a7ff5"
+    context.strokeRect(
+      pickerOffset.x + x * pickerScale,
+      pickerOffset.y + y * pickerScale,
+      sliceWidth * pickerScale,
+      sliceHeight * pickerScale,
+    )
+    context.fillStyle = selected ? "#ff3b30" : "#0a7ff5"
+    context.fillRect(pickerOffset.x + x * pickerScale, pickerOffset.y + y * pickerScale, context.measureText(`IMG${slice.index}`).width + 6, 15)
+    context.fillStyle = "#fff"
+    context.fillText(`IMG${slice.index}`, pickerOffset.x + x * pickerScale + 3, pickerOffset.y + y * pickerScale + 2)
+  }
+}
+
+function openImageSlicePicker(path: string, source: "BACK_STYLE" | "FORE_STYLE", property: "NM_IMG" | "HL_IMG", selectedSource?: TileRect): void {
+  if (!archive?.isImage(path)) return
+  const bytes = archive.getBytes(path)
+  if (!bytes) return
+  if (pickerURL) URL.revokeObjectURL(pickerURL)
+  pickerURL = URL.createObjectURL(new Blob([bytes], { type: "image/png" }))
+  pickerPath = path
+  pickerTarget = { source, property }
+  const tilePathForPicker = path.replace(/\.png$/i, ".til")
+  pickerSlices = archive.isText(tilePathForPicker) ? tileSlices(IniDocument.parse(archive.getText(tilePathForPicker))) : []
+  pickerSelectedIndex = pickerSlices.find((slice) => selectedSource && slice.source.join(",") === selectedSource.join(","))?.index
+  pickerImage = new Image()
+  pickerImage.onload = () => {
+    if (!pickerImage) return
+    const scale = Math.min(720 / pickerImage.naturalWidth, 520 / pickerImage.naturalHeight)
+    styleImagePickerCanvas.width = Math.max(1, Math.round(pickerImage.naturalWidth * scale))
+    styleImagePickerCanvas.height = Math.max(1, Math.round(pickerImage.naturalHeight * scale))
+    drawImageSlicePicker()
+  }
+  pickerImage.src = pickerURL
+  styleImagePreview.hidden = true
+  styleImagePicker.hidden = false
+  styleImageDialog.querySelector("h2")!.textContent = `${path.split("/").pop() ?? path} · 选择切片`
+  styleImagePickerMeta.textContent = pickerSlices.length ? "点击图片中的切片以修改引用" : "此图片没有可用的 TIL 切片"
+  styleImageDialog.showModal()
+}
+
 function selectedRects(): LayoutRect[] {
   if (!layoutDocument) return []
   return selectedKeySections.flatMap((section) => {
@@ -1956,6 +2300,94 @@ function isTextEditingTarget(target: EventTarget | null): boolean {
   return Boolean(target.closest("input, textarea, select, button, [contenteditable]"))
 }
 
+function atlasPoint(event: Pick<PointerEvent, "clientX" | "clientY">): TilePoint {
+  const bounds = atlasCanvas.getBoundingClientRect()
+  return {
+    x: ((event.clientX - bounds.left) / bounds.width) * atlasCanvas.width,
+    y: ((event.clientY - bounds.top) / bounds.height) * atlasCanvas.height,
+  }
+}
+
+function commitTile(slice: TileSlice): void {
+  if (!archive || !selectedResourcePath || !isEditing()) return
+  const [x, y, width, height] = slice.source
+  if (
+    width <= 0 || height <= 0 || x < 0 || y < 0 ||
+    x + width > atlasCanvas.width || y + height > atlasCanvas.height
+  ) return
+  const before = tileDocument.toString()
+  updateTileSlice(tileDocument, slice)
+  commitText(tilePath, before, tileDocument.toString())
+  setSourceValue(tileDocument.toString())
+  slices = tileSlices(tileDocument)
+  selectedTileIndex = slice.index
+  populateTileInspector()
+  drawAtlas()
+  updateDirty()
+  renderResourceInspectorMetadata()
+}
+
+function renderResourceInspectorMetadata(): void {
+  for (const item of resourceGallery.querySelectorAll<HTMLElement>(".resource-item")) {
+    if (item.dataset.path !== selectedResourcePath) continue
+    const meta = item.querySelector("small")
+    const size = meta?.textContent?.split(" · ")[0]
+    if (meta) meta.textContent = `${size ? `${size} · ` : ""}TIL`
+  }
+}
+
+function setDrawingTile(active: boolean): void {
+  drawingTile = active
+  tileDragStart = undefined
+  tileDraft = undefined
+  if (active) {
+    movingTile = undefined
+    moveStart = undefined
+    moveSource = undefined
+  }
+  newTileButton.classList.toggle("active", active)
+  atlasCanvas.classList.toggle("drawing", active)
+  drawAtlas()
+}
+
+function moveSelectedTile(deltaX: number, deltaY: number): void {
+  if (!archive || !selectedResourcePath || !isEditing()) return
+  const existing = slices.find((slice) => slice.index === selectedTileIndex)
+  if (!existing) return
+  const source = moveTileRect(existing.source, deltaX, deltaY, atlasCanvas.width, atlasCanvas.height)
+  const actualX = source[0] - existing.source[0]
+  const actualY = source[1] - existing.source[1]
+  if (!actualX && !actualY) return
+  const inner = existing.inner
+    ? moveTileRect(existing.inner, actualX, actualY, atlasCanvas.width, atlasCanvas.height)
+    : undefined
+  commitTile({ index: existing.index, source, ...(inner ? { inner } : {}) })
+}
+
+function deleteSelectedTile(): void {
+  if (!archive || !selectedResourcePath || !isEditing() || selectedTileIndex === undefined) return
+  const before = tileDocument.toString()
+  if (!removeTileSlice(tileDocument, selectedTileIndex)) return
+  commitText(tilePath, before, tileDocument.toString())
+  setSourceValue(tileDocument.toString())
+  slices = tileSlices(tileDocument)
+  selectedTileIndex = undefined
+  populateTileInspector()
+  drawAtlas()
+  updateDirty()
+}
+
+function updateSelectedTile(): void {
+  const existing = slices.find((slice) => slice.index === selectedTileIndex)
+  if (!existing) return
+  const source = tileSourceFields.map((field) => Number(field.value)) as TileRect
+  if (source.some((value) => !Number.isFinite(value))) return
+  const innerValues = tileInnerFields.map((field) => field.value.trim())
+  const innerNumbers = innerValues.map(Number) as TileRect
+  const inner = innerValues.every(Boolean) && innerNumbers.every(Number.isFinite) ? innerNumbers : undefined
+  commitTile({ index: existing.index, source, ...(inner ? { inner } : {}) })
+}
+
 function setSidebarView(view: "overview" | "source"): void {
   sidebarView = view
   for (const button of sidebarViewButtons) {
@@ -1965,7 +2397,22 @@ function setSidebarView(view: "overview" | "source"): void {
   files.querySelector<HTMLElement>(".raw-files")?.toggleAttribute("hidden", view !== "source")
 }
 
-function selectFile(path: string, preferredSidebarView = sidebarView): void {
+function selectFile(path: string, preferredSidebarView = sidebarView, resourceMode = false): void {
+  resourceConfigActive = resourceMode
+  toggleGuides.title = resourceMode ? "切片网格" : "辅助线"
+  toggleGuides.setAttribute("aria-label", resourceMode ? "切片网格" : "辅助线")
+  if (!resourceMode) {
+    selectedResourcePath = ""
+    drawingTile = false
+    tileDragStart = undefined
+    tileDraft = undefined
+    newTileButton.classList.remove("active")
+    atlasCanvas.classList.remove("drawing")
+  } else {
+    selectedResourcePath = ""
+    resourceListView.hidden = false
+    resourceDetail.hidden = true
+  }
   if (archive?.isImage(path) && selectedPath && !archive.isImage(selectedPath)) {
     assetReturnPath = selectedPath
   }
@@ -2025,6 +2472,7 @@ function selectFile(path: string, preferredSidebarView = sidebarView): void {
     inspectorTab = "source"
   }
   updateInspectorView()
+  if (resourceMode) renderResourceInspector()
   if (!quickInspector.hidden) populateKeyInspector()
   selectedFileButton?.classList.remove("selected")
   const preferredContainer = files.querySelector(preferredSidebarView === "overview" ? ".sidebar-overview" : ".raw-files")
@@ -2084,7 +2532,6 @@ function renderFiles(): void {
     "sel_en.ini": { group: "手写与选择", label: "英文选择栏", className: "nav-component", icon: "list.bullet" },
     "help.ini": { group: "手写与选择", label: "帮助面板", className: "nav-component", icon: "list.bullet" },
     "logo.ini": { group: "键盘组件", label: "输入法标识", className: "nav-component", icon: "app" },
-    "gen.ini": { group: "配置与资源", label: "键盘基础配置", className: "nav-style", icon: "gearshape" },
   }
   const configPrefix = `${theme.value}/skin/${orientation.value}/`
   const appearancePath = bdaAppearancePath(archive, theme.value, orientation.value)
@@ -2096,6 +2543,7 @@ function renderFiles(): void {
     if (!path.startsWith(configPrefix) || path.slice(configPrefix.length).includes("/") || !/\.ini$/i.test(path)) continue
     if (archive.format === "bda" && !bdaBase?.isText(basePath)) continue
     const name = path.split("/").pop() ?? path
+    if (name.toLowerCase() === "gen.ini") continue
     const info = iniTypes[name] ?? {
       group: "扩展布局",
       label: name.replace(/\.ini$/i, "").replaceAll("_", " "),
@@ -2110,7 +2558,7 @@ function renderFiles(): void {
   const hintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
   if (hintPath) entries.push({ group: "键盘组件", label: "按键气泡", path: hintPath, className: "nav-component", icon: "rectangle.and.hand.point" })
   const stylePath = appearancePath ?? (archive.format === "bda" ? undefined : styleConfigPath())
-  if (stylePath) entries.push({ group: "配置与资源", label: "按键样式", path: stylePath, className: "nav-style", icon: "paintpalette" })
+  if (stylePath) entries.push({ group: "资源配置", label: "资源配置", path: stylePath, className: "nav-resource", icon: "photo" })
   if (archive.format === "bda") {
     for (const [kind, label] of [
       ["animation", "序列帧动画"],
@@ -2119,13 +2567,10 @@ function renderFiles(): void {
       ["switch", "开关配置"],
     ] as const) {
       const path = bdaConfigPath(archive, theme.value, orientation.value, kind)
-      if (path) entries.push({ group: "配置与资源", label, path, className: "nav-style", icon: "gearshape" })
+      if (path) entries.push({ group: "扩展配置", label, path, className: "nav-style", icon: "gearshape" })
     }
   }
-  const imagePath = archive.names().find((path) => path.startsWith(`${theme.value}/skin/res/`) && archive?.isImage(path))
-  if (imagePath) entries.push({ group: "配置与资源", label: "图片资源", path: imagePath, className: "nav-style", icon: "photo" })
-
-  for (const group of ["皮肤", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "配置与资源", "扩展布局"]) {
+  for (const group of ["皮肤", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "资源配置", "扩展配置", "扩展布局"]) {
     const grouped = entries.filter((entry) => entry.group === group && (
       archive?.names().includes(entry.path) ||
       archive?.format === "bda" && Boolean(bdaBase?.isText(bdaBasePath(entry.path)))
@@ -2661,6 +3106,18 @@ imageOpen.addEventListener("change", async () => {
 })
 source.addEventListener("input", () => {
   if (!isEditing() || !archive || !selectedPath) return
+  if (resourceConfigActive && selectedResourcePath) {
+    const before = tileDocument.toString()
+    tileDocument = IniDocument.parse(source.value)
+    commitText(tilePath, before, source.value)
+    slices = tileSlices(tileDocument)
+    if (!slices.some((slice) => slice.index === selectedTileIndex)) selectedTileIndex = undefined
+    populateTileInspector()
+    drawAtlas()
+    updateDirty()
+    updateSourceHighlight()
+    return
+  }
   const before = selectedDocument?.toString() ?? archive.getText(selectedPath)
   selectedDocument = IniDocument.parse(source.value)
   commitText(selectedPath, before, source.value)
@@ -2793,7 +3250,9 @@ for (const control of [theme, orientation, layout]) {
   })
 }
 mode.addEventListener("change", () => {
-  populateKeyInspector()
+  applyModeState()
+  if (resourceConfigActive) populateTileInspector()
+  else populateKeyInspector()
   eventLog.textContent =
     mode.value === "edit"
       ? "编辑模式：点击选择按键，在检查器中修改布局与属性。"
@@ -2814,7 +3273,82 @@ toggleGuides.addEventListener("click", () => {
   toggleGuides.setAttribute("aria-pressed", String(guidesVisible))
   preview.setGuides(guidesVisible)
   toolbarPreview.setGuides(guidesVisible)
+  drawAtlas()
 })
+newTileButton.addEventListener("click", () => {
+  if (!selectedResourcePath || !isEditing()) return
+  if (!guidesVisible) toggleGuides.click()
+  setDrawingTile(!drawingTile)
+})
+deleteTileButton.addEventListener("click", deleteSelectedTile)
+resourceBackButton.addEventListener("click", showResourceList)
+for (const button of tileModeButtons) {
+  button.addEventListener("click", () => {
+    tileMode = button.dataset.tileMode === "move" ? "move" : "select"
+    tileModeButtons.forEach((item) => item.classList.toggle("active", item === button))
+    setDrawingTile(false)
+  })
+}
+atlasCanvas.addEventListener("pointerdown", (event) => {
+  if (!resourceConfigActive || !guidesVisible) return
+  const point = atlasPoint(event)
+  if (drawingTile) {
+    tileDragStart = point
+    tileDraft = undefined
+    atlasCanvas.setPointerCapture(event.pointerId)
+    return
+  }
+  const hit = tileSliceAt(slices, point)
+  selectedTileIndex = hit?.index
+  if (tileMode === "move" && hit && isEditing()) {
+    movingTile = hit
+    moveStart = point
+    moveSource = hit.source
+    atlasCanvas.setPointerCapture(event.pointerId)
+  }
+  populateTileInspector()
+  drawAtlas()
+})
+atlasCanvas.addEventListener("pointermove", (event) => {
+  if (tileDragStart && drawingTile) {
+    tileDraft = boundedTileRect(tileDragStart, atlasPoint(event), atlasCanvas.width, atlasCanvas.height)
+    drawAtlas()
+    return
+  }
+  if (!moveStart || !moveSource || !movingTile) return
+  const point = atlasPoint(event)
+  const source = moveTileRect(moveSource, point.x - moveStart.x, point.y - moveStart.y, atlasCanvas.width, atlasCanvas.height)
+  const dx = source[0] - moveSource[0]
+  const dy = source[1] - moveSource[1]
+  movingTile = { ...movingTile, source, ...(movingTile.inner ? { inner: moveTileRect(movingTile.inner, dx, dy, atlasCanvas.width, atlasCanvas.height) } : {}) }
+  drawAtlas()
+})
+atlasCanvas.addEventListener("pointerup", (event) => {
+  if (tileDragStart && drawingTile) {
+    tileDraft = boundedTileRect(tileDragStart, atlasPoint(event), atlasCanvas.width, atlasCanvas.height)
+    const source = tileDraft
+    setDrawingTile(false)
+    if (source) commitTile({ index: nextTileIndex(tileDocument), source })
+    return
+  }
+  if (movingTile) {
+    const moved = movingTile
+    movingTile = undefined
+    moveStart = undefined
+    moveSource = undefined
+    commitTile(moved)
+  }
+})
+atlasCanvas.addEventListener("pointercancel", () => {
+  setDrawingTile(false)
+  movingTile = undefined
+  moveStart = undefined
+  moveSource = undefined
+  drawAtlas()
+})
+for (const field of [...tileSourceFields, ...tileInnerFields]) {
+  field.addEventListener("change", updateSelectedTile)
+}
 skinState.addEventListener("change", () => {
   const state = skinState.value ? Number(skinState.value) : undefined
   applySkinState(state, state ? `皮肤状态：S${state}` : "皮肤状态：默认")
@@ -2836,7 +3370,15 @@ for (const button of stylePreviewButtons) {
     if (!(event.metaKey || event.ctrlKey)) {
       const visuals = processedPreviewVisuals.get(button)
       if (!visuals?.length) return
+      const visual = visuals.find((item) => item.imagePath)
+      if (visual?.imagePath) {
+        const [sourceName, state] = (button.dataset.stylePreview ?? "back:normal").split(":")
+        openImageSlicePicker(visual.imagePath, sourceName === "fore" ? "FORE_STYLE" : "BACK_STYLE", state === "highlighted" ? "HL_IMG" : "NM_IMG", visual.source)
+        return
+      }
       drawVisualPreview(styleImagePreview, visuals, button.dataset.stylePreview?.startsWith("fore:") || button.hasAttribute("data-preview-foreground"))
+      styleImagePicker.hidden = true
+      styleImagePreview.hidden = false
       styleImageDialog.showModal()
       return
     }
@@ -2850,12 +3392,44 @@ for (const button of imagePreviewButtons) {
   button.addEventListener("click", () => {
     const visuals = imagePreviewVisuals.get(button.dataset.imagePreview ?? "")
     if (!visuals?.length) return
+    const visual = visuals.find((item) => item.imagePath)
+    if (visual?.imagePath) {
+      openImageSlicePicker(visual.imagePath, "BACK_STYLE", button.dataset.imagePreview === "highlighted" ? "HL_IMG" : "NM_IMG", visual.source)
+      return
+    }
     drawVisualPreview(styleImagePreview, visuals, false)
+    styleImagePicker.hidden = true
+    styleImagePreview.hidden = false
     styleImageDialog.showModal()
   })
 }
+styleImagePickerCanvas.addEventListener("click", (event) => {
+  if (!pickerImage || !pickerTarget || !pickerSlices.length) return
+  const bounds = styleImagePickerCanvas.getBoundingClientRect()
+  const point = {
+    x: ((event.clientX - bounds.left) / bounds.width) * styleImagePickerCanvas.width,
+    y: ((event.clientY - bounds.top) / bounds.height) * styleImagePickerCanvas.height,
+  }
+  const imagePoint = { x: (point.x - pickerOffset.x) / pickerScale, y: (point.y - pickerOffset.y) / pickerScale }
+  const selected = tileSliceAt(pickerSlices, imagePoint)
+  if (!selected) return
+  pickerSelectedIndex = selected.index
+  const name = pickerPath.split("/").pop()?.replace(/\.png$/i, "") ?? pickerPath
+  updateSelectedImageReference(pickerTarget.source, pickerTarget.property, `${name},${selected.index}`)
+  drawImageSlicePicker()
+})
 styleImageDialog.addEventListener("click", (event) => {
-  if (event.target === styleImageDialog) styleImageDialog.close()
+  if (event.target === styleImageDialog) {
+    styleImageDialog.close()
+  }
+})
+styleImageDialog.addEventListener("close", () => {
+  if (pickerURL) URL.revokeObjectURL(pickerURL)
+  pickerURL = ""
+  pickerImage = undefined
+  pickerTarget = undefined
+  styleImagePicker.hidden = true
+  styleImagePreview.hidden = false
 })
 for (const button of Array.from(editContextMenu.querySelectorAll<HTMLButtonElement>("[data-context-action]"))) {
   button.addEventListener("click", () => {
@@ -2883,11 +3457,44 @@ window.addEventListener("keydown", (event) => {
   }
   const direction = movement[event.key]
   if (direction) {
+    if (resourceConfigActive && !isTextEditingTarget(event.target)) {
+      if (selectedTileIndex === undefined || !isEditing()) return
+      event.preventDefault()
+      const distance = event.shiftKey ? 10 : 1
+      moveSelectedTile(direction[0] * distance, direction[1] * distance)
+      return
+    }
     if (!isEditing() || !selectedKeySections.length || isTextEditingTarget(event.target)) return
     event.preventDefault()
     const distance = event.shiftKey ? 10 : 1
     moveSelectedKeys(direction[0] * distance, direction[1] * distance)
     return
+  }
+  if (resourceConfigActive && !isTextEditingTarget(event.target)) {
+    if ((event.key === "Delete" || event.key === "Backspace") && isEditing()) {
+      event.preventDefault()
+      deleteSelectedTile()
+      return
+    }
+    if (event.metaKey || event.ctrlKey) {
+      if (event.key.toLowerCase() === "c") {
+        const existing = slices.find((slice) => slice.index === selectedTileIndex)
+        if (existing) {
+          copiedTile = duplicateTileSlice(existing, existing.index)
+          event.preventDefault()
+        }
+        return
+      }
+      if (event.key.toLowerCase() === "v" && copiedTile && isEditing()) {
+        event.preventDefault()
+        const index = nextTileIndex(tileDocument)
+        commitTile({ ...copiedTile, index })
+        selectedTileIndex = index
+        populateTileInspector()
+        drawAtlas()
+        return
+      }
+    }
   }
   if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return
   event.preventDefault()

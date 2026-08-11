@@ -142,7 +142,8 @@
             </div>
           </div>
           <figure id="workspace-image-figure" hidden>
-            <img id="workspace-image" alt="皮肤资源预览" />
+            <img id="workspace-image" alt="" hidden />
+            <canvas id="atlas-canvas" aria-label="皮肤图集切片画布"></canvas>
             <figcaption id="workspace-image-error" hidden>无法预览此 PNG</figcaption>
           </figure>
         </div>
@@ -253,13 +254,13 @@
                   </span>
                 </span>
               </label>
-              <label>正常按键图片 <span class="style-field"><input data-background-style-field="NM_IMG" placeholder="例如 btn,1" /><button class="style-preview-button image-preview-button" data-image-preview="normal" title="查看按键图片预览" aria-label="查看正常按键图片预览"><canvas width="64" height="44"></canvas></button></span></label>
-              <label>按下按键图片 <span class="style-field"><input data-background-style-field="HL_IMG" placeholder="例如 btn,2" /><button class="style-preview-button image-preview-button" data-image-preview="highlighted" title="查看按键图片预览" aria-label="查看按下按键图片预览"><canvas width="64" height="44"></canvas></button></span></label>
-              <label>字体 <input data-style-field="FONT_NAME" /></label>
-              <label>字重 <input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
-              <label>字号 <input data-style-field="FONT_SIZE" type="number" /></label>
-              <label>文字正常颜色 <span class="color-control"><input data-style-field="NM_COLOR" /><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色"><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度"></span></label>
-              <label>文字按下颜色 <span class="color-control"><input data-style-field="HL_COLOR" /><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色"><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度"></span></label>
+              <label class="image-resource-field">正常按键图片 <span class="style-field"><input data-background-style-field="NM_IMG" placeholder="例如 btn,1" /><button class="style-preview-button image-preview-button" data-image-preview="normal" title="查看按键图片预览" aria-label="查看正常按键图片预览"><canvas width="240" height="120"></canvas></button></span></label>
+              <label class="image-resource-field">按下按键图片 <span class="style-field"><input data-background-style-field="HL_IMG" placeholder="例如 btn,2" /><button class="style-preview-button image-preview-button" data-image-preview="highlighted" title="查看按键图片预览" aria-label="查看按下按键图片预览"><canvas width="240" height="120"></canvas></button></span></label>
+              <label data-text-style>字体 <input data-style-field="FONT_NAME" /></label>
+              <label data-text-style>字重 <input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
+              <label data-text-style>字号 <input data-style-field="FONT_SIZE" type="number" /></label>
+              <label data-text-style>文字正常颜色 <span class="color-control"><input data-style-field="NM_COLOR" /><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色"><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度"></span></label>
+              <label data-text-style>文字按下颜色 <span class="color-control"><input data-style-field="HL_COLOR" /><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色"><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度"></span></label>
             </div>
             <p class="inspector-note">多选时图片会批量写入各按键引用的背景样式。共享样式也会影响其他引用它的按键。</p>
           </div>
@@ -276,6 +277,48 @@
               <label class="direction-right"><span>右滑 →</span><input data-key-field="RIGHT" /><small data-action-meaning="RIGHT"></small></label>
               <label class="direction-down"><span>↓ 下滑</span><input data-key-field="DOWN" /><small data-action-meaning="DOWN"></small></label>
             </div>
+          </div>
+        </div>
+        <div id="resource-inspector" hidden>
+          <div id="resource-list-view">
+            <div class="inspector-title">
+              <strong>皮肤图片</strong>
+              <span id="resource-count"></span>
+            </div>
+            <div id="resource-gallery" class="resource-gallery"></div>
+          </div>
+          <div id="resource-detail" hidden>
+            <div class="resource-detail-heading">
+              <button id="resource-back" type="button" title="返回图片列表" aria-label="返回图片列表"><span class="system-symbol" data-system-symbol="chevron.left" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m12 4-6 6 6 6"/></svg></span></button>
+              <div><strong id="resource-name">图片</strong><small id="resource-meta"></small></div>
+            </div>
+            <div class="tile-toolbar">
+              <div class="tile-mode-control" aria-label="切片操作模式">
+                <button id="select-tile" class="active" type="button" data-tile-mode="select" title="选择切片" aria-label="选择切片"><span class="system-symbol" data-system-symbol="cursorarrow" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 2.5 15.5 11l-5 .8 2.8 5-2.5 1.4-2.7-5L4 16z"/></svg></span></button>
+                <button id="move-tile" type="button" data-tile-mode="move" title="移动切片" aria-label="移动切片"><span class="system-symbol" data-system-symbol="arrow.up.and.down.and.arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 2v16m0-16L7 5m3-3 3 3M2 10h16m-16 0 3-3m-3 3 3 3m13-3-3-3m3 3-3 3m-5 5-3-3m3 3 3-3"/></svg></span></button>
+              </div>
+              <button id="new-tile" type="button" title="新建切片" aria-label="新建切片"><span class="system-symbol" data-system-symbol="plus.rectangle" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M10 7v6M7 10h6"/></svg></span></button>
+              <button id="delete-tile" type="button" title="删除选中切片" aria-label="删除选中切片"><span class="system-symbol" data-system-symbol="trash" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 6h12M8 3h4l1 3H7zm-2 3 1 9h8l1-9M8 9v6m4-6v6"/></svg></span></button>
+            </div>
+          <div id="tile-inspector" class="inspector-group">
+            <div class="tile-heading">
+              <h3 id="tile-title">切片</h3>
+            </div>
+            <div id="tile-preview-wrap" hidden><canvas id="tile-preview" width="360" height="180" aria-label="选中切片放大预览"></canvas></div>
+            <div class="inspector-grid geometry-fields">
+              <label>X <input data-tile-source="0" type="number" min="0" /></label>
+              <label>Y <input data-tile-source="1" type="number" min="0" /></label>
+              <label>宽 <input data-tile-source="2" type="number" min="1" /></label>
+              <label>高 <input data-tile-source="3" type="number" min="1" /></label>
+            </div>
+            <h3>INNER_RECT（可选）</h3>
+            <div class="inspector-grid geometry-fields">
+              <label>X <input data-tile-inner="0" type="number" /></label>
+              <label>Y <input data-tile-inner="1" type="number" /></label>
+              <label>宽 <input data-tile-inner="2" type="number" min="1" /></label>
+              <label>高 <input data-tile-inner="3" type="number" min="1" /></label>
+            </div>
+          </div>
           </div>
         </div>
         <div id="source-editor" hidden>
@@ -356,6 +399,10 @@
       <form method="dialog">
         <header><h2 id="style-image-title">图片预览</h2></header>
         <canvas id="style-image-preview" width="480" height="260"></canvas>
+        <div id="style-image-picker" hidden>
+          <canvas id="style-image-picker-canvas" width="720" height="420" aria-label="原始图片切片选择器"></canvas>
+          <small id="style-image-picker-meta">点击图片中的切片以修改引用</small>
+        </div>
       </form>
     </dialog>
 
