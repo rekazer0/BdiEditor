@@ -276,7 +276,14 @@ let pickerPath = ""
 let pickerSlices: TileSlice[] = []
 let pickerScale = 1
 let pickerOffset: TilePoint = { x: 0, y: 0 }
-let pickerTarget: { source: "BACK_STYLE" | "FORE_STYLE"; property: "NM_IMG" | "HL_IMG" } | undefined
+type StyleImagePickerTarget = {
+  source: "BACK_STYLE" | "FORE_STYLE"
+  property: "NM_IMG" | "HL_IMG"
+  document?: IniDocument
+  path?: string
+  sections?: string[]
+}
+let pickerTarget: StyleImagePickerTarget | undefined
 type NativeImagePickerPayload = {
   path: string
   dataURL: string
@@ -288,6 +295,7 @@ type NativeResourcePickerPayload = { path: string; dataURL: string }[]
 let nativeImagePickerPayload: NativeImagePickerPayload | undefined
 let nativeResourcePickerPayload: NativeResourcePickerPayload = []
 const processedPreviewVisuals = new Map<HTMLButtonElement, Visual[]>()
+const processedPreviewStyleIDs = new Map<HTMLButtonElement, string[]>()
 let selectedFileButton: HTMLElement | undefined
 let sidebarView: "overview" | "source" = "overview"
 let guidesVisible = false
@@ -1744,6 +1752,7 @@ async function updateStylePreviews(): Promise<void> {
     button.hidden = styleIDs.length === 0
     const drawable = visuals.filter((visual): visual is Visual => Boolean(visual))
     processedPreviewVisuals.set(button, drawable)
+    processedPreviewStyleIDs.set(button, styleIDs)
     drawStylePreview(button, drawable, foreground)
   }
 }
@@ -1763,15 +1772,22 @@ function selectedStylePropertyContext(property: string):
   return sources ? { document, path, sources } : undefined
 }
 
-function selectedBdaRefs(source: "BACK_STYLE" | "FORE_STYLE", type: BdaStyleRef["type"]): BdaStyleRef[] {
+function selectedBdaRefs(
+  source: "BACK_STYLE" | "FORE_STYLE",
+  type: BdaStyleRef["type"],
+  fallbackSource?: "BACK_STYLE" | "FORE_STYLE",
+): BdaStyleRef[] {
   if (archive?.format !== "bda" || !layoutDocument) return []
-  return selectedKeySections.flatMap((section) => {
-    const ref = (layoutDocument?.get(section, source) ?? "")
-      .split(",")
-      .map(bdaStyleRef)
-      .find((item) => item?.type === type)
-    return ref ? [ref] : []
-  })
+  const collect = (name: "BACK_STYLE" | "FORE_STYLE") =>
+    selectedKeySections.flatMap((section) => {
+      const ref = (layoutDocument?.get(section, name) ?? "")
+        .split(",")
+        .map(bdaStyleRef)
+        .find((item) => item?.type === type)
+      return ref ? [ref] : []
+    })
+  const refs = collect(source)
+  return refs.length || !fallbackSource ? refs : collect(fallbackSource)
 }
 
 function bdaStyleValue(appearance: BdaAppearance, ref: BdaStyleRef, property: string): string {
@@ -2263,21 +2279,62 @@ function selectedStyleImageSections(source: "BACK_STYLE" | "FORE_STYLE"): { docu
   return sections.length ? { document, path, sections } : undefined
 }
 
-function updateSelectedImageReference(source: "BACK_STYLE" | "FORE_STYLE", property: "NM_IMG" | "HL_IMG", value: string): void {
-  if (archive?.format === "bda") {
-    updateBdaRefs(selectedBdaRefs(source, "image"), property, value)
-    return
+function styleWriteTarget(
+  source: "BACK_STYLE" | "FORE_STYLE",
+  property: "NM_IMG" | "HL_IMG",
+  styleIDs: string[],
+): StyleImagePickerTarget {
+  if (archive?.format === "bda") return { source, property }
+  const path = styleConfigPath()
+  if (!archive?.isText(path)) return { source, property }
+  const document = IniDocument.parse(archive.getText(path))
+  const sections = [
+    ...new Set(
+      styleIDs.flatMap((token) => {
+        const value = Number(token)
+        return [
+          `STYLE${token}`,
+          source === "FORE_STYLE" && Number.isFinite(value)
+            ? `STYLE${Math.floor(value / 100)}`
+            : "",
+        ].filter(Boolean)
+      }).filter((section) => document.sections().includes(section)),
+    ),
+  ]
+  return sections.length ? { source, property, document, path, sections } : { source, property }
+}
+
+function updateSelectedImageReference(target: StyleImagePickerTarget | undefined, value: string): boolean {
+  if (!archive || !target) return false
+  const { document, path, sections } = target
+  if (document && path && sections?.length) {
+    const before = document.toString()
+    setStyleField(document, sections, target.property, value)
+    const text = document.toString()
+    commitText(path, before, text)
+    if (selectedPath === path) setSourceValue(text)
+    refreshPreview()
+    populateKeyInspector()
+    updateDirty()
+    return true
   }
-  const context = selectedStyleImageSections(source)
-  if (!archive || !context) return
+  if (archive?.format === "bda") {
+    const refs = target.source === "FORE_STYLE"
+      ? selectedBdaRefs("FORE_STYLE", "image", "BACK_STYLE")
+      : selectedBdaRefs("BACK_STYLE", "image")
+    return updateBdaRefs(refs, target.property, value)
+  }
+  const context = selectedStyleImageSections(target.source)
+  if (!archive || !context) return false
   const before = context.document.toString()
-  setStyleField(context.document, context.sections, property, value)
+  setStyleField(context.document, context.sections, target.property, value)
   const text = context.document.toString()
   commitText(context.path, before, text)
   if (selectedPath === context.path) setSourceValue(text)
   refreshPreview()
   populateKeyInspector()
   updateDirty()
+  return true
 }
 
 let pickerSelectedIndex: number | undefined
@@ -2375,14 +2432,14 @@ function drawImageSlicePicker(): void {
   }
 }
 
-function openImageSlicePicker(path: string, source: "BACK_STYLE" | "FORE_STYLE", property: "NM_IMG" | "HL_IMG", selectedSource?: TileRect): void {
+function openImageSlicePicker(path: string, target: StyleImagePickerTarget, selectedSource?: TileRect): void {
   if (!archive?.isImage(path)) return
   const bytes = archive.getBytes(path)
   if (!bytes) return
   if (pickerURL) URL.revokeObjectURL(pickerURL)
   pickerURL = URL.createObjectURL(new Blob([bytes], { type: "image/png" }))
   pickerPath = path
-  pickerTarget = { source, property }
+  pickerTarget = target
   const tilePathForPicker = path.replace(/\.png$/i, ".til")
   pickerSlices = archive.isText(tilePathForPicker) ? tileSlices(IniDocument.parse(archive.getText(tilePathForPicker))) : []
   pickerSelectedIndex = pickerSlices.find((slice) => selectedSource && slice.source.join(",") === selectedSource.join(","))?.index
@@ -3543,30 +3600,75 @@ candidateArea.addEventListener("click", () => {
   const path = toolbarStrip.dataset.path
   if (path) selectFile(path)
 })
+function fallbackBackgroundStyleID(button: HTMLButtonElement): string | undefined {
+  // Key style-reference buttons fall back to the selected keys' background style.
+  if (button.dataset.stylePreview) {
+    const shared = commonSelectedStyle("BACK_STYLE")?.split(",")[0]?.trim()
+    if (shared) return shared
+    const sections = layoutDocument ? backgroundStyleSections(layoutDocument, selectedKeySections) : []
+    return sections[0]?.replace(/^STYLE/, "")
+  }
+  // Toolbar/field previews pair with the same section's background field
+  // (FORE_STYLE ↔ BACK_STYLE, FIRST_FORE ↔ FIRST_BACK, ICON*.FORE_STYLE ↔ ICON*.BACK_STYLE),
+  // falling back to the panel background style when the pair is not configured.
+  const [scope, fieldName] = (button.dataset.stylePreviewField ?? "").split(":")
+  if (scope !== "toolbar") return
+  const [section, key] = fieldName.split(".")
+  const pair = key
+    ? `${section}.${key.replace(/FORE_STYLE$/, "BACK_STYLE")}`
+    : fieldName.replace(/FORE_STYLE$/, "BACK_STYLE")
+  const candidates = pair === fieldName ? [pair] : [pair, "BACK_STYLE"]
+  for (const name of candidates) {
+    const field = toolbarFields.find((item) => item.dataset.toolbarField === name)
+    const styleID = field?.value.split(",")[0]?.trim()
+    if (styleID) return styleID
+  }
+}
+
 for (const button of stylePreviewButtons) {
-  button.addEventListener("click", (event) => {
-    if (!(event.metaKey || event.ctrlKey)) {
-      const visuals = processedPreviewVisuals.get(button)
-      if (!visuals?.length) return
-      const visual = visuals.find((item) => item.imagePath)
-      if (visual?.imagePath) {
-        const [sourceName, state] = (button.dataset.stylePreview ?? "back:normal").split(":")
-        openImageSlicePicker(visual.imagePath, sourceName === "fore" ? "FORE_STYLE" : "BACK_STYLE", state === "highlighted" ? "HL_IMG" : "NM_IMG", visual.source)
-        return
-      }
-      drawVisualPreview(styleImagePreview, visuals, button.dataset.stylePreview?.startsWith("fore:") || button.hasAttribute("data-preview-foreground"))
-      styleImagePicker.hidden = true
-      styleImagePreview.hidden = false
-      styleImageImgList.hidden = true
-      styleImageTitle.textContent = "图片预览"
-      styleImageSubtitle.textContent = ""
-      styleImageDialog.hidden = false
+  button.addEventListener("click", async (event) => {
+    if (event.metaKey || event.ctrlKey) {
+      const path = button.dataset.path
+      if (!path) return
+      selectFile(path)
+      revealSourceFile(path)
       return
     }
-    const path = button.dataset.path
-    if (!path) return
-    selectFile(path)
-    revealSourceFile(path)
+    const visuals = processedPreviewVisuals.get(button) ?? []
+    const styleIDs = processedPreviewStyleIDs.get(button) ?? []
+    if (!visuals.length) return
+    const [sourceName, state] = (button.dataset.stylePreview ?? "back:normal").split(":")
+    const foreground = sourceName === "fore" || button.hasAttribute("data-preview-foreground")
+    const property = state === "highlighted" ? "HL_IMG" : "NM_IMG"
+    const visual = visuals.find((item) => item.imagePath)
+    if (visual?.imagePath) {
+      const target = styleWriteTarget(
+        foreground ? "FORE_STYLE" : "BACK_STYLE",
+        property,
+        foreground ? styleIDs : styleIDs.slice(0, 1),
+      )
+      openImageSlicePicker(visual.imagePath, target, visual.source)
+      return
+    }
+    // Foreground styles without an image (e.g. text-only styles) fall back to
+    // the paired background style reference so the click still opens a slice
+    // picker, same as clicking the background style reference.
+    const backgroundID = fallbackBackgroundStyleID(button)
+    if (backgroundID) {
+      const backVisual = await visualResolver()?.resolve(backgroundID, state === "highlighted").catch(() => undefined)
+      if (backVisual?.imagePath) {
+        const target = styleWriteTarget("BACK_STYLE", property, [backgroundID])
+        openImageSlicePicker(backVisual.imagePath, target, backVisual.source)
+        return
+      }
+    }
+    drawVisualPreview(styleImagePreview, visuals, foreground)
+    styleImagePicker.hidden = true
+    styleImagePreview.hidden = false
+    styleImageImgList.hidden = true
+    styleImageTitle.textContent = "图片预览"
+    styleImageSubtitle.textContent = ""
+    styleImageDialog.hidden = false
   })
 }
 styleImagePickerCanvas.addEventListener("click", (event) => {
@@ -3582,7 +3684,7 @@ styleImagePickerCanvas.addEventListener("click", (event) => {
   if (!selected) return
   pickerSelectedIndex = selected.index
   const name = pickerPath.split("/").pop()?.replace(/\.png$/i, "") ?? pickerPath
-  updateSelectedImageReference(pickerTarget.source, pickerTarget.property, `${name},${selected.index}`)
+  updateSelectedImageReference(pickerTarget, `${name},${selected.index}`)
   drawImageSlicePicker()
 })
 styleImageClose.addEventListener("click", clearImageSlicePicker)
@@ -3598,11 +3700,11 @@ void listen<{ index: number }>("image-picker-select", (event) => {
   if (!selected) return
   pickerSelectedIndex = selected.index
   const name = pickerPath.split("/").pop()?.replace(/\.png$/i, "") ?? pickerPath
-  updateSelectedImageReference(pickerTarget.source, pickerTarget.property, `${name},${selected.index}`)
+  updateSelectedImageReference(pickerTarget, `${name},${selected.index}`)
 })
 void listen("resource-picker-open", openResourcePickerWindow)
 void listen<{ path: string }>("resource-picker-select", (event) => {
-  if (pickerTarget) openImageSlicePicker(event.payload.path, pickerTarget.source, pickerTarget.property)
+  if (pickerTarget) openImageSlicePicker(event.payload.path, pickerTarget)
 })
 
 // Inspector resize handle
@@ -3749,7 +3851,7 @@ styleImageTitle.addEventListener("click", () => {
     btn.addEventListener("click", () => {
       styleImageImgList.hidden = true
       if (pickerTarget) {
-        openImageSlicePicker(path, pickerTarget.source, pickerTarget.property)
+        openImageSlicePicker(path, pickerTarget)
       }
     })
     styleImageImgList.append(btn)
