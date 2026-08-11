@@ -369,6 +369,10 @@ test("canvas mode shrinks below parsed panel width but never enlarges past it", 
     css,
     /\.device-shell\.canvas-only #preview\s*\{[^}]*width:\s*100%[^}]*max-height:\s*none/s,
   )
+  assert.match(
+    css,
+    /\.device-shell\.canvas-only \.device-screen\s*\{[^}]*height:\s*auto[^}]*overflow:\s*visible/s,
+  )
   assert.doesNotMatch(
     css,
     /\.device-shell\.canvas-only #candidate-area\s*\{[^}]*grid-template-rows:\s*40px 93px/s,
@@ -668,15 +672,33 @@ test("platform materials and toolbar status surfaces stay visually consistent", 
   assert.match(css, /:root\.windows\[data-window-material="on"\]\s+\*\s*\{[^}]*backdrop-filter:\s*none\s*!important/s)
 })
 
-test("panel tools expose S-state, resolution and portrait-to-landscape conversion", () => {
-  assert.match(html, /id="panel-scale"[^>]*title="面板缩放与竖转横"/)
+test("panel tools expose S-state and configurable one-panel copying", () => {
+  assert.match(html, /id="panel-scale"[^>]*title="面板复制"/)
   assert.match(html, /id="skin-state"[^>]*aria-label="皮肤 S 状态"/)
   assert.match(html, /id="panel-status"[^>]*>面板：-- × -- · 预览缩放：--%/)
-  assert.match(html, /id="panel-scale-dialog"/)
+  assert.match(html, /id="panel-scale-dialog"[^>]*aria-labelledby="panel-scale-title"/)
+  assert.match(html, /id="panel-scale-title">面板复制</)
+  assert.match(html, /id="panel-copy-source"/)
+  assert.match(html, /id="panel-target-theme"[\s\S]*?value="light">浅色[\s\S]*?value="dark">深色/)
+  assert.match(html, /id="panel-target-orientation"[\s\S]*?value="port">竖屏[\s\S]*?value="land">横屏/)
+  assert.match(html, /id="panel-target-existing"[^>]*aria-label="选择目标路径下的 INI"/)
+  assert.match(html, /id="panel-target-file"[^>]*required/)
+  assert.doesNotMatch(html, /<datalist id="panel-target-files">/)
+  assert.match(html, /id="panel-scale-enabled" type="checkbox"/)
+  assert.match(html, /id="panel-scale-options"[^>]*hidden/)
+  assert.doesNotMatch(html, /竖转横|同时转换浅色与深色/)
   assert.match(main, /availableSkinStates\(\.\.\.skinStateDocuments\(\)\)/)
-  assert.match(main, /panelConversionPaths\(/)
-  assert.match(main, /scaleIniDocument\(/)
+  assert.match(main, /copyablePanelPaths\(archive\.names\(\)\)/)
+  assert.match(main, /function openPanelCopyDialog\(\)/)
+  assert.match(main, /function updatePanelCopyForm\(\)/)
+  assert.match(main, /panelTargetExisting\.replaceChildren\([\s\S]*?copyablePanelPaths\(archive\.names\(\)\)/)
+  assert.match(main, /panelTargetExisting\.addEventListener\("change"/)
+  assert.match(main, /async function copyPanel\(\)/)
+  assert.match(main, /validPanelFilename\(panelTargetFile\.value\.trim\(\)\)/)
+  assert.match(main, /const staged = new Map<string, Uint8Array>\(\)/)
   assert.match(main, /window\.confirm\([^)]*覆盖/s)
+  assert.match(main, /runFileOperation\("复制面板", copyPanel\)/)
+  assert.doesNotMatch(main, /convertPortraitPanels|panelConversionPaths/)
 })
 
 test("preview S actions route through one shared state setter for both canvases", () => {
