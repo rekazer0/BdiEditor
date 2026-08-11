@@ -1193,7 +1193,9 @@ h2 {
 }
 
 .device-shell.canvas-only .device-screen {
+  height: auto;
   display: block;
+  overflow: visible;
   border-radius: 12px;
   background: transparent;
 }

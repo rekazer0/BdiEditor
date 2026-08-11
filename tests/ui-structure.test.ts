@@ -369,6 +369,10 @@ test("canvas mode shrinks below parsed panel width but never enlarges past it", 
     css,
     /\.device-shell\.canvas-only #preview\s*\{[^}]*width:\s*100%[^}]*max-height:\s*none/s,
   )
+  assert.match(
+    css,
+    /\.device-shell\.canvas-only \.device-screen\s*\{[^}]*height:\s*auto[^}]*overflow:\s*visible/s,
+  )
   assert.doesNotMatch(
     css,
     /\.device-shell\.canvas-only #candidate-area\s*\{[^}]*grid-template-rows:\s*40px 93px/s,
