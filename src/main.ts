@@ -3301,7 +3301,7 @@ for (const button of tileModeButtons) {
   })
 }
 atlasCanvas.addEventListener("pointerdown", (event) => {
-  if (!resourceConfigActive || !guidesVisible) return
+  if (!resourceConfigActive) return
   const point = atlasPoint(event)
   if (drawingTile) {
     tileDragStart = point

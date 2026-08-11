@@ -477,6 +477,13 @@ test("resource slices keep guides and source selection in sync", () => {
   assert.match(css, /#tile-preview-wrap\s*\{[^}]*aspect-ratio:\s*1[^}]*box-sizing:\s*border-box/s)
 })
 
+test("atlas slice selection does not depend on visible guides", () => {
+  const pointerdown = main.match(/atlasCanvas\.addEventListener\("pointerdown", \(event\) => \{\n([\s\S]*?)\n}\)/)?.[1] ?? ""
+  const entryGuard = pointerdown.split("\n")[0]
+  assert.match(entryGuard, /!resourceConfigActive/)
+  assert.doesNotMatch(entryGuard, /guidesVisible/)
+})
+
 test("image style properties use large previews and text styles can be hidden", () => {
   assert.match(html, /data-background-style-field="NM_IMG"[^>]*\/>/)
   assert.match(html, /data-background-style-field="HL_IMG"[^>]*\/>/)
