@@ -376,7 +376,7 @@ test("canvas mode shrinks below parsed panel width but never enlarges past it", 
   assert.match(html, /<div id="panel-viewport">\s*<canvas id="preview"/)
   assert.match(
     css,
-    /\.device-shell\.canvas-only #panel-viewport\s*\{[^}]*aspect-ratio:\s*var\(--canvas-width\)\s*\/\s*var\(--panel-visible-height\)[^}]*overflow:\s*hidden/s,
+    /\.device-shell\.canvas-only #panel-viewport\s*\{[^}]*aspect-ratio:\s*calc\(var\(--canvas-width\)\s*\/\s*1px\)\s*\/\s*var\(--panel-visible-height\)[^}]*overflow:\s*hidden/s,
   )
   assert.match(css, /\.device-shell\.canvas-only #preview\s*\{[^}]*transform:\s*translateY\(var\(--panel-crop-offset\)\)/s)
   assert.match(

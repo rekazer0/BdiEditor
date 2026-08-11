@@ -1243,7 +1243,8 @@ h2 {
 
 .device-shell.canvas-only #panel-viewport {
   width: 100%;
-  aspect-ratio: var(--canvas-width) / var(--panel-visible-height);
+  /* ponytail: --canvas-width carries px; ratio needs unitless numbers */
+  aspect-ratio: calc(var(--canvas-width) / 1px) / var(--panel-visible-height);
   overflow: hidden;
 }
 
