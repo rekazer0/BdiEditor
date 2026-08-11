@@ -7,7 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; connect-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     />
-    <title>BdiEditor v0.5.10</title>
+    <title>BdiEditor v0.6.1</title>
   </head>
   <body>
     <header class="titlebar" data-tauri-drag-region>
@@ -185,8 +185,10 @@
               <label>背景样式 <span class="style-field"><input data-keyboard-field="styleID" /><button class="style-preview-button compact-style-preview" data-style-preview-field="keyboard:styleID" title="查看背景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
               <label>正常背景图片 <input data-keyboard-field="NM_IMG" placeholder="例如 panel,1" /></label>
               <label>按下背景图片 <input data-keyboard-field="HL_IMG" placeholder="例如 panel,2" /></label>
-              <label>正常背景色 / 透明度 <span class="color-control"><input data-keyboard-field="NM_COLOR" placeholder="AARRGGBB" /><input type="color" data-color-picker-for="keyboard-NM_COLOR" value="#ffffff" aria-label="正常背景色"><input type="number" data-color-alpha-for="keyboard-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="正常背景透明度"></span></label>
-              <label>按下背景色 / 透明度 <span class="color-control"><input data-keyboard-field="HL_COLOR" placeholder="AARRGGBB" /><input type="color" data-color-picker-for="keyboard-HL_COLOR" value="#ffffff" aria-label="按下背景色"><input type="number" data-color-alpha-for="keyboard-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="按下背景透明度"></span></label>
+              <div class="color-pair-field">
+                <label>正常背景色 / 透明度 <span class="color-control"><input data-keyboard-field="NM_COLOR" placeholder="AARRGGBB" /><input type="color" data-color-picker-for="keyboard-NM_COLOR" value="#ffffff" aria-label="正常背景色"><input type="number" data-color-alpha-for="keyboard-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="正常背景透明度"></span></label>
+                <label>按下背景色 / 透明度 <span class="color-control"><input data-keyboard-field="HL_COLOR" placeholder="AARRGGBB" /><input type="color" data-color-picker-for="keyboard-HL_COLOR" value="#ffffff" aria-label="按下背景色"><input type="number" data-color-alpha-for="keyboard-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="按下背景透明度"></span></label>
+              </div>
             </div>
             <p class="inspector-note">整体高度写入 gen.ini 的 PANEL SIZE；颜色前两位是透明度。背景图片透明度由 PNG 决定。</p>
           </div>
@@ -259,8 +261,10 @@
               <label data-text-style>字体 <input data-style-field="FONT_NAME" /></label>
               <label data-text-style>字重 <input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
               <label data-text-style>字号 <input data-style-field="FONT_SIZE" type="number" /></label>
-              <label data-text-style>文字正常颜色 <span class="color-control"><input data-style-field="NM_COLOR" /><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色"><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度"></span></label>
-              <label data-text-style>文字按下颜色 <span class="color-control"><input data-style-field="HL_COLOR" /><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色"><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度"></span></label>
+              <div class="color-pair-field" data-text-style>
+                <label>文字正常颜色 <span class="color-control"><input data-style-field="NM_COLOR" /><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色"><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度"></span></label>
+                <label>文字按下颜色 <span class="color-control"><input data-style-field="HL_COLOR" /><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色"><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度"></span></label>
+              </div>
             </div>
             <p class="inspector-note">多选时图片会批量写入各按键引用的背景样式。共享样式也会影响其他引用它的按键。</p>
           </div>
@@ -289,16 +293,16 @@
           </div>
           <div id="resource-detail" hidden>
             <div class="resource-detail-heading">
-              <button id="resource-back" type="button" title="返回图片列表" aria-label="返回图片列表"><span class="system-symbol" data-system-symbol="chevron.left" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m12 4-6 6 6 6"/></svg></span></button>
+              <button id="resource-back" class="toolbar-button" type="button" title="返回图片列表" aria-label="返回图片列表"><span class="system-symbol" data-system-symbol="chevron.left" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m12 4-6 6 6 6"/></svg></span></button>
               <div><strong id="resource-name">图片</strong><small id="resource-meta"></small></div>
             </div>
             <div class="tile-toolbar">
               <div class="tile-mode-control" aria-label="切片操作模式">
-                <button id="select-tile" class="active" type="button" data-tile-mode="select" title="选择切片" aria-label="选择切片"><span class="system-symbol" data-system-symbol="cursorarrow" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 2.5 15.5 11l-5 .8 2.8 5-2.5 1.4-2.7-5L4 16z"/></svg></span></button>
-                <button id="move-tile" type="button" data-tile-mode="move" title="移动切片" aria-label="移动切片"><span class="system-symbol" data-system-symbol="arrow.up.and.down.and.arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 2v16m0-16L7 5m3-3 3 3M2 10h16m-16 0 3-3m-3 3 3 3m13-3-3-3m3 3-3 3m-5 5-3-3m3 3 3-3"/></svg></span></button>
+                <button id="select-tile" class="toolbar-button active" type="button" data-tile-mode="select" title="选择切片" aria-label="选择切片"><span class="system-symbol" data-system-symbol="cursorarrow" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 2.5 15.5 11l-5 .8 2.8 5-2.5 1.4-2.7-5L4 16z"/></svg></span></button>
+                <button id="move-tile" class="toolbar-button" type="button" data-tile-mode="move" title="移动切片" aria-label="移动切片"><span class="system-symbol" data-system-symbol="arrow.up.and.down.and.arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 2v16m0-16L7 5m3-3 3 3M2 10h16m-16 0 3-3m-3 3 3 3m13-3-3-3m3 3-3 3m-5 5-3-3m3 3 3-3"/></svg></span></button>
               </div>
-              <button id="new-tile" type="button" title="新建切片" aria-label="新建切片"><span class="system-symbol" data-system-symbol="plus.rectangle" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M10 7v6M7 10h6"/></svg></span></button>
-              <button id="delete-tile" type="button" title="删除选中切片" aria-label="删除选中切片"><span class="system-symbol" data-system-symbol="trash" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 6h12M8 3h4l1 3H7zm-2 3 1 9h8l1-9M8 9v6m4-6v6"/></svg></span></button>
+              <button id="new-tile" class="toolbar-button" type="button" title="新建切片" aria-label="新建切片"><span class="system-symbol" data-system-symbol="plus.rectangle" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M10 7v6M7 10h6"/></svg></span></button>
+              <button id="delete-tile" class="toolbar-button" type="button" title="删除选中切片" aria-label="删除选中切片"><span class="system-symbol" data-system-symbol="trash" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 6h12M8 3h4l1 3H7zm-2 3 1 9h8l1-9M8 9v6m4-6v6"/></svg></span></button>
             </div>
           <div id="tile-inspector" class="inspector-group">
             <div class="tile-heading">
@@ -410,11 +414,11 @@
 
     <dialog id="about-dialog" class="app-dialog" aria-labelledby="about-title">
       <form method="dialog">
-        <header><h2 id="about-title">关于 BdiEditor v0.5.10</h2><button aria-label="关闭">关闭</button></header>
+        <header><h2 id="about-title">关于 BdiEditor v0.6.1</h2><button aria-label="关闭">关闭</button></header>
         <p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
-        <p>版本 0.5.10</p>
+        <p>版本 0.6.1</p>
         <p>支持读取、编辑和导出 BDI、BDS、BDA 皮肤包。</p>
-        <section id="about-update" class="about-update" data-current-version="0.5.10">
+        <section id="about-update" class="about-update" data-current-version="0.6.1">
           <div><strong>版本更新</strong><button id="check-update" type="button">检查更新</button></div>
           <p id="update-status" aria-live="polite">正在检查更新…</p>
           <a id="download-update" href="https://github.com/rekazer0/BdiEditor/releases" target="_blank" rel="noreferrer" hidden>查看最新版本</a>

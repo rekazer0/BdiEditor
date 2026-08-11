@@ -101,15 +101,6 @@ export function previewSelectionVisible(mode: "edit" | "preview", selected: bool
   return mode === "edit" && selected
 }
 
-export function shouldDrawFallbackKeyChrome(
-  mode: "edit" | "preview",
-  editable: boolean,
-  hasBackVisual: boolean,
-  hasForeground: boolean,
-): boolean {
-  return mode === "edit" && editable && !hasBackVisual && !hasForeground
-}
-
 export function previewFallbackText(
   item: PreviewItem,
   mode: "edit" | "preview",
@@ -117,10 +108,6 @@ export function previewFallbackText(
 ): string {
   if (hasForeground) return ""
   return item.show
-}
-
-export function previewAnnotationsVisible(mode: "edit" | "preview"): boolean {
-  return mode === "edit"
 }
 
 export function foregroundLayerRect(
@@ -592,10 +579,8 @@ export class Preview {
   }
 
   private fitCanvas(): void {
-    const maxX = Math.max(this.panelWidth, ...this.keys.map((key) => key.rect.x + key.rect.width))
-    const maxY = Math.max(this.panelHeight, ...this.keys.map((key) => key.rect.y + key.rect.height))
-    const width = Math.ceil(maxX)
-    const height = Math.ceil(maxY)
+    const width = Math.ceil(this.panelWidth)
+    const height = Math.ceil(this.panelHeight)
     if (this.canvas.width !== width) this.canvas.width = width
     if (this.canvas.height !== height) this.canvas.height = height
   }
@@ -734,21 +719,6 @@ export class Preview {
       const foregrounds = phoneForegroundLayers(visuals[index].fore)
       const styleTexts = visuals[index].styleTexts
       const hasForeground = foregrounds.some(Boolean) || styleTexts.some(Boolean)
-      if (shouldDrawFallbackKeyChrome(this.mode, key.editable, Boolean(visuals[index].back), hasForeground)) {
-        context.fillStyle = active ? "#8eb7f2" : "#f7f7f8"
-        context.strokeStyle = active || selected ? "#087ff5" : "#8c929b"
-        context.lineWidth = active || selected ? 4 : 2
-        context.beginPath()
-        context.roundRect(
-          key.rect.x + 2,
-          key.rect.y + 2,
-          key.rect.width - 4,
-          key.rect.height - 4,
-          12,
-        )
-        context.fill()
-        context.stroke()
-      }
       if (shouldDrawItemBackground(key, this.panelStyle, this.panelWidth, this.panelHeight)) {
         this.drawVisual(context, visuals[index].back, key.rect, true)
       }
@@ -769,7 +739,7 @@ export class Preview {
         this.drawStyleText(context, styleText, point)
       }
 
-      if (selected && visuals[index].back) {
+      if (selected) {
         context.strokeStyle = "#087ff5"
         context.lineWidth = 4
         context.strokeRect(key.rect.x + 2, key.rect.y + 2, key.rect.width - 4, key.rect.height - 4)
@@ -792,17 +762,6 @@ export class Preview {
         )
       }
 
-      if (!key.editable || !previewAnnotationsVisible(this.mode)) continue
-      context.font = `${Math.max(12, Math.min(24, key.rect.height * 0.14))}px system-ui`
-      context.fillStyle = textVisual?.color ?? "#565b64"
-      if (key.up) context.fillText(key.up, key.rect.x + key.rect.width / 2, key.rect.y + 20)
-      if (key.left) context.fillText(key.left, key.rect.x + 18, key.rect.y + key.rect.height / 2)
-      if (key.right) {
-        context.fillText(key.right, key.rect.x + key.rect.width - 18, key.rect.y + key.rect.height / 2)
-      }
-      if (key.down) {
-        context.fillText(key.down, key.rect.x + key.rect.width / 2, key.rect.y + key.rect.height - 18)
-      }
     }
 
     if (this.animationVisual) {

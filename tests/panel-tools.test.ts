@@ -3,6 +3,7 @@ import test from "node:test"
 import { IniDocument } from "../src/ini.ts"
 import {
   availableSkinStates,
+  canvasFitWidth,
   panelConversionPaths,
   previewScalePercent,
   scaleIniDocument,
@@ -44,6 +45,12 @@ test("combines S states from every layout in the current skin", () => {
 test("reports the actual panel-to-canvas scale", () => {
   assert.equal(previewScalePercent(960, 313, 1920, 626), 50)
   assert.equal(previewScalePercent(800, 500, 1125, 595), 71)
+})
+
+test("fits the candidate toolbar and panel with one shared scale", () => {
+  assert.equal(canvasFitWidth(1200, 900, 1080, 704), 1080)
+  assert.equal(canvasFitWidth(900, 900, 1080, 704), 900)
+  assert.equal(canvasFitWidth(1200, 528, 1080, 704), 810)
 })
 
 test("scales official panel geometry with independent horizontal and vertical ratios", () => {

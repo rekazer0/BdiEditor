@@ -61,6 +61,7 @@ import { shouldClearMixedInput } from "./mixed-input.ts"
 import { loadBuiltInProjectTemplate, operationError } from "./operations.ts"
 import {
   availableSkinStates,
+  canvasFitWidth,
   panelConversionPaths,
   previewScalePercent,
   scaleIniDocument,
@@ -250,6 +251,7 @@ let redoStack: Change[] = []
 let fileOperationRunning = false
 let firstCandidateTextVisual: TextVisual | undefined
 let candidateTextWidth = 1125
+let canvasLogicalSize: { width: number; height: number } | undefined
 let stylePreviewDrawID = 0
 let imagePreviewDrawID = 0
 const imagePreviewVisuals = new Map<string, Visual[]>()
@@ -809,7 +811,7 @@ function refreshPreview(): void {
       applyCandidateTextVisual(firstCandidate, firstCandidateTextVisual, candidateTextWidth)
     }
     preview.setPanel(config.styleID, config.width, config.height)
-    updatePanelTools(config.width, config.height)
+    updatePanelTools(config.width, config.height, toolbarSize?.height)
     applyDeviceKeyboardGeometry(config.width, config.height, toolbarSize?.height ?? 0, composing)
   } else if (bdaGen && layoutDocument) {
     const size = bdaGen.get("PANEL", "SIZE")?.split(",").map(Number)
@@ -837,7 +839,7 @@ function refreshPreview(): void {
       panelWidth,
       panelHeight,
     )
-    updatePanelTools(panelWidth, panelHeight)
+    updatePanelTools(panelWidth, panelHeight, toolbarSize?.height)
     applyDeviceKeyboardGeometry(panelWidth, panelHeight, toolbarSize?.height ?? 0, composing)
   } else {
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
@@ -857,7 +859,23 @@ function skinStateDocuments(): IniDocument[] {
   })
 }
 
-function updatePanelTools(width: number, height: number): void {
+function fitCanvasPreview(): void {
+  if (!canvasLogicalSize) return
+  const width = canvasFitWidth(
+    canvasWrap.clientWidth - 36,
+    canvasWrap.clientHeight - 36,
+    canvasLogicalSize.width,
+    canvasLogicalSize.height,
+  )
+  deviceShell.style.setProperty("--canvas-fit-width", `${width}px`)
+}
+
+new ResizeObserver(fitCanvasPreview).observe(canvasWrap)
+
+function updatePanelTools(width: number, height: number, candidateHeight = 0): void {
+  deviceShell.style.setProperty("--canvas-width", `${width}px`)
+  canvasLogicalSize = { width, height: height + candidateHeight }
+  fitCanvasPreview()
   const states = availableSkinStates(...skinStateDocuments())
   const selected = skinState.value
   skinState.replaceChildren(new Option("默认", ""), ...states.map((state) => new Option(`S${state}`, String(state))))
@@ -891,6 +909,7 @@ function updateDevicePreview(): void {
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
   }
   preview.setTransparent(device.value !== "canvas")
+  fitCanvasPreview()
 }
 
 function panelSizeFrom(document: IniDocument | undefined): [number, number] | undefined {
@@ -2235,7 +2254,7 @@ function openImageSlicePicker(path: string, source: "BACK_STYLE" | "FORE_STYLE",
   pickerImage = new Image()
   pickerImage.onload = () => {
     if (!pickerImage) return
-    const scale = Math.min(720 / pickerImage.naturalWidth, 520 / pickerImage.naturalHeight)
+    const scale = Math.min(960 / pickerImage.naturalWidth, 640 / pickerImage.naturalHeight)
     styleImagePickerCanvas.width = Math.max(1, Math.round(pickerImage.naturalWidth * scale))
     styleImagePickerCanvas.height = Math.max(1, Math.round(pickerImage.naturalHeight * scale))
     drawImageSlicePicker()
@@ -3290,14 +3309,8 @@ atlasCanvas.addEventListener("pointerdown", (event) => {
   }
   const hit = tileSliceAt(slices, point)
   selectedTileIndex = hit?.index
-  if (hit) {
-    inspectorTab = "source"
-    updateInspectorView()
-    updateSourceHighlight()
-    requestAnimationFrame(scrollSelectedSource)
-  } else {
-    updateSourceHighlight()
-  }
+  updateSourceHighlight()
+  if (hit) requestAnimationFrame(scrollSelectedSource)
   if (tileMode === "move" && hit && isEditing()) {
     movingTile = hit
     moveStart = point
@@ -3402,6 +3415,7 @@ for (const button of imagePreviewButtons) {
   })
 }
 styleImagePickerCanvas.addEventListener("click", (event) => {
+  if (!isEditing()) return
   if (!pickerImage || !pickerTarget || !pickerSlices.length) return
   const bounds = styleImagePickerCanvas.getBoundingClientRect()
   const point = {

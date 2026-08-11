@@ -46,6 +46,16 @@ export function previewScalePercent(
   return Math.round(Math.min(renderedWidth / panelWidth, renderedHeight / panelHeight) * 100)
 }
 
+export function canvasFitWidth(
+  availableWidth: number,
+  availableHeight: number,
+  logicalWidth: number,
+  logicalHeight: number,
+): number {
+  if (![availableWidth, availableHeight, logicalWidth, logicalHeight].every((value) => value > 0)) return 0
+  return logicalWidth * Math.min(1, availableWidth / logicalWidth, availableHeight / logicalHeight)
+}
+
 export function scaleIniDocument(
   source: IniDocument,
   xRatio: number,

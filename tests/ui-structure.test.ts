@@ -285,6 +285,10 @@ test("color controls preserve ARGB alpha while using native color inputs", () =>
   assert.match(main, /field\.value = `\$\{Math\.round\(Math\.max\(0, Math\.min\(1, alphaValue\)\) \* 255\)/)
   assert.match(main, /syncColorControl\(field\)/)
   assert.doesNotMatch(main, /colorDialog\.showModal\(\)/)
+  assert.equal((html.match(/class="color-pair-field"/g) ?? []).length, 2)
+  assert.match(css, /\.color-pair-field\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/s)
+  assert.match(css, /\.color-control\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 28px/s)
+  assert.match(css, /\.color-control input\[type="color"\]\s*\{[^}]*width:\s*28px[^}]*height:\s*28px/s)
 })
 
 test("key image fields preview processed atlas slices in a dialog", () => {
@@ -351,17 +355,26 @@ test("Shift selects the complete key range from the anchor", () => {
   assert.match(preview, /sections\.slice\(Math\.min\(from, to\), Math\.max\(from, to\) \+ 1\)/)
 })
 
-test("canvas mode preserves configured toolbar proportions at responsive widths", () => {
+test("canvas mode shrinks below parsed panel width but never enlarges past it", () => {
   assert.match(main, /toolbarCanvas\.style\.setProperty\("--toolbar-width", String\(width\)\)/)
   assert.match(main, /toolbarCanvas\.style\.setProperty\("--toolbar-height", String\(height\)\)/)
+  assert.match(main, /deviceShell\.style\.setProperty\("--canvas-width", `\$\{width\}px`\)/)
+  assert.match(css, /\.device-shell\.canvas-only\s*\{[^}]*width:\s*min\(100%, var\(--canvas-fit-width, var\(--canvas-width, 1080px\)\)\)/s)
+  assert.doesNotMatch(css, /\.device-shell\.canvas-only\s*\{[^}]*920px/s)
   assert.match(
     css,
     /\.device-shell\.canvas-only #toolbar-preview\s*\{[^}]*aspect-ratio:\s*var\(--toolbar-width\)\s*\/\s*var\(--toolbar-height\)[^}]*height:\s*auto/s,
+  )
+  assert.match(
+    css,
+    /\.device-shell\.canvas-only #preview\s*\{[^}]*width:\s*100%[^}]*max-height:\s*none/s,
   )
   assert.doesNotMatch(
     css,
     /\.device-shell\.canvas-only #candidate-area\s*\{[^}]*grid-template-rows:\s*40px 93px/s,
   )
+  assert.match(preview, /private fitCanvas\(\): void \{\s*const width = Math\.ceil\(this\.panelWidth\)\s*const height = Math\.ceil\(this\.panelHeight\)/s)
+  assert.doesNotMatch(preview, /private fitCanvas\(\): void \{[^}]*this\.keys\.map/s)
   assert.match(css, /@media \(max-width:\s*1060px\)/)
 })
 
@@ -388,8 +401,8 @@ test("settings expose canvas backgrounds and edit mode exposes key context actio
 })
 
 test("window and about names match the GitHub project and include the version", () => {
-  assert.match(html, /<title>BdiEditor v0\.5\.10<\/title>/)
-  assert.match(html, /关于 BdiEditor v0\.5\.10/)
+  assert.match(html, /<title>BdiEditor v0\.6\.1<\/title>/)
+  assert.match(html, /关于 BdiEditor v0\.6\.1/)
   assert.match(html, /<strong>技术交流与反馈<\/strong><br><button id="copy-qq-group"[^>]*>QQ群：228040912<\/button>/)
 })
 
@@ -409,7 +422,7 @@ test("deleting a mixed inspector value clears every selected key through its inp
 })
 
 test("about dialog automatically checks the canonical GitHub project for updates", () => {
-  assert.match(html, /id="about-update"[^>]*data-current-version="0\.5\.10"/)
+  assert.match(html, /id="about-update"[^>]*data-current-version="0\.6\.1"/)
   assert.match(html, /id="check-update"/)
   assert.match(html, /id="update-status"[^>]*aria-live="polite"/)
   assert.match(html, /id="download-update"[^>]*https:\/\/github\.com\/rekazer0\/BdiEditor\/releases["']/)
@@ -494,10 +507,11 @@ test("resource editing keeps mode switching and TIL source context working", () 
 
 test("resource detail uses icon tools and previews the selected slice", () => {
   assert.match(html, /<canvas id="tile-preview"/)
-  for (const id of ["select-tile", "move-tile", "new-tile", "delete-tile"]) {
-    assert.match(html, new RegExp(`<button id="${id}"[^>]*aria-label=`))
+  for (const id of ["resource-back", "select-tile", "move-tile", "new-tile", "delete-tile"]) {
+    assert.match(html, new RegExp(`<button id="${id}" class="[^"]*toolbar-button[^"]*"[^>]*aria-label=`))
   }
   assert.match(main, /function drawTilePreview\(/)
+  assert.match(css, /#tile-preview-wrap\s*\{[^}]*width:\s*100%/s)
 })
 
 test("resource slices keep guides and source selection in sync", () => {
@@ -505,7 +519,10 @@ test("resource slices keep guides and source selection in sync", () => {
   assert.match(main, /resourceMode[\s\S]*?setGuidesVisible\(true\)/)
   assert.match(main, /function selectedSourceSections\(\): string\[\]/)
   assert.match(main, /selectedTileIndex === undefined \? \[\] : \[`IMG\$\{selectedTileIndex\}`\]/)
-  assert.match(main, /if \(hit\)[\s\S]*?inspectorTab = "source"[\s\S]*?updateInspectorView\(\)/)
+  const pointerdown = main.match(/atlasCanvas\.addEventListener\("pointerdown", \(event\) => \{\n([\s\S]*?)\n}\)/)?.[1] ?? ""
+  assert.doesNotMatch(pointerdown, /inspectorTab = "source"|updateInspectorView\(\)/)
+  assert.match(pointerdown, /updateSourceHighlight\(\)/)
+  assert.match(pointerdown, /requestAnimationFrame\(scrollSelectedSource\)/)
   assert.match(html, /id="tile-preview" width="240" height="240"/)
   assert.match(css, /#tile-preview-wrap\s*\{[^}]*aspect-ratio:\s*1[^}]*box-sizing:\s*border-box/s)
 })
@@ -528,6 +545,10 @@ test("image style properties use large previews and text styles can be hidden", 
   assert.match(html, /data-text-style/)
   assert.match(main, /textStyleLabels/)
   assert.match(css, /\.image-resource-field[\s\S]*\.image-preview-button/)
+  assert.match(css, /\.style-field\s*\{[^}]*grid-template-columns:\s*30% minmax\(0, 70%\)/s)
+  assert.match(css, /\.compact-style-preview\s*\{[^}]*width:\s*100%[^}]*height:\s*44px/s)
+  assert.match(css, /\.style-preview-pair \.style-preview-button\s*\{[^}]*flex:\s*1/s)
+  assert.doesNotMatch(css, /\.image-resource-field \.style-field\s*\{[^}]*grid-template-columns:/s)
 })
 
 test("image previews preserve aspect ratio and open the TIL slice picker", () => {
@@ -537,6 +558,17 @@ test("image previews preserve aspect ratio and open the TIL slice picker", () =>
   assert.match(main, /const scale = Math\.min\(canvas\.width \/ sourceWidth, canvas\.height \/ sourceHeight\)/)
   assert.match(main, /styleImagePickerCanvas\.height = Math\.max\(1, Math\.round\(pickerImage\.naturalHeight \* scale\)\)/)
   assert.match(css, /#style-image-picker-canvas/)
+  assert.match(css, /#style-image-picker-canvas\s*\{[^}]*width:\s*auto[^}]*max-width:\s*80%/s)
+  assert.match(css, /\.style-image-dialog\s*\{[^}]*width:\s*min\(80vw, 1200px\)/s)
+  assert.match(main, /Math\.min\(960 \/ pickerImage\.naturalWidth, 640 \/ pickerImage\.naturalHeight\)/)
+  assert.match(css, /#style-image-preview\[hidden\],[\s\S]*#style-image-picker\[hidden\]\s*\{\s*display:\s*none/s)
+  assert.match(css, /\.style-image-dialog\s*\{[^}]*z-index:\s*200/s)
+})
+
+test("interaction preview cannot change an image slice reference", () => {
+  const pickerClick = main.match(/styleImagePickerCanvas\.addEventListener\("click", \(event\) => \{\n([\s\S]*?)\n}\)/)?.[1] ?? ""
+  assert.match(pickerClick.split("\n")[0], /if \(!isEditing\(\)\) return/)
+  assert.match(pickerClick, /updateSelectedImageReference\(/)
 })
 
 test("loading another archive closes and fully resets the image slice picker", () => {

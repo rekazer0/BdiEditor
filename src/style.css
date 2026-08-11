@@ -236,7 +236,8 @@ summary:focus-visible {
   line-height: 1;
 }
 
-.toolbar-button .icon svg {
+.toolbar-button .icon svg,
+.toolbar-button .system-symbol {
   width: 18px;
   height: 18px;
   display: block;
@@ -456,7 +457,7 @@ select {
 main {
   height: calc(100vh - var(--titlebar-height));
   display: grid;
-  grid-template-columns: 220px minmax(500px, 1fr) minmax(340px, 28%);
+  grid-template-columns: 220px minmax(500px, 1fr) 340px;
   background: transparent;
 }
 
@@ -1182,7 +1183,7 @@ h2 {
 }
 
 .device-shell.canvas-only {
-  width: min(100%, 920px);
+  width: min(100%, var(--canvas-fit-width, var(--canvas-width, 1080px)));
   height: auto;
   aspect-ratio: auto;
   padding: 0;
@@ -1225,6 +1226,11 @@ h2 {
 .device-shell.canvas-only #candidate-area:has(#candidate-composition:not([hidden])) {
   height: 133px;
   grid-template-rows: 40px 93px;
+}
+
+.device-shell.canvas-only #preview {
+  width: 100%;
+  max-height: none;
 }
 
 .keyboard-dock #preview {
@@ -1509,12 +1515,6 @@ canvas {
   margin-bottom: 10px;
 }
 
-.resource-detail-heading button {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-}
-
 .resource-detail-heading strong,
 .resource-detail-heading small {
   display: block;
@@ -1542,17 +1542,7 @@ canvas {
 
 .tile-mode-control {
   display: inline-flex;
-  border: 1px solid var(--separator);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.tile-mode-control button {
-  width: 30px;
-  height: 30px;
-  border: 0;
-  border-radius: 0;
-  padding: 6px;
+  gap: 2px;
 }
 
 .tile-mode-control button.active {
@@ -1564,22 +1554,10 @@ canvas {
   margin-left: auto;
 }
 
-#new-tile,
-#delete-tile {
-  width: 30px;
-  height: 30px;
-  padding: 6px;
-}
-
-.tile-toolbar .system-symbol {
-  width: 16px;
-  height: 16px;
-}
-
 #tile-preview-wrap {
   display: grid;
   place-items: center;
-  width: min(100%, 240px);
+  width: 100%;
   height: auto;
   aspect-ratio: 1;
   box-sizing: border-box;
@@ -1599,16 +1577,6 @@ canvas {
   width: 100%;
   height: 100%;
   object-fit: contain;
-}
-
-#new-tile {
-  min-height: 26px;
-  padding: 4px 8px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--text);
-  background: var(--control);
-  font-size: 9px;
 }
 
 #new-tile.active {
@@ -1777,13 +1745,24 @@ canvas {
 
 .style-field {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 30% minmax(0, 70%);
   gap: 5px;
 }
 
+.style-field > input {
+  width: 100%;
+  min-width: 0;
+}
+
 .style-preview-pair {
+  width: 100%;
   display: flex;
   gap: 3px;
+}
+
+.style-preview-pair .style-preview-button {
+  width: auto;
+  flex: 1;
 }
 
 .style-preview-button {
@@ -1795,6 +1774,11 @@ canvas {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 50% / 8px 8px;
+}
+
+.compact-style-preview {
+  width: 100%;
+  height: 44px;
 }
 
 .style-preview-button[hidden] {
@@ -1832,27 +1816,29 @@ canvas {
 }
 
 .image-resource-field .style-field {
-  display: grid;
-  grid-template-columns: 76px minmax(0, 1fr);
   align-items: center;
   gap: 7px;
 }
 
 .image-resource-field .image-preview-button {
   width: 100%;
-  height: 76px;
+  height: 92px;
   padding: 4px;
 }
 
 .image-resource-field .style-field > input {
-  width: 76px;
-  min-width: 0;
   align-self: center;
 }
 
+#style-image-picker {
+  display: grid;
+  justify-items: center;
+}
+
 #style-image-picker-canvas {
-  width: 100%;
+  width: auto;
   height: auto;
+  max-width: 80%;
   max-height: 62vh;
   display: block;
   border: 1px solid var(--line);
@@ -1875,9 +1861,10 @@ canvas {
 
 .style-image-dialog {
   position: fixed;
+  z-index: 200;
   top: calc(var(--titlebar-height) + 12px);
   right: 12px;
-  width: min(560px, calc(100vw - 32px));
+  width: min(80vw, 1200px);
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2102,6 +2089,11 @@ canvas {
   background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 50% / 16px 16px;
 }
 
+#style-image-preview[hidden],
+#style-image-picker[hidden] {
+  display: none;
+}
+
 #quick-inspector[data-readonly="true"] {
   opacity: 0.82;
 }
@@ -2112,6 +2104,13 @@ canvas {
   gap: 3px;
   color: var(--secondary);
   font-size: 9px;
+}
+
+.color-pair-field {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
 }
 
 .color-control {

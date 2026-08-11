@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { gestureDirection, rectToString } from "../src/layout.ts"
 import { IniDocument } from "../src/ini.ts"
-import { animationSequenceForKey, effectivePreviewItem, foregroundTextPoint, isAdditiveSelection, previewBackground, previewFallbackText, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawFallbackKeyChrome, shouldDrawItemBackground } from "../src/preview.ts"
+import { animationSequenceForKey, effectivePreviewItem, foregroundTextPoint, isAdditiveSelection, previewBackground, previewFallbackText, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawItemBackground } from "../src/preview.ts"
 
 test("classifies click, hold and directional gestures", () => {
   assert.equal(gestureDirection(2, 3, 100, true), "center")
@@ -147,24 +147,15 @@ test("candidate icons use TIP overrides for the selected state", () => {
   assert.equal(effectivePreviewItem(document, icon, 4).backStyle, "7")
 })
 
-test("interaction preview hides editor-only labels and gesture annotations", async () => {
-  const module = await import("../src/preview.ts") as typeof import("../src/preview.ts") & {
-    previewFallbackText?: (
-      item: ReturnType<typeof previewItems>[number],
-      mode: "edit" | "preview",
-      hasForeground: boolean,
-    ) => string
-    previewAnnotationsVisible?: (mode: "edit" | "preview") => boolean
-  }
+test("editing preserves the skin rendering without gesture annotations", async () => {
+  const module = await import("../src/preview.ts")
   const blank = previewItems(IniDocument.parse("[KEY4]\nVIEW_RECT=14,12,165,429\n"))[0]
   const labelled = previewItems(IniDocument.parse("[KEY5]\nVIEW_RECT=178,12,187,143\nSHOW=q\n"))[0]
-  assert.equal(typeof module.previewFallbackText, "function")
-  assert.equal(typeof module.previewAnnotationsVisible, "function")
-  assert.equal(module.previewFallbackText?.(blank, "preview", false), "")
-  assert.equal(module.previewFallbackText?.(blank, "edit", false), "")
-  assert.equal(module.previewFallbackText?.(labelled, "preview", true), "")
-  assert.equal(module.previewAnnotationsVisible?.("preview"), false)
-  assert.equal(module.previewAnnotationsVisible?.("edit"), true)
+  assert.equal(module.previewFallbackText(blank, "preview", false), "")
+  assert.equal(module.previewFallbackText(blank, "edit", false), "")
+  assert.equal(module.previewFallbackText(labelled, "preview", true), "")
+  assert.equal("previewAnnotationsVisible" in module, false)
+  assert.equal("shouldDrawFallbackKeyChrome" in module, false)
 })
 
 test("preview text never falls back from missing SHOW to CENTER action text", () => {
@@ -307,13 +298,6 @@ test("does not composite a full-panel skin background twice", () => {
   const item = previewItems(IniDocument.parse("[KEY1]\nVIEW_RECT=0,0,1125,595\nBACK_STYLE=1103\n"))[0]
   assert.equal(shouldDrawItemBackground(item, "1103", 1125, 595), false)
   assert.equal(shouldDrawItemBackground(item, "1102", 1125, 595), true)
-})
-
-test("uses fallback key chrome only for a completely blank key while editing", () => {
-  assert.equal(shouldDrawFallbackKeyChrome("edit", true, false, false), true)
-  assert.equal(shouldDrawFallbackKeyChrome("preview", true, false, false), false)
-  assert.equal(shouldDrawFallbackKeyChrome("edit", true, false, true), false)
-  assert.equal(shouldDrawFallbackKeyChrome("edit", true, true, false), false)
 })
 
 test("hides editor selection outlines in interaction preview", () => {

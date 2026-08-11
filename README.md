@@ -6,7 +6,7 @@
 
 ![BdiEditor v0.3.2 编辑界面](docs/screenshots/bdiedito-v0.3.2-overview.png)
 
-## v0.5.10 更新
+## v0.6.1 更新
 
 - 修复 Windows 发布版启动时额外出现黑色控制台窗口的问题。
 - 修复应用更新后被识别为全新应用的问题，保持稳定应用身份。
