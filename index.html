@@ -379,7 +379,8 @@
             <label>目标主题 <select id="panel-target-theme"><option value="light">浅色</option><option value="dark">深色</option></select></label>
             <label>目标方向 <select id="panel-target-orientation"><option value="port">竖屏</option><option value="land">横屏</option></select></label>
           </div>
-          <label>目标文件名 <input id="panel-target-file" list="panel-target-files" required autocomplete="off"><datalist id="panel-target-files"></datalist></label>
+          <label>目标面板 <select id="panel-target-existing" aria-label="选择目标路径下的 INI"></select></label>
+          <label>目标文件名 <input id="panel-target-file" required autocomplete="off"></label>
         </div>
         <label class="project-template-option"><input id="panel-scale-enabled" type="checkbox"><span><strong>缩放分辨率</strong><small>按配置的目标宽高缩放面板、切片和图片</small></span></label>
         <div id="panel-scale-options" class="panel-scale-grid" hidden>

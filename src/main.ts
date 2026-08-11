@@ -144,8 +144,8 @@ const panelScaleForm = $("#panel-scale-form") as HTMLFormElement
 const panelCopySource = $("#panel-copy-source") as HTMLSelectElement
 const panelTargetTheme = $("#panel-target-theme") as HTMLSelectElement
 const panelTargetOrientation = $("#panel-target-orientation") as HTMLSelectElement
+const panelTargetExisting = $("#panel-target-existing") as HTMLSelectElement
 const panelTargetFile = $("#panel-target-file") as HTMLInputElement
-const panelTargetFiles = $("#panel-target-files") as HTMLDataListElement
 const panelScaleEnabled = $("#panel-scale-enabled") as HTMLInputElement
 const panelScaleOptions = $("#panel-scale-options")
 const panelSourceWidth = $("#panel-source-width") as HTMLInputElement
@@ -953,9 +953,14 @@ function updatePanelCopyForm(): void {
     field.disabled = !panelScaleEnabled.checked
   }
   const prefix = `${panelTargetTheme.value}/skin/${panelTargetOrientation.value}/`
-  panelTargetFiles.replaceChildren(...copyablePanelPaths(archive.names())
+  const targetFiles = copyablePanelPaths(archive.names())
     .filter((path) => path.startsWith(prefix))
-    .map((path) => Object.assign(document.createElement("option"), { value: path.slice(prefix.length) })))
+    .map((path) => path.slice(prefix.length))
+  panelTargetExisting.replaceChildren(
+    Object.assign(document.createElement("option"), { value: "", textContent: "新建 / 自定义文件名" }),
+    ...targetFiles.map((value) => Object.assign(document.createElement("option"), { value, textContent: value })),
+  )
+  panelTargetExisting.value = targetFiles.includes(panelTargetFile.value.trim()) ? panelTargetFile.value.trim() : ""
   panelScaleSummary.textContent = `目标：${panelCopyTargetPath()}`
 }
 
@@ -3464,6 +3469,10 @@ panelCopySource.addEventListener("change", () => {
 for (const field of [panelTargetTheme, panelTargetOrientation, panelScaleEnabled]) {
   field.addEventListener("change", updatePanelCopyForm)
 }
+panelTargetExisting.addEventListener("change", () => {
+  if (panelTargetExisting.value) panelTargetFile.value = panelTargetExisting.value
+  updatePanelCopyForm()
+})
 panelTargetFile.addEventListener("input", updatePanelCopyForm)
 panelScaleForm.addEventListener("submit", (event) => {
   if ((event.submitter as HTMLButtonElement | null)?.value !== "copy") return
