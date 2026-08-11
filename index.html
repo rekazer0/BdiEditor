@@ -29,7 +29,7 @@
             <button class="export-action" data-export-format="bda" disabled>导出新版 Android 皮肤 (.bda)…</button>
           </div>
         </details>
-        <button id="panel-scale" class="toolbar-button" disabled title="面板缩放与竖转横" aria-label="面板缩放与竖转横"><span class="icon system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 6h14M3 6l3-3M3 6l3 3M17 14H3m14 0-3-3m3 3-3 3"/></svg></span></button>
+        <button id="panel-scale" class="toolbar-button" disabled title="面板复制" aria-label="面板复制"><span class="icon system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 6h14M3 6l3-3M3 6l3 3M17 14H3m14 0-3-3m3 3-3 3"/></svg></span></button>
         <span class="toolbar-divider"></span>
         <button id="undo" class="toolbar-button" disabled title="撤销" aria-label="撤销"><span class="icon system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12"/><path d="M4 8.5h7.2a5 5 0 0 1 5 5"/></svg></span></button>
         <button id="redo" class="toolbar-button" disabled title="重做" aria-label="重做"><span class="icon system-symbol" data-system-symbol="arrow.uturn.forward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m13 5 4 3.5-4 3.5"/><path d="M16 8.5H8.8a5 5 0 0 0-5 5"/></svg></span></button>
@@ -372,16 +372,24 @@
 
     <dialog id="panel-scale-dialog" class="project-dialog" aria-labelledby="panel-scale-title">
       <form id="panel-scale-form" method="dialog">
-        <header><h2 id="panel-scale-title">面板缩放与竖转横</h2><p>复制完整竖屏主题到横屏，并按目标面板分辨率缩放布局与资源。</p></header>
-        <div class="panel-scale-grid">
+        <header><h2 id="panel-scale-title">面板复制</h2><p>复制一个面板及其样式与图片资源，可跨主题和屏幕方向。</p></header>
+        <div class="panel-copy-fields">
+          <label>源面板 <select id="panel-copy-source" required></select></label>
+          <div class="panel-scale-grid">
+            <label>目标主题 <select id="panel-target-theme"><option value="light">浅色</option><option value="dark">深色</option></select></label>
+            <label>目标方向 <select id="panel-target-orientation"><option value="port">竖屏</option><option value="land">横屏</option></select></label>
+          </div>
+          <label>目标文件名 <input id="panel-target-file" list="panel-target-files" required autocomplete="off"><datalist id="panel-target-files"></datalist></label>
+        </div>
+        <label class="project-template-option"><input id="panel-scale-enabled" type="checkbox"><span><strong>缩放分辨率</strong><small>按配置的目标宽高缩放面板、切片和图片</small></span></label>
+        <div id="panel-scale-options" class="panel-scale-grid" hidden>
           <label>源宽度 <input id="panel-source-width" type="number" min="1" readonly></label>
           <label>源高度 <input id="panel-source-height" type="number" min="1" readonly></label>
           <label>目标宽度 <input id="panel-target-width" type="number" min="1" required></label>
           <label>目标高度 <input id="panel-target-height" type="number" min="1" required></label>
         </div>
-        <label class="project-template-option"><input id="panel-all-themes" type="checkbox"><span><strong>同时转换浅色与深色</strong><small>仅处理皮肤中实际存在的主题</small></span></label>
         <p id="panel-scale-summary"></p>
-        <footer><button value="cancel">取消</button><button class="primary" value="convert">转换</button></footer>
+        <footer><button value="cancel">取消</button><button class="primary" value="copy">复制</button></footer>
       </form>
     </dialog>
 

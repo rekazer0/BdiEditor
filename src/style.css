@@ -2350,12 +2350,20 @@ canvas {
   gap: 12px;
 }
 
-.panel-scale-grid label {
+.panel-copy-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.panel-scale-grid label,
+.panel-copy-fields > label {
   display: grid;
   gap: 6px;
   color: var(--secondary);
   font-size: 12px;
 }
+
+#panel-scale-options[hidden] { display: none; }
 
 .workspace-status {
   min-width: 0;
