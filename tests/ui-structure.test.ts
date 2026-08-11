@@ -530,6 +530,22 @@ test("image previews preserve aspect ratio and open the TIL slice picker", () =>
   assert.match(css, /#style-image-picker-canvas/)
 })
 
+test("loading another archive closes and fully resets the image slice picker", () => {
+  const cleanup = main.match(/function clearImageSlicePicker\(\): void \{\n([\s\S]*?)\n\}/)?.[1] ?? ""
+  assert.match(cleanup, /if \(pickerURL\) URL\.revokeObjectURL\(pickerURL\)/)
+  assert.match(cleanup, /pickerURL = ""/)
+  assert.match(cleanup, /pickerImage = undefined/)
+  assert.match(cleanup, /pickerSlices = \[\]/)
+  assert.match(cleanup, /pickerPath = ""/)
+  assert.match(cleanup, /pickerTarget = undefined/)
+  assert.match(cleanup, /pickerSelectedIndex = undefined/)
+  assert.match(cleanup, /styleImagePicker\.hidden = true/)
+  assert.match(cleanup, /styleImagePreview\.hidden = false/)
+  assert.match(cleanup, /if \(styleImageDialog\.open\) styleImageDialog\.close\(\)/)
+  assert.match(main, /async function loadArchive[\s\S]*?clearImageSlicePicker\(\)\s*archive = nextArchive/)
+  assert.match(main, /styleImageDialog\.addEventListener\("close", clearImageSlicePicker\)/)
+})
+
 test("preview interactions keep the sidebar on the rendered keyboard file", () => {
   assert.match(main, /if \(selectedPath !== layoutPath\) selectFile\(layoutPath,\s*"overview"\)/)
   assert.match(main, /if \(target\)[\s\S]*?selectFile\(path\)/)

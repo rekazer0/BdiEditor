@@ -2176,6 +2176,19 @@ function updateSelectedImageReference(source: "BACK_STYLE" | "FORE_STYLE", prope
 
 let pickerSelectedIndex: number | undefined
 
+function clearImageSlicePicker(): void {
+  if (pickerURL) URL.revokeObjectURL(pickerURL)
+  pickerURL = ""
+  pickerImage = undefined
+  pickerSlices = []
+  pickerPath = ""
+  pickerTarget = undefined
+  pickerSelectedIndex = undefined
+  styleImagePicker.hidden = true
+  styleImagePreview.hidden = false
+  if (styleImageDialog.open) styleImageDialog.close()
+}
+
 function drawImageSlicePicker(): void {
   const context = styleImagePickerCanvas.getContext("2d")
   if (!context || !pickerImage?.naturalWidth) return
@@ -2757,6 +2770,7 @@ async function loadArchive(bytes: Uint8Array, path: string, isNew = false): Prom
     bdaBase = SkinArchive.open(new Uint8Array(await response.arrayBuffer()))
   }
   assetURL = releaseImagePreviewURL(assetURL)
+  clearImageSlicePicker()
   archive = nextArchive
   const availableThemes = ["light", "dark"].filter((value) =>
     archive?.names().some((name) => name.startsWith(`${value}/skin/`)),
@@ -3403,14 +3417,7 @@ styleImagePickerCanvas.addEventListener("click", (event) => {
   drawImageSlicePicker()
 })
 styleImageClose.addEventListener("click", () => styleImageDialog.close())
-styleImageDialog.addEventListener("close", () => {
-  if (pickerURL) URL.revokeObjectURL(pickerURL)
-  pickerURL = ""
-  pickerImage = undefined
-  pickerTarget = undefined
-  styleImagePicker.hidden = true
-  styleImagePreview.hidden = false
-})
+styleImageDialog.addEventListener("close", clearImageSlicePicker)
 for (const button of Array.from(editContextMenu.querySelectorAll<HTMLButtonElement>("[data-context-action]"))) {
   button.addEventListener("click", () => {
     if (button.dataset.contextAction === "copy") copySelectedKeys()
