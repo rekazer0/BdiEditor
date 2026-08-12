@@ -447,8 +447,8 @@ test("settings expose canvas backgrounds and edit mode exposes key context actio
 })
 
 test("window and about names match the GitHub project and include the version", () => {
-  assert.match(html, /<title>BdiEditor v0\.6\.12<\/title>/)
-  assert.match(html, /关于 BdiEditor v0\.6\.12/)
+  assert.match(html, /<title>BdiEditor v0\.6\.13<\/title>/)
+  assert.match(html, /关于 BdiEditor v0\.6\.13/)
   assert.match(html, /<strong>技术交流与反馈<\/strong><br><button id="copy-qq-group"[^>]*>QQ群：228040912<\/button>/)
 })
 
@@ -468,7 +468,7 @@ test("deleting a mixed inspector value clears every selected key through its inp
 })
 
 test("about dialog automatically checks the canonical GitHub project for updates", () => {
-  assert.match(html, /id="about-update"[^>]*data-current-version="0\.6\.12"/)
+  assert.match(html, /id="about-update"[^>]*data-current-version="0\.6\.13"/)
   assert.match(html, /id="check-update"/)
   assert.match(html, /id="update-status"[^>]*aria-live="polite"/)
   assert.match(html, /id="download-update"[^>]*https:\/\/github\.com\/rekazer0\/BdiEditor\/releases["']/)
