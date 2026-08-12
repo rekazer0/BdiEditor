@@ -6,3 +6,4 @@ src-tauri/gen/
 *.log
 .tmp/
 .worktrees/
+.mimosa/
