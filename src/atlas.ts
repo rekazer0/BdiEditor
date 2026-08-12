@@ -7,6 +7,9 @@ export type Visual = {
   color?: string
   source?: [number, number, number, number]
   inner?: [number, number, number, number]
+  scale?: [number, number, number, number, number]
+  borderColor?: string
+  filterColor?: string
 }
 
 export type TextVisual = {
@@ -14,6 +17,7 @@ export type TextVisual = {
   fontName?: string
   fontWeight?: number
   color?: string
+  clearType?: number
 }
 
 export type StyleTextVisual = TextVisual & { text: string }
@@ -30,12 +34,19 @@ type VisualSpec = {
   imageName?: string
   tile?: number
   color?: string
+  borderColor?: string
 }
 
 function numbers(value: string | undefined): [number, number, number, number] | undefined {
   const parsed = value?.split(",").map(Number)
   if (!parsed || parsed.length !== 4 || parsed.some((item) => !Number.isFinite(item))) return
   return parsed as [number, number, number, number]
+}
+
+function scaleNumbers(value: string | undefined): [number, number, number, number, number] | undefined {
+  const parsed = value?.split(",").map(Number)
+  if (!parsed || parsed.length !== 5 || parsed.some((item) => !Number.isFinite(item))) return
+  return parsed as [number, number, number, number, number]
 }
 
 function parseColor(value: string | undefined): string | undefined {
@@ -101,6 +112,7 @@ export function resolveTextVisual(
       const fontSize = Number(styles.get(section, "FONT_SIZE"))
       const fontName = styles.get(section, "FONT_NAME")?.trim()
       const fontWeight = Number(styles.get(section, "FONT_WEIGHT"))
+      const clearType = Number(styles.get(section, "FONT_CLEARTYPE"))
       const color = parseColor(
         (highlighted ? styles.get(section, "HL_COLOR") : undefined) ??
           styles.get(section, "NM_COLOR"),
@@ -113,6 +125,7 @@ export function resolveTextVisual(
         fontWeight >= 1 &&
         fontWeight <= 1000
       ) result.fontWeight = fontWeight
+      if (result.clearType === undefined && Number.isFinite(clearType)) result.clearType = clearType
       if (result.color === undefined && color) result.color = color
     }
   }
@@ -145,10 +158,12 @@ export function resolveVisualSpec(
     (highlighted ? styles.get(section, "HL_COLOR") : undefined) ??
     styles.get(section, "NM_COLOR")
   const color = parseColor(colorValue)
+  const borderColor = parseColor(styles.get(section, "BORDER_COLOR"))
   return {
     imageName: imageName || undefined,
     tile: tileValue ? Number(tileValue) : undefined,
     color,
+    ...(borderColor ? { borderColor } : {}),
   }
 }
 
@@ -220,7 +235,9 @@ export class AtlasResolver {
     if (!this.styles) return
     const spec = resolveVisualSpec(this.styles, styleID, highlighted)
     if (!spec) return
-    if (!spec.imageName || !spec.tile) return { color: spec.color }
+    if (!spec.imageName || !spec.tile) {
+      return { color: spec.color, borderColor: spec.borderColor }
+    }
 
     const base = this.resourceRoots
       .map((root) => `${root}/${spec.imageName}`)
@@ -228,11 +245,13 @@ export class AtlasResolver {
         this.archive.names().includes(`${candidate}.png`) &&
         this.archive.names().includes(`${candidate}.til`),
       )
-    if (!base) return { color: spec.color }
+    if (!base) return { color: spec.color, borderColor: spec.borderColor }
     const imagePath = `${base}.png`
     const tilePath = `${base}.til`
     const image = this.bitmap(imagePath)
-    if (!image || !this.archive.names().includes(tilePath)) return { color: spec.color }
+    if (!image || !this.archive.names().includes(tilePath)) {
+      return { color: spec.color, borderColor: spec.borderColor }
+    }
 
     let tiles = this.tiles.get(tilePath)
     if (!tiles) {
@@ -240,7 +259,7 @@ export class AtlasResolver {
       this.tiles.set(tilePath, tiles)
     }
     const source = numbers(tiles.get(`IMG${spec.tile}`, "SOURCE_RECT"))
-    if (!source) return { color: spec.color }
+    if (!source) return { color: spec.color, borderColor: spec.borderColor }
     const absoluteInner = numbers(tiles.get(`IMG${spec.tile}`, "INNER_RECT"))
     const inner = absoluteInner
       ? ([
@@ -250,7 +269,8 @@ export class AtlasResolver {
           absoluteInner[3],
         ] as [number, number, number, number])
       : undefined
-    return { image: await image, imagePath, source, inner, color: spec.color }
+    const scale = scaleNumbers(tiles.get(`IMG${spec.tile}`, "SCALE"))
+    return { image: await image, imagePath, source, inner, scale, color: spec.color, borderColor: spec.borderColor }
   }
 
   async resolveToolbarImages(limit = 3): Promise<Visual[]> {

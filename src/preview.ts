@@ -171,6 +171,15 @@ function parseOffset(value: string | undefined): [number, number] | undefined {
   return parts as [number, number]
 }
 
+// gen.ini 的 OFFSET 段既有 POS=x,y 也有 R_POS=x,y（部分 Android 皮肤）。
+// 两者同义，解析时优先 POS、回退 R_POS。
+export function offsetFromSection(document: IniDocument | undefined, section: string): [number, number] | undefined {
+  if (!document) return
+  return parseOffset(
+    document.get(section, "POS") ?? document.get(section, "R_POS"),
+  )
+}
+
 function itemFromSection(document: IniDocument, section: string): PreviewItem | undefined {
   const rect = parseRect(document.get(section, "VIEW_RECT"))
   if (!rect) return
@@ -667,37 +676,70 @@ export class Preview {
       context.fillStyle = visual.color
       context.fillRect(destination.x, destination.y, destination.width, destination.height)
     }
-    if (!visual.image || !visual.source) return
-    if (stretch && visual.inner) {
-      this.drawNineSlice(context, visual, destination)
+    if (!visual.image || !visual.source) {
+      this.strokeBorder(context, visual, destination)
       return
     }
-    const [sx, sy, sw, sh] = visual.source
-    if (stretch) {
-      context.drawImage(
-        visual.image,
-        sx,
-        sy,
-        sw,
-        sh,
-        destination.x,
-        destination.y,
-        destination.width,
-        destination.height,
-      )
+    if (stretch && visual.inner) {
+      this.drawNineSlice(context, visual, destination)
     } else {
-      context.drawImage(
-        visual.image,
-        sx,
-        sy,
-        sw,
-        sh,
-        destination.x + (destination.width - sw) / 2,
-        destination.y + (destination.height - sh) / 2,
-        sw,
-        sh,
-      )
+      const [sx, sy, sw, sh] = visual.source
+      if (stretch) {
+        context.drawImage(
+          visual.image,
+          sx,
+          sy,
+          sw,
+          sh,
+          destination.x,
+          destination.y,
+          destination.width,
+          destination.height,
+        )
+      } else {
+        context.drawImage(
+          visual.image,
+          sx,
+          sy,
+          sw,
+          sh,
+          destination.x + (destination.width - sw) / 2,
+          destination.y + (destination.height - sh) / 2,
+          sw,
+          sh,
+        )
+      }
     }
+    // BDA filterColor 是叠加在图片之上的颜色滤镜（tint），在图片之后绘制。
+    if (visual.filterColor && !isTransparentColor(visual.filterColor)) {
+      context.save()
+      context.globalAlpha = this.filterAlpha(visual.filterColor)
+      context.fillStyle = this.filterRgb(visual.filterColor)
+      context.fillRect(destination.x, destination.y, destination.width, destination.height)
+      context.restore()
+    }
+    this.strokeBorder(context, visual, destination)
+  }
+
+  private filterRgb(color: string): string {
+    const match = color.match(/^rgba\(([^,]+),([^,]+),([^,]+),/)
+    return match ? `rgb(${match[1]}, ${match[2]}, ${match[3]})` : color
+  }
+
+  private filterAlpha(color: string): number {
+    const match = color.match(/rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/)
+    return match ? Math.max(0, Math.min(1, Number(match[1]))) : 1
+  }
+
+  private strokeBorder(
+    context: CanvasRenderingContext2D,
+    visual: Visual,
+    destination: Rect,
+  ): void {
+    if (!visual.borderColor || isTransparentColor(visual.borderColor)) return
+    context.strokeStyle = visual.borderColor
+    context.lineWidth = 1
+    context.strokeRect(destination.x + 0.5, destination.y + 0.5, destination.width - 1, destination.height - 1)
   }
 
   private async draw(): Promise<void> {
@@ -750,8 +792,9 @@ export class Preview {
         this.drawVisual(context, visuals[index].back, key.rect, true)
       }
       for (const [layer, fore] of foregrounds.entries()) {
-        const offset = key.foreOffsets[layer] ?? parseOffset(
-          this.offsets?.get(`OFFSET${key.positionTypes[layer] ?? ""}`, "POS"),
+        const offset = key.foreOffsets[layer] ?? offsetFromSection(
+          this.offsets,
+          `OFFSET${key.positionTypes[layer] ?? ""}`,
         )
         const destination = key.foreRect ?? foregroundLayerRect(key.rect, fore?.source, layer, offset)
         this.drawVisual(context, fore, destination, false)
@@ -759,8 +802,9 @@ export class Preview {
 
       for (const [layer, styleText] of styleTexts.entries()) {
         if (!styleText || foregrounds[layer]) continue
-        const offset = key.foreOffsets[layer] ?? parseOffset(
-          this.offsets?.get(`OFFSET${key.positionTypes[layer] ?? ""}`, "POS"),
+        const offset = key.foreOffsets[layer] ?? offsetFromSection(
+          this.offsets,
+          `OFFSET${key.positionTypes[layer] ?? ""}`,
         )
         const point = foregroundTextPoint(key.foreRect ?? key.rect, offset)
         this.drawStyleText(context, styleText, point)

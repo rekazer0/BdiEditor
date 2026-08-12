@@ -359,6 +359,14 @@ function bdaCssColor(value: number): string | undefined {
   return `rgba(${red}, ${green}, ${blue}, ${Number(alpha.toFixed(3))})`
 }
 
+// BDA filterColor 是叠加在图片之上的颜色滤镜（tint），不是背景填充。
+// 0 与 0xFFFFFFFF（不透明白）都表示「无滤镜」。
+export function bdaFilterColor(value: number): string | undefined {
+  const unsigned = value >>> 0
+  if (!unsigned || unsigned === 0xffffffff) return
+  return bdaCssColor(unsigned)
+}
+
 function pngBlob(bytes: Uint8Array): Blob {
   const copy = new Uint8Array(bytes)
   return new Blob([copy.buffer], { type: "image/png" })
@@ -429,7 +437,7 @@ export class BdaResolver implements VisualResolver {
     const style = this.appearance.imageStyles.get(ref.key)
     const atom = highlighted ? style?.highlightImage ?? style?.normalImage : style?.normalImage
     const found = atom?.resource?.resourceID ? this.resource(atom.resource.resourceID) : undefined
-    if (!found) return { color: bdaCssColor(atom?.filterColor ?? 0) }
+    if (!found) return { filterColor: bdaFilterColor(atom?.filterColor ?? 0) }
     const image = await this.bitmap(found.archive, found.path)
     return {
       image,
@@ -438,7 +446,7 @@ export class BdaResolver implements VisualResolver {
       inner: atom?.innerRect
         ? [atom.innerRect.x, atom.innerRect.y, atom.innerRect.width, atom.innerRect.height]
         : undefined,
-      color: bdaCssColor(atom?.filterColor ?? 0),
+      filterColor: bdaFilterColor(atom?.filterColor ?? 0),
     }
   }
 

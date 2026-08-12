@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { gestureDirection, rectToString } from "../src/layout.ts"
 import { IniDocument } from "../src/ini.ts"
-import { animationSequenceForKey, effectivePreviewItem, foregroundTextPoint, isAdditiveSelection, previewBackground, previewFallbackText, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawItemBackground } from "../src/preview.ts"
+import { animationSequenceForKey, effectivePreviewItem, foregroundTextPoint, isAdditiveSelection, offsetFromSection, previewBackground, previewFallbackText, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawItemBackground } from "../src/preview.ts"
 
 test("classifies click, hold and directional gestures", () => {
   assert.equal(gestureDirection(2, 3, 100, true), "center")
@@ -198,6 +198,17 @@ test("positions text-only foreground layers with the configured style offset", (
     foregroundTextPoint({ x: 12, y: 0, width: 100, height: 127 }, [0, -42]),
     { x: 62, y: 21.5 },
   )
+})
+
+test("reads foreground offsets from both POS and R_POS gen sections", () => {
+  const offsets = IniDocument.parse(
+    "[OFFSET1]\nPOS=0,25\n[OFFSET75]\nR_POS=0,-32\n",
+  )
+
+  assert.deepEqual(offsetFromSection(offsets, "OFFSET1"), [0, 25])
+  assert.deepEqual(offsetFromSection(offsets, "OFFSET75"), [0, -32])
+  assert.equal(offsetFromSection(offsets, "OFFSET90"), undefined)
+  assert.equal(offsetFromSection(undefined, "OFFSET1"), undefined)
 })
 
 test("does not draw a color-only phone foreground visual", async () => {

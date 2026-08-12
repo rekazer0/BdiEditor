@@ -4,6 +4,7 @@ import { zipSync } from "fflate"
 import {
   BdaResolver,
   bdaConfigPath,
+  bdaFilterColor,
   bdaLayoutDocument,
   bdaLayoutNames,
   bdaResourceIDs,
@@ -121,6 +122,12 @@ test("describes BDA protobuf configuration without exposing editable binary text
 test("resolves raw style IDs used by the official BDA candidate configuration", () => {
   const resolver = new BdaResolver({} as never, bytes)
   assert.equal(resolver.resolveText("8", false)?.fontName, "Old")
+})
+
+test("treats BDA filterColor as a tint, dropping opaque white and zero", () => {
+  assert.equal(bdaFilterColor(0), undefined)
+  assert.equal(bdaFilterColor(0xffffffff), undefined)
+  assert.equal(bdaFilterColor(0x80ff0000), "rgba(255, 0, 0, 0.502)")
 })
 
 test("decodes BDA animation targets and frame resources", () => {

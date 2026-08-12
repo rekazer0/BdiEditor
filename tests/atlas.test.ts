@@ -29,6 +29,19 @@ test("resolves normal and highlighted atlas entries", () => {
   })
 })
 
+test("resolves a style border color for key outlines", () => {
+  const styles = IniDocument.parse(
+    "[STYLE4]\nNM_COLOR=ffd0d4db\nBORDER_COLOR=ff9477a9\n",
+  )
+
+  assert.deepEqual(resolveVisualSpec(styles, "4", false), {
+    imageName: undefined,
+    tile: undefined,
+    color: "rgba(208, 212, 219, 1)",
+    borderColor: "rgba(148, 119, 169, 1)",
+  })
+})
+
 test("decodes Baidu AARRGGBB transparency into a canvas-safe color", () => {
   const styles = IniDocument.parse(`
 [STYLE1102]
@@ -89,6 +102,18 @@ FONT_WEIGHT=550
   assert.equal(resolveTextVisual(styles, "", false), undefined)
 })
 
+test("reads the FONT_CLEARTYPE hint from a text style", () => {
+  const styles = IniDocument.parse(
+    "[STYLE1]\nFONT_SIZE=45\nFONT_CLEARTYPE=1\nNM_COLOR=000000\n",
+  )
+
+  assert.deepEqual(resolveTextVisual(styles, "1", false), {
+    fontSize: 45,
+    color: "#000000",
+    clearType: 1,
+  })
+})
+
 test("resolves text-only foreground styles used by Android 26-key layouts", () => {
   const styles = IniDocument.parse(`
 [STYLE43]
@@ -124,6 +149,28 @@ test("atlas resolver exposes the resolved resource path and tile source rectangl
     const visual = await new AtlasResolver(archive, "light", "port").resolve("211", false)
     assert.equal(visual?.imagePath, "light/skin/res/btn.png")
     assert.deepEqual(visual?.source, [10, 20, 30, 40])
+  } finally {
+    Object.defineProperty(globalThis, "createImageBitmap", {
+      configurable: true,
+      value: previous,
+    })
+  }
+})
+
+test("atlas resolver preserves the five-part tile SCALE stretch flags", async () => {
+  const archive = SkinArchive.open(zipSync({
+    "light/skin/port/res/default.css": strToU8("[STYLE211]\nNM_IMG=btn,1\n"),
+    "light/skin/res/btn.png": new Uint8Array([1, 2, 3]),
+    "light/skin/res/btn.til": strToU8("[IMG1]\nSOURCE_RECT=10,20,30,40\nSCALE=1,1,1,1,1\n"),
+  }))
+  const previous = globalThis.createImageBitmap
+  Object.defineProperty(globalThis, "createImageBitmap", {
+    configurable: true,
+    value: async () => ({ width: 64, height: 64 }),
+  })
+  try {
+    const visual = await new AtlasResolver(archive, "light", "port").resolve("211", false)
+    assert.deepEqual(visual?.scale, [1, 1, 1, 1, 1])
   } finally {
     Object.defineProperty(globalThis, "createImageBitmap", {
       configurable: true,

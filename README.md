@@ -88,7 +88,7 @@ npm run tauri build -- --bundles nsis
 
 ## 兼容性
 
-当前保证兼容项目测试样本所属的百度 iOS 皮肤格式家族。所有未知文件和字段会被保留，但其他历史格式仍需真实样本验证。详情见 [兼容性说明](docs/compatibility.md)。
+当前保证兼容项目测试样本所属的百度 iOS 皮肤格式家族。所有未知文件和字段会被保留，但其他历史格式仍需真实样本验证。详情见 [皮肤格式规范](docs/skin-format.md)。
 
 界面支持跟随系统、浅色和深色模式，并使用轻量毛玻璃；Windows 使用系统 Mica 窗口材质。macOS 发布包使用 ad-hoc 签名，尚未使用 Apple Developer ID 公证；首次打开若被 Gatekeeper 拦截，请在 Finder 中右键应用并选择“打开”。Windows 版本依赖系统 WebView2 Runtime。
 
