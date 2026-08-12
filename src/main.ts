@@ -201,7 +201,14 @@ const atlasCanvas = $("#atlas-canvas") as HTMLCanvasElement
 const workspaceImageError = $("#workspace-image-error")
 const resourceInspector = $("#resource-inspector")
 const resourceListView = $("#resource-list-view")
+const resourceListTitle = $("#resource-list-title")
 const resourceDetail = $("#resource-detail")
+const imageResourceDetail = $("#image-resource-detail")
+const styleResourceDetail = $("#style-resource-detail")
+const styleDetailFields = $("#style-detail-fields")
+const styleDetailNormal = $("#style-detail-normal") as HTMLCanvasElement
+const styleDetailHighlighted = $("#style-detail-highlighted") as HTMLCanvasElement
+const styleDetailImageButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-style-image-property]"))
 const resourceBackButton = $("#resource-back") as HTMLButtonElement
 const resourceName = $("#resource-name")
 const resourceMeta = $("#resource-meta")
@@ -209,6 +216,11 @@ const resourceCount = $("#resource-count")
 const resourceSearch = $("#resource-search") as HTMLInputElement
 const resourceGallery = $("#resource-gallery")
 const resourceUploadButton = $("#resource-upload") as HTMLButtonElement
+const styleAddButton = $("#style-add") as HTMLButtonElement
+const newStyleDialog = $("#new-style-dialog") as HTMLDialogElement
+const newStyleForm = $("#new-style-form") as HTMLFormElement
+const newStyleID = $("#new-style-id") as HTMLInputElement
+const newStyleError = $("#new-style-error")
 const resourceDownloadButton = $("#resource-download") as HTMLButtonElement
 const resourceDeleteButton = $("#resource-delete") as HTMLButtonElement
 const resourceUploadInput = $("#resource-upload-input") as HTMLInputElement
@@ -253,6 +265,12 @@ const styleImagePreview = $("#style-image-preview") as HTMLCanvasElement
 const styleImagePicker = $("#style-image-picker")
 const styleImagePickerCanvas = $("#style-image-picker-canvas") as HTMLCanvasElement
 const styleImagePickerMeta = $("#style-image-picker-meta")
+const stylePickerDialog = $("#style-picker-dialog") as HTMLDialogElement
+const stylePickerSearch = $("#style-picker-search") as HTMLInputElement
+const stylePickerCount = $("#style-picker-count")
+const stylePickerGrid = $("#style-picker-grid")
+const stylePickerEmpty = $("#style-picker-empty")
+const stylePickerClose = $("#style-picker-close") as HTMLButtonElement
 
 let archive: SkinArchive | undefined
 let bdaBase: SkinArchive | undefined
@@ -307,6 +325,8 @@ let sidebarView: "overview" | "source" = "overview"
 let guidesVisible = false
 let previewReturnName = "py_9.ini"
 let resourceConfigActive = false
+let resourceInspectorMode: "image" | "style" = "image"
+let selectedStyleID = ""
 let selectedResourcePath = ""
 let resourceURLs: string[] = []
 let tilePath = ""
@@ -1315,13 +1335,160 @@ function loadTiles(path: string): void {
   drawAtlas()
 }
 
+function openStyleImageResourceChooser(target: StyleImagePickerTarget): void {
+  pickerTarget = target
+  if (isTauri()) openResourcePickerWindow()
+  else openStyleImageResourcePicker()
+}
+
+function chooseStyleImageSlice(property: "NM_IMG" | "HL_IMG"): void {
+  const target = styleSectionTarget(selectedStyleID, property)
+  const path = styleConfigPath()
+  const stylesDocument = archive?.isText(path) ? IniDocument.parse(archive.getText(path)) : undefined
+  const current = stylesDocument?.get(`STYLE${selectedStyleID}`, property)?.split(",")[0]?.trim()
+  const imagePath = resourceImagePaths(archive?.names() ?? [], theme.value, orientation.value)
+    .find((candidate) => candidate.split("/").pop()?.replace(/\.png$/i, "") === current)
+  if (imagePath && target) openImageSlicePicker(imagePath, target)
+  else if (target) openStyleImageResourceChooser(target)
+}
+
+for (const button of styleDetailImageButtons) {
+  button.addEventListener("click", () => chooseStyleImageSlice(button.dataset.styleImageProperty as "NM_IMG" | "HL_IMG"))
+}
+
+function styleSectionTarget(styleID: string, property: "NM_IMG" | "HL_IMG"): StyleImagePickerTarget | undefined {
+  const path = styleConfigPath()
+  if (!archive?.isText(path)) return
+  return {
+    source: "BACK_STYLE",
+    property,
+    document: IniDocument.parse(archive.getText(path)),
+    path,
+    sections: [`STYLE${styleID}`],
+  }
+}
+
+function parseStyleColor(value: string): { hex: string; alpha: number } | undefined {
+  const clean = value.trim().replace(/^#/, "")
+  if (!/^[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(clean)) return
+  const normalized = clean.length === 6 ? `FF${clean}` : clean.toUpperCase()
+  return { hex: normalized.slice(2), alpha: Number.parseInt(normalized.slice(0, 2), 16) / 255 }
+}
+
+function bindStyleDetailColor(
+  textInput: HTMLInputElement,
+  picker: HTMLInputElement,
+  alpha: HTMLInputElement,
+): void {
+  const sync = () => {
+    const parsed = parseStyleColor(textInput.value)
+    if (!parsed) return
+    picker.value = `#${parsed.hex}`
+    alpha.value = String(parsed.alpha)
+    picker.disabled = textInput.disabled
+  }
+  const write = () => {
+    const parsed = parseStyleColor(textInput.value)
+    const rgb = picker.value.slice(1).toUpperCase()
+    if (!parsed && rgb.length !== 6) return
+    const alphaValue = Math.max(0, Math.min(1, Number(alpha.value) || 1))
+    textInput.value = `${Math.round(alphaValue * 255).toString(16).padStart(2, "0")}${rgb}`.toUpperCase()
+    textInput.dispatchEvent(new Event("change", { bubbles: true }))
+  }
+  textInput.addEventListener("input", sync)
+  textInput.addEventListener("change", sync)
+  picker.addEventListener("input", write)
+  alpha.addEventListener("input", write)
+  sync()
+}
+
+async function renderStyleResourceDetail(): Promise<void> {
+  const path = styleConfigPath()
+  if (!archive?.isText(path) || !selectedStyleID) return
+  const stylesDocument = IniDocument.parse(archive.getText(path))
+  const section = `STYLE${selectedStyleID}`
+  resourceName.textContent = section
+  resourceMeta.textContent = path
+  imageResourceDetail.hidden = true
+  styleResourceDetail.hidden = false
+  const resolver = visualResolver()
+  if (resolver) {
+    drawVisualPreview(styleDetailNormal, [await resolver.resolve(selectedStyleID, false).catch(() => undefined)], false)
+    drawVisualPreview(styleDetailHighlighted, [await resolver.resolve(selectedStyleID, true).catch(() => undefined)], false)
+  }
+  styleDetailFields.replaceChildren()
+  const existing = stylesDocument.entries(section)
+  const common = ["NM_COLOR", "HL_COLOR", "FONT_NAME", "FONT_WEIGHT", "FONT_SIZE", "SHOW", "INFO"]
+  const keys = [...common, ...existing.map((entry) => entry.key).filter((key) => !common.includes(key) && key !== "NM_IMG" && key !== "HL_IMG")]
+  for (const key of keys) {
+    const label = document.createElement("label")
+    label.className = "style-detail-field"
+    const caption = document.createElement("span")
+    caption.textContent = documentFieldLabels[key] ?? key
+    caption.title = key
+    const row = document.createElement("span")
+    row.className = "style-detail-field-row"
+    const updateField = (value: string) => {
+      if (!archive?.isText(path)) return
+      const current = IniDocument.parse(archive.getText(path))
+      const before = current.toString()
+      if (!current.set(section, key, value)) return
+      commitText(path, before, current.toString())
+      setSourceValue(current.toString())
+      refreshPreview()
+      void renderStyleResourceDetail()
+      updateDirty()
+    }
+    if (key.endsWith("COLOR")) {
+      const textInput = document.createElement("input")
+      textInput.value = stylesDocument.get(section, key) ?? ""
+      textInput.disabled = !isEditing()
+      const picker = document.createElement("input")
+      picker.type = "color"
+      picker.setAttribute("aria-label", `${key} 颜色选择器`)
+      const alpha = document.createElement("input")
+      alpha.type = "number"
+      alpha.min = "0"
+      alpha.max = "1"
+      alpha.step = "0.01"
+      alpha.setAttribute("aria-label", `${key} 透明度`)
+      const colorControl = document.createElement("span")
+      colorControl.className = "color-control"
+      colorControl.append(textInput, picker, alpha)
+      bindStyleDetailColor(textInput, picker, alpha)
+      textInput.addEventListener("change", () => updateField(textInput.value))
+      row.append(colorControl)
+    } else {
+      const input = document.createElement("input")
+      input.value = stylesDocument.get(section, key) ?? ""
+      input.disabled = !isEditing()
+      input.addEventListener("change", () => updateField(input.value))
+      row.append(input)
+    }
+    label.append(caption, row)
+    styleDetailFields.append(label)
+  }
+}
+
+function selectStyleResource(styleID: string): void {
+  if (!availableStyleIDs().includes(styleID)) return
+  selectedStyleID = styleID
+  resourceListView.hidden = true
+  resourceDetail.hidden = false
+  resourceInspector.scrollTop = 0
+  void renderStyleResourceDetail()
+}
+
 function selectResourceImage(path: string): void {
   if (!archive?.isImage(path)) return
   selectedResourcePath = path
   resourceListView.hidden = true
   resourceDetail.hidden = false
+  resourceInspector.scrollTop = 0
   resourceName.textContent = path.split("/").pop() ?? path
   resourceMeta.textContent = path
+  imageResourceDetail.hidden = false
+  styleResourceDetail.hidden = true
   tileMode = "select"
   tileModeButtons.forEach((button) => button.classList.toggle("active", button.dataset.tileMode === tileMode))
   showImage(path)
@@ -1337,10 +1504,80 @@ function releaseResourceURLs(): void {
   resourceURLs = []
 }
 
+async function renderStyleResourceGallery(): Promise<void> {
+  if (!archive?.isText(styleConfigPath())) return
+  const query = resourceSearch.value.trim().toLowerCase()
+  const stylesDocument = IniDocument.parse(archive.getText(styleConfigPath()))
+  const styleIDs = availableStyleIDs().filter((styleID) => {
+    const entries = stylesDocument.entries(`STYLE${styleID}`)
+    return !query || styleID.includes(query) || entries.some((entry) =>
+      (entry.key === "INFO" || entry.key === "SHOW") && entry.value.toLowerCase().includes(query),
+    )
+  })
+  resourceListTitle.textContent = "样式配置"
+  resourceSearch.placeholder = "搜索样式"
+  resourceSearch.setAttribute("aria-label", "搜索样式")
+  resourceCount.textContent = `${styleIDs.length} 个样式`
+  resourceUploadButton.hidden = true
+  styleAddButton.hidden = false
+  resourceDownloadButton.hidden = true
+  resourceDeleteButton.hidden = true
+  resourceListView.hidden = Boolean(selectedStyleID)
+  resourceDetail.hidden = !selectedStyleID
+  const resolver = visualResolver()
+  if (!resolver) return
+  for (const styleID of styleIDs) {
+    const button = document.createElement("button")
+    button.className = "resource-item style-resource-item"
+    button.dataset.path = `STYLE${styleID}`
+    button.title = `STYLE${styleID}`
+    const previews = document.createElement("span")
+    previews.className = "resource-style-previews"
+    for (const highlighted of [false, true]) {
+      const canvas = document.createElement("canvas")
+      canvas.width = 64
+      canvas.height = 44
+      drawVisualPreview(canvas, [await resolver.resolve(styleID, highlighted).catch(() => undefined)], false)
+      previews.append(canvas)
+    }
+    const name = document.createElement("strong")
+    name.textContent = `STYLE${styleID}`
+    const entries = stylesDocument.entries(`STYLE${styleID}`)
+    const meta = document.createElement("small")
+    meta.textContent = entries.find((entry) => entry.key === "INFO")?.value
+      || entries.find((entry) => entry.key === "SHOW")?.value
+      || `${entries.length} 项配置`
+    button.append(previews, name, meta)
+    let clickTimer: ReturnType<typeof setTimeout> | undefined
+    button.addEventListener("click", () => {
+      clearTimeout(clickTimer)
+      clickTimer = setTimeout(() => selectGalleryItem(`STYLE${styleID}`, resourceGallery), 200)
+    })
+    button.addEventListener("dblclick", () => {
+      clearTimeout(clickTimer)
+      selectGalleryItem(`STYLE${styleID}`, resourceGallery)
+      selectStyleResource(styleID)
+    })
+    resourceGallery.append(button)
+  }
+  if (selectedResourceGalleryPath) selectGalleryItem(selectedResourceGalleryPath, resourceGallery)
+}
+
 function renderResourceInspector(): void {
   if (!archive) return
   releaseResourceURLs()
   resourceGallery.replaceChildren()
+  if (resourceInspectorMode === "style") {
+    void renderStyleResourceGallery()
+    return
+  }
+  resourceListTitle.textContent = "皮肤图片"
+  resourceSearch.placeholder = "搜索图片"
+  resourceSearch.setAttribute("aria-label", "搜索图片")
+  resourceUploadButton.hidden = false
+  styleAddButton.hidden = true
+  resourceDownloadButton.hidden = false
+  resourceDeleteButton.hidden = false
   const query = resourceSearch.value.trim().toLowerCase()
   const paths = resourceImagePaths(archive.names(), theme.value, orientation.value)
     .filter((path) => !query || path.toLowerCase().includes(query))
@@ -1395,6 +1632,12 @@ function renderResourceInspector(): void {
 function showResourceList(): void {
   resourceListView.hidden = false
   resourceDetail.hidden = true
+  resourceInspector.scrollTop = 0
+  if (resourceInspectorMode === "style") {
+    selectedStyleID = ""
+    renderResourceInspector()
+    return
+  }
   setDrawingTile(false)
   movingTile = undefined
   selectedTileIndex = undefined
@@ -1703,6 +1946,108 @@ function drawVisualPreview(canvas: HTMLCanvasElement, visuals: Array<Visual | un
   })
 }
 
+let stylePickerTarget: HTMLInputElement | undefined
+let stylePickerRenderID = 0
+
+function styleReferenceKey(input: HTMLInputElement): string {
+  return input.dataset.keyboardField ?? input.dataset.toolbarField ?? input.dataset.keyField ?? input.dataset.documentStyleKey ?? ""
+}
+
+function isStyleReferenceKey(key: string): boolean {
+  return key === "styleID" || /(?:^|\.)(?:[A-Z0-9_]*STYLE|FIRST_BACK|FIRST_FORE)$/i.test(key)
+}
+
+function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferenceKey(input)): void {
+  if (!isStyleReferenceKey(key) || input.closest(".style-reference-input")) return
+  input.dataset.documentStyleKey ||= key
+  const parent = input.parentNode
+  if (!parent) return
+  const wrapper = document.createElement("span")
+  wrapper.className = "style-reference-input"
+  parent.insertBefore(wrapper, input)
+  wrapper.append(input)
+  const button = document.createElement("button")
+  button.type = "button"
+  button.className = "style-picker-trigger"
+  button.title = "浏览所有样式"
+  button.setAttribute("aria-label", "浏览所有样式")
+  button.textContent = "⌄"
+  button.addEventListener("click", () => openStylePicker(input))
+  wrapper.append(button)
+}
+
+function availableStyleIDs(): string[] {
+  if (!archive || archive.format === "bda") return []
+  const path = styleConfigPath()
+  if (!archive.isText(path)) return []
+  return IniDocument.parse(archive.getText(path)).sections()
+    .flatMap((section) => section.match(/^STYLE(\d+)$/)?.[1] ?? [])
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+}
+
+async function renderStylePicker(): Promise<void> {
+  const renderID = ++stylePickerRenderID
+  const query = stylePickerSearch.value.trim().toLowerCase()
+  const styleIDs = availableStyleIDs().filter((styleID) => styleID.toLowerCase().includes(query))
+  const resolver = visualResolver()
+  stylePickerGrid.replaceChildren()
+  stylePickerCount.textContent = `${styleIDs.length} 个样式`
+  stylePickerEmpty.hidden = styleIDs.length > 0
+  if (!resolver) return
+  const foreground = /FORE|INPUT_STYLE|SCAND_STYLE|CELL_STYLE/.test(styleReferenceKey(stylePickerTarget!))
+  const items = await Promise.all(styleIDs.map(async (styleID) => ({
+    styleID,
+    visuals: await Promise.all([
+      resolver.resolve(styleID, false).catch(() => undefined),
+      resolver.resolve(styleID, true).catch(() => undefined),
+    ]),
+  })))
+  if (renderID !== stylePickerRenderID) return
+  for (const { styleID, visuals } of items) {
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = "style-picker-item"
+    button.title = `使用样式 ${styleID}`
+    const label = document.createElement("strong")
+    label.textContent = styleID
+    const previews = document.createElement("span")
+    previews.className = "style-picker-previews"
+    for (const [index, visual] of visuals.entries()) {
+      const canvas = document.createElement("canvas")
+      canvas.width = 64
+      canvas.height = 44
+      canvas.setAttribute("aria-label", index === 0 ? "正常状态" : "按下状态")
+      drawVisualPreview(canvas, [visual], foreground)
+      previews.append(canvas)
+    }
+    button.append(label, previews)
+    button.addEventListener("click", () => {
+      if (!stylePickerTarget) return
+      stylePickerTarget.value = styleID
+      stylePickerTarget.dispatchEvent(new Event("input", { bubbles: true }))
+      stylePickerTarget.dispatchEvent(new Event("change", { bubbles: true }))
+      stylePickerDialog.close()
+    })
+    stylePickerGrid.append(button)
+  }
+}
+
+function openStylePicker(input: HTMLInputElement): void {
+  if (input.disabled || !availableStyleIDs().length) return
+  stylePickerTarget = input
+  stylePickerSearch.value = ""
+  stylePickerDialog.showModal()
+  void renderStylePicker()
+  stylePickerSearch.focus()
+}
+
+for (const input of [...keyboardFields, ...toolbarFields, ...keyFields]) decorateStyleReferenceInput(input)
+stylePickerSearch.addEventListener("input", () => void renderStylePicker())
+stylePickerClose.addEventListener("click", () => stylePickerDialog.close())
+stylePickerDialog.addEventListener("click", (event) => {
+  if (event.target === stylePickerDialog) stylePickerDialog.close()
+})
+
 function drawStylePreview(
   button: HTMLButtonElement,
   visuals: Array<Visual | undefined>,
@@ -1927,6 +2272,7 @@ function populateDocumentInspector(): void {
         updateDirty()
       })
       label.append(caption, input)
+      decorateStyleReferenceInput(input, entry.key)
       grid.append(label)
     }
     disclosure.append(summary, grid)
@@ -1995,11 +2341,13 @@ function addNavButton(
   path: string,
   className: string,
   icon?: string,
+  navMode = className === "nav-resource" ? "resource" : "document",
 ): void {
   if (!archive?.names().includes(path) && !isBdaVirtualTextPath(path)) return
   const button = document.createElement("button")
   button.className = `nav-item ${className}`
   button.dataset.path = path
+  button.dataset.navMode = navMode
   const navigationSystemSymbols: Record<string, string> = {
     "nav-overview": "info.circle",
     "nav-layout": "keyboard",
@@ -2021,7 +2369,7 @@ function addNavButton(
       layout.value = path.endsWith("_9.ini") ? "py_9.ini" : "py_26.ini"
       previewReturnName = path.split("/").pop() ?? layout.value
     }
-    selectFile(path, "overview", className === "nav-resource")
+    selectFile(path, "overview", navMode === "resource" ? "image" : navMode === "style" ? "style" : "document")
   })
   parent.append(button)
 }
@@ -2320,6 +2668,9 @@ function updateSelectedImageReference(target: StyleImagePickerTarget | undefined
     commitText(path, before, text)
     if (selectedPath === path) setSourceValue(text)
     refreshPreview()
+    if (resourceInspectorMode === "style" && resourceConfigActive) {
+      void renderStyleResourceDetail()
+    }
     populateKeyInspector()
     updateDirty()
     return true
@@ -2713,12 +3064,17 @@ function setSidebarView(view: "overview" | "source"): void {
   files.querySelector<HTMLElement>(".raw-files")?.toggleAttribute("hidden", view !== "source")
 }
 
-function selectFile(path: string, preferredSidebarView = sidebarView, resourceMode = false): void {
-  resourceConfigActive = resourceMode
-  toggleGuides.title = resourceMode ? "切片网格" : "辅助线"
-  toggleGuides.setAttribute("aria-label", resourceMode ? "切片网格" : "辅助线")
-  if (resourceMode) setGuidesVisible(true)
-  if (!resourceMode) {
+function selectFile(
+  path: string,
+  preferredSidebarView = sidebarView,
+  resourceMode: "document" | "image" | "style" = "document",
+): void {
+  resourceConfigActive = resourceMode !== "document"
+  resourceInspectorMode = resourceMode === "style" ? "style" : "image"
+  toggleGuides.title = resourceInspectorMode === "image" && resourceConfigActive ? "切片网格" : "辅助线"
+  toggleGuides.setAttribute("aria-label", resourceInspectorMode === "image" && resourceConfigActive ? "切片网格" : "辅助线")
+  if (resourceInspectorMode === "image" && resourceConfigActive) setGuidesVisible(true)
+  if (!resourceConfigActive) {
     selectedResourcePath = ""
     drawingTile = false
     tileDragStart = undefined
@@ -2727,6 +3083,8 @@ function selectFile(path: string, preferredSidebarView = sidebarView, resourceMo
     atlasCanvas.classList.remove("drawing")
   } else {
     selectedResourcePath = ""
+    selectedStyleID = ""
+    selectedResourceGalleryPath = ""
     resourceListView.hidden = false
     resourceDetail.hidden = true
   }
@@ -2789,11 +3147,17 @@ function selectFile(path: string, preferredSidebarView = sidebarView, resourceMo
     inspectorTab = "source"
   }
   updateInspectorView()
-  if (resourceMode) renderResourceInspector()
+  if (resourceConfigActive) renderResourceInspector()
   if (!quickInspector.hidden) populateKeyInspector()
   selectedFileButton?.classList.remove("selected")
   const preferredContainer = files.querySelector(preferredSidebarView === "overview" ? ".sidebar-overview" : ".raw-files")
-  selectedFileButton = preferredContainer?.querySelector<HTMLElement>(`button[data-path="${CSS.escape(path)}"]`)
+  const navMode = resourceInspectorMode === "style" && resourceConfigActive
+    ? "style"
+    : resourceConfigActive
+      ? "resource"
+      : "document"
+  selectedFileButton = preferredContainer?.querySelector<HTMLElement>(`button[data-path="${CSS.escape(path)}"][data-nav-mode="${navMode}"]`)
+    ?? preferredContainer?.querySelector<HTMLElement>(`button[data-path="${CSS.escape(path)}"]`)
     ?? files.querySelector<HTMLElement>(`button[data-path="${CSS.escape(path)}"]`)
     ?? undefined
   if (selectedFileButton) {
@@ -2801,6 +3165,8 @@ function selectFile(path: string, preferredSidebarView = sidebarView, resourceMo
   }
   selectedFileButton?.classList.add("selected")
 }
+
+const overviewGroupState = new Map<string, boolean>()
 
 function renderFiles(): void {
   files.replaceChildren()
@@ -2811,14 +3177,26 @@ function renderFiles(): void {
   overview.className = "sidebar-overview"
   files.append(overview)
 
-  const section = (title: string) => {
-    const heading = document.createElement("div")
-    heading.className = "nav-section"
-    heading.textContent = title
-    overview.append(heading)
+  const section = (title: string): HTMLElement => {
+    const disclosure = document.createElement("details")
+    disclosure.className = "nav-group"
+    disclosure.open = overviewGroupState.get(title) ?? true
+    disclosure.addEventListener("toggle", () => overviewGroupState.set(title, disclosure.open))
+    const summary = document.createElement("summary")
+    summary.className = "nav-section"
+    const marker = document.createElement("span")
+    marker.className = "source-disclosure"
+    const label = document.createElement("span")
+    label.textContent = title
+    summary.append(marker, label)
+    const body = document.createElement("div")
+    body.className = "nav-group-body"
+    disclosure.append(summary, body)
+    overview.append(disclosure)
+    return body
   }
 
-  type NavEntry = { group: string; label: string; path: string; className: string; icon: string }
+  type NavEntry = { group: string; label: string; path: string; className: string; icon: string; navMode?: string }
   const entries: NavEntry[] = []
   const overviewPath = archive.names().includes(`${theme.value}/skin/Info.txt`)
     ? `${theme.value}/skin/Info.txt`
@@ -2875,7 +3253,12 @@ function renderFiles(): void {
   const hintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
   if (hintPath) entries.push({ group: "键盘组件", label: "按键气泡", path: hintPath, className: "nav-component", icon: "rectangle.and.hand.point" })
   const stylePath = appearancePath ?? (archive.format === "bda" ? undefined : styleConfigPath())
-  if (stylePath) entries.push({ group: "资源配置", label: "资源配置", path: stylePath, className: "nav-resource", icon: "photo" })
+  if (stylePath) {
+    entries.push({ group: "资源配置", label: "图片资源", path: stylePath, className: "nav-resource", icon: "photo", navMode: "resource" })
+    if (archive.format !== "bda") {
+      entries.push({ group: "资源配置", label: "样式配置", path: stylePath, className: "nav-style", icon: "paintpalette", navMode: "style" })
+    }
+  }
   if (archive.format === "bda") {
     for (const [kind, label] of [
       ["animation", "序列帧动画"],
@@ -2887,14 +3270,14 @@ function renderFiles(): void {
       if (path) entries.push({ group: "扩展配置", label, path, className: "nav-style", icon: "gearshape" })
     }
   }
-  for (const group of ["皮肤", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "资源配置", "扩展配置", "扩展布局"]) {
+  for (const group of ["皮肤", "资源配置", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "扩展配置", "扩展布局"]) {
     const grouped = entries.filter((entry) => entry.group === group && (
       archive?.names().includes(entry.path) ||
       archive?.format === "bda" && Boolean(bdaBase?.isText(bdaBasePath(entry.path)))
     ))
     if (!grouped.length) continue
-    section(group)
-    for (const entry of grouped) addNavButton(overview, entry.label, entry.path, entry.className, entry.icon)
+    const body = section(group)
+    for (const entry of grouped) addNavButton(body, entry.label, entry.path, entry.className, entry.icon, entry.navMode)
   }
 
   const sourceFiles = document.createElement("div")
@@ -3805,11 +4188,58 @@ void listen<{ path: string }>("resource-picker-select", (event) => {
   })
 }
 
+function nextStyleID(): string {
+  const ids = availableStyleIDs().map(Number).filter(Number.isSafeInteger)
+  return String((ids.length ? Math.max(...ids) : -1) + 1)
+}
+
+function showNewStyleError(text: string): void {
+  newStyleError.textContent = text
+  newStyleError.hidden = !text
+}
+
+styleAddButton.addEventListener("click", () => {
+  if (!archive?.isText(styleConfigPath()) || !isEditing()) return
+  newStyleID.value = nextStyleID()
+  showNewStyleError("")
+  newStyleDialog.showModal()
+  newStyleID.select()
+})
+
+newStyleForm.addEventListener("submit", (event) => {
+  if ((event.submitter as HTMLButtonElement | null)?.value !== "create") return
+  event.preventDefault()
+  const styleID = newStyleID.value.trim()
+  if (!/^\d+$/.test(styleID)) {
+    showNewStyleError("样式序号必须是非负整数")
+    return
+  }
+  if (availableStyleIDs().includes(styleID)) {
+    showNewStyleError(`STYLE${styleID} 已存在`)
+    return
+  }
+  const path = styleConfigPath()
+  if (!archive?.isText(path)) return
+  const stylesDocument = IniDocument.parse(archive.getText(path))
+  const before = stylesDocument.toString()
+  stylesDocument.appendSection(`STYLE${styleID}`, [])
+  const currentMax = Number(stylesDocument.get("GLOBAL", "STYLE_NUM") ?? -1)
+  const numericID = Number(styleID)
+  if (!Number.isFinite(currentMax) || numericID > currentMax) stylesDocument.set("GLOBAL", "STYLE_NUM", styleID)
+  commitText(path, before, stylesDocument.toString())
+  setSourceValue(stylesDocument.toString())
+  newStyleDialog.close()
+  selectedResourceGalleryPath = `STYLE${styleID}`
+  selectStyleResource(styleID)
+  refreshPreview()
+  updateDirty()
+})
+
 // Resource image actions
 let selectedResourceGalleryPath = ""
 
 function updateResourceActionButtons(): void {
-  const hasSelection = Boolean(selectedResourceGalleryPath)
+  const hasSelection = resourceInspectorMode === "image" && Boolean(selectedResourceGalleryPath)
   resourceDownloadButton.disabled = !hasSelection
   resourceDeleteButton.disabled = !hasSelection || !isEditing()
 }

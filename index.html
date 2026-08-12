@@ -288,10 +288,11 @@
         <div id="resource-inspector" hidden>
           <div id="resource-list-view">
             <div class="inspector-title">
-              <strong>皮肤图片</strong>
+              <strong id="resource-list-title">皮肤图片</strong>
               <span id="resource-count"></span>
               <input id="resource-search" type="search" placeholder="搜索图片" aria-label="搜索图片">
               <div class="resource-actions">
+                <button id="style-add" class="toolbar-button" type="button" title="新增样式" aria-label="新增样式" hidden><span class="icon system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14"/></svg></span></button>
                 <button id="resource-upload" class="toolbar-button" type="button" title="上传图片" aria-label="上传图片"><span class="icon system-symbol" data-system-symbol="arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 13V4m-4 4 4-4 4 4M4 16h12"/></svg></span></button>
                 <button id="resource-download" class="toolbar-button" type="button" title="下载选中图片" aria-label="下载选中图片" disabled><span class="icon system-symbol" data-system-symbol="arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 4v9m-4-4 4 4 4-4M4 16h12"/></svg></span></button>
                 <button id="resource-delete" class="toolbar-button" type="button" title="删除选中图片" aria-label="删除选中图片" disabled><span class="icon system-symbol" data-system-symbol="trash" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 6h12M8 3h4l1 3H7zm-2 3 1 9h8l1-9M8 9v6m4-6v6"/></svg></span></button>
@@ -305,7 +306,8 @@
               <button id="resource-back" class="toolbar-button" type="button" title="返回图片列表" aria-label="返回图片列表"><span class="icon system-symbol" data-system-symbol="chevron.left" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m12 4-6 6 6 6"/></svg></span></button>
               <div><strong id="resource-name">图片</strong><small id="resource-meta"></small></div>
             </div>
-            <div class="tile-toolbar">
+            <div id="image-resource-detail">
+              <div class="tile-toolbar">
               <div class="tile-mode-control" aria-label="切片操作模式">
                 <button id="select-tile" class="toolbar-button active" type="button" data-tile-mode="select" title="选择切片" aria-label="选择切片"><span class="icon system-symbol" data-system-symbol="cursorarrow" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 2.5 15.5 11l-5 .8 2.8 5-2.5 1.4-2.7-5L4 16z"/></svg></span></button>
                 <button id="move-tile" class="toolbar-button" type="button" data-tile-mode="move" title="移动切片" aria-label="移动切片"><span class="icon system-symbol" data-system-symbol="arrow.up.and.down.and.arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 2v16m0-16L7 5m3-3 3 3M2 10h16m-16 0 3-3m-3 3 3 3m13-3-3-3m3 3-3 3m-5 5-3-3m3 3 3-3"/></svg></span></button>
@@ -332,7 +334,15 @@
               <label>宽 <input data-tile-inner="2" type="number" min="1" /></label>
               <label>高 <input data-tile-inner="3" type="number" min="1" /></label>
             </div>
-          </div>
+            </div>
+            </div>
+            <div id="style-resource-detail" hidden>
+              <div id="style-detail-previews" class="style-detail-previews">
+                <button type="button" data-style-image-property="NM_IMG" aria-label="选择正常状态图片切片"><canvas id="style-detail-normal" width="128" height="88" aria-label="正常状态预览"></canvas><span>正常</span></button>
+                <button type="button" data-style-image-property="HL_IMG" aria-label="选择按下状态图片切片"><canvas id="style-detail-highlighted" width="128" height="88" aria-label="按下状态预览"></canvas><span>按下</span></button>
+              </div>
+              <div id="style-detail-fields" class="inspector-grid action-fields"></div>
+            </div>
           </div>
         </div>
         <div id="source-editor" hidden>
@@ -437,6 +447,30 @@
         <p id="style-image-resource-empty" class="style-image-resource-empty" hidden>没有匹配的图片资源</p>
       </section>
     </div>
+
+    <dialog id="new-style-dialog" class="app-dialog new-style-dialog" aria-labelledby="new-style-title">
+      <form id="new-style-form" method="dialog">
+        <header><h2 id="new-style-title">新增样式</h2><button value="cancel" aria-label="关闭">关闭</button></header>
+        <label>样式序号 <input id="new-style-id" type="number" min="0" step="1" required></label>
+        <p id="new-style-error" class="field-error" hidden></p>
+        <footer><button class="secondary" value="cancel">取消</button><button id="new-style-submit" class="primary" value="create">创建</button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="style-picker-dialog" class="style-picker-dialog" aria-labelledby="style-picker-title">
+      <header class="style-picker-header">
+        <div>
+          <h2 id="style-picker-title">选择样式</h2>
+          <small id="style-picker-count"></small>
+        </div>
+        <div class="style-picker-tools">
+          <input id="style-picker-search" type="search" placeholder="搜索样式编号" aria-label="搜索样式编号">
+          <button id="style-picker-close" type="button" aria-label="关闭样式选择器">关闭</button>
+        </div>
+      </header>
+      <div id="style-picker-grid" class="style-picker-grid"></div>
+      <p id="style-picker-empty" class="style-picker-empty" hidden>没有匹配的样式</p>
+    </dialog>
 
     <dialog id="settings-dialog" class="app-dialog" aria-labelledby="settings-title">
       <form method="dialog">
