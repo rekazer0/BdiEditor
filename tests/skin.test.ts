@@ -174,6 +174,22 @@ test("writes a changed BDA resource back to its original package path", () => {
   assert.equal(output["dark/skin/res/key.png"], undefined)
 })
 
+test("BDS to BDI conversion keeps a single root Info.txt and demo.png", () => {
+  const bds = SkinArchive.open(zipSync({
+    "Info.txt": strToU8("Name=T\r\nSupportPlatform=A\r\nSupportDarkMode=1\r\n"),
+    "demo.png": new Uint8Array([1, 2, 3]),
+    "dark/land/py_9.ini": strToU8("[K]\nCENTER=a\n"),
+    "light/land/py_9.ini": strToU8("[K]\nCENTER=a\n"),
+  }))
+  const output = unzipSync(bds.toBytes("bdi"))
+  assert.ok(output["skin/Info.txt"])
+  assert.ok(output["skin/demo.png"])
+  assert.equal(output["skin/dark/skin/Info.txt"], undefined)
+  assert.equal(output["skin/light/skin/Info.txt"], undefined)
+  assert.equal(output["skin/dark/skin/demo.png"], undefined)
+  assert.equal(output["skin/light/skin/demo.png"], undefined)
+})
+
 test("keeps platform directories when editing current BDI and BDS packages", () => {
   const bdi = SkinArchive.open(zipSync({
     "skin/Info.txt": strToU8("SupportPlatform=I\r\n"),

@@ -400,20 +400,6 @@ export class SkinArchive {
       add(destination, data)
     }
 
-    if (format === "bdi" && !single) {
-      const rootInfo = output.get("skin/Info.txt")
-      const rootDemo = output.get("skin/demo.png")
-      for (const theme of ["dark", "light"] as const) {
-        if (!this.names().some((name) => name.startsWith(`${theme}/skin/`))) continue
-        if (rootInfo && !output.has(`skin/${theme}/skin/Info.txt`)) {
-          add(`skin/${theme}/skin/Info.txt`, rootInfo)
-        }
-        if (rootDemo && !output.has(`skin/${theme}/skin/demo.png`)) {
-          add(`skin/${theme}/skin/demo.png`, rootDemo)
-        }
-      }
-    }
-
     return zipSync(Object.fromEntries(output), { level: 6 })
   }
 
