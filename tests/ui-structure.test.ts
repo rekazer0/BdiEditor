@@ -304,21 +304,19 @@ test("toolbar configurations expose parsed inspector fields", () => {
 })
 
 test("color controls preserve ARGB alpha while using native color inputs", () => {
-  assert.equal((html.match(/data-color-picker-for=/g) ?? []).length, 4)
-  assert.equal((html.match(/data-color-alpha-for=/g) ?? []).length, 4)
+  assert.equal((html.match(/data-color-picker-for=/g) ?? []).length, 2)
+  assert.equal((html.match(/data-color-alpha-for=/g) ?? []).length, 2)
   assert.match(main, /alpha\.value = String\(Number\.parseInt\(hex\.slice\(0, 2\), 16\) \/ 255\)/)
   assert.match(main, /field\.value = `\$\{Math\.round\(Math\.max\(0, Math\.min\(1, alphaValue\)\) \* 255\)/)
   assert.match(main, /syncColorControl\(field\)/)
   assert.doesNotMatch(main, /colorDialog\.showModal\(\)/)
-  assert.equal((html.match(/class="color-pair-field"/g) ?? []).length, 2)
+  assert.equal((html.match(/class="color-pair-field"/g) ?? []).length, 1)
   assert.match(css, /\.color-pair-field\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/s)
   assert.match(css, /\.color-control\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 28px/s)
   assert.match(css, /\.color-control input\[type="color"\]\s*\{[^}]*width:\s*28px[^}]*height:\s*28px/s)
 })
 
-test("background style previews open processed atlas slices in a native window", () => {
-  assert.match(html, /data-style-preview="back:normal"/)
-  assert.match(html, /data-style-preview="back:highlighted"/)
+test("image slice picker remains available for style resource editing", () => {
   assert.doesNotMatch(html, /data-image-preview=/)
   assert.match(main, /new WebviewWindow\(label,/)
   assert.match(main, /showPickerWindow\("image-picker", "image", "图片切片"/)
@@ -367,13 +365,10 @@ test("default template is built in and cannot be replaced from the interface", (
   assert.doesNotMatch(main, /defaultTemplate|setDefaultTemplate|setDefaultButton|browserTemplate/)
 })
 
-test("inspector contains previews for resolved background and foreground styles", () => {
-  assert.match(html, /data-style-preview="back:normal"/)
-  assert.match(html, /data-style-preview="back:highlighted"/)
-  assert.match(html, /data-style-preview="fore:normal"/)
-  assert.match(html, /data-style-preview="fore:highlighted"/)
-  assert.equal((html.match(/data-style-preview="[^"]+"[^>]*>\s*<canvas/g) ?? []).length, 4)
-  assert.match(css, /\.style-preview-button\s*\{[^}]*width:\s*36px/s)
+test("inspector removes duplicate normal and pressed preview pairs", () => {
+  assert.doesNotMatch(html, /data-style-preview=/)
+  assert.doesNotMatch(html, /style-preview-pair/)
+  assert.doesNotMatch(main, /processedPreviewVisuals|fallbackBackgroundStyleID/)
 })
 
 test("interaction preview starts a press instead of returning after selection", () => {
@@ -630,9 +625,7 @@ test("key inspector keeps style references together and text styles can be hidde
   assert.match(css, /\.appearance-fields\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/s)
   assert.match(html, /data-text-style/)
   assert.match(main, /textStyleLabels/)
-  assert.match(css, /\.style-field\s*\{[^}]*grid-template-columns:\s*30% minmax\(0, 70%\)/s)
-  assert.match(css, /\.compact-style-preview\s*\{[^}]*width:\s*100%[^}]*height:\s*44px/s)
-  assert.match(css, /\.style-preview-pair \.style-preview-button\s*\{[^}]*aspect-ratio:\s*64 \/ 44/s)
+  assert.match(css, /\.style-field\s*\{\s*display:\s*block/s)
 })
 
 test("image previews preserve aspect ratio and open the TIL slice picker", () => {
@@ -737,6 +730,9 @@ test("overview groups are collapsible and resource configuration precedes keyboa
   assert.match(main, /\["皮肤", "资源配置", "键盘布局"/)
   assert.match(main, /group: "资源配置", label: "图片资源"[\s\S]*navMode: "resource"/)
   assert.match(main, /group: "资源配置", label: "样式配置"[\s\S]*navMode: "style"/)
+  assert.match(main, /"gen\.ini": \{ group: "资源配置", label: "通用配置", className: "nav-style", icon: "gearshape" \}/)
+  assert.doesNotMatch(main, /if \(name\.toLowerCase\(\) === "gen\.ini"\) continue/)
+  assert.doesNotMatch(main, /genConfigSections|isGenConfig/)
   assert.match(main, /button\.dataset\.navMode = navMode/)
   assert.match(css, /\.nav-group\[open\] > summary > \.source-disclosure/)
 })
@@ -751,6 +747,32 @@ test("style reference inputs share one searchable preview picker", () => {
   assert.match(main, /resolver\.resolve\(styleID, true\)/)
   assert.match(main, /stylePickerTarget\.dispatchEvent\(new Event\("change", \{ bubbles: true \}\)\)/)
   assert.match(css, /\.style-picker-previews canvas\s*\{[^}]*aspect-ratio:\s*64 \/ 44/s)
+})
+
+test("style thumbnails change on click and edit on command click", () => {
+  assert.match(main, /button\.className = "style-picker-trigger"/)
+  assert.match(main, /previews\.className = "style-picker-states"/)
+  assert.match(main, /for \(const state of \["正常", "按下"\]\)/)
+  assert.match(main, /Promise\.all\(\[false, true\]\.map/)
+  assert.match(main, /if \(event\.metaKey \|\| event\.ctrlKey\) openStyleReferenceEditor/)
+  assert.match(main, /else openStylePicker\(input\)/)
+  assert.match(main, /if \(event\.metaKey \|\| event\.ctrlKey\) \{\s*stylePickerDialog\.close\(\)\s*openStyleReferenceEditor\(styleID\)/s)
+  assert.match(main, /selectFile\(path, "overview", "style"\)/)
+  assert.match(main, /function refreshStyleReferenceThumbnail\(/)
+  assert.match(main, /styleReferenceDrawIDs\.get\(button\)/)
+  assert.match(main, /function refreshStyleReferenceThumbnails\(\)/)
+  assert.match(main, /if \(isStyleReferenceKey\(entry\.key\)\) label\.classList\.add\("style-reference-field"\)/)
+  assert.match(css, /\.style-reference-field\s*\{[^}]*grid-column:\s*1 \/ -1/s)
+  assert.match(css, /\.style-picker-trigger\s*\{[^}]*width:\s*154px[^}]*height:\s*58px/s)
+  assert.match(css, /\.style-picker-states\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s)
+  assert.match(css, /\.style-picker-state canvas\s*\{[^}]*display:\s*block/)
+  assert.match(css, /\.style-picker-state small\s*\{[^}]*text-align:\s*center/s)
+  assert.match(html, /单击应用 · Command\/Ctrl 单击编辑/)
+})
+
+test("layout inspector omits the redundant whole-keyboard form", () => {
+  assert.match(html, /<div class="keyboard-fields" hidden><\/div>/)
+  assert.doesNotMatch(html, /<h3>整个键盘<\/h3>|data-keyboard-field=/)
 })
 
 test("style configuration reuses the resource gallery and opens an editable detail", () => {
@@ -807,7 +829,7 @@ test("style detail edits every field with typed color and slice pickers", () => 
   assert.match(css, /\.resource-detail-heading\s*\{[^}]*position:\s*sticky[^}]*top:\s*-14px/s)
   assert.match(css, /\.resource-detail-heading\s*\{[^}]*background:\s*var\(--inspector\)/s)
   assert.match(css, /#resource-list-view \.inspector-title\s*\{[^}]*position:\s*sticky[^}]*top:\s*-14px/s)
-  assert.match(css, /#style-detail-fields\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit, minmax\(180px, 1fr\)\)/s)
+  assert.match(css, /#style-detail-fields\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/s)
   assert.match(main, /selectedStyleID = styleID[\s\S]*resourceInspector\.scrollTop = 0/)
 })
 
@@ -819,9 +841,17 @@ test("source file clicks open text files in the source inspector", () => {
 test("every overview text document exposes editable non-key properties", () => {
   assert.match(html, /class="inspector-group document-fields" hidden/)
   assert.match(html, /id="document-fields"/)
+  assert.doesNotMatch(html, /<h3>文档配置<\/h3>/)
   assert.match(main, /function populateDocumentInspector\(\)/)
   assert.match(main, /!\/\^KEY\\d\+\$\/\.test\(entry\.section\)/)
   assert.match(main, /selectedDocument\.set\(section, key, input\.value\)/)
+  assert.match(main, /function translatedConfigLabel\(key: string\)/)
+  assert.match(main, /documentFieldLabels\[key\] \?\? "扩展配置"/)
+  assert.match(main, /function translatedSectionLabel\(section: string\)/)
+  assert.match(main, /function isHiddenConfigEntry\(section: string, key: string\)/)
+  assert.match(main, /!isHiddenConfigEntry\(entry\.section, entry\.key\)/)
+  assert.match(main, /documentSectionLabels\[section\] \?\? "扩展区域"/)
+  assert.match(main, /caption\.textContent = translatedConfigLabel\(entry\.key\)/)
   assert.match(main, /preferredSidebarView === "overview"[\s\S]*?inspectorTab = "properties"/)
   assert.match(css, /\.document-property-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s)
   assert.match(css, /\.document-property-field\.wide\s*\{[^}]*grid-column:\s*1 \/ -1/s)

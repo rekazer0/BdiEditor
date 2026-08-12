@@ -168,7 +168,7 @@
         <div id="quick-inspector" hidden>
           <div class="inspector-title">
             <strong id="selected-key">选择画布中的按键</strong>
-            <span>按住 Command 点击可多选（Windows 使用 Ctrl）；修改会同步写回配置</span>
+            <span>更改会自动写回配置</span>
           </div>
           <div class="inspector-group skin-fields" hidden>
             <h3>皮肤信息</h3>
@@ -182,36 +182,22 @@
               <label>支持深色模式 <input data-skin-field="SupportDarkMode" /></label>
             </div>
           </div>
-          <div class="inspector-group keyboard-fields" hidden>
-            <h3>整个键盘</h3>
-            <div class="inspector-grid action-fields">
-              <label>整体高度 <input data-keyboard-field="height" type="number" min="1" /></label>
-              <label>背景样式 <span class="style-field"><input data-keyboard-field="styleID" /><button class="style-preview-button compact-style-preview" data-style-preview-field="keyboard:styleID" title="查看背景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
-              <label>正常背景图片 <input data-keyboard-field="NM_IMG" placeholder="例如 panel,1" /></label>
-              <label>按下背景图片 <input data-keyboard-field="HL_IMG" placeholder="例如 panel,2" /></label>
-              <div class="color-pair-field">
-                <label>正常背景色 / 透明度 <span class="color-control"><input data-keyboard-field="NM_COLOR" placeholder="AARRGGBB" /><input type="color" data-color-picker-for="keyboard-NM_COLOR" value="#ffffff" aria-label="正常背景色"><input type="number" data-color-alpha-for="keyboard-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="正常背景透明度"></span></label>
-                <label>按下背景色 / 透明度 <span class="color-control"><input data-keyboard-field="HL_COLOR" placeholder="AARRGGBB" /><input type="color" data-color-picker-for="keyboard-HL_COLOR" value="#ffffff" aria-label="按下背景色"><input type="number" data-color-alpha-for="keyboard-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="按下背景透明度"></span></label>
-              </div>
-            </div>
-            <p class="inspector-note">整体高度写入 gen.ini 的 PANEL SIZE；颜色前两位是透明度。背景图片透明度由 PNG 决定。</p>
-          </div>
+          <div class="keyboard-fields" hidden></div>
           <div class="inspector-group toolbar-fields" hidden>
             <h3>候选栏与工具栏</h3>
             <div class="inspector-grid action-fields">
               <label>显示区域 <input data-toolbar-field="VIEW_RECT" /></label>
-              <label>背景样式 <span class="style-field"><input data-toolbar-field="BACK_STYLE" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:BACK_STYLE" title="查看背景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
-              <label>前景样式 <span class="style-field"><input data-toolbar-field="FORE_STYLE" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:FORE_STYLE" data-preview-foreground title="查看前景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
+              <label>背景样式 <span class="style-field"><input data-toolbar-field="BACK_STYLE" /></span></label>
+              <label>前景样式 <span class="style-field"><input data-toolbar-field="FORE_STYLE" /></span></label>
               <label>内边距 <input data-toolbar-field="PADDING" /></label>
-              <label>首个候选前景 <span class="style-field"><input data-toolbar-field="FIRST_FORE" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:FIRST_FORE" data-preview-foreground title="查看前景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
-              <label>首个候选背景 <span class="style-field"><input data-toolbar-field="FIRST_BACK" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:FIRST_BACK" title="查看背景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
-              <label>工具按钮 1 <span class="style-field"><input data-toolbar-field="ICON1.FORE_STYLE" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:ICON1.FORE_STYLE" data-preview-foreground title="查看前景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
-              <label>工具按钮 2 <span class="style-field"><input data-toolbar-field="ICON2.FORE_STYLE" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:ICON2.FORE_STYLE" data-preview-foreground title="查看前景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
-              <label>工具按钮 3 <span class="style-field"><input data-toolbar-field="ICON3.FORE_STYLE" /><button class="style-preview-button compact-style-preview" data-style-preview-field="toolbar:ICON3.FORE_STYLE" data-preview-foreground title="查看前景样式预览"><canvas width="64" height="44"></canvas></button></span></label>
+              <label>首个候选前景 <span class="style-field"><input data-toolbar-field="FIRST_FORE" /></span></label>
+              <label>首个候选背景 <span class="style-field"><input data-toolbar-field="FIRST_BACK" /></span></label>
+              <label>工具按钮 1 <span class="style-field"><input data-toolbar-field="ICON1.FORE_STYLE" /></span></label>
+              <label>工具按钮 2 <span class="style-field"><input data-toolbar-field="ICON2.FORE_STYLE" /></span></label>
+              <label>工具按钮 3 <span class="style-field"><input data-toolbar-field="ICON3.FORE_STYLE" /></span></label>
             </div>
           </div>
           <div class="inspector-group document-fields" hidden>
-            <h3>文档配置</h3>
             <div id="document-fields"></div>
           </div>
           <div class="inspector-group bda-config-fields" hidden>
@@ -252,19 +238,11 @@
               <label class="style-ref-row" title="按键引用的共享背景样式编号">背景样式引用
                 <span class="style-field">
                   <input data-key-field="BACK_STYLE" />
-                  <span class="style-preview-pair" aria-label="背景样式预览">
-                    <button class="style-preview-button" data-style-preview="back:normal" title="正常状态；Command 点击跳转到图片源文件"><canvas width="64" height="44" aria-label="背景正常状态预览"></canvas><span>常</span></button>
-                    <button class="style-preview-button" data-style-preview="back:highlighted" title="按下状态；Command 点击跳转到图片源文件"><canvas width="64" height="44" aria-label="背景按下状态预览"></canvas><span>按</span></button>
-                  </span>
                 </span>
               </label>
               <label class="style-ref-row" title="按键引用的共享前景样式编号">前景样式引用
                 <span class="style-field">
                   <input data-key-field="FORE_STYLE" />
-                  <span class="style-preview-pair" aria-label="前景样式预览">
-                    <button class="style-preview-button" data-style-preview="fore:normal" title="正常状态；Command 点击跳转到图片源文件"><canvas width="64" height="44" aria-label="前景正常状态预览"></canvas><span>常</span></button>
-                    <button class="style-preview-button" data-style-preview="fore:highlighted" title="按下状态；Command 点击跳转到图片源文件"><canvas width="64" height="44" aria-label="前景按下状态预览"></canvas><span>按</span></button>
-                  </span>
                 </span>
               </label>
               <label data-text-style>字体 <input data-style-field="FONT_NAME" /></label>
@@ -275,7 +253,6 @@
                 <label>文字按下颜色 <span class="color-control"><input data-style-field="HL_COLOR" /><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色"><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度"></span></label>
               </div>
             </div>
-            <p class="inspector-note">多选时图片会批量写入各按键引用的背景样式。共享样式也会影响其他引用它的按键。</p>
           </details>
           <details class="inspector-group inspector-disclosure key-only">
             <summary>滑动与长按</summary>
@@ -495,8 +472,9 @@
     <dialog id="style-picker-dialog" class="style-picker-dialog" aria-labelledby="style-picker-title">
       <header class="style-picker-header">
         <div>
-          <h2 id="style-picker-title">选择样式</h2>
+          <h2 id="style-picker-title">更换样式</h2>
           <small id="style-picker-count"></small>
+          <span class="style-picker-hint">单击应用 · Command/Ctrl 单击编辑</span>
         </div>
         <div class="style-picker-tools">
           <input id="style-picker-search" type="search" placeholder="搜索样式编号" aria-label="搜索样式编号">

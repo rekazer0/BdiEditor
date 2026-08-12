@@ -281,9 +281,6 @@ const candidateWords = $("#candidate-words")
 const modeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mode-choice]"))
 const themeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-theme-choice]"))
 const orientationChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-orientation-choice]"))
-const stylePreviewButtons = Array.from(
-  document.querySelectorAll<HTMLButtonElement>("[data-style-preview], [data-style-preview-field]"),
-)
 const styleImageDialog = $("#style-image-dialog") as HTMLDivElement
 const styleImageClose = $("#style-image-close") as HTMLButtonElement
 const styleImageTitle = $("#style-image-title") as HTMLElement
@@ -336,7 +333,6 @@ let fileOperationRunning = false
 let firstCandidateTextVisual: TextVisual | undefined
 let candidateTextWidth = 1125
 let canvasLogicalSize: { width: number; height: number; panelHeight: number } | undefined
-let stylePreviewDrawID = 0
 let pickerURL = ""
 let pickerImage: HTMLImageElement | undefined
 let pickerPath = ""
@@ -361,8 +357,6 @@ type NativeImagePickerPayload = {
 type NativeResourcePickerPayload = { path: string; dataURL: string }[]
 let nativeImagePickerPayload: NativeImagePickerPayload | undefined
 let nativeResourcePickerPayload: NativeResourcePickerPayload = []
-const processedPreviewVisuals = new Map<HTMLButtonElement, Visual[]>()
-const processedPreviewStyleIDs = new Map<HTMLButtonElement, string[]>()
 let selectedFileButton: HTMLElement | undefined
 let sidebarView: "overview" | "source" = "overview"
 let guidesVisible = false
@@ -1522,7 +1516,7 @@ async function renderStyleResourceDetail(): Promise<void> {
     const label = document.createElement("label")
     label.className = "style-detail-field"
     const caption = document.createElement("span")
-    caption.textContent = documentFieldLabels[key] ?? key
+    caption.textContent = translatedConfigLabel(key)
     caption.title = key
     const row = document.createElement("span")
     row.className = "style-detail-field-row"
@@ -2061,6 +2055,7 @@ function drawVisualPreview(canvas: HTMLCanvasElement, visuals: Array<Visual | un
 
 let stylePickerTarget: HTMLInputElement | undefined
 let stylePickerRenderID = 0
+const styleReferenceDrawIDs = new WeakMap<HTMLButtonElement, number>()
 
 function styleReferenceKey(input: HTMLInputElement): string {
   return input.dataset.keyboardField ?? input.dataset.toolbarField ?? input.dataset.keyField ?? input.dataset.documentStyleKey ?? ""
@@ -2082,11 +2077,67 @@ function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferen
   const button = document.createElement("button")
   button.type = "button"
   button.className = "style-picker-trigger"
-  button.title = "浏览所有样式"
-  button.setAttribute("aria-label", "浏览所有样式")
-  button.textContent = "⌄"
-  button.addEventListener("click", () => openStylePicker(input))
+  button.title = "点击更换样式；Command/Ctrl 点击编辑样式"
+  button.setAttribute("aria-label", "更换或编辑引用样式")
+  const previews = document.createElement("span")
+  previews.className = "style-picker-states"
+  for (const state of ["正常", "按下"]) {
+    const item = document.createElement("span")
+    item.className = "style-picker-state"
+    const canvas = document.createElement("canvas")
+    canvas.width = 56
+    canvas.height = 28
+    canvas.setAttribute("aria-hidden", "true")
+    const label = document.createElement("small")
+    label.textContent = state
+    item.append(canvas, label)
+    previews.append(item)
+  }
+  button.append(previews)
+  button.addEventListener("click", (event) => {
+    if (event.metaKey || event.ctrlKey) openStyleReferenceEditor(input.value.split(",")[0]?.trim() ?? "")
+    else openStylePicker(input)
+  })
+  input.addEventListener("input", () => void refreshStyleReferenceThumbnail(button, input, key))
+  input.addEventListener("change", () => void refreshStyleReferenceThumbnail(button, input, key))
+  void refreshStyleReferenceThumbnail(button, input, key)
   wrapper.append(button)
+}
+
+function styleReferenceForeground(key: string): boolean {
+  return /FORE|INPUT_STYLE|SCAND_STYLE|CELL_STYLE/.test(key)
+}
+
+async function refreshStyleReferenceThumbnail(
+  button: HTMLButtonElement,
+  input: HTMLInputElement,
+  key: string,
+): Promise<void> {
+  const drawID = (styleReferenceDrawIDs.get(button) ?? 0) + 1
+  styleReferenceDrawIDs.set(button, drawID)
+  const canvases = Array.from(button.querySelectorAll<HTMLCanvasElement>("canvas"))
+  const resolver = visualResolver()
+  const styleIDs = input.value.split(",").map((value) => value.trim()).filter(Boolean)
+  if (canvases.length < 2 || !resolver || !styleIDs.length) {
+    for (const canvas of canvases) {
+      const context = canvas.getContext("2d")
+      context?.clearRect(0, 0, canvas.width, canvas.height)
+    }
+    return
+  }
+  const visuals = await Promise.all([false, true].map((highlighted) => Promise.all(
+    styleIDs.map((styleID) => resolver.resolve(styleID, highlighted).catch(() => undefined)),
+  )))
+  if (drawID !== styleReferenceDrawIDs.get(button)) return
+  visuals.forEach((layers, index) => drawVisualPreview(canvases[index], layers, styleReferenceForeground(key)))
+}
+
+function openStyleReferenceEditor(styleID: string): void {
+  if (!styleID || !availableStyleIDs().includes(styleID)) return
+  const path = styleConfigPath()
+  if (!archive?.isText(path)) return
+  selectFile(path, "overview", "style")
+  selectStyleResource(styleID)
 }
 
 function availableStyleIDs(): string[] {
@@ -2120,7 +2171,7 @@ async function renderStylePicker(): Promise<void> {
     const button = document.createElement("button")
     button.type = "button"
     button.className = "style-picker-item"
-    button.title = `使用样式 ${styleID}`
+    button.title = `点击使用样式 ${styleID}；Command/Ctrl 点击编辑`
     const label = document.createElement("strong")
     label.textContent = styleID
     const previews = document.createElement("span")
@@ -2134,7 +2185,12 @@ async function renderStylePicker(): Promise<void> {
       previews.append(canvas)
     }
     button.append(label, previews)
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
+      if (event.metaKey || event.ctrlKey) {
+        stylePickerDialog.close()
+        openStyleReferenceEditor(styleID)
+        return
+      }
       if (!stylePickerTarget) return
       stylePickerTarget.value = styleID
       stylePickerTarget.dispatchEvent(new Event("input", { bubbles: true }))
@@ -2161,63 +2217,16 @@ stylePickerDialog.addEventListener("click", (event) => {
   if (event.target === stylePickerDialog) stylePickerDialog.close()
 })
 
-function drawStylePreview(
-  button: HTMLButtonElement,
-  visuals: Array<Visual | undefined>,
-  foreground: boolean,
-): void {
-  const canvas = button.querySelector("canvas")
-  if (!canvas) return
-  delete button.dataset.path
-  const firstResource = visuals.find((visual) => visual?.imagePath)?.imagePath
-  if (firstResource) button.dataset.path = firstResource
-  const hasVisual = visuals.some((visual) => Boolean(visual?.image || visual?.color))
-  button.disabled = !hasVisual
-  button.setAttribute("aria-disabled", String(!hasVisual))
-  drawVisualPreview(canvas, visuals, foreground)
+async function updateStylePreviews(): Promise<void> {
+  refreshStyleReferenceThumbnails()
 }
 
-async function updateStylePreviews(): Promise<void> {
-  const drawID = ++stylePreviewDrawID
-  const backStyle = commonSelectedStyle("BACK_STYLE")?.split(",")[0]?.trim() ?? ""
-  const foreStyles = commonSelectedStyle("FORE_STYLE")
-    ?.split(",")
-    .map((value) => value.trim())
-    .filter(Boolean) ?? []
-  if (!archive) {
-    for (const button of stylePreviewButtons) button.hidden = true
-    return
-  }
-  const resolver = visualResolver()
-  if (!resolver) return
-  const requests = stylePreviewButtons.map(async (button) => {
-    const [group, state] = (button.dataset.stylePreview ?? "").split(":")
-    const [scope, fieldName] = (button.dataset.stylePreviewField ?? "").split(":")
-    const field = scope === "keyboard"
-      ? keyboardFields.find((item) => item.dataset.keyboardField === fieldName)
-      : toolbarFields.find((item) => item.dataset.toolbarField === fieldName)
-    const fieldStyles = field?.value.split(",").map((value) => value.trim()).filter(Boolean) ?? []
-    const styleIDs = field
-      ? fieldStyles
-      : group === "fore"
-        ? foreStyles
-        : backStyle
-          ? [backStyle]
-          : []
-    const highlighted = state === "highlighted"
-    const visuals = await Promise.all(
-      styleIDs.map((styleID) => resolver.resolve(styleID, highlighted).catch(() => undefined)),
-    )
-    return { button, foreground: group === "fore" || button.hasAttribute("data-preview-foreground"), styleIDs, visuals }
-  })
-  const results = await Promise.all(requests)
-  if (drawID !== stylePreviewDrawID) return
-  for (const { button, foreground, styleIDs, visuals } of results) {
-    button.hidden = styleIDs.length === 0
-    const drawable = visuals.filter((visual): visual is Visual => Boolean(visual))
-    processedPreviewVisuals.set(button, drawable)
-    processedPreviewStyleIDs.set(button, styleIDs)
-    drawStylePreview(button, drawable, foreground)
+function refreshStyleReferenceThumbnails(): void {
+  for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>(".style-picker-trigger"))) {
+    const input = button.previousElementSibling
+    if (input instanceof HTMLInputElement) {
+      void refreshStyleReferenceThumbnail(button, input, styleReferenceKey(input))
+    }
   }
 }
 
@@ -2330,6 +2339,44 @@ const documentFieldLabels: Record<string, string> = {
   POS: "位置",
   NO_BLUR: "禁用模糊",
   OFFSET_NUM: "偏移数量",
+  OFFSET: "偏移",
+  FORE_STYLE_NUM: "前景样式数量",
+  INPUT_STYLE: "输入区样式",
+  SCAND_STYLE: "次选区样式",
+  MORE_STYLE: "更多按钮样式",
+  BG_COLOR: "背景颜色",
+  FONT_NAME: "字体",
+  FONT_WEIGHT: "字重",
+  FONT_SIZE: "字号",
+  NM_COLOR: "正常颜色",
+  HL_COLOR: "按下颜色",
+  SHOW: "显示内容",
+  INFO: "说明",
+}
+
+const documentSectionLabels: Record<string, string> = {
+  PANEL: "面板",
+  INPUT: "输入区",
+  CAND: "候选栏",
+  SCAND: "次选区",
+  HINT: "提示栏",
+  MORE: "更多按钮",
+  LOGO: "输入法标识",
+  EMOJI: "表情面板",
+}
+
+function translatedConfigLabel(key: string): string {
+  return `${documentFieldLabels[key] ?? "扩展配置"}（${key}）`
+}
+
+function translatedSectionLabel(section: string): string {
+  const offset = section.match(/^OFFSET(\d+)$/)
+  const label = offset ? `偏移 ${offset[1]}` : documentSectionLabels[section] ?? "扩展区域"
+  return `${label}（${section}）`
+}
+
+function isHiddenConfigEntry(section: string, key: string): boolean {
+  return /^(?:OFFSET|TIP)\d*$/i.test(section) || /^(?:OFFSET|TIP)(?:_|\d|$)/i.test(key)
 }
 
 function populateDocumentInspector(): void {
@@ -2350,7 +2397,9 @@ function populateDocumentInspector(): void {
     }
   }
   const entries = selectedDocument.entries().filter((entry) =>
-    !/^KEY\d+$/.test(entry.section) && !specialized.has(`${entry.section}\u0000${entry.key}`),
+    !/^KEY\d+$/.test(entry.section) &&
+    !isHiddenConfigEntry(entry.section, entry.key) &&
+    !specialized.has(`${entry.section}\u0000${entry.key}`),
   )
   documentFieldsGroup.hidden = entries.length === 0
   if (!entries.length) return
@@ -2361,20 +2410,23 @@ function populateDocumentInspector(): void {
     disclosure.className = "document-property-section"
     disclosure.open = sections.length <= 4 || sectionIndex === 0
     const summary = document.createElement("summary")
-    summary.textContent = section || "基本信息"
+    summary.textContent = section ? translatedSectionLabel(section) : "基本信息"
     const grid = document.createElement("div")
     grid.className = "document-property-grid"
     for (const entry of entries.filter((item) => item.section === section)) {
       const label = document.createElement("label")
       label.className = "document-property-field"
+      if (isStyleReferenceKey(entry.key)) label.classList.add("style-reference-field")
       if (entry.value.length > 18 || /(?:RECT|IMG|PADDING|ORDER|LIST|SOURCE|FONT_NAME)/.test(entry.key)) {
         label.classList.add("wide")
       }
       const caption = document.createElement("span")
-      caption.textContent = documentFieldLabels[entry.key] ?? entry.key
+      caption.textContent = translatedConfigLabel(entry.key)
       caption.title = entry.key
       const input = document.createElement("input")
       input.value = entry.value
+      input.classList.add("document-property-input")
+      input.title = `${translatedConfigLabel(entry.key)}：${entry.value}`
       input.disabled = !isEditing()
       input.addEventListener("change", () => {
         if (!selectedDocument || selectedPath !== input.closest<HTMLElement>(".document-fields")?.dataset.path) return
@@ -3406,6 +3458,7 @@ function renderFiles(): void {
     "sel_en.ini": { group: "手写与选择", label: "英文选择栏", className: "nav-component", icon: "list.bullet" },
     "help.ini": { group: "手写与选择", label: "帮助面板", className: "nav-component", icon: "list.bullet" },
     "logo.ini": { group: "键盘组件", label: "输入法标识", className: "nav-component", icon: "app" },
+    "gen.ini": { group: "资源配置", label: "通用配置", className: "nav-style", icon: "gearshape" },
   }
   const configPrefix = `${theme.value}/skin/${orientation.value}/`
   const appearancePath = bdaAppearancePath(archive, theme.value, orientation.value)
@@ -3417,7 +3470,6 @@ function renderFiles(): void {
     if (!path.startsWith(configPrefix) || path.slice(configPrefix.length).includes("/") || !/\.ini$/i.test(path)) continue
     if (archive.format === "bda" && !bdaBase?.isText(basePath)) continue
     const name = path.split("/").pop() ?? path
-    if (name.toLowerCase() === "gen.ini") continue
     const info = iniTypes[name] ?? {
       group: "扩展布局",
       label: name.replace(/\.ini$/i, "").replaceAll("_", " "),
@@ -4505,78 +4557,6 @@ candidateArea.addEventListener("click", () => {
   const path = toolbarStrip.dataset.path
   if (path) selectFile(path)
 })
-function fallbackBackgroundStyleID(button: HTMLButtonElement): string | undefined {
-  // Key style-reference buttons fall back to the selected keys' background style.
-  if (button.dataset.stylePreview) {
-    const shared = commonSelectedStyle("BACK_STYLE")?.split(",")[0]?.trim()
-    if (shared) return shared
-    const sections = layoutDocument ? backgroundStyleSections(layoutDocument, selectedKeySections) : []
-    return sections[0]?.replace(/^STYLE/, "")
-  }
-  // Toolbar/field previews pair with the same section's background field
-  // (FORE_STYLE ↔ BACK_STYLE, FIRST_FORE ↔ FIRST_BACK, ICON*.FORE_STYLE ↔ ICON*.BACK_STYLE),
-  // falling back to the panel background style when the pair is not configured.
-  const [scope, fieldName] = (button.dataset.stylePreviewField ?? "").split(":")
-  if (scope !== "toolbar") return
-  const [section, key] = fieldName.split(".")
-  const pair = key
-    ? `${section}.${key.replace(/FORE_STYLE$/, "BACK_STYLE")}`
-    : fieldName.replace(/FORE_STYLE$/, "BACK_STYLE")
-  const candidates = pair === fieldName ? [pair] : [pair, "BACK_STYLE"]
-  for (const name of candidates) {
-    const field = toolbarFields.find((item) => item.dataset.toolbarField === name)
-    const styleID = field?.value.split(",")[0]?.trim()
-    if (styleID) return styleID
-  }
-}
-
-for (const button of stylePreviewButtons) {
-  button.addEventListener("click", async (event) => {
-    if (event.metaKey || event.ctrlKey) {
-      const path = button.dataset.path
-      if (!path) return
-      selectFile(path)
-      revealSourceFile(path)
-      return
-    }
-    const visuals = processedPreviewVisuals.get(button) ?? []
-    const styleIDs = processedPreviewStyleIDs.get(button) ?? []
-    if (!visuals.length) return
-    const [sourceName, state] = (button.dataset.stylePreview ?? "back:normal").split(":")
-    const foreground = sourceName === "fore" || button.hasAttribute("data-preview-foreground")
-    const property = state === "highlighted" ? "HL_IMG" : "NM_IMG"
-    const visual = visuals.find((item) => item.imagePath)
-    if (visual?.imagePath) {
-      const target = styleWriteTarget(
-        foreground ? "FORE_STYLE" : "BACK_STYLE",
-        property,
-        foreground ? styleIDs : styleIDs.slice(0, 1),
-      )
-      openImageSlicePicker(visual.imagePath, target, visual.source)
-      return
-    }
-    // Foreground styles without an image (e.g. text-only styles) fall back to
-    // the paired background style reference so the click still opens a slice
-    // picker, same as clicking the background style reference.
-    const backgroundID = fallbackBackgroundStyleID(button)
-    if (backgroundID) {
-      const backVisual = await visualResolver()?.resolve(backgroundID, state === "highlighted").catch(() => undefined)
-      if (backVisual?.imagePath) {
-        const target = styleWriteTarget("BACK_STYLE", property, [backgroundID])
-        openImageSlicePicker(backVisual.imagePath, target, backVisual.source)
-        return
-      }
-    }
-    drawVisualPreview(styleImagePreview, visuals, foreground)
-    styleImagePicker.hidden = true
-    styleImagePreview.hidden = false
-    styleImageResourceOpen.hidden = true
-    closeStyleImageResourcePicker()
-    styleImageTitle.textContent = "图片预览"
-    styleImageSubtitle.textContent = ""
-    styleImageDialog.hidden = false
-  })
-}
 styleImagePickerCanvas.addEventListener("click", (event) => {
   if (!isEditing()) return
   if (!pickerImage || !pickerTarget || !pickerSlices.length) return
@@ -4773,14 +4753,6 @@ resourceDeleteButton.addEventListener("click", () => {
   updateDirty()
 })
 
-// Patch renderResourceInspector to use single-click select, double-click open
-const _origRenderResourceInspector = renderResourceInspector
-;(window as any).__resourceGalleryClickHandler = (path: string, container: HTMLElement) => {
-  selectGalleryItem(path, container)
-}
-;(window as any).__resourceGalleryDblClickHandler = (path: string) => {
-  selectResourceImage(path)
-}
 for (const button of Array.from(editContextMenu.querySelectorAll<HTMLButtonElement>("[data-context-action]"))) {
   button.addEventListener("click", () => {
     if (button.dataset.contextAction === "copy") copySelectedKeys()
