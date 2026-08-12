@@ -7,3 +7,4 @@ src-tauri/gen/
 .tmp/
 .worktrees/
 .mimosa/
+.zcode/

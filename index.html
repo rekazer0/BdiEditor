@@ -7,7 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     />
-    <title>BdiEditor v0.6.13</title>
+    <title>BdiEditor v0.7.3</title>
   </head>
   <body>
     <header class="titlebar" data-tauri-drag-region>
@@ -29,7 +29,9 @@
             <button class="export-action" data-export-format="bda" disabled>导出新版 Android 皮肤 (.bda)…</button>
           </div>
         </details>
+        <span class="toolbar-divider"></span>
         <button id="panel-scale" class="toolbar-button" disabled title="面板复制" aria-label="面板复制"><span class="icon system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 6h14M3 6l3-3M3 6l3 3M17 14H3m14 0-3-3m3 3-3 3"/></svg></span></button>
+        <button id="replace-layout-image" class="toolbar-button" disabled title="替换键盘样式" aria-label="替换键盘样式"><span class="icon system-symbol" data-system-symbol="photo.badge.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="m4.5 14 4-4 3 3 2-2 2 2M10 2v6m-2-2 2 2 2-2"/></svg></span></button>
         <span class="toolbar-divider"></span>
         <button id="undo" class="toolbar-button" disabled title="撤销" aria-label="撤销"><span class="icon system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12"/><path d="M4 8.5h7.2a5 5 0 0 1 5 5"/></svg></span></button>
         <button id="redo" class="toolbar-button" disabled title="重做" aria-label="重做"><span class="icon system-symbol" data-system-symbol="arrow.uturn.forward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m13 5 4 3.5-4 3.5"/><path d="M16 8.5H8.8a5 5 0 0 0-5 5"/></svg></span></button>
@@ -448,6 +450,38 @@
       </section>
     </div>
 
+    <dialog id="layout-image-dialog" class="app-dialog layout-image-dialog" aria-labelledby="layout-image-title">
+      <form id="layout-image-form" method="dialog">
+        <header><div><h2 id="layout-image-title">替换键盘样式</h2><small id="layout-image-layout"></small></div><button value="cancel" aria-label="关闭">关闭</button></header>
+        <button id="layout-image-file" class="layout-image-file" type="button">
+          <img id="layout-image-preview" alt="待切片的键盘图片预览" hidden>
+          <span id="layout-image-file-label">选择或拖入一张 PNG 图片</span>
+          <small id="layout-image-size"></small>
+        </button>
+        <fieldset id="layout-image-targets" class="layout-image-targets">
+          <legend>替换位置</legend>
+          <label><input type="radio" name="layout-image-target" value="panel"><span><strong>键盘背景</strong><small>替换当前布局的完整背景</small></span></label>
+          <label><input type="radio" name="layout-image-target" value="key-normal"><span><strong>正常按键背景</strong><small>按按键区域自动切片</small></span></label>
+          <label><input type="radio" name="layout-image-target" value="key-highlight"><span><strong>按下按键背景</strong><small>按按键区域自动切片</small></span></label>
+          <label><input type="radio" name="layout-image-target" value="fore-normal"><span><strong>按键前景</strong><small>保留现有前景并添加图片层</small></span></label>
+          <label><input type="radio" name="layout-image-target" value="fore-highlight"><span><strong>按键按下前景</strong><small>保留现有前景并添加图片层</small></span></label>
+          <label><input type="radio" name="layout-image-target" value="candidate"><span><strong>候选栏背景样式</strong><small>替换候选栏背景图片</small></span></label>
+        </fieldset>
+        <fieldset id="layout-image-config" class="layout-image-config">
+          <legend>布局配置</legend>
+          <div class="layout-image-config-control glass-module" aria-label="布局配置">
+            <button type="button" class="active" data-layout-image-config="none">无跟随</button>
+            <button type="button" data-layout-image-config="image-follows-layout">图片跟随布局</button>
+            <button type="button" data-layout-image-config="layout-follows-image">布局跟随图片</button>
+          </div>
+          <small id="layout-image-config-desc">保持当前布局，图片按面板尺寸缩放后替换按键区域。</small>
+        </fieldset>
+        <p id="layout-image-scope"></p>
+        <p id="layout-image-error" class="field-error" hidden></p>
+        <footer><button value="cancel">取消</button><button id="layout-image-apply" class="primary" value="apply" disabled>应用替换</button></footer>
+      </form>
+    </dialog>
+
     <dialog id="new-style-dialog" class="app-dialog new-style-dialog" aria-labelledby="new-style-title">
       <form id="new-style-form" method="dialog">
         <header><h2 id="new-style-title">新增样式</h2><button value="cancel" aria-label="关闭">关闭</button></header>
@@ -490,11 +524,12 @@
 
     <dialog id="about-dialog" class="app-dialog" aria-labelledby="about-title">
       <form method="dialog">
-        <header><h2 id="about-title">关于 BdiEditor v0.6.13</h2><button aria-label="关闭">关闭</button></header>
+        <header><h2 id="about-title">关于 BdiEditor v0.7.3</h2><button aria-label="关闭">关闭</button></header>
         <p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
-        <p>版本 0.6.13</p>
+        <p>版本 0.7.3</p>
         <p>支持读取、编辑和导出 BDI、BDS、BDA 皮肤包。</p>
-        <section id="about-update" class="about-update" data-current-version="0.6.13">
+        <p class="about-alpha">阿尔法版本：包含未完成的功能与实验性改动，仅用于测试。</p>
+        <section id="about-update" class="about-update" data-current-version="0.7.3">
           <div><strong>版本更新</strong><button id="check-update" type="button">检查更新</button></div>
           <p id="update-status" aria-live="polite">正在检查更新…</p>
           <a id="download-update" href="https://github.com/rekazer0/BdiEditor/releases" target="_blank" rel="noreferrer" hidden>查看最新版本</a>
@@ -506,6 +541,7 @@
 
     <input id="browser-open" type="file" accept=".bdi,.bds,.bda,.zip" hidden />
     <input id="image-open" type="file" accept=".png" hidden />
+    <input id="layout-image-open" type="file" accept=".png,image/png" hidden />
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

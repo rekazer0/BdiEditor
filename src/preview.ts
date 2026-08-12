@@ -542,6 +542,8 @@ export class Preview {
       else this.selected.add(key.section)
     } else if (!this.selected.has(key.section) || this.mode === "preview") {
       this.selected = new Set([key.section])
+    } else if (this.mode === "edit") {
+      this.selected.delete(key.section)
     }
     if (this.mode === "edit" && !event.shiftKey) this.selectionAnchor = key.section
     this.onSelect([...this.selected])

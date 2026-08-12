@@ -1477,6 +1477,10 @@ canvas {
   box-shadow: inset 0 0 0 2px var(--accent), inset 0 0 24px rgb(10 127 245 / 14%);
 }
 
+.canvas-wrap.layout-image-target {
+  box-shadow: inset 0 0 0 3px var(--accent), inset 0 0 40px rgb(10 127 245 / 26%);
+}
+
 .skin-fields[hidden],
 .keyboard-fields[hidden],
 .document-fields[hidden],
@@ -1790,6 +1794,10 @@ canvas {
   height: 26px;
 }
 
+.resource-actions .toolbar-button[hidden] {
+  display: none;
+}
+
 .inspector-group + .inspector-group {
   margin-top: 17px;
   padding-top: 15px;
@@ -1841,6 +1849,193 @@ canvas {
 
 .action-fields {
   grid-template-columns: 1fr;
+}
+
+#style-detail-fields {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.app-dialog.layout-image-dialog {
+  width: min(640px, calc(100vw - 32px));
+  min-height: 560px;
+}
+
+.app-dialog.layout-image-dialog form {
+  height: 100%;
+}
+
+.layout-image-dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.layout-image-dialog footer button {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--control);
+  cursor: pointer;
+}
+
+.layout-image-dialog footer .primary {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
+}
+
+.layout-image-dialog form {
+  gap: 14px;
+}
+
+.layout-image-file {
+  min-height: 170px;
+  display: grid;
+  align-content: center;
+  place-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 7px;
+  padding: 16px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--secondary);
+  background: var(--content);
+  cursor: pointer;
+}
+
+.layout-image-file:hover,
+.layout-image-file.has-image {
+  border-color: var(--accent);
+  background: var(--hover);
+}
+
+.layout-image-file img {
+  max-width: 100%;
+  max-height: 190px;
+  object-fit: contain;
+}
+
+.layout-image-file small,
+.layout-image-dialog header small,
+.layout-image-targets label small {
+  color: var(--tertiary);
+  font-size: 10px;
+}
+
+.layout-image-targets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.layout-image-targets legend {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+  color: var(--secondary);
+  font-size: 11px;
+}
+
+.layout-image-targets label {
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--control);
+  cursor: pointer;
+}
+
+.layout-image-targets label:has(input:checked) {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--hover);
+}
+
+.layout-image-targets input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  opacity: 0;
+}
+
+.layout-image-targets label span {
+  display: grid;
+  gap: 3px;
+}
+
+.layout-image-config {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.layout-image-config legend {
+  color: var(--secondary);
+  font-size: 11px;
+}
+
+.layout-image-config-control {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--glass-border);
+  border-radius: 9px;
+  background: var(--glass-surface);
+}
+
+.layout-image-config-control button {
+  flex: 1;
+  min-width: 0;
+  height: 25px;
+  padding: 0 6px;
+  border-radius: 6px;
+  color: var(--secondary);
+  background: transparent;
+  font-size: 10px;
+}
+
+.layout-image-config-control button.active {
+  color: var(--text);
+  background: var(--glass-highlight);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 10%);
+}
+
+.layout-image-config small {
+  color: var(--tertiary);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.layout-image-config[disabled] .layout-image-config-control button {
+  color: var(--tertiary);
+  cursor: not-allowed;
+}
+
+.layout-image-config[disabled] .layout-image-config-control button.active {
+  color: var(--tertiary);
+  background: transparent;
+  box-shadow: none;
+}
+
+.layout-image-scope,
+.layout-image-error {
+  margin: 0;
+}
+
+@media (max-width: 520px) {
+  .layout-image-targets {
+    grid-template-columns: 1fr;
+  }
 }
 
 .document-property-section + .document-property-section {

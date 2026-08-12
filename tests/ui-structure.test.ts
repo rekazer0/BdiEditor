@@ -386,6 +386,16 @@ test("Shift selects the complete key range from the anchor", () => {
   assert.match(preview, /sections\.slice\(Math\.min\(from, to\), Math\.max\(from, to\) \+ 1\)/)
 })
 
+test("clicking an already selected key in edit mode deselects it", () => {
+  assert.match(preview, /\} else if \(this\.mode === "edit"\) \{\s*this\.selected\.delete\(key\.section\)/s)
+})
+
+test("panel tools disable in interactive preview mode", () => {
+  assert.match(main, /panelScaleButton\.disabled = !editing \|\| fileOperationRunning \|\| !archive/)
+  assert.match(main, /replaceLayoutImageButton\.disabled = !editing \|\| fileOperationRunning \|\| !archive \|\| archive\.format === "bda"/)
+  assert.match(main, /updatePanelToolButtons\(\)/)
+})
+
 test("canvas mode shrinks below parsed panel width but never enlarges past it", () => {
   assert.match(main, /toolbarCanvas\.style\.setProperty\("--toolbar-width", String\(width\)\)/)
   assert.match(main, /toolbarCanvas\.style\.setProperty\("--toolbar-height", String\(height\)\)/)
@@ -447,8 +457,8 @@ test("settings expose canvas backgrounds and edit mode exposes key context actio
 })
 
 test("window and about names match the GitHub project and include the version", () => {
-  assert.match(html, /<title>BdiEditor v0\.6\.13<\/title>/)
-  assert.match(html, /关于 BdiEditor v0\.6\.13/)
+  assert.match(html, /<title>BdiEditor v0\.7\.3<\/title>/)
+  assert.match(html, /关于 BdiEditor v0\.7\.3/)
   assert.match(html, /<strong>技术交流与反馈<\/strong><br><button id="copy-qq-group"[^>]*>QQ群：228040912<\/button>/)
 })
 
@@ -468,7 +478,7 @@ test("deleting a mixed inspector value clears every selected key through its inp
 })
 
 test("about dialog automatically checks the canonical GitHub project for updates", () => {
-  assert.match(html, /id="about-update"[^>]*data-current-version="0\.6\.13"/)
+  assert.match(html, /id="about-update"[^>]*data-current-version="0\.7\.3"/)
   assert.match(html, /id="check-update"/)
   assert.match(html, /id="update-status"[^>]*aria-live="polite"/)
   assert.match(html, /id="download-update"[^>]*https:\/\/github\.com\/rekazer0\/BdiEditor\/releases["']/)
@@ -766,6 +776,12 @@ test("style configuration reuses the resource gallery and opens an editable deta
   assert.match(css, /\.resource-style-previews\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s)
 })
 
+test("resource toolbar shows only actions supported by each resource mode", () => {
+  assert.match(main, /renderStyleResourceGallery[\s\S]*resourceUploadButton\.hidden = true[\s\S]*styleAddButton\.hidden = false[\s\S]*resourceDownloadButton\.hidden = true/)
+  assert.match(main, /resourceUploadButton\.hidden = false[\s\S]*styleAddButton\.hidden = true[\s\S]*resourceDownloadButton\.hidden = false/)
+  assert.match(css, /\.resource-actions \.toolbar-button\[hidden\]\s*\{[^}]*display:\s*none/s)
+})
+
 test("new styles use the next numeric ID while allowing a custom ID", () => {
   assert.match(html, /id="new-style-dialog"[\s\S]*id="new-style-id"/)
   assert.doesNotMatch(html, /new-style-image/)
@@ -791,6 +807,7 @@ test("style detail edits every field with typed color and slice pickers", () => 
   assert.match(css, /\.resource-detail-heading\s*\{[^}]*position:\s*sticky[^}]*top:\s*-14px/s)
   assert.match(css, /\.resource-detail-heading\s*\{[^}]*background:\s*var\(--inspector\)/s)
   assert.match(css, /#resource-list-view \.inspector-title\s*\{[^}]*position:\s*sticky[^}]*top:\s*-14px/s)
+  assert.match(css, /#style-detail-fields\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit, minmax\(180px, 1fr\)\)/s)
   assert.match(main, /selectedStyleID = styleID[\s\S]*resourceInspector\.scrollTop = 0/)
 })
 
@@ -886,9 +903,58 @@ test("preview S actions route through one shared state setter for both canvases"
 })
 
 test("panel tools keep their toolbar order and each layout's native aspect ratio", () => {
-  assert.ok(html.indexOf('id="panel-scale"') < html.indexOf('class="toolbar-divider"'))
+  assert.ok(html.indexOf('class="toolbar-divider"') < html.indexOf('id="panel-scale"'))
+  assert.ok(html.indexOf('id="panel-scale"') < html.indexOf('id="replace-layout-image"'))
   assert.match(main, /availableSkinStates\(\.\.\.skinStateDocuments\(\)\)/)
   assert.doesNotMatch(css, /#preview\s*\{[^}]*aspect-ratio:\s*1125\s*\/\s*650/s)
+})
+
+test("layout image replacement adds a divider, dialog, and png-only drag handling", () => {
+  assert.match(html, /id="replace-layout-image"[^>]*title="替换键盘样式"/)
+  assert.match(html, /id="layout-image-dialog"[^>]*aria-labelledby="layout-image-title"/)
+  assert.match(html, /id="layout-image-file"[^>]*type="button"/)
+  assert.match(html, /id="layout-image-preview"[^>]*hidden/)
+  assert.match(html, /id="layout-image-open"[^>]*accept="\.png,image\/png"/)
+  assert.match(html, /name="layout-image-target"[^>]*value="panel"/)
+  assert.match(html, /name="layout-image-target"[^>]*value="key-normal"/)
+  assert.match(html, /name="layout-image-target"[^>]*value="key-highlight"/)
+  assert.match(html, /name="layout-image-target"[^>]*value="fore-normal"/)
+  assert.match(html, /name="layout-image-target"[^>]*value="fore-highlight"/)
+  assert.match(html, /name="layout-image-target"[^>]*value="candidate"/)
+  assert.match(html, /layout-image-targets[\s\S]*>键盘背景<\/strong>/)
+  assert.match(html, /layout-image-targets[\s\S]*>按键按下前景<\/strong>/)
+  assert.match(html, /layout-image-targets[\s\S]*>候选栏背景样式<\/strong>/)
+  assert.match(main, /applyLayoutImageStyles[\s\S]*planLayoutImage[\s\S]*fitPngTo/)
+  assert.match(main, /applyCandidateImageStyles\(stylesDoc, candDoc, plan/)
+  assert.match(main, /case "candidate": return "候选栏背景样式"/)
+  assert.match(main, /replaceLayoutImageButton\.addEventListener\("click", openLayoutImageDialog\)/)
+  assert.match(main, /\/\\\.png\$\/i/)
+  assert.match(main, /setLayoutImageHighlight\(Boolean\(/)
+  assert.match(main, /layoutImageDialog\.showModal\(\)/)
+  assert.match(main, /case "fore-highlight": return "按键按下前景"/)
+  assert.match(main, /commitBatch\(\[[\s\S]*kind: "bytes"[\s\S]*kind: "text"/)
+  assert.match(css, /\.canvas-wrap\.layout-image-target\s*\{[^}]*box-shadow:/s)
+})
+
+test("layout image dialog offers a three-way layout config slider", () => {
+  assert.match(html, /<fieldset id="layout-image-config"[^>]*>\s*<legend>布局配置<\/legend>/)
+  assert.match(html, /data-layout-image-config="none">无跟随/)
+  assert.match(html, /data-layout-image-config="image-follows-layout">图片跟随布局/)
+  assert.match(html, /data-layout-image-config="layout-follows-image">布局跟随图片/)
+  assert.match(html, /id="layout-image-config-desc"/)
+  assert.match(css, /\.layout-image-config-control button\.active\s*\{/)
+  assert.match(main, /function syncLayoutImageConfig\(\)/)
+  assert.match(main, /layoutImageConfigFieldset\.disabled = layoutImageTarget === "panel" \|\| layoutImageTarget === "candidate"/)
+  assert.match(main, /decodePngMask\(layoutImageBytes\)[\s\S]*detectGridCells\(scan\.mask/)
+  assert.match(main, /planLayoutImageSlices\(layoutImageTarget, matchedKeys, cells/)
+  assert.match(main, /matchLayoutKeysToCells\(layoutDoc, keys, cells\)/)
+  assert.match(main, /applyLayoutImageRects\(layoutDoc, plan\.keys, plan\.slices\.map/)
+  assert.doesNotMatch(main, /cells\.length !== keys\.length/)
+})
+
+test("selection clears across layout switches so edits default to all keys", () => {
+  assert.match(main, /selectedKeySections = \[\]\s*preview\.setSelected\(\[\]\)/s)
+  assert.match(main, /kind: "batch"; changes: Change\[\]/)
 })
 
 test("toolbar menus use a readable frosted surface", () => {

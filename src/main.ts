@@ -44,6 +44,19 @@ import { IniDocument } from "./ini.ts"
 import { highlightIni } from "./highlight.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
 import {
+  applyCandidateImageStyles,
+  applyLayoutImageRects,
+  applyLayoutImageStyles,
+  layoutKeyRects,
+  matchLayoutKeysToCells,
+  planLayoutImage,
+  planLayoutImageSlices,
+  validateKeyRects,
+  type LayoutImagePlan,
+  type LayoutImageTarget,
+} from "./layout-image.ts"
+import { alphaMask, detectGridCells } from "./layout-scan.ts"
+import {
   backgroundStyleSections,
   keyboardConfig,
   resolvePanelConfig,
@@ -224,6 +237,22 @@ const newStyleError = $("#new-style-error")
 const resourceDownloadButton = $("#resource-download") as HTMLButtonElement
 const resourceDeleteButton = $("#resource-delete") as HTMLButtonElement
 const resourceUploadInput = $("#resource-upload-input") as HTMLInputElement
+const replaceLayoutImageButton = $("#replace-layout-image") as HTMLButtonElement
+const layoutImageDialog = $("#layout-image-dialog") as HTMLDialogElement
+const layoutImageForm = $("#layout-image-form") as HTMLFormElement
+const layoutImageFile = $("#layout-image-file") as HTMLButtonElement
+const layoutImagePreview = $("#layout-image-preview") as HTMLImageElement
+const layoutImageFileLabel = $("#layout-image-file-label") as HTMLElement
+const layoutImageSize = $("#layout-image-size") as HTMLElement
+const layoutImageLayout = $("#layout-image-layout") as HTMLElement
+const layoutImageScope = $("#layout-image-scope") as HTMLElement
+const layoutImageError = $("#layout-image-error") as HTMLElement
+const layoutImageApply = $("#layout-image-apply") as HTMLButtonElement
+const layoutImageTargetInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="layout-image-target"]'))
+const layoutImageOpen = $("#layout-image-open") as HTMLInputElement
+const layoutImageConfigFieldset = $("#layout-image-config") as HTMLFieldSetElement
+const layoutImageConfigDesc = $("#layout-image-config-desc") as HTMLElement
+const layoutImageConfigButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-layout-image-config]"))
 const inspectorResizeHandle = $("#inspector-resize-handle") as HTMLDivElement
 const tileInspector = $("#tile-inspector")
 const tileTitle = $("#tile-title")
@@ -287,8 +316,17 @@ let inspectorTab: "properties" | "source" = "properties"
 type Change =
   | { kind: "text"; path: string; before: string; after: string }
   | { kind: "bytes"; path: string; before: Uint8Array; after: Uint8Array }
+  | { kind: "batch"; changes: Change[] }
+type LayoutImageConfig = "none" | "image-follows-layout" | "layout-follows-image"
 let undoStack: Change[] = []
 let redoStack: Change[] = []
+let layoutImageBytes: Uint8Array | undefined
+let layoutImageWidth = 0
+let layoutImageHeight = 0
+let layoutImageTarget: LayoutImageTarget | undefined
+let layoutImageConfig: LayoutImageConfig = "none"
+let layoutImageObjectURL = ""
+let layoutImageHighlight = false
 let fileOperationRunning = false
 let firstCandidateTextVisual: TextVisual | undefined
 let candidateTextWidth = 1125
@@ -550,6 +588,12 @@ function syncSegmentedControls(): void {
   }
 }
 
+function updatePanelToolButtons(): void {
+  const editing = isEditing()
+  panelScaleButton.disabled = !editing || fileOperationRunning || !archive
+  replaceLayoutImageButton.disabled = !editing || fileOperationRunning || !archive || archive.format === "bda"
+}
+
 function applyModeState(): void {
   const editing = isEditing()
   deviceShell.dataset.mode = editing ? "edit" : "preview"
@@ -563,6 +607,7 @@ function applyModeState(): void {
     }
     for (const button of layoutActionButtons) button.disabled = true
   }
+  updatePanelToolButtons()
   syncSegmentedControls()
 }
 
@@ -623,6 +668,17 @@ function commitBytes(path: string, before: Uint8Array, after: Uint8Array): void 
   updateHistoryButtons()
 }
 
+function commitBatch(changes: Change[]): void {
+  if (!archive || !changes.length) return
+  for (const change of changes) {
+    if (change.kind === "text") archive.setText(change.path, change.after)
+    else archive.setBytes(change.path, change.after)
+  }
+  undoStack.push({ kind: "batch", changes })
+  redoStack = []
+  updateHistoryButtons()
+}
+
 function applyTextSnapshot(path: string, text: string): void {
   if (!archive) return
   archive.setText(path, text)
@@ -650,7 +706,12 @@ function undo(): void {
   const change = undoStack.pop()
   if (!change) return
   redoStack.push(change)
-  if (change.kind === "text") applyTextSnapshot(change.path, change.before)
+  if (change.kind === "batch") {
+    for (const child of [...change.changes].reverse()) {
+      if (child.kind === "text") applyTextSnapshot(child.path, child.before)
+      else applyBytesSnapshot(child.path, child.before)
+    }
+  } else if (change.kind === "text") applyTextSnapshot(change.path, change.before)
   else applyBytesSnapshot(change.path, change.before)
   updateHistoryButtons()
 }
@@ -659,7 +720,12 @@ function redo(): void {
   const change = redoStack.pop()
   if (!change) return
   undoStack.push(change)
-  if (change.kind === "text") applyTextSnapshot(change.path, change.after)
+  if (change.kind === "batch") {
+    for (const child of change.changes) {
+      if (child.kind === "text") applyTextSnapshot(child.path, child.after)
+      else applyBytesSnapshot(child.path, child.after)
+    }
+  } else if (change.kind === "text") applyTextSnapshot(change.path, change.after)
   else applyBytesSnapshot(change.path, change.after)
   updateHistoryButtons()
 }
@@ -1060,6 +1126,33 @@ async function resizePng(bytes: Uint8Array, xRatio: number, yRatio: number): Pro
   return new Uint8Array(await blob.arrayBuffer())
 }
 
+// ponytail: 复用 resizePng 的画布输出逻辑，按面板精确尺寸拉伸素材图
+async function fitPngTo(bytes: Uint8Array, width: number, height: number): Promise<Uint8Array> {
+  const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes).buffer], { type: "image/png" }))
+  const canvas = document.createElement("canvas")
+  canvas.width = width
+  canvas.height = height
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, width, height)
+  bitmap.close()
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((value) => value ? resolve(value) : reject(new Error("PNG 缩放失败")), "image/png")
+  })
+  return new Uint8Array(await blob.arrayBuffer())
+}
+
+// 复用 fitPngTo 的解码方式，读取像素后只保留 alpha 掩码用于按键网格检测
+async function decodePngMask(bytes: Uint8Array): Promise<{ width: number; height: number; mask: Uint8Array }> {
+  const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes).buffer], { type: "image/png" }))
+  const canvas = document.createElement("canvas")
+  canvas.width = bitmap.width
+  canvas.height = bitmap.height
+  const context = canvas.getContext("2d", { willReadFrequently: true })
+  context?.drawImage(bitmap, 0, 0)
+  bitmap.close()
+  if (!context) throw new Error("无法读取图片像素")
+  return { width: canvas.width, height: canvas.height, mask: alphaMask(context.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height) }
+}
+
 function panelResourceRoots(path: string): string[] {
   const match = path.match(/^(light|dark)\/skin\/(port|land)\//)
   if (!match) throw new Error(`无效面板路径：${path}`)
@@ -1189,7 +1282,7 @@ function setFileOperationBusy(busy: boolean): void {
   newButton.disabled = busy
   openButton.disabled = busy
   saveButton.disabled = busy || !archive
-  panelScaleButton.disabled = busy || !archive
+  updatePanelToolButtons()
   for (const button of exportButtons) {
     const format = button.dataset.exportFormat as ExportFormat
     button.disabled = busy || !archive || (archive.format !== "bda" && format === "bda")
@@ -3098,7 +3191,10 @@ function selectFile(
     const previewLayout = isBdaLayoutPath(path) && previewItems(base).some((item) => item.editable)
     if (previewLayout && !refreshBdaLayout(path)) return
     selectedDocument = previewLayout ? layoutDocument : base
-    if (previewLayout) selectedKeySections = []
+    if (previewLayout) {
+      selectedKeySections = []
+      preview.setSelected([])
+    }
     setSourceValue(`# BDA 官方基础布局（只读几何）\n\n${selectedDocument?.toString() ?? ""}`)
     source.disabled = true
     sourceName.textContent = `${path} · 几何来自百度输入法安装包`
@@ -3122,6 +3218,7 @@ function selectFile(
       layoutPath = path
       layoutDocument = selectedDocument
       selectedKeySections = []
+      preview.setSelected([])
       inspectorTab = "properties"
       refreshPreview()
     } else if (preferredSidebarView === "overview") {
@@ -3770,19 +3867,38 @@ canvasWrap.addEventListener("dragenter", (event) => {
 })
 canvasWrap.addEventListener("dragover", (event) => {
   event.preventDefault()
-  if (event.dataTransfer) event.dataTransfer.dropEffect = "copy"
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "copy"
+    const file = event.dataTransfer.files[0]
+    setLayoutImageHighlight(Boolean(archive && archive.format !== "bda" && file && /\.png$/i.test(file.name)))
+  }
 })
 canvasWrap.addEventListener("dragleave", (event) => {
   event.preventDefault()
   canvasDragDepth = Math.max(0, canvasDragDepth - 1)
-  if (!canvasDragDepth) setCanvasDropState(false)
+  if (!canvasDragDepth) {
+    setCanvasDropState(false)
+    setLayoutImageHighlight(false)
+  }
 })
 canvasWrap.addEventListener("drop", (event) => {
   event.preventDefault()
   canvasDragDepth = 0
   setCanvasDropState(false)
+  setLayoutImageHighlight(false)
   const file = event.dataTransfer?.files[0]
-  if (file) void runFileOperation("打开", () => loadDroppedFile(file))
+  if (!file) return
+  if (/\.png$/i.test(file.name)) {
+    if (!archive || archive.format === "bda") return
+    const reader = new FileReader()
+    reader.onload = () => {
+      setLayoutImageBytes(new Uint8Array(reader.result as ArrayBuffer))
+      openLayoutImageDialog()
+    }
+    reader.readAsArrayBuffer(file)
+    return
+  }
+  void runFileOperation("打开", () => loadDroppedFile(file))
 })
 replaceAssetButton.addEventListener("click", () => imageOpen.click())
 assetBackButton.addEventListener("click", () => {
@@ -3893,6 +4009,7 @@ for (const control of [theme, orientation, layout]) {
       layoutPath = path
       layoutDocument = IniDocument.parse(archive.getText(path))
       selectedKeySections = []
+      preview.setSelected([])
       renderFiles()
       selectFile(path)
     }
@@ -4013,6 +4130,274 @@ skinState.addEventListener("change", () => {
   applySkinState(state, state ? `皮肤状态：S${state}` : "皮肤状态：默认")
 })
 panelScaleButton.addEventListener("click", openPanelCopyDialog)
+
+// 替换键盘样式
+function resourceRootPath(): string {
+  return `${theme.value}/skin/${orientation.value}/res`
+}
+
+function currentLayoutDocument(): IniDocument | undefined {
+  if (!archive || archive.format === "bda") return
+  if (archive.isText(layoutPath)) return IniDocument.parse(archive.getText(layoutPath))
+  const path = currentConfigPath(layout.value)
+  return archive.isText(path) ? IniDocument.parse(archive.getText(path)) : layoutDocument
+}
+
+function currentStyleDocument(): IniDocument | undefined {
+  const path = styleConfigPath()
+  return archive?.isText(path) ? IniDocument.parse(archive.getText(path)) : undefined
+}
+
+function currentGenDocument(): IniDocument | undefined {
+  const path = genConfigPath()
+  return archive?.isText(path) ? IniDocument.parse(archive.getText(path)) : undefined
+}
+
+function nextResourceBase(): string {
+  const root = resourceRootPath()
+  let base = `${root}/replace_image`
+  let suffix = 2
+  while (archive?.names().some((path) => path === `${base}.png` || path === `${base}.til`)) {
+    base = `${root}/replace_image${suffix}`
+    suffix += 1
+  }
+  return base
+}
+
+function updateLayoutImageForm(): void {
+  layoutImageSize.textContent = layoutImageWidth > 0 ? `${layoutImageWidth} × ${layoutImageHeight}` : "未选择图片"
+  layoutImageApply.disabled =
+    !archive || archive.format === "bda" || layoutImageWidth === 0 || !layoutImageTarget
+}
+
+function setLayoutImageHighlight(active: boolean): void {
+  if (layoutImageHighlight === active) return
+  layoutImageHighlight = active
+  canvasWrap.classList.toggle("layout-image-target", active)
+}
+
+function openLayoutImageDialog(): void {
+  if (!archive || archive.format === "bda") return
+  const layout = currentLayoutDocument()
+  const styles = currentStyleDocument()
+  if (!layout || !styles) return
+  layoutImageLayout.textContent = `当前布局：${layoutPath.split("/").pop() ?? layout.value}（${orientation.value}）`
+  layoutImageScope.textContent = selectedKeySections.length
+    ? `已选中 ${selectedKeySections.length} 个按键，将只替换这些按键。`
+    : "未选中按键，将替换当前布局的全部按键。"
+  layoutImageError.hidden = true
+  layoutImageError.textContent = ""
+  if (!layoutImageTarget) {
+    layoutImageTarget = selectedKeySections.length ? "key-normal" : "panel"
+    layoutImageTargetInputs.find((input) => input.value === layoutImageTarget)!.checked = true
+  }
+  if (!layoutImageBytes) layoutImageFile.click()
+  else updateLayoutImageForm()
+  layoutImageDialog.showModal()
+}
+
+function setLayoutImageBytes(bytes: Uint8Array): void {
+  if (layoutImageObjectURL) URL.revokeObjectURL(layoutImageObjectURL)
+  layoutImageObjectURL = URL.createObjectURL(new Blob([bytes], { type: "image/png" }))
+  layoutImageBytes = bytes
+  const image = new Image()
+  image.onload = () => {
+    layoutImageWidth = image.naturalWidth
+    layoutImageHeight = image.naturalHeight
+    layoutImagePreview.src = layoutImageObjectURL
+    layoutImagePreview.hidden = false
+    layoutImageFileLabel.hidden = true
+    layoutImageFile.classList.add("has-image")
+    updateLayoutImageForm()
+  }
+  image.src = layoutImageObjectURL
+}
+
+function layoutImageTargetLabel(target: LayoutImageTarget): string {
+  switch (target) {
+    case "panel": return "键盘背景"
+    case "key-normal": return "正常按键背景"
+    case "key-highlight": return "按下按键背景"
+    case "fore-normal": return "按键前景"
+    case "fore-highlight": return "按键按下前景"
+    case "candidate": return "候选栏背景样式"
+  }
+}
+
+async function applyLayoutImage(): Promise<void> {
+  const layout = currentLayoutDocument()
+  const styles = currentStyleDocument()
+  const gen = currentGenDocument()
+  if (!archive || !layout || !styles || !gen || !layoutImageBytes || !layoutImageTarget) return
+  if (layoutImageTarget === "panel" && selectedKeySections.length) {
+    layoutImageError.textContent = "键盘背景替换作用于整个布局，请先取消按键选择。"
+    layoutImageError.hidden = false
+    return
+  }
+  const panel = resolvePanelConfig(layout, gen, styles)
+  if (layoutImageTarget === "candidate") {
+    const candPath = toolbarConfigPath()
+    const cand = candPath && archive.isText(candPath) ? IniDocument.parse(archive.getText(candPath)) : undefined
+    if (!candPath || !cand) {
+      layoutImageError.textContent = "当前主题未找到候选栏配置文件。"
+      layoutImageError.hidden = false
+      return
+    }
+    if (layoutImageWidth !== panel.width || layoutImageHeight !== panel.height) {
+      layoutImageBytes = await fitPngTo(layoutImageBytes, panel.width, panel.height)
+      layoutImageWidth = panel.width
+      layoutImageHeight = panel.height
+    }
+    const base = nextResourceBase()
+    const plan = planLayoutImage(layoutImageTarget, [], IniDocument.parse(""), panel.width, panel.height)
+    const tilesDoc = IniDocument.parse("")
+    for (const slice of plan.slices) updateTileSlice(tilesDoc, slice)
+    const stylesDoc = IniDocument.parse(styles.toString())
+    const candDoc = IniDocument.parse(cand.toString())
+    applyCandidateImageStyles(stylesDoc, candDoc, plan, base.split("/").pop()!)
+    const pngPath = `${base}.png`
+    const tilPath = `${base}.til`
+    const stylePath = styleConfigPath()
+    commitBatch([
+      { kind: "bytes", path: pngPath, before: archive.getBytes(pngPath) ?? new Uint8Array(0), after: layoutImageBytes },
+      { kind: "bytes", path: tilPath, before: archive.getBytes(tilPath) ?? new Uint8Array(0), after: new TextEncoder().encode(tilesDoc.toString()) },
+      { kind: "text", path: candPath, before: cand.toString(), after: candDoc.toString() },
+      { kind: "text", path: stylePath, before: styles.toString(), after: stylesDoc.toString() },
+    ])
+    layoutImageDialog.close()
+    if (selectedPath === candPath) {
+      selectedDocument = candDoc
+      setSourceValue(candDoc.toString())
+    }
+    renderFiles()
+    selectFile(candPath)
+    refreshPreview()
+    updateDirty()
+    showStatus(`已应用「${layoutImageTargetLabel(layoutImageTarget)}」替换`)
+    return
+  }
+  const keys = layoutKeyRects(layout, selectedKeySections, [panel.width, panel.height])
+  const layoutDoc = IniDocument.parse(layout.toString())
+  let plan: LayoutImagePlan
+  let sourceWidth = panel.width
+  let sourceHeight = panel.height
+  if (layoutImageConfig === "none" || layoutImageTarget === "panel") {
+    // 布局配置仅对按键类目标生效，面板替换始终按整图处理
+    if (layoutImageTarget !== "panel") {
+      const rectError = validateKeyRects(keys, panel.width, panel.height)
+      if (rectError) {
+        layoutImageError.textContent = rectError
+        layoutImageError.hidden = false
+        return
+      }
+    }
+    if (layoutImageWidth !== panel.width || layoutImageHeight !== panel.height) {
+      layoutImageBytes = await fitPngTo(layoutImageBytes, panel.width, panel.height)
+      layoutImageWidth = panel.width
+      layoutImageHeight = panel.height
+    }
+    plan = planLayoutImage(layoutImageTarget, keys, IniDocument.parse(""), panel.width, panel.height)
+  } else {
+    // 图片跟随布局 / 布局跟随图片：按图片空白检测按键网格，切片源取自图片
+    const scan = await decodePngMask(layoutImageBytes)
+    const cells = detectGridCells(scan.mask, scan.width, scan.height)
+    if (!cells.length) {
+      layoutImageError.textContent = "无法在图片中识别按键区域，请检查图片是否包含透明间隔。"
+      layoutImageError.hidden = false
+      return
+    }
+    const matchedKeys = layoutImageConfig === "layout-follows-image"
+      ? matchLayoutKeysToCells(layoutDoc, keys, cells)
+      : keys
+    plan = planLayoutImageSlices(layoutImageTarget, matchedKeys, cells, IniDocument.parse(""))
+    sourceWidth = scan.width
+    sourceHeight = scan.height
+  }
+  const base = nextResourceBase()
+  const tilesDoc = IniDocument.parse("")
+  for (const slice of plan.slices) updateTileSlice(tilesDoc, slice)
+  const stylesDoc = IniDocument.parse(styles.toString())
+  if (layoutImageConfig === "layout-follows-image" && layoutImageTarget !== "panel") {
+    // 布局跟随图片：把按键矩形与面板尺寸改写为图片网格
+    applyLayoutImageRects(layoutDoc, plan.keys, plan.slices.map((slice) => slice.source), sourceWidth, sourceHeight)
+  }
+  applyLayoutImageStyles(layoutImageTarget, layoutDoc, stylesDoc, plan, base.split("/").pop()!)
+  const pngPath = `${base}.png`
+  const tilPath = `${base}.til`
+  const targetPath = layoutPath
+  const stylePath = styleConfigPath()
+  commitBatch([
+    { kind: "bytes", path: pngPath, before: archive.getBytes(pngPath) ?? new Uint8Array(0), after: layoutImageBytes },
+    { kind: "bytes", path: tilPath, before: archive.getBytes(tilPath) ?? new Uint8Array(0), after: new TextEncoder().encode(tilesDoc.toString()) },
+    { kind: "text", path: targetPath, before: layout.toString(), after: layoutDoc.toString() },
+    { kind: "text", path: stylePath, before: styles.toString(), after: stylesDoc.toString() },
+  ])
+  layoutDocument = layoutDoc
+  layoutImageDialog.close()
+  if (selectedPath === targetPath) {
+    selectedDocument = layoutDoc
+    setSourceValue(layoutDoc.toString())
+  }
+  renderFiles()
+  selectFile(targetPath)
+  refreshPreview()
+  populateKeyInspector()
+  updateDirty()
+  showStatus(`已应用「${layoutImageTargetLabel(layoutImageTarget)}」替换`)
+}
+
+replaceLayoutImageButton.addEventListener("click", openLayoutImageDialog)
+layoutImageFile.addEventListener("click", () => layoutImageOpen.click())
+layoutImageOpen.addEventListener("change", () => {
+  const file = layoutImageOpen.files?.[0]
+  if (file) {
+    const reader = new FileReader()
+    reader.onload = () => setLayoutImageBytes(new Uint8Array(reader.result as ArrayBuffer))
+    reader.readAsArrayBuffer(file)
+  }
+  layoutImageOpen.value = ""
+})
+for (const input of layoutImageTargetInputs) {
+  input.addEventListener("change", () => {
+    layoutImageTarget = input.value as LayoutImageTarget
+    layoutImageScope.textContent = layoutImageTarget === "panel"
+      ? "替换当前布局的完整背景。"
+      : layoutImageTarget === "candidate"
+        ? "替换当前主题候选栏的背景图片。"
+        : selectedKeySections.length
+        ? `已选中 ${selectedKeySections.length} 个按键，将只替换这些按键。`
+        : "未选中按键，将替换当前布局的全部按键。"
+    syncLayoutImageConfig()
+    updateLayoutImageForm()
+  })
+}
+const layoutImageConfigDescriptions: Record<LayoutImageConfig, string> = {
+  none: "保持当前布局，图片按面板尺寸缩放后替换按键区域。",
+  "image-follows-layout": "图片不按键盘布局切片，而是识别图片自身的按键区域并切片，再拉伸贴到按键上，不改布局。",
+  "layout-follows-image": "识别图片的按键布局，把当前键盘布局的按键区域改为图片的布局，再导入切片。",
+}
+function syncLayoutImageConfig(): void {
+  for (const button of layoutImageConfigButtons) {
+    button.classList.toggle("active", button.dataset.layoutImageConfig === layoutImageConfig)
+  }
+  layoutImageConfigDesc.textContent = layoutImageConfigDescriptions[layoutImageConfig]
+  layoutImageConfigFieldset.disabled = layoutImageTarget === "panel" || layoutImageTarget === "candidate"
+}
+for (const button of layoutImageConfigButtons) {
+  button.addEventListener("click", () => {
+    if (layoutImageConfigFieldset.disabled) return
+    const value = button.dataset.layoutImageConfig as LayoutImageConfig
+    if (value === layoutImageConfig) return
+    layoutImageConfig = value
+    syncLayoutImageConfig()
+  })
+}
+layoutImageForm.addEventListener("submit", (event) => {
+  const submitter = event.submitter as HTMLButtonElement | null
+  if (submitter?.value !== "apply") return
+  event.preventDefault()
+  void applyLayoutImage()
+})
 panelCopySource.addEventListener("change", () => {
   panelTargetFile.value = panelCopySource.value.split("/").pop() ?? "panel.ini"
   panelTargetWidth.value = ""
@@ -4416,6 +4801,16 @@ if (isTauri()) {
   })
   void listen<{ paths?: string[] } | string[]>("tauri://drag-drop", (event) => {
     const paths = Array.isArray(event.payload) ? event.payload : event.payload.paths ?? []
+    const pngPath = paths.find((path) => /\.png$/i.test(path))
+    if (pngPath) {
+      void (async () => {
+        if (!archive || archive.format === "bda") return
+        const bytes = new Uint8Array(await invoke<number[]>("read_file", { path: pngPath }))
+        setLayoutImageBytes(bytes)
+        openLayoutImageDialog()
+      })()
+      return
+    }
     const path = paths.find(isSupportedSkinPath)
     if (path) void runFileOperation("打开", () => loadDroppedPath(path))
   })
@@ -4433,6 +4828,7 @@ if (isTauri()) {
 }
 mode.value = "preview"
 applyModeState()
+syncLayoutImageConfig()
 updateDevicePreview()
 updateSourceHighlight()
 updateInspectorView()

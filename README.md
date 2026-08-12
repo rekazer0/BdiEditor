@@ -6,7 +6,7 @@
 
 ![BdiEditor v0.3.2 编辑界面](docs/screenshots/bdiedito-v0.3.2-overview.png)
 
-## v0.6.13 更新
+## v0.7.3 更新
 
 - 修复 BDS 转 BDI 时重复添加主题级 `Info.txt` 与 `demo.png` 的问题。
 - 修复无图片的前景样式（如纯文字）预览点击时无法打开切片选择器的问题。
