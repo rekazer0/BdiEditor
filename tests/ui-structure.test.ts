@@ -621,7 +621,7 @@ test("key inspector keeps style references together and text styles can be hidde
   assert.match(main, /textStyleLabels/)
   assert.match(css, /\.style-field\s*\{[^}]*grid-template-columns:\s*30% minmax\(0, 70%\)/s)
   assert.match(css, /\.compact-style-preview\s*\{[^}]*width:\s*100%[^}]*height:\s*44px/s)
-  assert.match(css, /\.style-preview-pair \.style-preview-button\s*\{[^}]*flex:\s*1/s)
+  assert.match(css, /\.style-preview-pair \.style-preview-button\s*\{[^}]*aspect-ratio:\s*64 \/ 44/s)
 })
 
 test("image previews preserve aspect ratio and open the TIL slice picker", () => {
@@ -636,6 +636,21 @@ test("image previews preserve aspect ratio and open the TIL slice picker", () =>
   assert.match(main, /Math\.min\(960 \/ pickerImage\.naturalWidth, 640 \/ pickerImage\.naturalHeight\)/)
   assert.match(css, /#style-image-preview\[hidden\],[\s\S]*#style-image-picker\[hidden\]\s*\{\s*display:\s*none/s)
   assert.match(capabilities, /core:webview:allow-create-webview-window/)
+})
+
+test("browser image picker opens a searchable resource layer without losing the slice target", () => {
+  assert.match(html, /id="style-image-resource-open"[^>]*>选择图片资源<\/button>/)
+  assert.match(html, /id="style-image-resource-picker"[\s\S]*id="style-image-resource-search"[\s\S]*id="style-image-img-list"/)
+  assert.match(html, /id="style-image-resource-count"/)
+  assert.match(html, /id="style-image-resource-empty"[^>]*hidden>没有匹配的图片资源/)
+  assert.match(main, /function openStyleImageResourcePicker\(\): void \{[\s\S]*if \(isTauri\(\) \|\| !archive \|\| !pickerTarget\) return/)
+  assert.match(main, /function renderStyleImageResources\(\): void \{[\s\S]*path\.toLowerCase\(\)\.includes\(query\)/)
+  assert.match(main, /button\.addEventListener\("click", \(\) => \{[\s\S]*closeStyleImageResourcePicker\(\)[\s\S]*openImageSlicePicker\(path, pickerTarget\)/)
+  const closePicker = main.match(/function closeStyleImageResourcePicker\(\): void \{\n([\s\S]*?)\n\}/)?.[1] ?? ""
+  assert.doesNotMatch(closePicker, /clearImageSlicePicker|pickerTarget = undefined/)
+  assert.match(css, /\.style-image-resource-picker\s*\{[^}]*position:\s*absolute[^}]*inset:\s*0/s)
+  assert.match(css, /\.style-image-img-list\s*\{[^}]*overflow-y:\s*auto/s)
+  assert.match(css, /\.style-image-img-list img\s*\{[^}]*object-fit:\s*contain/s)
 })
 
 test("interaction preview cannot change an image slice reference", () => {
@@ -655,6 +670,8 @@ test("loading another archive closes and fully resets the image slice picker", (
   assert.match(cleanup, /pickerSelectedIndex = undefined/)
   assert.match(cleanup, /styleImagePicker\.hidden = true/)
   assert.match(cleanup, /styleImagePreview\.hidden = false/)
+  assert.match(cleanup, /closeStyleImageResourcePicker\(\)/)
+  assert.match(cleanup, /styleImageImgList\.replaceChildren\(\)/)
   assert.match(cleanup, /WebviewWindow\.getByLabel\(label\).*pickerWindow\?\.close\(\)/s)
   assert.match(main, /async function loadArchive[\s\S]*?clearImageSlicePicker\(\)\s*archive = nextArchive/)
 })

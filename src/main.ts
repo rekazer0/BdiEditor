@@ -240,8 +240,14 @@ const stylePreviewButtons = Array.from(
 )
 const styleImageDialog = $("#style-image-dialog") as HTMLDivElement
 const styleImageClose = $("#style-image-close") as HTMLButtonElement
-const styleImageTitle = $("#style-image-title") as HTMLButtonElement
+const styleImageTitle = $("#style-image-title") as HTMLElement
 const styleImageSubtitle = $("#style-image-subtitle") as HTMLSpanElement
+const styleImageResourceOpen = $("#style-image-resource-open") as HTMLButtonElement
+const styleImageResourcePicker = $("#style-image-resource-picker") as HTMLElement
+const styleImageResourceClose = $("#style-image-resource-close") as HTMLButtonElement
+const styleImageResourceSearch = $("#style-image-resource-search") as HTMLInputElement
+const styleImageResourceCount = $("#style-image-resource-count") as HTMLElement
+const styleImageResourceEmpty = $("#style-image-resource-empty") as HTMLElement
 const styleImageImgList = $("#style-image-img-list") as HTMLDivElement
 const styleImagePreview = $("#style-image-preview") as HTMLCanvasElement
 const styleImagePicker = $("#style-image-picker")
@@ -2382,6 +2388,48 @@ function openResourcePickerWindow(): void {
   void showPickerWindow("resource-picker", "resource", "选择图片资源", 860, 640)
 }
 
+function closeStyleImageResourcePicker(): void {
+  styleImageResourcePicker.hidden = true
+  styleImageResourceSearch.value = ""
+}
+
+function renderStyleImageResources(): void {
+  if (!archive) return
+  const query = styleImageResourceSearch.value.trim().toLowerCase()
+  const paths = resourceImagePaths(archive.names(), theme.value, orientation.value)
+    .filter((path) => path.toLowerCase().includes(query))
+  styleImageImgList.replaceChildren()
+  for (const path of paths) {
+    const bytes = archive.getBytes(path)
+    if (!bytes) continue
+    const button = document.createElement("button")
+    button.type = "button"
+    button.title = path
+    const image = document.createElement("img")
+    image.src = imageDataURL(bytes)
+    image.alt = ""
+    const name = document.createElement("span")
+    name.textContent = path.split("/").pop() ?? path
+    button.append(image, name)
+    button.classList.toggle("active", path === pickerPath)
+    button.addEventListener("click", () => {
+      closeStyleImageResourcePicker()
+      if (pickerTarget) openImageSlicePicker(path, pickerTarget)
+    })
+    styleImageImgList.append(button)
+  }
+  const count = styleImageImgList.childElementCount
+  styleImageResourceCount.textContent = `${count} 张图片`
+  styleImageResourceEmpty.hidden = count > 0
+}
+
+function openStyleImageResourcePicker(): void {
+  if (isTauri() || !archive || !pickerTarget) return
+  styleImageResourcePicker.hidden = false
+  renderStyleImageResources()
+  styleImageResourceSearch.focus()
+}
+
 function clearImageSlicePicker(): void {
   if (pickerURL) URL.revokeObjectURL(pickerURL)
   pickerURL = ""
@@ -2392,6 +2440,11 @@ function clearImageSlicePicker(): void {
   pickerSelectedIndex = undefined
   styleImagePicker.hidden = true
   styleImagePreview.hidden = false
+  styleImageResourceOpen.hidden = true
+  closeStyleImageResourcePicker()
+  styleImageImgList.replaceChildren()
+  styleImageResourceCount.textContent = ""
+  styleImageResourceEmpty.hidden = true
   styleImageDialog.hidden = true
   nativeImagePickerPayload = undefined
   nativeResourcePickerPayload = []
@@ -2455,6 +2508,7 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
     void showPickerWindow("image-picker", "image", "图片切片", 1100, 760)
     return
   }
+  closeStyleImageResourcePicker()
   pickerImage = new Image()
   pickerImage.onload = () => {
     if (!pickerImage) return
@@ -2466,6 +2520,7 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
   pickerImage.src = pickerURL
   styleImagePreview.hidden = true
   styleImagePicker.hidden = false
+  styleImageResourceOpen.hidden = false
   styleImageTitle.textContent = path.split("/").pop() ?? path
   styleImageSubtitle.textContent = " · 选择切片"
   styleImagePickerMeta.textContent = pickerSlices.length ? "点击图片中的切片以修改引用" : "此图片没有可用的 TIL 切片"
@@ -3665,7 +3720,8 @@ for (const button of stylePreviewButtons) {
     drawVisualPreview(styleImagePreview, visuals, foreground)
     styleImagePicker.hidden = true
     styleImagePreview.hidden = false
-    styleImageImgList.hidden = true
+    styleImageResourceOpen.hidden = true
+    closeStyleImageResourcePicker()
     styleImageTitle.textContent = "图片预览"
     styleImageSubtitle.textContent = ""
     styleImageDialog.hidden = false
@@ -3688,6 +3744,9 @@ styleImagePickerCanvas.addEventListener("click", (event) => {
   drawImageSlicePicker()
 })
 styleImageClose.addEventListener("click", clearImageSlicePicker)
+styleImageResourceOpen.addEventListener("click", openStyleImageResourcePicker)
+styleImageResourceClose.addEventListener("click", closeStyleImageResourcePicker)
+styleImageResourceSearch.addEventListener("input", renderStyleImageResources)
 
 void listen<{ mode: "image" | "resource" }>("picker-window-ready", (event) => {
   const label = event.payload.mode === "image" ? "image-picker" : "resource-picker"
@@ -3825,38 +3884,6 @@ const _origRenderResourceInspector = renderResourceInspector
 ;(window as any).__resourceGalleryDblClickHandler = (path: string) => {
   selectResourceImage(path)
 }
-
-// Web fallback: the image name button opens the resource list inline.
-styleImageTitle.addEventListener("click", () => {
-  if (!archive) return
-  const paths = resourceImagePaths(archive.names(), theme.value, orientation.value)
-  styleImageImgList.hidden = !styleImageImgList.hidden
-  if (styleImageImgList.hidden) return
-  styleImageImgList.replaceChildren()
-  for (const path of paths) {
-    const bytes = archive.getBytes(path)
-    if (!bytes) continue
-    const url = URL.createObjectURL(new Blob([bytes], { type: "image/png" }))
-    const btn = document.createElement("button")
-    btn.type = "button"
-    btn.title = path
-    const img = document.createElement("img")
-    img.src = url
-    img.alt = ""
-    img.addEventListener("load", () => URL.revokeObjectURL(url))
-    const name = document.createElement("span")
-    name.textContent = path.split("/").pop()?.replace(/\.png$/i, "") ?? path
-    btn.append(img, name)
-    btn.classList.toggle("active", path === pickerPath)
-    btn.addEventListener("click", () => {
-      styleImageImgList.hidden = true
-      if (pickerTarget) {
-        openImageSlicePicker(path, pickerTarget)
-      }
-    })
-    styleImageImgList.append(btn)
-  }
-})
 for (const button of Array.from(editContextMenu.querySelectorAll<HTMLButtonElement>("[data-context-action]"))) {
   button.addEventListener("click", () => {
     if (button.dataset.contextAction === "copy") copySelectedKeys()

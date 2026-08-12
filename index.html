@@ -246,7 +246,7 @@
           <details class="inspector-group inspector-disclosure key-only">
             <summary>样式引用、文字与图片</summary>
             <div class="inspector-grid appearance-fields">
-              <label title="按键引用的共享背景样式编号">背景样式引用
+              <label class="style-ref-row" title="按键引用的共享背景样式编号">背景样式引用
                 <span class="style-field">
                   <input data-key-field="BACK_STYLE" />
                   <span class="style-preview-pair" aria-label="背景样式预览">
@@ -255,7 +255,7 @@
                   </span>
                 </span>
               </label>
-              <label title="按键引用的共享前景样式编号">前景样式引用
+              <label class="style-ref-row" title="按键引用的共享前景样式编号">前景样式引用
                 <span class="style-field">
                   <input data-key-field="FORE_STYLE" />
                   <span class="style-preview-pair" aria-label="前景样式预览">
@@ -409,17 +409,33 @@
     <div id="style-image-dialog" class="style-image-dialog" hidden role="dialog" aria-labelledby="style-image-title">
       <header class="style-image-header" id="style-image-drag-handle">
         <div class="style-image-title-wrap">
-          <button id="style-image-title" class="style-image-name-btn" type="button" aria-label="选择图片">图片预览</button>
+          <strong id="style-image-title" class="style-image-name">图片预览</strong>
           <span class="style-image-subtitle" id="style-image-subtitle"></span>
         </div>
-        <button id="style-image-close" type="button" aria-label="关闭">关闭</button>
+        <div class="style-image-actions">
+          <button id="style-image-resource-open" type="button">选择图片资源</button>
+          <button id="style-image-close" type="button" aria-label="关闭">关闭</button>
+        </div>
       </header>
-      <div id="style-image-img-list" class="style-image-img-list" hidden></div>
       <canvas id="style-image-preview" width="480" height="260"></canvas>
       <div id="style-image-picker" hidden>
         <canvas id="style-image-picker-canvas" width="720" height="420" aria-label="原始图片切片选择器"></canvas>
         <small id="style-image-picker-meta">点击图片中的切片以修改引用</small>
       </div>
+      <section id="style-image-resource-picker" class="style-image-resource-picker" hidden aria-labelledby="style-image-resource-title">
+        <header class="style-image-resource-header">
+          <div>
+            <strong id="style-image-resource-title">选择图片资源</strong>
+            <small id="style-image-resource-count"></small>
+          </div>
+          <div class="style-image-resource-tools">
+            <input id="style-image-resource-search" type="search" placeholder="搜索图片资源" aria-label="搜索图片资源">
+            <button id="style-image-resource-close" type="button" aria-label="返回图片切片">关闭</button>
+          </div>
+        </header>
+        <div id="style-image-img-list" class="style-image-img-list"></div>
+        <p id="style-image-resource-empty" class="style-image-resource-empty" hidden>没有匹配的图片资源</p>
+      </section>
     </div>
 
     <dialog id="settings-dialog" class="app-dialog" aria-labelledby="settings-title">
