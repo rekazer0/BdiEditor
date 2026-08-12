@@ -65,8 +65,13 @@ import {
 } from "./keyboard.ts"
 import {
   applyLayoutAction as transformLayout,
+  isListCell,
+  listCellIndex,
+  listCellRect,
+  listCellValue,
   moveRects,
   setExactGap,
+  setListCellValue,
   type LayoutAction,
   type LayoutRect,
 } from "./layout.ts"
@@ -1848,6 +1853,17 @@ function genConfigPath(): string {
   return currentConfigPath("gen.ini")
 }
 
+// LIST 候选栏单元的几何（POS/CELL_SIZE）可能定义在布局自身或 gen.ini（候选栏几何通常全局共享）
+function listGeometryDocument(): { document: IniDocument; path: string } | undefined {
+  if (!archive || !layoutDocument) return
+  if (layoutDocument.get("LIST", "POS") !== undefined || layoutDocument.get("LIST", "CELL_SIZE") !== undefined) {
+    return { document: layoutDocument, path: layoutPath }
+  }
+  const path = genConfigPath()
+  if (archive.isText(path)) return { document: IniDocument.parse(archive.getText(path)), path }
+  return { document: layoutDocument, path: layoutPath }
+}
+
 function isSkinInfoPath(path: string): boolean {
   return /(^|\/)Info\.txt$/i.test(path)
 }
@@ -1988,7 +2004,11 @@ function refreshToolbarPreview(
 
 function commonSelectedStyle(name: "BACK_STYLE" | "FORE_STYLE"): string | undefined {
   if (!layoutDocument || !selectedKeySections.length) return
-  const values = selectedKeySections.map((section) => layoutDocument?.get(section, name)?.trim() ?? "")
+  const values = selectedKeySections.map((section) =>
+    isListCell(section)
+      ? (layoutDocument?.get("LIST", name) ?? "").trim()
+      : layoutDocument?.get(section, name)?.trim() ?? "",
+  )
   return values.every((value) => value === values[0]) ? values[0] : undefined
 }
 
@@ -2210,7 +2230,11 @@ function selectedStylePropertyContext(property: string):
   const document = IniDocument.parse(archive.getText(path))
   const sources = resolveStylePropertySources(
     document,
-    selectedKeySections.map((section) => layoutDocument?.get(section, "FORE_STYLE") ?? ""),
+    selectedKeySections.map((section) =>
+      isListCell(section)
+        ? (layoutDocument?.get("LIST", "FORE_STYLE") ?? "").trim()
+        : layoutDocument?.get(section, "FORE_STYLE") ?? "",
+    ),
     property,
   )
   return sources ? { document, path, sources } : undefined
@@ -2489,7 +2513,9 @@ function populateKeyInspector(): void {
     : !hasSelection
       ? `${layout.value === "py_26.ini" ? "26 键" : "九键"} · 整体设置`
     : sections.length === 1
-      ? `${sections[0]} · ${document?.get(sections[0], "CENTER") || "未配置点击动作"}`
+      ? isListCell(sections[0])
+        ? "LIST · 候选栏"
+        : `${sections[0]} · ${document?.get(sections[0], "CENTER") || "未配置点击动作"}`
       : `已选择 ${sections.length} 个按键`
   for (const field of skinFields) {
     field.value = skinSelected ? selectedDocument?.get("", field.dataset.skinField ?? "") ?? "" : ""
@@ -2530,6 +2556,20 @@ function populateKeyInspector(): void {
     field.placeholder = ""
     if (!hasSelection) {
       field.value = ""
+      continue
+    }
+    if (isListCell(sections[0]) && sections.length === 1) {
+      if (name === "height") {
+        // 整体高度 = CELL_SIZE 高 × LIST_NUM；LIST_NUM 在布局文档，几何在定义处（布局或 gen.ini）
+        const geometry = listGeometryDocument()
+        const count = Number(document?.get("LIST", "LIST_NUM")) || 1
+        field.value = geometry ? listCellValue(geometry.document, sections[0], "height", count) : ""
+      } else if (["x", "y", "width"].includes(name)) {
+        const geometry = listGeometryDocument()
+        field.value = geometry ? listCellValue(geometry.document, sections[0], name) : ""
+      } else {
+        field.value = listCellValue(document, sections[0], name)
+      }
       continue
     }
     const rectIndex = ["x", "y", "width", "height"].indexOf(name)
@@ -2573,12 +2613,13 @@ function populateKeyInspector(): void {
     ? selectedBdaRefs("FORE_STYLE", "text").length > 0
     : styleFields.some((field) => Boolean(selectedStylePropertyContext(field.dataset.styleField ?? "")))
   for (const label of textStyleLabels) label.hidden = !hasSelection || !hasTextStyle
+  const listSelected = sections.some(isListCell)
   for (const button of layoutActionButtons) {
-    button.disabled = selectedKeySections.length < 2 || archive?.format === "bda"
+    button.disabled = selectedKeySections.length < 2 || archive?.format === "bda" || listSelected
   }
-  const rects = selectedRects()
+  const rects = selectedRects().filter((rect) => !isListCell(rect.section))
   for (const field of gapFields) {
-    field.disabled = rects.length < 2 || archive?.format === "bda"
+    field.disabled = rects.length < 2 || archive?.format === "bda" || listSelected
     field.placeholder = ""
     if (rects.length < 2) {
       field.value = ""
@@ -2667,9 +2708,36 @@ function updateToolbar(field: HTMLInputElement): void {
 
 function updateSelectedKey(field: HTMLInputElement): void {
   if (!archive || archive.format === "bda" || !layoutDocument || !selectedKeySections.length) return
-  const before = layoutDocument.toString()
   const name = field.dataset.keyField ?? ""
   const rectNames = ["x", "y", "width", "height"]
+  if (selectedKeySections.length === 1 && isListCell(selectedKeySections[0])) {
+    // LIST 候选栏单元：几何字段写回定义处（布局或 gen.ini），其余写回布局的 [LIST]
+    if (rectNames.includes(name)) {
+      const geometry = listGeometryDocument()
+      if (!geometry) return
+      const before = geometry.document.toString()
+      const count = name === "height"
+        ? Number(layoutDocument.get("LIST", "LIST_NUM")) || 1
+        : undefined
+      setListCellValue(geometry.document, selectedKeySections[0], name, field.value, count)
+      const text = geometry.document.toString()
+      if (text === before) return
+      commitText(geometry.path, before, text)
+      if (selectedPath === geometry.path) setSourceValue(text)
+      refreshPreview()
+    } else {
+      const before = layoutDocument.toString()
+      setListCellValue(layoutDocument, selectedKeySections[0], name, field.value)
+      const text = layoutDocument.toString()
+      commitText(layoutPath, before, text)
+      if (selectedPath === layoutPath) setSourceValue(text)
+      preview.setDocument(layoutDocument)
+    }
+    populateKeyInspector()
+    updateDirty()
+    return
+  }
+  const before = layoutDocument.toString()
   const rectIndex = rectNames.indexOf(name)
   for (const section of selectedKeySections) {
     if (rectIndex >= 0) {
@@ -2716,13 +2784,22 @@ function selectedStyleImageSections(source: "BACK_STYLE" | "FORE_STYLE"): { docu
   if (!archive.isText(path)) return
   const document = IniDocument.parse(archive.getText(path))
   const sections = source === "BACK_STYLE"
-    ? backgroundStyleSections(layoutDocument, selectedKeySections)
-    : [...new Set(selectedKeySections.flatMap((key) =>
-        (layoutDocument?.get(key, source) ?? "").split(",").map((token) => token.trim()).flatMap((token) => {
+    ? [...new Set(selectedKeySections.flatMap((key) => {
+        const backStyle = isListCell(key)
+          ? layoutDocument?.get("LIST", "BACK_STYLE") ?? ""
+          : layoutDocument?.get(key, source) ?? ""
+        const id = backStyle.split(",")[0]?.trim()
+        return id && /^\d+$/.test(id) ? [`STYLE${id}`] : []
+      }))]
+    : [...new Set(selectedKeySections.flatMap((key) => {
+        const foreStyle = isListCell(key)
+          ? layoutDocument?.get("LIST", "FORE_STYLE") ?? ""
+          : layoutDocument?.get(key, source) ?? ""
+        return foreStyle.split(",").map((token) => token.trim()).flatMap((token) => {
           const value = Number(token)
           return [`STYLE${token}`, Number.isFinite(value) ? `STYLE${Math.floor(value / 100)}` : ""]
-        }).filter((section) => section && document.sections().includes(section)),
-      ))]
+        }).filter((section) => section && document.sections().includes(section))
+      }))]
   return sections.length ? { document, path, sections } : undefined
 }
 
@@ -2974,6 +3051,10 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
 function selectedRects(): LayoutRect[] {
   if (!layoutDocument) return []
   return selectedKeySections.flatMap((section) => {
+    if (isListCell(section)) {
+      const rect = listCellRect(layoutDocument, section)
+      return rect ? [rect] : []
+    }
     const values = layoutDocument?.get(section, "VIEW_RECT")?.split(",").map(Number)
     if (!values || values.length !== 4 || values.some((value) => !Number.isFinite(value))) return []
     const [x, y, width, height] = values
@@ -2983,7 +3064,8 @@ function selectedRects(): LayoutRect[] {
 
 function applyLayoutAction(action: string): void {
   if (!archive || !layoutDocument) return
-  const rects = transformLayout(selectedRects(), action as LayoutAction)
+  const real = selectedRects().filter((rect) => !isListCell(rect.section))
+  const rects = transformLayout(real, action as LayoutAction)
   if (rects.length < 2) return
   const before = layoutDocument.toString()
   for (const rect of rects) {
@@ -3006,7 +3088,7 @@ function applyExactGap(field: HTMLInputElement): void {
   const gap = Number(field.value)
   if (!Number.isFinite(gap)) return
   const rects = setExactGap(
-    selectedRects(),
+    selectedRects().filter((rect) => !isListCell(rect.section)),
     field.dataset.gapField === "horizontal" ? "horizontal" : "vertical",
     gap,
   )
@@ -3029,7 +3111,7 @@ function applyExactGap(field: HTMLInputElement): void {
 
 function moveSelectedKeys(deltaX: number, deltaY: number): void {
   if (!archive || !layoutDocument) return
-  const rects = moveRects(selectedRects(), deltaX, deltaY)
+  const rects = moveRects(selectedRects().filter((rect) => !isListCell(rect.section)), deltaX, deltaY)
   if (!rects.length) return
   const before = layoutDocument.toString()
   for (const rect of rects) {

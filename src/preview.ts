@@ -209,6 +209,7 @@ function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[]
     !Number.isFinite(count) || count <= 0
   ) return []
   const foreStyles = value("FORE_STYLE")?.split(",").map((token) => token.trim()).filter(Boolean) ?? []
+  // 每个标点只负责文字渲染，不可单独选中
   const cells: PreviewItem[] = names.slice(0, count).map((show, index) => ({
     section: `LIST:${index + 1}`,
     rect: {
@@ -233,23 +234,32 @@ function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[]
     positionTypes: [],
     statStyle: "",
   }))
-  if (!cells.length) return []
-  const backStyle = value("BACK_STYLE")?.split(",")[0]
-  if (!backStyle) return cells
-  return [{
-    ...cells[0],
-    section: "LIST:SURFACE",
+  // 整个候选栏是一个可选中按钮
+  const bar: PreviewItem = {
+    section: "LIST",
     rect: {
       x: position[0],
       y: position[1],
       width: cell[0],
       height: cell[1] * count,
     },
+    fontSize: Math.min(cell[0], cell[1]) * 0.36,
+    editable: true,
     show: "",
-    backStyle,
+    center: "",
+    up: "",
+    down: "",
+    left: "",
+    right: "",
+    hold: "",
+    backStyle: value("BACK_STYLE")?.split(",")[0] ?? "",
     foreStyle: "",
     foreStyles: [],
-  }, ...cells]
+    foreOffsets: [],
+    positionTypes: [],
+    statStyle: "",
+  }
+  return [bar, ...cells]
 }
 
 export function dynamicToolbarRect(

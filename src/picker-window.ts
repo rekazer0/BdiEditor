@@ -1,5 +1,6 @@
 import { emitTo, listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
+import { LogicalSize } from "@tauri-apps/api/dpi"
 import { tileSliceAt, type TilePoint, type TileSlice } from "./tiles.ts"
 
 type ImagePayload = {
@@ -30,6 +31,17 @@ let imagePayload: ImagePayload | undefined
 let image: HTMLImageElement | undefined
 let scale = 1
 let offset: TilePoint = { x: 0, y: 0 }
+
+// 窗口高度不固定：测量页面内容高度后调整窗口高度，跟随图片大小变动（宽度保持不变）
+async function fitWindowHeight(): Promise<void> {
+  if (!isTauri) return
+  const appWindow = getCurrentWindow()
+  const [inner, outer] = await Promise.all([appWindow.innerSize(), appWindow.outerSize()])
+  const scaleFactor = inner.height / window.innerHeight
+  const chrome = (outer.height - inner.height) / scaleFactor
+  const content = document.documentElement.scrollHeight
+  void appWindow.setSize(new LogicalSize(outer.width / scaleFactor, Math.max(480, Math.ceil(content + chrome))))
+}
 
 function drawImage(): void {
   const context = canvas.getContext("2d")
@@ -69,6 +81,7 @@ function showImage(payload: ImagePayload): void {
     canvas.width = Math.max(1, Math.round(image.naturalWidth * fit))
     canvas.height = Math.max(1, Math.round(image.naturalHeight * fit))
     drawImage()
+    void fitWindowHeight()
   }
   image.src = payload.dataURL
 }

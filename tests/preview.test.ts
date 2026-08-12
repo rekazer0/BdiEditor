@@ -113,18 +113,23 @@ test("binds a BDA frame animation to its semantic key target", () => {
   }, item), sequence)
 })
 
-test("expands the LIST definition into the four phone punctuation cells", () => {
+test("renders the LIST candidate bar as one selectable button with label cells", () => {
   const document = IniDocument.parse(
     "[PANEL]\nKEY_NUM=100\n[LIST]\nCELL_SIZE=147,103\nPOS=23,19\nLIST_NUM=4\nNAMES=， 。 ？ ！ ～ 、 .\n[KEY4]\nVIEW_RECT=14,12,165,429\nBACK_STYLE=1231\n",
   )
-  const list = previewItems(document).filter((item) => item.section.startsWith("LIST:"))
-  assert.deepEqual(list.map((item) => item.show), ["，", "。", "？", "！"])
-  assert.deepEqual(list.map((item) => item.rect), [
+  const bar = previewItems(document).find((item) => item.section === "LIST")!
+  assert.ok(bar, "the whole candidate bar is present")
+  assert.equal(bar.editable, true, "the whole candidate bar is selectable on the canvas")
+  assert.deepEqual(bar.rect, { x: 23, y: 19, width: 147, height: 412 })
+  const cells = previewItems(document).filter((item) => /^LIST:\d+$/.test(item.section))
+  assert.deepEqual(cells.map((item) => item.show), ["，", "。", "？", "！"])
+  assert.deepEqual(cells.map((item) => item.rect), [
     { x: 23, y: 19, width: 147, height: 103 },
     { x: 23, y: 122, width: 147, height: 103 },
     { x: 23, y: 225, width: 147, height: 103 },
     { x: 23, y: 328, width: 147, height: 103 },
   ])
+  assert.equal(cells.every((item) => !item.editable), true, "individual punctuation cells are not separately selectable")
 })
 
 test("uses gen LIST styles when the layout only supplies list content", () => {
@@ -132,8 +137,10 @@ test("uses gen LIST styles when the layout only supplies list content", () => {
   const layout = IniDocument.parse(
     "[LIST]\nCELL_SIZE=150,124\nPOS=0,0\nLIST_NUM=2\nNAMES=a b\n",
   )
-  const list = previewItems(layout, 300, 248, defaults).filter((item) => item.section.startsWith("LIST:"))
-  const cell = list.find((item) => item.section === "LIST:1")!
+  const items = previewItems(layout, 300, 248, defaults)
+  const bar = items.find((item) => item.section === "LIST")!
+  assert.equal(bar.backStyle, "476")
+  const cell = items.find((item) => item.section === "LIST:1")!
   assert.equal(cell.backStyle, "247")
   assert.deepEqual(cell.foreStyles, ["130"])
 })

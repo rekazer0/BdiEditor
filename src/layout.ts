@@ -1,3 +1,5 @@
+import { IniDocument } from "./ini.ts"
+
 export type LayoutRect = {
   section: string
   x: number
@@ -16,6 +18,109 @@ export type LayoutAction =
 
 export function rectToString(rect: Omit<LayoutRect, "section">): string {
   return [rect.x, rect.y, rect.width, rect.height].map(Math.round).join(",")
+}
+
+// 检查器里的 LIST 是 [LIST] 段的整体候选栏（画布上作为一个可选中按钮）：
+// 位置来自 POS、尺寸来自 CELL_SIZE × LIST_NUM、样式来自 BACK_STYLE/FORE_STYLE。
+// LIST:n 仅为预览渲染的标点占位，不可单独选中。
+const listCellUnit = /^LIST:(\d+)$/
+
+export function isListCell(section: string): boolean {
+  return section === "LIST" || listCellUnit.test(section)
+}
+
+export function listCellIndex(section: string): number {
+  const match = section.match(listCellUnit)
+  return match ? Number(match[1]) - 1 : 0
+}
+
+function listPair(layout: IniDocument, key: string): [number, number] | undefined {
+  const parts = layout.get("LIST", key)?.split(",").map(Number)
+  if (!parts || parts.length !== 2 || parts.some((part) => !Number.isFinite(part))) return
+  return [parts[0], parts[1]]
+}
+
+function setListPair(layout: IniDocument, key: string, pair: [number, number]): void {
+  layout.set("LIST", key, pair.map(Math.round).join(","))
+}
+
+export function listCellValue(layout: IniDocument, section: string, name: string, countOverride?: number): string {
+  if (!isListCell(section)) return layout.get(section, name) ?? ""
+  if (name === "x" || name === "y") {
+    const pair = listPair(layout, "POS") ?? [0, 0]
+    return String(Math.round(pair[name === "x" ? 0 : 1]))
+  }
+  if (name === "width") {
+    const cell = listPair(layout, "CELL_SIZE") ?? [0, 0]
+    return String(Math.round(cell[0]))
+  }
+  if (name === "height") {
+    const cell = listPair(layout, "CELL_SIZE") ?? [0, 0]
+    const count = countOverride ?? (Number(layout.get("LIST", "LIST_NUM")) || 1)
+    return String(Math.round(cell[1] * count))
+  }
+  if (name === "SHOW") return layout.get("LIST", "NAMES") ?? ""
+  if (name === "CENTER") return layout.get("LIST", "VALUES") ?? ""
+  return layout.get("LIST", name) ?? ""
+}
+
+export function listCellRect(layout: IniDocument, section: string): LayoutRect | undefined {
+  if (!isListCell(section)) return
+  const position = listPair(layout, "POS")
+  const cell = listPair(layout, "CELL_SIZE")
+  const count = Number(layout.get("LIST", "LIST_NUM"))
+  if (!position || !cell || cell.some((value) => value <= 0) || !Number.isFinite(count) || count <= 0) return
+  return {
+    section,
+    x: position[0],
+    y: position[1],
+    width: cell[0],
+    height: cell[1] * count,
+  }
+}
+
+export function setListCellValue(layout: IniDocument, section: string, name: string, value: string, countOverride?: number): void {
+  if (!isListCell(section)) {
+    layout.set(section, name, value)
+    return
+  }
+  if (name === "x" || name === "y") {
+    const pair = listPair(layout, "POS") ?? [0, 0]
+    const number = Number(value)
+    if (!Number.isFinite(number)) return
+    pair[name === "x" ? 0 : 1] = number
+    setListPair(layout, "POS", pair)
+    return
+  }
+  if (name === "width") {
+    const pair = listPair(layout, "CELL_SIZE") ?? [0, 0]
+    const number = Number(value)
+    if (!Number.isFinite(number) || number <= 0) return
+    pair[0] = number
+    setListPair(layout, "CELL_SIZE", pair)
+    return
+  }
+  if (name === "height") {
+    // 整体高度 = CELL_SIZE 高度 × LIST_NUM，编辑整体高度换算回单元高度
+    const pair = listPair(layout, "CELL_SIZE") ?? [0, 0]
+    const number = Number(value)
+    if (!Number.isFinite(number) || number <= 0) return
+    const count = countOverride ?? (Number(layout.get("LIST", "LIST_NUM")) || 1)
+    pair[1] = Math.max(1, Math.round(number / count))
+    setListPair(layout, "CELL_SIZE", pair)
+    return
+  }
+  // SHOW 对应 NAMES、CENTER 对应 VALUES；方向键对候选栏无意义，不写回
+  if (name === "SHOW") {
+    layout.set("LIST", "NAMES", value)
+    return
+  }
+  if (name === "CENTER") {
+    layout.set("LIST", "VALUES", value)
+    return
+  }
+  if (name === "UP" || name === "DOWN" || name === "LEFT" || name === "RIGHT" || name === "HOLD") return
+  layout.set("LIST", name, value)
 }
 
 export function gestureDirection(

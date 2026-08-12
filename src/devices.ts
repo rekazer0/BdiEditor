@@ -5,6 +5,7 @@ export type DeviceSpec = {
 }
 
 const DEVICES: Record<string, DeviceSpec> = {
+  "iphone-15-pro": { width: 1179, height: 2556, family: "iphone" },
   "iphone-17-pro": { width: 1206, height: 2622, family: "iphone" },
   "iphone-17-pro-max": { width: 1320, height: 2868, family: "iphone" },
   "xiaomi-17": { width: 1220, height: 2656, family: "android" },

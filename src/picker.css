@@ -50,12 +50,11 @@ button, input { font: inherit; color: inherit; }
 }
 .picker-toolbar button:hover { background: var(--hover); }
 .picker-toolbar input { width: min(260px, 40vw); }
-.picker-canvas-stage { min-height: calc(100vh - 94px); display: grid; place-items: center; padding: 16px; overflow: auto; }
+.picker-canvas-stage { min-height: 300px; display: grid; place-items: center; padding: 16px; overflow: auto; }
 #picker-canvas {
   width: auto;
   height: auto;
   max-width: 100%;
-  max-height: calc(100vh - 130px);
   display: block;
   border: 1px solid var(--line);
   background-color: #f7f7f8;

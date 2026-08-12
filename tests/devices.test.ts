@@ -7,6 +7,7 @@ import {
 } from "../src/devices.ts"
 
 test("uses verified physical display resolutions for common phones", () => {
+  assert.deepEqual(deviceSpec("iphone-15-pro"), { width: 1179, height: 2556, family: "iphone" })
   assert.deepEqual(deviceSpec("iphone-17-pro"), { width: 1206, height: 2622, family: "iphone" })
   assert.deepEqual(deviceSpec("iphone-17-pro-max"), { width: 1320, height: 2868, family: "iphone" })
   assert.deepEqual(deviceSpec("xiaomi-17"), { width: 1220, height: 2656, family: "android" })

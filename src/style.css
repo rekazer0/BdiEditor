@@ -897,6 +897,57 @@ h2 {
   background: #222326;
 }
 
+/* Appetize-style titanium iPhone shell. The screen remains the live skin preview. */
+.canvas-wrap:has(.device-shell[data-device="iphone-15-pro"]) {
+  background: #070d19;
+}
+
+.device-shell[data-device="iphone-15-pro"] {
+  position: relative;
+  padding: 5px;
+  border: 1px solid #b9b6aa;
+  border-radius: 42px;
+  background: linear-gradient(90deg, #6d6d67, #e8e5d5 7%, #353735 13%, #21231f 87%, #e3dfcb 94%, #696964);
+  box-shadow: 0 22px 52px rgb(0 0 0 / 46%), inset 0 0 0 1px rgb(255 255 255 / 34%);
+}
+
+.device-shell[data-device="iphone-15-pro"]::before,
+.device-shell[data-device="iphone-15-pro"]::after {
+  position: absolute;
+  z-index: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(#a9a79b, #3b3d39 36%, #a19e93);
+  content: "";
+}
+
+.device-shell[data-device="iphone-15-pro"]::before {
+  top: 19%;
+  left: -3px;
+  height: 14%;
+  box-shadow: 0 67px #696a64;
+}
+
+.device-shell[data-device="iphone-15-pro"]::after {
+  top: 28%;
+  right: -3px;
+  height: 20%;
+}
+
+.device-shell[data-device="iphone-15-pro"] .device-screen {
+  z-index: 1;
+  border-radius: 37px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 10%);
+}
+
+.device-shell[data-device="iphone-15-pro"] .device-screen::before {
+  width: 29%;
+  height: 2.3%;
+  min-height: 16px;
+  top: 1.05%;
+  border-radius: 999px;
+}
+
 .device-shell[data-orientation="land"] {
   width: min(96%, 900px);
   height: auto;
@@ -1857,11 +1908,10 @@ canvas {
 
 .app-dialog.layout-image-dialog {
   width: min(640px, calc(100vw - 32px));
-  min-height: 560px;
 }
 
 .app-dialog.layout-image-dialog form {
-  height: 100%;
+  height: fit-content;
 }
 
 .layout-image-dialog footer {

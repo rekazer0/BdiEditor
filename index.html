@@ -7,7 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     />
-    <title>BdiEditor v0.7.6</title>
+    <title>BdiEditor v0.7.7</title>
   </head>
   <body>
     <header class="titlebar" data-tauri-drag-region>
@@ -81,6 +81,7 @@
           <label class="field-control">
             <span>设备</span>
             <select id="device" aria-label="设备">
+              <option value="iphone-15-pro">iPhone 15 Pro · 1179×2556</option>
               <option value="iphone-17-pro">iPhone 17 Pro · 1206×2622</option>
               <option value="iphone-17-pro-max">iPhone 17 Pro Max · 1320×2868</option>
               <option value="xiaomi-17">Xiaomi 17 · 1220×2656</option>
@@ -511,7 +512,7 @@
         <header><h2 id="settings-title">设置</h2><button aria-label="关闭">关闭</button></header>
         <label>软件外观 <select id="app-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
         <label class="settings-switch">窗口玻璃与亚克力材质 <input id="window-material" type="checkbox" role="switch" checked></label>
-        <label>默认预览设备 <select id="default-device"><option value="canvas">画布</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
+        <label>默认预览设备 <select id="default-device"><option value="canvas">画布</option><option value="iphone-15-pro">iPhone 15 Pro</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
         <label>画布背景 <select id="canvas-background"><option value="glass">玻璃</option><option value="checkerboard">马赛克</option><option value="white" selected>白色</option><option value="dark">深色</option></select></label>
         <p>新打开的皮肤将使用此预览设备。</p>
       </form>
@@ -524,12 +525,12 @@
 
     <dialog id="about-dialog" class="app-dialog" aria-labelledby="about-title">
       <form method="dialog">
-        <header><h2 id="about-title">关于 BdiEditor v0.7.6</h2><button aria-label="关闭">关闭</button></header>
+        <header><h2 id="about-title">关于 BdiEditor v0.7.7</h2><button aria-label="关闭">关闭</button></header>
         <p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
-        <p>版本 0.7.6</p>
+        <p>版本 0.7.7</p>
         <p>支持读取、编辑和导出 BDI、BDS、BDA 皮肤包。</p>
         <p class="about-alpha">阿尔法版本：包含未完成的功能与实验性改动，仅用于测试。</p>
-        <section id="about-update" class="about-update" data-current-version="0.7.6">
+        <section id="about-update" class="about-update" data-current-version="0.7.7">
           <div><strong>版本更新</strong><button id="check-update" type="button">检查更新</button></div>
           <p id="update-status" aria-live="polite">正在检查更新…</p>
           <a id="download-update" href="https://github.com/rekazer0/BdiEditor/releases" target="_blank" rel="noreferrer" hidden>查看最新版本</a>
