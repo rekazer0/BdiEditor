@@ -41,6 +41,7 @@ import {
 } from "./bda.ts"
 import { convertBdaArchive } from "./bda-convert.ts"
 import { IniDocument } from "./ini.ts"
+import { adaptIos26Variant, isIos26Adapted } from "./ios26.ts"
 import { highlightIni } from "./highlight.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
 import {
@@ -159,6 +160,9 @@ const dirty = $("#dirty")
 const eventLog = $("#event-log")
 const panelStatus = $("#panel-status")
 const panelScaleButton = $("#panel-scale") as HTMLButtonElement
+const adaptIos26Button = $("#adapt-ios26") as HTMLButtonElement
+const ios26Dialog = $("#ios26-dialog") as HTMLDialogElement
+const ios26Form = $("#ios26-form") as HTMLFormElement
 const panelScaleDialog = $("#panel-scale-dialog") as HTMLDialogElement
 const panelScaleForm = $("#panel-scale-form") as HTMLFormElement
 const panelCopySource = $("#panel-copy-source") as HTMLSelectElement
@@ -610,6 +614,7 @@ function updatePanelToolButtons(): void {
   const editing = isEditing()
   panelScaleButton.disabled = !editing || fileOperationRunning || !archive
   replaceLayoutImageButton.disabled = !editing || fileOperationRunning || !archive || archive.format === "bda"
+  adaptIos26Button.disabled = fileOperationRunning || !archive || archive.format === "bda"
 }
 
 function applyModeState(): void {
@@ -935,6 +940,21 @@ function applyDeviceKeyboardGeometry(
   deviceShell.style.setProperty("--safe-row", `${geometry.safeBottomHeight}fr`)
 }
 
+function activeIos26Adapted(): boolean {
+  if (!archive) return false
+  const candidatePath = toolbarConfigPath()
+  const generalPath = genConfigPath()
+  return isIos26Adapted(
+    candidatePath && archive.isText(candidatePath) ? archive.getText(candidatePath) : undefined,
+    archive.isText(generalPath) ? archive.getText(generalPath) : undefined,
+  )
+}
+
+function devicePreviewTransparent(): boolean {
+  if (device.value === "canvas") return false
+  return deviceSpec(device.value)?.family !== "iphone" || activeIos26Adapted()
+}
+
 function refreshPreview(): void {
   if (!archive) return
   const composing = refreshSimulationState()
@@ -954,7 +974,7 @@ function refreshPreview(): void {
   preview.setOffsets(context?.gen ?? bdaGen)
   preview.setDefaults(context?.gen ?? bdaGen)
   preview.setTheme(theme.value === "dark" ? "dark" : "light")
-  preview.setTransparent(device.value !== "canvas")
+  preview.setTransparent(devicePreviewTransparent())
   if (context && layoutDocument) {
     const config = resolvePanelConfig(layoutDocument, context.gen, context.styles)
     const inputVisual = resolveTextVisual(
@@ -1129,7 +1149,7 @@ function updateDevicePreview(): void {
     deviceShell.style.removeProperty("aspect-ratio")
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
   }
-  preview.setTransparent(device.value !== "canvas")
+  preview.setTransparent(devicePreviewTransparent())
   fitCanvasPreview()
 }
 
@@ -1362,6 +1382,46 @@ function showError(error: unknown, action = "操作"): void {
   if (isTauri()) {
     void message(text, { title: `${action}失败`, kind: "error" }).catch(() => {})
   }
+}
+
+function ios26StylePath(genPath: string): string | undefined {
+  if (!archive) return
+  const directory = genPath.slice(0, genPath.lastIndexOf("/"))
+  const themeRoot = genPath.split("/").slice(0, 2).join("/")
+  return [`${directory}/res/default.css`, `${themeRoot}/res/default.css`]
+    .find((path) => archive?.isText(path))
+}
+
+function adaptArchiveForIos26(): boolean {
+  if (!archive) return false
+  const staged = new Map<string, string>()
+  let variants = 0
+  const text = (path: string) => staged.get(path) ?? archive!.getText(path)
+  for (const genPath of archive.names().filter((path) => /\/(?:port|land)\/gen\.ini$/i.test(path))) {
+    const directory = genPath.slice(0, genPath.lastIndexOf("/"))
+    const gen = IniDocument.parse(text(genPath))
+    const candidateName = gen.get("CAND", "LAYOUT_NAME") ?? "cand1"
+    const candidatePath = `${directory}/${candidateName.replace(/\.cnd$/i, "")}.cnd`
+    const stylePath = ios26StylePath(genPath)
+    if (!archive.isText(candidatePath) || !stylePath) continue
+    variants++
+    const adapted = adaptIos26Variant(text(candidatePath), text(genPath), text(stylePath))
+    staged.set(candidatePath, adapted.candidate)
+    staged.set(genPath, adapted.general)
+    staged.set(stylePath, adapted.styles)
+  }
+  const changes: Change[] = [...staged].flatMap(([path, after]) => {
+    const before = archive!.getText(path)
+    return before === after ? [] : [{ kind: "text" as const, path, before, after }]
+  })
+  if (!variants) throw new Error("没有找到可适配的候选栏和通用配置。")
+  if (!changes.length) return true
+  commitBatch(changes)
+  renderFiles()
+  if (selectedPath && archive.isText(selectedPath)) selectFile(selectedPath)
+  refreshPreview()
+  updateDirty()
+  return true
 }
 
 async function runFileOperation(
@@ -2042,7 +2102,7 @@ function refreshToolbarPreview(
   toolbarPreview.setOffsets(gen)
   toolbarPreview.setDefaults(gen)
   toolbarPreview.setTheme(theme.value === "dark" ? "dark" : "light")
-  toolbarPreview.setTransparent(device.value !== "canvas")
+  toolbarPreview.setTransparent(devicePreviewTransparent())
   const width = size?.length === 4 && Number.isFinite(size[2]) ? size[2] : 1125
   const height = size?.length === 4 && Number.isFinite(size[3]) ? size[3] : 133
   toolbarCanvas.style.setProperty("--toolbar-width", String(width))
@@ -4357,6 +4417,13 @@ skinState.addEventListener("change", () => {
   applySkinState(state, state ? `皮肤状态：S${state}` : "皮肤状态：默认")
 })
 panelScaleButton.addEventListener("click", openPanelCopyDialog)
+adaptIos26Button.addEventListener("click", () => ios26Dialog.showModal())
+ios26Form.addEventListener("submit", (event) => {
+  if ((event.submitter as HTMLButtonElement | null)?.value !== "apply") return
+  event.preventDefault()
+  ios26Dialog.close()
+  void runFileOperation("适配 iOS 26", adaptArchiveForIos26)
+})
 
 // 替换键盘样式
 function resourceRootPath(): string {
