@@ -11,6 +11,8 @@ const rects: LayoutRect[] = [
 
 test("aligns and sizes selected keys without mutating input", () => {
   assert.deepEqual(applyLayoutAction(rects, "left").map((rect) => rect.x), [2, 2, 2])
+  assert.deepEqual(applyLayoutAction(rects, "right").map((rect) => rect.x + rect.width), [380, 380, 380])
+  assert.deepEqual(applyLayoutAction(rects, "bottom").map((rect) => rect.y + rect.height), [85, 85, 85])
   assert.deepEqual(applyLayoutAction(rects, "same-height").map((rect) => rect.height), [80, 80, 80])
   assert.equal(rects[1].x, 140)
 })

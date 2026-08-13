@@ -87,14 +87,25 @@ export function scalePanelDocument(
   return output
 }
 
-export function panelConversionPaths(
+export function variantCopyPaths(
   names: readonly string[],
-  themes: readonly string[],
+  sourceTheme: string,
+  sourceOrientation: string,
+  targetTheme: string,
+  targetOrientation: string,
 ): Array<{ source: string; target: string }> {
+  const existing = new Set(names)
+  const themeChange = sourceTheme !== targetTheme
+  const sourcePrefix = themeChange
+    ? `${sourceTheme}/skin/`
+    : `${sourceTheme}/skin/${sourceOrientation}/`
+  const targetPrefix = themeChange
+    ? `${targetTheme}/skin/`
+    : `${targetTheme}/skin/${targetOrientation}/`
   return names.flatMap((source) => {
-    const match = source.match(/^(light|dark)\/skin\/port\/(.+)$/)
-    if (!match || !themes.includes(match[1]) || source.endsWith("/")) return []
-    return [{ source, target: `${match[1]}/skin/land/${match[2]}` }]
+    if (!source.startsWith(sourcePrefix) || source.endsWith("/")) return []
+    const target = `${targetPrefix}${source.slice(sourcePrefix.length)}`
+    return existing.has(target) ? [] : [{ source, target }]
   }).sort((a, b) => a.source.localeCompare(b.source))
 }
 

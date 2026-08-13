@@ -166,8 +166,8 @@ test("desktop editor grid keeps the inspector beside the workspace", () => {
   )
 })
 
-test("single-theme skins disable unavailable theme choices", () => {
-  assert.match(main, /button\.disabled = Boolean\(archive\).*button\.dataset\.themeChoice/s)
+test("single-theme skins keep missing theme choices available for creation", () => {
+  assert.doesNotMatch(main, /button\.disabled = Boolean\(archive\).*button\.dataset\.themeChoice/s)
   assert.match(main, /if \(!availableThemes\.includes\(theme\.value\)\)[^\n]+\n\s*syncSegmentedControls\(\)/)
 })
 
@@ -449,6 +449,9 @@ test("settings expose canvas backgrounds and edit mode exposes key context actio
   assert.match(html, /data-context-action="delete"/)
   assert.match(main, /function copySelectedKeys\(\)/)
   assert.match(main, /function deleteSelectedKeys\(\)/)
+  assert.match(main, /event\.key === "Delete" \|\| event\.key === "Backspace"[\s\S]*deleteSelectedKeys\(\)/)
+  assert.match(main, /createSystemSymbol\("doc\.on\.doc"\)/)
+  assert.match(main, /createSystemSymbol\("trash"\)/)
 })
 
 test("window and about names match the GitHub project and include the version", () => {
@@ -577,7 +580,8 @@ test("action fields offer every Baidu function code while remaining editable", (
   assert.equal((html.match(/list="baidu-action-codes"/g) ?? []).length, 6)
   assert.match(html, /<datalist id="baidu-action-codes"><\/datalist>/)
   assert.match(main, /Array\.from\(\{ length: 99 \}/)
-  assert.match(main, /new Option\(describeAction\(value\), value\)/)
+  assert.match(main, /new Option\(actionDescription\(value\), value\)/)
+  assert.match(main, /shouldSuggestActionCodes\(field\.value\)[\s\S]*field\.setAttribute\("list", "baidu-action-codes"\)[\s\S]*field\.removeAttribute\("list"\)/)
 })
 
 test("resource gallery adds columns with inspector width and caps cards at 180px", () => {
@@ -683,10 +687,26 @@ test("loading another archive closes and fully resets the image slice picker", (
 test("key inspector keeps common fields visible and collapses advanced controls", () => {
   const common = html.slice(html.indexOf('class="inspector-group key-only primary-key-fields"'), html.indexOf("</div>\n          </div>", html.indexOf('class="inspector-group key-only primary-key-fields"')))
   assert.match(common, /data-key-field="SHOW"[\s\S]*?data-key-field="CENTER"/)
-  assert.match(html, /<details class="inspector-group inspector-disclosure key-only">\s*<summary>布局<\/summary>/)
-  assert.match(html, /<summary>样式引用、文字与图片<\/summary>/)
+  assert.match(html, /<details class="inspector-group inspector-disclosure key-only" open>\s*<summary>布局<\/summary>/)
+  assert.match(html, /<details class="inspector-group inspector-disclosure key-only" open>\s*<summary>样式引用、文字与图片<\/summary>/)
   assert.match(html, /<summary>滑动与长按<\/summary>/)
   assert.match(css, /\.inspector-disclosure > summary/)
+})
+
+test("ordinary configuration navigation clears key selection", () => {
+  assert.match(main, /if \(path !== layoutPath\)[\s\S]*selectedKeySections = \[\][\s\S]*preview\.setSelected\(\[\]\)/)
+  assert.match(main, /function populateKeyInspector\(\): void \{\s*if \(selectedPath !== layoutPath && selectedKeySections\.length\)[\s\S]*preview\.setSelected\(\[\]\)/)
+  assert.match(main, /const hasSelection = Boolean\(document && sections\.length && selectedPath === layoutPath\)/)
+})
+
+test("common document sections open by default", () => {
+  assert.match(main, /\["PANEL", "INPUT", "CAND"\]\.includes\(section\)/)
+  assert.match(css, /\.document-property-section > summary:hover/)
+})
+
+test("layout actions include right and bottom alignment", () => {
+  assert.match(html, /data-layout-action="right"[^>]*title="右对齐"/)
+  assert.match(html, /data-layout-action="bottom"[^>]*title="底对齐"/)
 })
 
 test("visible Chinese UI text contains no replacement characters", () => {
@@ -752,7 +772,7 @@ test("style reference inputs share one searchable preview picker", () => {
 test("style thumbnails change on click and edit on command click", () => {
   assert.match(main, /button\.className = "style-picker-trigger"/)
   assert.match(main, /previews\.className = "style-picker-states"/)
-  assert.match(main, /for \(const state of \["正常", "按下"\]\)/)
+  assert.match(main, /for \(let index = 0; index < 2; index \+= 1\)/)
   assert.match(main, /Promise\.all\(\[false, true\]\.map/)
   assert.match(main, /if \(event\.metaKey \|\| event\.ctrlKey\) openStyleReferenceEditor/)
   assert.match(main, /else openStylePicker\(input\)/)
@@ -763,11 +783,63 @@ test("style thumbnails change on click and edit on command click", () => {
   assert.match(main, /function refreshStyleReferenceThumbnails\(\)/)
   assert.match(main, /if \(isStyleReferenceKey\(entry\.key\)\) label\.classList\.add\("style-reference-field"\)/)
   assert.match(css, /\.style-reference-field\s*\{[^}]*grid-column:\s*1 \/ -1/s)
-  assert.match(css, /\.style-picker-trigger\s*\{[^}]*width:\s*154px[^}]*height:\s*58px/s)
+  assert.match(css, /\.style-picker-trigger\s*\{[^}]*width:\s*auto[^}]*height:\s*92px/s)
   assert.match(css, /\.style-picker-states\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s)
   assert.match(css, /\.style-picker-state canvas\s*\{[^}]*display:\s*block/)
-  assert.match(css, /\.style-picker-state small\s*\{[^}]*text-align:\s*center/s)
+  assert.doesNotMatch(css, /\.style-picker-state small\s*\{/)
   assert.match(html, /单击应用 · Command\/Ctrl 单击编辑/)
+})
+
+test("style detail returns to the configuration that opened it", () => {
+  assert.match(main, /let styleReturnPath = ""/)
+  assert.match(main, /let styleReturnSelection: string\[\] = \[\]/)
+  assert.match(main, /let styleReturnScrollTop = 0/)
+  assert.match(main, /let styleReturnDisclosures: boolean\[\] = \[\]/)
+  assert.match(main, /function openStyleReferenceEditor\(styleID: string\): void \{[\s\S]*const returnSelection = \[\.\.\.selectedKeySections\][\s\S]*const returnScrollTop = quickInspector\.scrollTop[\s\S]*const returnDisclosures = keyInspectorDisclosures\.map[\s\S]*selectFile\(path, "overview", "style"\)[\s\S]*styleReturnSelection = returnSelection/s)
+  assert.match(main, /resourceBackButton\.addEventListener\("click", \(\) => \{[\s\S]*const selection = \[\.\.\.styleReturnSelection\][\s\S]*selectFile\(path, "overview"\)[\s\S]*selectedKeySections = selection[\s\S]*preview\.setSelected\(selection\)[\s\S]*quickInspector\.scrollTop = scrollTop[\s\S]*revealSourceFile\(path\)/s)
+})
+
+test("style picker uses the shared glass dialog and selected-card styling", () => {
+  assert.match(html, /id="style-picker-dialog" class="style-picker-dialog glass-module"/)
+  assert.match(main, /button\.classList\.toggle\("selected", stylePickerTarget\?\.value\.split\(","\)\[0\]\?\.trim\(\) === styleID\)/)
+  assert.match(css, /\.style-picker-dialog\s*\{[^}]*border-radius:\s*14px[^}]*background:\s*var\(--menu\)/s)
+  assert.match(css, /\.style-picker-item\.selected\s*\{[^}]*border-color:\s*var\(--accent\)/s)
+  assert.match(css, /\.style-picker-previews\s*\{[^}]*gap:\s*0[^}]*overflow:\s*hidden/s)
+})
+
+test("style reference preview is enlarged inside one input control", () => {
+  const wrapper = css.match(/\.style-reference-input\s*\{[^}]+\}/s)?.[0] ?? ""
+  const input = css.match(/\.style-reference-input > input,\s*\.inspector-grid \.style-reference-input > input\s*\{[^}]+\}/s)?.[0] ?? ""
+  const trigger = css.match(/\.style-picker-trigger\s*\{[^}]+\}/s)?.[0] ?? ""
+  const canvas = css.match(/\.style-picker-state canvas\s*\{[^}]+\}/s)?.[0] ?? ""
+  assert.match(wrapper, /border:\s*1px solid var\(--line\)/)
+  assert.match(wrapper, /overflow:\s*hidden/)
+  assert.match(input, /border:\s*0/)
+  assert.match(trigger, /width:\s*auto/)
+  assert.match(trigger, /border:\s*0/)
+  assert.match(canvas, /width:\s*100%/)
+  assert.match(canvas, /max-width:\s*100%/)
+  assert.match(canvas, /height:\s*76px/)
+  assert.match(canvas, /background-image:\s*linear-gradient/)
+  assert.doesNotMatch(main, /label\.textContent = state/)
+})
+
+test("gap inputs share one taller split control", () => {
+  const gaps = css.match(/\.gap-fields\s*\{[^}]+\}/s)?.[0] ?? ""
+  assert.match(gaps, /grid-template-columns:\s*repeat\(2, 1fr\)/)
+  assert.match(gaps, /border:\s*1px solid var\(--line\)/)
+  assert.match(gaps, /overflow:\s*hidden/)
+  assert.match(css, /\.gap-fields label \+ label\s*\{[^}]*border-left:\s*1px solid var\(--line-soft\)/s)
+  assert.match(css, /\.gap-fields input,[\s\S]*?\.inspector-grid\.gap-fields input\s*\{[^}]*height:\s*40px[^}]*border:\s*0/s)
+})
+
+test("missing theme and orientation switches offer to create the target variant", () => {
+  assert.doesNotMatch(main, /button\.disabled = Boolean\(archive\).*button\.dataset\.themeChoice/s)
+  assert.match(main, /function createMissingVariant\(/)
+  assert.match(main, /window\.confirm\(`当前皮肤没有\$\{label\}，是否从当前配置创建？`\)/)
+  assert.match(main, /variantCopyPaths\(archive\.names\(\), sourceTheme, sourceOrientation, targetTheme, targetOrientation\)/)
+  assert.match(main, /for \(const \{ source, target \} of copies\) archive\.setBytes\(target, archive\.getBytes\(source\)!\.slice\(\)\)/)
+  assert.match(main, /if \(control !== layout && !createMissingVariant\(path\)\) return/)
 })
 
 test("layout inspector omits the redundant whole-keyboard form", () => {

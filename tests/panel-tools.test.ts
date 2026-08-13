@@ -7,7 +7,6 @@ import {
   copiedResourceBase,
   copyablePanelPaths,
   mergePanelStyles,
-  panelConversionPaths,
   panelStyleIDs,
   previewScalePercent,
   rewritePanelStyleIDs,
@@ -16,6 +15,7 @@ import {
   scaleIniDocument,
   stateStyleValue,
   validPanelFilename,
+  variantCopyPaths,
 } from "../src/panel-tools.ts"
 import { previewContentVerticalBounds } from "../src/preview.ts"
 
@@ -103,7 +103,7 @@ test("scaled panel owns its configured target size instead of inheriting gen.ini
   assert.equal(scaled.get("KEY1", "VIEW_RECT"), "74,31,148,63")
 })
 
-test("plans a complete portrait-to-landscape theme conversion", () => {
+test("plans missing theme and orientation variants without overwriting targets", () => {
   const names = [
     "light/skin/port/gen.ini",
     "light/skin/port/py_26.ini",
@@ -111,10 +111,15 @@ test("plans a complete portrait-to-landscape theme conversion", () => {
     "light/skin/res/shared.png",
     "dark/skin/port/gen.ini",
   ]
-  assert.deepEqual(panelConversionPaths(names, ["light"]), [
+  assert.deepEqual(variantCopyPaths(names, "light", "port", "light", "land"), [
     { source: "light/skin/port/gen.ini", target: "light/skin/land/gen.ini" },
     { source: "light/skin/port/py_26.ini", target: "light/skin/land/py_26.ini" },
     { source: "light/skin/port/res/key.png", target: "light/skin/land/res/key.png" },
+  ])
+  assert.deepEqual(variantCopyPaths(names, "light", "port", "dark", "port"), [
+    { source: "light/skin/port/py_26.ini", target: "dark/skin/port/py_26.ini" },
+    { source: "light/skin/port/res/key.png", target: "dark/skin/port/res/key.png" },
+    { source: "light/skin/res/shared.png", target: "dark/skin/res/shared.png" },
   ])
 })
 

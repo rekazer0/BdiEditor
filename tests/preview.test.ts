@@ -2,13 +2,21 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { gestureDirection, rectToString } from "../src/layout.ts"
 import { IniDocument } from "../src/ini.ts"
-import { animationSequenceForKey, effectivePreviewItem, foregroundTextPoint, isAdditiveSelection, offsetFromSection, previewBackground, previewFallbackText, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawItemBackground } from "../src/preview.ts"
+import { animationSequenceForKey, effectivePreviewItem, foregroundTextPoint, isAdditiveSelection, offsetFromSection, previewBackground, previewFallbackText, previewHitRect, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawItemBackground } from "../src/preview.ts"
 
 test("classifies click, hold and directional gestures", () => {
   assert.equal(gestureDirection(2, 3, 100, true), "center")
   assert.equal(gestureDirection(2, 3, 500, true), "hold")
   assert.equal(gestureDirection(40, 5, 100, false), "right")
   assert.equal(gestureDirection(3, -40, 100, false), "up")
+})
+
+test("hit testing includes resized visual bounds and configured touch bounds", () => {
+  const item = previewItems(IniDocument.parse("[KEY1]\nVIEW_RECT=0,0,200,100\nTOUCH_RECT=0,0,100,50\n"))[0]
+  assert.deepEqual(previewHitRect(item, "edit"), item.rect)
+  assert.deepEqual(previewHitRect(item, "preview"), item.rect)
+  const extendedTouch = previewItems(IniDocument.parse("[KEY1]\nVIEW_RECT=20,20,50,50\nTOUCH_RECT=0,0,100,80\n"))[0]
+  assert.deepEqual(previewHitRect(extendedTouch, "preview"), { x: 0, y: 0, width: 100, height: 80 })
 })
 
 test("rounds a preview rectangle for config output", () => {

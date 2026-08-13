@@ -1602,6 +1602,12 @@ canvas {
   gap: 3px;
 }
 
+.resource-style-previews canvas {
+  height: auto;
+  aspect-ratio: 64 / 44;
+  align-self: center;
+}
+
 .style-detail-previews {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1857,15 +1863,22 @@ canvas {
 }
 
 .inspector-disclosure > summary {
-  padding: 2px 0;
+  padding: 5px 6px;
+  border-radius: 6px;
   color: var(--secondary);
   font-size: 10px;
   font-weight: 600;
-  cursor: default;
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+
+.inspector-disclosure > summary:hover {
+  color: var(--text);
+  background: var(--hover);
 }
 
 .inspector-disclosure[open] > summary {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   color: var(--text);
 }
 
@@ -1897,6 +1910,32 @@ canvas {
 .gap-fields {
   grid-template-columns: repeat(2, 1fr);
   margin-bottom: 9px;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--control);
+}
+
+.gap-fields:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgb(10 127 245 / 16%);
+}
+
+.gap-fields label {
+  padding: 6px 8px 7px;
+}
+
+.gap-fields label + label {
+  border-left: 1px solid var(--line-soft);
+}
+
+.gap-fields input,
+.inspector-grid.gap-fields input {
+  height: 40px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .action-fields {
@@ -2100,10 +2139,17 @@ canvas {
 
 .document-property-section > summary {
   padding: 7px 4px;
+  border-radius: 6px;
   color: var(--secondary);
   font-size: 11px;
   font-weight: 600;
-  cursor: default;
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+
+.document-property-section > summary:hover {
+  color: var(--text);
+  background: var(--hover);
 }
 
 .document-property-grid {
@@ -2223,80 +2269,91 @@ canvas {
 .style-reference-input {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 154px;
-  gap: 8px;
+  grid-template-columns: minmax(72px, 0.72fr) minmax(190px, 1.6fr);
+  gap: 0;
   align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--control);
 }
 
-.style-reference-input > input {
+.style-reference-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgb(10 127 245 / 16%);
+}
+
+.style-reference-input > input,
+.inspector-grid .style-reference-input > input {
   width: 100%;
   min-width: 0;
-  height: 58px;
+  height: 92px;
   padding: 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .style-picker-trigger {
   position: relative;
-  width: 154px;
-  min-width: 154px;
-  height: 58px;
-  padding: 5px;
+  width: auto;
+  min-width: 0;
+  height: 92px;
+  padding: 6px;
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--control);
+  border: 0;
+  border-left: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: transparent;
   cursor: pointer;
 }
 
 .style-picker-states {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5px;
+  gap: 0;
   width: 100%;
   height: 100%;
 }
 
 .style-picker-state {
   min-width: 0;
-  display: grid;
-  grid-template-rows: 34px 12px;
-  gap: 2px;
-  align-content: center;
+  height: 100%;
+  display: block;
 }
 
 .style-picker-state canvas {
   width: 100%;
-  height: 34px;
+  max-width: 100%;
+  height: 76px;
   display: block;
   border: 1px solid var(--line-soft);
   border-radius: 5px;
-  background: var(--content);
-}
-
-.style-picker-state small {
-  color: var(--tertiary);
-  font-size: 9px;
-  line-height: 12px;
-  text-align: center;
-  pointer-events: none;
+  background-color: #f7f7f8;
+  background-image:
+    linear-gradient(45deg, #e3e5e8 25%, transparent 25%, transparent 75%, #e3e5e8 75%),
+    linear-gradient(45deg, #e3e5e8 25%, transparent 25%, transparent 75%, #e3e5e8 75%);
+  background-position: 0 0, 5px 5px;
+  background-size: 10px 10px;
 }
 
 .style-picker-trigger:hover {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgb(10 127 245 / 16%);
+  background: var(--hover);
 }
 
 .style-picker-dialog {
-  width: min(860px, calc(100vw - 40px));
-  height: min(680px, calc(100vh - 40px));
+  width: min(920px, calc(100vw - 40px));
+  height: min(720px, calc(100vh - 40px));
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
+  border-radius: 14px;
+  background: var(--menu);
   color: var(--text);
-  box-shadow: 0 22px 70px rgb(0 0 0 / 32%);
+  box-shadow: 0 28px 90px rgb(0 0 0 / 28%), inset 0 1px rgb(255 255 255 / 48%);
+  -webkit-backdrop-filter: saturate(180%) blur(28px);
+  backdrop-filter: saturate(180%) blur(28px);
 }
 
 .style-picker-dialog[open] {
@@ -2305,19 +2362,20 @@ canvas {
 }
 
 .style-picker-dialog::backdrop {
-  background: rgb(0 0 0 / 22%);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  background: rgb(20 24 30 / 26%);
+  -webkit-backdrop-filter: saturate(120%) blur(8px);
+  backdrop-filter: saturate(120%) blur(8px);
 }
 
 .style-picker-header {
-  min-height: 70px;
+  min-height: 76px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 12px 16px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--line);
+  background: var(--toolbar);
 }
 
 .style-picker-header > div:first-child {
@@ -2349,6 +2407,8 @@ canvas {
 .style-picker-tools input {
   min-width: 0;
   flex: 1;
+  height: 34px;
+  border-radius: 8px;
 }
 
 .style-picker-tools button {
@@ -2358,29 +2418,39 @@ canvas {
 .style-picker-grid {
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   align-content: start;
-  gap: 10px;
+  gap: 12px;
   overflow-y: auto;
-  padding: 14px;
+  padding: 16px 18px 20px;
 }
 
 .style-picker-item {
   min-width: 0;
   display: grid;
-  gap: 7px;
-  padding: 8px;
+  gap: 9px;
+  padding: 10px;
   border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--control);
+  border-radius: 10px;
+  background: var(--glass-surface);
   color: var(--text);
   text-align: left;
   cursor: pointer;
+  box-shadow: inset 0 1px rgb(255 255 255 / 42%);
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
 .style-picker-item:hover {
   border-color: var(--accent);
   background: var(--hover);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 10%), inset 0 1px rgb(255 255 255 / 58%);
+  transform: translateY(-1px);
+}
+
+.style-picker-item.selected {
+  border-color: var(--accent);
+  background: rgb(10 127 245 / 8%);
+  box-shadow: 0 0 0 2px rgb(10 127 245 / 15%), inset 0 1px rgb(255 255 255 / 58%);
 }
 
 .style-picker-item strong {
@@ -2390,7 +2460,10 @@ canvas {
 .style-picker-previews {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
 }
 
 .style-picker-previews canvas {
@@ -2398,14 +2471,18 @@ canvas {
   height: auto;
   aspect-ratio: 64 / 44;
   display: block;
-  border: 1px solid var(--line);
-  border-radius: 5px;
+  border: 0;
+  border-radius: 0;
   background-color: #f7f7f8;
   background-image:
     linear-gradient(45deg, #e3e5e8 25%, transparent 25%, transparent 75%, #e3e5e8 75%),
     linear-gradient(45deg, #e3e5e8 25%, transparent 25%, transparent 75%, #e3e5e8 75%);
   background-position: 0 0, 5px 5px;
   background-size: 10px 10px;
+}
+
+.style-picker-previews canvas + canvas {
+  border-left: 1px solid var(--line-soft);
 }
 
 .style-picker-empty {
@@ -2849,7 +2926,7 @@ canvas {
   padding: 5px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--panel);
+  background: var(--menu);
   box-shadow: 0 10px 28px rgb(0 0 0 / 20%);
 }
 
@@ -2862,8 +2939,16 @@ canvas {
   height: 29px;
   padding: 0 9px;
   border-radius: 5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: transparent;
   text-align: left;
+}
+
+.edit-context-menu .system-symbol {
+  width: 14px;
+  height: 14px;
 }
 
 .edit-context-menu button:hover {

@@ -10,7 +10,9 @@ export type LayoutRect = {
 
 export type LayoutAction =
   | "left"
+  | "right"
   | "top"
+  | "bottom"
   | "same-width"
   | "same-height"
   | "horizontal-gap"
@@ -159,9 +161,15 @@ export function applyLayoutAction(rects: LayoutRect[], action: LayoutAction): La
   if (action === "left") {
     const x = Math.min(...next.map((rect) => rect.x))
     next.forEach((rect) => (rect.x = x))
+  } else if (action === "right") {
+    const right = Math.max(...next.map((rect) => rect.x + rect.width))
+    next.forEach((rect) => (rect.x = right - rect.width))
   } else if (action === "top") {
     const y = Math.min(...next.map((rect) => rect.y))
     next.forEach((rect) => (rect.y = y))
+  } else if (action === "bottom") {
+    const bottom = Math.max(...next.map((rect) => rect.y + rect.height))
+    next.forEach((rect) => (rect.y = bottom - rect.height))
   } else if (action === "same-width") {
     next.forEach((rect) => (rect.width = next[0].width))
   } else if (action === "same-height") {

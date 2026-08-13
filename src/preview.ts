@@ -158,6 +158,15 @@ export function isAdditiveSelection(
   return event.metaKey || event.ctrlKey || event.shiftKey
 }
 
+export function previewHitRect(item: PreviewItem, mode: "edit" | "preview"): Rect {
+  if (mode === "edit" || !item.touchRect) return item.rect
+  const x = Math.min(item.rect.x, item.touchRect.x)
+  const y = Math.min(item.rect.y, item.touchRect.y)
+  const right = Math.max(item.rect.x + item.rect.width, item.touchRect.x + item.touchRect.width)
+  const bottom = Math.max(item.rect.y + item.rect.height, item.touchRect.y + item.touchRect.height)
+  return { x, y, width: right - x, height: bottom - y }
+}
+
 function parseRect(value: string | undefined): Rect | undefined {
   const parts = value?.split(",").map(Number)
   if (!parts || parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) return
@@ -526,10 +535,10 @@ export class Preview {
   }
 
   private hit(point: { x: number; y: number }): PreviewItem | undefined {
-    return [...this.keys].reverse().find(({ editable, rect, touchRect }) => {
-      const target = touchRect ?? rect
+    return [...this.keys].reverse().find((item) => {
+      const target = previewHitRect(item, this.mode)
       return (
-        editable &&
+        item.editable &&
         point.x >= target.x &&
         point.x <= target.x + target.width &&
         point.y >= target.y &&

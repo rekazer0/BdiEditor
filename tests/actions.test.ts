@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { previewPageTarget, previewPageTransition } from "../src/actions.ts"
+import { actionDescription, previewPageTarget, previewPageTransition, shouldSuggestActionCodes } from "../src/actions.ts"
 import { IniDocument } from "../src/ini.ts"
 
 test("preview page resolves explicit and supported keyboard actions", () => {
@@ -54,4 +54,21 @@ test("9-key summary counts grouped letter keys but excludes state and delete key
 
   assert.equal(typeof actions.layoutLetterKeyCount, "function")
   assert.equal(actions.layoutLetterKeyCount?.(document), 2)
+})
+
+test("describes documented Baidu function codes", () => {
+  assert.equal(actionDescription("F3"), "切换到拇指/全键盘")
+  assert.equal(actionDescription("F36"), "退格")
+  assert.equal(actionDescription("F62"), "切换其他输入法（地球）")
+  assert.equal(actionDescription("F99"), "快速编辑（待定）")
+  assert.equal(actionDescription("F2"), "百度功能码 F2")
+  assert.equal(actionDescription("hello"), "")
+})
+
+test("suggests function codes only while entering an F code", () => {
+  assert.equal(shouldSuggestActionCodes(""), true)
+  assert.equal(shouldSuggestActionCodes("F64"), true)
+  assert.equal(shouldSuggestActionCodes("f"), true)
+  assert.equal(shouldSuggestActionCodes("k"), false)
+  assert.equal(shouldSuggestActionCodes("S1"), false)
 })

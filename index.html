@@ -211,7 +211,7 @@
               <label>点击动作 <input data-key-field="CENTER" list="baidu-action-codes" /><small data-action-meaning="CENTER"></small></label>
             </div>
           </div>
-          <details class="inspector-group inspector-disclosure key-only">
+          <details class="inspector-group inspector-disclosure key-only" open>
             <summary>布局</summary>
             <div class="inspector-grid geometry-fields">
               <label>X <input data-key-field="x" type="number" /></label>
@@ -225,14 +225,16 @@
             </div>
             <div class="layout-actions" aria-label="对齐与分布">
               <button data-layout-action="left" title="左对齐">左齐</button>
+              <button data-layout-action="right" title="右对齐">右齐</button>
               <button data-layout-action="top" title="顶对齐">顶齐</button>
+              <button data-layout-action="bottom" title="底对齐">底齐</button>
               <button data-layout-action="same-width" title="等宽">等宽</button>
               <button data-layout-action="same-height" title="等高">等高</button>
               <button data-layout-action="horizontal-gap" title="水平等间距">水平分布</button>
               <button data-layout-action="vertical-gap" title="垂直等间距">垂直分布</button>
             </div>
           </details>
-          <details class="inspector-group inspector-disclosure key-only">
+          <details class="inspector-group inspector-disclosure key-only" open>
             <summary>样式引用、文字与图片</summary>
             <div class="inspector-grid appearance-fields">
               <label class="style-ref-row" title="按键引用的共享背景样式编号">背景样式引用
@@ -283,7 +285,7 @@
           </div>
           <div id="resource-detail" hidden>
             <div class="resource-detail-heading">
-              <button id="resource-back" class="toolbar-button" type="button" title="返回图片列表" aria-label="返回图片列表"><span class="icon system-symbol" data-system-symbol="chevron.left" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m12 4-6 6 6 6"/></svg></span></button>
+              <button id="resource-back" class="toolbar-button" type="button" title="返回" aria-label="返回"><span class="icon system-symbol" data-system-symbol="chevron.left" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m12 4-6 6 6 6"/></svg></span></button>
               <div><strong id="resource-name">图片</strong><small id="resource-meta"></small></div>
             </div>
             <div id="image-resource-detail">
@@ -469,7 +471,7 @@
       </form>
     </dialog>
 
-    <dialog id="style-picker-dialog" class="style-picker-dialog" aria-labelledby="style-picker-title">
+    <dialog id="style-picker-dialog" class="style-picker-dialog glass-module" aria-labelledby="style-picker-title">
       <header class="style-picker-header">
         <div>
           <h2 id="style-picker-title">更换样式</h2>

@@ -4,7 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window"
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { message, open, save } from "@tauri-apps/plugin-dialog"
 import "./style.css"
-import { previewPageTransition, previewStateFromAction } from "./actions.ts"
+import { actionDescription, previewPageTransition, previewStateFromAction, shouldSuggestActionCodes } from "./actions.ts"
 import {
   AtlasResolver,
   canvasFontFamily,
@@ -89,6 +89,7 @@ import {
   scaleIniDocument,
   scalePanelDocument,
   validPanelFilename,
+  variantCopyPaths,
 } from "./panel-tools.ts"
 import { Preview, previewContentVerticalBounds, previewItems, type PreviewEvent } from "./preview.ts"
 import { firstExistingPath, resourceImagePaths } from "./resources.ts"
@@ -191,6 +192,9 @@ const bdaConfigFields = $("#bda-config-fields")
 const colorPickers = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-picker-for]"))
 const colorAlphas = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-alpha-for]"))
 const keyOnlyGroups = Array.from(document.querySelectorAll<HTMLElement>(".key-only"))
+const keyInspectorDisclosures = Array.from(
+  document.querySelectorAll<HTMLDetailsElement>(".inspector-disclosure.key-only"),
+)
 const gapFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-gap-field]"))
 const layoutActionButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-layout-action]"),
@@ -199,6 +203,7 @@ const actionMeaningNodes = Array.from(
   document.querySelectorAll<HTMLElement>("[data-action-meaning]"),
 )
 const baiduActionCodes = $("#baidu-action-codes") as HTMLDataListElement
+const actionFieldNames = new Set(actionMeaningNodes.map((node) => node.dataset.actionMeaning ?? ""))
 const inspectorTabButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-inspector-tab]"),
 )
@@ -364,6 +369,10 @@ let previewReturnName = "py_9.ini"
 let resourceConfigActive = false
 let resourceInspectorMode: "image" | "style" = "image"
 let selectedStyleID = ""
+let styleReturnPath = ""
+let styleReturnSelection: string[] = []
+let styleReturnScrollTop = 0
+let styleReturnDisclosures: boolean[] = []
 let selectedResourcePath = ""
 let resourceURLs: string[] = []
 let tilePath = ""
@@ -547,6 +556,8 @@ const fallbackSymbolPaths: Record<string, string[]> = {
   paintpalette: ["M12 3a9 9 0 1 0 0 18h2a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h9a9 9 0 0 0-6-14", "M7 9h.01M10 6h.01M15 7h.01M18 11h.01"],
   folder: ["M3 6h7l2 2h9l-2 10H5z", "M5 6V4h6l2 2"],
   "doc.text": ["M6 3h8l4 4v14H6z", "M14 3v5h5M9 12h6M9 16h6"],
+  "doc.on.doc": ["M8 7V3h10l3 3v12h-4", "M5 7h10v14H5z", "M9 12h2m-2 4h2"],
+  trash: ["M5 7h14M9 7V4h6v3m2 0-1 14H8L7 7m4 4v6m2-6v6"],
   photo: ["M4 4h16v16H4z", "m6 16 4-5 3 3 2-2 3 4M9 9h.01"],
   doc: ["M6 3h8l4 4v14H6z", "M14 3v5h5"],
 }
@@ -568,6 +579,17 @@ function createSystemSymbol(name: string): HTMLSpanElement {
   return symbol
 }
 
+for (const button of Array.from(editContextMenu.querySelectorAll<HTMLButtonElement>("[data-context-action]"))) {
+  const label = button.textContent?.trim() ?? ""
+  const icon = button.dataset.contextAction === "copy"
+    ? createSystemSymbol("doc.on.doc")
+    : createSystemSymbol("trash")
+  button.replaceChildren(
+    icon,
+    Object.assign(document.createElement("span"), { textContent: label }),
+  )
+}
+
 function isEditing(): boolean {
   return mode.value === "edit"
 }
@@ -578,9 +600,6 @@ function syncSegmentedControls(): void {
   }
   for (const button of themeChoiceButtons) {
     button.classList.toggle("active", button.dataset.themeChoice === theme.value)
-    button.disabled = Boolean(archive) && !archive.names().some((name) =>
-      name.startsWith(`${button.dataset.themeChoice}/skin/`),
-    )
   }
   for (const button of orientationChoiceButtons) {
     button.classList.toggle("active", button.dataset.orientationChoice === orientation.value)
@@ -741,6 +760,49 @@ function applyBytesSnapshot(path: string, bytes: Uint8Array): void {
 
 function preferredPath(): string {
   return `${theme.value}/skin/${orientation.value}/${layout.value}`
+}
+
+function selectedVariant(): { theme: "light" | "dark"; orientation: "port" | "land" } {
+  const match = layoutPath.match(/^(light|dark)\/skin\/(port|land)\//)
+  return {
+    theme: (match?.[1] as "light" | "dark") ?? theme.value as "light" | "dark",
+    orientation: (match?.[2] as "port" | "land") ?? orientation.value,
+  }
+}
+
+function preferredVariantExists(path: string): boolean {
+  return archive?.format === "bda"
+    ? bdaAvailableLayoutPaths().includes(path)
+    : Boolean(archive?.names().includes(path))
+}
+
+function createMissingVariant(path: string): boolean {
+  if (!archive || preferredVariantExists(path)) return true
+  const { theme: sourceTheme, orientation: sourceOrientation } = selectedVariant()
+  const targetTheme = theme.value as "light" | "dark"
+  const targetOrientation = orientation.value
+  const label = sourceTheme !== targetTheme
+    ? `${targetTheme === "dark" ? "深色" : "浅色"}布局`
+    : `${targetOrientation === "land" ? "横屏" : "竖屏"}布局`
+  if (!window.confirm(`当前皮肤没有${label}，是否从当前配置创建？`)) {
+    theme.value = sourceTheme
+    orientation.value = sourceOrientation
+    syncSegmentedControls()
+    return false
+  }
+  const copies = variantCopyPaths(archive.names(), sourceTheme, sourceOrientation, targetTheme, targetOrientation)
+  if (!copies.some(({ target }) => target === path)) {
+    theme.value = sourceTheme
+    orientation.value = sourceOrientation
+    syncSegmentedControls()
+    showError(new Error("当前配置没有可复制的对应布局"), `创建${label}`)
+    return false
+  }
+  for (const { source, target } of copies) archive.setBytes(target, archive.getBytes(source)!.slice())
+  renderFiles()
+  updateDirty()
+  showStatus(`${label}已创建。`)
+  return true
 }
 
 function bdaBasePath(path = preferredPath()): string {
@@ -2081,16 +2143,14 @@ function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferen
   button.setAttribute("aria-label", "更换或编辑引用样式")
   const previews = document.createElement("span")
   previews.className = "style-picker-states"
-  for (const state of ["正常", "按下"]) {
+  for (let index = 0; index < 2; index += 1) {
     const item = document.createElement("span")
     item.className = "style-picker-state"
     const canvas = document.createElement("canvas")
     canvas.width = 56
     canvas.height = 28
     canvas.setAttribute("aria-hidden", "true")
-    const label = document.createElement("small")
-    label.textContent = state
-    item.append(canvas, label)
+    item.append(canvas)
     previews.append(item)
   }
   button.append(previews)
@@ -2136,7 +2196,15 @@ function openStyleReferenceEditor(styleID: string): void {
   if (!styleID || !availableStyleIDs().includes(styleID)) return
   const path = styleConfigPath()
   if (!archive?.isText(path)) return
+  const returnPath = selectedPath
+  const returnSelection = [...selectedKeySections]
+  const returnScrollTop = quickInspector.scrollTop
+  const returnDisclosures = keyInspectorDisclosures.map((details) => details.open)
   selectFile(path, "overview", "style")
+  styleReturnPath = returnPath === path ? "" : returnPath
+  styleReturnSelection = returnSelection
+  styleReturnScrollTop = returnScrollTop
+  styleReturnDisclosures = returnDisclosures
   selectStyleResource(styleID)
 }
 
@@ -2171,6 +2239,7 @@ async function renderStylePicker(): Promise<void> {
     const button = document.createElement("button")
     button.type = "button"
     button.className = "style-picker-item"
+    button.classList.toggle("selected", stylePickerTarget?.value.split(",")[0]?.trim() === styleID)
     button.title = `点击使用样式 ${styleID}；Command/Ctrl 点击编辑`
     const label = document.createElement("strong")
     label.textContent = styleID
@@ -2301,25 +2370,16 @@ function updateBdaRefs(refs: BdaStyleRef[], property: string, value: string): bo
   return true
 }
 
-function describeAction(value: string): string {
-  const known: Record<string, string> = {
-    F1: "切换符号面板",
-    F6: "切换数字键盘",
-    F16: "切换 ABC 键盘",
-    F38: "输入空格",
-    F39: "换行/确认",
-  }
-  if (!value) return "未配置"
-  if (known[value]) return known[value]
-  if (/^F\d+$/.test(value)) return `百度功能码 ${value}`
-  if (/^S\d+/.test(value)) return `百度状态码 ${value}`
-  return `输入“${value}”`
-}
-
 baiduActionCodes.replaceChildren(...Array.from({ length: 99 }, (_, index) => {
   const value = `F${index + 1}`
-  return new Option(describeAction(value), value)
+  return new Option(actionDescription(value), value)
 }))
+
+function syncActionCodeSuggestions(field: HTMLInputElement): void {
+  if (!actionFieldNames.has(field.dataset.keyField ?? "")) return
+  if (shouldSuggestActionCodes(field.value)) field.setAttribute("list", "baidu-action-codes")
+  else field.removeAttribute("list")
+}
 
 const documentFieldLabels: Record<string, string> = {
   BACK_STYLE: "背景样式",
@@ -2408,7 +2468,7 @@ function populateDocumentInspector(): void {
   for (const [sectionIndex, section] of sections.entries()) {
     const disclosure = document.createElement("details")
     disclosure.className = "document-property-section"
-    disclosure.open = sections.length <= 4 || sectionIndex === 0
+    disclosure.open = sections.length <= 4 || sectionIndex === 0 || ["PANEL", "INPUT", "CAND"].includes(section)
     const summary = document.createElement("summary")
     summary.textContent = section ? translatedSectionLabel(section) : "基本信息"
     const grid = document.createElement("div")
@@ -2544,9 +2604,13 @@ function addNavButton(
 }
 
 function populateKeyInspector(): void {
+  if (selectedPath !== layoutPath && selectedKeySections.length) {
+    selectedKeySections = []
+    preview.setSelected([])
+  }
   const document = layoutDocument
   const sections = selectedKeySections
-  const hasSelection = Boolean(document && sections.length)
+  const hasSelection = Boolean(document && sections.length && selectedPath === layoutPath)
   const skinSelected = isSkinInfoPath(selectedPath)
   const toolbarSelected = isToolbarPath(selectedPath)
   const bdaConfigSelected = Boolean(archive?.isBdaConfig(selectedPath))
@@ -2697,8 +2761,9 @@ function populateKeyInspector(): void {
         ? hasSelection
           ? "混合操作"
           : ""
-        : describeAction(values[0])
+        : actionDescription(values[0])
   }
+  for (const field of keyFields) syncActionCodeSuggestions(field)
   void updateStylePreviews()
   populateDocumentInspector()
   populateBdaConfigInspector()
@@ -3296,6 +3361,7 @@ function selectFile(
   preferredSidebarView = sidebarView,
   resourceMode: "document" | "image" | "style" = "document",
 ): void {
+  styleReturnPath = ""
   resourceConfigActive = resourceMode !== "document"
   resourceInspectorMode = resourceMode === "style" ? "style" : "image"
   toggleGuides.title = resourceInspectorMode === "image" && resourceConfigActive ? "切片网格" : "辅助线"
@@ -3319,6 +3385,10 @@ function selectFile(
     assetReturnPath = selectedPath
   }
   selectedPath = path
+  if (path !== layoutPath) {
+    selectedKeySections = []
+    preview.setSelected([])
+  }
   if (isBdaVirtualTextPath(path)) {
     hideImageWorkspace()
     const base = IniDocument.parse(bdaBase!.getText(bdaBasePath(path)))
@@ -4084,7 +4154,10 @@ source.addEventListener("scroll", () => {
   highlight.scrollLeft = source.scrollLeft
 })
 for (const field of keyFields) {
-  field.addEventListener("input", () => updateSelectedKey(field))
+  field.addEventListener("input", () => {
+    syncActionCodeSuggestions(field)
+    updateSelectedKey(field)
+  })
 }
 for (const field of styleFields) {
   field.addEventListener("input", () => updateSelectedStyle(field))
@@ -4136,6 +4209,7 @@ for (const button of inspectorTabButtons) {
 for (const control of [theme, orientation, layout]) {
   control.addEventListener("change", () => {
     const path = preferredPath()
+    if (control !== layout && !createMissingVariant(path)) return
     if (archive?.format === "bda") {
       renderFiles()
       if (bdaAvailableLayoutPaths().includes(path)) selectFile(path)
@@ -4188,7 +4262,26 @@ newTileButton.addEventListener("click", () => {
 })
 duplicateTileButton.addEventListener("click", duplicateSelectedTile)
 deleteTileButton.addEventListener("click", deleteSelectedTile)
-resourceBackButton.addEventListener("click", showResourceList)
+resourceBackButton.addEventListener("click", () => {
+  if (resourceInspectorMode === "style" && styleReturnPath) {
+    const path = styleReturnPath
+    const selection = [...styleReturnSelection]
+    const scrollTop = styleReturnScrollTop
+    const disclosures = [...styleReturnDisclosures]
+    styleReturnPath = ""
+    selectFile(path, "overview")
+    selectedKeySections = selection
+    preview.setSelected(selection)
+    populateKeyInspector()
+    keyInspectorDisclosures.forEach((details, index) => {
+      details.open = disclosures[index] ?? details.open
+    })
+    quickInspector.scrollTop = scrollTop
+    revealSourceFile(path)
+    return
+  }
+  showResourceList()
+})
 resourceSearch.addEventListener("input", renderResourceInspector)
 for (const button of tileModeButtons) {
   button.addEventListener("click", () => {
@@ -4817,6 +4910,16 @@ window.addEventListener("keydown", (event) => {
         return
       }
     }
+  }
+  if (
+    (event.key === "Delete" || event.key === "Backspace") &&
+    isEditing() &&
+    selectedKeySections.length &&
+    !isTextEditingTarget(event.target)
+  ) {
+    event.preventDefault()
+    deleteSelectedKeys()
+    return
   }
   if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return
   event.preventDefault()
