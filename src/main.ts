@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core"
+import { invoke, isTauri } from "@tauri-apps/api/core"
 import { emitTo, listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
@@ -116,8 +116,8 @@ import {
 import { unsavedDecision } from "./unsaved.ts"
 import { checkForUpdate } from "./update.ts"
 
-document.documentElement.classList.toggle("macos", navigator.userAgent.includes("Macintosh"))
-document.documentElement.classList.toggle("windows", navigator.userAgent.includes("Windows"))
+document.documentElement.classList.toggle("macos", isTauri() && navigator.userAgent.includes("Macintosh"))
+document.documentElement.classList.toggle("windows", isTauri() && navigator.userAgent.includes("Windows"))
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 const newButton = $("#new") as HTMLButtonElement

@@ -3590,3 +3590,56 @@ input[type="search"]:focus {
     display: none;
   }
 }
+
+@media (max-width: 600px) {
+  .titlebar {
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  .titlebar > .toolbar-group {
+    min-width: 0;
+    flex: 1;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .titlebar > .toolbar-group::-webkit-scrollbar {
+    display: none;
+  }
+
+  .document-title {
+    display: none;
+  }
+
+  .mode-control,
+  .titlebar > .toolbar-more {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  aside {
+    display: none;
+  }
+
+  .preview-toolbar {
+    gap: 5px;
+    padding-inline: 7px;
+  }
+
+  .preview-toolbar .field-control {
+    min-width: 0;
+    flex: 1;
+    position: static;
+    transform: none;
+  }
+
+  .preview-toolbar .field-control select {
+    width: 100%;
+    min-width: 0;
+  }
+}

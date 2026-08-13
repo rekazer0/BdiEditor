@@ -198,6 +198,11 @@ test("desktop editor grid keeps the inspector beside the workspace", () => {
     css,
     /@media \(max-width: 1060px\)[\s\S]*?\.inspector-resize-handle,\s*\.source\s*\{[^}]*display:\s*none/s,
   )
+  assert.match(
+    css,
+    /@media \(max-width: 600px\)[\s\S]*?main\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)[\s\S]*?aside\s*\{[^}]*display:\s*none/s,
+  )
+  assert.match(main, /classList\.toggle\("macos", isTauri\(\) && navigator\.userAgent\.includes\("Macintosh"\)\)/)
 })
 
 test("single-theme skins keep missing theme choices available for creation", () => {
@@ -507,8 +512,8 @@ test("key layout supports select, drag-move, merge, and wheel-adjusted geometry 
 })
 
 test("window and about names match the GitHub project and include the version", () => {
-  assert.match(html, /<title>BdiEditor v0\.7\.7<\/title>/)
-  assert.match(html, /关于 BdiEditor v0\.7\.7/)
+  assert.match(html, /<title>BdiEditor v0\.8\.31<\/title>/)
+  assert.match(html, /关于 BdiEditor v0\.8\.31/)
   assert.match(html, /<strong>技术交流与反馈<\/strong><br><button id="copy-qq-group"[^>]*>QQ群：228040912<\/button>/)
 })
 
@@ -528,7 +533,7 @@ test("deleting a mixed inspector value clears every selected key through its inp
 })
 
 test("about dialog automatically checks the canonical GitHub project for updates", () => {
-  assert.match(html, /id="about-update"[^>]*data-current-version="0\.7\.7"/)
+  assert.match(html, /id="about-update"[^>]*data-current-version="0\.8\.31"/)
   assert.match(html, /id="check-update"/)
   assert.match(html, /id="update-status"[^>]*aria-live="polite"/)
   assert.match(html, /id="download-update"[^>]*https:\/\/github\.com\/rekazer0\/BdiEditor\/releases["']/)
@@ -1042,7 +1047,7 @@ test("preview toolbar centers the device selector and toggles canvas guides", ()
 })
 
 test("platform materials and toolbar status surfaces stay visually consistent", () => {
-  assert.match(main, /document\.documentElement\.classList\.toggle\("windows", navigator\.userAgent\.includes\("Windows"\)\)/)
+  assert.match(main, /document\.documentElement\.classList\.toggle\("windows", isTauri\(\) && navigator\.userAgent\.includes\("Windows"\)\)/)
   assert.match(css, /#skin-state-control\s*\{[^}]*left:\s*45px[^}]*transform:\s*none/s)
   assert.match(css, /#skin-state-control\[hidden\]\s*\{[^}]*display:\s*none\s*!important/s)
   assert.match(css, /\.source\s*\{[^}]*background:\s*var\(--sidebar\)[^}]*blur\(28px\)/s)
@@ -1202,7 +1207,7 @@ test("top, sidebar, menus and segmented controls share animated glass materials"
   assert.match(css, /\.canvas-wrap\s*\{[^}]*background:\s*var\(--canvas\)/s)
   assert.doesNotMatch(css.match(/\.canvas-only canvas\s*\{[^}]*\}/s)?.[0] ?? "", /border:|box-shadow:/)
   assert.match(css, /@keyframes glass-select/)
-  assert.match(main, /document\.documentElement\.classList\.toggle\("macos", navigator\.userAgent\.includes\("Macintosh"\)\)/)
+  assert.match(main, /document\.documentElement\.classList\.toggle\("macos", isTauri\(\) && navigator\.userAgent\.includes\("Macintosh"\)\)/)
   assert.match(css, /:root\.macos\s*\{[^}]*--titlebar-height:\s*86px/s)
   assert.match(html, /<header class="titlebar" data-tauri-drag-region>/)
   assert.match(html, /<div class="document-title" data-tauri-drag-region>/)

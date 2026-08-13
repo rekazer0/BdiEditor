@@ -6,12 +6,11 @@
 
 ![BdiEditor v0.3.2 编辑界面](docs/screenshots/bdiedito-v0.3.2-overview.png)
 
-## v0.7.7 更新
+## v0.8.31 更新
 
-- 修复 BDS 转 BDI 时重复添加主题级 `Info.txt` 与 `demo.png` 的问题。
-- 修复无图片的前景样式（如纯文字）预览点击时无法打开切片选择器的问题。
-- 修复 Windows PowerShell 下 `tauri build` 参数丢失导致打包失败的问题。
-- 改进浏览器端图片资源选择器：切片预览中可直接打开可搜索的资源列表，无需丢失切片目标。
+- 新增 iOS 26 透明适配、按键拖动/交换/合并和画布缩放平移工具。
+- 完善样式搜索、双状态缩略图、布局变体创建和 LIST 候选栏编辑。
+- 修复 iPhone 预览几何、按键命中区域、皮肤格式解析和 Windows Acrylic 可读性。
 
 完整记录见 [CHANGELOG.md](CHANGELOG.md)。
 
