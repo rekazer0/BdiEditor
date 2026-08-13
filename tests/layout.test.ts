@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { applyLayoutAction, isListCell, listCellIndex, listCellRect, listCellValue, moveRects, resizeRect, setExactGap, setListCellValue, type LayoutRect } from "../src/layout.ts"
+import { applyLayoutAction, isListCell, listCellIndex, listCellRect, listCellValue, mergeLayoutRects, moveRects, resizeRect, setExactGap, setListCellValue, type LayoutRect } from "../src/layout.ts"
 import { IniDocument } from "../src/ini.ts"
 
 const rects: LayoutRect[] = [
@@ -15,6 +15,25 @@ test("aligns and sizes selected keys without mutating input", () => {
   assert.deepEqual(applyLayoutAction(rects, "bottom").map((rect) => rect.y + rect.height), [85, 85, 85])
   assert.deepEqual(applyLayoutAction(rects, "same-height").map((rect) => rect.height), [80, 80, 80])
   assert.equal(rects[1].x, 140)
+})
+
+test("swaps only the positions of exactly two selected keys", () => {
+  const swapped = applyLayoutAction(rects.slice(0, 2), "swap")
+  assert.deepEqual(swapped, [
+    { section: "KEY1", x: 140, y: 10, width: 100, height: 80 },
+    { section: "KEY2", x: 2, y: 5, width: 120, height: 70 },
+  ])
+  assert.deepEqual(applyLayoutAction(rects, "swap"), rects)
+})
+
+test("merges two key bounds while retaining the first key identity", () => {
+  assert.deepEqual(mergeLayoutRects(rects[0], rects[1]), {
+    section: "KEY1",
+    x: 2,
+    y: 5,
+    width: 258,
+    height: 80,
+  })
 })
 
 test("distributes keys within their original outer bounds", () => {

@@ -398,6 +398,7 @@ export class Preview {
   private readonly canvas: HTMLCanvasElement
   private readonly onEvent: (event: PreviewEvent) => void
   private readonly onSelect: (sections: string[]) => void
+  private readonly onMove: (sections: string[], deltaX: number, deltaY: number) => void
   private readonly toolbarSlots: boolean
   private document?: IniDocument
   private defaults?: IniDocument
@@ -410,6 +411,13 @@ export class Preview {
   private transparent = false
   private keys: PreviewItem[] = []
   private mode: "edit" | "preview" = "edit"
+  private editTool: "select" | "move" = "select"
+  private editDrag?: {
+    pointerId: number
+    startX: number
+    startY: number
+    original: Map<string, Rect>
+  }
   private active?: {
     key: PreviewItem
     startX: number
@@ -431,12 +439,15 @@ export class Preview {
     onSelect: (sections: string[]) => void,
     toolbarSlots = false,
     onContextMenu?: (section: string, event: MouseEvent) => void,
+    onMove: (sections: string[], deltaX: number, deltaY: number) => void = () => {},
   ) {
     this.canvas = canvas
     this.onEvent = onEvent
     this.onSelect = onSelect
+    this.onMove = onMove
     this.toolbarSlots = toolbarSlots
     canvas.addEventListener("pointerdown", (event) => this.pointerDown(event))
+    canvas.addEventListener("pointermove", (event) => this.pointerMove(event))
     canvas.addEventListener("pointerup", (event) => this.pointerUp(event))
     canvas.addEventListener("contextmenu", (event) => {
       const key = this.hit(this.point(event))
@@ -446,6 +457,8 @@ export class Preview {
     })
     canvas.addEventListener("pointercancel", () => {
       this.active = undefined
+      this.cancelEditDrag()
+      this.updateCursor()
       void this.draw()
     })
   }
@@ -453,7 +466,15 @@ export class Preview {
   setMode(mode: "edit" | "preview"): void {
     this.mode = mode
     this.active = undefined
-    this.canvas.style.cursor = mode === "edit" ? "default" : "pointer"
+    this.cancelEditDrag()
+    this.updateCursor()
+    void this.draw()
+  }
+
+  setEditTool(tool: "select" | "move"): void {
+    this.editTool = tool
+    this.cancelEditDrag()
+    this.updateCursor()
     void this.draw()
   }
 
@@ -570,12 +591,23 @@ export class Preview {
       else this.selected.add(key.section)
     } else if (!this.selected.has(key.section) || this.mode === "preview") {
       this.selected = new Set([key.section])
-    } else if (this.mode === "edit") {
+    } else if (this.mode === "edit" && this.editTool === "select") {
       this.selected.delete(key.section)
     }
     if (this.mode === "edit" && !event.shiftKey) this.selectionAnchor = key.section
     this.onSelect([...this.selected])
     if (this.mode === "edit") {
+      if (this.editTool === "move" && !key.section.startsWith("LIST")) {
+        const selectedKeys = this.keys.filter((item) => this.selected.has(item.section) && !item.section.startsWith("LIST"))
+        this.editDrag = {
+          pointerId: event.pointerId,
+          startX: point.x,
+          startY: point.y,
+          original: new Map(selectedKeys.map((item) => [item.section, { ...item.rect }])),
+        }
+        this.canvas.setPointerCapture(event.pointerId)
+        this.canvas.style.cursor = "grabbing"
+      }
       void this.draw()
       return
     }
@@ -587,6 +619,18 @@ export class Preview {
       startedAt: Date.now(),
     }
     void this.playAnimation(key)
+    void this.draw()
+  }
+
+  private pointerMove(event: PointerEvent): void {
+    if (!this.editDrag || this.editDrag.pointerId !== event.pointerId) return
+    const point = this.point(event)
+    const dx = Math.round(point.x - this.editDrag.startX)
+    const dy = Math.round(point.y - this.editDrag.startY)
+    for (const key of this.keys) {
+      const original = this.editDrag.original.get(key.section)
+      if (original) key.rect = { ...original, x: original.x + dx, y: original.y + dy }
+    }
     void this.draw()
   }
 
@@ -611,6 +655,16 @@ export class Preview {
   }
 
   private pointerUp(event: PointerEvent): void {
+    if (this.editDrag?.pointerId === event.pointerId) {
+      const point = this.point(event)
+      const dx = point.x - this.editDrag.startX
+      const dy = point.y - this.editDrag.startY
+      this.editDrag = undefined
+      this.updateCursor()
+      if (Math.round(dx) || Math.round(dy)) this.onMove([...this.selected], Math.round(dx), Math.round(dy))
+      else void this.draw()
+      return
+    }
     if (!this.active) return
     const point = this.point(event)
     const { key, startX, startY, startedAt } = this.active
@@ -621,6 +675,19 @@ export class Preview {
     this.onEvent({ section: key.section, direction, code })
     this.active = undefined
     void this.draw()
+  }
+
+  private cancelEditDrag(): void {
+    if (!this.editDrag) return
+    for (const key of this.keys) {
+      const original = this.editDrag.original.get(key.section)
+      if (original) key.rect = original
+    }
+    this.editDrag = undefined
+  }
+
+  private updateCursor(): void {
+    this.canvas.style.cursor = this.mode === "preview" ? "pointer" : this.editTool === "move" ? "grab" : "default"
   }
 
   private fitCanvas(): void {

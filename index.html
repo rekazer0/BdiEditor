@@ -82,7 +82,6 @@
           <label class="field-control">
             <span>设备</span>
             <select id="device" aria-label="设备">
-              <option value="iphone-15-pro">iPhone 15 Pro · 1179×2556</option>
               <option value="iphone-17-pro">iPhone 17 Pro · 1206×2622</option>
               <option value="iphone-17-pro-max">iPhone 17 Pro Max · 1320×2868</option>
               <option value="xiaomi-17">Xiaomi 17 · 1220×2656</option>
@@ -115,10 +114,10 @@
           </div>
           <div id="device-shell" class="device-shell canvas-only" data-device="canvas" data-orientation="port">
             <div class="device-screen">
-              <div class="device-status"><span>9:41</span><span class="device-status-icons"><span class="system-symbol" data-system-symbol="cellularbars" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 16v-2m4 2v-5m4 5V8m4 8V5"/></svg></span><span class="system-symbol" data-system-symbol="wifi" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 8a11 11 0 0 1 14 0M6 11a7 7 0 0 1 8 0m-5 3a2 2 0 0 1 2 0"/></svg></span><span class="system-symbol" data-system-symbol="battery.100" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 20"><rect x="2" y="5" width="18" height="10" rx="2"/><path d="M22 8v4M5 8h12v4H5z"/></svg></span></span></div>
+              <div class="device-status"><span class="device-status-time">18:23 <span class="system-symbol" data-system-symbol="speaker.slash" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4zM17 9l4 6M21 9l-4 6"/></svg></span></span><span class="device-status-icons"><span class="system-symbol" data-system-symbol="cellularbars" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 16v-2m4 2v-5m4 5V8m4 8V5"/></svg></span><span class="system-symbol" data-system-symbol="wifi" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 8a11 11 0 0 1 14 0M6 11a7 7 0 0 1 8 0m-5 3a2 2 0 0 1 2 0"/></svg></span><span class="system-symbol" data-system-symbol="battery.100" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 20"><rect x="2" y="5" width="18" height="10" rx="2"/><path d="M22 8v4M5 8h12v4H5z"/></svg></span></span></div>
               <div class="phone-navigation" aria-hidden="true">
                 <span class="phone-nav-round"><span class="system-symbol" data-system-symbol="chevron.left" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m12 4-6 6 6 6"/></svg></span></span>
-                <span class="phone-nav-actions"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12M4 8.5h7a5 5 0 0 1 5 5"/></svg></span><span class="system-symbol" data-system-symbol="arrow.uturn.forward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m13 5 4 3.5-4 3.5M16 8.5H9a5 5 0 0 0-5 5"/></svg></span></span>
+                <span class="phone-nav-round phone-nav-undo"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12M4 8.5h7a5 5 0 0 1 5 5"/></svg></span></span>
                 <span class="phone-nav-actions"><span class="system-symbol" data-system-symbol="square.and.arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 13V3m-4 4 4-4 4 4M4 10v6h12v-6"/></svg></span><span class="system-symbol" data-system-symbol="ellipsis" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><circle class="fallback-dot" cx="4" cy="10" r="1"/><circle class="fallback-dot" cx="10" cy="10" r="1"/><circle class="fallback-dot" cx="16" cy="10" r="1"/></svg></span></span>
                 <span class="phone-nav-done"><span class="system-symbol" data-system-symbol="checkmark" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m4 10 4 4 8-9"/></svg></span></span>
               </div>
@@ -128,6 +127,13 @@
                   <button id="clear-simulation">清除</button>
                 </div>
                 <textarea id="simulated-output" rows="2" aria-label="模拟输入内容" placeholder="在交互预览中点击按键，或直接输入"></textarea>
+              </div>
+              <div class="phone-editing-toolbar" aria-hidden="true">
+                <strong>格式</strong>
+                <span class="system-symbol" data-system-symbol="list.bullet" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg></span>
+                <span class="system-symbol" data-system-symbol="square.grid.2x2" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></span>
+                <span class="system-symbol" data-system-symbol="paperclip" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="M8 12.5 15.5 5a4 4 0 0 1 5.7 5.7L11 20.8a6 6 0 0 1-8.5-8.5L13 1.8"/></svg></span>
+                <span class="system-symbol" data-system-symbol="pencil" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="m4 20 4.5-1 11-11-3.5-3.5-11 11zM14.5 6 18 9.5"/></svg></span>
               </div>
               <div class="keyboard-dock">
                 <div id="candidate-area">
@@ -151,6 +157,11 @@
             <figcaption id="workspace-image-error" hidden>无法预览此 PNG</figcaption>
           </figure>
         </div>
+        <div class="preview-zoom-control" aria-label="画布缩放">
+          <button id="preview-zoom-out" type="button" aria-label="缩小画布" title="缩小"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10" /></svg></button>
+          <button id="preview-zoom-fit" type="button" aria-label="适配窗口" title="适配窗口"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v4m8-4h4v4M8 16H4v-4m8 4h4v-4" /></svg></button>
+          <button id="preview-zoom-in" type="button" aria-label="放大画布" title="放大"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M10 5v10" /></svg></button>
+        </div>
         <div class="workspace-status"><div id="event-log" aria-live="polite">打开皮肤后可预览按键。</div><div id="panel-status">面板：-- × -- · 预览缩放：--%</div></div>
       </section>
 
@@ -167,9 +178,15 @@
           </div>
         </div>
         <div id="quick-inspector" hidden>
-          <div class="inspector-title">
+          <div class="inspector-title key-inspector-title">
             <strong id="selected-key">选择画布中的按键</strong>
             <span>更改会自动写回配置</span>
+            <div class="tile-toolbar key-toolbar key-only">
+              <div class="tile-mode-control key-mode-control" aria-label="按键操作模式">
+                <button class="toolbar-button active" type="button" data-key-mode="select" title="点击选择" aria-label="点击选择"><span class="icon system-symbol" data-system-symbol="cursorarrow" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 2.5 15.5 11l-5 .8 2.8 5-2.5 1.4-2.7-5L4 16z"/></svg></span></button>
+                <button class="toolbar-button" type="button" data-key-mode="move" title="拖动按键" aria-label="拖动按键"><span class="icon system-symbol" data-system-symbol="arrow.up.and.down.and.arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 2v16m0-16L7 5m3-3 3 3M2 10h16m-16 0 3-3m-3 3 3 3m13-3-3-3m3 3-3 3m-5 5-3-3m3 3 3-3"/></svg></span></button>
+              </div>
+            </div>
           </div>
           <div class="inspector-group skin-fields" hidden>
             <h3>皮肤信息</h3>
@@ -220,6 +237,7 @@
               <label>宽 <input data-key-field="width" type="number" min="1" /></label>
               <label>高 <input data-key-field="height" type="number" min="1" /></label>
             </div>
+            <p class="inspector-note">选中按键后，可使用方向键移动；按住 Shift 每次移动 10 像素。</p>
             <div class="inspector-grid gap-fields">
               <label>水平间距 <input data-gap-field="horizontal" type="number" /></label>
               <label>垂直间距 <input data-gap-field="vertical" type="number" /></label>
@@ -233,6 +251,8 @@
               <button data-layout-action="same-height" title="等高">等高</button>
               <button data-layout-action="horizontal-gap" title="水平等间距">水平分布</button>
               <button data-layout-action="vertical-gap" title="垂直等间距">垂直分布</button>
+              <button data-layout-action="swap" title="交换位置">交换</button>
+              <button data-layout-action="merge" title="合并按键">合并</button>
             </div>
           </details>
           <details class="inspector-group inspector-disclosure key-only" open>
@@ -273,7 +293,7 @@
             <div class="inspector-title">
               <strong id="resource-list-title">皮肤图片</strong>
               <span id="resource-count"></span>
-              <input id="resource-search" type="search" placeholder="搜索图片" aria-label="搜索图片">
+              <label class="search-control" aria-label="搜索图片"><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"></span><input id="resource-search" type="search" results="0" placeholder="搜索图片"></label>
               <div class="resource-actions">
                 <button id="style-add" class="toolbar-button" type="button" title="新增样式" aria-label="新增样式" hidden><span class="icon system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14"/></svg></span></button>
                 <button id="resource-upload" class="toolbar-button" type="button" title="上传图片" aria-label="上传图片"><span class="icon system-symbol" data-system-symbol="arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 13V4m-4 4 4-4 4 4M4 16h12"/></svg></span></button>
@@ -375,6 +395,14 @@
       </form>
     </dialog>
 
+    <dialog id="skin-name-dialog" class="project-dialog" aria-labelledby="skin-name-title">
+      <form id="skin-name-form" method="dialog">
+        <header><h2 id="skin-name-title">命名皮肤</h2><p>保存前请输入皮肤文件名称。</p></header>
+        <div class="panel-copy-fields"><label>皮肤名称 <input id="skin-name-input" required maxlength="80" autocomplete="off" placeholder="请输入皮肤名称" /></label></div>
+        <footer><button value="cancel" formnovalidate>取消</button><button class="primary" value="confirm">确认</button></footer>
+      </form>
+    </dialog>
+
     <dialog id="panel-scale-dialog" class="project-dialog" aria-labelledby="panel-scale-title">
       <form id="panel-scale-form" method="dialog">
         <header><h2 id="panel-scale-title">面板复制</h2><p>复制一个面板及其样式与图片资源，可跨主题和屏幕方向。</p></header>
@@ -435,7 +463,7 @@
             <small id="style-image-resource-count"></small>
           </div>
           <div class="style-image-resource-tools">
-            <input id="style-image-resource-search" type="search" placeholder="搜索图片资源" aria-label="搜索图片资源">
+            <label class="search-control" aria-label="搜索图片资源"><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"></span><input id="style-image-resource-search" type="search" results="0" placeholder="搜索图片资源"></label>
             <button id="style-image-resource-close" type="button" aria-label="返回图片切片">关闭</button>
           </div>
         </header>
@@ -493,7 +521,7 @@
           <span class="style-picker-hint">单击应用 · Command/Ctrl 单击编辑</span>
         </div>
         <div class="style-picker-tools">
-          <input id="style-picker-search" type="search" placeholder="搜索样式编号" aria-label="搜索样式编号">
+          <label class="search-control" aria-label="搜索样式编号"><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"></span><input id="style-picker-search" type="search" results="0" placeholder="搜索样式编号"></label>
           <button id="style-picker-close" type="button" aria-label="关闭样式选择器">关闭</button>
         </div>
       </header>
@@ -506,7 +534,7 @@
         <header><h2 id="settings-title">设置</h2><button aria-label="关闭">关闭</button></header>
         <label>软件外观 <select id="app-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
         <label class="settings-switch">窗口玻璃与亚克力材质 <input id="window-material" type="checkbox" role="switch" checked></label>
-        <label>默认预览设备 <select id="default-device"><option value="canvas">画布</option><option value="iphone-15-pro">iPhone 15 Pro</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
+        <label>默认预览设备 <select id="default-device"><option value="canvas">画布</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
         <label>画布背景 <select id="canvas-background"><option value="glass">玻璃</option><option value="checkerboard">马赛克</option><option value="white" selected>白色</option><option value="dark">深色</option></select></label>
         <p>新打开的皮肤将使用此预览设备。</p>
       </form>
@@ -514,6 +542,7 @@
 
     <div id="edit-context-menu" class="edit-context-menu" hidden role="menu">
       <button data-context-action="copy" role="menuitem">复制按键</button>
+      <button data-context-action="swap" role="menuitem">交换位置</button>
       <button data-context-action="delete" role="menuitem">删除按键</button>
     </div>
 

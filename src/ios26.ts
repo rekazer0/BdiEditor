@@ -30,7 +30,9 @@ function setSectionValue(document: IniDocument, section: string, key: string, va
 
 export function adaptIos26Variant(candidateText: string, generalText: string, styleText: string): {
   candidate: string
+  candidateStyle: string
   general: string
+  panelStyle: string
   styles: string
 } {
   const candidate = IniDocument.parse(candidateText)
@@ -41,8 +43,24 @@ export function adaptIos26Variant(candidateText: string, generalText: string, st
   setSectionValue(candidate, "CAND", "BACK_STYLE", candidateStyle)
   setSectionValue(general, "SCAND", "BACK_STYLE", candidateStyle)
   setSectionValue(general, "PANEL", "BACK_STYLE", panelStyle)
-  return { candidate: candidate.toString(), general: general.toString(), styles: styles.toString() }
+  return {
+    candidate: candidate.toString(),
+    candidateStyle,
+    general: general.toString(),
+    panelStyle,
+    styles: styles.toString(),
+  }
 }
+
+function adaptExistingSection(text: string, section: "CAND" | "PANEL", style: string): string {
+  const document = IniDocument.parse(text)
+  if (!document.sections().includes(section)) return text
+  document.set(section, "BACK_STYLE", style)
+  return document.toString()
+}
+
+export const adaptIos26Candidate = (text: string, style: string): string => adaptExistingSection(text, "CAND", style)
+export const adaptIos26Panel = (text: string, style: string): string => adaptExistingSection(text, "PANEL", style)
 
 export function isIos26Adapted(candidateText: string | undefined, generalText: string | undefined): boolean {
   if (!candidateText || !generalText) return false

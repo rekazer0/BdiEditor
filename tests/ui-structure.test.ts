@@ -71,7 +71,8 @@ test("static and dynamic system symbol elements are decorative and retain inline
   assert.ok(staticSymbols.length > 0)
   for (const symbol of staticSymbols) assert.match(symbol, /aria-hidden="true"/)
   assert.equal(
-    (html.match(/class="system-symbol-fallback"/g) ?? []).length,
+    (html.match(/class="system-symbol-fallback"/g) ?? []).length +
+      (html.match(/class="system-symbol"[^>]*data-system-symbol="magnifyingglass"/g) ?? []).length,
     staticSymbols.length,
   )
   assert.match(main, /symbol\.dataset\.systemSymbol = name/)
@@ -118,7 +119,7 @@ test("placeholder icon glyphs are absent from editor chrome and CSS", () => {
   }
 })
 
-test("preview toolbar defaults to a canvas shell without zoom controls", () => {
+test("preview canvas provides mouse-wheel and button zoom controls", () => {
   const toolbar = html.slice(
     html.indexOf('<div class="preview-toolbar">'),
     html.indexOf('<div class="canvas-wrap empty">'),
@@ -131,13 +132,46 @@ test("preview toolbar defaults to a canvas shell without zoom controls", () => {
   assert.match(toolbar, /data-theme-choice="light"[^>]*>浅色/)
   assert.match(toolbar, /data-theme-choice="dark"[^>]*>深色/)
   assert.match(html, /<option value="canvas" selected>画布<\/option>/)
-  assert.doesNotMatch(html, /id="zoom-(?:out|in)"|id="zoom-value"/)
-  assert.doesNotMatch(main, /applyZoom|stepZoom|clampZoom|--preview-zoom/)
-  assert.doesNotMatch(css, /zoom:\s*var\(--preview-zoom\)/)
+  assert.doesNotMatch(html, /iphone-15-pro/)
+  assert.match(html, /id="preview-zoom-out"/)
+  assert.match(html, /id="preview-zoom-fit"/)
+  assert.match(html, /id="preview-zoom-in"/)
+  assert.match(main, /event\.metaKey \|\| event\.ctrlKey/)
+  assert.match(main, /function applyPreviewZoom\(value: number, anchor\?: \{ x: number; y: number \}\)/)
+  assert.match(main, /anchor\.x - \(after\.left \+ anchorX \* after\.width\)/)
+  assert.match(main, /event\.key !== " "/)
+  assert.match(main, /canvasWrap\.setPointerCapture\(event\.pointerId\)/)
+  assert.match(main, /previewPanStart\.panX \+ event\.clientX - previewPanStart\.x/)
+  assert.match(main, /const renderedWidth = width \* previewZoom/)
+  assert.match(main, /scale\(\$\{device\.value === "canvas" \? 1 : previewZoom\}\)/)
+  assert.doesNotMatch(main, /phoneFitSize/)
   assert.match(html, /id="device-shell" class="device-shell canvas-only" data-device="canvas"/)
+  assert.match(css, /\.device-shell\s*\{[^}]*place-self:\s*safe center/s)
+  assert.match(css, /\.canvas-wrap\.preview-pan-ready\s*\{[^}]*cursor:\s*grab/s)
   const titlebar = css.match(/\.titlebar\s*\{[^}]+\}/s)?.[0] ?? ""
   assert.match(titlebar, /padding:\s*6px 12px/)
   assert.doesNotMatch(html, /data-skin-field="Authors"/)
+})
+
+test("iPhone preview uses per-model physical frame geometry", () => {
+  assert.match(main, /const frame = spec\.frame/)
+  assert.match(main, /frame\.width/)
+  assert.match(main, /--device-screen-inset-x/)
+  assert.match(main, /--device-island-width/)
+  assert.match(main, /const bodyRadius = frame\.width \* 0\.26/)
+  assert.match(main, /bodyRadius \/ frame\.width \* 100}% \/ \$\{bodyRadius \/ frame\.height \* 100}%/)
+  assert.doesNotMatch(main, /--device-body-radius[^\n]+shortUnit/)
+  assert.match(css, /\.device-shell\[data-family="iphone"\][\s\S]*?corner-shape:\s*squircle/)
+  assert.doesNotMatch(css, /data-device="iphone-15-pro"/)
+})
+
+test("iPhone editing chrome follows the native Notes composition", () => {
+  assert.match(html, /class="phone-editing-toolbar"/)
+  assert.match(html, /data-system-symbol="list\.bullet"/)
+  assert.match(html, /data-system-symbol="paperclip"/)
+  assert.match(css, /\.device-status\s*\{[^}]*font-size:\s*11px/s)
+  assert.match(css, /\.phone-nav-round,[\s\S]*?width:\s*32px/s)
+  assert.match(css, /\.phone-editing-toolbar\s*\{[^}]*border-radius:\s*999px/s)
 })
 
 test("layout remains hidden state while preview controls replace inspector layout controls", () => {
@@ -262,8 +296,8 @@ test("export menu exposes direct readable BDI, BDS and BDA actions", () => {
   assert.match(html, /data-export-format="bda"[^>]*>[^<]*导出新版 Android 皮肤/)
   assert.doesNotMatch(html, /id="export-format"/)
   assert.doesNotMatch(html, /id="save-as"/)
-  assert.match(main, /saveNative\(true, format\)/)
-  assert.match(main, /saveNative\(false, currentExportFormat\(\)\)/)
+  assert.match(main, /saveArchive\(true, format\)/)
+  assert.match(main, /saveArchive\(false, currentExportFormat\(\)\)/)
 })
 
 test("BDA exports reuse one conversion path without disabling BDI or BDS", () => {
@@ -382,16 +416,17 @@ test("Shift selects the complete key range from the anchor", () => {
 })
 
 test("clicking an already selected key in edit mode deselects it", () => {
-  assert.match(preview, /\} else if \(this\.mode === "edit"\) \{\s*this\.selected\.delete\(key\.section\)/s)
+  assert.match(preview, /\} else if \(this\.mode === "edit" && this\.editTool === "select"\) \{\s*this\.selected\.delete\(key\.section\)/s)
 })
 
 test("panel tools disable in interactive preview mode", () => {
   assert.match(main, /panelScaleButton\.disabled = !editing \|\| fileOperationRunning \|\| !archive/)
   assert.match(main, /replaceLayoutImageButton\.disabled = !editing \|\| fileOperationRunning \|\| !archive \|\| archive\.format === "bda"/)
+  assert.match(main, /adaptIos26Button\.disabled = !editing \|\| fileOperationRunning \|\| !archive \|\| archive\.format === "bda"/)
   assert.match(main, /updatePanelToolButtons\(\)/)
 })
 
-test("canvas mode shrinks below parsed panel width but never enlarges past it", () => {
+test("canvas mode auto-fits while allowing manual enlargement", () => {
   assert.match(main, /toolbarCanvas\.style\.setProperty\("--toolbar-width", String\(width\)\)/)
   assert.match(main, /toolbarCanvas\.style\.setProperty\("--toolbar-height", String\(height\)\)/)
   assert.match(main, /deviceShell\.style\.setProperty\("--canvas-width", `\$\{width\}px`\)/)
@@ -399,7 +434,7 @@ test("canvas mode shrinks below parsed panel width but never enlarges past it", 
   assert.match(main, /new ResizeObserver\(scheduleFitCanvasPreview\)\.observe\(canvasWrap\)/)
   assert.doesNotMatch(main, /canvasMaximumWidth/)
   assert.match(main, /function updateCanvasPanelStatus\(/)
-  assert.match(css, /\.device-shell\.canvas-only\s*\{[^}]*width:\s*min\(100%, var\(--canvas-fit-width, var\(--canvas-width, 1080px\)\)\)/s)
+  assert.match(css, /\.device-shell\.canvas-only\s*\{[^}]*width:\s*var\(--canvas-fit-width, var\(--canvas-width, 1080px\)\)[^}]*max-width:\s*none/s)
   assert.doesNotMatch(css, /\.device-shell\.canvas-only\s*\{[^}]*920px/s)
   assert.match(
     css,
@@ -446,12 +481,29 @@ test("settings expose canvas backgrounds and edit mode exposes key context actio
   assert.match(main, /savedCanvasBackground === "default" \? "glass" : savedCanvasBackground \?\? "white"/)
   assert.match(css, /\.canvas-wrap\[data-background="glass"\]\s*\{[^}]*backdrop-filter:/s)
   assert.match(html, /data-context-action="copy"/)
+  assert.match(html, /data-context-action="swap"/)
   assert.match(html, /data-context-action="delete"/)
   assert.match(main, /function copySelectedKeys\(\)/)
   assert.match(main, /function deleteSelectedKeys\(\)/)
   assert.match(main, /event\.key === "Delete" \|\| event\.key === "Backspace"[\s\S]*deleteSelectedKeys\(\)/)
   assert.match(main, /createSystemSymbol\("doc\.on\.doc"\)/)
+  assert.match(main, /createSystemSymbol\("arrow\.left\.and\.right"\)/)
   assert.match(main, /createSystemSymbol\("trash"\)/)
+  assert.match(css, /\.edit-context-menu button\s*\{[^}]*font-size:\s*11px[^}]*font-weight:\s*400[^}]*color:\s*var\(--secondary\)/s)
+})
+
+test("key layout supports select, drag-move, merge, and wheel-adjusted geometry fields", () => {
+  assert.match(html, /class="inspector-title key-inspector-title"[\s\S]*class="tile-toolbar key-toolbar key-only"[\s\S]*class="tile-mode-control key-mode-control"[^>]*aria-label="按键操作模式"/)
+  assert.ok(html.indexOf('class="tile-toolbar key-toolbar key-only"') < html.indexOf('<summary>布局</summary>'))
+  assert.match(html, /data-key-mode="select"/)
+  assert.match(html, /data-key-mode="move"/)
+  assert.match(html, /data-layout-action="merge"[^>]*>合并</)
+  assert.match(main, /preview\.setEditTool\(keyMode\)/)
+  assert.match(main, /function mergeSelectedKeys\(\)/)
+  assert.match(preview, /canvas\.addEventListener\("pointermove"/)
+  assert.match(preview, /this\.onMove\(\[\.\.\.this\.selected\], Math\.round\(dx\), Math\.round\(dy\)\)/)
+  assert.match(css, /\.geometry-fields input\s*\{[^}]*text-align:\s*left/s)
+  assert.match(main, /field\.type === "number"[\s\S]*field\.addEventListener\("wheel"[\s\S]*field\.stepUp\(\)[\s\S]*field\.stepDown\(\)/)
 })
 
 test("window and about names match the GitHub project and include the version", () => {
@@ -591,8 +643,8 @@ test("resource gallery adds columns with inspector width and caps cards at 180px
   assert.match(html, /id="resource-search"[^>]*type="search"/)
   assert.match(main, /resourceSearch\.value\.trim\(\)\.toLowerCase\(\)/)
   assert.match(css, /#resource-list-view \.inspector-title\s*\{[^}]*grid-template-columns:\s*auto minmax\(160px, 1fr\) auto/s)
-  assert.match(css, /#resource-list-view \.inspector-title #resource-search\s*\{[^}]*height:\s*26px/s)
-  assert.match(css, /#resource-list-view \.inspector-title #resource-search:focus\s*\{[^}]*border-color:\s*var\(--accent\)/s)
+  assert.match(css, /#resource-list-view \.inspector-title \.search-control\s*\{[^}]*height:\s*26px/s)
+  assert.match(css, /\.search-control:focus-within\s*\{[^}]*border-color:\s*color-mix/s)
   assert.match(main, /Math\.round\(window\.innerWidth \* 0\.28\)/)
   assert.match(main, /inspectorWidthV3/)
 })
@@ -688,6 +740,7 @@ test("key inspector keeps common fields visible and collapses advanced controls"
   const common = html.slice(html.indexOf('class="inspector-group key-only primary-key-fields"'), html.indexOf("</div>\n          </div>", html.indexOf('class="inspector-group key-only primary-key-fields"')))
   assert.match(common, /data-key-field="SHOW"[\s\S]*?data-key-field="CENTER"/)
   assert.match(html, /<details class="inspector-group inspector-disclosure key-only" open>\s*<summary>布局<\/summary>/)
+  assert.match(html, /选中按键后，可使用方向键移动；按住 Shift 每次移动 10 像素。/)
   assert.match(html, /<details class="inspector-group inspector-disclosure key-only" open>\s*<summary>样式引用、文字与图片<\/summary>/)
   assert.match(html, /<summary>滑动与长按<\/summary>/)
   assert.match(css, /\.inspector-disclosure > summary/)
@@ -707,6 +760,31 @@ test("common document sections open by default", () => {
 test("layout actions include right and bottom alignment", () => {
   assert.match(html, /data-layout-action="right"[^>]*title="右对齐"/)
   assert.match(html, /data-layout-action="bottom"[^>]*title="底对齐"/)
+  assert.match(html, /data-layout-action="swap"[^>]*title="交换位置"/)
+})
+
+test("unnamed saves and exports use the shared naming dialog", () => {
+  assert.match(html, /<dialog id="skin-name-dialog" class="project-dialog"/)
+  assert.match(html, /id="skin-name-input"[^>]*required/)
+  assert.match(html, /value="cancel" formnovalidate>取消<\/button><button class="primary" value="confirm">确认<\/button>/)
+  assert.match(main, /async function saveArchive\(saveAs: boolean, format: ExportFormat\)/)
+  assert.match(main, /isUnnamedSkinName\(currentName\)[\s\S]*chooseSkinName\(format\)/)
+  assert.match(main, /saveNative\(saveAs \|\| unnamed, format, suggestedName\)/)
+  assert.match(main, /prepareDocumentReplacement\(\)[\s\S]*saveArchive\(false, currentExportFormat\(\)\)/)
+})
+
+test("text fields, search fields, and dialogs share the rounded control style", () => {
+  assert.match(html, /id="resource-search"[^>]*type="search"[^>]*results="0"/)
+  assert.match(html, /id="style-image-resource-search"[^>]*type="search"[^>]*results="0"/)
+  assert.match(html, /id="style-picker-search"[^>]*type="search"[^>]*results="0"/)
+  assert.match(pickerHtml, /id="resource-search"[^>]*type="search"[^>]*results="0"/)
+  assert.match(css, /input\[type="search"\]\s*\{[^}]*border-radius:\s*999px[^}]*background:\s*color-mix/s)
+  assert.match(css, /#skin-name-input\s*\{[^}]*border-radius:\s*999px[^}]*background:\s*color-mix/s)
+  assert.match(css, /\.app-dialog\s*\{[^}]*border-radius:\s*18px/s)
+  assert.match(css, /\.project-dialog\s*\{[^}]*border-radius:\s*18px/s)
+  assert.match(pickerCss, /\.picker-toolbar input\s*\{[^}]*border-radius:\s*999px[^}]*background:\s*color-mix/s)
+  assert.equal((html.match(/class="search-control"/g) ?? []).length, 3)
+  assert.match(main, /querySelectorAll<HTMLElement>\("\.system-symbol\[data-system-symbol\]:empty"\)/)
 })
 
 test("visible Chinese UI text contains no replacement characters", () => {
@@ -741,6 +819,14 @@ test("overview classifies ini files and uses a consistent filename row", () => {
   }
   assert.match(main, /metaNode\.textContent = path\.split\("\/"\)\.pop\(\) \?\? path/)
   assert.match(main, /button\.className = `nav-item \$\{className\}`/)
+})
+
+test("overview hides default layouts, leads with Chinese layouts, and keeps stroke input last", () => {
+  assert.match(main, /const hiddenLayouts = new Set\(\["def_9\.ini", "def_26\.ini"\]\)/)
+  assert.match(main, /if \(hiddenLayouts\.has\(name\)\) continue/)
+  assert.doesNotMatch(main, /"def_(?:9|26)\.ini": \{ group: "键盘布局"/)
+  assert.match(main, /const layoutRank: Record<string, number> = \{ "py_9\.ini": 0, "py_26\.ini": 1, "bh\.ini": 3 \}/)
+  assert.match(main, /\(layoutRank\[aName\] \?\? 2\) - \(layoutRank\[bName\] \?\? 2\)/)
 })
 
 test("overview groups are collapsible and resource configuration precedes keyboard layouts", () => {
@@ -802,7 +888,7 @@ test("style detail returns to the configuration that opened it", () => {
 test("style picker uses the shared glass dialog and selected-card styling", () => {
   assert.match(html, /id="style-picker-dialog" class="style-picker-dialog glass-module"/)
   assert.match(main, /button\.classList\.toggle\("selected", stylePickerTarget\?\.value\.split\(","\)\[0\]\?\.trim\(\) === styleID\)/)
-  assert.match(css, /\.style-picker-dialog\s*\{[^}]*border-radius:\s*14px[^}]*background:\s*var\(--menu\)/s)
+  assert.match(css, /\.style-picker-dialog\s*\{[^}]*border-radius:\s*18px[^}]*background:\s*var\(--menu\)/s)
   assert.match(css, /\.style-picker-item\.selected\s*\{[^}]*border-color:\s*var\(--accent\)/s)
   assert.match(css, /\.style-picker-previews\s*\{[^}]*gap:\s*0[^}]*overflow:\s*hidden/s)
 })
@@ -831,6 +917,7 @@ test("gap inputs share one taller split control", () => {
   assert.match(gaps, /overflow:\s*hidden/)
   assert.match(css, /\.gap-fields label \+ label\s*\{[^}]*border-left:\s*1px solid var\(--line-soft\)/s)
   assert.match(css, /\.gap-fields input,[\s\S]*?\.inspector-grid\.gap-fields input\s*\{[^}]*height:\s*40px[^}]*border:\s*0/s)
+  assert.match(css, /\.gap-fields input,[\s\S]*?\.inspector-grid\.gap-fields input\s*\{[^}]*text-align:\s*center/s)
 })
 
 test("missing theme and orientation switches offer to create the target variant", () => {
@@ -964,6 +1051,8 @@ test("platform materials and toolbar status surfaces stay visually consistent", 
   assert.match(css, /#panel-status\s*\{[^}]*color:\s*inherit[^}]*font:\s*inherit/s)
   assert.match(css, /:root\.macos\[data-window-material="on"\][\s\S]*?\.app-dialog[\s\S]*?backdrop-filter:/)
   assert.match(css, /:root\.windows\[data-window-material="on"\]\s+\*\s*\{[^}]*backdrop-filter:\s*none\s*!important/s)
+  assert.match(css, /:root\.windows\[data-window-material="on"\]\s*\{[^}]*--window:\s*rgb\(255 255 255 \/ 92%\)[^}]*--content:\s*rgb\(245 247 249 \/ 82%\)/s)
+  assert.match(css, /:root\.windows\[data-app-theme="dark"\]\[data-window-material="on"\]\s*\{[^}]*--window:\s*rgb\(23 25 27 \/ 92%\)[^}]*--content:\s*rgb\(25 28 31 \/ 84%\)/s)
 })
 
 test("panel tools expose S-state and configurable one-panel copying", () => {

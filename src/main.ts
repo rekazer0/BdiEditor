@@ -20,6 +20,7 @@ import {
   exportFormatFromPath,
   exportName,
   exportPath,
+  isUnnamedSkinName,
   type ExportFormat,
 } from "./export.ts"
 import {
@@ -41,7 +42,7 @@ import {
 } from "./bda.ts"
 import { convertBdaArchive } from "./bda-convert.ts"
 import { IniDocument } from "./ini.ts"
-import { adaptIos26Variant, isIos26Adapted } from "./ios26.ts"
+import { adaptIos26Candidate, adaptIos26Panel, adaptIos26Variant, isIos26Adapted } from "./ios26.ts"
 import { highlightIni } from "./highlight.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
 import {
@@ -70,6 +71,7 @@ import {
   listCellIndex,
   listCellRect,
   listCellValue,
+  mergeLayoutRects,
   moveRects,
   setExactGap,
   setListCellValue,
@@ -121,6 +123,8 @@ const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>
 const newButton = $("#new") as HTMLButtonElement
 const newProjectDialog = $("#new-project-dialog") as HTMLDialogElement
 const newProjectForm = $("#new-project-form") as HTMLFormElement
+const skinNameDialog = $("#skin-name-dialog") as HTMLDialogElement
+const skinNameInput = $("#skin-name-input") as HTMLInputElement
 const openButton = $("#open") as HTMLButtonElement
 const saveButton = $("#save") as HTMLButtonElement
 const undoButton = $("#undo") as HTMLButtonElement
@@ -159,6 +163,9 @@ const sourceName = $("#source-name")
 const dirty = $("#dirty")
 const eventLog = $("#event-log")
 const panelStatus = $("#panel-status")
+const previewZoomOut = $("#preview-zoom-out") as HTMLButtonElement
+const previewZoomFit = $("#preview-zoom-fit") as HTMLButtonElement
+const previewZoomIn = $("#preview-zoom-in") as HTMLButtonElement
 const panelScaleButton = $("#panel-scale") as HTMLButtonElement
 const adaptIos26Button = $("#adapt-ios26") as HTMLButtonElement
 const ios26Dialog = $("#ios26-dialog") as HTMLDialogElement
@@ -203,6 +210,7 @@ const gapFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-
 const layoutActionButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-layout-action]"),
 )
+const keyModeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-key-mode]"))
 const actionMeaningNodes = Array.from(
   document.querySelectorAll<HTMLElement>("[data-action-meaning]"),
 )
@@ -387,6 +395,7 @@ let drawingTile = false
 let tileDragStart: TilePoint | undefined
 let tileDraft: TileRect | undefined
 let tileMode: "select" | "move" = "select"
+let keyMode: "select" | "move" = "select"
 let movingTile: TileSlice | undefined
 let moveStart: TilePoint | undefined
 let moveSource: TileRect | undefined
@@ -400,6 +409,16 @@ const deviceGeometryProperties = [
   "--candidate-content-row",
   "--panel-row",
   "--safe-row",
+] as const
+
+const deviceFrameProperties = [
+  "--device-screen-inset-x",
+  "--device-screen-inset-y",
+  "--device-screen-radius",
+  "--device-body-radius",
+  "--device-island-width",
+  "--device-island-height",
+  "--device-island-offset",
 ] as const
 
 const preview = new Preview(
@@ -416,6 +435,7 @@ const preview = new Preview(
   },
   false,
   (section, event) => showEditContextMenu(section, event),
+  (_sections, deltaX, deltaY) => moveSelectedKeys(deltaX, deltaY),
 )
 
 const toolbarPreview = new Preview(toolbarCanvas, () => {}, () => {}, true)
@@ -476,8 +496,8 @@ function showEditContextMenu(section: string, event: MouseEvent): void {
     updateSourceHighlight()
   }
   editContextMenu.hidden = false
-  editContextMenu.style.left = `${Math.min(event.clientX, window.innerWidth - 150)}px`
-  editContextMenu.style.top = `${Math.min(event.clientY, window.innerHeight - 74)}px`
+  editContextMenu.style.left = `${Math.min(event.clientX, window.innerWidth - editContextMenu.offsetWidth - 8)}px`
+  editContextMenu.style.top = `${Math.min(event.clientY, window.innerHeight - editContextMenu.offsetHeight - 8)}px`
 }
 
 function copySelectedKeys(): void {
@@ -553,6 +573,8 @@ const fallbackSymbolPaths: Record<string, string[]> = {
   asterisk: ["M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"],
   pencil: ["m4 20 4.5-1 11-11-3.5-3.5-11 11z", "m14.5 6 3.5 3.5"],
   "list.bullet": ["M9 6h11M9 12h11M9 18h11", "M4 6h.01M4 12h.01M4 18h.01"],
+  paperclip: ["M8 12.5 15.5 5a4 4 0 0 1 5.7 5.7L11 20.8a6 6 0 0 1-8.5-8.5L13 1.8", "M6 15.5 16.5 5a2 2 0 0 1 2.8 2.8L8.8 18.3"],
+  "speaker.slash": ["M4 9h4l5-4v14l-5-4H4z", "m17 9 4 6M21 9l-4 6"],
   gearshape: ["M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8", "M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"],
   "text.bubble": ["M4 4h16v12H9l-5 4z", "M8 8h8M8 12h5"],
   app: ["M4 4h16v16H4z", "M8 8h8v8H8z"],
@@ -561,6 +583,7 @@ const fallbackSymbolPaths: Record<string, string[]> = {
   folder: ["M3 6h7l2 2h9l-2 10H5z", "M5 6V4h6l2 2"],
   "doc.text": ["M6 3h8l4 4v14H6z", "M14 3v5h5M9 12h6M9 16h6"],
   "doc.on.doc": ["M8 7V3h10l3 3v12h-4", "M5 7h10v14H5z", "M9 12h2m-2 4h2"],
+  magnifyingglass: ["M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14", "m16 16 5 5"],
   trash: ["M5 7h14M9 7V4h6v3m2 0-1 14H8L7 7m4 4v6m2-6v6"],
   photo: ["M4 4h16v16H4z", "m6 16 4-5 3 3 2-2 3 4M9 9h.01"],
   doc: ["M6 3h8l4 4v14H6z", "M14 3v5h5"],
@@ -571,6 +594,13 @@ function createSystemSymbol(name: string): HTMLSpanElement {
   symbol.className = "system-symbol"
   symbol.dataset.systemSymbol = name
   symbol.ariaHidden = "true"
+  const existingFallback = document.querySelector<SVGSVGElement>(
+    `[data-system-symbol="${CSS.escape(name)}"] .system-symbol-fallback`,
+  )
+  if (existingFallback) {
+    symbol.append(existingFallback.cloneNode(true))
+    return symbol
+  }
   const fallback = document.createElementNS(svgNamespace, "svg")
   fallback.classList.add("system-symbol-fallback")
   fallback.setAttribute("viewBox", "0 0 24 24")
@@ -583,11 +613,18 @@ function createSystemSymbol(name: string): HTMLSpanElement {
   return symbol
 }
 
+for (const symbol of Array.from(document.querySelectorAll<HTMLElement>(".system-symbol[data-system-symbol]:empty"))) {
+  const rendered = createSystemSymbol(symbol.dataset.systemSymbol ?? "doc")
+  symbol.replaceChildren(...rendered.childNodes)
+}
+
 for (const button of Array.from(editContextMenu.querySelectorAll<HTMLButtonElement>("[data-context-action]"))) {
   const label = button.textContent?.trim() ?? ""
   const icon = button.dataset.contextAction === "copy"
     ? createSystemSymbol("doc.on.doc")
-    : createSystemSymbol("trash")
+    : button.dataset.contextAction === "swap"
+      ? createSystemSymbol("arrow.left.and.right")
+      : createSystemSymbol("trash")
   button.replaceChildren(
     icon,
     Object.assign(document.createElement("span"), { textContent: label }),
@@ -614,13 +651,14 @@ function updatePanelToolButtons(): void {
   const editing = isEditing()
   panelScaleButton.disabled = !editing || fileOperationRunning || !archive
   replaceLayoutImageButton.disabled = !editing || fileOperationRunning || !archive || archive.format === "bda"
-  adaptIos26Button.disabled = fileOperationRunning || !archive || archive.format === "bda"
+  adaptIos26Button.disabled = !editing || fileOperationRunning || !archive || archive.format === "bda"
 }
 
 function applyModeState(): void {
   const editing = isEditing()
   deviceShell.dataset.mode = editing ? "edit" : "preview"
   preview.setMode(editing ? "edit" : "preview")
+  preview.setEditTool(keyMode)
   source.readOnly = !editing
   replaceAssetButton.disabled = !editing
   quickInspector.dataset.readonly = editing ? "false" : "true"
@@ -661,9 +699,7 @@ async function prepareDocumentReplacement(): Promise<boolean> {
   }
   if (decision === "cancel") return false
   if (decision === "discard") return true
-  return isTauri()
-    ? saveNative(false, currentExportFormat())
-    : downloadArchive(currentExportFormat())
+  return saveArchive(false, currentExportFormat())
 }
 
 function updateDirty(): void {
@@ -1076,16 +1112,17 @@ function fitCanvasPreview(): void {
     canvasLogicalSize.width,
     canvasLogicalSize.height,
   )
-  const scale = width / canvasLogicalSize.width
+  const renderedWidth = width * previewZoom
+  const scale = renderedWidth / canvasLogicalSize.width
   const panelViewportHeight = Math.round(canvasLogicalSize.panelHeight * scale)
-  deviceShell.style.setProperty("--canvas-fit-width", `${width}px`)
+  deviceShell.style.setProperty("--canvas-fit-width", `${renderedWidth}px`)
   deviceShell.style.setProperty("--panel-viewport-height", `${panelViewportHeight}px`)
   const toolbarHeight = Number(toolbarCanvas.style.getPropertyValue("--toolbar-height") || "0")
   const toolbarWidth = Number(toolbarCanvas.style.getPropertyValue("--toolbar-width") || "0")
   if (toolbarWidth > 0 && toolbarHeight > 0) {
     deviceShell.style.setProperty("--toolbar-viewport-height", `${Math.round(toolbarHeight * scale)}px`)
   }
-  if (device.value === "canvas") updateCanvasPanelStatus(width)
+  if (device.value === "canvas") updateCanvasPanelStatus(renderedWidth)
 }
 
 function updateCanvasPanelStatus(renderedWidth: number): void {
@@ -1095,14 +1132,111 @@ function updateCanvasPanelStatus(renderedWidth: number): void {
 
 let fitCanvasDebounce: ReturnType<typeof setTimeout> | undefined
 let canvasFitFrozen = false
+let previewZoom = 1
+let previewPanX = 0
+let previewPanY = 0
+let previewPanStart: { x: number; y: number; panX: number; panY: number } | undefined
+let previewSpaceHeld = false
+
+function setPreviewPan(x: number, y: number): void {
+  previewPanX = x
+  previewPanY = y
+  deviceShell.style.transform = `translate(${x}px, ${y}px) scale(${device.value === "canvas" ? 1 : previewZoom})`
+}
+
+function applyPreviewZoom(value: number, anchor?: { x: number; y: number }): void {
+  const before = anchor ? deviceShell.getBoundingClientRect() : undefined
+  const anchorX = before && anchor ? (anchor.x - before.left) / before.width : 0.5
+  const anchorY = before && anchor ? (anchor.y - before.top) / before.height : 0.5
+  previewZoom = Math.min(3, Math.max(0.4, Math.round(value * 10) / 10))
+  previewZoomOut.disabled = previewZoom <= 0.4
+  previewZoomIn.disabled = previewZoom >= 3
+  if (device.value === "canvas") fitCanvasPreview()
+  else setPreviewPan(previewPanX, previewPanY)
+  if (anchor && before) {
+    const after = deviceShell.getBoundingClientRect()
+    setPreviewPan(
+      previewPanX + anchor.x - (after.left + anchorX * after.width),
+      previewPanY + anchor.y - (after.top + anchorY * after.height),
+    )
+  }
+  if (device.value !== "canvas" && canvasLogicalSize) {
+    requestAnimationFrame(() => {
+      const bounds = ($("#preview") as HTMLCanvasElement).getBoundingClientRect()
+      panelStatus.textContent = `面板：${Math.round(canvasLogicalSize!.width)} × ${Math.round(canvasLogicalSize!.panelHeight)} · 预览缩放：${previewScalePercent(bounds.width, bounds.height, canvasLogicalSize!.width, canvasLogicalSize!.panelHeight)}%`
+    })
+  }
+}
 
 function scheduleFitCanvasPreview(): void {
   if (canvasFitFrozen) return
   clearTimeout(fitCanvasDebounce)
-  fitCanvasDebounce = setTimeout(fitCanvasPreview, 50)
+  fitCanvasDebounce = setTimeout(() => {
+    if (device.value === "canvas") fitCanvasPreview()
+  }, 50)
 }
 
 new ResizeObserver(scheduleFitCanvasPreview).observe(canvasWrap)
+
+previewZoomOut.addEventListener("click", () => applyPreviewZoom(previewZoom - 0.1))
+previewZoomFit.addEventListener("click", () => {
+  setPreviewPan(0, 0)
+  applyPreviewZoom(1)
+})
+previewZoomIn.addEventListener("click", () => applyPreviewZoom(previewZoom + 0.1))
+canvasWrap.addEventListener("wheel", (event) => {
+  const modified = event.metaKey || event.ctrlKey
+  if (!modified || deviceShell.hidden) return
+  event.preventDefault()
+  applyPreviewZoom(
+    previewZoom + (event.deltaY < 0 ? 0.1 : -0.1),
+    { x: event.clientX, y: event.clientY },
+  )
+}, { passive: false })
+
+window.addEventListener("keydown", (event) => {
+  if (event.key !== " " || isTextEditingTarget(event.target)) return
+  previewSpaceHeld = true
+  canvasWrap.classList.add("preview-pan-ready")
+  event.preventDefault()
+})
+
+window.addEventListener("keyup", (event) => {
+  if (event.key !== " ") return
+  previewSpaceHeld = false
+  canvasWrap.classList.remove("preview-pan-ready")
+})
+
+window.addEventListener("blur", () => {
+  previewSpaceHeld = false
+  previewPanStart = undefined
+  canvasWrap.classList.remove("preview-pan-ready", "preview-panning")
+})
+
+canvasWrap.addEventListener("pointerdown", (event) => {
+  if (!previewSpaceHeld || event.button !== 0 || deviceShell.hidden) return
+  event.preventDefault()
+  event.stopPropagation()
+  previewPanStart = { x: event.clientX, y: event.clientY, panX: previewPanX, panY: previewPanY }
+  canvasWrap.classList.add("preview-panning")
+  canvasWrap.setPointerCapture(event.pointerId)
+}, { capture: true })
+
+canvasWrap.addEventListener("pointermove", (event) => {
+  if (!previewPanStart) return
+  setPreviewPan(
+    previewPanStart.panX + event.clientX - previewPanStart.x,
+    previewPanStart.panY + event.clientY - previewPanStart.y,
+  )
+})
+
+function finishPreviewPan(): void {
+  previewPanStart = undefined
+  canvasWrap.classList.remove("preview-panning")
+}
+
+canvasWrap.addEventListener("pointerup", finishPreviewPan)
+canvasWrap.addEventListener("pointercancel", finishPreviewPan)
 
 function updatePanelTools(width: number, height: number, candidateHeight = 0): void {
   const content = previewContentVerticalBounds(
@@ -1130,6 +1264,7 @@ function updatePanelTools(width: number, height: number, candidateHeight = 0): v
 }
 
 function updateDevicePreview(): void {
+  setPreviewPan(0, 0)
   deviceShell.dataset.device = device.value
   deviceShell.dataset.orientation = orientation.value
   deviceShell.dataset.theme = theme.value
@@ -1141,16 +1276,36 @@ function updateDevicePreview(): void {
   if (spec) {
     deviceShell.dataset.family = spec.family
     const portrait = orientation.value === "port"
+    const frame = spec.frame
     deviceShell.style.aspectRatio = portrait
-      ? `${spec.width} / ${spec.height}`
-      : `${spec.height} / ${spec.width}`
+      ? `${frame?.width ?? spec.width} / ${frame?.height ?? spec.height}`
+      : `${frame?.height ?? spec.height} / ${frame?.width ?? spec.width}`
+    for (const property of deviceFrameProperties) deviceShell.style.removeProperty(property)
+    if (frame) {
+      const insetX = (frame.width - frame.screenWidth) / 2
+      const insetY = (frame.height - frame.screenHeight) / 2
+      const screenRadius = frame.width * 0.26 - insetX
+      deviceShell.style.setProperty("--device-screen-inset-x", `${(portrait ? insetX / frame.width : insetY / frame.height) * 100}%`)
+      deviceShell.style.setProperty("--device-screen-inset-y", `${(portrait ? insetY / frame.height : insetX / frame.width) * 100}%`)
+      deviceShell.style.setProperty("--device-screen-radius", portrait
+        ? `${screenRadius / frame.screenWidth * 100}% / ${screenRadius / frame.screenHeight * 100}%`
+        : `${screenRadius / frame.screenHeight * 100}% / ${screenRadius / frame.screenWidth * 100}%`)
+      const bodyRadius = frame.width * 0.26
+      deviceShell.style.setProperty("--device-body-radius", portrait
+        ? `${bodyRadius / frame.width * 100}% / ${bodyRadius / frame.height * 100}%`
+        : `${bodyRadius / frame.height * 100}% / ${bodyRadius / frame.width * 100}%`)
+      deviceShell.style.setProperty("--device-island-width", `${(portrait ? 126 / frame.viewportWidth : 37 / frame.viewportHeight) * 100}%`)
+      deviceShell.style.setProperty("--device-island-height", `${(portrait ? 37 / frame.viewportHeight : 126 / frame.viewportWidth) * 100}%`)
+      deviceShell.style.setProperty("--device-island-offset", `${11 / frame.viewportHeight * 100}%`)
+    }
   } else {
     delete deviceShell.dataset.family
     deviceShell.style.removeProperty("aspect-ratio")
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
+    for (const property of deviceFrameProperties) deviceShell.style.removeProperty(property)
   }
   preview.setTransparent(devicePreviewTransparent())
-  fitCanvasPreview()
+  applyPreviewZoom(previewZoom)
 }
 
 function panelSizeFrom(document: IniDocument | undefined): [number, number] | undefined {
@@ -1406,9 +1561,17 @@ function adaptArchiveForIos26(): boolean {
     if (!archive.isText(candidatePath) || !stylePath) continue
     variants++
     const adapted = adaptIos26Variant(text(candidatePath), text(genPath), text(stylePath))
-    staged.set(candidatePath, adapted.candidate)
     staged.set(genPath, adapted.general)
     staged.set(stylePath, adapted.styles)
+    for (const path of archive.names().filter((path) => {
+      const name = path.slice(directory.length + 1)
+      return path.startsWith(`${directory}/`) && !name.includes("/") && /\.(?:cnd|ini)$/i.test(name) && path !== genPath
+    })) {
+      if (!archive.isText(path)) continue
+      staged.set(path, /\.cnd$/i.test(path)
+        ? adaptIos26Candidate(text(path), adapted.candidateStyle)
+        : adaptIos26Panel(text(path), adapted.panelStyle))
+    }
   }
   const changes: Change[] = [...staged].flatMap(([path, after]) => {
     const before = archive!.getText(path)
@@ -2790,8 +2953,19 @@ function populateKeyInspector(): void {
     : styleFields.some((field) => Boolean(selectedStylePropertyContext(field.dataset.styleField ?? "")))
   for (const label of textStyleLabels) label.hidden = !hasSelection || !hasTextStyle
   const listSelected = sections.some(isListCell)
+  const keyToolsAvailable = hasSelection && isEditing() && archive?.format !== "bda" && !listSelected
+  for (const button of keyModeButtons) button.disabled = !keyToolsAvailable
+  if (!keyToolsAvailable && keyMode === "move") {
+    keyMode = "select"
+    keyModeButtons.forEach((button) => button.classList.toggle("active", button.dataset.keyMode === keyMode))
+    preview.setEditTool(keyMode)
+  }
   for (const button of layoutActionButtons) {
-    button.disabled = selectedKeySections.length < 2 || archive?.format === "bda" || listSelected
+    button.disabled = archive?.format === "bda" || listSelected || (
+      button.dataset.layoutAction === "swap" || button.dataset.layoutAction === "merge"
+        ? selectedKeySections.length !== 2
+        : selectedKeySections.length < 2
+    )
   }
   const rects = selectedRects().filter((rect) => !isListCell(rect.section))
   for (const field of gapFields) {
@@ -3241,6 +3415,10 @@ function selectedRects(): LayoutRect[] {
 
 function applyLayoutAction(action: string): void {
   if (!archive || !layoutDocument) return
+  if (action === "merge") {
+    mergeSelectedKeys()
+    return
+  }
   const real = selectedRects().filter((rect) => !isListCell(rect.section))
   const rects = transformLayout(real, action as LayoutAction)
   if (rects.length < 2) return
@@ -3257,6 +3435,25 @@ function applyLayoutAction(action: string): void {
   if (selectedPath === layoutPath) setSourceValue(text)
   preview.setDocument(layoutDocument)
   populateKeyInspector()
+  updateDirty()
+}
+
+function mergeSelectedKeys(): void {
+  if (!archive || !layoutDocument) return
+  const rects = selectedRects().filter((rect) => !isListCell(rect.section))
+  if (rects.length !== 2) return
+  const before = layoutDocument.toString()
+  const merged = mergeLayoutRects(rects[0], rects[1])
+  layoutDocument.set(merged.section, "VIEW_RECT", [merged.x, merged.y, merged.width, merged.height].map(Math.round).join(","))
+  if (!layoutDocument.removeSections([rects[1].section])) return
+  const text = layoutDocument.toString()
+  commitText(layoutPath, before, text)
+  if (selectedPath === layoutPath) setSourceValue(text)
+  selectedKeySections = [merged.section]
+  preview.setDocument(layoutDocument)
+  preview.setSelected(selectedKeySections)
+  populateKeyInspector()
+  updateSourceHighlight()
   updateDirty()
 }
 
@@ -3570,8 +3767,6 @@ function renderFiles(): void {
   const iniTypes: Record<string, Omit<NavEntry, "path">> = {
     "py_9.ini": { group: "键盘布局", label: "中文 9 键", className: "nav-layout", icon: "keyboard" },
     "py_26.ini": { group: "键盘布局", label: "中文 26 键", className: "nav-layout", icon: "keyboard" },
-    "def_9.ini": { group: "键盘布局", label: "默认 9 键", className: "nav-layout", icon: "keyboard" },
-    "def_26.ini": { group: "键盘布局", label: "默认 26 键", className: "nav-layout", icon: "keyboard" },
     "en_9.ini": { group: "键盘布局", label: "英文 9 键", className: "nav-layout", icon: "keyboard" },
     "en_9s.ini": { group: "键盘布局", label: "英文 9 键 Shift", className: "nav-layout", icon: "keyboard" },
     "en_26.ini": { group: "键盘布局", label: "英文 26 键", className: "nav-layout", icon: "keyboard" },
@@ -3590,6 +3785,7 @@ function renderFiles(): void {
     "logo.ini": { group: "键盘组件", label: "输入法标识", className: "nav-component", icon: "app" },
     "gen.ini": { group: "资源配置", label: "通用配置", className: "nav-style", icon: "gearshape" },
   }
+  const hiddenLayouts = new Set(["def_9.ini", "def_26.ini"])
   const configPrefix = `${theme.value}/skin/${orientation.value}/`
   const appearancePath = bdaAppearancePath(archive, theme.value, orientation.value)
   const layoutPaths = archive.format === "bda"
@@ -3600,6 +3796,7 @@ function renderFiles(): void {
     if (!path.startsWith(configPrefix) || path.slice(configPrefix.length).includes("/") || !/\.ini$/i.test(path)) continue
     if (archive.format === "bda" && !bdaBase?.isText(basePath)) continue
     const name = path.split("/").pop() ?? path
+    if (hiddenLayouts.has(name)) continue
     const info = iniTypes[name] ?? {
       group: "扩展布局",
       label: name.replace(/\.ini$/i, "").replaceAll("_", " "),
@@ -3636,6 +3833,14 @@ function renderFiles(): void {
       archive?.names().includes(entry.path) ||
       archive?.format === "bda" && Boolean(bdaBase?.isText(bdaBasePath(entry.path)))
     ))
+    if (group === "键盘布局") {
+      const layoutRank: Record<string, number> = { "py_9.ini": 0, "py_26.ini": 1, "bh.ini": 3 }
+      grouped.sort((a, b) => {
+        const aName = a.path.split("/").pop() ?? ""
+        const bName = b.path.split("/").pop() ?? ""
+        return (layoutRank[aName] ?? 2) - (layoutRank[bName] ?? 2)
+      })
+    }
     if (!grouped.length) continue
     const body = section(group)
     for (const entry of grouped) addNavButton(body, entry.label, entry.path, entry.className, entry.icon, entry.navMode)
@@ -3897,12 +4102,12 @@ function exportArchive(format: ExportFormat): {
   return { bytes: result.archive.toBytes(format), converted: true, warnings: result.warnings }
 }
 
-async function saveNative(saveAs: boolean, format: ExportFormat): Promise<boolean> {
+async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: string): Promise<boolean> {
   if (!archive) throw new Error("当前没有可保存的皮肤")
   let path = currentPath
   if (saveAs || !path || exportFormatFromPath(path) !== format) {
     const picked = await save({
-      defaultPath: exportName(documentName.textContent ?? "skin", format),
+      defaultPath: suggestedName,
       filters: [
         {
           name: format === "bdi"
@@ -3930,22 +4135,49 @@ async function saveNative(saveAs: boolean, format: ExportFormat): Promise<boolea
   return true
 }
 
-function downloadArchive(format: ExportFormat): boolean {
+function downloadArchive(format: ExportFormat, suggestedName: string): boolean {
   if (!archive) throw new Error("当前没有可保存的皮肤")
   const exported = exportArchive(format)
   if (!exported) return false
   const blob = new Blob([exported.bytes as BlobPart], { type: "application/zip" })
   const link = document.createElement("a")
   link.href = URL.createObjectURL(blob)
-  link.download = exportName(documentName.textContent || "skin", format)
+  link.download = suggestedName
   link.click()
   URL.revokeObjectURL(link.href)
   if (!exported.converted) {
+    currentPath = suggestedName
+    documentName.textContent = suggestedName
     archive.markSaved(exported.bytes)
     unsavedNew = false
     updateDirty()
   }
   return true
+}
+
+function chooseSkinName(format: ExportFormat): Promise<string | undefined> {
+  skinNameDialog.returnValue = ""
+  skinNameInput.value = ""
+  skinNameDialog.showModal()
+  skinNameInput.focus()
+  return new Promise((resolve) => {
+    skinNameDialog.addEventListener("close", () => {
+      const name = skinNameInput.value.trim()
+      resolve(skinNameDialog.returnValue === "confirm" && name ? exportName(name, format) : undefined)
+    }, { once: true })
+  })
+}
+
+async function saveArchive(saveAs: boolean, format: ExportFormat): Promise<boolean> {
+  const currentName = documentName.textContent?.trim() ?? ""
+  const unnamed = isUnnamedSkinName(currentName)
+  const suggestedName = unnamed
+    ? await chooseSkinName(format)
+    : exportName(currentName, format)
+  if (!suggestedName) return false
+  return isTauri()
+    ? saveNative(saveAs || unnamed, format, suggestedName)
+    : downloadArchive(format, suggestedName)
 }
 
 function chooseProjectTemplate(): Promise<string | undefined> {
@@ -3988,19 +4220,13 @@ openButton.addEventListener("click", () => {
 })
 emptyOpenButton.addEventListener("click", () => openButton.click())
 saveButton.addEventListener("click", () => {
-  void runFileOperation("保存", () =>
-    isTauri()
-      ? saveNative(false, currentExportFormat())
-      : downloadArchive(currentExportFormat()),
-  )
+  void runFileOperation("保存", () => saveArchive(false, currentExportFormat()))
 })
 for (const button of exportButtons) {
   button.addEventListener("click", () => {
     const format = button.dataset.exportFormat as ExportFormat
     toolbarMore.open = false
-    void runFileOperation("导出", () =>
-      isTauri() ? saveNative(true, format) : downloadArchive(format),
-    )
+    void runFileOperation("导出", () => saveArchive(true, format))
   })
 }
 async function refreshUpdateStatus(): Promise<void> {
@@ -4063,7 +4289,10 @@ for (const dialog of [settingsDialog, aboutDialog]) {
 for (const button of sidebarViewButtons) {
   button.addEventListener("click", () => setSidebarView(button.dataset.sidebarView === "source" ? "source" : "overview"))
 }
-defaultDevice.value = localStorage.getItem("default-device") ?? device.value
+const savedDefaultDevice = localStorage.getItem("default-device")
+defaultDevice.value = Array.from(defaultDevice.options).some((option) => option.value === savedDefaultDevice)
+  ? savedDefaultDevice!
+  : device.value
 defaultDevice.addEventListener("change", () => {
   localStorage.setItem("default-device", defaultDevice.value)
 })
@@ -4218,6 +4447,14 @@ for (const field of keyFields) {
     syncActionCodeSuggestions(field)
     updateSelectedKey(field)
   })
+  if (field.type === "number") {
+    field.addEventListener("wheel", (event) => {
+      if (field.disabled) return
+      event.preventDefault()
+      event.deltaY < 0 ? field.stepUp() : field.stepDown()
+      field.dispatchEvent(new Event("input", { bubbles: true }))
+    }, { passive: false })
+  }
 }
 for (const field of styleFields) {
   field.addEventListener("input", () => updateSelectedStyle(field))
@@ -4259,6 +4496,13 @@ for (const alpha of colorAlphas) {
 }
 for (const button of layoutActionButtons) {
   button.addEventListener("click", () => applyLayoutAction(button.dataset.layoutAction ?? ""))
+}
+for (const button of keyModeButtons) {
+  button.addEventListener("click", () => {
+    keyMode = button.dataset.keyMode === "move" ? "move" : "select"
+    keyModeButtons.forEach((item) => item.classList.toggle("active", item === button))
+    preview.setEditTool(keyMode)
+  })
 }
 for (const button of inspectorTabButtons) {
   button.addEventListener("click", () => {
@@ -4916,6 +5160,7 @@ resourceDeleteButton.addEventListener("click", () => {
 for (const button of Array.from(editContextMenu.querySelectorAll<HTMLButtonElement>("[data-context-action]"))) {
   button.addEventListener("click", () => {
     if (button.dataset.contextAction === "copy") copySelectedKeys()
+    else if (button.dataset.contextAction === "swap") applyLayoutAction("swap")
     else deleteSelectedKeys()
     editContextMenu.hidden = true
   })

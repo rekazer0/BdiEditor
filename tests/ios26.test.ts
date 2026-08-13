@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { adaptIos26Variant, isIos26Adapted } from "../src/ios26.ts"
+import { adaptIos26Candidate, adaptIos26Panel, adaptIos26Variant, isIos26Adapted } from "../src/ios26.ts"
 
 test("adapts the three iOS 26 transparent backgrounds without touching layout values", () => {
   const cand = "[CAND]\nBACK_STYLE=117\nPADDING=0,6,150,0\n"
@@ -16,4 +16,12 @@ test("adapts the three iOS 26 transparent backgrounds without touching layout va
   assert.match(adapted.styles, /\[STYLE119\][\s\S]*NM_COLOR=01d0d4db[\s\S]*HL_COLOR=01d0d4db/)
   assert.equal(isIos26Adapted(adapted.candidate, adapted.general), true)
   assert.equal(isIos26Adapted(cand, gen), false)
+})
+
+test("adapts candidate and panel overrides used by auxiliary screens", () => {
+  const adapted = adaptIos26Variant("[CAND]\n", "[PANEL]\n", "[STYLE117]\nNM_COLOR=ffffffff\n")
+
+  assert.match(adaptIos26Candidate("[CAND]\nBACK_STYLE=121\nICON_NUM=3\n", adapted.candidateStyle), /BACK_STYLE=118/)
+  assert.match(adaptIos26Panel("[PANEL]\nBACK_STYLE=2994\nSIZE=1080,703\n", adapted.panelStyle), /BACK_STYLE=119/)
+  assert.equal(adaptIos26Panel("[INPUT]\nTYPE=1\n", adapted.panelStyle), "[INPUT]\nTYPE=1\n")
 })

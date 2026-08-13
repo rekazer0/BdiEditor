@@ -17,6 +17,7 @@ export type LayoutAction =
   | "same-height"
   | "horizontal-gap"
   | "vertical-gap"
+  | "swap"
 
 export function rectToString(rect: Omit<LayoutRect, "section">): string {
   return [rect.x, rect.y, rect.width, rect.height].map(Math.round).join(",")
@@ -155,10 +156,26 @@ export function moveRects(rects: LayoutRect[], deltaX: number, deltaY: number): 
   return rects.map((rect) => ({ ...rect, x: rect.x + deltaX, y: rect.y + deltaY }))
 }
 
+export function mergeLayoutRects(first: LayoutRect, second: LayoutRect): LayoutRect {
+  const x = Math.min(first.x, second.x)
+  const y = Math.min(first.y, second.y)
+  return {
+    ...first,
+    x,
+    y,
+    width: Math.max(first.x + first.width, second.x + second.width) - x,
+    height: Math.max(first.y + first.height, second.y + second.height) - y,
+  }
+}
+
 export function applyLayoutAction(rects: LayoutRect[], action: LayoutAction): LayoutRect[] {
   const next = rects.map((rect) => ({ ...rect }))
   if (next.length < 2) return next
-  if (action === "left") {
+  if (action === "swap") {
+    if (next.length !== 2) return next
+    ;[next[0].x, next[1].x] = [next[1].x, next[0].x]
+    ;[next[0].y, next[1].y] = [next[1].y, next[0].y]
+  } else if (action === "left") {
     const x = Math.min(...next.map((rect) => rect.x))
     next.forEach((rect) => (rect.x = x))
   } else if (action === "right") {

@@ -49,7 +49,16 @@ button, input { font: inherit; color: inherit; }
   font-size: 12px;
 }
 .picker-toolbar button:hover { background: var(--hover); }
-.picker-toolbar input { width: min(260px, 40vw); }
+.picker-toolbar input {
+  width: min(260px, 40vw);
+  padding-inline: 12px;
+  border-color: transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--secondary) 12%, transparent);
+  box-shadow: none;
+}
+.picker-toolbar input::placeholder { color: var(--secondary); }
+.picker-toolbar input:focus { outline: 3px solid color-mix(in srgb, var(--accent) 16%, transparent); }
 .picker-canvas-stage { min-height: 300px; display: grid; place-items: center; padding: 16px; overflow: auto; }
 #picker-canvas {
   width: auto;

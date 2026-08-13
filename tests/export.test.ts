@@ -4,6 +4,7 @@ import {
   exportFormatFromPath,
   exportName,
   exportPath,
+  isUnnamedSkinName,
   type ExportFormat,
 } from "../src/export.ts"
 
@@ -12,6 +13,13 @@ test("detects bdi, bds and bda export formats independently", () => {
   assert.equal(exportFormatFromPath("/tmp/skin.BDS"), "bds")
   assert.equal(exportFormatFromPath("/tmp/skin.bda"), "bda")
   assert.equal(exportFormatFromPath("/tmp/skin.zip"), undefined)
+})
+
+test("recognises browser and project placeholder skin names", () => {
+  assert.equal(isUnnamedSkinName("未命名.bds"), true)
+  assert.equal(isUnnamedSkinName("未命名 (6).bdi"), true)
+  assert.equal(isUnnamedSkinName("未命名皮肤.bda"), true)
+  assert.equal(isUnnamedSkinName("我的皮肤.bdi"), false)
 })
 
 test("replaces the destination extension with the selected export format", () => {

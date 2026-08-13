@@ -56,6 +56,30 @@
   --glass-shadow: 0 10px 32px rgb(0 0 0 / 28%), inset 0 1px rgb(255 255 255 / 12%);
 }
 
+:root.windows[data-window-material="on"] {
+  --window: rgb(255 255 255 / 92%);
+  --toolbar: rgb(255 255 255 / 88%);
+  --sidebar: rgb(238 244 250 / 88%);
+  --inspector: rgb(255 255 255 / 90%);
+  --panel: rgb(255 255 255 / 94%);
+  --menu: rgb(255 255 255 / 97%);
+  --content: rgb(245 247 249 / 82%);
+  --control: rgb(255 255 255 / 92%);
+  --glass-surface: rgb(255 255 255 / 88%);
+}
+
+:root.windows[data-app-theme="dark"][data-window-material="on"] {
+  --window: rgb(23 25 27 / 92%);
+  --toolbar: rgb(28 31 34 / 88%);
+  --sidebar: rgb(27 32 34 / 88%);
+  --inspector: rgb(25 28 31 / 90%);
+  --panel: rgb(36 39 42 / 94%);
+  --menu: rgb(36 39 42 / 97%);
+  --content: rgb(25 28 31 / 84%);
+  --control: rgb(52 55 59 / 92%);
+  --glass-surface: rgb(48 51 55 / 90%);
+}
+
 :root[data-window-material="off"] {
   background: #f4f5f6;
   --window: #f4f5f6;
@@ -759,6 +783,7 @@ h2 {
   grid-template-rows: 44px minmax(0, 1fr) 29px;
   background: var(--content);
   overflow: hidden;
+  position: relative;
 }
 
 .preview-toolbar {
@@ -818,9 +843,18 @@ h2 {
   place-items: center;
   position: relative;
   padding: 18px;
-  overflow-x: hidden;
+  overflow-x: auto;
   overflow-y: auto;
   background: var(--canvas);
+}
+
+.canvas-wrap.preview-pan-ready {
+  cursor: grab;
+}
+
+.canvas-wrap.preview-panning {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .canvas-wrap[data-background="glass"] {
@@ -847,7 +881,7 @@ h2 {
 }
 
 .device-shell {
-  place-self: center;
+  place-self: safe center;
   height: min(calc(100vh - 145px), 720px);
   max-height: 720px;
   max-width: 96%;
@@ -856,7 +890,55 @@ h2 {
   border-radius: 38px;
   background: #171719;
   box-shadow: 0 18px 44px rgb(0 0 0 / 22%);
-  transition: width 180ms ease, height 180ms ease, aspect-ratio 180ms ease;
+  transition: aspect-ratio 180ms ease;
+}
+
+.preview-zoom-control {
+  position: absolute;
+  right: 14px;
+  bottom: 42px;
+  z-index: 8;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+}
+
+.preview-zoom-control button {
+  width: 30px;
+  height: 30px;
+  padding: 5px;
+  border-radius: 8px;
+  color: var(--text);
+  background: transparent;
+}
+
+.preview-zoom-control button:hover:not(:disabled) {
+  background: rgb(120 120 128 / 14%);
+}
+
+.preview-zoom-control button:disabled {
+  opacity: 0.3;
+}
+
+.preview-zoom-control svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.workspace:has(.canvas-wrap.empty) .preview-zoom-control,
+.workspace:has(#workspace-image-figure:not([hidden])) .preview-zoom-control {
+  display: none;
 }
 
 #workspace-image-figure {
@@ -897,55 +979,21 @@ h2 {
   background: #222326;
 }
 
-/* Appetize-style titanium iPhone shell. The screen remains the live skin preview. */
-.canvas-wrap:has(.device-shell[data-device="iphone-15-pro"]) {
-  background: #070d19;
-}
-
-.device-shell[data-device="iphone-15-pro"] {
+.device-shell[data-family="iphone"] {
   position: relative;
-  padding: 5px;
-  border: 1px solid #b9b6aa;
-  border-radius: 42px;
-  background: linear-gradient(90deg, #6d6d67, #e8e5d5 7%, #353735 13%, #21231f 87%, #e3dfcb 94%, #696964);
-  box-shadow: 0 22px 52px rgb(0 0 0 / 46%), inset 0 0 0 1px rgb(255 255 255 / 34%);
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--device-body-radius, 38px);
+  corner-shape: squircle;
 }
 
-.device-shell[data-device="iphone-15-pro"]::before,
-.device-shell[data-device="iphone-15-pro"]::after {
+.device-shell[data-family="iphone"] .device-screen {
   position: absolute;
-  z-index: 0;
-  width: 3px;
-  border-radius: 2px;
-  background: linear-gradient(#a9a79b, #3b3d39 36%, #a19e93);
-  content: "";
-}
-
-.device-shell[data-device="iphone-15-pro"]::before {
-  top: 19%;
-  left: -3px;
-  height: 14%;
-  box-shadow: 0 67px #696a64;
-}
-
-.device-shell[data-device="iphone-15-pro"]::after {
-  top: 28%;
-  right: -3px;
-  height: 20%;
-}
-
-.device-shell[data-device="iphone-15-pro"] .device-screen {
-  z-index: 1;
-  border-radius: 37px;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 10%);
-}
-
-.device-shell[data-device="iphone-15-pro"] .device-screen::before {
-  width: 29%;
-  height: 2.3%;
-  min-height: 16px;
-  top: 1.05%;
-  border-radius: 999px;
+  inset: var(--device-screen-inset-y) var(--device-screen-inset-x);
+  height: auto;
+  border-radius: var(--device-screen-radius, 32px);
+  corner-shape: squircle;
+  background: #fff;
 }
 
 .device-shell[data-orientation="land"] {
@@ -974,16 +1022,22 @@ h2 {
 }
 
 .device-screen::before {
-  width: 74px;
-  height: 19px;
+  width: var(--device-island-width, 74px);
+  height: var(--device-island-height, 19px);
   position: absolute;
   z-index: 3;
-  top: 8px;
+  top: var(--device-island-offset, 8px);
   left: 50%;
   border-radius: 12px;
   background: #09090a;
   content: "";
   transform: translateX(-50%);
+}
+
+.device-shell[data-family="iphone"][data-orientation="land"] .device-screen::before {
+  top: 50%;
+  left: var(--device-island-offset);
+  transform: translateY(-50%);
 }
 
 .device-shell[data-family="android"] .device-screen::before {
@@ -994,22 +1048,33 @@ h2 {
 }
 
 .device-status {
-  height: 32px;
+  height: 41px;
   flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 14px 0;
+  padding: 14px 25px 0;
   color: #151517;
-  font-size: 8px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.device-status-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.device-status-time .system-symbol {
+  width: 13px;
+  height: 13px;
 }
 
 .device-status-icons {
   display: flex;
   align-items: center;
-  gap: 3px;
-  font-size: 10px;
+  gap: 4px;
+  font-size: 11px;
 }
 
 .device-status-icons .system-symbol:last-child {
@@ -1017,39 +1082,39 @@ h2 {
 }
 
 .phone-navigation {
-  height: 34px;
+  height: 45px;
   flex: none;
   display: grid;
   grid-template-columns: 1fr auto auto auto;
   align-items: center;
-  gap: 5px;
-  padding: 2px 12px;
+  gap: 7px;
+  padding: 3px 17px;
   color: #111;
   font-size: 10px;
 }
 
 .phone-nav-round,
 .phone-nav-done {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   border: 1px solid rgb(0 0 0 / 9%);
   border-radius: 50%;
   background: #fff;
-  font-size: 20px;
+  font-size: 19px;
   line-height: 1;
 }
 
 .phone-nav-actions {
-  height: 26px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  padding: 0 9px;
+  gap: 11px;
+  padding: 0 11px;
   border: 1px solid rgb(0 0 0 / 9%);
-  border-radius: 14px;
+  border-radius: 17px;
   background: #fff;
   white-space: nowrap;
 }
@@ -1062,11 +1127,15 @@ h2 {
 
 .phone-nav-round .system-symbol,
 .phone-nav-done .system-symbol {
-  font-size: 14px;
+  font-size: 17px;
 }
 
 .phone-nav-actions .system-symbol {
-  font-size: 12px;
+  font-size: 14px;
+}
+
+.phone-nav-actions .system-symbol:first-child {
+  opacity: 0.35;
 }
 
 .simulation {
@@ -1075,7 +1144,7 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 7px;
-  padding: 8px 15px 12px;
+  padding: 10px 25px 12px;
   color: #1d1d1f;
 }
 
@@ -1084,7 +1153,7 @@ h2 {
   align-items: center;
   justify-content: space-between;
   color: #99999f;
-  font-size: 8px;
+  font-size: 9px;
 }
 
 .simulation-heading button {
@@ -1105,13 +1174,45 @@ h2 {
   border-radius: 0;
   outline: none;
   background: transparent;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.45;
   user-select: text;
 }
 
 #simulated-output::placeholder {
   color: #a1a1a7;
+}
+
+.device-shell[data-family="iphone"] #simulated-output::placeholder {
+  color: transparent;
+}
+
+.device-shell[data-family="iphone"] .simulation-heading {
+  visibility: hidden;
+}
+
+.phone-editing-toolbar {
+  height: 34px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  margin: 0 7px 8px;
+  padding: 0 10px;
+  border: 1px solid rgb(0 0 0 / 10%);
+  border-radius: 999px;
+  color: #111;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 6px 16px rgb(0 0 0 / 8%);
+}
+
+.phone-editing-toolbar strong {
+  font-size: 10px;
+}
+
+.phone-editing-toolbar .system-symbol {
+  width: 17px;
+  height: 17px;
 }
 
 .keyboard-dock {
@@ -1209,6 +1310,7 @@ h2 {
 .device-shell[data-theme="dark"] .phone-navigation,
 .device-shell[data-theme="dark"] .simulation,
 .device-shell[data-theme="dark"] #simulated-output,
+.device-shell[data-theme="dark"] .phone-editing-toolbar,
 .device-shell[data-theme="dark"] .keyboard-accessories {
   color: #f5f5f7;
 }
@@ -1218,6 +1320,11 @@ h2 {
   border-color: rgb(255 255 255 / 12%);
   color: #f5f5f7;
   background: #252527;
+}
+
+.device-shell[data-theme="dark"] .phone-editing-toolbar {
+  border-color: rgb(255 255 255 / 12%);
+  background: rgb(37 37 39 / 92%);
 }
 
 .device-shell[data-theme="dark"] .phone-nav-done {
@@ -1257,6 +1364,10 @@ h2 {
   padding-right: 4%;
 }
 
+.device-shell[data-orientation="land"] .phone-editing-toolbar {
+  display: none;
+}
+
 .device-shell[data-orientation="land"] .simulation {
   position: static;
   width: auto;
@@ -1276,7 +1387,8 @@ h2 {
 }
 
 .device-shell.canvas-only {
-  width: min(100%, var(--canvas-fit-width, var(--canvas-width, 1080px)));
+  width: var(--canvas-fit-width, var(--canvas-width, 1080px));
+  max-width: none;
   transition: none;
   height: auto;
   aspect-ratio: auto;
@@ -1298,6 +1410,7 @@ h2 {
 .device-shell.canvas-only .device-status,
 .device-shell.canvas-only .phone-navigation,
 .device-shell.canvas-only .simulation,
+.device-shell.canvas-only .phone-editing-toolbar,
 .device-shell.canvas-only .keyboard-accessories {
   display: none;
 }
@@ -1736,6 +1849,30 @@ canvas {
   background: rgb(10 127 245 / 12%);
 }
 
+.key-toolbar {
+  margin: 0;
+}
+
+.key-inspector-title {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.key-inspector-title > strong,
+.key-inspector-title > span {
+  grid-column: 1;
+}
+
+.key-inspector-title > .key-toolbar {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: center;
+  padding: 3px;
+}
+
+.geometry-fields input {
+  text-align: left;
+}
+
 #delete-tile {
   margin-left: auto;
 }
@@ -1819,26 +1956,17 @@ canvas {
   margin-top: 0;
 }
 
-#resource-list-view .inspector-title #resource-search {
+#resource-list-view .inspector-title .search-control {
   grid-column: 2;
   grid-row: 1 / 3;
   width: 100%;
   min-width: 0;
   align-self: center;
-  box-sizing: border-box;
   height: 26px;
-  padding: 3px 9px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  color: var(--text);
-  background: var(--control);
-  box-shadow: inset 0 1px rgb(255 255 255 / 8%);
 }
 
-#resource-list-view .inspector-title #resource-search:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 4px rgb(51 149 255 / 28%), inset 0 1px rgb(255 255 255 / 8%);
+#resource-list-view .inspector-title #resource-search {
+  height: 100%;
 }
 
 .resource-actions {
@@ -1936,6 +2064,7 @@ canvas {
   border: 0;
   border-radius: 0;
   background: transparent;
+  text-align: center;
 }
 
 .action-fields {
@@ -2348,7 +2477,7 @@ canvas {
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 18px;
   background: var(--menu);
   color: var(--text);
   box-shadow: 0 28px 90px rgb(0 0 0 / 28%), inset 0 1px rgb(255 255 255 / 48%);
@@ -2404,11 +2533,10 @@ canvas {
   gap: 7px;
 }
 
-.style-picker-tools input {
+.style-picker-tools .search-control {
   min-width: 0;
   flex: 1;
   height: 34px;
-  border-radius: 8px;
 }
 
 .style-picker-tools button {
@@ -2546,7 +2674,7 @@ canvas {
   padding: 12px 14px 14px;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 18px;
   background: var(--panel);
   box-shadow: 0 18px 48px rgb(0 0 0 / 22%);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -2659,16 +2787,10 @@ canvas {
   gap: 8px;
 }
 
-.style-image-resource-tools input {
+.style-image-resource-tools .search-control {
   min-width: 0;
   flex: 1;
   height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--control);
-  color: var(--text);
-  font: inherit;
 }
 
 .style-image-resource-tools button {
@@ -2761,7 +2883,7 @@ canvas {
   padding: 16px;
   font-size: 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 18px;
   background: var(--panel);
   box-shadow: 0 18px 48px rgb(0 0 0 / 22%);
 }
@@ -2942,6 +3064,9 @@ canvas {
   display: flex;
   align-items: center;
   gap: 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--secondary);
   background: transparent;
   text-align: left;
 }
@@ -2952,6 +3077,7 @@ canvas {
 }
 
 .edit-context-menu button:hover {
+  color: var(--text);
   background: var(--hover);
 }
 
@@ -3211,7 +3337,7 @@ canvas {
   width: min(440px, calc(100% - 32px));
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 18px;
   color: var(--text);
   background: var(--panel);
   box-shadow: 0 24px 70px rgb(0 0 0 / 24%);
@@ -3375,6 +3501,83 @@ canvas {
 .new-style-dialog .field-error {
   color: #ff453a;
   font-size: 11px;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]):not([type="file"]) {
+  border-radius: 9px;
+}
+
+input[type="search"] {
+  padding-inline: 13px;
+  border-color: transparent;
+  border-radius: 999px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--secondary) 12%, transparent);
+  box-shadow: none;
+}
+
+input[type="search"]::placeholder {
+  color: var(--secondary);
+}
+
+input[type="search"]:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.search-control {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--secondary);
+  background: color-mix(in srgb, var(--secondary) 12%, transparent);
+}
+
+.search-control:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.search-control .system-symbol {
+  width: 15px;
+  height: 15px;
+}
+
+.search-control input[type="search"] {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#skin-name-input {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--secondary) 12%, transparent);
+}
+
+#skin-name-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.style-reference-input > input,
+.inspector-grid .style-reference-input > input,
+.gap-fields input,
+.inspector-grid.gap-fields input {
+  border-radius: 0;
 }
 
 @media (max-width: 1060px) {

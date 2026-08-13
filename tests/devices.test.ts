@@ -7,9 +7,33 @@ import {
 } from "../src/devices.ts"
 
 test("uses verified physical display resolutions for common phones", () => {
-  assert.deepEqual(deviceSpec("iphone-15-pro"), { width: 1179, height: 2556, family: "iphone" })
-  assert.deepEqual(deviceSpec("iphone-17-pro"), { width: 1206, height: 2622, family: "iphone" })
-  assert.deepEqual(deviceSpec("iphone-17-pro-max"), { width: 1320, height: 2868, family: "iphone" })
+  assert.equal(deviceSpec("iphone-15-pro"), undefined)
+  assert.deepEqual(deviceSpec("iphone-17-pro"), {
+    width: 1206,
+    height: 2622,
+    family: "iphone",
+    frame: {
+      width: 68.98,
+      height: 150.01,
+      screenWidth: 66.67,
+      screenHeight: 147.61,
+      viewportWidth: 402,
+      viewportHeight: 874,
+    },
+  })
+  assert.deepEqual(deviceSpec("iphone-17-pro-max"), {
+    width: 1320,
+    height: 2868,
+    family: "iphone",
+    frame: {
+      width: 74.86,
+      height: 163.43,
+      screenWidth: 72.56,
+      screenHeight: 161.03,
+      viewportWidth: 440,
+      viewportHeight: 956,
+    },
+  })
   assert.deepEqual(deviceSpec("xiaomi-17"), { width: 1220, height: 2656, family: "android" })
   assert.deepEqual(deviceSpec("pixel-10-pro"), { width: 1280, height: 2856, family: "android" })
   assert.deepEqual(deviceSpec("galaxy-s25-ultra"), {
