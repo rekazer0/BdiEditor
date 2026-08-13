@@ -42,7 +42,7 @@ import {
 } from "./bda.ts"
 import { convertBdaArchive } from "./bda-convert.ts"
 import { IniDocument } from "./ini.ts"
-import { adaptIos26Variant, isIos26Adapted } from "./ios26.ts"
+import { adaptIos26KeyboardLayout, adaptIos26Variant, isIos26Adapted } from "./ios26.ts"
 import { highlightIni } from "./highlight.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
 import {
@@ -1564,6 +1564,11 @@ function adaptArchiveForIos26(): boolean {
     staged.set(candidatePath, adapted.candidate)
     staged.set(genPath, adapted.general)
     staged.set(stylePath, adapted.styles)
+    for (const path of archive.names().filter((path) => path.startsWith(`${directory}/`) && /\.ini$/i.test(path))) {
+      if (!archive.isText(path)) continue
+      const name = path.slice(directory.length + 1)
+      staged.set(path, adaptIos26KeyboardLayout(name, text(path), adapted.panelStyle))
+    }
   }
   const changes: Change[] = [...staged].flatMap(([path, after]) => {
     const before = archive!.getText(path)

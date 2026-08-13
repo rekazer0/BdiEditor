@@ -434,6 +434,7 @@ test("panel tools disable in interactive preview mode", () => {
 
 test("iOS 26 adaptation leaves auxiliary screens unchanged", () => {
   assert.match(main, /staged\.set\(candidatePath, adapted\.candidate\)/)
+  assert.match(main, /adaptIos26KeyboardLayout\(name, text\(path\), adapted\.panelStyle\)/)
   assert.doesNotMatch(main, /adaptIos26Candidate|adaptIos26Panel/)
   assert.doesNotMatch(ios26, /general, "PANEL", "BACK_STYLE"|iOS26透明主输入区/)
 })
