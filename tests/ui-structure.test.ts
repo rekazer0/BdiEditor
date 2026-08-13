@@ -5,6 +5,7 @@ import test from "node:test"
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8")
 const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8")
 const main = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8")
+const ios26 = readFileSync(new URL("../src/ios26.ts", import.meta.url), "utf8")
 const preview = readFileSync(new URL("../src/preview.ts", import.meta.url), "utf8")
 const vite = readFileSync(new URL("../vite.config.ts", import.meta.url), "utf8")
 const pickerHtml = readFileSync(new URL("../picker.html", import.meta.url), "utf8")
@@ -429,6 +430,12 @@ test("panel tools disable in interactive preview mode", () => {
   assert.match(main, /replaceLayoutImageButton\.disabled = !editing \|\| fileOperationRunning \|\| !archive \|\| archive\.format === "bda"/)
   assert.match(main, /adaptIos26Button\.disabled = !editing \|\| fileOperationRunning \|\| !archive \|\| archive\.format === "bda"/)
   assert.match(main, /updatePanelToolButtons\(\)/)
+})
+
+test("iOS 26 adaptation leaves auxiliary screens unchanged", () => {
+  assert.match(main, /staged\.set\(candidatePath, adapted\.candidate\)/)
+  assert.doesNotMatch(main, /adaptIos26Candidate|adaptIos26Panel/)
+  assert.doesNotMatch(ios26, /general, "PANEL", "BACK_STYLE"|iOS26透明主输入区/)
 })
 
 test("canvas mode auto-fits while allowing manual enlargement", () => {
