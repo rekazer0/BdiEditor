@@ -2,7 +2,7 @@
   "app": {
     "windows": [
       {
-        "title": "BdiEditor v0.8.31",
+        "title": "BdiEditor v0.8.33",
         "width": 1440,
         "height": 900,
         "minWidth": 900,
