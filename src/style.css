@@ -1282,6 +1282,7 @@ h2 {
   align-items: flex-start;
   gap: 4.8cqw;
   padding: var(--candidate-padding, 1cqw 3.2cqw 0);
+  padding-inline-start: max(3.2cqw, var(--candidate-left-padding, 0cqw));
   padding-inline-end: var(--candidate-more-width, 3.2cqw);
   overflow: hidden;
   line-height: 1.15;
@@ -1449,8 +1450,8 @@ h2 {
 }
 
 .device-shell.canvas-only #candidate-area:has(#candidate-composition:not([hidden])) {
-  height: var(--toolbar-viewport-height, 133px);
-  grid-template-rows: 40fr 93fr;
+  height: var(--candidate-viewport-height, 228px);
+  grid-template-rows: var(--candidate-input-height, 95px) var(--toolbar-viewport-height, 133px);
 }
 
 .device-shell.canvas-only #preview {

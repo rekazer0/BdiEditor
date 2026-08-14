@@ -355,7 +355,12 @@ let layoutImageHighlight = false
 let fileOperationRunning = false
 let firstCandidateTextVisual: TextVisual | undefined
 let candidateTextWidth = 1125
-let canvasLogicalSize: { width: number; height: number; panelHeight: number } | undefined
+let canvasLogicalSize: {
+  width: number
+  height: number
+  panelHeight: number
+  panelVisibleHeight: number
+} | undefined
 let pickerURL = ""
 let pickerImage: HTMLImageElement | undefined
 let pickerPath = ""
@@ -1050,7 +1055,7 @@ function refreshPreview(): void {
       applyCandidateTextVisual(firstCandidate, firstCandidateTextVisual, candidateTextWidth)
     }
     preview.setPanel(config.styleID, config.width, config.height)
-    updatePanelTools(config.width, config.height, toolbarSize?.height)
+    updatePanelTools(config.width, config.height, toolbarSize?.height, composing)
     activeKeyboardGeometry = {
       panelWidth: config.width,
       panelHeight: config.height,
@@ -1083,7 +1088,7 @@ function refreshPreview(): void {
       panelWidth,
       panelHeight,
     )
-    updatePanelTools(panelWidth, panelHeight, toolbarSize?.height)
+    updatePanelTools(panelWidth, panelHeight, toolbarSize?.height, composing)
     activeKeyboardGeometry = {
       panelWidth,
       panelHeight,
@@ -1106,6 +1111,7 @@ function refreshSimulationPreview(): void {
     activeKeyboardGeometry.candidateHeight,
     composing,
   )
+  updateCanvasCandidateGeometry(composing, activeKeyboardGeometry.candidateHeight)
   const resolver = visualResolver()
   if (!resolver) return
   const toolbarSize = refreshToolbarPreview(composing, resolver)
@@ -1118,6 +1124,7 @@ function refreshSimulationPreview(): void {
       candidateHeight,
       composing,
     )
+    updateCanvasCandidateGeometry(composing, candidateHeight)
   }
 }
 
@@ -1153,6 +1160,12 @@ function fitCanvasPreview(): void {
   const toolbarWidth = Number(toolbarCanvas.style.getPropertyValue("--toolbar-width") || "0")
   if (toolbarWidth > 0 && toolbarHeight > 0) {
     deviceShell.style.setProperty("--toolbar-viewport-height", `${Math.round(toolbarHeight * scale)}px`)
+    const inputHeight = candidateComposition.hidden ? 0 : 95
+    deviceShell.style.setProperty("--candidate-input-height", `${Math.round(inputHeight * scale)}px`)
+    deviceShell.style.setProperty(
+      "--candidate-viewport-height",
+      `${Math.round((toolbarHeight + inputHeight) * scale)}px`,
+    )
   }
   if (device.value === "canvas") updateCanvasPanelStatus(renderedWidth)
 }
@@ -1270,7 +1283,19 @@ function finishPreviewPan(): void {
 canvasWrap.addEventListener("pointerup", finishPreviewPan)
 canvasWrap.addEventListener("pointercancel", finishPreviewPan)
 
-function updatePanelTools(width: number, height: number, candidateHeight = 0): void {
+function updateCanvasCandidateGeometry(composing: boolean, candidateHeight: number): void {
+  if (!canvasLogicalSize) return
+  canvasLogicalSize.height =
+    canvasLogicalSize.panelVisibleHeight + candidateHeight + (composing ? 95 : 0)
+  fitCanvasPreview()
+}
+
+function updatePanelTools(
+  width: number,
+  height: number,
+  candidateHeight = 0,
+  composing = false,
+): void {
   const content = previewContentVerticalBounds(
     layoutDocument ? previewItems(layoutDocument, width, height) : [],
     width,
@@ -1280,7 +1305,12 @@ function updatePanelTools(width: number, height: number, candidateHeight = 0): v
   deviceShell.style.setProperty("--canvas-ratio-width", String(width))
   deviceShell.style.setProperty("--panel-visible-height", String(content.height))
   deviceShell.style.removeProperty("--panel-crop-offset")
-  canvasLogicalSize = { width, height: content.height + candidateHeight, panelHeight: height }
+  canvasLogicalSize = {
+    width,
+    height: content.height + candidateHeight + (composing ? 95 : 0),
+    panelHeight: height,
+    panelVisibleHeight: content.height,
+  }
   fitCanvasPreview()
   const states = availableSkinStates(...skinStateDocuments())
   const selected = skinState.value
@@ -2264,6 +2294,8 @@ function applyCandidateGeometry(document: IniDocument, width: number): void {
   } else {
     candidateArea.style.removeProperty("--candidate-padding")
   }
+  if (padding?.[0]) candidateArea.style.setProperty("--candidate-left-padding", padding[0])
+  else candidateArea.style.removeProperty("--candidate-left-padding")
   const firstGap = candidateCssLength(document.get("CAND", "FIRST_GAP"), width)
   const cellWidth = candidateCssLength(document.get("CAND", "CELL_W"), width)
   const moreWidth = candidateCssLength(document.get("CAND", "MORE_W"), width)

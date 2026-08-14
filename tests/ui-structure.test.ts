@@ -266,7 +266,18 @@ test("typing updates simulation state without rebuilding the complete skin previ
 })
 
 test("canvas typing preserves the scaled candidate row height", () => {
-  assert.match(css, /\.device-shell\.canvas-only #candidate-area:has\(#candidate-composition:not\(\[hidden\]\)\)\s*\{[^}]*height:\s*var\(--toolbar-viewport-height, 133px\)[^}]*grid-template-rows:\s*40fr 93fr/s)
+  assert.match(
+    css,
+    /\.device-shell\.canvas-only #candidate-area:has\(#candidate-composition:not\(\[hidden\]\)\)\s*\{[^}]*height:\s*var\(--candidate-viewport-height, 228px\)[^}]*grid-template-rows:\s*var\(--candidate-input-height, 95px\) var\(--toolbar-viewport-height, 133px\)/s,
+  )
+  assert.match(main, /candidateHeight \+ \(composing \? 95 : 0\)/)
+  assert.match(main, /--candidate-input-height/)
+  assert.match(main, /--candidate-viewport-height/)
+})
+
+test("candidate words keep the native left inset even when the skin padding starts at zero", () => {
+  assert.match(css, /#candidate-words\s*\{[^}]*padding-inline-start:\s*max\(3\.2cqw, var\(--candidate-left-padding, 0cqw\)\)/s)
+  assert.match(main, /--candidate-left-padding/)
 })
 
 test("toolbar availability is invalidated before lightweight typing refreshes", () => {

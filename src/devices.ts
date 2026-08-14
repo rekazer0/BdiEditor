@@ -47,8 +47,9 @@ export function candidateBackgroundLogicalHeight(
   contentHeight: number,
   composing = false,
 ): number {
-  if (device?.family !== "iphone" || orientation !== "port") return contentHeight
-  return contentHeight + (composing ? 95 : 66)
+  if (orientation !== "port") return contentHeight
+  if (device?.family === "iphone") return contentHeight + (composing ? 95 : 66)
+  return contentHeight + (!device && composing ? 95 : 0)
 }
 
 export function keyboardPreviewGeometry(

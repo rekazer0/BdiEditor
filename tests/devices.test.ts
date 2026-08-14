@@ -88,6 +88,7 @@ test("extends the candidate skin background by the active iPhone candidate inset
   assert.equal(candidateBackgroundLogicalHeight(deviceSpec("iphone-17-pro"), "land", 109), 109)
   assert.equal(candidateBackgroundLogicalHeight(deviceSpec("xiaomi-17"), "port", 109), 109)
   assert.equal(candidateBackgroundLogicalHeight(undefined, "port", 109), 109)
+  assert.equal(candidateBackgroundLogicalHeight(undefined, "port", 109, true), 204)
 })
 
 test("shows keyboard accessories only for an iPhone in portrait", () => {
