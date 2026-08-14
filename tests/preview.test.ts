@@ -196,6 +196,10 @@ test("places the second foreground image at the phone key's upper-right slot", a
     { x: 307, y: 18, width: 50, height: 50 },
   )
   assert.deepEqual(
+    module.foregroundLayerRect?.({ x: 195, y: 0, width: 228, height: 145 }, [0, 0, 228, 145], 1),
+    { x: 195, y: 0, width: 228, height: 145 },
+  )
+  assert.deepEqual(
     module.foregroundLayerRect?.({ x: 0, y: 0, width: 110, height: 140 }, [0, 0, 50, 40], 0, [-6, 16]),
     { x: 24, y: 66, width: 50, height: 40 },
   )

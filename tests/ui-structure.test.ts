@@ -137,10 +137,12 @@ test("preview canvas provides mouse-wheel and button zoom controls", () => {
   assert.match(html, /id="preview-zoom-out"/)
   assert.match(html, /id="preview-zoom-fit"/)
   assert.match(html, /id="preview-zoom-in"/)
-  assert.match(main, /event\.metaKey \|\| event\.ctrlKey/)
+  assert.match(main, /canvasWrap\.addEventListener\("wheel", \(event\) => \{\s*if \(deviceShell\.hidden\) return/)
+  assert.doesNotMatch(main, /const modified = event\.metaKey \|\| event\.ctrlKey/)
   assert.match(main, /function applyPreviewZoom\(value: number, anchor\?: \{ x: number; y: number \}\)/)
   assert.match(main, /anchor\.x - \(after\.left \+ anchorX \* after\.width\)/)
-  assert.match(main, /event\.key !== " "/)
+  assert.doesNotMatch(main, /previewSpaceHeld/)
+  assert.match(main, /if \(event\.button !== 0 \|\| deviceShell\.hidden\) return/)
   assert.match(main, /canvasWrap\.setPointerCapture\(event\.pointerId\)/)
   assert.match(main, /previewPanStart\.panX \+ event\.clientX - previewPanStart\.x/)
   assert.match(main, /const renderedWidth = width \* previewZoom/)
@@ -152,6 +154,17 @@ test("preview canvas provides mouse-wheel and button zoom controls", () => {
   const titlebar = css.match(/\.titlebar\s*\{[^}]+\}/s)?.[0] ?? ""
   assert.match(titlebar, /padding:\s*6px 12px/)
   assert.doesNotMatch(html, /data-skin-field="Authors"/)
+})
+
+test("candidate input text is capped to the height of its composition row", () => {
+  assert.match(
+    main,
+    /applyCandidateTextVisual\(candidateInput, inputVisual, candidateTextWidth, 40\)/,
+  )
+  assert.match(
+    main,
+    /Math\.min\(visual\.fontSize, maxFontSize \?\? visual\.fontSize\)/,
+  )
 })
 
 test("iPhone preview uses per-model physical frame geometry", () => {
@@ -233,12 +246,22 @@ test("phone keyboard keeps transparent toolbar and canvas over a stable transluc
 
 test("transparent candidate preview is not painted by a native button", () => {
   const html = readFileSync(new URL("../index.html", import.meta.url), "utf8")
+  assert.match(
+    html,
+    /<div id="candidate-area">\s*<canvas id="candidate-background"[^>]*><\/canvas>\s*<div id="candidate-composition"/,
+  )
   assert.match(html, /<div id="toolbar-strip"[^>]*><canvas id="toolbar-preview"/)
   assert.doesNotMatch(html, /<button id="toolbar-strip"/)
+  assert.match(main, /const candidateBackgroundPreview = new Preview\(candidateBackgroundCanvas/)
+  assert.match(main, /candidateBackgroundLogicalHeight\(deviceSpec\(device\.value\), orientation\.value, height, composing\)/)
+  assert.match(main, /toolbarDocument\.set\("CAND", "BACK_STYLE", ""\)/)
+  assert.match(css, /#candidate-background\s*\{[^}]*position:\s*absolute[^}]*inset:\s*0[^}]*width:\s*100%[^}]*height:\s*100%/s)
 })
 
 test("typing updates simulation state without rebuilding the complete skin preview", () => {
-  assert.match(main, /simulatedOutput\.addEventListener\("input", refreshSimulationState\)/)
+  assert.match(main, /simulatedOutput\.addEventListener\("input", refreshSimulationPreview\)/)
+  assert.match(main, /function refreshSimulationPreview\(\): void \{[\s\S]*?refreshSimulationState\(\)[\s\S]*?applyDeviceKeyboardGeometry/s)
+  assert.match(main, /function refreshSimulationPreview\(\): void \{[\s\S]*?refreshToolbarPreview\(composing, resolver\)/s)
   assert.doesNotMatch(main, /simulatedOutput\.addEventListener\("input", \(\) => refreshPreview\(\)\)/)
 })
 
@@ -576,10 +599,10 @@ test("new-project chooser excludes removed legacy templates", () => {
 })
 
 test("candidate DOM and key canvas apply the merged skin font family and weight", () => {
-  assert.match(main, /candidateInput\.style\.fontFamily/)
-  assert.match(main, /candidateInput\.style\.fontWeight/)
-  assert.match(main, /candidateWords\.style\.fontFamily/)
-  assert.match(main, /candidateWords\.style\.fontWeight/)
+  assert.match(main, /element\.style\.fontFamily = canvasFontFamily\(visual\?\.fontName\)/)
+  assert.match(main, /element\.style\.fontWeight = visual\?\.fontWeight/)
+  assert.match(main, /applyCandidateTextVisual\(candidateInput, inputVisual/)
+  assert.match(main, /applyCandidateTextVisual\(candidateWords, candidateVisual/)
   assert.match(preview, /textVisual\?\.fontWeight/)
 })
 

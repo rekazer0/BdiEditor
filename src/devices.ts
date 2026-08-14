@@ -41,13 +41,23 @@ export function showsKeyboardAccessories(
   return device?.family === "iphone" && orientation === "port"
 }
 
+export function candidateBackgroundLogicalHeight(
+  device: DeviceSpec | undefined,
+  orientation: "port" | "land",
+  contentHeight: number,
+  composing = false,
+): number {
+  if (device?.family !== "iphone" || orientation !== "port") return contentHeight
+  return contentHeight + (composing ? 95 : 66)
+}
+
 export function keyboardPreviewGeometry(
   device: DeviceSpec,
   orientation: "port" | "land",
   skinWidth: number,
   panelLogicalHeight: number,
   candidateLogicalHeight: number,
-  _composing = false,
+  composing = false,
 ): {
   candidateHeight: number
   candidateInsetHeight: number
@@ -60,14 +70,19 @@ export function keyboardPreviewGeometry(
   const screenHeight = orientation === "port" ? device.height : device.width
   const iphonePortrait = orientation === "port" && device.family === "iphone"
   const androidPortrait = orientation === "port" && device.family === "android"
-  const candidateInsetLogicalHeight = iphonePortrait ? 95 : 0
+  const candidateBackgroundHeight = candidateBackgroundLogicalHeight(
+    device,
+    orientation,
+    candidateLogicalHeight,
+    composing,
+  )
+  const candidateInsetLogicalHeight = candidateBackgroundHeight - candidateLogicalHeight
   const safeLogicalHeight = iphonePortrait
     ? device.width * (236 / 1206)
     : androidPortrait
       ? device.width * 0.06
       : 0
-  const totalLogicalHeight =
-    candidateInsetLogicalHeight + candidateLogicalHeight + panelLogicalHeight
+  const totalLogicalHeight = candidateBackgroundHeight + panelLogicalHeight
   const widthScale = screenWidth / skinWidth
   const heightScale = (screenHeight - safeLogicalHeight) / totalLogicalHeight
   const scale = Math.min(widthScale, heightScale)

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  candidateBackgroundLogicalHeight,
   deviceSpec,
   keyboardPreviewGeometry,
   showsKeyboardAccessories,
@@ -51,13 +52,13 @@ test("maps Baidu skin coordinates to the iPhone 17 Pro bottom keyboard", () => {
     595,
     133,
   )
-  assert.equal(Math.round(geometry.candidateHeight), 244)
+  assert.equal(Math.round(geometry.candidateHeight), 213)
   assert.equal(Math.round(geometry.panelHeight), 638)
   assert.equal(Math.round(geometry.safeBottomHeight), 236)
-  assert.equal(Math.round(geometry.totalHeight), 1118)
+  assert.equal(Math.round(geometry.totalHeight), 1087)
 })
 
-test("keeps the iPhone keyboard height fixed while composing", () => {
+test("expands the iPhone candidate area while composing without moving the panel", () => {
   const idle = keyboardPreviewGeometry(
     deviceSpec("iphone-17-pro")!,
     "port",
@@ -74,7 +75,19 @@ test("keeps the iPhone keyboard height fixed while composing", () => {
     133,
     true,
   )
-  assert.deepEqual(composing, idle)
+  assert.equal(Math.round(idle.candidateInsetHeight), 71)
+  assert.equal(Math.round(composing.candidateInsetHeight), 102)
+  assert.equal(Math.round(composing.candidateHeight - idle.candidateHeight), 31)
+  assert.equal(composing.panelHeight, idle.panelHeight)
+  assert.equal(composing.safeBottomHeight, idle.safeBottomHeight)
+})
+
+test("extends the candidate skin background by the active iPhone candidate inset", () => {
+  assert.equal(candidateBackgroundLogicalHeight(deviceSpec("iphone-17-pro"), "port", 109, false), 175)
+  assert.equal(candidateBackgroundLogicalHeight(deviceSpec("iphone-17-pro"), "port", 109, true), 204)
+  assert.equal(candidateBackgroundLogicalHeight(deviceSpec("iphone-17-pro"), "land", 109), 109)
+  assert.equal(candidateBackgroundLogicalHeight(deviceSpec("xiaomi-17"), "port", 109), 109)
+  assert.equal(candidateBackgroundLogicalHeight(undefined, "port", 109), 109)
 })
 
 test("shows keyboard accessories only for an iPhone in portrait", () => {

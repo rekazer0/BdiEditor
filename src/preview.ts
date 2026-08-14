@@ -126,7 +126,9 @@ export function foregroundLayerRect(
       height,
     }
   }
-  if (layer === 0) return key
+  // Full-size image layers (for example the 9-key shadow/top layers) share
+  // the key's coordinate system and must not use the small-icon fallback.
+  if (layer === 0 || (width === key.width && height === key.height)) return key
   return {
     x: key.x + key.width - width - 8,
     y: key.y + 6,
@@ -465,6 +467,13 @@ export class Preview {
 
   setMode(mode: "edit" | "preview"): void {
     this.mode = mode
+    this.active = undefined
+    this.cancelEditDrag()
+    this.updateCursor()
+    void this.draw()
+  }
+
+  cancelPointerInteraction(): void {
     this.active = undefined
     this.cancelEditDrag()
     this.updateCursor()

@@ -1231,14 +1231,30 @@ h2 {
   min-height: 0;
   display: grid;
   grid-template-rows: var(--candidate-inset-row, 0fr) var(--candidate-content-row, 133fr);
+  position: relative;
   overflow: hidden;
   container-type: inline-size;
+}
+
+#candidate-background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 #toolbar-strip,
 #candidate-composition {
   min-height: 0;
   grid-row: 2;
+}
+
+#toolbar-strip,
+#candidate-input,
+#candidate-words {
+  position: relative;
+  z-index: 1;
 }
 
 #candidate-composition {

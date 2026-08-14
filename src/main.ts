@@ -15,7 +15,12 @@ import {
   type Visual,
   type VisualResolver,
 } from "./atlas.ts"
-import { deviceSpec, keyboardPreviewGeometry, showsKeyboardAccessories } from "./devices.ts"
+import {
+  candidateBackgroundLogicalHeight,
+  deviceSpec,
+  keyboardPreviewGeometry,
+  showsKeyboardAccessories,
+} from "./devices.ts"
 import {
   exportFormatFromPath,
   exportName,
@@ -291,6 +296,7 @@ const simulatedOutput = $("#simulated-output") as HTMLTextAreaElement
 const clearSimulationButton = $("#clear-simulation") as HTMLButtonElement
 const toolbarStrip = $("#toolbar-strip") as HTMLDivElement
 const candidateArea = $("#candidate-area")
+const candidateBackgroundCanvas = $("#candidate-background") as HTMLCanvasElement
 const toolbarCanvas = $("#toolbar-preview") as HTMLCanvasElement
 const candidateComposition = $("#candidate-composition")
 const candidateInput = $("#candidate-input")
@@ -439,6 +445,8 @@ const preview = new Preview(
 )
 
 const toolbarPreview = new Preview(toolbarCanvas, () => {}, () => {}, true)
+const candidateBackgroundPreview = new Preview(candidateBackgroundCanvas, () => {}, () => {})
+let activeKeyboardGeometry: { panelWidth: number; panelHeight: number; candidateHeight: number } | undefined
 
 function applySkinState(state?: number, message?: string): void {
   skinState.value = state === undefined ? "" : String(state)
@@ -480,7 +488,7 @@ function handlePreviewEvent(event: PreviewEvent): void {
     simulatedOutput.value = result.value
     simulatedOutput.focus()
     simulatedOutput.setSelectionRange(result.caret, result.caret)
-    refreshSimulationState()
+    refreshSimulationPreview()
     return
   }
   if (!code || /^(F\d+|S\d+|Z\+)/.test(code)) return
@@ -558,7 +566,7 @@ function insertSimulatedText(text: string): void {
   simulatedOutput.value = result.value
   simulatedOutput.focus()
   simulatedOutput.setSelectionRange(result.caret, result.caret)
-  refreshSimulationState()
+  refreshSimulationPreview()
 }
 
 function isTauri(): boolean {
@@ -910,12 +918,13 @@ function applyCandidateTextVisual(
   element: HTMLElement,
   visual: TextVisual | undefined,
   canvasWidth: number,
+  maxFontSize?: number,
 ): void {
   element.style.color = visual?.color ?? ""
   element.style.fontFamily = canvasFontFamily(visual?.fontName)
   element.style.fontWeight = visual?.fontWeight ? String(visual.fontWeight) : ""
   element.style.fontSize = visual?.fontSize
-    ? `${(visual.fontSize / canvasWidth) * 100}cqw`
+    ? `${(Math.min(visual.fontSize, maxFontSize ?? visual.fontSize) / canvasWidth) * 100}cqw`
     : ""
 }
 
@@ -1034,26 +1043,19 @@ function refreshPreview(): void {
     )
     firstCandidateTextVisual = firstCandidateVisual
     candidateTextWidth = config.width
-    candidateInput.style.color = inputVisual?.color ?? ""
-    candidateInput.style.fontFamily = canvasFontFamily(inputVisual?.fontName)
-    candidateInput.style.fontWeight = inputVisual?.fontWeight ? String(inputVisual.fontWeight) : ""
-    candidateInput.style.fontSize = inputVisual?.fontSize
-      ? `${(inputVisual.fontSize / config.width) * 100}cqw`
-      : ""
-    candidateWords.style.color = candidateVisual?.color ?? ""
-    candidateWords.style.fontFamily = canvasFontFamily(candidateVisual?.fontName)
-    candidateWords.style.fontWeight = candidateVisual?.fontWeight
-      ? String(candidateVisual.fontWeight)
-      : ""
-    candidateWords.style.fontSize = candidateVisual?.fontSize
-      ? `${(candidateVisual.fontSize / config.width) * 100}cqw`
-      : ""
+    applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth, 40)
+    applyCandidateTextVisual(candidateWords, candidateVisual, candidateTextWidth)
     const firstCandidate = candidateWords.firstElementChild as HTMLElement | null
     if (firstCandidate) {
       applyCandidateTextVisual(firstCandidate, firstCandidateTextVisual, candidateTextWidth)
     }
     preview.setPanel(config.styleID, config.width, config.height)
     updatePanelTools(config.width, config.height, toolbarSize?.height)
+    activeKeyboardGeometry = {
+      panelWidth: config.width,
+      panelHeight: config.height,
+      candidateHeight: toolbarSize?.height ?? 0,
+    }
     applyDeviceKeyboardGeometry(config.width, config.height, toolbarSize?.height ?? 0, composing)
   } else if (bdaGen && layoutDocument) {
     const size = bdaGen.get("PANEL", "SIZE")?.split(",").map(Number)
@@ -1072,7 +1074,7 @@ function refreshPreview(): void {
     const firstVisual = resolver?.resolveText(candidateDocument?.get("CAND", "FIRST_FORE") ?? "", false)
     candidateTextWidth = panelWidth
     firstCandidateTextVisual = firstVisual
-    applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth)
+    applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth, 40)
     applyCandidateTextVisual(candidateWords, candidateVisual, candidateTextWidth)
     const firstCandidate = candidateWords.firstElementChild as HTMLElement | null
     if (firstCandidate) applyCandidateTextVisual(firstCandidate, firstVisual, candidateTextWidth)
@@ -1082,11 +1084,41 @@ function refreshPreview(): void {
       panelHeight,
     )
     updatePanelTools(panelWidth, panelHeight, toolbarSize?.height)
+    activeKeyboardGeometry = {
+      panelWidth,
+      panelHeight,
+      candidateHeight: toolbarSize?.height ?? 0,
+    }
     applyDeviceKeyboardGeometry(panelWidth, panelHeight, toolbarSize?.height ?? 0, composing)
   } else {
+    activeKeyboardGeometry = undefined
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
   }
   preview.setDocument(layoutDocument)
+}
+
+function refreshSimulationPreview(): void {
+  const composing = refreshSimulationState()
+  if (!archive || !activeKeyboardGeometry) return
+  applyDeviceKeyboardGeometry(
+    activeKeyboardGeometry.panelWidth,
+    activeKeyboardGeometry.panelHeight,
+    activeKeyboardGeometry.candidateHeight,
+    composing,
+  )
+  const resolver = visualResolver()
+  if (!resolver) return
+  const toolbarSize = refreshToolbarPreview(composing, resolver)
+  const candidateHeight = toolbarSize?.height ?? activeKeyboardGeometry.candidateHeight
+  if (candidateHeight !== activeKeyboardGeometry.candidateHeight) {
+    activeKeyboardGeometry.candidateHeight = candidateHeight
+    applyDeviceKeyboardGeometry(
+      activeKeyboardGeometry.panelWidth,
+      activeKeyboardGeometry.panelHeight,
+      candidateHeight,
+      composing,
+    )
+  }
 }
 
 function skinStateDocuments(): IniDocument[] {
@@ -1136,7 +1168,7 @@ let previewZoom = 1
 let previewPanX = 0
 let previewPanY = 0
 let previewPanStart: { x: number; y: number; panX: number; panY: number } | undefined
-let previewSpaceHeld = false
+let previewPanCandidate: { pointerId: number; x: number; y: number; panX: number; panY: number } | undefined
 
 function setPreviewPan(x: number, y: number): void {
   previewPanX = x
@@ -1185,8 +1217,7 @@ previewZoomFit.addEventListener("click", () => {
 })
 previewZoomIn.addEventListener("click", () => applyPreviewZoom(previewZoom + 0.1))
 canvasWrap.addEventListener("wheel", (event) => {
-  const modified = event.metaKey || event.ctrlKey
-  if (!modified || deviceShell.hidden) return
+  if (deviceShell.hidden) return
   event.preventDefault()
   applyPreviewZoom(
     previewZoom + (event.deltaY < 0 ? 0.1 : -0.1),
@@ -1194,36 +1225,36 @@ canvasWrap.addEventListener("wheel", (event) => {
   )
 }, { passive: false })
 
-window.addEventListener("keydown", (event) => {
-  if (event.key !== " " || isTextEditingTarget(event.target)) return
-  previewSpaceHeld = true
-  canvasWrap.classList.add("preview-pan-ready")
-  event.preventDefault()
-})
-
-window.addEventListener("keyup", (event) => {
-  if (event.key !== " ") return
-  previewSpaceHeld = false
-  canvasWrap.classList.remove("preview-pan-ready")
-})
-
 window.addEventListener("blur", () => {
-  previewSpaceHeld = false
+  previewPanCandidate = undefined
   previewPanStart = undefined
   canvasWrap.classList.remove("preview-pan-ready", "preview-panning")
 })
 
 canvasWrap.addEventListener("pointerdown", (event) => {
-  if (!previewSpaceHeld || event.button !== 0 || deviceShell.hidden) return
-  event.preventDefault()
-  event.stopPropagation()
-  previewPanStart = { x: event.clientX, y: event.clientY, panX: previewPanX, panY: previewPanY }
-  canvasWrap.classList.add("preview-panning")
-  canvasWrap.setPointerCapture(event.pointerId)
-}, { capture: true })
+  if (event.button !== 0 || deviceShell.hidden) return
+  previewPanCandidate = {
+    pointerId: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+    panX: previewPanX,
+    panY: previewPanY,
+  }
+  canvasWrap.classList.add("preview-pan-ready")
+})
 
 canvasWrap.addEventListener("pointermove", (event) => {
+  if (!previewPanStart && previewPanCandidate?.pointerId === event.pointerId) {
+    const dx = event.clientX - previewPanCandidate.x
+    const dy = event.clientY - previewPanCandidate.y
+    if (Math.hypot(dx, dy) < 3) return
+    previewPanStart = previewPanCandidate
+    preview.cancelPointerInteraction()
+    canvasWrap.classList.add("preview-panning")
+    canvasWrap.setPointerCapture(event.pointerId)
+  }
   if (!previewPanStart) return
+  event.preventDefault()
   setPreviewPan(
     previewPanStart.panX + event.clientX - previewPanStart.x,
     previewPanStart.panY + event.clientY - previewPanStart.y,
@@ -1231,8 +1262,9 @@ canvasWrap.addEventListener("pointermove", (event) => {
 })
 
 function finishPreviewPan(): void {
+  previewPanCandidate = undefined
   previewPanStart = undefined
-  canvasWrap.classList.remove("preview-panning")
+  canvasWrap.classList.remove("preview-pan-ready", "preview-panning")
 }
 
 canvasWrap.addEventListener("pointerup", finishPreviewPan)
@@ -2252,6 +2284,7 @@ function refreshToolbarPreview(
   if (!archive || !path || !document) {
     delete toolbarStrip.dataset.path
     toolbarStrip.hidden = true
+    candidateBackgroundCanvas.hidden = true
     return
   }
   const gen = textDocument(genConfigPath())
@@ -2262,18 +2295,27 @@ function refreshToolbarPreview(
   toolbarPreview.setOffsets(gen)
   toolbarPreview.setDefaults(gen)
   toolbarPreview.setTheme(theme.value === "dark" ? "dark" : "light")
-  toolbarPreview.setTransparent(devicePreviewTransparent())
+  toolbarPreview.setTransparent(true)
   const width = size?.length === 4 && Number.isFinite(size[2]) ? size[2] : 1125
   const height = size?.length === 4 && Number.isFinite(size[3]) ? size[3] : 133
+  const backgroundStyle = document.get("CAND", "BACK_STYLE")?.split(",")[0] ?? ""
+  candidateBackgroundCanvas.hidden = false
+  candidateBackgroundPreview.setResolver(resolver)
+  candidateBackgroundPreview.setTheme(theme.value === "dark" ? "dark" : "light")
+  candidateBackgroundPreview.setTransparent(devicePreviewTransparent())
+  candidateBackgroundPreview.setPanel(
+    backgroundStyle,
+    width,
+    candidateBackgroundLogicalHeight(deviceSpec(device.value), orientation.value, height, composing),
+  )
+  candidateBackgroundPreview.setDocument(undefined)
   toolbarCanvas.style.setProperty("--toolbar-width", String(width))
   toolbarCanvas.style.setProperty("--toolbar-height", String(height))
   applyCandidateGeometry(document, width)
-  toolbarPreview.setPanel(
-    document.get("CAND", "BACK_STYLE")?.split(",")[0] ?? "",
-    width,
-    height,
-  )
-  toolbarPreview.setDocument(document)
+  const toolbarDocument = IniDocument.parse(document.toString())
+  toolbarDocument.set("CAND", "BACK_STYLE", "")
+  toolbarPreview.setPanel("", width, height)
+  toolbarPreview.setDocument(toolbarDocument)
   toolbarPreview.setMode("preview")
   return { width, height }
 }
@@ -5169,9 +5211,9 @@ device.addEventListener("change", () => {
 clearSimulationButton.addEventListener("click", () => {
   simulatedOutput.value = ""
   simulatedOutput.setSelectionRange(0, 0)
-  refreshSimulationState()
+  refreshSimulationPreview()
 })
-simulatedOutput.addEventListener("input", refreshSimulationState)
+simulatedOutput.addEventListener("input", refreshSimulationPreview)
 window.addEventListener("keydown", (event) => {
   const movement: Record<string, readonly [number, number]> = {
     ArrowLeft: [-1, 0],
