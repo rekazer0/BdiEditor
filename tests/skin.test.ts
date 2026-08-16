@@ -64,6 +64,20 @@ test("undoing to original bytes clears the changed state", () => {
   assert.equal(archive.changed.size, 0)
 })
 
+test("deletes and restores canonical archive files", () => {
+  const archive = SkinArchive.open(zipSync({
+    "light/port/key.ini": strToU8("CENTER=q\n"),
+  }))
+
+  archive.delete("light/skin/port/key.ini")
+  assert.equal(archive.getBytes("light/skin/port/key.ini"), undefined)
+  assert.equal(unzipSync(archive.toBytes())["light/port/key.ini"], undefined)
+
+  archive.setText("light/skin/port/key.ini", "CENTER=q\n")
+  assert.equal(archive.changed.size, 0)
+  assert.equal(new TextDecoder().decode(unzipSync(archive.toBytes())["light/port/key.ini"]), "CENTER=q\n")
+})
+
 test("returns the original container byte-for-byte when unchanged", () => {
   const bytes = zipSync({ "skin.ini": strToU8("[KEY1]\nCENTER=q\n") })
   const archive = SkinArchive.open(bytes)

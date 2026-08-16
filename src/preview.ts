@@ -16,7 +16,6 @@ export type PreviewItem = {
   rect: Rect
   touchRect?: Rect
   foreRect?: Rect
-  fontSize?: number
   editable: boolean
   show: string
   center: string
@@ -31,6 +30,176 @@ export type PreviewItem = {
   foreOffsets: Array<[number, number] | undefined>
   positionTypes: string[]
   statStyle: string
+  animStyle?: string
+  backAnimStyle?: string
+  foreAnimStyle?: string
+  foreAnimStyles: string[]
+}
+
+type LegacyAnimationFrame = {
+  type: "opacity" | "translate" | "scale"
+  start: number
+  duration: number
+  delay: number
+  repeat: number
+  reverse: boolean
+  easing: readonly [number, number]
+  from: readonly [number, number]
+  to: readonly [number, number]
+}
+
+export type LegacyAnimation = Map<string, LegacyAnimationFrame[]>
+
+function animationEasing(type: number, progress: number): number {
+  if (type === 1) return progress * progress
+  if (type === 2) return 1 - (1 - progress) ** 2
+  if (type === 3) return Math.cos((progress + 1) * Math.PI) / 2 + 0.5
+  if (type === 4) {
+    const bounce = (value: number) => value * value * 8
+    const value = progress * 1.1226
+    if (value < 0.3535) return bounce(value)
+    if (value < 0.7408) return bounce(value - 0.54719) + 0.7
+    if (value < 0.9644) return bounce(value - 0.8526) + 0.9
+    return bounce(value - 1.0435) + 0.95
+  }
+  return progress
+}
+
+function animationDuration(frame: LegacyAnimationFrame): number {
+  return frame.duration * frame.repeat * (frame.reverse ? 2 : 1)
+}
+
+function scalePair(value: string | undefined): [number, number] | undefined {
+  const parts = value?.split(",").map(Number)
+  if (!parts || parts.length < 2 || parts.some((part) => !Number.isFinite(part))) return
+  return [parts[0] / 100, parts[1] / 100]
+}
+
+function pixelPair(value: string | undefined): [number, number] | undefined {
+  const parts = value?.split(",").map(Number)
+  if (!parts || parts.length < 2 || parts.some((part) => !Number.isFinite(part))) return
+  return [parts[0], parts[1]]
+}
+
+function opacityPair(value: string | undefined): [number, number] | undefined {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return
+  const opacity = Math.max(0, Math.min(1, number / 255))
+  return [opacity, opacity]
+}
+
+export function parseLegacyAnimation(
+  styles: IniDocument,
+  animations: IniDocument,
+): LegacyAnimation {
+  const result: LegacyAnimation = new Map()
+  for (const section of styles.sections()) {
+    const styleID = section.match(/^STYLE(.+)$/)?.[1]
+    const animationID = styles.get(section, "PRESS_ANIM") ?? styles.get(section, "SHOW_ANIM")
+    if (!styleID || !animationID) continue
+    const build = `ANIM${animationID}`
+    const ids = (animations.get(build, "BUILD_LIST") ?? animationID)
+      .split(",").map((value) => value.trim()).filter(Boolean)
+    const parallel = animations.get(build, "BUILD_METHOD") === "0"
+    let start = 0
+    const frames = ids.flatMap((id) => {
+      const frame = `ANIM${id}`
+      const type = animations.get(frame, "TYPE")
+      const from = type === "0"
+        ? opacityPair(animations.get(frame, "FROM"))
+        : type === "2"
+          ? pixelPair(animations.get(frame, "FROM_PX") ?? animations.get(frame, "FROM"))
+          : scalePair(animations.get(frame, "FROM"))
+      const to = type === "0"
+        ? opacityPair(animations.get(frame, "TO"))
+        : type === "2"
+          ? pixelPair(animations.get(frame, "TO_PX") ?? animations.get(frame, "TO"))
+          : scalePair(animations.get(frame, "TO"))
+      if (!["0", "2", "3", "4"].includes(type ?? "") || !from || !to) return []
+      const duration = Math.max(0, Number(animations.get(frame, "DURATION")) || 0)
+      const delay = Math.max(0, Number(animations.get(frame, "DELAY")) || 0)
+      const repeat = Math.max(1, Number(animations.get(frame, "REPEAT_CNT")) || 1)
+      const reverse = animations.get(frame, "REPEAT_MODE") === "1"
+      const easingValues = (animations.get(frame, "INTPOL") ?? "0")
+        .split(",").map((value) => Number(value.trim()) || 0)
+      const parsed = {
+        type: type === "0" ? "opacity" as const : type === "2" ? "translate" as const : "scale" as const,
+        start: parallel ? 0 : start,
+        duration,
+        delay,
+        repeat,
+        reverse,
+        easing: [easingValues[0] ?? 0, easingValues[1] ?? easingValues[0] ?? 0] as const,
+        from,
+        to,
+      }
+      if (!parallel) start += delay + animationDuration(parsed)
+      return [parsed]
+    })
+    if (frames.length) result.set(styleID, frames)
+  }
+  return result
+}
+
+export const parseLegacyScaleAnimation = parseLegacyAnimation
+
+function legacyAnimationPair(
+  animation: LegacyAnimation | undefined,
+  styleID: string | undefined,
+  elapsed: number,
+  type: "opacity" | "translate" | "scale",
+): readonly [number, number] | undefined {
+  const frames = styleID ? animation?.get(styleID) : undefined
+  if (!frames) return
+  const total = Math.max(...frames.map((frame) => frame.start + frame.delay + animationDuration(frame)))
+  if (elapsed > total) return
+  let previous: (typeof frames)[number] | undefined
+  for (const frame of frames.filter((frame) => frame.type === type)) {
+    const start = frame.start + frame.delay
+    const duration = animationDuration(frame)
+    const end = start + duration
+    if (elapsed < start) return previous ? (previous.reverse ? previous.from : previous.to) : frame.from
+    if (elapsed <= end) {
+      let progress = duration ? (elapsed - start) / duration : 1
+      if (progress < 1 && frame.repeat > 1) progress = (progress * frame.repeat) % 1
+      if (frame.reverse) {
+        progress *= 2
+        if (progress > 1) progress = 2 - progress
+      }
+      const x = animationEasing(frame.easing[0], progress)
+      const y = animationEasing(frame.easing[1], progress)
+      return [
+        frame.from[0] + (frame.to[0] - frame.from[0]) * x,
+        frame.from[1] + (frame.to[1] - frame.from[1]) * y,
+      ]
+    }
+    previous = frame
+  }
+  return previous ? (previous.reverse ? previous.from : previous.to) : undefined
+}
+
+export function legacyAnimationScale(
+  animation: LegacyAnimation | undefined,
+  styleID: string | undefined,
+  elapsed: number,
+): readonly [number, number] | undefined {
+  return legacyAnimationPair(animation, styleID, elapsed, "scale")
+}
+
+export function legacyAnimationTranslation(
+  animation: LegacyAnimation | undefined,
+  styleID: string | undefined,
+  elapsed: number,
+): readonly [number, number] | undefined {
+  return legacyAnimationPair(animation, styleID, elapsed, "translate")
+}
+
+export function legacyAnimationOpacity(
+  animation: LegacyAnimation | undefined,
+  styleID: string | undefined,
+  elapsed: number,
+): number | undefined {
+  return legacyAnimationPair(animation, styleID, elapsed, "opacity")?.[0]
 }
 
 export function previewStateActive(item: PreviewItem, state: number | undefined): boolean {
@@ -113,25 +282,13 @@ export function previewFallbackText(
 export function foregroundLayerRect(
   key: Rect,
   source: [number, number, number, number] | undefined,
-  layer: number,
   offset?: [number, number],
 ): Rect {
-  if (!source) return key
+  if (!source || !offset) return key
   const [, , width, height] = source
-  if (offset) {
-    return {
-      x: key.x + (key.width - width) / 2 + offset[0],
-      y: key.y + (key.height - height) / 2 + offset[1],
-      width,
-      height,
-    }
-  }
-  // Full-size image layers (for example the 9-key shadow/top layers) share
-  // the key's coordinate system and must not use the small-icon fallback.
-  if (layer === 0 || (width === key.width && height === key.height)) return key
   return {
-    x: key.x + key.width - width - 8,
-    y: key.y + 6,
+    x: key.x + (key.width - width) / 2 + offset[0],
+    y: key.y + (key.height - height) / 2 + offset[1],
     width,
     height,
   }
@@ -158,6 +315,10 @@ export function isAdditiveSelection(
   event: Pick<MouseEvent, "metaKey" | "ctrlKey" | "shiftKey">,
 ): boolean {
   return event.metaKey || event.ctrlKey || event.shiftKey
+}
+
+export function isTouchLongPress(pointerType: string, duration: number, distance: number): boolean {
+  return pointerType === "touch" && duration >= 450 && distance <= 12
 }
 
 export function previewHitRect(item: PreviewItem, mode: "edit" | "preview"): Rect {
@@ -214,6 +375,10 @@ function itemFromSection(document: IniDocument, section: string): PreviewItem | 
     foreOffsets: value("FORE_OFFSET").split(";").map(parseOffset),
     positionTypes: value("POS_TYPE").split(",").map((token) => token.trim()).filter(Boolean),
     statStyle: value("STAT_STYLE"),
+    animStyle: value("ANIM_STYLE"),
+    backAnimStyle: value("BACK_ANIM_STYLE"),
+    foreAnimStyle: value("FORE_ANIM_STYLE").split(",")[0],
+    foreAnimStyles: value("FORE_ANIM_STYLE").split(",").map((token) => token.trim()).filter(Boolean),
   }
 }
 
@@ -238,7 +403,6 @@ function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[]
       width: cell[0],
       height: cell[1],
     },
-    fontSize: Math.min(cell[0], cell[1]) * 0.36,
     editable: false,
     show,
     center: "",
@@ -253,6 +417,7 @@ function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[]
     foreOffsets: [],
     positionTypes: [],
     statStyle: "",
+    foreAnimStyles: [],
   }))
   // 整个候选栏是一个可选中按钮
   const bar: PreviewItem = {
@@ -263,7 +428,6 @@ function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[]
       width: cell[0],
       height: cell[1] * count,
     },
-    fontSize: Math.min(cell[0], cell[1]) * 0.36,
     editable: true,
     show: "",
     center: "",
@@ -278,6 +442,7 @@ function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[]
     foreOffsets: [],
     positionTypes: [],
     statStyle: "",
+    foreAnimStyles: [],
   }
   return [bar, ...cells]
 }
@@ -287,9 +452,13 @@ export function dynamicToolbarRect(
   panelWidth: number,
   panelHeight: number,
 ): Rect | undefined {
-  const size = document.get("ICON2", "SIZE")?.split(",").map(Number)
-  const position = document.get("ICON2", "POS")?.split(",").map(Number)
-  const anchor = Number(document.get("ICON2", "ANCHOR_TYPE"))
+  const section = document.sections().find((name) =>
+    /^ICON\d+$/i.test(name) && document.get(name, "KEY")?.trim().toUpperCase() === "F14"
+  )
+  if (!section) return
+  const size = document.get(section, "SIZE")?.split(",").map(Number)
+  const position = document.get(section, "POS")?.split(",").map(Number)
+  const anchor = Number(document.get(section, "ANCHOR_TYPE"))
   if (
     !size || size.length !== 2 || size.some((value) => !Number.isFinite(value) || value <= 0) ||
     !position || position.length !== 2 || position.some((value) => !Number.isFinite(value))
@@ -364,7 +533,7 @@ export function previewItems(
       rect: { x, y, width, height },
       foreRect,
       editable: false,
-      show: section === "CAND" ? "" : section,
+      show: document.get(section, "SHOW") ?? "",
       center: value("KEY") || value("CENTER"),
       up: value("UP"),
       down: value("DOWN"),
@@ -377,6 +546,8 @@ export function previewItems(
       foreOffsets: [],
       positionTypes: document.get(section, "POS_TYPE")?.split(",").map((token) => token.trim()).filter(Boolean) ?? [],
       statStyle: value("STAT_STYLE"),
+      animStyle: value("ANIM_STYLE"),
+      foreAnimStyles: [],
     }]
   }), ...list]
 }
@@ -420,6 +591,18 @@ export class Preview {
     startY: number
     original: Map<string, Rect>
   }
+  private editTouch?: {
+    pointerId: number
+    pointerType: string
+    key: PreviewItem
+    startX: number
+    startY: number
+    clientX: number
+    clientY: number
+    startedAt: number
+    longPress: boolean
+    longPressTimer?: number
+  }
   private active?: {
     key: PreviewItem
     startX: number
@@ -427,12 +610,16 @@ export class Preview {
     startedAt: number
   }
   private selected = new Set<string>()
+  private mobileMultiSelect = false
   private selectionAnchor?: string
   private guides = false
   private skinState?: number
   private animation?: BdaAnimation
   private animationVisual?: { key: PreviewItem; visual: Visual }
   private animationTimer?: number
+  private legacyAnimation?: LegacyAnimation
+  private legacyAnimationState?: { key: PreviewItem; startedAt: number }
+  private legacyAnimationTimer?: number
   private drawID = 0
 
   constructor(
@@ -440,7 +627,6 @@ export class Preview {
     onEvent: (event: PreviewEvent) => void,
     onSelect: (sections: string[]) => void,
     toolbarSlots = false,
-    onContextMenu?: (section: string, event: MouseEvent) => void,
     onMove: (sections: string[], deltaX: number, deltaY: number) => void = () => {},
   ) {
     this.canvas = canvas
@@ -451,14 +637,10 @@ export class Preview {
     canvas.addEventListener("pointerdown", (event) => this.pointerDown(event))
     canvas.addEventListener("pointermove", (event) => this.pointerMove(event))
     canvas.addEventListener("pointerup", (event) => this.pointerUp(event))
-    canvas.addEventListener("contextmenu", (event) => {
-      const key = this.hit(this.point(event))
-      if (!key || !onContextMenu) return
-      event.preventDefault()
-      onContextMenu(key.section, event)
-    })
+    canvas.addEventListener("contextmenu", (event) => event.preventDefault())
     canvas.addEventListener("pointercancel", () => {
       this.active = undefined
+      this.cancelEditTouch()
       this.cancelEditDrag()
       this.updateCursor()
       void this.draw()
@@ -467,7 +649,9 @@ export class Preview {
 
   setMode(mode: "edit" | "preview"): void {
     this.mode = mode
+    this.mobileMultiSelect = false
     this.active = undefined
+    this.cancelEditTouch()
     this.cancelEditDrag()
     this.updateCursor()
     void this.draw()
@@ -475,6 +659,7 @@ export class Preview {
 
   cancelPointerInteraction(): void {
     this.active = undefined
+    this.cancelEditTouch()
     this.cancelEditDrag()
     this.updateCursor()
     void this.draw()
@@ -482,6 +667,7 @@ export class Preview {
 
   setEditTool(tool: "select" | "move"): void {
     this.editTool = tool
+    this.cancelEditTouch()
     this.cancelEditDrag()
     this.updateCursor()
     void this.draw()
@@ -489,6 +675,7 @@ export class Preview {
 
   setSelected(sections: readonly string[]): void {
     this.selected = new Set(sections)
+    if (!sections.length) this.mobileMultiSelect = false
     void this.draw()
   }
 
@@ -538,6 +725,13 @@ export class Preview {
     void this.draw()
   }
 
+  setLegacyAnimation(animation?: LegacyAnimation): void {
+    this.legacyAnimation = animation
+    this.legacyAnimationState = undefined
+    if (this.legacyAnimationTimer) window.cancelAnimationFrame(this.legacyAnimationTimer)
+    void this.draw()
+  }
+
   setPanel(styleID: string, width: number, height: number): void {
     this.panelStyle = styleID
     this.panelWidth = width
@@ -583,28 +777,38 @@ export class Preview {
     if (!key) {
       if (this.mode === "edit") {
         this.selected.clear()
+        this.mobileMultiSelect = false
         this.onSelect([])
         void this.draw()
       }
       return
     }
-    if (this.mode === "edit" && event.shiftKey && this.selectionAnchor) {
-      const sections = this.keys.filter((item) => item.editable).map((item) => item.section)
-      const from = sections.indexOf(this.selectionAnchor)
-      const to = sections.indexOf(key.section)
-      if (from >= 0 && to >= 0) {
-        this.selected = new Set(sections.slice(Math.min(from, to), Math.max(from, to) + 1))
+    if (this.mode === "edit" && this.editTool === "select" && event.pointerType === "touch") {
+      this.editTouch = {
+        pointerId: event.pointerId,
+        pointerType: event.pointerType,
+        key,
+        startX: point.x,
+        startY: point.y,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        startedAt: Date.now(),
+        longPress: false,
       }
-    } else if (this.mode === "edit" && isAdditiveSelection(event)) {
-      if (this.selected.has(key.section)) this.selected.delete(key.section)
-      else this.selected.add(key.section)
-    } else if (!this.selected.has(key.section) || this.mode === "preview") {
-      this.selected = new Set([key.section])
-    } else if (this.mode === "edit" && this.editTool === "select") {
-      this.selected.delete(key.section)
+      const touch = this.editTouch
+      touch.longPressTimer = window.setTimeout(() => {
+        if (this.editTouch !== touch) return
+        touch.longPress = true
+        this.mobileMultiSelect = true
+        this.selected.add(key.section)
+        this.selectionAnchor = key.section
+        this.onSelect([...this.selected])
+        void this.draw()
+      }, 450)
+      this.canvas.setPointerCapture(event.pointerId)
+      return
     }
-    if (this.mode === "edit" && !event.shiftKey) this.selectionAnchor = key.section
-    this.onSelect([...this.selected])
+    this.selectKey(key, event)
     if (this.mode === "edit") {
       if (this.editTool === "move" && !key.section.startsWith("LIST")) {
         const selectedKeys = this.keys.filter((item) => this.selected.has(item.section) && !item.section.startsWith("LIST"))
@@ -614,6 +818,7 @@ export class Preview {
           startY: point.y,
           original: new Map(selectedKeys.map((item) => [item.section, { ...item.rect }])),
         }
+        event.stopPropagation()
         this.canvas.setPointerCapture(event.pointerId)
         this.canvas.style.cursor = "grabbing"
       }
@@ -631,7 +836,38 @@ export class Preview {
     void this.draw()
   }
 
+  private selectKey(
+    key: PreviewItem,
+    event: Pick<PointerEvent, "metaKey" | "ctrlKey" | "shiftKey">,
+  ): void {
+    if (this.mode === "edit" && event.shiftKey && this.selectionAnchor) {
+      const sections = this.keys.filter((item) => item.editable).map((item) => item.section)
+      const from = sections.indexOf(this.selectionAnchor)
+      const to = sections.indexOf(key.section)
+      if (from >= 0 && to >= 0) {
+        this.selected = new Set(sections.slice(Math.min(from, to), Math.max(from, to) + 1))
+      }
+    } else if (this.mode === "edit" && isAdditiveSelection(event)) {
+      if (this.selected.has(key.section)) this.selected.delete(key.section)
+      else this.selected.add(key.section)
+    } else if (!this.selected.has(key.section) || this.mode === "preview") {
+      this.selected = new Set([key.section])
+    } else if (this.mode === "edit" && this.editTool === "select") {
+      this.selected.delete(key.section)
+    }
+    if (this.mobileMultiSelect && !this.selected.size) this.mobileMultiSelect = false
+    if (this.mode === "edit" && !event.shiftKey) this.selectionAnchor = key.section
+    this.onSelect([...this.selected])
+  }
+
   private pointerMove(event: PointerEvent): void {
+    if (this.editTouch?.pointerId === event.pointerId && !this.editTouch.longPress) {
+      const distance = Math.hypot(event.clientX - this.editTouch.clientX, event.clientY - this.editTouch.clientY)
+      if (distance > 12 && this.editTouch.longPressTimer !== undefined) {
+        window.clearTimeout(this.editTouch.longPressTimer)
+        this.editTouch.longPressTimer = undefined
+      }
+    }
     if (!this.editDrag || this.editDrag.pointerId !== event.pointerId) return
     const point = this.point(event)
     const dx = Math.round(point.x - this.editDrag.startX)
@@ -644,6 +880,7 @@ export class Preview {
   }
 
   private async playAnimation(key: PreviewItem): Promise<void> {
+    this.playLegacyAnimation(key)
     const sequence = animationSequenceForKey(this.animation, key)
     if (!sequence?.frames.length || !this.resolver?.resolveResource) return
     if (this.animationTimer) window.clearTimeout(this.animationTimer)
@@ -663,7 +900,49 @@ export class Preview {
     await play(0)
   }
 
+  private playLegacyAnimation(key: PreviewItem): void {
+    const styles = [key.animStyle, key.backAnimStyle, ...key.foreAnimStyles].filter(Boolean) as string[]
+    const duration = Math.max(0, ...styles.flatMap((style) => {
+      const frames = this.legacyAnimation?.get(style)
+      return frames ? [Math.max(...frames.map((frame) => frame.start + frame.delay + animationDuration(frame)))] : []
+    }))
+    if (!duration) return
+    if (this.legacyAnimationTimer) window.cancelAnimationFrame(this.legacyAnimationTimer)
+    this.legacyAnimationState = { key, startedAt: Date.now() }
+    const tick = () => {
+      const elapsed = Date.now() - this.legacyAnimationState!.startedAt
+      if (elapsed >= duration) this.legacyAnimationState = undefined
+      void this.draw()
+      if (elapsed < duration) this.legacyAnimationTimer = window.requestAnimationFrame(tick)
+    }
+    tick()
+  }
+
   private pointerUp(event: PointerEvent): void {
+    if (this.editTouch?.pointerId === event.pointerId) {
+      const touch = this.editTouch
+      this.cancelEditTouch()
+      const distance = Math.hypot(event.clientX - touch.clientX, event.clientY - touch.clientY)
+      const longPress = touch.longPress || isTouchLongPress(
+        touch.pointerType,
+        Date.now() - touch.startedAt,
+        distance,
+      )
+      if (longPress) {
+        this.mobileMultiSelect = true
+        this.selected.add(touch.key.section)
+        this.selectionAnchor = touch.key.section
+        this.onSelect([...this.selected])
+      } else {
+        this.selectKey(touch.key, {
+          metaKey: event.metaKey,
+          ctrlKey: event.ctrlKey || this.mobileMultiSelect,
+          shiftKey: event.shiftKey,
+        })
+      }
+      void this.draw()
+      return
+    }
     if (this.editDrag?.pointerId === event.pointerId) {
       const point = this.point(event)
       const dx = point.x - this.editDrag.startX
@@ -679,8 +958,9 @@ export class Preview {
     const { key, startX, startY, startedAt } = this.active
     const dx = point.x - startX
     const dy = point.y - startY
-    const direction = gestureDirection(dx, dy, Date.now() - startedAt, Boolean(key.hold))
-    const code = key[direction]
+    const clearOnHold = key.center.trim() === "F36"
+    const direction = gestureDirection(dx, dy, Date.now() - startedAt, Boolean(key.hold) || clearOnHold)
+    const code = direction === "hold" && clearOnHold ? "F48" : key[direction]
     this.onEvent({ section: key.section, direction, code })
     this.active = undefined
     void this.draw()
@@ -693,6 +973,11 @@ export class Preview {
       if (original) key.rect = original
     }
     this.editDrag = undefined
+  }
+
+  private cancelEditTouch(): void {
+    if (this.editTouch?.longPressTimer !== undefined) window.clearTimeout(this.editTouch.longPressTimer)
+    this.editTouch = undefined
   }
 
   private updateCursor(): void {
@@ -827,6 +1112,32 @@ export class Preview {
     context.strokeRect(destination.x + 0.5, destination.y + 0.5, destination.width - 1, destination.height - 1)
   }
 
+  private withTransform(
+    context: CanvasRenderingContext2D,
+    rect: Rect,
+    scale: readonly [number, number] | undefined,
+    translation: readonly [number, number] | undefined,
+    opacity: number | undefined,
+    draw: () => void,
+  ): void {
+    if (!scale && !translation && opacity === undefined) {
+      draw()
+      return
+    }
+    const centerX = rect.x + rect.width / 2
+    const centerY = rect.y + rect.height / 2
+    context.save()
+    if (opacity !== undefined) context.globalAlpha *= opacity
+    if (translation) context.translate(translation[0], translation[1])
+    if (scale) {
+      context.translate(centerX, centerY)
+      context.scale(scale[0], scale[1])
+      context.translate(-centerX, -centerY)
+    }
+    draw()
+    context.restore()
+  }
+
   private async draw(): Promise<void> {
     const drawID = ++this.drawID
     const keys = this.keys.map((key) =>
@@ -835,7 +1146,8 @@ export class Preview {
     const [panel, visuals, toolbarImages] = await Promise.all([
       this.resolver?.resolve(this.panelStyle, false),
       Promise.all(keys.map(async (key) => {
-        const highlighted = this.active?.key.section === key.section
+        const highlighted = this.active?.key.section === key.section ||
+          this.legacyAnimationState?.key.section === key.section
         return {
           back: await this.resolver?.resolve(key.backStyle, highlighted),
           fore: await Promise.all(
@@ -870,29 +1182,68 @@ export class Preview {
     for (const [index, key] of keys.entries()) {
       const active = this.active?.key.section === key.section
       const selected = previewSelectionVisible(this.mode, this.selected.has(key.section))
+      const animationElapsed = this.legacyAnimationState?.key.section === key.section
+        ? Date.now() - this.legacyAnimationState.startedAt
+        : -1
+      const backAnimationStyle = key.backAnimStyle || key.animStyle
+      const backScale = animationElapsed >= 0
+        ? legacyAnimationScale(this.legacyAnimation, backAnimationStyle, animationElapsed)
+        : undefined
+      const backTranslation = animationElapsed >= 0
+        ? legacyAnimationTranslation(this.legacyAnimation, backAnimationStyle, animationElapsed)
+        : undefined
+      const backOpacity = animationElapsed >= 0
+        ? legacyAnimationOpacity(this.legacyAnimation, backAnimationStyle, animationElapsed)
+        : undefined
       const foregrounds = phoneForegroundLayers(visuals[index].fore)
       const styleTexts = visuals[index].styleTexts
       const hasForeground = foregrounds.some(Boolean) || styleTexts.some(Boolean)
       if (shouldDrawItemBackground(key, this.panelStyle, this.panelWidth, this.panelHeight)) {
-        this.drawVisual(context, visuals[index].back, key.rect, true)
+        this.withTransform(context, key.rect, backScale, backTranslation, backOpacity, () => {
+          this.drawVisual(context, visuals[index].back, key.rect, true)
+        })
       }
       for (const [layer, fore] of foregrounds.entries()) {
+        const animationStyle = key.foreAnimStyles[layer] || key.foreAnimStyle || key.animStyle
+        const foreScale = animationElapsed >= 0
+          ? legacyAnimationScale(this.legacyAnimation, animationStyle, animationElapsed)
+          : undefined
+        const foreTranslation = animationElapsed >= 0
+          ? legacyAnimationTranslation(this.legacyAnimation, animationStyle, animationElapsed)
+          : undefined
+        const foreOpacity = animationElapsed >= 0
+          ? legacyAnimationOpacity(this.legacyAnimation, animationStyle, animationElapsed)
+          : undefined
         const offset = key.foreOffsets[layer] ?? offsetFromSection(
           this.offsets,
           `OFFSET${key.positionTypes[layer] ?? ""}`,
         )
-        const destination = key.foreRect ?? foregroundLayerRect(key.rect, fore?.source, layer, offset)
-        this.drawVisual(context, fore, destination, false)
+        const destination = key.foreRect ?? foregroundLayerRect(key.rect, fore?.source, offset)
+        this.withTransform(context, key.rect, foreScale, foreTranslation, foreOpacity, () => {
+          this.drawVisual(context, fore, destination, false)
+        })
       }
 
       for (const [layer, styleText] of styleTexts.entries()) {
         if (!styleText || foregrounds[layer]) continue
+        const animationStyle = key.foreAnimStyles[layer] || key.foreAnimStyle || key.animStyle
+        const foreScale = animationElapsed >= 0
+          ? legacyAnimationScale(this.legacyAnimation, animationStyle, animationElapsed)
+          : undefined
+        const foreTranslation = animationElapsed >= 0
+          ? legacyAnimationTranslation(this.legacyAnimation, animationStyle, animationElapsed)
+          : undefined
+        const foreOpacity = animationElapsed >= 0
+          ? legacyAnimationOpacity(this.legacyAnimation, animationStyle, animationElapsed)
+          : undefined
         const offset = key.foreOffsets[layer] ?? offsetFromSection(
           this.offsets,
           `OFFSET${key.positionTypes[layer] ?? ""}`,
         )
         const point = foregroundTextPoint(key.foreRect ?? key.rect, offset)
-        this.drawStyleText(context, styleText, point)
+        this.withTransform(context, key.rect, foreScale, foreTranslation, foreOpacity, () => {
+          this.drawStyleText(context, styleText, point)
+        })
       }
 
       if (selected) {
@@ -903,19 +1254,30 @@ export class Preview {
 
       const textVisual: TextVisual | undefined = visuals[index].text
       context.fillStyle = textVisual?.color ?? (this.theme === "dark" ? "#f5f5f7" : "#17191c")
-      const fontSize =
-        key.fontSize ?? textVisual?.fontSize ?? Math.max(18, Math.min(42, key.rect.height * 0.25))
+      const fontSize = textVisual?.fontSize ?? Math.max(18, Math.min(42, key.rect.height * 0.25))
       const fontWeight = textVisual?.fontWeight ? `${textVisual.fontWeight} ` : ""
       context.font = `${fontWeight}${fontSize}px ${canvasFontFamily(textVisual?.fontName)}`
       context.textAlign = "center"
       context.textBaseline = "middle"
       const fallbackText = previewFallbackText(key, this.mode, hasForeground)
       if (fallbackText) {
-        context.fillText(
-          fallbackText,
-          key.rect.x + key.rect.width / 2,
-          key.rect.y + key.rect.height / 2,
-        )
+        const animationStyle = key.foreAnimStyle || key.animStyle
+        const foreScale = animationElapsed >= 0
+          ? legacyAnimationScale(this.legacyAnimation, animationStyle, animationElapsed)
+          : undefined
+        const foreTranslation = animationElapsed >= 0
+          ? legacyAnimationTranslation(this.legacyAnimation, animationStyle, animationElapsed)
+          : undefined
+        const foreOpacity = animationElapsed >= 0
+          ? legacyAnimationOpacity(this.legacyAnimation, animationStyle, animationElapsed)
+          : undefined
+        this.withTransform(context, key.rect, foreScale, foreTranslation, foreOpacity, () => {
+          context.fillText(
+            fallbackText,
+            key.rect.x + key.rect.width / 2,
+            key.rect.y + key.rect.height / 2,
+          )
+        })
       }
 
     }

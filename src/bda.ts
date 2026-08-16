@@ -55,6 +55,10 @@ export type BdaAnimation = {
   targets: string[]
   sequences: Map<string, BdaAnimationSequence>
 }
+export type BdaSoundConfig = {
+  keySounds: Map<string, BdaResource>
+  iosKeySounds: Map<string, BdaResource>
+}
 export type BdaConfigKind = "appearance" | "animation" | "lightAnimation" | "sound" | "switch"
 
 const STYLE_BASE = { image: 1_000_000, color: 2_000_000, text: 3_000_000 } as const
@@ -107,7 +111,12 @@ export function bdaLayoutDocument(base: IniDocument, appearance: BdaAppearance, 
     document.set(section, "BACK_STYLE", bdaStyleID(key.backStyle))
     document.set(section, "FORE_STYLE", key.foreStyles.map(bdaStyleID).join(","))
     if (key.foreStyleOffsets.length) {
-      document.set(section, "FORE_OFFSET", key.foreStyleOffsets.map(({ x, y }) => `${x},${y}`).join(";"))
+      const rect = document.get(section, "VIEW_RECT")?.split(",").map(Number)
+      const width = rect?.[2] ?? 0
+      const height = rect?.[3] ?? 0
+      document.set(section, "FORE_OFFSET", key.foreStyleOffsets
+        .map(({ x, y }) => `${x * width},${y * height}`)
+        .join(";"))
     }
   }
   return document
@@ -330,6 +339,19 @@ export function decodeBdaAnimation(bytes: Uint8Array): BdaAnimation {
   }
 }
 
+export function decodeBdaSoundConfig(bytes: Uint8Array): BdaSoundConfig {
+  const root = fields(bytes)
+  const soundMap = (fieldNumber: number) => new Map(mapEntries(root, fieldNumber).flatMap((entry) => {
+    const key = string(first(entry, 1))
+    const value = resource(first(entry, 2))
+    return key && value ? [[key, value] as const] : []
+  }))
+  return {
+    keySounds: soundMap(1),
+    iosKeySounds: soundMap(3),
+  }
+}
+
 export function bdaLayoutNames(bytes: Uint8Array): string[] {
   return [...decodeBdaAppearance(bytes).panels.keys()]
 }
@@ -475,6 +497,14 @@ export class BdaResolver implements VisualResolver {
     } : undefined
   }
 
+  resolveStyleText(styleID: string, highlighted: boolean): StyleTextVisual | undefined {
+    const ref = bdaStyleRef(styleID)
+    if (ref?.type !== "text") return
+    const style = this.appearance.textStyles.get(ref.key)
+    if (!style?.contentText) return
+    return { text: style.contentText, ...this.resolveText(styleID, highlighted) }
+  }
+
   async resolveToolbarImages(): Promise<Visual[]> {
     return []
   }
@@ -559,6 +589,46 @@ function replaceField(bytes: Uint8Array, number: number, wire: 0 | 2, payload: U
 export function updateBdaDesignWidth(bytes: Uint8Array, width: number): Uint8Array {
   if (!Number.isFinite(width) || width <= 0) throw new Error("BDA 设计宽度必须是正数")
   return replaceField(bytes, 6, 0, encodeVarint(Math.round(width)))
+}
+
+export function bdaSoundResourceType(filename: string): number {
+  if (/\.wav$/i.test(filename)) return 4
+  if (/\.ogg$/i.test(filename)) return 5
+  if (/\.aiff?$/i.test(filename)) return 10
+  throw new Error("BDA 按键音仅支持 OGG、WAV 或 AIFF")
+}
+
+export function updateBdaKeySound(
+  bytes: Uint8Array,
+  key: string,
+  sound: BdaResource,
+  ios = false,
+): Uint8Array {
+  const fieldNumber = ios ? 3 : 1
+  const existing = rawFields(bytes).find((field) => {
+    if (field.number !== fieldNumber || !field.bytes) return false
+    return rawString(rawFields(field.bytes).find((item) => item.number === 1)) === key
+  })
+  const encodeResource = (original = new Uint8Array()) => replaceField(
+    replaceField(original, 1, 0, encodeVarint(sound.type)),
+    2,
+    2,
+    new TextEncoder().encode(sound.resourceID),
+  )
+  if (existing?.bytes) {
+    const original = rawFields(existing.bytes).find((field) => field.number === 2)?.bytes
+    const entry = replaceField(existing.bytes, 2, 2, encodeResource(original))
+    return join([
+      bytes.slice(0, existing.start),
+      encodedField(fieldNumber, 2, entry),
+      bytes.slice(existing.end),
+    ])
+  }
+  const entry = join([
+    encodedField(1, 2, new TextEncoder().encode(key)),
+    encodedField(2, 2, encodeResource()),
+  ])
+  return join([bytes, encodedField(fieldNumber, 2, entry)])
 }
 
 function updateMapValue(
@@ -706,6 +776,6 @@ export function describeBdaConfig(path: string, bytes: Uint8Array): string {
     "已按百度官方 protobuf 字段解析；保存时保留原始配置和未知字段。",
   ].join("\n")
 }
-import type { TextVisual, Visual, VisualResolver } from "./atlas.ts"
+import type { StyleTextVisual, TextVisual, Visual, VisualResolver } from "./atlas.ts"
 import { IniDocument } from "./ini.ts"
 import { SkinArchive } from "./skin.ts"

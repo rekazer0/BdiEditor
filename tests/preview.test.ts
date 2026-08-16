@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { gestureDirection, rectToString } from "../src/layout.ts"
 import { IniDocument } from "../src/ini.ts"
-import { animationSequenceForKey, effectivePreviewItem, foregroundTextPoint, isAdditiveSelection, offsetFromSection, previewBackground, previewFallbackText, previewHitRect, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawItemBackground } from "../src/preview.ts"
+import { animationSequenceForKey, effectivePreviewItem, foregroundTextPoint, isAdditiveSelection, isTouchLongPress, legacyAnimationOpacity, legacyAnimationScale, legacyAnimationTranslation, offsetFromSection, parseLegacyAnimation, previewBackground, previewFallbackText, previewHitRect, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawItemBackground } from "../src/preview.ts"
 
 test("classifies click, hold and directional gestures", () => {
   assert.equal(gestureDirection(2, 3, 100, true), "center")
@@ -58,6 +58,27 @@ test("candidate toolbar renders only its default mutually exclusive state", () =
     "[ICON4]\nFORE_STYLE=3\nSIZE=100,100\nPERSIST=2\n[TIP1]\nFORE_STYLE=4\nSIZE=100,100\n",
   )
   assert.deepEqual(previewItems(document).map((item) => item.section), ["CAND", "ICON3"])
+})
+
+test("candidate toolbar never displays internal ICON section names", () => {
+  const items = previewItems(IniDocument.parse(
+    "[CAND]\nBACK_STYLE=1\n[ICON1]\nFORE_STYLE=2\nSIZE=100,100\n",
+  ))
+  assert.equal(items.find((item) => item.section === "ICON1")?.show, "")
+})
+
+test("symbol preview renders only content present in the skin files", () => {
+  const document = IniDocument.parse(
+    "[MORE]\nGRID=4,4\n[LIST]\nCELL_SIZE=200,100\nPOS=0,0\nLIST_NUM=5\nNAMES=， 。 ？ ！ ～\n" +
+    "[KEY1]\nVIEW_RECT=200,0,800,400\nCENTER=F55\n",
+  )
+  const defaults = IniDocument.parse("[MORE]\nCELL_STYLE=148\nFORE_STYLE=2\n")
+  const items = previewItems(document, 1000, 500, defaults)
+  assert.equal(items.some((item) => item.section.startsWith("MORE:")), false)
+  assert.deepEqual(
+    items.filter((item) => item.section.startsWith("LIST:")).map((item) => item.show),
+    ["，", "。", "？", "！", "～"],
+  )
 })
 
 test("keeps every configured foreground layer for phone rendering", () => {
@@ -121,6 +142,66 @@ test("binds a BDA frame animation to its semantic key target", () => {
   }, item), sequence)
 })
 
+test("parses BDS and BDI press transforms for each foreground layer", () => {
+  const styles = IniDocument.parse("[STYLE218]\nPRESS_ANIM=9\n[STYLE219]\nPRESS_ANIM=12\n")
+  const animations = IniDocument.parse(
+    "[ANIM9]\nBUILD_LIST=10,11\n" +
+    "[ANIM10]\nTYPE=4\nDURATION=100\nFROM=100,100\nTO=91,91\n" +
+    "[ANIM11]\nTYPE=4\nDURATION=100\nFROM=100,100\nTO=109,109\n" +
+    "[ANIM12]\nTYPE=2\nDURATION=120\nFROM_PX=0,19\nTO_PX=0,0\n",
+  )
+  const parsed = parseLegacyAnimation(styles, animations)
+  const item = previewItems(IniDocument.parse(
+    "[KEY8]\nVIEW_RECT=0,0,100,100\nBACK_ANIM_STYLE=218\nFORE_ANIM_STYLE=218,219\n",
+  ))[0]
+
+  assert.equal(item.backAnimStyle, "218")
+  assert.equal(item.foreAnimStyle, "218")
+  assert.deepEqual(item.foreAnimStyles, ["218", "219"])
+  assert.ok(Math.abs(legacyAnimationScale(parsed, item.backAnimStyle, 50)![0] - 0.955) < 1e-9)
+  assert.ok(Math.abs(legacyAnimationScale(parsed, item.foreAnimStyle, 150)![0] - 1.045) < 1e-9)
+  assert.equal(legacyAnimationScale(parsed, item.foreAnimStyle, 201), undefined)
+  assert.deepEqual(legacyAnimationTranslation(parsed, item.foreAnimStyles[1], 60), [0, 9.5])
+})
+
+test("composes dynamic ANIM_STYLE opacity, scale and translation tracks", () => {
+  const styles = IniDocument.parse("[STYLE446]\nSHOW_ANIM=5\n")
+  const animations = IniDocument.parse(
+    "[ANIM5]\nBUILD_LIST=7,8,9\nBUILD_METHOD=0\n" +
+    "[ANIM7]\nTYPE=0\nDURATION=120\nFROM=0\nTO=255\n" +
+    "[ANIM8]\nTYPE=3\nDURATION=120\nFROM=0,0\nTO=100,100\n" +
+    "[ANIM9]\nTYPE=2\nDURATION=120\nFROM=0,35\nTO=0,0\n",
+  )
+  const parsed = parseLegacyAnimation(styles, animations)
+  const item = previewItems(IniDocument.parse(
+    "[KEY1]\nVIEW_RECT=0,0,100,100\nANIM_STYLE=446\n",
+  ))[0]
+
+  assert.equal(item.animStyle, "446")
+  assert.equal(legacyAnimationOpacity(parsed, item.animStyle, 60), 0.5)
+  assert.deepEqual(legacyAnimationScale(parsed, item.animStyle, 60), [0.5, 0.5])
+  assert.deepEqual(legacyAnimationTranslation(parsed, item.animStyle, 60), [0, 17.5])
+})
+
+test("matches Baidu repeat, reverse and interpolator timing", () => {
+  const parsed = parseLegacyAnimation(
+    IniDocument.parse("[STYLE1]\nPRESS_ANIM=9\n"),
+    IniDocument.parse(
+      "[ANIM9]\nTYPE=3\nDURATION=100\nDELAY=50\nFROM=100,100\nTO=80,80\n" +
+      "INTPOL=2,3\nREPEAT_CNT=2\nREPEAT_MODE=1\n",
+    ),
+  )
+
+  assert.deepEqual(legacyAnimationScale(parsed, "1", 49), [1, 1])
+  const eased = legacyAnimationScale(parsed, "1", 100)!
+  assert.ok(Math.abs(eased[0] - 0.85) < 1e-9)
+  assert.ok(Math.abs(eased[1] - 0.9) < 1e-9)
+  assert.deepEqual(legacyAnimationScale(parsed, "1", 150), [0.8, 0.8])
+  assert.deepEqual(legacyAnimationScale(parsed, "1", 250), [1, 1])
+  assert.deepEqual(legacyAnimationScale(parsed, "1", 450), [1, 1])
+  assert.equal(legacyAnimationScale(parsed, "1", 451), undefined)
+})
+
 test("renders the LIST candidate bar as one selectable button with label cells", () => {
   const document = IniDocument.parse(
     "[PANEL]\nKEY_NUM=100\n[LIST]\nCELL_SIZE=147,103\nPOS=23,19\nLIST_NUM=4\nNAMES=， 。 ？ ！ ～ 、 .\n[KEY4]\nVIEW_RECT=14,12,165,429\nBACK_STYLE=1231\n",
@@ -151,6 +232,7 @@ test("uses gen LIST styles when the layout only supplies list content", () => {
   const cell = items.find((item) => item.section === "LIST:1")!
   assert.equal(cell.backStyle, "247")
   assert.deepEqual(cell.foreStyles, ["130"])
+  assert.equal("fontSize" in cell, false)
 })
 
 test("candidate icons use TIP overrides for the selected state", () => {
@@ -181,26 +263,21 @@ test("preview text never falls back from missing SHOW to CENTER action text", ()
   assert.equal(previewFallbackText(item, "preview", false), "")
 })
 
-test("places the second foreground image at the phone key's upper-right slot", async () => {
+test("positions foreground images only from parsed offsets", async () => {
   const module = await import("../src/preview.ts") as typeof import("../src/preview.ts") & {
     foregroundLayerRect?: (
       key: { x: number; y: number; width: number; height: number },
       source: [number, number, number, number] | undefined,
-      layer: number,
       offset?: [number, number],
     ) => { x: number; y: number; width: number; height: number }
   }
   assert.equal(typeof module.foregroundLayerRect, "function")
   assert.deepEqual(
-    module.foregroundLayerRect?.({ x: 178, y: 12, width: 187, height: 143 }, [0, 0, 50, 50], 1),
-    { x: 307, y: 18, width: 50, height: 50 },
+    module.foregroundLayerRect?.({ x: 178, y: 12, width: 187, height: 143 }, [0, 0, 50, 50]),
+    { x: 178, y: 12, width: 187, height: 143 },
   )
   assert.deepEqual(
-    module.foregroundLayerRect?.({ x: 195, y: 0, width: 228, height: 145 }, [0, 0, 228, 145], 1),
-    { x: 195, y: 0, width: 228, height: 145 },
-  )
-  assert.deepEqual(
-    module.foregroundLayerRect?.({ x: 0, y: 0, width: 110, height: 140 }, [0, 0, 50, 40], 0, [-6, 16]),
+    module.foregroundLayerRect?.({ x: 0, y: 0, width: 110, height: 140 }, [0, 0, 50, 40], [-6, 16]),
     { x: 24, y: 66, width: 50, height: 40 },
   )
 })
@@ -287,7 +364,7 @@ test("uses only SHOW for fallback text and drawable foregrounds suppress it", as
   )
 })
 
-test("uses the invisible ICON2 rectangle as the three-slot phone toolbar", async () => {
+test("uses the F14 icon rectangle as the three-slot phone toolbar", async () => {
   const module = await import("../src/preview.ts") as typeof import("../src/preview.ts") & {
     dynamicToolbarRect?: (
       document: IniDocument,
@@ -305,6 +382,17 @@ test("uses the invisible ICON2 rectangle as the three-slot phone toolbar", async
     width: 790,
     height: 133,
   })
+
+  const reordered = IniDocument.parse(
+    "[ICON2]\nSIZE=130,133\nANCHOR_TYPE=3\nPOS=-130,0\nKEY=F8\n" +
+    "[ICON4]\nSIZE=700,120\nANCHOR_TYPE=5\nPOS=-350,-60\nKEY=F14\n",
+  )
+  assert.deepEqual(module.dynamicToolbarRect?.(reordered, 1125, 133), {
+    x: 212.5,
+    y: 6.5,
+    width: 700,
+    height: 120,
+  })
 })
 
 test("uses Command, Ctrl, or Shift for additive selection", () => {
@@ -312,6 +400,13 @@ test("uses Command, Ctrl, or Shift for additive selection", () => {
   assert.equal(isAdditiveSelection({ metaKey: false, ctrlKey: true, shiftKey: false }), true)
   assert.equal(isAdditiveSelection({ metaKey: false, ctrlKey: false, shiftKey: true }), true)
   assert.equal(isAdditiveSelection({ metaKey: false, ctrlKey: false, shiftKey: false }), false)
+})
+
+test("treats a stationary mobile long press as additive selection", () => {
+  assert.equal(isTouchLongPress("touch", 450, 12), true)
+  assert.equal(isTouchLongPress("touch", 449, 0), false)
+  assert.equal(isTouchLongPress("touch", 600, 13), false)
+  assert.equal(isTouchLongPress("mouse", 600, 0), false)
 })
 
 test("uses the selected preview theme for the canvas fallback", () => {

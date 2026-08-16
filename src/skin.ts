@@ -356,6 +356,19 @@ export class SkinArchive {
     }
   }
 
+  delete(path: string): void {
+    const raw = this.canonicalToRaw.get(path)
+    if (!raw) return
+    this.files.delete(raw)
+    this.canonicalToRaw.delete(path)
+    if (this.originals.has(raw)) {
+      this.changed.add(path)
+    } else {
+      this.changed.delete(path)
+    }
+    this.changedRaw.delete(raw)
+  }
+
   markSaved(bytes?: Uint8Array): void {
     if (bytes) {
       const reopened = SkinArchive.open(bytes)

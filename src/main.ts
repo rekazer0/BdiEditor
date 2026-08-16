@@ -2,7 +2,8 @@ import { invoke, isTauri } from "@tauri-apps/api/core"
 import { emitTo, listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
-import { message, open, save } from "@tauri-apps/plugin-dialog"
+import { getCurrentWebview } from "@tauri-apps/api/webview"
+import { message, open } from "@tauri-apps/plugin-dialog"
 import "./style.css"
 import { actionDescription, previewPageTransition, previewStateFromAction, shouldSuggestActionCodes } from "./actions.ts"
 import {
@@ -24,7 +25,6 @@ import {
 import {
   exportFormatFromPath,
   exportName,
-  exportPath,
   isUnnamedSkinName,
   type ExportFormat,
 } from "./export.ts"
@@ -35,12 +35,16 @@ import {
   bdaConfigPath,
   bdaLayoutDocument,
   bdaLayoutNames,
+  bdaPanelKeyName,
+  bdaSoundResourceType,
   bdaStyleID,
   bdaStyleRef,
   decodeBdaAnimation,
   decodeBdaAppearance,
+  decodeBdaSoundConfig,
   describeBdaConfig,
   updateBdaAnimationFrame,
+  updateBdaKeySound,
   updateBdaStyle,
   type BdaAppearance,
   type BdaStyleRef,
@@ -99,10 +103,22 @@ import {
   validPanelFilename,
   variantCopyPaths,
 } from "./panel-tools.ts"
-import { Preview, previewContentVerticalBounds, previewItems, type PreviewEvent } from "./preview.ts"
+import { Preview, parseLegacyAnimation, previewContentVerticalBounds, previewItems, type PreviewEvent } from "./preview.ts"
 import { firstExistingPath, resourceImagePaths } from "./resources.ts"
 import { candidatePreview, deleteBackward, insertText } from "./simulation.ts"
 import { SkinArchive } from "./skin.ts"
+import {
+  SOUND_ACCEPT,
+  decodeAiffPcm,
+  iniSoundStyles,
+  isSoundPath,
+  nextSoundStyleID,
+  setIniSoundStyle,
+  soundFilenameForKey,
+  soundMimeType,
+  soundPathForFilename,
+  soundResourcePaths,
+} from "./sounds.ts"
 import { resolveStylePropertySources, type StylePropertySource } from "./style-properties.ts"
 import {
   boundedTileRect,
@@ -132,10 +148,17 @@ const skinNameDialog = $("#skin-name-dialog") as HTMLDialogElement
 const skinNameInput = $("#skin-name-input") as HTMLInputElement
 const openButton = $("#open") as HTMLButtonElement
 const saveButton = $("#save") as HTMLButtonElement
+const mobileShareButton = $("#mobile-share") as HTMLButtonElement
 const undoButton = $("#undo") as HTMLButtonElement
 const redoButton = $("#redo") as HTMLButtonElement
 const toolbarMore = $(".toolbar-more") as HTMLDetailsElement
 const toolbarMenus = Array.from(document.querySelectorAll<HTMLDetailsElement>(".toolbar-more"))
+const mobileCommandMenu = $(".mobile-command-menu") as HTMLDetailsElement
+const mobileUndoButton = $("#mobile-undo") as HTMLButtonElement
+const mobileRedoButton = $("#mobile-redo") as HTMLButtonElement
+const mobileCommandButtons = Array.from(
+  mobileCommandMenu.querySelectorAll<HTMLButtonElement>("[data-mobile-command], [data-mobile-export-format]"),
+)
 const appDialogButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-app-dialog]"))
 const settingsDialog = $("#settings-dialog") as HTMLDialogElement
 const aboutDialog = $("#about-dialog") as HTMLDialogElement
@@ -144,24 +167,45 @@ const aboutUpdate = $("#about-update")
 const checkUpdateButton = $("#check-update") as HTMLButtonElement
 const updateStatus = $("#update-status")
 const downloadUpdate = $("#download-update") as HTMLAnchorElement
-const editContextMenu = $("#edit-context-menu") as HTMLDivElement
 const defaultDevice = $("#default-device") as HTMLSelectElement
 const canvasBackground = $("#canvas-background") as HTMLSelectElement
 const appTheme = $("#app-theme") as HTMLSelectElement
 const windowMaterial = $("#window-material") as HTMLInputElement
+const mobilePreviewPosition = $("#mobile-preview-position") as HTMLSelectElement
+const mobilePaneButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mobile-pane]"))
+const mobileSplitHandle = $("#mobile-split-handle") as HTMLButtonElement
+const mobilePortraitQuery = matchMedia("(max-width: 760px) and (orientation: portrait)")
 const exportButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-export-format]"),
 )
 const source = $("#source") as HTMLTextAreaElement
 const sourceEditor = $("#source-editor")
 const sourceHighlight = $("#source-highlight code")
+const sourceLineNumbers = $("#source-line-numbers")
+const sourceSearch = $("#source-search") as HTMLInputElement
+const sourceSearchCount = $("#source-search-count")
 const canvasWrap = $(".canvas-wrap")
+const previewCanvas = $("#preview") as HTMLCanvasElement
+const previewPanelViewport = $("#panel-viewport")
+const mainWorkspace = $("main")
+const sidebarPane = $("aside.sidebar")
+const inspectorPane = $("section.source")
+const sourceHeading = $(".source-heading")
+const mobileInspectorSelection = $("#mobile-inspector-selection")
 const emptyOpenButton = $("#empty-open") as HTMLButtonElement
 const asset = $("#asset")
 const assetImage = $("#asset-image") as HTMLImageElement
 const replaceAssetButton = $("#replace-asset") as HTMLButtonElement
 const assetBackButton = $("#asset-back") as HTMLButtonElement
 const files = $("#files")
+const sourceFileToolbar = $("#source-file-toolbar")
+const sourceUploadButton = $("#source-upload") as HTMLButtonElement
+const sourceDownloadButton = $("#source-download") as HTMLButtonElement
+const sourceCopyButton = $("#source-copy") as HTMLButtonElement
+const sourcePasteButton = $("#source-paste") as HTMLButtonElement
+const sourceMoveButton = $("#source-move") as HTMLButtonElement
+const sourceDeleteButton = $("#source-delete") as HTMLButtonElement
+const sourceUploadInput = $("#source-upload-input") as HTMLInputElement
 const sidebarViewButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-sidebar-view]"))
 const documentName = $("#document-name")
 const sourceName = $("#source-name")
@@ -190,6 +234,9 @@ const panelTargetWidth = $("#panel-target-width") as HTMLInputElement
 const panelTargetHeight = $("#panel-target-height") as HTMLInputElement
 const panelScaleSummary = $("#panel-scale-summary")
 const quickInspector = $("#quick-inspector")
+const mobileInspectorGroups = $("#mobile-inspector-groups")
+const keyInspectorTitle = $(".key-inspector-title")
+const keyToolbar = $(".key-toolbar")
 const selectedKeyName = $("#selected-key")
 const keyFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-key-field]"))
 const styleFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-style-field]"))
@@ -216,6 +263,7 @@ const layoutActionButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-layout-action]"),
 )
 const keyModeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-key-mode]"))
+const keyActionButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-key-action]"))
 const actionMeaningNodes = Array.from(
   document.querySelectorAll<HTMLElement>("[data-action-meaning]"),
 )
@@ -254,6 +302,7 @@ const resourceName = $("#resource-name")
 const resourceMeta = $("#resource-meta")
 const resourceCount = $("#resource-count")
 const resourceSearch = $("#resource-search") as HTMLInputElement
+const resourceSearchControl = resourceSearch.closest("label")!
 const resourceGallery = $("#resource-gallery")
 const resourceUploadButton = $("#resource-upload") as HTMLButtonElement
 const styleAddButton = $("#style-add") as HTMLButtonElement
@@ -304,6 +353,7 @@ const candidateWords = $("#candidate-words")
 const modeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mode-choice]"))
 const themeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-theme-choice]"))
 const orientationChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-orientation-choice]"))
+const mobileChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mobile-choice]"))
 const styleImageDialog = $("#style-image-dialog") as HTMLDivElement
 const styleImageClose = $("#style-image-close") as HTMLButtonElement
 const styleImageTitle = $("#style-image-title") as HTMLElement
@@ -338,9 +388,10 @@ let unsavedNew = false
 let assetURL = ""
 let assetReturnPath = ""
 let inspectorTab: "properties" | "source" = "properties"
+let sourceSearchIndex = -1
 type Change =
   | { kind: "text"; path: string; before: string; after: string }
-  | { kind: "bytes"; path: string; before: Uint8Array; after: Uint8Array }
+  | { kind: "bytes"; path: string; before?: Uint8Array; after?: Uint8Array }
   | { kind: "batch"; changes: Change[] }
 type LayoutImageConfig = "none" | "image-follows-layout" | "layout-follows-image"
 let undoStack: Change[] = []
@@ -386,12 +437,20 @@ type NativeResourcePickerPayload = { path: string; dataURL: string }[]
 let nativeImagePickerPayload: NativeImagePickerPayload | undefined
 let nativeResourcePickerPayload: NativeResourcePickerPayload = []
 let selectedFileButton: HTMLElement | undefined
+type SourceTransfer = {
+  mode: "copy" | "move"
+  sourcePath: string
+  folder: boolean
+  files: { path: string; source: string; bytes: Uint8Array }[]
+}
+let sourceTransfer: SourceTransfer | undefined
 let sidebarView: "overview" | "source" = "overview"
 let guidesVisible = false
 let previewReturnName = "py_9.ini"
 let resourceConfigActive = false
-let resourceInspectorMode: "image" | "style" = "image"
+let resourceInspectorMode: "image" | "style" | "sound" = "image"
 let selectedStyleID = ""
+let selectedSoundID = ""
 let styleReturnPath = ""
 let styleReturnSelection: string[] = []
 let styleReturnScrollTop = 0
@@ -440,12 +499,12 @@ const preview = new Preview(
   (sections) => {
     if (selectedPath !== layoutPath) selectFile(layoutPath, "overview")
     selectedKeySections = sections
+    if (sections.length && mobilePortraitQuery.matches) setMobilePane("inspector")
     populateKeyInspector()
     updateSourceHighlight()
     scrollSelectedSource()
   },
   false,
-  (section, event) => showEditContextMenu(section, event),
   (_sections, deltaX, deltaY) => moveSelectedKeys(deltaX, deltaY),
 )
 
@@ -460,7 +519,119 @@ function applySkinState(state?: number, message?: string): void {
   if (message) eventLog.textContent = message
 }
 
+let keySoundAudio: HTMLAudioElement | undefined
+let keySoundURL = ""
+let keySoundPath = ""
+let keySoundContext: AudioContext | undefined
+let keySoundSource: AudioBufferSourceNode | undefined
+const keySoundBuffers = new Map<string, AudioBuffer>()
+
+function releaseKeySound(): void {
+  keySoundAudio?.pause()
+  keySoundAudio = undefined
+  try {
+    keySoundSource?.stop()
+  } catch {}
+  keySoundSource = undefined
+  keySoundPath = ""
+  if (keySoundURL) URL.revokeObjectURL(keySoundURL)
+  keySoundURL = ""
+}
+
+async function playDecodedSound(path: string, bytes: Uint8Array): Promise<void> {
+  keySoundContext ??= new AudioContext()
+  if (keySoundContext.state === "suspended") await keySoundContext.resume()
+  let buffer = keySoundBuffers.get(path)
+  if (!buffer) {
+    try {
+      buffer = await keySoundContext.decodeAudioData(bytes.slice().buffer)
+    } catch (error) {
+      if (/^FORM$/.test(new TextDecoder("ascii").decode(bytes.subarray(0, 4)))) {
+        const decoded = decodeAiffPcm(bytes)
+        buffer = keySoundContext.createBuffer(decoded.channelData.length, decoded.samplesDecoded, decoded.sampleRate)
+        decoded.channelData.forEach((channel, index) => buffer!.copyToChannel(channel, index))
+      } else {
+        const ogg = /^OggS$/.test(new TextDecoder("ascii").decode(bytes.subarray(0, 4))) || /\.ogg$/i.test(path)
+        if (!ogg) throw error
+        const { OggVorbisDecoder } = await import("@wasm-audio-decoders/ogg-vorbis")
+        const decoder = new OggVorbisDecoder()
+        await decoder.ready
+        const decoded = await decoder.decodeFile(bytes)
+        decoder.free()
+        if (!decoded.samplesDecoded || !decoded.channelData.length) throw new Error("OGG 文件没有可播放的音频")
+        buffer = keySoundContext.createBuffer(decoded.channelData.length, decoded.samplesDecoded, decoded.sampleRate)
+        decoded.channelData.forEach((channel, index) => buffer!.copyToChannel(channel, index))
+      }
+      if (!buffer) {
+        throw error
+      }
+    }
+    keySoundBuffers.set(path, buffer)
+  }
+  keySoundSource = keySoundContext.createBufferSource()
+  keySoundSource.buffer = buffer
+  keySoundSource.connect(keySoundContext.destination)
+  keySoundSource.start()
+}
+
+function playSoundPath(path: string): void {
+  const bytes = archive?.getBytes(path)
+  if (!bytes) return
+  if (path !== keySoundPath) {
+    releaseKeySound()
+    const copy = bytes.slice()
+    keySoundURL = URL.createObjectURL(new Blob([copy.buffer], { type: soundMimeType(path) }))
+    keySoundPath = path
+    keySoundAudio = new Audio(keySoundURL)
+    keySoundAudio.preload = "auto"
+  }
+  if (!keySoundAudio) return
+  keySoundAudio.currentTime = 0
+  void keySoundAudio.play().catch(async (error: unknown) => {
+    if (error instanceof DOMException && error.name === "NotSupportedError") {
+      try {
+        await playDecodedSound(path, bytes)
+        return
+      } catch (fallbackError) {
+        error = fallbackError
+      }
+    }
+    const reason = error instanceof Error ? `（${error.name}：${error.message}）` : ""
+    eventLog.textContent = `无法播放按键音：${path.split("/").pop() ?? path}${reason}`
+  })
+}
+
+function keySoundForEvent(event: PreviewEvent): string | undefined {
+  if (!archive || !layoutDocument) return
+  const names = archive.names()
+  if (archive.format === "bda") {
+    const path = bdaConfigPath(archive, theme.value, orientation.value, "sound")
+    const bytes = path ? archive.getBytes(path) : undefined
+    if (!bytes) return
+    const sounds = decodeBdaSoundConfig(bytes).keySounds
+    const resource = sounds.get(bdaPanelKeyName(event.code))
+      ?? sounds.get(event.section)
+      ?? [...sounds.values()][0]
+    return resource?.resourceID
+      ? soundPathForFilename(names, theme.value, orientation.value, resource.resourceID)
+      : undefined
+  }
+  const stylesPath = styleConfigPath()
+  if (!archive.isText(stylesPath)) return
+  const generalPath = genConfigPath()
+  const general = archive.isText(generalPath) ? IniDocument.parse(archive.getText(generalPath)) : undefined
+  const filename = soundFilenameForKey(
+    layoutDocument,
+    event.section,
+    IniDocument.parse(archive.getText(stylesPath)),
+    general,
+  )
+  return filename ? soundPathForFilename(names, theme.value, orientation.value, filename) : undefined
+}
+
 function handlePreviewEvent(event: PreviewEvent): void {
+  const soundPath = keySoundForEvent(event)
+  if (soundPath) playSoundPath(soundPath)
   eventLog.textContent =
     `${event.section} · ${event.direction.toUpperCase()} · ${event.code || "未配置"}`
   const code = event.code.trim()
@@ -496,21 +667,18 @@ function handlePreviewEvent(event: PreviewEvent): void {
     refreshSimulationPreview()
     return
   }
+  if (code === "F48") {
+    clearSimulatedOutput()
+    return
+  }
   if (!code || /^(F\d+|S\d+|Z\+)/.test(code)) return
   insertSimulatedText(code)
 }
 
-function showEditContextMenu(section: string, event: MouseEvent): void {
-  if (!isEditing() || archive?.format === "bda") return
-  if (!selectedKeySections.includes(section)) {
-    selectedKeySections = [section]
-    preview.setSelected(selectedKeySections)
-    populateKeyInspector()
-    updateSourceHighlight()
-  }
-  editContextMenu.hidden = false
-  editContextMenu.style.left = `${Math.min(event.clientX, window.innerWidth - editContextMenu.offsetWidth - 8)}px`
-  editContextMenu.style.top = `${Math.min(event.clientY, window.innerHeight - editContextMenu.offsetHeight - 8)}px`
+function clearSimulatedOutput(): void {
+  simulatedOutput.value = ""
+  simulatedOutput.setSelectionRange(0, 0)
+  refreshSimulationPreview()
 }
 
 function copySelectedKeys(): void {
@@ -556,6 +724,7 @@ function deleteSelectedKeys(): void {
   selectedKeySections = []
   preview.setDocument(layoutDocument)
   preview.setSelected([])
+  refreshPreview()
   populateKeyInspector()
   updateSourceHighlight()
   updateDirty()
@@ -596,6 +765,12 @@ const fallbackSymbolPaths: Record<string, string[]> = {
   folder: ["M3 6h7l2 2h9l-2 10H5z", "M5 6V4h6l2 2"],
   "doc.text": ["M6 3h8l4 4v14H6z", "M14 3v5h5M9 12h6M9 16h6"],
   "doc.on.doc": ["M8 7V3h10l3 3v12h-4", "M5 7h10v14H5z", "M9 12h2m-2 4h2"],
+  "arrow.uturn.backward": ["m7 5-4 3.5L7 12", "M4 8.5h7.2a5 5 0 0 1 5 5"],
+  "arrow.uturn.forward": ["m13 5 4 3.5-4 3.5", "M16 8.5H8.8a5 5 0 0 0-5 5"],
+  "rectangle.portrait": ["M6 2.5h12v19H6z", "M9 5h6M9 19h6"],
+  "rectangle.landscape": ["M2.5 6h19v12h-19z", "M5 9v6M19 9v6"],
+  "sun.max": ["M12 4V2m0 20v-2M4 12H2m20 0h-2M5.6 5.6 4.2 4.2m15.6 15.6-1.4-1.4m0-12.8 1.4-1.4M5.6 18.4l-1.4 1.4", "M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10"],
+  moon: ["M20 15.5A8 8 0 0 1 8.5 4 8 8 0 1 0 20 15.5z"],
   magnifyingglass: ["M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14", "m16 16 5 5"],
   trash: ["M5 7h14M9 7V4h6v3m2 0-1 14H8L7 7m4 4v6m2-6v6"],
   photo: ["M4 4h16v16H4z", "m6 16 4-5 3 3 2-2 3 4M9 9h.01"],
@@ -631,17 +806,42 @@ for (const symbol of Array.from(document.querySelectorAll<HTMLElement>(".system-
   symbol.replaceChildren(...rendered.childNodes)
 }
 
-for (const button of Array.from(editContextMenu.querySelectorAll<HTMLButtonElement>("[data-context-action]"))) {
-  const label = button.textContent?.trim() ?? ""
-  const icon = button.dataset.contextAction === "copy"
-    ? createSystemSymbol("doc.on.doc")
-    : button.dataset.contextAction === "swap"
-      ? createSystemSymbol("arrow.left.and.right")
-      : createSystemSymbol("trash")
-  button.replaceChildren(
-    icon,
-    Object.assign(document.createElement("span"), { textContent: label }),
-  )
+function mobileCommandTarget(button: HTMLButtonElement): HTMLButtonElement | undefined {
+  const command = button.dataset.mobileCommand
+  if (command) return document.getElementById(command) as HTMLButtonElement | null ?? undefined
+  const format = button.dataset.mobileExportFormat
+  return format
+    ? document.querySelector<HTMLButtonElement>(`[data-export-format="${format}"]`) ?? undefined
+    : undefined
+}
+
+function syncMobileCommands(): void {
+  for (const button of mobileCommandButtons) {
+    button.disabled = mobileCommandTarget(button)?.disabled ?? true
+  }
+  mobileUndoButton.disabled = undoButton.disabled
+  mobileRedoButton.disabled = redoButton.disabled
+}
+
+for (const button of mobileCommandButtons) {
+  button.addEventListener("click", () => {
+    const target = mobileCommandTarget(button)
+    if (!target || target.disabled) return
+    mobileCommandMenu.open = false
+    target.click()
+  })
+}
+new MutationObserver(syncMobileCommands).observe($(".toolbar-group"), {
+  subtree: true,
+  attributes: true,
+  attributeFilter: ["disabled"],
+})
+syncMobileCommands()
+
+for (const [button, target] of [[mobileUndoButton, undoButton], [mobileRedoButton, redoButton]] as const) {
+  button.addEventListener("click", () => {
+    if (!target.disabled) target.click()
+  })
 }
 
 function isEditing(): boolean {
@@ -658,6 +858,169 @@ function syncSegmentedControls(): void {
   for (const button of orientationChoiceButtons) {
     button.classList.toggle("active", button.dataset.orientationChoice === orientation.value)
   }
+  const values: Record<string, string> = { mode: mode.value, theme: theme.value, orientation: orientation.value }
+  const labels: Record<string, string> = {
+    preview: "交互预览",
+    edit: "编辑模式",
+    light: "浅色",
+    dark: "深色",
+    port: "竖屏",
+    land: "横屏",
+  }
+  for (const button of mobileChoiceButtons) {
+    const value = values[button.dataset.mobileChoice ?? ""] ?? ""
+    for (const icon of Array.from(button.querySelectorAll<HTMLElement>("[data-mobile-choice-value]"))) {
+      icon.classList.toggle("active", icon.dataset.mobileChoiceValue === value)
+    }
+    button.setAttribute("aria-label", `切换${labels[value] ?? "选项"}（当前${labels[value] ?? value}）`)
+  }
+}
+
+function syncMobileInspectorHeader(): void {
+  mobileInspectorSelection.textContent = selectedKeyName.textContent
+  sourceHeading.dataset.mobileKeyTools = selectedKeySections.length ? "on" : "off"
+  const target = mobilePortraitQuery.matches ? sourceHeading : keyInspectorTitle
+  if (keyToolbar.parentElement !== target) target.append(keyToolbar)
+}
+
+function mobileInspectorGroupLabel(group: HTMLElement): string {
+  if (group.classList.contains("primary-key-fields")) return "常用"
+  if (group.classList.contains("skin-fields")) return "皮肤"
+  if (group.classList.contains("toolbar-fields")) return "候选栏"
+  if (group.classList.contains("document-fields")) return "文档"
+  if (group.classList.contains("bda-config-fields")) return "BDA"
+  const label = group.querySelector(":scope > summary, :scope > h3")?.textContent?.trim() ?? "属性"
+  if (label.includes("样式")) return "样式"
+  if (label.includes("滑动")) return "手势"
+  return label.split(/[、与（]/)[0]
+}
+
+function setMobileInspectorGroup(id: string, scroll = true): void {
+  quickInspector.dataset.mobileInspectorGroup = id
+  for (const group of Array.from(quickInspector.querySelectorAll<HTMLElement>(":scope > .inspector-group"))) {
+    const active = group.dataset.mobileInspectorGroup === id
+    group.classList.toggle("mobile-inspector-active", active)
+    if (active && group instanceof HTMLDetailsElement) group.open = true
+  }
+  for (const button of Array.from(mobileInspectorGroups.querySelectorAll<HTMLButtonElement>("button"))) {
+    const active = button.dataset.mobileInspectorGroup === id
+    button.classList.toggle("active", active)
+    button.setAttribute("aria-pressed", String(active))
+  }
+  if (scroll) quickInspector.scrollTop = 0
+}
+
+function syncMobileInspectorGroups(): void {
+  const groups = Array.from(quickInspector.querySelectorAll<HTMLElement>(":scope > .inspector-group"))
+    .filter((group) => !group.hidden)
+  for (const [index, group] of groups.entries()) {
+    group.dataset.mobileInspectorGroup = `${index}`
+    group.classList.add("mobile-inspector-managed")
+  }
+  const active = groups.find((group) => group.dataset.mobileInspectorGroup === quickInspector.dataset.mobileInspectorGroup)
+    ?? groups[0]
+  mobileInspectorGroups.hidden = groups.length < 2
+  mobileInspectorGroups.replaceChildren(...groups.map((group) => {
+    const button = document.createElement("button")
+    button.type = "button"
+    button.textContent = mobileInspectorGroupLabel(group)
+    button.dataset.mobileInspectorGroup = group.dataset.mobileInspectorGroup
+    button.addEventListener("click", () => setMobileInspectorGroup(group.dataset.mobileInspectorGroup ?? "0"))
+    return button
+  }))
+  setMobileInspectorGroup(active?.dataset.mobileInspectorGroup ?? "", false)
+}
+
+function setMobilePane(pane: "layout" | "inspector"): void {
+  document.documentElement.dataset.mobilePane = pane
+  for (const button of mobilePaneButtons) {
+    const active = button.dataset.mobilePane === pane
+    button.classList.toggle("active", active)
+    button.setAttribute("aria-pressed", String(active))
+  }
+  const mobile = mobilePortraitQuery.matches
+  sidebarPane.inert = mobile && pane !== "layout"
+  inspectorPane.inert = mobile && pane !== "inspector"
+}
+
+function setMobileSplit(value: number, persist = true): void {
+  const clamped = Math.max(28, Math.min(72, value))
+  document.documentElement.style.setProperty("--mobile-workspace-split", `${clamped}%`)
+  mobileSplitHandle.setAttribute("aria-valuenow", String(Math.round(clamped)))
+  mobileSplitHandle.setAttribute("aria-valuetext", `画布占 ${Math.round(clamped)}%`)
+  if (persist) localStorage.setItem("mobile-workspace-split", String(clamped))
+}
+
+setMobileSplit(Number(localStorage.getItem("mobile-workspace-split")) || 50, false)
+
+setMobilePane("layout")
+syncMobileInspectorHeader()
+for (const button of mobilePaneButtons) {
+  button.addEventListener("click", () => setMobilePane(button.dataset.mobilePane === "inspector" ? "inspector" : "layout"))
+}
+mobilePortraitQuery.addEventListener("change", () => {
+  setMobilePane(document.documentElement.dataset.mobilePane === "inspector" ? "inspector" : "layout")
+  syncMobileInspectorHeader()
+})
+let mobileSwipeStart: { pointerId: number; x: number; y: number } | undefined
+mainWorkspace.addEventListener("pointerdown", (event) => {
+  if (!mobilePortraitQuery.matches || event.pointerType !== "touch" ||
+    !(event.target as Element).closest("aside, .source")) return
+  mobileSwipeStart = { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
+  mainWorkspace.setPointerCapture(event.pointerId)
+})
+mainWorkspace.addEventListener("pointerup", (event) => {
+  if (!mobileSwipeStart || mobileSwipeStart.pointerId !== event.pointerId || event.pointerType !== "touch") return
+  const deltaX = event.clientX - mobileSwipeStart.x
+  const deltaY = event.clientY - mobileSwipeStart.y
+  mobileSwipeStart = undefined
+  if (mainWorkspace.hasPointerCapture(event.pointerId)) mainWorkspace.releasePointerCapture(event.pointerId)
+  if (Math.abs(deltaX) < 56 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return
+  setMobilePane(deltaX < 0 ? "inspector" : "layout")
+})
+mainWorkspace.addEventListener("pointercancel", (event) => {
+  if (mobileSwipeStart?.pointerId === event.pointerId) mobileSwipeStart = undefined
+})
+
+{
+  let dragging = false
+  let pointerId = -1
+
+  mobileSplitHandle.addEventListener("pointerdown", (event) => {
+    if (!mobilePortraitQuery.matches) return
+    dragging = true
+    pointerId = event.pointerId
+    mobileSplitHandle.classList.add("dragging")
+    mobileSplitHandle.setPointerCapture(pointerId)
+    event.preventDefault()
+  })
+
+  mobileSplitHandle.addEventListener("pointermove", (event) => {
+    if (!dragging || event.pointerId !== pointerId) return
+    const rect = mainWorkspace.getBoundingClientRect()
+    if (!rect.height) return
+    const fromTop = (event.clientY - rect.top) / rect.height * 100
+    const split = mobilePreviewPosition.value === "top" ? fromTop : 100 - fromTop
+    setMobileSplit(split)
+  })
+
+  const finishMobileSplitDrag = (event: PointerEvent) => {
+    if (!dragging || event.pointerId !== pointerId) return
+    dragging = false
+    pointerId = -1
+    mobileSplitHandle.classList.remove("dragging")
+    if (mobileSplitHandle.hasPointerCapture(event.pointerId)) mobileSplitHandle.releasePointerCapture(event.pointerId)
+  }
+  mobileSplitHandle.addEventListener("pointerup", finishMobileSplitDrag)
+  mobileSplitHandle.addEventListener("pointercancel", finishMobileSplitDrag)
+  mobileSplitHandle.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return
+    const current = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue("--mobile-workspace-split"),
+    ) || 50
+    setMobileSplit(current + (event.key === "ArrowUp" ? 2 : -2))
+    event.preventDefault()
+  })
 }
 
 function updatePanelToolButtons(): void {
@@ -682,6 +1045,7 @@ function applyModeState(): void {
     for (const button of layoutActionButtons) button.disabled = true
   }
   updatePanelToolButtons()
+  updateSourceFileActions()
   syncSegmentedControls()
 }
 
@@ -744,7 +1108,10 @@ function commitBatch(changes: Change[]): void {
   if (!archive || !changes.length) return
   for (const change of changes) {
     if (change.kind === "text") archive.setText(change.path, change.after)
-    else archive.setBytes(change.path, change.after)
+    else if (change.kind === "bytes") {
+      if (change.after) archive.setBytes(change.path, change.after)
+      else archive.delete(change.path)
+    }
   }
   undoStack.push({ kind: "batch", changes })
   redoStack = []
@@ -785,6 +1152,8 @@ function undo(): void {
     }
   } else if (change.kind === "text") applyTextSnapshot(change.path, change.before)
   else applyBytesSnapshot(change.path, change.before)
+  renderFiles()
+  if (selectedPath && archive?.getBytes(selectedPath)) selectFile(selectedPath, sidebarView)
   updateHistoryButtons()
 }
 
@@ -799,14 +1168,17 @@ function redo(): void {
     }
   } else if (change.kind === "text") applyTextSnapshot(change.path, change.after)
   else applyBytesSnapshot(change.path, change.after)
+  renderFiles()
+  if (selectedPath && archive?.getBytes(selectedPath)) selectFile(selectedPath, sidebarView)
   updateHistoryButtons()
 }
 
-function applyBytesSnapshot(path: string, bytes: Uint8Array): void {
+function applyBytesSnapshot(path: string, bytes?: Uint8Array): void {
   if (!archive) return
-  archive.setBytes(path, bytes)
+  if (bytes) archive.setBytes(path, bytes)
+  else archive.delete(path)
   refreshBdaLayout()
-  if (selectedPath === path) setSourceValue(describeBdaConfig(path, bytes))
+  if (selectedPath === path && bytes && archive.isBdaConfig(path)) setSourceValue(describeBdaConfig(path, bytes))
   refreshPreview()
   populateKeyInspector()
   updateDirty()
@@ -923,13 +1295,12 @@ function applyCandidateTextVisual(
   element: HTMLElement,
   visual: TextVisual | undefined,
   canvasWidth: number,
-  maxFontSize?: number,
 ): void {
   element.style.color = visual?.color ?? ""
   element.style.fontFamily = canvasFontFamily(visual?.fontName)
   element.style.fontWeight = visual?.fontWeight ? String(visual.fontWeight) : ""
   element.style.fontSize = visual?.fontSize
-    ? `${(Math.min(visual.fontSize, maxFontSize ?? visual.fontSize) / canvasWidth) * 100}cqw`
+    ? `${(visual.fontSize / canvasWidth) * 100}cqw`
     : ""
 }
 
@@ -963,7 +1334,6 @@ function applyDeviceKeyboardGeometry(
   panelWidth: number,
   panelHeight: number,
   candidateHeight: number,
-  composing: boolean,
 ): void {
   const spec = deviceSpec(device.value)
   if (!spec) {
@@ -976,7 +1346,6 @@ function applyDeviceKeyboardGeometry(
     panelWidth,
     panelHeight,
     candidateHeight,
-    composing,
   )
   const screenHeight = orientation.value === "port" ? spec.height : spec.width
   deviceShell.style.setProperty(
@@ -1017,6 +1386,19 @@ function refreshPreview(): void {
     : undefined
   const animationBytes = animationPath && archive.getBytes(animationPath)
   preview.setAnimation(animationBytes ? decodeBdaAnimation(animationBytes) : undefined)
+  const legacyAnimationPath = [
+    `${theme.value}/skin/${orientation.value}/anim.ini`,
+    `${theme.value}/skin/${orientation.value}/res/anim.ini`,
+    `${theme.value}/skin/res/anim.ini`,
+  ].find((path) => archive?.isText(path))
+  preview.setLegacyAnimation(
+    archive.format !== "bda" && archive.isText(styleConfigPath()) && legacyAnimationPath
+      ? parseLegacyAnimation(
+          IniDocument.parse(archive.getText(styleConfigPath())),
+          IniDocument.parse(archive.getText(legacyAnimationPath)),
+        )
+      : undefined,
+  )
   const bdaGenPath = bdaBasePath(genConfigPath())
   const bdaGen = archive.format === "bda" && bdaBase?.isText(bdaGenPath)
     ? IniDocument.parse(bdaBase.getText(bdaGenPath))
@@ -1048,20 +1430,20 @@ function refreshPreview(): void {
     )
     firstCandidateTextVisual = firstCandidateVisual
     candidateTextWidth = config.width
-    applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth, 40)
+    applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth)
     applyCandidateTextVisual(candidateWords, candidateVisual, candidateTextWidth)
     const firstCandidate = candidateWords.firstElementChild as HTMLElement | null
     if (firstCandidate) {
       applyCandidateTextVisual(firstCandidate, firstCandidateTextVisual, candidateTextWidth)
     }
     preview.setPanel(config.styleID, config.width, config.height)
-    updatePanelTools(config.width, config.height, toolbarSize?.height, composing)
+    updatePanelTools(config.width, config.height, toolbarSize?.height)
     activeKeyboardGeometry = {
       panelWidth: config.width,
       panelHeight: config.height,
       candidateHeight: toolbarSize?.height ?? 0,
     }
-    applyDeviceKeyboardGeometry(config.width, config.height, toolbarSize?.height ?? 0, composing)
+    applyDeviceKeyboardGeometry(config.width, config.height, toolbarSize?.height ?? 0)
   } else if (bdaGen && layoutDocument) {
     const size = bdaGen.get("PANEL", "SIZE")?.split(",").map(Number)
     const panelWidth = size?.[0] || 1080
@@ -1079,7 +1461,7 @@ function refreshPreview(): void {
     const firstVisual = resolver?.resolveText(candidateDocument?.get("CAND", "FIRST_FORE") ?? "", false)
     candidateTextWidth = panelWidth
     firstCandidateTextVisual = firstVisual
-    applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth, 40)
+    applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth)
     applyCandidateTextVisual(candidateWords, candidateVisual, candidateTextWidth)
     const firstCandidate = candidateWords.firstElementChild as HTMLElement | null
     if (firstCandidate) applyCandidateTextVisual(firstCandidate, firstVisual, candidateTextWidth)
@@ -1088,13 +1470,13 @@ function refreshPreview(): void {
       panelWidth,
       panelHeight,
     )
-    updatePanelTools(panelWidth, panelHeight, toolbarSize?.height, composing)
+    updatePanelTools(panelWidth, panelHeight, toolbarSize?.height)
     activeKeyboardGeometry = {
       panelWidth,
       panelHeight,
       candidateHeight: toolbarSize?.height ?? 0,
     }
-    applyDeviceKeyboardGeometry(panelWidth, panelHeight, toolbarSize?.height ?? 0, composing)
+    applyDeviceKeyboardGeometry(panelWidth, panelHeight, toolbarSize?.height ?? 0)
   } else {
     activeKeyboardGeometry = undefined
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
@@ -1109,9 +1491,8 @@ function refreshSimulationPreview(): void {
     activeKeyboardGeometry.panelWidth,
     activeKeyboardGeometry.panelHeight,
     activeKeyboardGeometry.candidateHeight,
-    composing,
   )
-  updateCanvasCandidateGeometry(composing, activeKeyboardGeometry.candidateHeight)
+  updateCanvasCandidateGeometry(activeKeyboardGeometry.candidateHeight)
   const resolver = visualResolver()
   if (!resolver) return
   const toolbarSize = refreshToolbarPreview(composing, resolver)
@@ -1122,9 +1503,8 @@ function refreshSimulationPreview(): void {
       activeKeyboardGeometry.panelWidth,
       activeKeyboardGeometry.panelHeight,
       candidateHeight,
-      composing,
     )
-    updateCanvasCandidateGeometry(composing, candidateHeight)
+    updateCanvasCandidateGeometry(candidateHeight)
   }
 }
 
@@ -1245,7 +1625,11 @@ window.addEventListener("blur", () => {
 })
 
 canvasWrap.addEventListener("pointerdown", (event) => {
-  if (event.button !== 0 || deviceShell.hidden) return
+  if (
+    event.button !== 0 ||
+    deviceShell.hidden ||
+    isEditing() && keyMode === "move" && previewPanelViewport.contains(event.target as Node)
+  ) return
   previewPanCandidate = {
     pointerId: event.pointerId,
     x: event.clientX,
@@ -1257,6 +1641,7 @@ canvasWrap.addEventListener("pointerdown", (event) => {
 })
 
 canvasWrap.addEventListener("pointermove", (event) => {
+  if (isEditing() && keyMode === "move" && previewPanelViewport.contains(event.target as Node)) return
   if (!previewPanStart && previewPanCandidate?.pointerId === event.pointerId) {
     const dx = event.clientX - previewPanCandidate.x
     const dy = event.clientY - previewPanCandidate.y
@@ -1283,10 +1668,9 @@ function finishPreviewPan(): void {
 canvasWrap.addEventListener("pointerup", finishPreviewPan)
 canvasWrap.addEventListener("pointercancel", finishPreviewPan)
 
-function updateCanvasCandidateGeometry(composing: boolean, candidateHeight: number): void {
+function updateCanvasCandidateGeometry(candidateHeight: number): void {
   if (!canvasLogicalSize) return
-  canvasLogicalSize.height =
-    canvasLogicalSize.panelVisibleHeight + candidateHeight + (composing ? 95 : 0)
+  canvasLogicalSize.height = canvasLogicalSize.panelVisibleHeight + candidateHeight
   fitCanvasPreview()
 }
 
@@ -1294,7 +1678,6 @@ function updatePanelTools(
   width: number,
   height: number,
   candidateHeight = 0,
-  composing = false,
 ): void {
   const content = previewContentVerticalBounds(
     layoutDocument ? previewItems(layoutDocument, width, height) : [],
@@ -1307,7 +1690,7 @@ function updatePanelTools(
   deviceShell.style.removeProperty("--panel-crop-offset")
   canvasLogicalSize = {
     width,
-    height: content.height + candidateHeight + (composing ? 95 : 0),
+    height: content.height + candidateHeight,
     panelHeight: height,
     panelVisibleHeight: content.height,
   }
@@ -1580,7 +1963,9 @@ function setFileOperationBusy(busy: boolean): void {
   newButton.disabled = busy
   openButton.disabled = busy
   saveButton.disabled = busy || !archive
+  mobileShareButton.disabled = busy || !archive
   updatePanelToolButtons()
+  updateSourceFileActions()
   for (const button of exportButtons) {
     const format = button.dataset.exportFormat as ExportFormat
     button.disabled = busy || !archive || (archive.format !== "bda" && format === "bda")
@@ -1999,6 +2384,118 @@ async function renderStyleResourceGallery(): Promise<void> {
   if (selectedResourceGalleryPath) selectGalleryItem(selectedResourceGalleryPath, resourceGallery)
 }
 
+type SoundEntry = {
+  id: string
+  label: string
+  filename: string
+  path?: string
+  usage: string
+  bdaKey?: string
+  styleID?: string
+}
+
+function currentSoundEntries(): SoundEntry[] {
+  if (!archive) return []
+  const names = archive.names()
+  const resources = soundResourcePaths(names, theme.value, orientation.value)
+  const entries: SoundEntry[] = []
+  if (archive.format === "bda") {
+    const configPath = bdaConfigPath(archive, theme.value, orientation.value, "sound")
+    const bytes = configPath ? archive.getBytes(configPath) : undefined
+    if (bytes) {
+      for (const [key, resource] of decodeBdaSoundConfig(bytes).keySounds) {
+        const path = soundPathForFilename(names, theme.value, orientation.value, resource.resourceID)
+        entries.push({
+          id: `bda:${key}`,
+          bdaKey: key,
+          label: key.replace(/^KEY_/, ""),
+          filename: path?.split("/").pop() ?? resource.resourceID,
+          path,
+          usage: `BDA 按键映射 · 类型 ${resource.type}`,
+        })
+      }
+    }
+  } else {
+    const stylesPath = styleConfigPath()
+    if (archive.isText(stylesPath)) {
+      const styles = IniDocument.parse(archive.getText(stylesPath))
+      for (const sound of iniSoundStyles(styles)) {
+        let uses = 0
+        for (const path of names.filter((name) => /\.ini$/i.test(name))) {
+          if (!archive.isText(path)) continue
+          const document = IniDocument.parse(archive.getText(path))
+          uses += document.sections().filter((section) => document.get(section, "SOUND_STYLE")?.trim() === sound.styleID).length
+        }
+        entries.push({
+          id: `style:${sound.styleID}`,
+          styleID: sound.styleID,
+          label: `STYLE${sound.styleID}`,
+          filename: sound.filename,
+          path: soundPathForFilename(names, theme.value, orientation.value, sound.filename),
+          usage: uses ? `${uses} 处按键引用` : "尚未被按键引用",
+        })
+      }
+    }
+  }
+  const used = new Set(entries.flatMap((entry) => entry.path ? [entry.path] : []))
+  for (const path of resources.filter((resource) => !used.has(resource))) {
+    entries.push({
+      id: `file:${path}`,
+      label: path.split("/").pop() ?? path,
+      filename: path.split("/").pop() ?? path,
+      path,
+      usage: "未关联的声音文件",
+    })
+  }
+  return entries
+}
+
+function renderSoundResourceGallery(): void {
+  if (!archive) return
+  const query = resourceSearch.value.trim().toLowerCase()
+  const entries = currentSoundEntries().filter((entry) =>
+    !query || `${entry.label} ${entry.filename} ${entry.usage}`.toLowerCase().includes(query)
+  )
+  resourceListTitle.textContent = "按键音"
+  resourceSearch.placeholder = "搜索按键音"
+  resourceSearch.setAttribute("aria-label", "搜索按键音")
+  resourceSearchControl.setAttribute("aria-label", "搜索按键音")
+  resourceCount.textContent = `${entries.length} 个声音`
+  resourceUploadInput.accept = SOUND_ACCEPT
+  resourceUploadButton.hidden = false
+  resourceUploadButton.title = selectedSoundID ? "替换选中按键音" : "添加按键音"
+  resourceUploadButton.setAttribute("aria-label", resourceUploadButton.title)
+  styleAddButton.hidden = true
+  resourceDownloadButton.hidden = false
+  resourceDownloadButton.title = "下载选中按键音"
+  resourceDownloadButton.setAttribute("aria-label", resourceDownloadButton.title)
+  resourceDeleteButton.hidden = true
+  resourceListView.hidden = false
+  resourceDetail.hidden = true
+  for (const entry of entries) {
+    const button = document.createElement("button")
+    button.className = "resource-item sound-resource-item"
+    button.dataset.path = entry.id
+    button.title = `${entry.label} · 点击试听并选择`
+    const icon = createSystemSymbol("speaker.wave.2")
+    icon.classList.add("sound-resource-icon")
+    const name = document.createElement("strong")
+    name.textContent = entry.label
+    const meta = document.createElement("small")
+    meta.textContent = `${entry.filename} · ${entry.usage}`
+    button.append(icon, name, meta)
+    button.addEventListener("click", () => {
+      selectedSoundID = entry.id
+      selectGalleryItem(entry.id, resourceGallery)
+      resourceUploadButton.title = "替换选中按键音"
+      resourceUploadButton.setAttribute("aria-label", resourceUploadButton.title)
+      if (entry.path) playSoundPath(entry.path)
+    })
+    resourceGallery.append(button)
+  }
+  if (selectedSoundID) selectGalleryItem(selectedSoundID, resourceGallery)
+}
+
 function renderResourceInspector(): void {
   if (!archive) return
   releaseResourceURLs()
@@ -2007,12 +2504,22 @@ function renderResourceInspector(): void {
     void renderStyleResourceGallery()
     return
   }
+  if (resourceInspectorMode === "sound") {
+    renderSoundResourceGallery()
+    return
+  }
   resourceListTitle.textContent = "皮肤图片"
   resourceSearch.placeholder = "搜索图片"
   resourceSearch.setAttribute("aria-label", "搜索图片")
+  resourceSearchControl.setAttribute("aria-label", "搜索图片")
+  resourceUploadInput.accept = ".png,image/png"
   resourceUploadButton.hidden = false
+  resourceUploadButton.title = "上传图片"
+  resourceUploadButton.setAttribute("aria-label", resourceUploadButton.title)
   styleAddButton.hidden = true
   resourceDownloadButton.hidden = false
+  resourceDownloadButton.title = "下载选中图片"
+  resourceDownloadButton.setAttribute("aria-label", resourceDownloadButton.title)
   resourceDeleteButton.hidden = false
   const query = resourceSearch.value.trim().toLowerCase()
   const paths = resourceImagePaths(archive.names(), theme.value, orientation.value)
@@ -2145,6 +2652,57 @@ function updateInspectorView(): void {
 
 function updateSourceHighlight(): void {
   sourceHighlight.innerHTML = `${highlightIni(source.value, selectedSourceSections())}\n`
+  sourceLineNumbers.textContent = Array.from(
+    { length: source.value.split(/\r\n|\n|\r/).length },
+    (_, index) => String(index + 1),
+  ).join("\n")
+  updateSourceSearchStatus()
+}
+
+function sourceSearchMatches(): number[] {
+  const query = sourceSearch.value.trim().toLocaleLowerCase()
+  if (!query) return []
+  const text = source.value.toLocaleLowerCase()
+  const matches: number[] = []
+  for (let index = text.indexOf(query); index >= 0; index = text.indexOf(query, index + query.length)) {
+    matches.push(index)
+  }
+  return matches
+}
+
+function updateSourceSearchStatus(): void {
+  const matches = sourceSearchMatches()
+  if (sourceSearchIndex >= matches.length) sourceSearchIndex = -1
+  sourceSearchCount.textContent = sourceSearch.value.trim()
+    ? `${sourceSearchIndex < 0 ? 0 : sourceSearchIndex + 1}/${matches.length}`
+    : ""
+}
+
+function syncSourceScroll(): void {
+  const highlight = $("#source-highlight")
+  highlight.scrollTop = source.scrollTop
+  highlight.scrollLeft = source.scrollLeft
+  sourceLineNumbers.scrollTop = source.scrollTop
+}
+
+function findSourceMatch(direction: 1 | -1): void {
+  const matches = sourceSearchMatches()
+  if (!matches.length) {
+    sourceSearchIndex = -1
+    updateSourceSearchStatus()
+    return
+  }
+  sourceSearchIndex = sourceSearchIndex < 0
+    ? direction > 0 ? 0 : matches.length - 1
+    : (sourceSearchIndex + direction + matches.length) % matches.length
+  const start = matches[sourceSearchIndex]
+  source.setSelectionRange(start, start + sourceSearch.value.trim().length)
+  const line = source.value.slice(0, start).split(/\r\n|\n|\r/).length - 1
+  const style = getComputedStyle(source)
+  const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.6
+  source.scrollTop = Math.max(0, line * lineHeight - source.clientHeight / 3)
+  syncSourceScroll()
+  updateSourceSearchStatus()
 }
 
 function selectedSourceSections(): string[] {
@@ -2166,8 +2724,7 @@ function scrollSelectedSource(): void {
   const style = getComputedStyle(source)
   const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.6
   source.scrollTop = Math.max(0, line * lineHeight - source.clientHeight / 3)
-  const highlight = $("#source-highlight")
-  highlight.scrollTop = source.scrollTop
+  syncSourceScroll()
 }
 
 function setSourceValue(text: string): void {
@@ -2338,7 +2895,7 @@ function refreshToolbarPreview(
   candidateBackgroundPreview.setPanel(
     backgroundStyle,
     width,
-    candidateBackgroundLogicalHeight(deviceSpec(device.value), orientation.value, height, composing),
+    candidateBackgroundLogicalHeight(deviceSpec(device.value), orientation.value, height),
   )
   candidateBackgroundPreview.setDocument(undefined)
   toolbarCanvas.style.setProperty("--toolbar-width", String(width))
@@ -2892,7 +3449,7 @@ function addNavButton(
       layout.value = path.endsWith("_9.ini") ? "py_9.ini" : "py_26.ini"
       previewReturnName = path.split("/").pop() ?? layout.value
     }
-    selectFile(path, "overview", navMode === "resource" ? "image" : navMode === "style" ? "style" : "document")
+    selectFile(path, "overview", navMode === "resource" ? "image" : navMode === "style" ? "style" : navMode === "sound" ? "sound" : "document")
   })
   parent.append(button)
 }
@@ -2927,6 +3484,7 @@ function populateKeyInspector(): void {
         ? "LIST · 候选栏"
         : `${sections[0]} · ${document?.get(sections[0], "CENTER") || "未配置点击动作"}`
       : `已选择 ${sections.length} 个按键`
+  syncMobileInspectorHeader()
   for (const field of skinFields) {
     field.value = skinSelected ? selectedDocument?.get("", field.dataset.skinField ?? "") ?? "" : ""
     field.disabled = !skinSelected
@@ -3026,6 +3584,11 @@ function populateKeyInspector(): void {
   const listSelected = sections.some(isListCell)
   const keyToolsAvailable = hasSelection && isEditing() && archive?.format !== "bda" && !listSelected
   for (const button of keyModeButtons) button.disabled = !keyToolsAvailable
+  for (const button of keyActionButtons) {
+    button.disabled = !keyToolsAvailable || (
+      button.dataset.keyAction === "swap" && selectedKeySections.length !== 2
+    )
+  }
   if (!keyToolsAvailable && keyMode === "move") {
     keyMode = "select"
     keyModeButtons.forEach((button) => button.classList.toggle("active", button.dataset.keyMode === keyMode))
@@ -3072,6 +3635,7 @@ function populateKeyInspector(): void {
   void updateStylePreviews()
   populateDocumentInspector()
   populateBdaConfigInspector()
+  syncMobileInspectorGroups()
   applyModeState()
 }
 
@@ -3391,8 +3955,10 @@ function clearImageSlicePicker(): void {
   styleImageDialog.hidden = true
   nativeImagePickerPayload = undefined
   nativeResourcePickerPayload = []
-  for (const label of ["image-picker", "resource-picker"]) {
-    void WebviewWindow.getByLabel(label).then((pickerWindow) => pickerWindow?.close())
+  if (isTauri()) {
+    for (const label of ["image-picker", "resource-picker"]) {
+      void WebviewWindow.getByLabel(label).then((pickerWindow) => pickerWindow?.close())
+    }
   }
 }
 
@@ -3682,16 +4248,208 @@ function setSidebarView(view: "overview" | "source"): void {
   }
   files.querySelector<HTMLElement>(".sidebar-overview")?.toggleAttribute("hidden", view !== "overview")
   files.querySelector<HTMLElement>(".raw-files")?.toggleAttribute("hidden", view !== "source")
+  sourceFileToolbar.hidden = view !== "source"
+  updateSourceFileActions()
 }
+
+function sourceSelection(): { path: string; folder: boolean } | undefined {
+  if (!selectedFileButton?.closest(".raw-files")) return
+  const path = selectedFileButton.dataset.path
+    ?? selectedFileButton.dataset.folderPath
+    ?? selectedFileButton.closest<HTMLDetailsElement>("details.raw-folder")?.dataset.folderPath
+  return path ? { path, folder: !selectedFileButton.dataset.path } : undefined
+}
+
+function updateSourceFileActions(): void {
+  const selection = sourceSelection()
+  const editable = Boolean(archive) && isEditing() && !fileOperationRunning
+  sourceUploadButton.disabled = !editable
+  sourceDownloadButton.disabled = fileOperationRunning || !selection || selection.folder
+  sourceCopyButton.disabled = fileOperationRunning || !selection
+  sourcePasteButton.disabled = !editable || !sourceTransfer?.files.length
+  sourceMoveButton.disabled = !editable || !selection
+  sourceDeleteButton.disabled = !editable || !selection
+  sourceCopyButton.classList.toggle("active", sourceTransfer?.mode === "copy")
+  sourceMoveButton.classList.toggle("active", sourceTransfer?.mode === "move")
+  sourceCopyButton.setAttribute("aria-pressed", String(sourceTransfer?.mode === "copy"))
+  sourceMoveButton.setAttribute("aria-pressed", String(sourceTransfer?.mode === "move"))
+}
+
+function sourceTargetFolder(): string {
+  const selection = sourceSelection()
+  if (!selection) return ""
+  if (selection.folder) return selection.path
+  return selection.path.split("/").slice(0, -1).join("/")
+}
+
+function sourcePaths(selection: { path: string; folder: boolean }): string[] {
+  if (!archive) return []
+  return selection.folder
+    ? archive.names().filter((path) => !path.endsWith("/") && path.startsWith(`${selection.path}/`))
+    : archive.getBytes(selection.path) ? [selection.path] : []
+}
+
+function setSourceTransfer(mode: SourceTransfer["mode"]): void {
+  const selection = sourceSelection()
+  if (!archive || !selection || mode === "move" && !isEditing()) return
+  const base = selection.folder ? `${selection.path.split("/").pop()}/` : ""
+  sourceTransfer = {
+    mode,
+    sourcePath: selection.path,
+    folder: selection.folder,
+    files: sourcePaths(selection).flatMap((source) => {
+      const bytes = archive?.getBytes(source)
+      if (!bytes) return []
+      const relative = selection.folder ? source.slice(selection.path.length + 1) : source.split("/").pop() ?? source
+      return [{ path: `${base}${relative}`, source, bytes: bytes.slice() }]
+    }),
+  }
+  updateSourceFileActions()
+}
+
+function refreshAfterSourceMutation(preferredPath?: string): void {
+  if (!archive) return
+  const selectedStillExists = archive.getBytes(selectedPath)
+  renderFiles()
+  setSidebarView("source")
+  const next = preferredPath && archive.getBytes(preferredPath)
+    ? preferredPath
+    : selectedStillExists
+      ? selectedPath
+      : archive.names().find((path) => archive?.isText(path) || archive?.isImage(path) || archive?.isBdaConfig(path))
+  if (next) selectFile(next, "source")
+  refreshPreview()
+  updateDirty()
+}
+
+type SourceUpload = { name: string; bytes: Uint8Array }
+
+function sourceDropFolder(target: Element | null): string | undefined {
+  if (!target?.closest(".raw-files")) return
+  const folder = target.closest<HTMLElement>(".source-folder-row")?.dataset.folderPath
+  if (folder !== undefined) return folder
+  const path = target.closest<HTMLElement>(".source-file-row")?.dataset.path
+  return path ? path.split("/").slice(0, -1).join("/") : sourceTargetFolder()
+}
+
+function setSourceDropTarget(target?: Element | null): void {
+  files.querySelector(".source-drop-target")?.classList.remove("source-drop-target")
+  target?.closest<HTMLElement>(".source-tree-row")?.classList.add("source-drop-target")
+}
+
+function commitSourceUploads(uploads: SourceUpload[], folder: string): boolean {
+  if (!archive || !uploads.length) return false
+  const changes = uploads.map(({ name, bytes }) => {
+    const filename = name.split(/[\\/]/).pop() ?? name
+    const path = folder ? `${folder}/${filename}` : filename
+    return { path, bytes }
+  })
+  const conflicts = changes.filter(({ path }) => archive?.getBytes(path)).map(({ path }) => path)
+  if (conflicts.length && !window.confirm(`以下文件已存在，是否替换？\n\n${conflicts.join("\n")}`)) return false
+  commitBatch(changes.map(({ path, bytes }) => ({
+    kind: "bytes",
+    path,
+    before: archive!.getBytes(path)?.slice(),
+    after: bytes,
+  })))
+  refreshAfterSourceMutation(changes[0]?.path)
+  return true
+}
+
+sourceUploadButton.addEventListener("click", () => {
+  if (!archive || !isEditing()) return
+  sourceUploadInput.value = ""
+  sourceUploadInput.click()
+})
+
+sourceUploadInput.addEventListener("change", () => {
+  void runFileOperation("上传文件", async () => {
+    if (!archive || !sourceUploadInput.files?.length) return false
+    const folder = sourceTargetFolder()
+    const uploads = await Promise.all(Array.from(sourceUploadInput.files).map(async (file) => ({
+      name: file.name,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+    })))
+    return commitSourceUploads(uploads, folder)
+  })
+})
+
+sourceDownloadButton.addEventListener("click", () => {
+  void runFileOperation("下载文件", async () => {
+    const selection = sourceSelection()
+    if (!archive || !selection || selection.folder) return false
+    const bytes = archive.getBytes(selection.path)
+    if (!bytes) return false
+    return Boolean(await writeToChosenDirectory(selection.path.split("/").pop() ?? "download", bytes))
+  })
+})
+
+sourceCopyButton.addEventListener("click", () => {
+  setSourceTransfer("copy")
+})
+
+sourcePasteButton.addEventListener("click", () => {
+  if (!archive || !isEditing() || !sourceTransfer?.files.length) return
+  const folder = sourceTargetFolder()
+  if (sourceTransfer.mode === "move" && sourceTransfer.folder &&
+    (folder === sourceTransfer.sourcePath || folder.startsWith(`${sourceTransfer.sourcePath}/`))) {
+    window.alert("不能将文件夹移动到自身内部。")
+    return
+  }
+  const copies = sourceTransfer.files.map(({ path, source, bytes }) => ({
+    path: folder ? `${folder}/${path}` : path,
+    source,
+    bytes,
+  }))
+  if (sourceTransfer.mode === "move" && copies.every(({ path, source }) => path === source)) return
+  const sources = new Set(sourceTransfer.files.map(({ source }) => source))
+  const conflicts = copies
+    .filter(({ path }) => archive?.getBytes(path) && (sourceTransfer?.mode !== "move" || !sources.has(path)))
+    .map(({ path }) => path)
+  if (conflicts.length && !window.confirm(`以下文件已存在，是否替换？\n\n${conflicts.join("\n")}`)) return
+  const changes: Change[] = copies.map(({ path, bytes }) => ({
+    kind: "bytes",
+    path,
+    before: archive!.getBytes(path)?.slice(),
+    after: bytes.slice(),
+  }))
+  if (sourceTransfer.mode === "move") {
+    for (const source of sources) {
+      if (!copies.some(({ path }) => path === source)) {
+        changes.push({ kind: "bytes", path: source, before: archive.getBytes(source)?.slice() })
+      }
+    }
+    sourceTransfer = undefined
+  }
+  commitBatch(changes)
+  refreshAfterSourceMutation(copies[0]?.path)
+})
+
+sourceMoveButton.addEventListener("click", () => {
+  setSourceTransfer("move")
+})
+
+sourceDeleteButton.addEventListener("click", () => {
+  const selection = sourceSelection()
+  if (!archive || !selection || !isEditing()) return
+  const paths = sourcePaths(selection)
+  if (!paths.length || !window.confirm(`确定要删除${selection.folder ? "文件夹" : "文件"} ${selection.path} 吗？此操作可撤销。`)) return
+  commitBatch(paths.map((path) => ({
+    kind: "bytes",
+    path,
+    before: archive!.getBytes(path)?.slice(),
+  })))
+  refreshAfterSourceMutation()
+})
 
 function selectFile(
   path: string,
   preferredSidebarView = sidebarView,
-  resourceMode: "document" | "image" | "style" = "document",
+  resourceMode: "document" | "image" | "style" | "sound" = "document",
 ): void {
   styleReturnPath = ""
   resourceConfigActive = resourceMode !== "document"
-  resourceInspectorMode = resourceMode === "style" ? "style" : "image"
+  resourceInspectorMode = resourceMode === "style" ? "style" : resourceMode === "sound" ? "sound" : "image"
   toggleGuides.title = resourceInspectorMode === "image" && resourceConfigActive ? "切片网格" : "辅助线"
   toggleGuides.setAttribute("aria-label", resourceInspectorMode === "image" && resourceConfigActive ? "切片网格" : "辅助线")
   if (resourceInspectorMode === "image" && resourceConfigActive) setGuidesVisible(true)
@@ -3705,6 +4463,7 @@ function selectFile(
   } else {
     selectedResourcePath = ""
     selectedStyleID = ""
+    selectedSoundID = ""
     selectedResourceGalleryPath = ""
     resourceListView.hidden = false
     resourceDetail.hidden = true
@@ -3782,6 +4541,8 @@ function selectFile(
   const preferredContainer = files.querySelector(preferredSidebarView === "overview" ? ".sidebar-overview" : ".raw-files")
   const navMode = resourceInspectorMode === "style" && resourceConfigActive
     ? "style"
+    : resourceInspectorMode === "sound" && resourceConfigActive
+      ? "sound"
     : resourceConfigActive
       ? "resource"
       : "document"
@@ -3793,6 +4554,7 @@ function selectFile(
     setSidebarView(selectedFileButton.closest(".raw-files") ? "source" : "overview")
   }
   selectedFileButton?.classList.add("selected")
+  updateSourceFileActions()
 }
 
 const overviewGroupState = new Map<string, boolean>()
@@ -3887,6 +4649,7 @@ function renderFiles(): void {
     if (archive.format !== "bda") {
       entries.push({ group: "资源配置", label: "样式配置", path: stylePath, className: "nav-style", icon: "paintpalette", navMode: "style" })
     }
+    entries.push({ group: "资源配置", label: "按键音", path: stylePath, className: "nav-resource", icon: "speaker.wave.2", navMode: "sound" })
   }
   if (archive.format === "bda") {
     for (const [kind, label] of [
@@ -3945,6 +4708,7 @@ function renderFiles(): void {
       item.tabIndex = item === row ? 0 : -1
     }
     row.focus()
+    updateSourceFileActions()
   }
   const appendNode = (parent: HTMLElement, node: SourceNode, parentPath = "") => {
     for (const [name, child] of [...node.folders].sort(([a], [b]) => sourceNameCompare(a, b))) {
@@ -3954,6 +4718,7 @@ function renderFiles(): void {
       folder.dataset.folderPath = path
       const folderSummary = document.createElement("summary")
       folderSummary.className = "source-tree-row source-folder-row"
+      folderSummary.dataset.folderPath = path
       folderSummary.setAttribute("role", "treeitem")
       folderSummary.setAttribute("aria-expanded", "false")
       folderSummary.tabIndex = -1
@@ -4004,12 +4769,56 @@ function renderFiles(): void {
       button.append(label)
       button.title = path
       button.dataset.path = path
-      button.disabled = !archive?.isText(path) && !archive?.isImage(path) && !archive?.isBdaConfig(path)
-      button.addEventListener("click", () => selectFile(path, "source"))
+      button.draggable = true
+      button.addEventListener("click", () => {
+        if (archive?.isText(path) || archive?.isImage(path) || archive?.isBdaConfig(path)) selectFile(path, "source")
+        else selectSourceRow(button)
+        updateSourceFileActions()
+      })
+      button.addEventListener("dragstart", (event) => {
+        const bytes = archive?.getBytes(path)
+        if (!bytes || !event.dataTransfer) return
+        const mime = archive?.isText(path)
+          ? "text/plain"
+          : archive?.isImage(path)
+            ? "image/png"
+            : isSoundPath(path)
+              ? soundMimeType(path)
+              : "application/octet-stream"
+        const url = URL.createObjectURL(new Blob([bytes.slice().buffer], { type: mime }))
+        const filename = path.split("/").pop() ?? "download"
+        event.dataTransfer.effectAllowed = "copy"
+        event.dataTransfer.setData("DownloadURL", `${mime}:${filename}:${url}`)
+        event.dataTransfer.setData("text/uri-list", url)
+        button.addEventListener("dragend", () => URL.revokeObjectURL(url), { once: true })
+      })
       parent.append(button)
     }
   }
   appendNode(sourceFiles, root)
+  sourceFiles.addEventListener("dragover", (event) => {
+    if (!archive || !isEditing() || !event.dataTransfer?.types.includes("Files")) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "copy"
+    setSourceDropTarget(event.target as Element)
+  })
+  sourceFiles.addEventListener("dragleave", (event) => {
+    if (!sourceFiles.contains(event.relatedTarget as Node | null)) setSourceDropTarget()
+  })
+  sourceFiles.addEventListener("drop", (event) => {
+    const folder = sourceDropFolder(event.target as Element)
+    setSourceDropTarget()
+    if (!archive || !isEditing() || folder === undefined || !event.dataTransfer?.files.length) return
+    event.preventDefault()
+    const dropped = Array.from(event.dataTransfer.files)
+    void runFileOperation("上传文件", async () => commitSourceUploads(
+      await Promise.all(dropped.map(async (file) => ({
+        name: file.name,
+        bytes: new Uint8Array(await file.arrayBuffer()),
+      }))),
+      folder,
+    ))
+  })
   sourceFiles.querySelector<HTMLElement>(".source-tree-row")?.setAttribute("tabindex", "0")
   sourceFiles.addEventListener("keydown", (event) => {
     const current = (event.target as Element | null)?.closest<HTMLElement>(".source-tree-row")
@@ -4068,6 +4877,8 @@ function revealSourceFile(path: string): void {
 }
 
 async function loadArchive(bytes: Uint8Array, path: string, isNew = false): Promise<void> {
+  releaseKeySound()
+  keySoundBuffers.clear()
   const nextArchive = SkinArchive.open(bytes)
   if (nextArchive.format === "bda" && !bdaBase) {
     const response = await fetch(new URL("bda-base.bds", document.baseURI))
@@ -4077,6 +4888,7 @@ async function loadArchive(bytes: Uint8Array, path: string, isNew = false): Prom
   assetURL = releaseImagePreviewURL(assetURL)
   clearImageSlicePicker()
   archive = nextArchive
+  sourceTransfer = undefined
   const availableThemes = ["light", "dark"].filter((value) =>
     archive?.names().some((name) => name.startsWith(`${value}/skin/`)),
   )
@@ -4175,27 +4987,16 @@ function exportArchive(format: ExportFormat): {
 
 async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: string): Promise<boolean> {
   if (!archive) throw new Error("当前没有可保存的皮肤")
-  let path = currentPath
-  if (saveAs || !path || exportFormatFromPath(path) !== format) {
-    const picked = await save({
-      defaultPath: suggestedName,
-      filters: [
-        {
-          name: format === "bdi"
-            ? "百度输入法 iOS 皮肤"
-            : format === "bda"
-              ? "百度输入法新版 Android 皮肤"
-              : "百度输入法 Android 皮肤",
-          extensions: [format],
-        },
-      ],
-    })
-    if (!picked) return false
-    path = exportPath(picked, format)
-  }
   const exported = exportArchive(format)
   if (!exported) return false
-  await invoke("write_file", { path, data: Array.from(exported.bytes) })
+  let path = currentPath
+  if (saveAs || !path || exportFormatFromPath(path) !== format) {
+    const written = await writeToChosenDirectory(suggestedName, exported.bytes)
+    if (!written) return false
+    path = written
+  } else {
+    await invoke("write_file", { path, data: Array.from(exported.bytes) })
+  }
   if (!exported.converted) {
     currentPath = path
     unsavedNew = false
@@ -4206,18 +5007,47 @@ async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: 
   return true
 }
 
-function downloadArchive(format: ExportFormat, suggestedName: string): boolean {
+type BrowserDirectoryHandle = {
+  getFileHandle(name: string, options: { create: true }): Promise<{
+    createWritable(): Promise<{ write(data: Uint8Array): Promise<void>; close(): Promise<void> }>
+  }>
+}
+
+async function writeToChosenDirectory(filename: string, bytes: Uint8Array): Promise<string | undefined> {
+  if (isTauri()) {
+    const directory = await open({ directory: true, multiple: false, title: "选择下载目录" })
+    if (typeof directory !== "string") return
+    const separator = directory.includes("\\") ? "\\" : "/"
+    const path = `${directory.replace(/[\\/]$/, "")}${separator}${filename}`
+    await invoke("write_file", { path, data: Array.from(bytes) })
+    return path
+  }
+  const picker = (window as typeof window & {
+    showDirectoryPicker?: () => Promise<BrowserDirectoryHandle>
+  }).showDirectoryPicker
+  if (!picker) throw new Error("当前浏览器不支持系统目录选择，请使用 Chrome 或桌面版")
+  let directory: BrowserDirectoryHandle
+  try {
+    directory = await picker.call(window)
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") return
+    throw error
+  }
+  const file = await directory.getFileHandle(filename, { create: true })
+  const writable = await file.createWritable()
+  await writable.write(bytes)
+  await writable.close()
+  return filename
+}
+
+async function downloadArchive(format: ExportFormat, suggestedName: string): Promise<boolean> {
   if (!archive) throw new Error("当前没有可保存的皮肤")
   const exported = exportArchive(format)
   if (!exported) return false
-  const blob = new Blob([exported.bytes as BlobPart], { type: "application/zip" })
-  const link = document.createElement("a")
-  link.href = URL.createObjectURL(blob)
-  link.download = suggestedName
-  link.click()
-  URL.revokeObjectURL(link.href)
+  const path = await writeToChosenDirectory(suggestedName, exported.bytes)
+  if (!path) return false
   if (!exported.converted) {
-    currentPath = suggestedName
+    currentPath = path
     documentName.textContent = suggestedName
     archive.markSaved(exported.bytes)
     unsavedNew = false
@@ -4249,6 +5079,26 @@ async function saveArchive(saveAs: boolean, format: ExportFormat): Promise<boole
   return isTauri()
     ? saveNative(saveAs || unnamed, format, suggestedName)
     : downloadArchive(format, suggestedName)
+}
+
+async function shareArchiveToMobile(): Promise<boolean> {
+  if (!archive) return false
+  const format = currentExportFormat()
+  const exported = exportArchive(format)
+  if (!exported) return false
+  const currentName = documentName.textContent?.trim() || "皮肤"
+  const name = exportName(currentName, format)
+  const file = new File([exported.bytes], name, { type: "application/octet-stream" })
+  if (!navigator.share || navigator.canShare && !navigator.canShare({ files: [file] })) {
+    throw new Error("当前设备不支持系统文件分享")
+  }
+  try {
+    await navigator.share({ title: name, files: [file] })
+    return true
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") return false
+    throw error
+  }
 }
 
 function chooseProjectTemplate(): Promise<string | undefined> {
@@ -4292,6 +5142,9 @@ openButton.addEventListener("click", () => {
 emptyOpenButton.addEventListener("click", () => openButton.click())
 saveButton.addEventListener("click", () => {
   void runFileOperation("保存", () => saveArchive(false, currentExportFormat()))
+})
+mobileShareButton.addEventListener("click", () => {
+  void runFileOperation("分享皮肤", shareArchiveToMobile)
 })
 for (const button of exportButtons) {
   button.addEventListener("click", () => {
@@ -4373,6 +5226,12 @@ canvasWrap.dataset.background = canvasBackground.value
 canvasBackground.addEventListener("change", () => {
   localStorage.setItem("canvas-background", canvasBackground.value)
   canvasWrap.dataset.background = canvasBackground.value
+})
+mobilePreviewPosition.value = localStorage.getItem("mobile-preview-position") === "top" ? "top" : "bottom"
+document.documentElement.dataset.mobilePreviewPosition = mobilePreviewPosition.value
+mobilePreviewPosition.addEventListener("change", () => {
+  localStorage.setItem("mobile-preview-position", mobilePreviewPosition.value)
+  document.documentElement.dataset.mobilePreviewPosition = mobilePreviewPosition.value
 })
 const systemTheme = matchMedia("(prefers-color-scheme: dark)")
 function applyAppTheme(): void {
@@ -4509,9 +5368,16 @@ source.addEventListener("input", () => {
   updateSourceHighlight()
 })
 source.addEventListener("scroll", () => {
-  const highlight = $("#source-highlight")
-  highlight.scrollTop = source.scrollTop
-  highlight.scrollLeft = source.scrollLeft
+  syncSourceScroll()
+})
+sourceSearch.addEventListener("input", () => {
+  sourceSearchIndex = -1
+  findSourceMatch(1)
+})
+sourceSearch.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return
+  event.preventDefault()
+  findSourceMatch(event.shiftKey ? -1 : 1)
 })
 for (const field of keyFields) {
   field.addEventListener("input", () => {
@@ -4575,6 +5441,13 @@ for (const button of keyModeButtons) {
     preview.setEditTool(keyMode)
   })
 }
+for (const button of keyActionButtons) {
+  button.addEventListener("click", () => {
+    if (button.dataset.keyAction === "copy") copySelectedKeys()
+    else if (button.dataset.keyAction === "swap") applyLayoutAction("swap")
+    else deleteSelectedKeys()
+  })
+}
 for (const button of inspectorTabButtons) {
   button.addEventListener("click", () => {
     inspectorTab = button.dataset.inspectorTab === "source" ? "source" : "properties"
@@ -4618,6 +5491,15 @@ for (const button of themeChoiceButtons) {
 }
 for (const button of orientationChoiceButtons) {
   button.addEventListener("click", () => selectChoice(orientation, button.dataset.orientationChoice ?? "port"))
+}
+for (const button of mobileChoiceButtons) {
+  button.addEventListener("click", () => {
+    const choice = button.dataset.mobileChoice
+    const select = choice === "mode" ? mode : choice === "theme" ? theme : orientation
+    const values = Array.from(select.options).map((option) => option.value)
+    const next = values[(values.indexOf(select.value) + 1) % values.length]
+    selectChoice(select, next)
+  })
 }
 function setGuidesVisible(enabled: boolean): void {
   guidesVisible = enabled
@@ -5053,23 +5935,25 @@ styleImageResourceOpen.addEventListener("click", openStyleImageResourcePicker)
 styleImageResourceClose.addEventListener("click", closeStyleImageResourcePicker)
 styleImageResourceSearch.addEventListener("input", renderStyleImageResources)
 
-void listen<{ mode: "image" | "resource" }>("picker-window-ready", (event) => {
-  const label = event.payload.mode === "image" ? "image-picker" : "resource-picker"
-  const payload = event.payload.mode === "image" ? nativeImagePickerPayload : nativeResourcePickerPayload
-  if (payload) void emitTo(label, `${label}-data`, payload)
-})
-void listen<{ index: number }>("image-picker-select", (event) => {
-  if (!isEditing() || !pickerTarget) return
-  const selected = pickerSlices.find((slice) => slice.index === event.payload.index)
-  if (!selected) return
-  pickerSelectedIndex = selected.index
-  const name = pickerPath.split("/").pop()?.replace(/\.png$/i, "") ?? pickerPath
-  updateSelectedImageReference(pickerTarget, `${name},${selected.index}`)
-})
-void listen("resource-picker-open", openResourcePickerWindow)
-void listen<{ path: string }>("resource-picker-select", (event) => {
-  if (pickerTarget) openImageSlicePicker(event.payload.path, pickerTarget)
-})
+if (isTauri()) {
+  void listen<{ mode: "image" | "resource" }>("picker-window-ready", (event) => {
+    const label = event.payload.mode === "image" ? "image-picker" : "resource-picker"
+    const payload = event.payload.mode === "image" ? nativeImagePickerPayload : nativeResourcePickerPayload
+    if (payload) void emitTo(label, `${label}-data`, payload)
+  })
+  void listen<{ index: number }>("image-picker-select", (event) => {
+    if (!isEditing() || !pickerTarget) return
+    const selected = pickerSlices.find((slice) => slice.index === event.payload.index)
+    if (!selected) return
+    pickerSelectedIndex = selected.index
+    const name = pickerPath.split("/").pop()?.replace(/\.png$/i, "") ?? pickerPath
+    updateSelectedImageReference(pickerTarget, `${name},${selected.index}`)
+  })
+  void listen("resource-picker-open", openResourcePickerWindow)
+  void listen<{ path: string }>("resource-picker-select", (event) => {
+    if (pickerTarget) openImageSlicePicker(event.payload.path, pickerTarget)
+  })
+}
 
 // Inspector resize handle
 {
@@ -5161,9 +6045,11 @@ newStyleForm.addEventListener("submit", (event) => {
 let selectedResourceGalleryPath = ""
 
 function updateResourceActionButtons(): void {
-  const hasSelection = resourceInspectorMode === "image" && Boolean(selectedResourceGalleryPath)
-  resourceDownloadButton.disabled = !hasSelection
-  resourceDeleteButton.disabled = !hasSelection || !isEditing()
+  const imageSelected = resourceInspectorMode === "image" && Boolean(selectedResourceGalleryPath)
+  const soundSelected = resourceInspectorMode === "sound"
+    && Boolean(currentSoundEntries().find((entry) => entry.id === selectedSoundID)?.path)
+  resourceDownloadButton.disabled = !imageSelected && !soundSelected
+  resourceDeleteButton.disabled = !imageSelected || !isEditing()
 }
 
 function selectGalleryItem(path: string, container: HTMLElement): void {
@@ -5180,9 +6066,73 @@ resourceUploadButton.addEventListener("click", () => {
   resourceUploadInput.click()
 })
 
+async function uploadKeySound(file: File): Promise<void> {
+  if (!archive || !isSoundPath(file.name)) throw new Error("按键音仅支持 OGG、WAV 或 AIFF 文件")
+  const filename = file.name.split(/[\\/]/).pop() ?? file.name
+  const entries = currentSoundEntries()
+  const selected = entries.find((entry) => entry.id === selectedSoundID)
+  const base = selected?.path?.split("/").slice(0, -1).join("/")
+    ?? soundResourcePaths(archive.names(), theme.value, orientation.value)[0]?.split("/").slice(0, -1).join("/")
+    ?? `${theme.value}/skin/res`
+  const targetPath = `${base}/${filename}`
+  const beforeResource = archive.getBytes(targetPath)?.slice()
+  if (beforeResource && targetPath !== selected?.path && !window.confirm(`声音 ${filename} 已存在，是否替换？`)) return
+  const resourceBytes = new Uint8Array(await file.arrayBuffer())
+  keySoundBuffers.delete(targetPath)
+  const changes: Change[] = [{ kind: "bytes", path: targetPath, before: beforeResource, after: resourceBytes }]
+  releaseKeySound()
+
+  if (archive.format === "bda") {
+    const configPath = bdaConfigPath(archive, theme.value, orientation.value, "sound") ?? currentConfigPath("soundConfig")
+    const before = archive.getBytes(configPath)?.slice() ?? new Uint8Array()
+    const resourceID = filename.replace(/\.(?:ogg|wav|aiff?)$/i, "")
+    const resource = { type: bdaSoundResourceType(filename), resourceID }
+    const keys = selected?.bdaKey
+      ? [selected.bdaKey]
+      : [...new Set((layoutDocument?.sections() ?? []).flatMap((section) => {
+          if (!/^KEY\d+$/i.test(section)) return []
+          const action = layoutDocument?.get(section, "CENTER")?.trim()
+          return action ? [bdaPanelKeyName(action)] : []
+        }))]
+    let after = before
+    for (const key of keys.length ? keys : ["KEY_DEFAULT"]) after = updateBdaKeySound(after, key, resource)
+    changes.push({ kind: "bytes", path: configPath, before: archive.getBytes(configPath)?.slice(), after })
+    selectedSoundID = `bda:${keys[0] ?? "KEY_DEFAULT"}`
+  } else {
+    const stylesPath = styleConfigPath()
+    if (!archive.isText(stylesPath)) throw new Error("当前皮肤没有 default.css，无法配置按键音")
+    const styles = IniDocument.parse(archive.getText(stylesPath))
+    const styleID = selected?.styleID ?? nextSoundStyleID(styles)
+    const before = styles.toString()
+    setIniSoundStyle(styles, styleID, filename)
+    changes.push({ kind: "text", path: stylesPath, before, after: styles.toString() })
+    if (!selected?.styleID) {
+      const generalPath = genConfigPath()
+      if (archive.isText(generalPath)) {
+        const general = IniDocument.parse(archive.getText(generalPath))
+        const generalBefore = general.toString()
+        general.set("PANEL", "SOUND_STYLE", styleID)
+        changes.push({ kind: "text", path: generalPath, before: generalBefore, after: general.toString() })
+      }
+    }
+    selectedSoundID = `style:${styleID}`
+  }
+  commitBatch(changes)
+  renderResourceInspector()
+  updateDirty()
+  showStatus(`按键音已更新：${filename}`)
+}
+
 resourceUploadInput.addEventListener("change", () => {
   const file = resourceUploadInput.files?.[0]
   if (!file || !archive) return
+  if (resourceInspectorMode === "sound") {
+    void runFileOperation("上传按键音", async () => {
+      await uploadKeySound(file)
+      return true
+    })
+    return
+  }
   const reader = new FileReader()
   reader.onload = () => {
     if (!archive) return
@@ -5204,15 +6154,21 @@ resourceUploadInput.addEventListener("change", () => {
 })
 
 resourceDownloadButton.addEventListener("click", () => {
-  if (!archive || !selectedResourceGalleryPath) return
-  const bytes = archive.getBytes(selectedResourceGalleryPath)
-  if (!bytes) return
-  const url = URL.createObjectURL(new Blob([bytes], { type: "image/png" }))
-  const a = document.createElement("a")
-  a.href = url
-  a.download = selectedResourceGalleryPath.split("/").pop() ?? "image.png"
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  void runFileOperation(resourceInspectorMode === "sound" ? "下载按键音" : "下载图片", async () => {
+    if (resourceInspectorMode === "sound") {
+      const entry = currentSoundEntries().find((item) => item.id === selectedSoundID)
+      const bytes = entry?.path ? archive?.getBytes(entry.path) : undefined
+      if (!entry?.path || !bytes) return false
+      return Boolean(await writeToChosenDirectory(entry.filename, bytes))
+    }
+    if (!archive || !selectedResourceGalleryPath) return false
+    const bytes = archive.getBytes(selectedResourceGalleryPath)
+    if (!bytes) return false
+    return Boolean(await writeToChosenDirectory(
+      selectedResourceGalleryPath.split("/").pop() ?? "image.png",
+      bytes,
+    ))
+  })
 })
 
 resourceDeleteButton.addEventListener("click", () => {
@@ -5221,30 +6177,18 @@ resourceDeleteButton.addEventListener("click", () => {
   if (!window.confirm(`确定要删除图片 ${name} 吗？此操作可撤销。`)) return
   const before = archive.getBytes(selectedResourceGalleryPath)
   if (!before) return
-  commitBytes(selectedResourceGalleryPath, before, new Uint8Array(0))
+  commitBatch([{ kind: "bytes", path: selectedResourceGalleryPath, before }])
   selectedResourceGalleryPath = ""
   updateResourceActionButtons()
   renderResourceInspector()
   updateDirty()
 })
 
-for (const button of Array.from(editContextMenu.querySelectorAll<HTMLButtonElement>("[data-context-action]"))) {
-  button.addEventListener("click", () => {
-    if (button.dataset.contextAction === "copy") copySelectedKeys()
-    else if (button.dataset.contextAction === "swap") applyLayoutAction("swap")
-    else deleteSelectedKeys()
-    editContextMenu.hidden = true
-  })
-}
 device.addEventListener("change", () => {
   updateDevicePreview()
   refreshPreview()
 })
-clearSimulationButton.addEventListener("click", () => {
-  simulatedOutput.value = ""
-  simulatedOutput.setSelectionRange(0, 0)
-  refreshSimulationPreview()
-})
+clearSimulationButton.addEventListener("click", clearSimulatedOutput)
 simulatedOutput.addEventListener("input", refreshSimulationPreview)
 window.addEventListener("keydown", (event) => {
   const movement: Record<string, readonly [number, number]> = {
@@ -5313,10 +6257,6 @@ window.addEventListener("pointerdown", (event) => {
   for (const menu of toolbarMenus) {
     if (menu.open && !menu.contains(event.target as Node)) menu.open = false
   }
-  if (!editContextMenu.hidden && !editContextMenu.contains(event.target as Node)) editContextMenu.hidden = true
-})
-window.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") editContextMenu.hidden = true
 })
 window.addEventListener("beforeunload", (event) => {
   if (isTauri() || !hasUnsavedChanges()) return
@@ -5339,21 +6279,48 @@ if (isTauri()) {
     destroyingWindow = true
     void invoke("quit_app")
   })
-  void listen<{ paths?: string[] } | string[]>("tauri://drag-drop", (event) => {
-    const paths = Array.isArray(event.payload) ? event.payload : event.payload.paths ?? []
-    const pngPath = paths.find((path) => /\.png$/i.test(path))
-    if (pngPath) {
-      void (async () => {
-        if (!archive || archive.format === "bda") return
-        const bytes = new Uint8Array(await invoke<number[]>("read_file", { path: pngPath }))
-        setLayoutImageBytes(bytes)
-        openLayoutImageDialog()
-      })()
-      return
-    }
-    const path = paths.find(isSupportedSkinPath)
-    if (path) void runFileOperation("打开", () => loadDroppedPath(path))
-  })
+  void (async () => {
+    const scaleFactor = await getCurrentWindow().scaleFactor()
+    await getCurrentWebview().onDragDropEvent((event) => {
+      const payload = event.payload
+      if (payload.type === "leave") {
+        setSourceDropTarget()
+        return
+      }
+      const target = document.elementFromPoint(
+        payload.position.x / scaleFactor,
+        payload.position.y / scaleFactor,
+      )
+      const folder = sourceDropFolder(target)
+      if (payload.type === "enter" || payload.type === "over") {
+        setSourceDropTarget(folder === undefined ? undefined : target)
+        return
+      }
+      setSourceDropTarget()
+      if (folder !== undefined && archive && isEditing()) {
+        void runFileOperation("上传文件", async () => commitSourceUploads(
+          await Promise.all(payload.paths.map(async (path) => ({
+            name: path,
+            bytes: new Uint8Array(await invoke<number[]>("read_file", { path })),
+          }))),
+          folder,
+        ))
+        return
+      }
+      const pngPath = payload.paths.find((path) => /\.png$/i.test(path))
+      if (pngPath) {
+        void (async () => {
+          if (!archive || archive.format === "bda") return
+          const bytes = new Uint8Array(await invoke<number[]>("read_file", { path: pngPath }))
+          setLayoutImageBytes(bytes)
+          openLayoutImageDialog()
+        })()
+        return
+      }
+      const path = payload.paths.find(isSupportedSkinPath)
+      if (path) void runFileOperation("打开", () => loadDroppedPath(path))
+    })
+  })()
   void listen<string[]>("opened", async (event) => {
     const path = event.payload[0]
     if (path && (await prepareDocumentReplacement())) {

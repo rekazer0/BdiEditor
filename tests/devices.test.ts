@@ -58,14 +58,13 @@ test("maps Baidu skin coordinates to the iPhone 17 Pro bottom keyboard", () => {
   assert.equal(Math.round(geometry.totalHeight), 1087)
 })
 
-test("expands the iPhone candidate area while composing without moving the panel", () => {
+test("keeps the iPhone candidate area fixed while composing", () => {
   const idle = keyboardPreviewGeometry(
     deviceSpec("iphone-17-pro")!,
     "port",
     1125,
     595,
     133,
-    false,
   )
   const composing = keyboardPreviewGeometry(
     deviceSpec("iphone-17-pro")!,
@@ -73,22 +72,24 @@ test("expands the iPhone candidate area while composing without moving the panel
     1125,
     595,
     133,
-    true,
   )
   assert.equal(Math.round(idle.candidateInsetHeight), 71)
-  assert.equal(Math.round(composing.candidateInsetHeight), 102)
-  assert.equal(Math.round(composing.candidateHeight - idle.candidateHeight), 31)
-  assert.equal(composing.panelHeight, idle.panelHeight)
-  assert.equal(composing.safeBottomHeight, idle.safeBottomHeight)
+  assert.deepEqual(composing, idle)
 })
 
-test("extends the candidate skin background by the active iPhone candidate inset", () => {
-  assert.equal(candidateBackgroundLogicalHeight(deviceSpec("iphone-17-pro"), "port", 109, false), 175)
-  assert.equal(candidateBackgroundLogicalHeight(deviceSpec("iphone-17-pro"), "port", 109, true), 204)
+test("keeps height-limited keyboard geometry fixed while composing", () => {
+  const device = { width: 1125, height: 800, family: "iphone" as const }
+  const idle = keyboardPreviewGeometry(device, "port", 1125, 595, 133)
+  const composing = keyboardPreviewGeometry(device, "port", 1125, 595, 133)
+
+  assert.deepEqual(composing, idle)
+})
+
+test("extends the candidate skin background by a stable iPhone candidate inset", () => {
+  assert.equal(candidateBackgroundLogicalHeight(deviceSpec("iphone-17-pro"), "port", 109), 175)
   assert.equal(candidateBackgroundLogicalHeight(deviceSpec("iphone-17-pro"), "land", 109), 109)
   assert.equal(candidateBackgroundLogicalHeight(deviceSpec("xiaomi-17"), "port", 109), 109)
   assert.equal(candidateBackgroundLogicalHeight(undefined, "port", 109), 109)
-  assert.equal(candidateBackgroundLogicalHeight(undefined, "port", 109, true), 204)
 })
 
 test("shows keyboard accessories only for an iPhone in portrait", () => {

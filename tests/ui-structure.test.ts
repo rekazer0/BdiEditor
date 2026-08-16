@@ -73,7 +73,7 @@ test("static and dynamic system symbol elements are decorative and retain inline
   for (const symbol of staticSymbols) assert.match(symbol, /aria-hidden="true"/)
   assert.equal(
     (html.match(/class="system-symbol-fallback"/g) ?? []).length +
-      (html.match(/class="system-symbol"[^>]*data-system-symbol="magnifyingglass"/g) ?? []).length,
+      (html.match(/class="system-symbol"[^>]*data-system-symbol="[^"]+"[^>]*><\/span>/g) ?? []).length,
     staticSymbols.length,
   )
   assert.match(main, /symbol\.dataset\.systemSymbol = name/)
@@ -114,6 +114,29 @@ test("form inputs inherit the editor font while the source editor stays monospac
   assert.match(sourceEditor, /ui-monospace/)
 })
 
+test("source editor shows line numbers and supports searching the current config", () => {
+  assert.match(html, /id="source-search"[^>]*type="search"/)
+  assert.match(html, /id="source-line-numbers"/)
+  assert.match(main, /sourceLineNumbers\.textContent = Array\.from\(/)
+  assert.match(main, /sourceSearch\.addEventListener\("input"/)
+  assert.match(main, /sourceSearch\.addEventListener\("keydown"[\s\S]*event\.key !== "Enter"/)
+  assert.match(css, /#source-editor\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)/s)
+  assert.match(css, /#source-line-numbers\s*\{[^}]*text-align:\s*right/s)
+})
+
+test("translated config controls retain their original field names", () => {
+  for (const label of [
+    "名称（Name）",
+    "显示区域（VIEW_RECT）",
+    "点击动作（CENTER）",
+    "背景样式引用（BACK_STYLE）",
+    "字体（FONT_NAME）",
+    "上滑（UP）",
+    "宽（INNER_RECT）",
+  ]) assert.match(html, new RegExp(label))
+  assert.match(main, /function translatedConfigLabel[\s\S]*documentFieldLabels\[key][\s\S]*（\$\{key\}）/)
+})
+
 test("placeholder icon glyphs are absent from editor chrome and CSS", () => {
   for (const placeholder of ["•••", "⌨", "▧", "◇", "◐", "◎", "● ᯤ ▰", "↶　↷", "⇧　•••", "‹"]) {
     assert.doesNotMatch(`${html}\n${css}`, new RegExp(placeholder))
@@ -142,7 +165,7 @@ test("preview canvas provides mouse-wheel and button zoom controls", () => {
   assert.match(main, /function applyPreviewZoom\(value: number, anchor\?: \{ x: number; y: number \}\)/)
   assert.match(main, /anchor\.x - \(after\.left \+ anchorX \* after\.width\)/)
   assert.doesNotMatch(main, /previewSpaceHeld/)
-  assert.match(main, /if \(event\.button !== 0 \|\| deviceShell\.hidden\) return/)
+  assert.match(main, /event\.button !== 0[\s\S]*deviceShell\.hidden[\s\S]*isEditing\(\) && keyMode === "move" && previewPanelViewport\.contains\(event\.target as Node\)/)
   assert.match(main, /canvasWrap\.setPointerCapture\(event\.pointerId\)/)
   assert.match(main, /previewPanStart\.panX \+ event\.clientX - previewPanStart\.x/)
   assert.match(main, /const renderedWidth = width \* previewZoom/)
@@ -156,15 +179,12 @@ test("preview canvas provides mouse-wheel and button zoom controls", () => {
   assert.doesNotMatch(html, /data-skin-field="Authors"/)
 })
 
-test("candidate input text is capped to the height of its composition row", () => {
+test("candidate input text uses the parsed skin font size", () => {
   assert.match(
     main,
-    /applyCandidateTextVisual\(candidateInput, inputVisual, candidateTextWidth, 40\)/,
+    /applyCandidateTextVisual\(candidateInput, inputVisual, candidateTextWidth\)/,
   )
-  assert.match(
-    main,
-    /Math\.min\(visual\.fontSize, maxFontSize \?\? visual\.fontSize\)/,
-  )
+  assert.doesNotMatch(main, /maxFontSize/)
 })
 
 test("iPhone preview uses per-model physical frame geometry", () => {
@@ -253,9 +273,16 @@ test("transparent candidate preview is not painted by a native button", () => {
   assert.match(html, /<div id="toolbar-strip"[^>]*><canvas id="toolbar-preview"/)
   assert.doesNotMatch(html, /<button id="toolbar-strip"/)
   assert.match(main, /const candidateBackgroundPreview = new Preview\(candidateBackgroundCanvas/)
-  assert.match(main, /candidateBackgroundLogicalHeight\(deviceSpec\(device\.value\), orientation\.value, height, composing\)/)
+  assert.match(main, /candidateBackgroundLogicalHeight\(deviceSpec\(device\.value\), orientation\.value, height\)/)
   assert.match(main, /toolbarDocument\.set\("CAND", "BACK_STYLE", ""\)/)
   assert.match(css, /#candidate-background\s*\{[^}]*position:\s*absolute[^}]*inset:\s*0[^}]*width:\s*100%[^}]*height:\s*100%/s)
+})
+
+test("canvas-only preview does not add rounding outside the parsed skin", () => {
+  assert.match(css, /\.device-shell\.canvas-only\s*\{[^}]*border-radius:\s*0/s)
+  assert.match(css, /\.device-shell\.canvas-only \.device-screen\s*\{[^}]*border-radius:\s*0/s)
+  assert.doesNotMatch(css, /\.device-shell\.canvas-only #preview\s*\{[^}]*border-radius:/s)
+  assert.doesNotMatch(css, /\.canvas-only canvas\s*\{[^}]*border-radius:/s)
 })
 
 test("typing updates simulation state without rebuilding the complete skin preview", () => {
@@ -265,12 +292,14 @@ test("typing updates simulation state without rebuilding the complete skin previ
   assert.doesNotMatch(main, /simulatedOutput\.addEventListener\("input", \(\) => refreshPreview\(\)\)/)
 })
 
-test("canvas typing preserves the scaled candidate row height", () => {
+test("typing switches candidate content without changing device keyboard geometry", () => {
   assert.match(
     css,
     /\.device-shell\.canvas-only #candidate-area:has\(#candidate-composition:not\(\[hidden\]\)\)\s*\{[^}]*height:\s*var\(--candidate-viewport-height, 228px\)[^}]*grid-template-rows:\s*var\(--candidate-input-height, 95px\) var\(--toolbar-viewport-height, 133px\)/s,
   )
-  assert.match(main, /candidateHeight \+ \(composing \? 95 : 0\)/)
+  assert.match(main, /canvasLogicalSize\.height = canvasLogicalSize\.panelVisibleHeight \+ candidateHeight/)
+  assert.doesNotMatch(main, /canvasLogicalSize\.panelVisibleHeight \+ candidateHeight \+ \(composing \? 95 : 0\)/)
+  assert.doesNotMatch(main, /applyDeviceKeyboardGeometry\([^)]*,\s*composing\s*\)/)
   assert.match(main, /--candidate-input-height/)
   assert.match(main, /--candidate-viewport-height/)
 })
@@ -313,11 +342,11 @@ test("device preview preserves resolved candidate geometry across formats", () =
   assert.match(main, /function applyDeviceKeyboardGeometry\(/)
   assert.match(
     main,
-    /applyDeviceKeyboardGeometry\(config\.width, config\.height, toolbarSize\?\.height \?\? 0, composing\)/,
+    /applyDeviceKeyboardGeometry\(config\.width, config\.height, toolbarSize\?\.height \?\? 0\)/,
   )
   assert.match(
     main,
-    /applyDeviceKeyboardGeometry\(panelWidth, panelHeight, toolbarSize\?\.height \?\? 0, composing\)/,
+    /applyDeviceKeyboardGeometry\(panelWidth, panelHeight, toolbarSize\?\.height \?\? 0\)/,
   )
   assert.match(
     main,
@@ -450,6 +479,31 @@ test("interaction preview starts a press instead of returning after selection", 
   assert.match(preview, /this\.active = \{\s*key,/)
 })
 
+test("mobile long press keeps subsequent touch clicks in multi-select mode", () => {
+  assert.match(preview, /private mobileMultiSelect = false/)
+  assert.match(preview, /touch\.longPressTimer = window\.setTimeout\(\(\) => \{[\s\S]*touch\.longPress = true[\s\S]*this\.mobileMultiSelect = true/)
+  assert.match(preview, /const longPress = touch\.longPress \|\| isTouchLongPress\(/)
+  assert.match(preview, /isTouchLongPress\(\s*touch\.pointerType,/)
+  assert.match(preview, /this\.mobileMultiSelect = true[\s\S]*this\.selected\.add\(touch\.key\.section\)/)
+  assert.match(preview, /ctrlKey: event\.ctrlKey \|\| this\.mobileMultiSelect/)
+  assert.match(preview, /this\.mobileMultiSelect && !this\.selected\.size\) this\.mobileMultiSelect = false/)
+  assert.match(preview, /private cancelEditTouch\(\): void \{[\s\S]*window\.clearTimeout\(this\.editTouch\.longPressTimer\)/)
+})
+
+test("holding the mobile backspace key clears the simulated input", () => {
+  assert.match(preview, /const clearOnHold = key\.center\.trim\(\) === "F36"/)
+  assert.match(preview, /direction === "hold" && clearOnHold \? "F48" : key\[direction\]/)
+  assert.match(main, /if \(code === "F48"\) \{\s*clearSimulatedOutput\(\)/)
+  assert.match(main, /clearSimulationButton\.addEventListener\("click", clearSimulatedOutput\)/)
+})
+
+test("animated keys keep their pressed visuals until the configured animation finishes", () => {
+  assert.match(
+    preview,
+    /const highlighted = this\.active\?\.key\.section === key\.section \|\|\s*this\.legacyAnimationState\?\.key\.section === key\.section/,
+  )
+})
+
 test("Shift selects the complete key range from the anchor", () => {
   assert.match(preview, /event\.shiftKey && this\.selectionAnchor/)
   assert.match(preview, /sections\.slice\(Math\.min\(from, to\), Math\.max\(from, to\) \+ 1\)/)
@@ -519,7 +573,7 @@ test("selected source scrolls to a full-row highlight", () => {
   assert.doesNotMatch(css, /\.token-selected(?:\s|::before)*\s*\{[^}]*text-decoration/s)
 })
 
-test("settings expose canvas backgrounds and edit mode exposes key context actions", () => {
+test("settings expose canvas backgrounds and the key inspector owns edit actions", () => {
   assert.match(html, /id="canvas-background"/)
   assert.match(html, /value="glass">玻璃/)
   assert.match(html, /value="checkerboard">马赛克/)
@@ -527,16 +581,17 @@ test("settings expose canvas backgrounds and edit mode exposes key context actio
   assert.doesNotMatch(html, /value="default">默认/)
   assert.match(main, /savedCanvasBackground === "default" \? "glass" : savedCanvasBackground \?\? "white"/)
   assert.match(css, /\.canvas-wrap\[data-background="glass"\]\s*\{[^}]*backdrop-filter:/s)
-  assert.match(html, /data-context-action="copy"/)
-  assert.match(html, /data-context-action="swap"/)
-  assert.match(html, /data-context-action="delete"/)
+  assert.match(html, /data-key-action="copy"/)
+  assert.match(html, /data-key-action="swap"/)
+  assert.match(html, /data-key-action="delete"/)
+  assert.doesNotMatch(html, /edit-context-menu|data-context-action=/)
   assert.match(main, /function copySelectedKeys\(\)/)
   assert.match(main, /function deleteSelectedKeys\(\)/)
+  assert.match(main, /selectedKeySections = \[\][\s\S]*preview\.setDocument\(layoutDocument\)[\s\S]*preview\.setSelected\(\[\]\)[\s\S]*refreshPreview\(\)/)
   assert.match(main, /event\.key === "Delete" \|\| event\.key === "Backspace"[\s\S]*deleteSelectedKeys\(\)/)
-  assert.match(main, /createSystemSymbol\("doc\.on\.doc"\)/)
-  assert.match(main, /createSystemSymbol\("arrow\.left\.and\.right"\)/)
-  assert.match(main, /createSystemSymbol\("trash"\)/)
-  assert.match(css, /\.edit-context-menu button\s*\{[^}]*font-size:\s*11px[^}]*font-weight:\s*400[^}]*color:\s*var\(--secondary\)/s)
+  assert.match(main, /button\.dataset\.keyAction === "copy"\) copySelectedKeys\(\)/)
+  assert.match(main, /button\.dataset\.keyAction === "swap"\) applyLayoutAction\("swap"\)/)
+  assert.doesNotMatch(main, /showEditContextMenu|editContextMenu/)
 })
 
 test("key layout supports select, drag-move, merge, and wheel-adjusted geometry fields", () => {
@@ -546,8 +601,10 @@ test("key layout supports select, drag-move, merge, and wheel-adjusted geometry 
   assert.match(html, /data-key-mode="move"/)
   assert.match(html, /data-layout-action="merge"[^>]*>合并</)
   assert.match(main, /preview\.setEditTool\(keyMode\)/)
+  assert.match(main, /isEditing\(\) && keyMode === "move" && previewPanelViewport\.contains\(event\.target as Node\)/)
   assert.match(main, /function mergeSelectedKeys\(\)/)
   assert.match(preview, /canvas\.addEventListener\("pointermove"/)
+  assert.match(preview, /event\.stopPropagation\(\)/)
   assert.match(preview, /this\.onMove\(\[\.\.\.this\.selected\], Math\.round\(dx\), Math\.round\(dy\)\)/)
   assert.match(css, /\.geometry-fields input\s*\{[^}]*text-align:\s*left/s)
   assert.match(main, /field\.type === "number"[\s\S]*field\.addEventListener\("wheel"[\s\S]*field\.stepUp\(\)[\s\S]*field\.stepDown\(\)/)
@@ -600,7 +657,7 @@ test("canvas accepts native and browser skin file drops", () => {
   assert.match(main, /canvasWrap\.addEventListener\("dragover"/)
   assert.match(main, /canvasWrap\.addEventListener\("drop"/)
   assert.match(main, /loadDroppedFile\(file\)/)
-  assert.match(main, /listen<\{ paths\?: string\[\] \} \| string\[\]>\("tauri:\/\/drag-drop"/)
+  assert.match(main, /getCurrentWebview\(\)\.onDragDropEvent/)
   assert.match(main, /return \/\\\.\(bdi\|bds\|bda\)\$\/i\.test\(path\)/)
   assert.match(css, /\.canvas-wrap\.drop-target\s*\{[^}]*box-shadow:/s)
 })
@@ -830,7 +887,7 @@ test("text fields, search fields, and dialogs share the rounded control style", 
   assert.match(css, /\.app-dialog\s*\{[^}]*border-radius:\s*18px/s)
   assert.match(css, /\.project-dialog\s*\{[^}]*border-radius:\s*18px/s)
   assert.match(pickerCss, /\.picker-toolbar input\s*\{[^}]*border-radius:\s*999px[^}]*background:\s*color-mix/s)
-  assert.equal((html.match(/class="search-control"/g) ?? []).length, 3)
+  assert.equal((html.match(/class="search-control"/g) ?? []).length, 4)
   assert.match(main, /querySelectorAll<HTMLElement>\("\.system-symbol\[data-system-symbol\]:empty"\)/)
 })
 
@@ -850,6 +907,31 @@ test("sidebar heading switches between overview and source files", () => {
   assert.match(html, /data-sidebar-view="overview"[^>]*>概览/)
   assert.match(html, /data-sidebar-view="source"[^>]*>源文件/)
   assert.match(main, /function setSidebarView\(/)
+})
+
+test("source files expose one icon-only operation toolbar", () => {
+  const toolbar = html.slice(html.indexOf('id="source-file-toolbar"'), html.indexOf('id="files"'))
+  for (const id of ["source-upload", "source-download", "source-copy", "source-paste", "source-move", "source-delete"]) {
+    assert.match(toolbar, new RegExp(`id="${id}"[^>]*class="toolbar-button"[^>]*aria-label=`))
+  }
+  assert.equal((toolbar.match(/<button/g) ?? []).length, 6)
+  assert.match(css, /\.source-file-toolbar \.toolbar-button\s*\{[^}]*width:\s*29px[^}]*height:\s*29px/s)
+})
+
+test("source copy and move wait for a destination folder before paste", () => {
+  assert.match(main, /type SourceTransfer = \{[\s\S]*?mode: "copy" \| "move"/)
+  assert.match(main, /sourceCopyButton\.classList\.toggle\("active", sourceTransfer\?\.mode === "copy"\)/)
+  assert.match(main, /sourceMoveButton\.classList\.toggle\("active", sourceTransfer\?\.mode === "move"\)/)
+  assert.match(main, /sourceCopyButton\.addEventListener\("click", \(\) => \{\s*setSourceTransfer\("copy"\)/)
+  assert.match(main, /sourceMoveButton\.addEventListener\("click", \(\) => \{\s*setSourceTransfer\("move"\)/)
+  assert.doesNotMatch(main, /输入移动后的完整路径/)
+  assert.match(css, /\.source-file-toolbar \.toolbar-button\.active\s*\{[^}]*background:\s*var\(--accent\)/s)
+})
+
+test("downloads use a system directory chooser", () => {
+  assert.match(main, /open\(\{ directory: true, multiple: false, title: "选择下载目录" \}\)/)
+  assert.match(main, /showDirectoryPicker/)
+  assert.doesNotMatch(main, /\.download\s*=/)
 })
 
 test("app dialogs close only when their backdrop is clicked", () => {
@@ -934,6 +1016,7 @@ test("style detail returns to the configuration that opened it", () => {
 
 test("style picker uses the shared glass dialog and selected-card styling", () => {
   assert.match(html, /id="style-picker-dialog" class="style-picker-dialog glass-module"/)
+  assert.match(html, /id="style-picker-close" class="toolbar-button"[\s\S]*?data-system-symbol="xmark"/)
   assert.match(main, /button\.classList\.toggle\("selected", stylePickerTarget\?\.value\.split\(","\)\[0\]\?\.trim\(\) === styleID\)/)
   assert.match(css, /\.style-picker-dialog\s*\{[^}]*border-radius:\s*18px[^}]*background:\s*var\(--menu\)/s)
   assert.match(css, /\.style-picker-item\.selected\s*\{[^}]*border-color:\s*var\(--accent\)/s)
@@ -985,7 +1068,7 @@ test("style configuration reuses the resource gallery and opens an editable deta
   assert.match(html, /id="style-add"[\s\S]*id="resource-gallery"/)
   assert.match(html, /id="style-resource-detail"[\s\S]*id="style-detail-normal"[\s\S]*id="style-detail-highlighted"/)
   assert.match(html, /id="image-resource-detail"[\s\S]*?<\/div>\s*<div id="style-resource-detail" hidden>/)
-  assert.match(main, /resourceInspectorMode: "image" \| "style"/)
+  assert.match(main, /resourceInspectorMode: "image" \| "style" \| "sound"/)
   assert.match(main, /async function renderStyleResourceGallery\(\)/)
   assert.match(main, /button\.className = "resource-item style-resource-item"/)
   assert.match(main, /drawVisualPreview\(canvas, \[await resolver\.resolve\(styleID, highlighted\)/)
@@ -1040,7 +1123,7 @@ test("style detail edits every field with typed color and slice pickers", () => 
 })
 
 test("source file clicks open text files in the source inspector", () => {
-  assert.match(main, /button\.addEventListener\("click", \(\) => selectFile\(path, "source"\)\)/)
+  assert.match(main, /archive\?\.isText\(path\) \|\| archive\?\.isImage\(path\) \|\| archive\?\.isBdaConfig\(path\)\) selectFile\(path, "source"\)/)
   assert.match(main, /preferredSidebarView === "source" && \(archive\?\.isText\(path\) \|\| archive\?\.isBdaConfig\(path\)\)/)
 })
 
@@ -1079,6 +1162,26 @@ test("source files use Finder-style rows and keyboard navigation", () => {
   assert.match(css, /#files \.source-file-row > \.system-symbol\s*\{[^}]*position:\s*static/s)
 })
 
+test("source files support dropping uploads and dragging files out for download", () => {
+  assert.match(main, /function commitSourceUploads\(/)
+  assert.match(main, /sourceFiles\.addEventListener\("drop"/)
+  assert.match(main, /button\.draggable = true/)
+  assert.match(main, /setData\("DownloadURL"/)
+  assert.match(main, /getCurrentWebview\(\)\.onDragDropEvent/)
+  assert.match(css, /\.source-tree-row\.source-drop-target\s*\{[^}]*outline:\s*2px solid var\(--accent\)/s)
+})
+
+test("resource configuration edits and previews BDS, BDI and BDA key sounds", () => {
+  assert.match(main, /label: "按键音"[\s\S]*navMode: "sound"/)
+  assert.match(main, /function renderSoundResourceGallery\(\)/)
+  assert.match(main, /async function uploadKeySound\(file: File\)/)
+  assert.match(main, /updateBdaKeySound\(/)
+  assert.match(main, /soundFilenameForKey\(/)
+  assert.match(main, /if \(soundPath\) playSoundPath\(soundPath\)/)
+  assert.match(main, /@wasm-audio-decoders\/ogg-vorbis/)
+  assert.match(html, /script-src 'self' 'wasm-unsafe-eval'/)
+})
+
 test("preview toolbar centers the device selector and toggles canvas guides", () => {
   assert.match(html, /id="toggle-guides"[^>]*aria-label="辅助线"[^>]*title="辅助线"[^>]*aria-pressed="false"[^>]*>[\s\S]*?data-system-symbol="ruler"/)
   assert.match(main, /preview\.setGuides\(guidesVisible\)/)
@@ -1086,6 +1189,103 @@ test("preview toolbar centers the device selector and toggles canvas guides", ()
   assert.match(preview, /setGuides\(enabled: boolean\)/)
   assert.match(css, /\.preview-toolbar\s*\{[^}]*position:\s*relative/s)
   assert.match(css, /\.field-control\s*\{[^}]*left:\s*50%[^}]*translateX\(-50%\)/s)
+})
+
+test("phone portrait uses a touch-first split preview and sliding editor panes", () => {
+  assert.match(css, /@media \(max-width: 760px\) and \(orientation: portrait\)/)
+  assert.match(html, /viewport-fit=cover/)
+  assert.match(css, /@media \(max-width: 600px\)[\s\S]*?\.titlebar\s*\{[^}]*overflow:\s*visible/s)
+  assert.match(css, /\.titlebar > \.spacer\s*\{[^}]*display:\s*none/s)
+  assert.match(html, /class="mobile-workspace-tabs"[^>]*>[\s\S]*?data-mobile-pane="layout"[\s\S]*?data-mobile-pane="inspector"/)
+  assert.match(css, /\.workspace\s*\{[^}]*height:\s*var\(--mobile-workspace-split,\s*50%\)[^}]*position:\s*absolute/s)
+  assert.match(css, /data-mobile-pane="inspector"\]\s+aside\s*\{[^}]*translateX\(-100%\)/s)
+  assert.match(css, /touch-action:\s*pan-y/)
+  assert.match(main, /mainWorkspace\.addEventListener\("pointerdown"/)
+  assert.match(main, /mainWorkspace\.setPointerCapture\(event\.pointerId\)/)
+  assert.match(main, /mobileSwipeStart\.pointerId !== event\.pointerId/)
+  assert.match(main, /Math\.abs\(deltaX\) < 56/)
+  assert.match(main, /sections\.length && mobilePortraitQuery\.matches\) setMobilePane\("inspector"\)/)
+  assert.match(css, /:has\(\.source :is\(input, textarea, select\):focus\) \.workspace\s*\{[^}]*opacity:\s*0/s)
+  assert.match(css, /@media \(max-width: 950px\) and \(max-height: 600px\) and \(orientation: landscape\)/)
+  assert.match(css, /grid-template-columns:\s*clamp\(116px, 18vw, 150px\)[^;]*clamp\(190px, 28vw, 240px\)/s)
+  assert.match(css, /\.preview-toolbar\s*\{[^}]*overflow-x:\s*auto/s)
+})
+
+test("mobile inspector merges its header, exposes light-bar pane controls, and groups fields in a side rail", () => {
+  assert.match(html, /id="mobile-inspector-selection"/)
+  assert.match(html, /id="mobile-inspector-groups"[^>]*aria-label="属性分组"/)
+  assert.match(main, /function syncMobileInspectorHeader\(\)/)
+  assert.match(main, /sourceHeading\.dataset\.mobileKeyTools = selectedKeySections\.length \? "on" : "off"/)
+  assert.match(main, /function syncMobileInspectorGroups\(\)/)
+  assert.match(main, /mobileInspectorGroupLabel\(group\)/)
+  assert.match(css, /\.mobile-workspace-tabs\s*\{\s*height:\s*18px/s)
+  assert.match(css, /\.mobile-workspace-tabs button\[data-mobile-pane\]::before\s*\{[^}]*height:\s*4px/s)
+  assert.match(css, /\.mobile-workspace-tabs button\[data-mobile-pane\]\.active::before\s*\{[^}]*box-shadow:/s)
+  assert.match(css, /#quick-inspector:not\(\[hidden\]\)\s*\{[^}]*grid-template-columns:\s*58px minmax\(0, 1fr\)/s)
+  assert.match(css, /#mobile-inspector-groups\s*\{[^}]*position:\s*sticky/s)
+  assert.match(css, /#quick-inspector > \.mobile-inspector-managed:not\(\.mobile-inspector-active\)\s*\{[^}]*display:\s*none !important/s)
+  assert.match(css, /\.source :is\(input, textarea, select\),\s*\.app-dialog :is\(input, textarea, select\)\s*\{\s*min-height:\s*36px/s)
+  assert.match(css, /\.source \.style-picker-trigger\s*\{\s*height:\s*58px/s)
+})
+
+test("mobile workspace exposes a draggable split handle for the preview and inspector", () => {
+  assert.match(html, /id="mobile-split-handle"[^>]*role="slider"[^>]*aria-valuemin="28"[^>]*aria-valuemax="72"[^>]*aria-label="拖动调整画布与配置区域比例"/)
+  assert.match(css, /\.mobile-split-handle\s*\{[\s\S]*touch-action:\s*none/s)
+  assert.match(css, /height:\s*var\(--mobile-workspace-split,\s*50%\)/)
+  assert.match(main, /function setMobileSplit\(value: number, persist = true\)/)
+  assert.match(main, /mobileSplitHandle\.addEventListener\("pointermove"/)
+  assert.match(main, /mobileSplitHandle\.addEventListener\("keydown"/)
+  assert.match(main, /localStorage\.setItem\("mobile-workspace-split"/)
+})
+
+test("mobile condenses desktop toolbar actions into a labeled menu", () => {
+  assert.match(html, /class="toolbar-more mobile-command-menu"[\s\S]*?data-mobile-command="new"[\s\S]*?>新建项目</)
+  assert.match(html, /data-mobile-command="mobile-share"[\s\S]*?>分享到其他应用</)
+  assert.match(html, /data-mobile-export-format="bdi"[\s\S]*?>导出 iOS 皮肤</)
+  assert.match(html, /class="mobile-quick-actions"[\s\S]*id="mobile-undo"[\s\S]*id="mobile-redo"/)
+  assert.match(html, /id="mobile-undo"[\s\S]*data-system-symbol="arrow\.uturn\.backward"/)
+  assert.match(html, /id="mobile-redo"[\s\S]*data-system-symbol="arrow\.uturn\.forward"/)
+  assert.match(main, /"arrow\.uturn\.backward":\s*\[/)
+  assert.match(main, /"arrow\.uturn\.forward":\s*\[/)
+  const mobileMenu = html.slice(html.indexOf('class="mobile-command-menu"'), html.indexOf('class="mobile-quick-actions"'))
+  assert.doesNotMatch(mobileMenu, /data-mobile-command="undo"|data-mobile-command="redo"/)
+  assert.match(main, /function mobileCommandTarget\(button: HTMLButtonElement\)/)
+  assert.match(main, /new MutationObserver\(syncMobileCommands\)\.observe/)
+  assert.match(main, /mobileUndoButton\.disabled = undoButton\.disabled/)
+  assert.match(main, /mobileRedoButton\.disabled = redoButton\.disabled/)
+  assert.match(css, /\.mobile-command-actions button\s*\{[^}]*min-height:\s*44px[^}]*grid-template-columns:\s*22px minmax\(0, 1fr\)/s)
+  assert.match(css, /\.mobile-quick-actions\s*\{\s*display:\s*none/s)
+  assert.match(css, /\.mobile-quick-actions\s*\{[^}]*display:\s*flex/s)
+  assert.match(css, /\.toolbar-button > span:not\(\.icon\):not\(\.system-symbol\)/)
+  assert.match(css, /\.toolbar-button \.system-symbol svg\s*\{[^}]*width:\s*18px[^}]*height:\s*18px/s)
+  assert.match(css, /\.mode-control > select,\s*\.preview-choice > select\s*\{\s*display:\s*none !important/s)
+})
+
+test("mobile two-way choices use one dual-icon toggle while desktop choices stay segmented", () => {
+  for (const [choice, first, second] of [
+    ["mode", "keyboard", "pencil"],
+    ["orientation", "rectangle.portrait", "rectangle.landscape"],
+    ["theme", "sun.max", "moon"],
+  ]) {
+    assert.match(html, new RegExp(`data-mobile-choice="${choice}"[\\s\\S]*data-system-symbol="${first.replaceAll(".", "\\.")}"[\\s\\S]*data-system-symbol="${second.replaceAll(".", "\\.")}"`))
+  }
+  assert.match(main, /const mobileChoiceButtons = Array\.from\(document\.querySelectorAll<HTMLButtonElement>\("\[data-mobile-choice\]"\)\)/)
+  assert.match(main, /const values: Record<string, string> = \{ mode: mode\.value, theme: theme\.value, orientation: orientation\.value \}/)
+  assert.match(main, /selectChoice\(select, next\)/)
+  assert.match(css, /\.mode-control > select,\s*\.preview-choice > select\s*\{\s*display:\s*none !important/s)
+  assert.match(css, /\.mode-control > \.mobile-choice-toggle,\s*\.preview-choice > \.mobile-choice-toggle\s*\{[^}]*display:\s*inline-flex !important/s)
+  assert.match(css, /\.mobile-choice-icon\.active\s*\{[^}]*opacity:\s*1/s)
+})
+
+test("mobile preview placement persists and skin files use the system share sheet", () => {
+  assert.match(html, /id="mobile-preview-position"[\s\S]*?value="bottom"[^>]*>下半区[\s\S]*?value="top">上半区/)
+  assert.match(main, /localStorage\.getItem\("mobile-preview-position"\)/)
+  assert.match(main, /dataset\.mobilePreviewPosition = mobilePreviewPosition\.value/)
+  assert.match(html, /id="mobile-share"[^>]*mobile-only-action[^>]*分享到百度输入法或其他应用/)
+  assert.match(main, /new File\(\[exported\.bytes\], name/)
+  assert.match(main, /navigator\.canShare\(\{ files: \[file\] \}\)/)
+  assert.match(main, /navigator\.share\(\{ title: name, files: \[file\] \}\)/)
+  assert.match(css, /\.mobile-only-action\s*\{\s*display:\s*none/s)
 })
 
 test("platform materials and toolbar status surfaces stay visually consistent", () => {

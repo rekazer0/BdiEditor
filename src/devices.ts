@@ -45,11 +45,10 @@ export function candidateBackgroundLogicalHeight(
   device: DeviceSpec | undefined,
   orientation: "port" | "land",
   contentHeight: number,
-  composing = false,
 ): number {
   if (orientation !== "port") return contentHeight
-  if (device?.family === "iphone") return contentHeight + (composing ? 95 : 66)
-  return contentHeight + (!device && composing ? 95 : 0)
+  if (device?.family === "iphone") return contentHeight + 66
+  return contentHeight
 }
 
 export function keyboardPreviewGeometry(
@@ -58,7 +57,6 @@ export function keyboardPreviewGeometry(
   skinWidth: number,
   panelLogicalHeight: number,
   candidateLogicalHeight: number,
-  composing = false,
 ): {
   candidateHeight: number
   candidateInsetHeight: number
@@ -75,7 +73,6 @@ export function keyboardPreviewGeometry(
     device,
     orientation,
     candidateLogicalHeight,
-    composing,
   )
   const candidateInsetLogicalHeight = candidateBackgroundHeight - candidateLogicalHeight
   const safeLogicalHeight = iphonePortrait

@@ -185,14 +185,14 @@ BDA 皮肤的按键几何/动作来源文件，与 `appearanceConfig` 并列。�
 
 ---
 
-## 8. 传统动画（`anim.ini` + `*_ANIM_STYLE`）**[未实现]**
+## 8. 传统动画（`anim.ini` + `*_ANIM_STYLE`）
 
 iOS/Android INI 皮肤支持按键帧动画：
 
 - `res/anim.ini` 描述动画段，字段（据官方解析器）：`[GLOBAL] ANIM_NUM`、`DURATION`、`ANIMATION_DIRECTION`、`INIT_SCALE`、`SCALE_SPEED`、`INIT_ROTATE`、`ROTATE_SPEED`；
 - 按键/提示条上的 `BACK_ANIM_STYLE`、`FORE_ANIM_STYLE`、`ANIM_STYLE` 引用动画样式。
 
-编辑器当前只渲染静态帧（正常/按下/状态覆盖），不播放帧动画；`anim.ini` 与 `*_ANIM_STYLE` 字段必须解析保留，等待真实动画样本补齐后实现。
+编辑器在交互预览中按皮肤配置播放 `TYPE=0` 透明度、`TYPE=2` 位移、`TYPE=3/4` 缩放动画；`BUILD_LIST` 默认顺序播放，明确配置 `BUILD_METHOD=0` 时并行组合。`BACK_ANIM_STYLE`、逐层 `FORE_ANIM_STYLE` 和动态整键 `ANIM_STYLE` 分别作用于对应渲染层。`ANIM_PATH` 外部动画资源目前只解析保留，不自行生成替代效果。
 
 ---
 
