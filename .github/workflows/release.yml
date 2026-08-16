@@ -115,23 +115,38 @@ jobs:
       - name: Configure APK signing
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           test -n "$ANDROID_KEYSTORE_BASE64"
-          test -n "$ANDROID_KEYSTORE_PASSWORD"
-          test -n "$ANDROID_KEY_ALIAS"
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/android-release.jks"
+          node <<'NODE'
+          const fs = require("node:fs")
+          const path = "src-tauri/gen/android/app/build.gradle.kts"
+          let gradle = fs.readFileSync(path, "utf8")
+          const replacements = [
+            ["    buildTypes {\n", `    signingConfigs {
+                  create("release") {
+                      storeFile = file(System.getenv("ANDROID_KEYSTORE_FILE"))
+                      storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                      keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                      keyPassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                  }
+              }
+              buildTypes {
+          `],
+            ["        getByName(\"release\") {\n", "        getByName(\"release\") {\n            signingConfig = signingConfigs.getByName(\"release\")\n"]
+          ]
+          for (const [before, after] of replacements) {
+            if (!gradle.includes(before)) throw new Error(`Missing Gradle marker: ${before}`)
+            gradle = gradle.replace(before, after)
+          }
+          fs.writeFileSync(path, gradle)
+          NODE
       - name: Build signed APK
         env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/android-release.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-        run: |
-          NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION" npm run tauri -- android build --apk --ci -- \
-            "-Pandroid.injected.signing.store.file=$RUNNER_TEMP/android-release.jks" \
-            "-Pandroid.injected.signing.store.password=$ANDROID_KEYSTORE_PASSWORD" \
-            "-Pandroid.injected.signing.key.alias=$ANDROID_KEY_ALIAS" \
-            "-Pandroid.injected.signing.key.password=$ANDROID_KEYSTORE_PASSWORD"
+        run: NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION" npm run tauri -- android build --apk --ci
       - name: Upload APK
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
