@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { gestureDirection, rectToString } from "../src/layout.ts"
 import { IniDocument } from "../src/ini.ts"
-import { animationSequenceForKey, effectivePreviewItem, foregroundTextPoint, isAdditiveSelection, isTouchLongPress, legacyAnimationOpacity, legacyAnimationScale, legacyAnimationTranslation, offsetFromSection, parseLegacyAnimation, previewBackground, previewFallbackText, previewHitRect, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawItemBackground } from "../src/preview.ts"
+import { animationSequenceForKey, effectivePreviewItem, foregroundTextPoint, isAdditiveSelection, isTouchLongPress, legacyAnimationOpacity, legacyAnimationScale, legacyAnimationTranslation, offsetFromSection, parseLegacyAnimation, Preview, previewBackground, previewFallbackText, previewHitRect, previewItems, previewSelectionVisible, previewStateActive, previewSurfaceColor, shouldDrawItemBackground, visiblePreviewItems, type PreviewEvent } from "../src/preview.ts"
 
 test("classifies click, hold and directional gestures", () => {
   assert.equal(gestureDirection(2, 3, 100, true), "center")
@@ -100,6 +100,82 @@ test("activates a key only when its official STAT_STYLE contains the selected S 
   assert.equal(previewStateActive(item, 17), true)
   assert.equal(previewStateActive(item, 4), false)
   assert.equal(previewStateActive(item, undefined), false)
+})
+
+test("renders one logical key from a state key and its fallback alias", () => {
+  const items = previewItems(IniDocument.parse(
+    "[KEY1]\nVIEW_RECT=0,0,100,100\nSHOW=a\nCENTER=a\nSTAT_STYLE=S0_1|S4_2\n" +
+    "[KEY2]\nVIEW_RECT=0,0,100,100\nSHOW=a\nCENTER=a\n",
+  ))
+
+  const defaultKeys = visiblePreviewItems(items)
+  assert.deepEqual(defaultKeys.map((item) => item.section), ["KEY1"])
+  assert.deepEqual(defaultKeys[0].sections, ["KEY1", "KEY2"])
+  assert.deepEqual(visiblePreviewItems(items, 4).map((item) => item.section), ["KEY1"])
+  assert.deepEqual(visiblePreviewItems(items, 7).map((item) => item.section), ["KEY2"])
+})
+
+test("preview pointer events hit the active state key instead of its overlapping fallback", () => {
+  const document = IniDocument.parse(
+    "[KEY1]\nVIEW_RECT=0,0,1080,595\n" +
+    "[KEY9]\nVIEW_RECT=662,296,247,149\nSHOW=9\nCENTER=x\nSTAT_STYLE=S4_12|S0_1\n" +
+    "[KEY29]\nVIEW_RECT=662,296,247,149\nSHOW=9\nCENTER=x\n",
+  )
+  const canvas = {
+    width: 1080,
+    height: 595,
+    style: { cursor: "" },
+    addEventListener: () => {},
+    setPointerCapture: () => {},
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 1080, height: 595 }),
+  } as unknown as HTMLCanvasElement
+  const events: PreviewEvent[] = []
+  const preview = new Preview(canvas, (event) => events.push(event), () => {}) as unknown as {
+    keys: ReturnType<typeof previewItems>
+    skinState?: number
+    mode: "preview"
+    draw: () => Promise<void>
+    playAnimation: () => Promise<void>
+    pointerDown: (event: PointerEvent) => void
+    pointerUp: (event: PointerEvent) => void
+  }
+  preview.keys = previewItems(document, 1080, 595)
+  preview.mode = "preview"
+  preview.draw = async () => {}
+  preview.playAnimation = async () => {}
+  const pointer = {
+    clientX: 785.5,
+    clientY: 370.5,
+    pointerId: 1,
+    pointerType: "mouse",
+    metaKey: false,
+    ctrlKey: false,
+    shiftKey: false,
+  } as PointerEvent
+
+  for (const [state, section] of [[undefined, "KEY9"], [4, "KEY9"], [8, "KEY29"]] as const) {
+    preview.skinState = state
+    preview.pointerDown(pointer)
+    preview.pointerUp(pointer)
+    assert.equal(events.at(-1)?.section, section)
+    assert.equal(events.at(-1)?.code, "x")
+  }
+})
+
+test("does not merge ordinary keys that happen to share actions", () => {
+  const items = previewItems(IniDocument.parse(
+    "[KEY1]\nVIEW_RECT=0,0,100,100\nSHOW=a\nCENTER=a\n" +
+    "[KEY2]\nVIEW_RECT=0,0,100,100\nSHOW=a\nCENTER=a\n",
+  ))
+  assert.deepEqual(visiblePreviewItems(items).map((item) => item.section), ["KEY1", "KEY2"])
+})
+
+test("uses S0 TIP styling for the default keyboard state", () => {
+  const document = IniDocument.parse(
+    "[KEY1]\nVIEW_RECT=0,0,100,100\nBACK_STYLE=1\nSTAT_STYLE=S0_3\n" +
+    "[TIP3]\nBACK_STYLE=9\n",
+  )
+  assert.equal(effectivePreviewItem(document, previewItems(document)[0], 0).backStyle, "9")
 })
 
 test("resolves a matching TIP section without changing absent properties", async () => {

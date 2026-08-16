@@ -5,7 +5,13 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { getCurrentWebview } from "@tauri-apps/api/webview"
 import { message, open } from "@tauri-apps/plugin-dialog"
 import "./style.css"
-import { actionDescription, previewPageTransition, previewStateFromAction, shouldSuggestActionCodes } from "./actions.ts"
+import {
+  actionDescription,
+  isConfiguredSymbolLayout,
+  previewPageTransition,
+  previewStateFromAction,
+  shouldSuggestActionCodes,
+} from "./actions.ts"
 import {
   AtlasResolver,
   canvasFontFamily,
@@ -505,12 +511,17 @@ const preview = new Preview(
     scrollSelectedSource()
   },
   false,
-  (_sections, deltaX, deltaY) => moveSelectedKeys(deltaX, deltaY),
+  (sections, deltaX, deltaY) => moveSelectedKeys(deltaX, deltaY, sections),
 )
 
 const toolbarPreview = new Preview(toolbarCanvas, () => {}, () => {}, true)
 const candidateBackgroundPreview = new Preview(candidateBackgroundCanvas, () => {}, () => {})
-let activeKeyboardGeometry: { panelWidth: number; panelHeight: number; candidateHeight: number } | undefined
+let activeKeyboardGeometry: {
+  panelWidth: number
+  panelHeight: number
+  candidateHeight: number
+  candidateInputHeight: number
+} | undefined
 
 function applySkinState(state?: number, message?: string): void {
   skinState.value = state === undefined ? "" : String(state)
@@ -690,7 +701,8 @@ function copySelectedKeys(): void {
     return value ? [Number(value)] : []
   })) + 1
   const copies: string[] = []
-  for (const section of selectedKeySections) {
+  const copyBySource = new Map<string, string>()
+  for (const section of preview.expandSections(selectedKeySections)) {
     while (occupied.has(`KEY${number}`)) number += 1
     const target = `KEY${number++}`
     const entries = layoutDocument.entries(section).map(({ key, value }) => {
@@ -702,11 +714,15 @@ function copySelectedKeys(): void {
     layoutDocument.appendSection(target, entries)
     occupied.add(target)
     copies.push(target)
+    copyBySource.set(section, target)
   }
   const text = layoutDocument.toString()
   commitText(layoutPath, before, text)
   if (selectedPath === layoutPath) setSourceValue(text)
-  selectedKeySections = copies
+  selectedKeySections = selectedKeySections.flatMap((section) => {
+    const copy = copyBySource.get(section)
+    return copy ? [copy] : []
+  })
   preview.setDocument(layoutDocument)
   preview.setSelected(copies)
   populateKeyInspector()
@@ -717,7 +733,7 @@ function copySelectedKeys(): void {
 function deleteSelectedKeys(): void {
   if (!archive || !layoutDocument || !selectedKeySections.length) return
   const before = layoutDocument.toString()
-  if (!layoutDocument.removeSections(selectedKeySections)) return
+  if (!layoutDocument.removeSections(preview.expandSections(selectedKeySections))) return
   const text = layoutDocument.toString()
   commitText(layoutPath, before, text)
   if (selectedPath === layoutPath) setSourceValue(text)
@@ -1326,7 +1342,9 @@ function renderCandidateState(): boolean {
 
 function refreshSimulationState(): boolean {
   const composing = renderCandidateState()
-  toolbarStrip.hidden = composing || !toolbarStrip.dataset.path
+  const symbolPanel = isConfiguredSymbolLayout(layoutPath, textDocument(genConfigPath()))
+  candidateArea.hidden = symbolPanel
+  toolbarStrip.hidden = symbolPanel || composing || !toolbarStrip.dataset.path
   return composing
 }
 
@@ -1334,6 +1352,7 @@ function applyDeviceKeyboardGeometry(
   panelWidth: number,
   panelHeight: number,
   candidateHeight: number,
+  candidateInputHeight: number,
 ): void {
   const spec = deviceSpec(device.value)
   if (!spec) {
@@ -1346,6 +1365,7 @@ function applyDeviceKeyboardGeometry(
     panelWidth,
     panelHeight,
     candidateHeight,
+    candidateInputHeight,
   )
   const screenHeight = orientation.value === "port" ? spec.height : spec.width
   deviceShell.style.setProperty(
@@ -1438,12 +1458,15 @@ function refreshPreview(): void {
     }
     preview.setPanel(config.styleID, config.width, config.height)
     updatePanelTools(config.width, config.height, toolbarSize?.height)
+    const candidateHeight = toolbarSize?.height ?? 0
+    const candidateInputHeight = toolbarSize?.inputHeight ?? 0
     activeKeyboardGeometry = {
       panelWidth: config.width,
       panelHeight: config.height,
-      candidateHeight: toolbarSize?.height ?? 0,
+      candidateHeight,
+      candidateInputHeight,
     }
-    applyDeviceKeyboardGeometry(config.width, config.height, toolbarSize?.height ?? 0)
+    applyDeviceKeyboardGeometry(config.width, config.height, candidateHeight, candidateInputHeight)
   } else if (bdaGen && layoutDocument) {
     const size = bdaGen.get("PANEL", "SIZE")?.split(",").map(Number)
     const panelWidth = size?.[0] || 1080
@@ -1471,12 +1494,15 @@ function refreshPreview(): void {
       panelHeight,
     )
     updatePanelTools(panelWidth, panelHeight, toolbarSize?.height)
+    const candidateHeight = toolbarSize?.height ?? 0
+    const candidateInputHeight = toolbarSize?.inputHeight ?? 0
     activeKeyboardGeometry = {
       panelWidth,
       panelHeight,
-      candidateHeight: toolbarSize?.height ?? 0,
+      candidateHeight,
+      candidateInputHeight,
     }
-    applyDeviceKeyboardGeometry(panelWidth, panelHeight, toolbarSize?.height ?? 0)
+    applyDeviceKeyboardGeometry(panelWidth, panelHeight, candidateHeight, candidateInputHeight)
   } else {
     activeKeyboardGeometry = undefined
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
@@ -1491,18 +1517,25 @@ function refreshSimulationPreview(): void {
     activeKeyboardGeometry.panelWidth,
     activeKeyboardGeometry.panelHeight,
     activeKeyboardGeometry.candidateHeight,
+    activeKeyboardGeometry.candidateInputHeight,
   )
   updateCanvasCandidateGeometry(activeKeyboardGeometry.candidateHeight)
   const resolver = visualResolver()
   if (!resolver) return
   const toolbarSize = refreshToolbarPreview(composing, resolver)
   const candidateHeight = toolbarSize?.height ?? activeKeyboardGeometry.candidateHeight
-  if (candidateHeight !== activeKeyboardGeometry.candidateHeight) {
+  const candidateInputHeight = toolbarSize?.inputHeight ?? activeKeyboardGeometry.candidateInputHeight
+  if (
+    candidateHeight !== activeKeyboardGeometry.candidateHeight ||
+    candidateInputHeight !== activeKeyboardGeometry.candidateInputHeight
+  ) {
     activeKeyboardGeometry.candidateHeight = candidateHeight
+    activeKeyboardGeometry.candidateInputHeight = candidateInputHeight
     applyDeviceKeyboardGeometry(
       activeKeyboardGeometry.panelWidth,
       activeKeyboardGeometry.panelHeight,
       candidateHeight,
+      candidateInputHeight,
     )
     updateCanvasCandidateGeometry(candidateHeight)
   }
@@ -1540,7 +1573,9 @@ function fitCanvasPreview(): void {
   const toolbarWidth = Number(toolbarCanvas.style.getPropertyValue("--toolbar-width") || "0")
   if (toolbarWidth > 0 && toolbarHeight > 0) {
     deviceShell.style.setProperty("--toolbar-viewport-height", `${Math.round(toolbarHeight * scale)}px`)
-    const inputHeight = candidateComposition.hidden ? 0 : 95
+    const inputHeight = candidateComposition.hidden
+      ? 0
+      : Number(toolbarCanvas.style.getPropertyValue("--candidate-input-height") || "0")
     deviceShell.style.setProperty("--candidate-input-height", `${Math.round(inputHeight * scale)}px`)
     deviceShell.style.setProperty(
       "--candidate-viewport-height",
@@ -2014,7 +2049,12 @@ function adaptArchiveForIos26(): boolean {
     for (const path of archive.names().filter((path) => path.startsWith(`${directory}/`) && /\.ini$/i.test(path))) {
       if (!archive.isText(path)) continue
       const name = path.slice(directory.length + 1)
-      staged.set(path, adaptIos26KeyboardLayout(name, text(path), adapted.panelStyle))
+      staged.set(path, adaptIos26KeyboardLayout(
+        name,
+        text(path),
+        adapted.panelStyle,
+        gen.get("MORE", "SYM_LAYOUT") ?? "symbol",
+      ))
     }
   }
   const changes: Change[] = [...staged].flatMap(([path, after]) => {
@@ -2839,7 +2879,11 @@ function candidateCssLength(value: string | undefined, width: number): string | 
   return Number.isFinite(number) ? `${(number / width) * 100}cqw` : undefined
 }
 
-function applyCandidateGeometry(document: IniDocument, width: number): void {
+function applyCandidateGeometry(
+  document: IniDocument,
+  general: IniDocument | undefined,
+  width: number,
+): void {
   const padding = document.get("CAND", "PADDING")?.split(",").map((value) => candidateCssLength(value, width))
   if (padding?.every(Boolean)) {
     const css = padding.length === 4
@@ -2862,12 +2906,22 @@ function applyCandidateGeometry(document: IniDocument, width: number): void {
   else candidateArea.style.removeProperty("--candidate-cell-width")
   if (moreWidth) candidateArea.style.setProperty("--candidate-more-width", moreWidth)
   else candidateArea.style.removeProperty("--candidate-more-width")
+  const inputPadding = general?.get("SCAND", "PADDING")?.split(",")
+  const inputLeading = candidateCssLength(inputPadding?.[0], width) ?? firstGap
+  if (inputLeading) candidateArea.style.setProperty("--candidate-input-leading", inputLeading)
+  else candidateArea.style.removeProperty("--candidate-input-leading")
 }
 
 function refreshToolbarPreview(
   composing: boolean,
   resolver: VisualResolver,
-): { width: number; height: number } | undefined {
+): { width: number; height: number; inputHeight: number } | undefined {
+  if (isConfiguredSymbolLayout(layoutPath, textDocument(genConfigPath()))) {
+    delete toolbarStrip.dataset.path
+    toolbarStrip.hidden = true
+    candidateBackgroundCanvas.hidden = true
+    return
+  }
   const path = toolbarConfigPath()
   const document = path ? textDocument(path) : undefined
   if (!archive || !path || !document) {
@@ -2887,6 +2941,8 @@ function refreshToolbarPreview(
   toolbarPreview.setTransparent(true)
   const width = size?.length === 4 && Number.isFinite(size[2]) ? size[2] : 1125
   const height = size?.length === 4 && Number.isFinite(size[3]) ? size[3] : 133
+  const inputStyle = gen?.get("SCAND", "BACK_STYLE")?.split(",")[0] ?? ""
+  const inputHeight = resolver.sourceSize?.(inputStyle, false)?.height ?? height
   const backgroundStyle = document.get("CAND", "BACK_STYLE")?.split(",")[0] ?? ""
   candidateBackgroundCanvas.hidden = false
   candidateBackgroundPreview.setResolver(resolver)
@@ -2895,18 +2951,19 @@ function refreshToolbarPreview(
   candidateBackgroundPreview.setPanel(
     backgroundStyle,
     width,
-    candidateBackgroundLogicalHeight(deviceSpec(device.value), orientation.value, height),
+    candidateBackgroundLogicalHeight(height, composing ? inputHeight : 0),
   )
   candidateBackgroundPreview.setDocument(undefined)
   toolbarCanvas.style.setProperty("--toolbar-width", String(width))
   toolbarCanvas.style.setProperty("--toolbar-height", String(height))
-  applyCandidateGeometry(document, width)
+  toolbarCanvas.style.setProperty("--candidate-input-height", String(inputHeight))
+  applyCandidateGeometry(document, gen, width)
   const toolbarDocument = IniDocument.parse(document.toString())
   toolbarDocument.set("CAND", "BACK_STYLE", "")
   toolbarPreview.setPanel("", width, height)
   toolbarPreview.setDocument(toolbarDocument)
   toolbarPreview.setMode("preview")
-  return { width, height }
+  return { width, height, inputHeight }
 }
 
 function commonSelectedStyle(name: "BACK_STYLE" | "FORE_STYLE"): string | undefined {
@@ -3725,7 +3782,7 @@ function updateSelectedKey(field: HTMLInputElement): void {
   }
   const before = layoutDocument.toString()
   const rectIndex = rectNames.indexOf(name)
-  for (const section of selectedKeySections) {
+  for (const section of preview.expandSections(selectedKeySections)) {
     if (rectIndex >= 0) {
       const rect = layoutDocument.get(section, "VIEW_RECT")?.split(",").map(Number)
       const value = Number(field.value)
@@ -4120,9 +4177,18 @@ function applyExactGap(field: HTMLInputElement): void {
   updateDirty()
 }
 
-function moveSelectedKeys(deltaX: number, deltaY: number): void {
+function moveSelectedKeys(
+  deltaX: number,
+  deltaY: number,
+  sections: readonly string[] = selectedKeySections,
+): void {
   if (!archive || !layoutDocument) return
-  const rects = moveRects(selectedRects().filter((rect) => !isListCell(rect.section)), deltaX, deltaY)
+  const rects = moveRects(sections.flatMap((section) => {
+    const values = layoutDocument?.get(section, "VIEW_RECT")?.split(",").map(Number)
+    if (!values || values.length !== 4 || values.some((value) => !Number.isFinite(value))) return []
+    const [x, y, width, height] = values
+    return [{ section, x, y, width, height }]
+  }), deltaX, deltaY)
   if (!rects.length) return
   const before = layoutDocument.toString()
   for (const rect of rects) {

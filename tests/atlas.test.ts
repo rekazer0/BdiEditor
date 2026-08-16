@@ -146,9 +146,11 @@ test("atlas resolver exposes the resolved resource path and tile source rectangl
     value: async () => ({ width: 64, height: 64 }),
   })
   try {
-    const visual = await new AtlasResolver(archive, "light", "port").resolve("211", false)
+    const resolver = new AtlasResolver(archive, "light", "port")
+    const visual = await resolver.resolve("211", false)
     assert.equal(visual?.imagePath, "light/skin/res/btn.png")
     assert.deepEqual(visual?.source, [10, 20, 30, 40])
+    assert.deepEqual(resolver.sourceSize("211", false), { width: 30, height: 40 })
   } finally {
     Object.defineProperty(globalThis, "createImageBitmap", {
       configurable: true,

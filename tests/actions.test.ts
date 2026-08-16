@@ -1,6 +1,12 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { actionDescription, previewPageTarget, previewPageTransition, shouldSuggestActionCodes } from "../src/actions.ts"
+import {
+  actionDescription,
+  isConfiguredSymbolLayout,
+  previewPageTarget,
+  previewPageTransition,
+  shouldSuggestActionCodes,
+} from "../src/actions.ts"
 import { IniDocument } from "../src/ini.ts"
 
 test("preview page resolves explicit and supported keyboard actions", () => {
@@ -28,6 +34,14 @@ test("preview page returns to the keyboard layout that opened a transient page",
     target: "py_26.ini",
     returnName: "py_26.ini",
   })
+})
+
+test("recognizes the full keyboard symbol panel from general configuration", () => {
+  const general = IniDocument.parse("[MORE]\nSYM_LAYOUT=punctuation\n")
+
+  assert.equal(isConfiguredSymbolLayout("light/skin/port/punctuation.ini", general), true)
+  assert.equal(isConfiguredSymbolLayout("light/skin/port/symbol.ini", general), false)
+  assert.equal(isConfiguredSymbolLayout("light/skin/port/symbol.ini", undefined), true)
 })
 
 test("parses only supported S0-S99 preview state actions", async () => {

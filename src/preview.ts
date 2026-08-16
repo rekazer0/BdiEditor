@@ -13,6 +13,7 @@ export type PreviewEvent = {
 type Rect = { x: number; y: number; width: number; height: number }
 export type PreviewItem = {
   section: string
+  sections: string[]
   rect: Rect
   touchRect?: Rect
   foreRect?: Rect
@@ -206,6 +207,47 @@ export function previewStateActive(item: PreviewItem, state: number | undefined)
   return state !== undefined && stateStyleValue(item.statStyle, state) !== undefined
 }
 
+function duplicateKeySignature(item: PreviewItem): string | undefined {
+  if (!item.editable || !/^KEY\d+$/i.test(item.section)) return
+  const actions = [item.show, item.center, item.up, item.down, item.left, item.right, item.hold]
+  if (!actions.some(Boolean)) return
+  return [item.rect.x, item.rect.y, item.rect.width, item.rect.height, ...actions].join("\u0000")
+}
+
+export function visiblePreviewItems(
+  items: readonly PreviewItem[],
+  state?: number,
+): PreviewItem[] {
+  const groups = new Map<string, PreviewItem[]>()
+  for (const item of items) {
+    const signature = duplicateKeySignature(item)
+    if (signature) groups.set(signature, [...(groups.get(signature) ?? []), item])
+  }
+  const handled = new Set<PreviewItem>()
+  const visible: PreviewItem[] = []
+  for (const item of items) {
+    if (handled.has(item)) continue
+    const signature = duplicateKeySignature(item)
+    const group = signature ? groups.get(signature) ?? [item] : [item]
+    const stateGroup = group.filter((candidate) => candidate.statStyle)
+    const fallbackGroup = group.filter((candidate) => !candidate.statStyle)
+    if (stateGroup.length && fallbackGroup.length) {
+      group.forEach((candidate) => handled.add(candidate))
+      const selected = stateGroup.find((candidate) =>
+        stateStyleValue(candidate.statStyle, state ?? 0) !== undefined
+      ) ?? fallbackGroup[0] ?? stateGroup[0]
+      visible.push({
+        ...selected,
+        sections: group.flatMap((candidate) => candidate.sections),
+      })
+    } else {
+      handled.add(item)
+      visible.push(item)
+    }
+  }
+  return visible
+}
+
 export function effectivePreviewItem(
   document: IniDocument,
   item: PreviewItem,
@@ -359,6 +401,7 @@ function itemFromSection(document: IniDocument, section: string): PreviewItem | 
   const foreStyles = value("FORE_STYLE").split(",").map((token) => token.trim()).filter(Boolean)
   return {
     section,
+    sections: [section],
     rect,
     touchRect: parseRect(document.get(section, "TOUCH_RECT")),
     editable: true,
@@ -397,6 +440,7 @@ function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[]
   // 每个标点只负责文字渲染，不可单独选中
   const cells: PreviewItem[] = names.slice(0, count).map((show, index) => ({
     section: `LIST:${index + 1}`,
+    sections: [`LIST:${index + 1}`],
     rect: {
       x: position[0],
       y: position[1] + index * cell[1],
@@ -422,6 +466,7 @@ function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[]
   // 整个候选栏是一个可选中按钮
   const bar: PreviewItem = {
     section: "LIST",
+    sections: ["LIST"],
     rect: {
       x: position[0],
       y: position[1],
@@ -530,6 +575,7 @@ export function previewItems(
     const value = (name: string) => document.get(section, name) ?? ""
     return [{
       section,
+      sections: [section],
       rect: { x, y, width, height },
       foreRect,
       editable: false,
@@ -718,6 +764,13 @@ export class Preview {
     void this.draw()
   }
 
+  expandSections(sections: readonly string[]): string[] {
+    const requested = new Set(sections)
+    return visiblePreviewItems(this.keys, this.skinState).flatMap((item) =>
+      item.sections.some((section) => requested.has(section)) ? item.sections : []
+    )
+  }
+
   setAnimation(animation?: BdaAnimation): void {
     this.animation = animation
     this.animationVisual = undefined
@@ -759,7 +812,7 @@ export class Preview {
   }
 
   private hit(point: { x: number; y: number }): PreviewItem | undefined {
-    return [...this.keys].reverse().find((item) => {
+    return [...visiblePreviewItems(this.keys, this.skinState)].reverse().find((item) => {
       const target = previewHitRect(item, this.mode)
       return (
         item.editable &&
@@ -769,6 +822,10 @@ export class Preview {
         point.y <= target.y + target.height
       )
     })
+  }
+
+  private itemSelected(item: PreviewItem): boolean {
+    return item.sections.some((section) => this.selected.has(section))
   }
 
   private pointerDown(event: PointerEvent): void {
@@ -811,7 +868,12 @@ export class Preview {
     this.selectKey(key, event)
     if (this.mode === "edit") {
       if (this.editTool === "move" && !key.section.startsWith("LIST")) {
-        const selectedKeys = this.keys.filter((item) => this.selected.has(item.section) && !item.section.startsWith("LIST"))
+        const selectedSections = new Set(
+          visiblePreviewItems(this.keys, this.skinState)
+            .filter((item) => this.itemSelected(item) && !item.section.startsWith("LIST"))
+            .flatMap((item) => item.sections),
+        )
+        const selectedKeys = this.keys.filter((item) => selectedSections.has(item.section))
         this.editDrag = {
           pointerId: event.pointerId,
           startX: point.x,
@@ -841,19 +903,20 @@ export class Preview {
     event: Pick<PointerEvent, "metaKey" | "ctrlKey" | "shiftKey">,
   ): void {
     if (this.mode === "edit" && event.shiftKey && this.selectionAnchor) {
-      const sections = this.keys.filter((item) => item.editable).map((item) => item.section)
+      const sections = visiblePreviewItems(this.keys, this.skinState)
+        .filter((item) => item.editable).map((item) => item.section)
       const from = sections.indexOf(this.selectionAnchor)
       const to = sections.indexOf(key.section)
       if (from >= 0 && to >= 0) {
         this.selected = new Set(sections.slice(Math.min(from, to), Math.max(from, to) + 1))
       }
     } else if (this.mode === "edit" && isAdditiveSelection(event)) {
-      if (this.selected.has(key.section)) this.selected.delete(key.section)
+      if (this.itemSelected(key)) key.sections.forEach((section) => this.selected.delete(section))
       else this.selected.add(key.section)
-    } else if (!this.selected.has(key.section) || this.mode === "preview") {
+    } else if (!this.itemSelected(key) || this.mode === "preview") {
       this.selected = new Set([key.section])
     } else if (this.mode === "edit" && this.editTool === "select") {
-      this.selected.delete(key.section)
+      key.sections.forEach((section) => this.selected.delete(section))
     }
     if (this.mobileMultiSelect && !this.selected.size) this.mobileMultiSelect = false
     if (this.mode === "edit" && !event.shiftKey) this.selectionAnchor = key.section
@@ -944,12 +1007,15 @@ export class Preview {
       return
     }
     if (this.editDrag?.pointerId === event.pointerId) {
+      const drag = this.editDrag
       const point = this.point(event)
-      const dx = point.x - this.editDrag.startX
-      const dy = point.y - this.editDrag.startY
+      const dx = point.x - drag.startX
+      const dy = point.y - drag.startY
       this.editDrag = undefined
       this.updateCursor()
-      if (Math.round(dx) || Math.round(dy)) this.onMove([...this.selected], Math.round(dx), Math.round(dy))
+      if (Math.round(dx) || Math.round(dy)) {
+        this.onMove([...drag.original.keys()], Math.round(dx), Math.round(dy))
+      }
       else void this.draw()
       return
     }
@@ -1140,8 +1206,8 @@ export class Preview {
 
   private async draw(): Promise<void> {
     const drawID = ++this.drawID
-    const keys = this.keys.map((key) =>
-      this.document ? effectivePreviewItem(this.document, key, this.skinState) : key,
+    const keys = visiblePreviewItems(this.keys, this.skinState).map((key) =>
+      this.document ? effectivePreviewItem(this.document, key, this.skinState ?? 0) : key,
     )
     const [panel, visuals, toolbarImages] = await Promise.all([
       this.resolver?.resolve(this.panelStyle, false),
@@ -1181,7 +1247,7 @@ export class Preview {
 
     for (const [index, key] of keys.entries()) {
       const active = this.active?.key.section === key.section
-      const selected = previewSelectionVisible(this.mode, this.selected.has(key.section))
+      const selected = previewSelectionVisible(this.mode, this.itemSelected(key))
       const animationElapsed = this.legacyAnimationState?.key.section === key.section
         ? Date.now() - this.legacyAnimationState.startedAt
         : -1
@@ -1308,8 +1374,8 @@ export class Preview {
       context.font = "15px system-ui"
       context.textAlign = "left"
       context.textBaseline = "top"
-      for (const key of this.keys) {
-        context.strokeStyle = this.selected.has(key.section) ? "#087ff5" : "#ef3e52"
+      for (const key of visiblePreviewItems(this.keys, this.skinState)) {
+        context.strokeStyle = this.itemSelected(key) ? "#087ff5" : "#ef3e52"
         context.fillStyle = context.strokeStyle
         context.strokeRect(key.rect.x + 0.75, key.rect.y + 0.75, key.rect.width - 1.5, key.rect.height - 1.5)
         context.fillText(key.section, key.rect.x + 4, key.rect.y + 4)

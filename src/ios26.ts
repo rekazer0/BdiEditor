@@ -49,8 +49,17 @@ export function adaptIos26Variant(candidateText: string, generalText: string, st
   }
 }
 
-export function adaptIos26KeyboardLayout(name: string, text: string, panelStyle: string): string {
-  if (!/^(?:(?:py|def|en|num|tool)_.+|bh|hw_(?:full|grid))\.ini$/i.test(name)) return text
+export function adaptIos26KeyboardLayout(
+  name: string,
+  text: string,
+  panelStyle: string,
+  symbolLayoutName = "symbol",
+): string {
+  const symbolName = `${symbolLayoutName.replace(/\.ini$/i, "")}.ini`
+  if (
+    !/^(?:(?:py|def|en|num|tool)_.+|bh|hw_(?:full|grid))\.ini$/i.test(name) &&
+    name.toLowerCase() !== symbolName.toLowerCase()
+  ) return text
   const layout = IniDocument.parse(text)
   layout.set("PANEL", "BACK_STYLE", panelStyle)
   return layout.toString()

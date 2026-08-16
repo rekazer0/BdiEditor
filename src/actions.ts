@@ -47,6 +47,14 @@ export function previewStateFromAction(code: string): number | undefined {
   return state <= 99 ? state : undefined
 }
 
+export function isConfiguredSymbolLayout(path: string, general: IniDocument | undefined): boolean {
+  const current = path.split("/").pop()?.replace(/\.ini$/i, "").toLowerCase()
+  const configured = (general?.get("MORE", "SYM_LAYOUT")?.trim() || "symbol")
+    .replace(/\.ini$/i, "")
+    .toLowerCase()
+  return Boolean(current && current === configured)
+}
+
 export function previewPageTarget(
   code: string,
   currentName: string,

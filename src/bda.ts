@@ -394,6 +394,12 @@ function pngBlob(bytes: Uint8Array): Blob {
   return new Blob([copy.buffer], { type: "image/png" })
 }
 
+function pngSize(bytes: Uint8Array): { width: number; height: number } | undefined {
+  if (bytes.length < 24 || bytes[0] !== 0x89 || bytes[1] !== 0x50 || bytes[2] !== 0x4e || bytes[3] !== 0x47) return
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  return { width: view.getUint32(16), height: view.getUint32(20) }
+}
+
 export class BdaResolver implements VisualResolver {
   private readonly appearance: BdaAppearance
   private readonly images = new Map<string, Promise<ImageBitmap>>()
@@ -437,6 +443,20 @@ export class BdaResolver implements VisualResolver {
       this.images.set(path, image)
     }
     return image
+  }
+
+  sourceSize(styleID: string, highlighted: boolean): { width: number; height: number } | undefined {
+    const rawKey = Number(styleID)
+    const ref = bdaStyleRef(styleID) ?? (
+      Number.isInteger(rawKey) && this.appearance.imageStyles.has(rawKey)
+        ? { type: "image" as const, key: rawKey }
+        : undefined
+    )
+    if (ref?.type !== "image") return
+    const style = this.appearance.imageStyles.get(ref.key)
+    const atom = highlighted ? style?.highlightImage ?? style?.normalImage : style?.normalImage
+    const found = atom?.resource?.resourceID ? this.resource(atom.resource.resourceID) : undefined
+    return found ? pngSize(found.archive.getBytes(found.path)!) : undefined
   }
 
   async resolve(styleID: string, highlighted: boolean): Promise<Visual | undefined> {

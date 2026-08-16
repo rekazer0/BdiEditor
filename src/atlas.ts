@@ -24,6 +24,7 @@ export type StyleTextVisual = TextVisual & { text: string }
 
 export type VisualResolver = {
   resolve(styleID: string, highlighted: boolean): Promise<Visual | undefined>
+  sourceSize?(styleID: string, highlighted: boolean): { width: number; height: number } | undefined
   resolveResource?(resourceID: string): Promise<Visual | undefined>
   resolveText(foreground: string, highlighted: boolean): TextVisual | undefined
   resolveStyleText?(styleID: string, highlighted: boolean): StyleTextVisual | undefined
@@ -229,6 +230,23 @@ export class AtlasResolver {
       this.images.set(path, image)
     }
     return image
+  }
+
+  sourceSize(styleID: string, highlighted: boolean): { width: number; height: number } | undefined {
+    if (!this.styles) return
+    const spec = resolveVisualSpec(this.styles, styleID, highlighted)
+    if (!spec?.imageName || !spec.tile) return
+    const tilePath = this.resourceRoots
+      .map((root) => `${root}/${spec.imageName}.til`)
+      .find((candidate) => this.archive.names().includes(candidate))
+    if (!tilePath) return
+    let tiles = this.tiles.get(tilePath)
+    if (!tiles) {
+      tiles = IniDocument.parse(this.archive.getText(tilePath))
+      this.tiles.set(tilePath, tiles)
+    }
+    const source = numbers(tiles.get(`IMG${spec.tile}`, "SOURCE_RECT"))
+    return source ? { width: source[2], height: source[3] } : undefined
   }
 
   async resolve(styleID: string, highlighted: boolean): Promise<Visual | undefined> {

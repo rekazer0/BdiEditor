@@ -51,11 +51,12 @@ test("maps Baidu skin coordinates to the iPhone 17 Pro bottom keyboard", () => {
     1125,
     595,
     133,
+    70,
   )
-  assert.equal(Math.round(geometry.candidateHeight), 213)
+  assert.equal(Math.round(geometry.candidateHeight), 218)
   assert.equal(Math.round(geometry.panelHeight), 638)
   assert.equal(Math.round(geometry.safeBottomHeight), 236)
-  assert.equal(Math.round(geometry.totalHeight), 1087)
+  assert.equal(Math.round(geometry.totalHeight), 1091)
 })
 
 test("keeps the iPhone candidate area fixed while composing", () => {
@@ -65,6 +66,7 @@ test("keeps the iPhone candidate area fixed while composing", () => {
     1125,
     595,
     133,
+    70,
   )
   const composing = keyboardPreviewGeometry(
     deviceSpec("iphone-17-pro")!,
@@ -72,24 +74,23 @@ test("keeps the iPhone candidate area fixed while composing", () => {
     1125,
     595,
     133,
+    70,
   )
-  assert.equal(Math.round(idle.candidateInsetHeight), 71)
+  assert.equal(Math.round(idle.candidateInsetHeight), 75)
   assert.deepEqual(composing, idle)
 })
 
 test("keeps height-limited keyboard geometry fixed while composing", () => {
   const device = { width: 1125, height: 800, family: "iphone" as const }
-  const idle = keyboardPreviewGeometry(device, "port", 1125, 595, 133)
-  const composing = keyboardPreviewGeometry(device, "port", 1125, 595, 133)
+  const idle = keyboardPreviewGeometry(device, "port", 1125, 595, 133, 70)
+  const composing = keyboardPreviewGeometry(device, "port", 1125, 595, 133, 70)
 
   assert.deepEqual(composing, idle)
 })
 
-test("extends the candidate skin background by a stable iPhone candidate inset", () => {
-  assert.equal(candidateBackgroundLogicalHeight(deviceSpec("iphone-17-pro"), "port", 109), 175)
-  assert.equal(candidateBackgroundLogicalHeight(deviceSpec("iphone-17-pro"), "land", 109), 109)
-  assert.equal(candidateBackgroundLogicalHeight(deviceSpec("xiaomi-17"), "port", 109), 109)
-  assert.equal(candidateBackgroundLogicalHeight(undefined, "port", 109), 109)
+test("builds the candidate stack from parsed candidate and input rows", () => {
+  assert.equal(candidateBackgroundLogicalHeight(109, 70), 179)
+  assert.equal(candidateBackgroundLogicalHeight(133, 0), 133)
 })
 
 test("shows keyboard accessories only for an iPhone in portrait", () => {

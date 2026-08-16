@@ -18,13 +18,14 @@ test("adapts iOS 26 candidate backgrounds without touching the shared panel", ()
   assert.equal(isIos26Adapted(cand, gen), false)
 })
 
-test("adapts keyboard layouts but preserves auxiliary panels", () => {
+test("adapts keyboard and configured symbol layouts but preserves other auxiliary panels", () => {
   const layout = "[PANEL]\nBACK_STYLE=1103\nKEY_NUM=100\n"
 
-  for (const name of ["py_9.ini", "en_26.ini", "tool_26.ini", "bh.ini", "hw_full.ini"]) {
+  for (const name of ["py_9.ini", "en_26.ini", "tool_26.ini", "bh.ini", "hw_full.ini", "symbol.ini"]) {
     assert.match(adaptIos26KeyboardLayout(name, layout, "119"), /BACK_STYLE=119/)
   }
-  for (const name of ["help.ini", "symbol.ini", "sel_ch.ini", "logo.ini", "gen.ini"]) {
+  assert.match(adaptIos26KeyboardLayout("punctuation.ini", layout, "119", "punctuation"), /BACK_STYLE=119/)
+  for (const name of ["help.ini", "sel_ch.ini", "logo.ini", "gen.ini"]) {
     assert.equal(adaptIos26KeyboardLayout(name, layout, "119"), layout)
   }
 })

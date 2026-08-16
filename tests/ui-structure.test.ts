@@ -273,9 +273,13 @@ test("transparent candidate preview is not painted by a native button", () => {
   assert.match(html, /<div id="toolbar-strip"[^>]*><canvas id="toolbar-preview"/)
   assert.doesNotMatch(html, /<button id="toolbar-strip"/)
   assert.match(main, /const candidateBackgroundPreview = new Preview\(candidateBackgroundCanvas/)
-  assert.match(main, /candidateBackgroundLogicalHeight\(deviceSpec\(device\.value\), orientation\.value, height\)/)
+  assert.match(main, /candidateBackgroundLogicalHeight\(height, composing \? inputHeight : 0\)/)
   assert.match(main, /toolbarDocument\.set\("CAND", "BACK_STYLE", ""\)/)
   assert.match(css, /#candidate-background\s*\{[^}]*position:\s*absolute[^}]*inset:\s*0[^}]*width:\s*100%[^}]*height:\s*100%/s)
+  assert.match(
+    css,
+    /\.device-shell:not\(\.canvas-only\) #candidate-area:not\(:has\(#candidate-composition:not\(\[hidden\]\)\)\) #candidate-background\s*\{[^}]*position:\s*relative[^}]*grid-row:\s*2/s,
+  )
 })
 
 test("canvas-only preview does not add rounding outside the parsed skin", () => {
@@ -295,7 +299,7 @@ test("typing updates simulation state without rebuilding the complete skin previ
 test("typing switches candidate content without changing device keyboard geometry", () => {
   assert.match(
     css,
-    /\.device-shell\.canvas-only #candidate-area:has\(#candidate-composition:not\(\[hidden\]\)\)\s*\{[^}]*height:\s*var\(--candidate-viewport-height, 228px\)[^}]*grid-template-rows:\s*var\(--candidate-input-height, 95px\) var\(--toolbar-viewport-height, 133px\)/s,
+    /\.device-shell\.canvas-only #candidate-area:has\(#candidate-composition:not\(\[hidden\]\)\)\s*\{[^}]*height:\s*var\(--candidate-viewport-height, auto\)[^}]*grid-template-rows:\s*var\(--candidate-input-height, 0px\) var\(--toolbar-viewport-height, auto\)/s,
   )
   assert.match(main, /canvasLogicalSize\.height = canvasLogicalSize\.panelVisibleHeight \+ candidateHeight/)
   assert.doesNotMatch(main, /canvasLogicalSize\.panelVisibleHeight \+ candidateHeight \+ \(composing \? 95 : 0\)/)
@@ -304,9 +308,11 @@ test("typing switches candidate content without changing device keyboard geometr
   assert.match(main, /--candidate-viewport-height/)
 })
 
-test("candidate words keep the native left inset even when the skin padding starts at zero", () => {
-  assert.match(css, /#candidate-words\s*\{[^}]*padding-inline-start:\s*max\(3\.2cqw, var\(--candidate-left-padding, 0cqw\)\)/s)
+test("candidate text positions come from the skin padding and first gap", () => {
+  assert.match(css, /#candidate-words\s*\{[^}]*padding-inline-start:\s*var\(--candidate-left-padding, 0cqw\)/s)
   assert.match(main, /--candidate-left-padding/)
+  assert.match(main, /const inputLeading = candidateCssLength\(inputPadding\?\.\[0\], width\) \?\? firstGap/)
+  assert.match(css, /#candidate-input\s*\{[^}]*padding:\s*0 var\(--candidate-input-leading, 0cqw\)/s)
 })
 
 test("toolbar availability is invalidated before lightweight typing refreshes", () => {
@@ -340,14 +346,9 @@ test("legacy LIST defaults and candidate geometry reach the existing preview sur
 test("device preview preserves resolved candidate geometry across formats", () => {
   assert.match(main, /resolvePanelConfig\(layoutDocument,\s*context\.gen,\s*context\.styles\)/)
   assert.match(main, /function applyDeviceKeyboardGeometry\(/)
-  assert.match(
-    main,
-    /applyDeviceKeyboardGeometry\(config\.width, config\.height, toolbarSize\?\.height \?\? 0\)/,
-  )
-  assert.match(
-    main,
-    /applyDeviceKeyboardGeometry\(panelWidth, panelHeight, toolbarSize\?\.height \?\? 0\)/,
-  )
+  assert.match(main, /const candidateInputHeight = toolbarSize\?\.inputHeight \?\? 0/)
+  assert.match(main, /applyDeviceKeyboardGeometry\(config\.width, config\.height, candidateHeight, candidateInputHeight\)/)
+  assert.match(main, /applyDeviceKeyboardGeometry\(panelWidth, panelHeight, candidateHeight, candidateInputHeight\)/)
   assert.match(
     main,
     /if \(!spec[^)]*\) \{\s*for \(const property of deviceGeometryProperties\) deviceShell\.style\.removeProperty\(property\)/s,
@@ -510,7 +511,7 @@ test("Shift selects the complete key range from the anchor", () => {
 })
 
 test("clicking an already selected key in edit mode deselects it", () => {
-  assert.match(preview, /\} else if \(this\.mode === "edit" && this\.editTool === "select"\) \{\s*this\.selected\.delete\(key\.section\)/s)
+  assert.match(preview, /\} else if \(this\.mode === "edit" && this\.editTool === "select"\) \{\s*key\.sections\.forEach\(\(section\) => this\.selected\.delete\(section\)\)/s)
 })
 
 test("panel tools disable in interactive preview mode", () => {
@@ -520,11 +521,22 @@ test("panel tools disable in interactive preview mode", () => {
   assert.match(main, /updatePanelToolButtons\(\)/)
 })
 
-test("iOS 26 adaptation leaves auxiliary screens unchanged", () => {
+test("iOS 26 adaptation includes the configured symbol panel and leaves other auxiliary screens unchanged", () => {
   assert.match(main, /staged\.set\(candidatePath, adapted\.candidate\)/)
-  assert.match(main, /adaptIos26KeyboardLayout\(name, text\(path\), adapted\.panelStyle\)/)
+  assert.match(main, /adaptIos26KeyboardLayout\([\s\S]*?gen\.get\("MORE", "SYM_LAYOUT"\) \?\? "symbol"/)
   assert.doesNotMatch(main, /adaptIos26Candidate|adaptIos26Panel/)
   assert.doesNotMatch(ios26, /general, "PANEL", "BACK_STYLE"|iOS26透明主输入区/)
+})
+
+test("configured symbol panels occupy the complete keyboard without a candidate row", () => {
+  assert.match(main, /isConfiguredSymbolLayout\(layoutPath, textDocument\(genConfigPath\(\)\)\)/)
+  assert.match(main, /candidateArea\.hidden = symbolPanel/)
+  assert.match(main, /if \(isConfiguredSymbolLayout\(layoutPath, textDocument\(genConfigPath\(\)\)\)\) \{[\s\S]*?return/)
+  assert.match(css, /#candidate-area\[hidden\]\s*\{[^}]*display:\s*none/s)
+  assert.match(css, /#candidate-area\s*\{[^}]*grid-row:\s*1/s)
+  assert.match(css, /\.keyboard-dock #panel-viewport\s*\{[^}]*grid-row:\s*2/s)
+  assert.match(css, /\.keyboard-dock \.keyboard-accessories\s*\{[^}]*grid-row:\s*3/s)
+  assert.match(html, /横竖屏键盘和符号面板添加透明背景/)
 })
 
 test("canvas mode auto-fits while allowing manual enlargement", () => {
@@ -605,7 +617,7 @@ test("key layout supports select, drag-move, merge, and wheel-adjusted geometry 
   assert.match(main, /function mergeSelectedKeys\(\)/)
   assert.match(preview, /canvas\.addEventListener\("pointermove"/)
   assert.match(preview, /event\.stopPropagation\(\)/)
-  assert.match(preview, /this\.onMove\(\[\.\.\.this\.selected\], Math\.round\(dx\), Math\.round\(dy\)\)/)
+  assert.match(preview, /const drag = this\.editDrag[\s\S]*?this\.onMove\(\[\.\.\.drag\.original\.keys\(\)\], Math\.round\(dx\), Math\.round\(dy\)\)/)
   assert.match(css, /\.geometry-fields input\s*\{[^}]*text-align:\s*left/s)
   assert.match(main, /field\.type === "number"[\s\S]*field\.addEventListener\("wheel"[\s\S]*field\.stepUp\(\)[\s\S]*field\.stepDown\(\)/)
 })

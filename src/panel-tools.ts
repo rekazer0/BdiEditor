@@ -32,7 +32,7 @@ export function stateTipSection(
   value: string | undefined,
   state: number | undefined,
 ): number | undefined {
-  if (state === undefined || state < 1 || state > 99) return
+  if (state === undefined || state < 0 || state > 99) return
   return stateStyleValue(value, state)
 }
 
