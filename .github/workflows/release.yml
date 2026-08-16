@@ -108,7 +108,7 @@ jobs:
         run: sdkmanager "ndk;$NDK_VERSION"
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi
+          targets: aarch64-linux-android
       - run: npm ci
       - name: Initialize Android project
         run: NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION" npm run tauri -- android init --ci --skip-targets-install
@@ -146,7 +146,7 @@ jobs:
           ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/android-release.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-        run: NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION" npm run tauri -- android build --apk --split-per-abi --target aarch64 armv7 --ci
+        run: NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION" npm run tauri -- android build --apk --split-per-abi --target aarch64 --ci
       - name: Upload APK
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
