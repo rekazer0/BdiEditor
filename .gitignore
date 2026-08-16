@@ -8,3 +8,4 @@ src-tauri/gen/
 .worktrees/
 .mimosa/
 .zcode/
+.release/

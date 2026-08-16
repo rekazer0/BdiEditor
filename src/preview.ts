@@ -253,6 +253,7 @@ export function effectivePreviewItem(
   item: PreviewItem,
   state?: number,
 ): PreviewItem {
+  if (!/^ICON\d+$/i.test(item.section)) return item
   const tip = stateTipSection(item.statStyle, state)
   if (tip === undefined) return item
   const section = `TIP${tip}`
@@ -865,8 +866,8 @@ export class Preview {
       this.canvas.setPointerCapture(event.pointerId)
       return
     }
-    this.selectKey(key, event)
     if (this.mode === "edit") {
+      this.selectKey(key, event)
       if (this.editTool === "move" && !key.section.startsWith("LIST")) {
         const selectedSections = new Set(
           visiblePreviewItems(this.keys, this.skinState)
@@ -1021,15 +1022,21 @@ export class Preview {
     }
     if (!this.active) return
     const point = this.point(event)
-    const { key, startX, startY, startedAt } = this.active
+    const active = this.active
+    const { key, startX, startY, startedAt } = active
     const dx = point.x - startX
     const dy = point.y - startY
     const clearOnHold = key.center.trim() === "F36"
     const direction = gestureDirection(dx, dy, Date.now() - startedAt, Boolean(key.hold) || clearOnHold)
     const code = direction === "hold" && clearOnHold ? "F48" : key[direction]
     this.onEvent({ section: key.section, direction, code })
-    this.active = undefined
-    void this.draw()
+    const release = () => {
+      if (this.active !== active) return
+      this.active = undefined
+      void this.draw()
+    }
+    if (event.pointerType === "touch") globalThis.setTimeout(release, 80)
+    else release()
   }
 
   private cancelEditDrag(): void {

@@ -159,6 +159,30 @@ test("atlas resolver exposes the resolved resource path and tile source rectangl
   }
 })
 
+test("keeps USE_ALPHA=2 atlas tiles in their source orientation", async () => {
+  const archive = SkinArchive.open(zipSync({
+    "light/skin/res/default.css": strToU8("[STYLE211]\nNM_IMG=btn,1\n"),
+    "light/skin/res/btn.png": new Uint8Array([1]),
+    "light/skin/res/btn.til": strToU8("[GLOBAL]\nUSE_ALPHA=2\n[IMG1]\nSOURCE_RECT=0,0,200,60\n"),
+  }))
+  const previous = globalThis.createImageBitmap
+  Object.defineProperty(globalThis, "createImageBitmap", {
+    configurable: true,
+    value: async () => ({ width: 200, height: 60 }),
+  })
+  try {
+    const resolver = new AtlasResolver(archive, "light", "port")
+    const visual = await resolver.resolve("211", false)
+    assert.deepEqual(visual?.source, [0, 0, 200, 60])
+    assert.deepEqual(resolver.sourceSize("211", false), { width: 200, height: 60 })
+  } finally {
+    Object.defineProperty(globalThis, "createImageBitmap", {
+      configurable: true,
+      value: previous,
+    })
+  }
+})
+
 test("atlas resolver preserves the five-part tile SCALE stretch flags", async () => {
   const archive = SkinArchive.open(zipSync({
     "light/skin/port/res/default.css": strToU8("[STYLE211]\nNM_IMG=btn,1\n"),

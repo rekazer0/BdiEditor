@@ -86,3 +86,55 @@ jobs:
               nsis/*.exe \
               --repo "${{ github.repository }}" --clobber
           fi
+
+  build-android:
+    needs: create-release
+    runs-on: ubuntu-latest
+    env:
+      NDK_VERSION: 27.0.12077973
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - name: Install Android NDK
+        run: sdkmanager "ndk;$NDK_VERSION"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - run: npm ci
+      - name: Initialize Android project
+        run: NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION" npm run tauri -- android init --ci --skip-targets-install
+      - name: Configure APK signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/android-release.jks"
+          printf '%s\n' \
+            "password=$ANDROID_KEYSTORE_PASSWORD" \
+            "keyAlias=$ANDROID_KEY_ALIAS" \
+            "storeFile=$RUNNER_TEMP/android-release.jks" \
+            > src-tauri/gen/android/keystore.properties
+      - name: Build signed APK
+        run: NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION" npm run tauri -- android build --apk --ci
+      - name: Upload APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          APK=$(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*.apk' ! -name '*unsigned*' | head -1)
+          test -n "$APK"
+          cp "$APK" "BdiEditor-${GITHUB_REF_NAME}-android.apk"
+          gh release upload "$GITHUB_REF_NAME" \
+            "BdiEditor-${GITHUB_REF_NAME}-android.apk" \
+            --repo "$GITHUB_REPOSITORY" --clobber

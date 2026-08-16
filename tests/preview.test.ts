@@ -115,7 +115,7 @@ test("renders one logical key from a state key and its fallback alias", () => {
   assert.deepEqual(visiblePreviewItems(items, 7).map((item) => item.section), ["KEY2"])
 })
 
-test("preview pointer events hit the active state key instead of its overlapping fallback", () => {
+test("preview pointer events hit the active state key without selecting it", async () => {
   const document = IniDocument.parse(
     "[KEY1]\nVIEW_RECT=0,0,1080,595\n" +
     "[KEY9]\nVIEW_RECT=662,296,247,149\nSHOW=9\nCENTER=x\nSTAT_STYLE=S4_12|S0_1\n" +
@@ -130,7 +130,8 @@ test("preview pointer events hit the active state key instead of its overlapping
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 1080, height: 595 }),
   } as unknown as HTMLCanvasElement
   const events: PreviewEvent[] = []
-  const preview = new Preview(canvas, (event) => events.push(event), () => {}) as unknown as {
+  const selections: string[][] = []
+  const preview = new Preview(canvas, (event) => events.push(event), (sections) => selections.push(sections)) as unknown as {
     keys: ReturnType<typeof previewItems>
     skinState?: number
     mode: "preview"
@@ -138,6 +139,7 @@ test("preview pointer events hit the active state key instead of its overlapping
     playAnimation: () => Promise<void>
     pointerDown: (event: PointerEvent) => void
     pointerUp: (event: PointerEvent) => void
+    active?: unknown
   }
   preview.keys = previewItems(document, 1080, 595)
   preview.mode = "preview"
@@ -160,6 +162,14 @@ test("preview pointer events hit the active state key instead of its overlapping
     assert.equal(events.at(-1)?.section, section)
     assert.equal(events.at(-1)?.code, "x")
   }
+  assert.deepEqual(selections, [])
+
+  const touch = { ...pointer, pointerId: 2, pointerType: "touch" } as PointerEvent
+  preview.pointerDown(touch)
+  preview.pointerUp(touch)
+  assert.ok(preview.active, "touch press remains visible after a quick tap")
+  await new Promise((resolve) => setTimeout(resolve, 90))
+  assert.equal(preview.active, undefined)
 })
 
 test("does not merge ordinary keys that happen to share actions", () => {
@@ -170,15 +180,15 @@ test("does not merge ordinary keys that happen to share actions", () => {
   assert.deepEqual(visiblePreviewItems(items).map((item) => item.section), ["KEY1", "KEY2"])
 })
 
-test("uses S0 TIP styling for the default keyboard state", () => {
+test("does not apply key-bubble TIP styling to keyboard keys", () => {
   const document = IniDocument.parse(
     "[KEY1]\nVIEW_RECT=0,0,100,100\nBACK_STYLE=1\nSTAT_STYLE=S0_3\n" +
     "[TIP3]\nBACK_STYLE=9\n",
   )
-  assert.equal(effectivePreviewItem(document, previewItems(document)[0], 0).backStyle, "9")
+  assert.equal(effectivePreviewItem(document, previewItems(document)[0], 0).backStyle, "1")
 })
 
-test("resolves a matching TIP section without changing absent properties", async () => {
+test("resolves a matching candidate ICON TIP without changing absent properties", async () => {
   const module = await import("../src/preview.ts") as typeof import("../src/preview.ts") & {
     effectivePreviewItem?: (
       document: IniDocument,
@@ -187,7 +197,7 @@ test("resolves a matching TIP section without changing absent properties", async
     ) => ReturnType<typeof previewItems>[number]
   }
   const document = IniDocument.parse(
-    "[KEY1]\nVIEW_RECT=0,0,100,100\nBACK_STYLE=211\nFORE_STYLE=81,180\nPOS_TYPE=2,3\nSTAT_STYLE=S4_2\n" +
+    "[ICON1]\nSIZE=100,100\nBACK_STYLE=211\nFORE_STYLE=81,180\nPOS_TYPE=2,3\nSTAT_STYLE=S4_2\n" +
     "[TIP2]\nBACK_STYLE=214\nFORE_STYLE=252\n",
   )
   const item = previewItems(document)[0]

@@ -151,10 +151,11 @@ test("preview canvas provides mouse-wheel and button zoom controls", () => {
 
   assert.ok(toolbar.indexOf('id="device"') < toolbar.indexOf('data-orientation-choice="port"'))
   assert.ok(toolbar.indexOf('data-orientation-choice="port"') < toolbar.indexOf('data-theme-choice="light"'))
-  assert.match(toolbar, /data-orientation-choice="port"[^>]*>竖屏/)
-  assert.match(toolbar, /data-orientation-choice="land"[^>]*>横屏/)
-  assert.match(toolbar, /data-theme-choice="light"[^>]*>浅色/)
-  assert.match(toolbar, /data-theme-choice="dark"[^>]*>深色/)
+  assert.match(toolbar, /data-orientation-choice="port"[^>]*aria-label="竖屏"[^>]*>[\s\S]*?data-system-symbol="rectangle\.portrait"/)
+  assert.match(toolbar, /data-orientation-choice="land"[^>]*aria-label="横屏"[^>]*>[\s\S]*?data-system-symbol="rectangle\.landscape"/)
+  assert.match(toolbar, /data-theme-choice="light"[^>]*aria-label="浅色"[^>]*>[\s\S]*?data-system-symbol="sun\.max"/)
+  assert.match(toolbar, /data-theme-choice="dark"[^>]*aria-label="深色"[^>]*>[\s\S]*?data-system-symbol="moon"/)
+  assert.match(css, /\.preview-choice > button \.system-symbol\s*\{[^}]*width:\s*16px[^}]*height:\s*16px/s)
   assert.match(html, /<option value="canvas" selected>画布<\/option>/)
   assert.doesNotMatch(html, /iphone-15-pro/)
   assert.match(html, /id="preview-zoom-out"/)
@@ -608,7 +609,7 @@ test("settings expose canvas backgrounds and the key inspector owns edit actions
 
 test("key layout supports select, drag-move, merge, and wheel-adjusted geometry fields", () => {
   assert.match(html, /class="inspector-title key-inspector-title"[\s\S]*class="tile-toolbar key-toolbar key-only"[\s\S]*class="tile-mode-control key-mode-control"[^>]*aria-label="按键操作模式"/)
-  assert.ok(html.indexOf('class="tile-toolbar key-toolbar key-only"') < html.indexOf('<summary>布局</summary>'))
+  assert.ok(html.indexOf('class="tile-toolbar key-toolbar key-only"') < html.indexOf('<h3>布局</h3>'))
   assert.match(html, /data-key-mode="select"/)
   assert.match(html, /data-key-mode="move"/)
   assert.match(html, /data-layout-action="merge"[^>]*>合并</)
@@ -623,8 +624,8 @@ test("key layout supports select, drag-move, merge, and wheel-adjusted geometry 
 })
 
 test("window and about names match the GitHub project and include the version", () => {
-  assert.match(html, /<title>BdiEditor v0\.8\.34<\/title>/)
-  assert.match(html, /关于 BdiEditor v0\.8\.34/)
+  assert.match(html, /<title>BdiEditor v1\.0\.0<\/title>/)
+  assert.match(html, /关于 BdiEditor v1\.0\.0/)
   assert.match(html, /<strong>技术交流与反馈<\/strong><br><button id="copy-qq-group"[^>]*>QQ群：228040912<\/button>/)
 })
 
@@ -644,7 +645,7 @@ test("deleting a mixed inspector value clears every selected key through its inp
 })
 
 test("about dialog automatically checks the canonical GitHub project for updates", () => {
-  assert.match(html, /id="about-update"[^>]*data-current-version="0\.8\.34"/)
+  assert.match(html, /id="about-update"[^>]*data-current-version="1\.0\.0"/)
   assert.match(html, /id="check-update"/)
   assert.match(html, /id="update-status"[^>]*aria-live="polite"/)
   assert.match(html, /id="download-update"[^>]*https:\/\/github\.com\/rekazer0\/BdiEditor\/releases["']/)
@@ -759,7 +760,7 @@ test("resource gallery adds columns with inspector width and caps cards at 180px
   assert.match(html, /id="resource-search"[^>]*type="search"/)
   assert.match(main, /resourceSearch\.value\.trim\(\)\.toLowerCase\(\)/)
   assert.match(css, /#resource-list-view \.inspector-title\s*\{[^}]*grid-template-columns:\s*auto minmax\(160px, 1fr\) auto/s)
-  assert.match(css, /#resource-list-view \.inspector-title \.search-control\s*\{[^}]*height:\s*26px/s)
+  assert.match(css, /#resource-list-view \.inspector-title \.resource-filters \.search-control\s*\{[^}]*height:\s*26px/s)
   assert.match(css, /\.search-control:focus-within\s*\{[^}]*border-color:\s*color-mix/s)
   assert.match(main, /Math\.round\(window\.innerWidth \* 0\.28\)/)
   assert.match(main, /inspectorWidthV3/)
@@ -791,7 +792,7 @@ test("hiding guides cancels active slice drawing", () => {
 })
 
 test("key inspector keeps style references together and text styles can be hidden", () => {
-  const advanced = html.match(/<summary>样式引用、文字与图片<\/summary>([\s\S]*?)<\/details>/)?.[1] ?? ""
+  const advanced = html.match(/<h3>样式引用、文字与图片<\/h3>([\s\S]*?)<\/section>/)?.[1] ?? ""
   assert.doesNotMatch(advanced, /正常状态图片|按下状态图片|data-background-style-field=/)
   assert.match(advanced, /背景样式引用[\s\S]*前景样式引用/)
   assert.match(css, /\.appearance-fields\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/s)
@@ -852,14 +853,14 @@ test("loading another archive closes and fully resets the image slice picker", (
   assert.match(main, /async function loadArchive[\s\S]*?clearImageSlicePicker\(\)\s*archive = nextArchive/)
 })
 
-test("key inspector keeps common fields visible and collapses advanced controls", () => {
+test("key inspector keeps common fields visible and moves advanced controls into side-rail sections", () => {
   const common = html.slice(html.indexOf('class="inspector-group key-only primary-key-fields"'), html.indexOf("</div>\n          </div>", html.indexOf('class="inspector-group key-only primary-key-fields"')))
   assert.match(common, /data-key-field="SHOW"[\s\S]*?data-key-field="CENTER"/)
-  assert.match(html, /<details class="inspector-group inspector-disclosure key-only" open>\s*<summary>布局<\/summary>/)
+  assert.match(html, /<section class="inspector-group inspector-disclosure key-only">\s*<h3>布局<\/h3>/)
   assert.match(html, /选中按键后，可使用方向键移动；按住 Shift 每次移动 10 像素。/)
-  assert.match(html, /<details class="inspector-group inspector-disclosure key-only" open>\s*<summary>样式引用、文字与图片<\/summary>/)
-  assert.match(html, /<summary>滑动与长按<\/summary>/)
-  assert.match(css, /\.inspector-disclosure > summary/)
+  assert.match(html, /<section class="inspector-group inspector-disclosure key-only">\s*<h3>样式引用、文字与图片<\/h3>/)
+  assert.match(html, /<h3>滑动与长按<\/h3>/)
+  assert.doesNotMatch(html, /<summary>布局<\/summary>|<summary>样式引用、文字与图片<\/summary>|<summary>滑动与长按<\/summary>/)
 })
 
 test("ordinary configuration navigation clears key selection", () => {
@@ -868,9 +869,10 @@ test("ordinary configuration navigation clears key selection", () => {
   assert.match(main, /const hasSelection = Boolean\(document && sections\.length && selectedPath === layoutPath\)/)
 })
 
-test("common document sections open by default", () => {
-  assert.match(main, /\["PANEL", "INPUT", "CAND"\]\.includes\(section\)/)
-  assert.match(css, /\.document-property-section > summary:hover/)
+test("document sections use the side rail instead of disclosure controls", () => {
+  assert.match(main, /sectionPanel\.className = "document-property-section"/)
+  assert.match(main, /sectionPanel\.append\(heading, grid\)/)
+  assert.doesNotMatch(css, /\.document-property-section > summary/)
 })
 
 test("layout actions include right and bottom alignment", () => {
@@ -1021,9 +1023,9 @@ test("style detail returns to the configuration that opened it", () => {
   assert.match(main, /let styleReturnPath = ""/)
   assert.match(main, /let styleReturnSelection: string\[\] = \[\]/)
   assert.match(main, /let styleReturnScrollTop = 0/)
-  assert.match(main, /let styleReturnDisclosures: boolean\[\] = \[\]/)
-  assert.match(main, /function openStyleReferenceEditor\(styleID: string\): void \{[\s\S]*const returnSelection = \[\.\.\.selectedKeySections\][\s\S]*const returnScrollTop = quickInspector\.scrollTop[\s\S]*const returnDisclosures = keyInspectorDisclosures\.map[\s\S]*selectFile\(path, "overview", "style"\)[\s\S]*styleReturnSelection = returnSelection/s)
-  assert.match(main, /resourceBackButton\.addEventListener\("click", \(\) => \{[\s\S]*const selection = \[\.\.\.styleReturnSelection\][\s\S]*selectFile\(path, "overview"\)[\s\S]*selectedKeySections = selection[\s\S]*preview\.setSelected\(selection\)[\s\S]*quickInspector\.scrollTop = scrollTop[\s\S]*revealSourceFile\(path\)/s)
+  assert.match(main, /let styleReturnInspectorGroup = ""/)
+  assert.match(main, /function openStyleReferenceEditor\(styleID: string\): void \{[\s\S]*const returnSelection = \[\.\.\.selectedKeySections\][\s\S]*const returnScrollTop = quickInspector\.scrollTop[\s\S]*const returnInspectorGroup = quickInspector\.dataset\.mobileInspectorGroup \?\? ""[\s\S]*selectFile\(path, "overview", "style"\)[\s\S]*styleReturnInspectorGroup = returnInspectorGroup/s)
+  assert.match(main, /resourceBackButton\.addEventListener\("click", \(\) => \{[\s\S]*const selection = \[\.\.\.styleReturnSelection\][\s\S]*const inspectorGroup = styleReturnInspectorGroup[\s\S]*selectFile\(path, "overview"\)[\s\S]*selectedKeySections = selection[\s\S]*preview\.setSelected\(selection\)[\s\S]*populateKeyInspector\(\)[\s\S]*if \(inspectorGroup\) setMobileInspectorGroup\(inspectorGroup, false\)[\s\S]*quickInspector\.scrollTop = scrollTop[\s\S]*revealSourceFile\(path\)/s)
 })
 
 test("style picker uses the shared glass dialog and selected-card styling", () => {
@@ -1135,7 +1137,7 @@ test("style detail edits every field with typed color and slice pickers", () => 
 })
 
 test("source file clicks open text files in the source inspector", () => {
-  assert.match(main, /archive\?\.isText\(path\) \|\| archive\?\.isImage\(path\) \|\| archive\?\.isBdaConfig\(path\)\) selectFile\(path, "source"\)/)
+  assert.match(main, /archive\?\.isText\(path\) \|\| archive\?\.isImage\(path\) \|\| archive\?\.isBdaConfig\(path\)\) \{[\s\S]*selectFile\(path, "source"\)/)
   assert.match(main, /preferredSidebarView === "source" && \(archive\?\.isText\(path\) \|\| archive\?\.isBdaConfig\(path\)\)/)
 })
 
@@ -1183,15 +1185,29 @@ test("source files support dropping uploads and dragging files out for download"
   assert.match(css, /\.source-tree-row\.source-drop-target\s*\{[^}]*outline:\s*2px solid var\(--accent\)/s)
 })
 
-test("resource configuration edits and previews BDS, BDI and BDA key sounds", () => {
-  assert.match(main, /label: "按键音"[\s\S]*navMode: "sound"/)
+test("resource configuration stores sound files and exposes SOUND_STYLE controls", () => {
+  assert.match(main, /label: "按键音效"[\s\S]*navMode: "sound"/)
+  assert.match(html, /id="resource-category"/)
+  assert.match(html, /data-key-field="SOUND_STYLE"/)
+  assert.match(main, /function currentSoundEntries\(\)[\s\S]*soundResourcePaths\(/)
   assert.match(main, /function renderSoundResourceGallery\(\)/)
   assert.match(main, /async function uploadKeySound\(file: File\)/)
-  assert.match(main, /updateBdaKeySound\(/)
-  assert.match(main, /soundFilenameForKey\(/)
+  assert.doesNotMatch(main, /updateBdaKeySound\(/)
+  assert.match(main, /PRESS_SOUND_PATH/)
+  assert.match(main, /sound-style-badge/)
+  assert.match(main, /const badge = createSystemSymbol\("play"\)/)
+  assert.match(main, /sound-style-play/)
+  assert.match(main, /style-detail-sound-card/)
+  assert.match(main, /const icon = createSystemSymbol\("music\.note"\)/)
+  assert.match(main, /style-picker-sound-play/)
+  assert.match(main, /const soundOnly =/)
+  assert.match(main, /soundStyleForKey\(/)
   assert.match(main, /if \(soundPath\) playSoundPath\(soundPath\)/)
   assert.match(main, /@wasm-audio-decoders\/ogg-vorbis/)
   assert.match(html, /script-src 'self' 'wasm-unsafe-eval'/)
+  assert.match(css, /\.sound-style-reference/)
+  assert.match(css, /\.sound-style-badge\s*\{[^}]*bottom:\s*10px[^}]*border:\s*0[^}]*color:\s*#fff[^}]*background:\s*transparent/s)
+  assert.match(css, /\.style-detail-sound-card\s*\{[^}]*grid-template-columns:\s*34px minmax\(0, 1fr\)/s)
 })
 
 test("preview toolbar centers the device selector and toggles canvas guides", () => {
@@ -1205,49 +1221,87 @@ test("preview toolbar centers the device selector and toggles canvas guides", ()
 
 test("phone portrait uses a touch-first split preview and sliding editor panes", () => {
   assert.match(css, /@media \(max-width: 760px\) and \(orientation: portrait\)/)
-  assert.match(html, /viewport-fit=cover/)
+  assert.match(html, /maximum-scale=1\.0, user-scalable=no, viewport-fit=cover/)
   assert.match(css, /@media \(max-width: 600px\)[\s\S]*?\.titlebar\s*\{[^}]*overflow:\s*visible/s)
   assert.match(css, /\.titlebar > \.spacer\s*\{[^}]*display:\s*none/s)
   assert.match(html, /class="mobile-workspace-tabs"[^>]*>[\s\S]*?data-mobile-pane="layout"[\s\S]*?data-mobile-pane="inspector"/)
   assert.match(css, /\.workspace\s*\{[^}]*height:\s*var\(--mobile-workspace-split,\s*50%\)[^}]*position:\s*absolute/s)
   assert.match(css, /data-mobile-pane="inspector"\]\s+aside\s*\{[^}]*translateX\(-100%\)/s)
   assert.match(css, /touch-action:\s*pan-y/)
+  assert.match(css, /body\s*\{[^}]*touch-action:\s*manipulation[^}]*-webkit-touch-callout:\s*none[^}]*-webkit-user-select:\s*none/s)
+  assert.match(css, /input,[\s\S]*?textarea\s*\{[^}]*-webkit-user-select:\s*text[^}]*user-select:\s*text/s)
   assert.match(main, /mainWorkspace\.addEventListener\("pointerdown"/)
+  assert.doesNotMatch(main, /event\.pointerType !== "touch"/)
+  assert.match(main, /mainWorkspace\.addEventListener\("pointermove"[\s\S]*Math\.abs\(deltaX\) < 56[\s\S]*setMobilePane\(deltaX < 0 \? "inspector" : "layout"\)/)
   assert.match(main, /mainWorkspace\.setPointerCapture\(event\.pointerId\)/)
   assert.match(main, /mobileSwipeStart\.pointerId !== event\.pointerId/)
   assert.match(main, /Math\.abs\(deltaX\) < 56/)
   assert.match(main, /sections\.length && mobilePortraitQuery\.matches\) setMobilePane\("inspector"\)/)
+  assert.match(main, /selectFile\(path, "overview"[\s\S]*mobilePortraitQuery\.matches\) setMobilePane\("inspector"\)/)
   assert.match(css, /:has\(\.source :is\(input, textarea, select\):focus\) \.workspace\s*\{[^}]*opacity:\s*0/s)
   assert.match(css, /@media \(max-width: 950px\) and \(max-height: 600px\) and \(orientation: landscape\)/)
   assert.match(css, /grid-template-columns:\s*clamp\(116px, 18vw, 150px\)[^;]*clamp\(190px, 28vw, 240px\)/s)
   assert.match(css, /\.preview-toolbar\s*\{[^}]*overflow-x:\s*auto/s)
+  assert.match(css, /:root:not\(\[data-mobile-preview-position="top"\]\) \.workspace\s*\{[^}]*top:\s*calc\(100% - var\(--mobile-workspace-split, 50%\) \+ 18px\)[^}]*height:\s*calc\(var\(--mobile-workspace-split, 50%\) - 18px\)/s)
 })
 
-test("mobile inspector merges its header, exposes light-bar pane controls, and groups fields in a side rail", () => {
+test("inspector uses a desktop bottom bar and a mobile side rail for property groups", () => {
   assert.match(html, /id="mobile-inspector-selection"/)
   assert.match(html, /id="mobile-inspector-groups"[^>]*aria-label="属性分组"/)
+  assert.match(css, /#mobile-inspector-selection\s*\{\s*display:\s*none/s)
+  assert.match(css, /#quick-inspector:not\(\[hidden\]\)\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s)
+  assert.match(css, /#quick-inspector:not\(\[hidden\]\)\s*\{[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\) auto/s)
+  assert.match(css, /#mobile-inspector-groups\s*\{[^}]*flex-direction:\s*row[^}]*position:\s*sticky[^}]*bottom:\s*0[^}]*grid-row:\s*3/s)
+  assert.match(css, /@media \(min-width: 761px\)[\s\S]*#mobile-inspector-groups\s*\{[^}]*position:\s*absolute[^}]*right:\s*8px[^}]*background:/s)
+  assert.match(html, /id="inspector-groups-drag"[^>]*title="拖动属性分组栏"/)
+  assert.match(css, /@media \(min-width: 761px\)[\s\S]*#quick-inspector:not\(\[hidden\]\)\s*\{[^}]*padding-right:\s*84px/s)
+  assert.match(css, /@media \(min-width: 761px\)[\s\S]*#mobile-inspector-groups\s*\{[^}]*top:\s*var\(--desktop-inspector-groups-y[^}]*right:\s*8px/s)
+  assert.match(main, /desktop-inspector-groups-y/)
+  assert.match(main, /savedPosition >= 15 && savedPosition <= 85/)
+  assert.match(main, /return label\.split\(\/\[、与（\(\]\//)
+  assert.match(css, /\.mobile-inspector-managed:not\(\.mobile-inspector-active\)\s*\{[^}]*display:\s*none !important/s)
+  assert.match(main, /group === documentFieldsGroup[\s\S]*document-property-section/)
+  assert.match(main, /document\.createElement\("section"\)[\s\S]*sectionPanel\.className = "document-property-section"/)
+  assert.doesNotMatch(main, /document\.createElement\("details"\)[\s\S]*document-property-section/)
+  assert.doesNotMatch(html, /<summary>布局<\/summary>|<summary>样式引用、文字与图片<\/summary>|<summary>滑动与长按<\/summary>/)
   assert.match(main, /function syncMobileInspectorHeader\(\)/)
   assert.match(main, /sourceHeading\.dataset\.mobileKeyTools = selectedKeySections\.length \? "on" : "off"/)
   assert.match(main, /function syncMobileInspectorGroups\(\)/)
   assert.match(main, /mobileInspectorGroupLabel\(group\)/)
   assert.match(css, /\.mobile-workspace-tabs\s*\{\s*height:\s*18px/s)
+  assert.match(css, /\.mobile-workspace-tabs\s*\{[^}]*gap:\s*0[^}]*padding:\s*0 8px/s)
   assert.match(css, /\.mobile-workspace-tabs button\[data-mobile-pane\]::before\s*\{[^}]*height:\s*4px/s)
   assert.match(css, /\.mobile-workspace-tabs button\[data-mobile-pane\]\.active::before\s*\{[^}]*box-shadow:/s)
-  assert.match(css, /#quick-inspector:not\(\[hidden\]\)\s*\{[^}]*grid-template-columns:\s*58px minmax\(0, 1fr\)/s)
-  assert.match(css, /#mobile-inspector-groups\s*\{[^}]*position:\s*sticky/s)
-  assert.match(css, /#quick-inspector > \.mobile-inspector-managed:not\(\.mobile-inspector-active\)\s*\{[^}]*display:\s*none !important/s)
-  assert.match(css, /\.source :is\(input, textarea, select\),\s*\.app-dialog :is\(input, textarea, select\)\s*\{\s*min-height:\s*36px/s)
-  assert.match(css, /\.source \.style-picker-trigger\s*\{\s*height:\s*58px/s)
+  assert.match(css, /@media \(max-width: 760px\) and \(orientation: portrait\)[\s\S]*#quick-inspector:not\(\[hidden\]\)\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 58px/s)
+  assert.match(css, /@media \(max-width: 760px\) and \(orientation: portrait\)[\s\S]*#mobile-inspector-groups\s*\{[^}]*flex-direction:\s*column[^}]*top:\s*0[^}]*grid-column:\s*2/s)
+  assert.match(css, /\.source :is\(input, textarea, select\),\s*\.app-dialog :is\(input:not\(\[type="checkbox"\]\), textarea, select\)\s*\{\s*min-height:\s*36px/s)
+  assert.match(css, /\.source \.style-reference-input > input,[\s\S]*\.source \.style-picker-trigger,[\s\S]*\{[^}]*height:\s*58px/s)
+  assert.match(css, /@media \(max-width: 760px\) and \(orientation: portrait\)[\s\S]*#quick-inspector \.mobile-inspector-managed\s*\{[^}]*display:\s*block !important/s)
+  assert.match(main, /scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/)
+})
+
+test("mobile overview uses groups as its side-rail units", () => {
+  assert.match(main, /mobileGroups\.className = "mobile-overview-groups"/)
+  assert.match(main, /disclosure\.dataset\.overviewGroup = title/)
+  assert.match(main, /setMobileOverviewGroup\(mobileOverviewGroup\)/)
+  assert.match(main, /mobile-overview-groups button\[data-overview-group=/)
+  assert.match(css, /\.sidebar-overview\s*\{[^}]*grid-template-columns:\s*70px minmax\(0, 1fr\)/s)
+  assert.match(css, /#files \.mobile-overview-groups button\s*\{[^}]*text-overflow:\s*clip[^}]*white-space:\s*normal/s)
+  assert.match(css, /\.sidebar-overview > \.nav-group\.mobile-overview-active\s*\{[^}]*display:\s*block/s)
 })
 
 test("mobile workspace exposes a draggable split handle for the preview and inspector", () => {
-  assert.match(html, /id="mobile-split-handle"[^>]*role="slider"[^>]*aria-valuemin="28"[^>]*aria-valuemax="72"[^>]*aria-label="拖动调整画布与配置区域比例"/)
+  assert.match(html, /id="mobile-split-handle"[^>]*role="slider"[^>]*aria-valuemin="28"[^>]*aria-valuemax="72"[^>]*aria-label="拖动调整画布与配置区域比例；点击收起或展开预览"/)
   assert.match(css, /\.mobile-split-handle\s*\{[\s\S]*touch-action:\s*none/s)
   assert.match(css, /height:\s*var\(--mobile-workspace-split,\s*50%\)/)
   assert.match(main, /function setMobileSplit\(value: number, persist = true\)/)
   assert.match(main, /mobileSplitHandle\.addEventListener\("pointermove"/)
   assert.match(main, /mobileSplitHandle\.addEventListener\("keydown"/)
   assert.match(main, /localStorage\.setItem\("mobile-workspace-split"/)
+  assert.match(html, /id="mobile-split-handle"[\s\S]*class="system-symbol mobile-split-icon"/)
+  assert.match(main, /function setMobilePreviewCollapsed\(collapsed: boolean\)/)
+  assert.match(main, /mobileSplitHandle\.addEventListener\("click"/)
+  assert.match(css, /data-mobile-preview-collapsed="true"\] \.workspace\s*\{\s*display:\s*none/s)
 })
 
 test("mobile condenses desktop toolbar actions into a labeled menu", () => {
@@ -1273,9 +1327,12 @@ test("mobile condenses desktop toolbar actions into a labeled menu", () => {
   assert.match(css, /\.mode-control > select,\s*\.preview-choice > select\s*\{\s*display:\s*none !important/s)
 })
 
-test("mobile two-way choices use one dual-icon toggle while desktop choices stay segmented", () => {
+test("mobile titlebar keeps a compact text mode and single-icon preview choices", () => {
+  assert.match(html, /data-mobile-choice="mode"[\s\S]*class="mobile-choice-label">交互预览</)
+  const modeToggle = html.slice(html.indexOf('data-mobile-choice="mode"'), html.indexOf('<select id="mode"'))
+  assert.doesNotMatch(modeToggle, /data-system-symbol="keyboard"|data-system-symbol="pencil"/)
+  assert.match(html, /class="mode-control[\s\S]*class="mobile-title-choices"[\s\S]*class="toolbar-more"/)
   for (const [choice, first, second] of [
-    ["mode", "keyboard", "pencil"],
     ["orientation", "rectangle.portrait", "rectangle.landscape"],
     ["theme", "sun.max", "moon"],
   ]) {
@@ -1283,10 +1340,12 @@ test("mobile two-way choices use one dual-icon toggle while desktop choices stay
   }
   assert.match(main, /const mobileChoiceButtons = Array\.from\(document\.querySelectorAll<HTMLButtonElement>\("\[data-mobile-choice\]"\)\)/)
   assert.match(main, /const values: Record<string, string> = \{ mode: mode\.value, theme: theme\.value, orientation: orientation\.value \}/)
+  assert.match(main, /labelNode\.textContent = label/)
   assert.match(main, /selectChoice\(select, next\)/)
-  assert.match(css, /\.mode-control > select,\s*\.preview-choice > select\s*\{\s*display:\s*none !important/s)
-  assert.match(css, /\.mode-control > \.mobile-choice-toggle,\s*\.preview-choice > \.mobile-choice-toggle\s*\{[^}]*display:\s*inline-flex !important/s)
-  assert.match(css, /\.mobile-choice-icon\.active\s*\{[^}]*opacity:\s*1/s)
+  assert.match(css, /\.mode-control\s*\{[^}]*width:\s*clamp\(78px, 22vw, 100px\)[^}]*flex:\s*none/s)
+  assert.match(css, /\.mobile-title-choices\s*\{[^}]*display:\s*flex[^}]*gap:\s*4px/s)
+  assert.match(css, /\.mobile-title-choices \.mobile-choice-icon\s*\{[^}]*display:\s*none/s)
+  assert.match(css, /\.mobile-title-choices \.mobile-choice-icon\.active\s*\{[^}]*display:\s*grid/s)
 })
 
 test("mobile preview placement persists and skin files use the system share sheet", () => {
@@ -1445,6 +1504,23 @@ test("settings can persistently disable native and CSS window materials", () => 
   assert.match(css, /:root\[data-window-material="off"\]\s+\*\s*\{[^}]*backdrop-filter:\s*none\s*!important/s)
   assert.match(css, /\.settings-switch input\s*\{[^}]*appearance:\s*none[^}]*border-radius:\s*999px/s)
   assert.match(css, /\.settings-switch input:checked\s*\{[^}]*background:\s*var\(--accent\)/s)
+})
+
+test("settings hide the inspector view switch by default and persist the preference", () => {
+  assert.match(html, /<input id="inspector-tabs-visible" type="checkbox"[^>]*role="switch"(?![^>]*checked)/)
+  assert.match(main, /localStorage\.getItem\("inspector-tabs-visible"\) === "on"/)
+  assert.match(main, /localStorage\.setItem\("inspector-tabs-visible", inspectorTabsVisible\.checked \? "on" : "off"\)/)
+  assert.match(main, /inspectorTabs\.toggleAttribute\("hidden", !inspectorTabsVisible\.checked\)/)
+  assert.match(css, /\.inspector-tabs\[hidden\]\s*\{[^}]*display:\s*none/s)
+})
+
+test("settings hide the sidebar view switch by default and persist the preference", () => {
+  assert.match(html, /<input id="sidebar-view-visible" type="checkbox"[^>]*role="switch"(?![^>]*checked)/)
+  assert.match(main, /localStorage\.getItem\("sidebar-view-visible"\) === "on"/)
+  assert.match(main, /localStorage\.setItem\("sidebar-view-visible", sidebarViewVisible\.checked \? "on" : "off"\)/)
+  assert.match(main, /sidebarViewControl\.closest<HTMLElement>\("\.pane-heading"\)/)
+  assert.match(main, /sidebarViewHeading\.toggleAttribute\("hidden", !sidebarViewVisible\.checked\)/)
+  assert.match(css, /\.sidebar > \.pane-heading\[hidden\]\s*\{[^}]*display:\s*none/s)
 })
 
 test("every toolbar menu closes when clicking elsewhere", () => {

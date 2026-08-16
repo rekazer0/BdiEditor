@@ -2,14 +2,15 @@
 
 一个面向百度输入法 iOS `.bdi` 与 Android `.bds`、`.bda` 皮肤的可视化桌面编辑器。BdiEditor 让皮肤布局、按键样式与资源编辑回到可实时预览的桌面工作流。
 
-支持 macOS 与 Windows，采用轻量的 Tauri 2 + 原生 HTML/CSS/TypeScript 技术栈。
+支持 macOS、Windows 与 Android，采用轻量的 Tauri 2 + 原生 HTML/CSS/TypeScript 技术栈。
 
 ![BdiEditor v0.3.2 编辑界面](docs/screenshots/bdiedito-v0.3.2-overview.png)
 
-## v0.8.34 更新
+## v1.0.0 更新
 
-- 修复 iOS 26 适配后普通键盘布局和候选栏仍不透明的问题。
-- 适配工具仅透明化键盘、候选栏和次选区，保留颜文字、剪贴板等功能页背景。
+- 新增手机竖屏触控编辑、按键音效、传统按键动画和源文件管理。
+- 修复候选区几何、状态按键重复渲染、图集方向和触摸反馈等问题。
+- GitHub Release 新增 Android APK，并继续提供 macOS DMG 与 Windows EXE。
 
 完整记录见 [CHANGELOG.md](CHANGELOG.md)。
 

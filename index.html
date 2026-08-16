@@ -2,12 +2,12 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'"
     />
-    <title>BdiEditor v0.8.34</title>
+    <title>BdiEditor v1.0.0</title>
   </head>
   <body>
     <header class="titlebar" data-tauri-drag-region>
@@ -70,12 +70,23 @@
         <button class="active" data-mode-choice="preview">交互预览</button>
         <button data-mode-choice="edit">编辑模式</button>
         <button class="mobile-choice-toggle" type="button" data-mobile-choice="mode" title="切换工作模式" aria-label="交互预览">
-          <span class="mobile-choice-icons" aria-hidden="true">
-            <span class="mobile-choice-icon" data-mobile-choice-value="preview"><span class="system-symbol" data-system-symbol="keyboard" aria-hidden="true"></span></span>
-            <span class="mobile-choice-icon" data-mobile-choice-value="edit"><span class="system-symbol" data-system-symbol="pencil" aria-hidden="true"></span></span>
-          </span>
+          <span class="mobile-choice-label">交互预览</span>
         </button>
         <select id="mode" hidden><option value="preview">交互预览</option><option value="edit">编辑模式</option></select>
+      </div>
+      <div class="mobile-title-choices" aria-label="预览选项">
+        <button class="mobile-choice-toggle glass-module" type="button" data-mobile-choice="orientation" title="切换方向" aria-label="竖屏">
+          <span class="mobile-choice-icons" aria-hidden="true">
+            <span class="mobile-choice-icon" data-mobile-choice-value="port"><span class="system-symbol" data-system-symbol="rectangle.portrait" aria-hidden="true"></span></span>
+            <span class="mobile-choice-icon" data-mobile-choice-value="land"><span class="system-symbol" data-system-symbol="rectangle.landscape" aria-hidden="true"></span></span>
+          </span>
+        </button>
+        <button class="mobile-choice-toggle glass-module" type="button" data-mobile-choice="theme" title="切换外观" aria-label="浅色">
+          <span class="mobile-choice-icons" aria-hidden="true">
+            <span class="mobile-choice-icon" data-mobile-choice-value="light"><span class="system-symbol" data-system-symbol="sun.max" aria-hidden="true"></span></span>
+            <span class="mobile-choice-icon" data-mobile-choice-value="dark"><span class="system-symbol" data-system-symbol="moon" aria-hidden="true"></span></span>
+          </span>
+        </button>
       </div>
       <details class="toolbar-more">
         <summary title="更多操作" aria-label="更多操作"><span class="system-symbol" data-system-symbol="ellipsis" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><circle class="fallback-dot" cx="4" cy="10" r="1"/><circle class="fallback-dot" cx="10" cy="10" r="1"/><circle class="fallback-dot" cx="16" cy="10" r="1"/></svg></span></summary>
@@ -90,8 +101,8 @@
       <nav class="mobile-workspace-tabs" aria-label="手机编辑区域">
         <button class="active" type="button" data-mobile-pane="layout" aria-pressed="true">文件与布局</button>
         <button type="button" data-mobile-pane="inspector" aria-pressed="false">属性检查器</button>
-        <button id="mobile-split-handle" class="mobile-split-handle" type="button" role="slider" aria-orientation="vertical" aria-valuemin="28" aria-valuemax="72" aria-valuenow="50" title="拖动调整画布与配置区域比例" aria-label="拖动调整画布与配置区域比例">
-          <span class="system-symbol" data-system-symbol="arrow.up.and.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 2v16m0-16L7 5m3-3 3 3M10 18l-3-3m3 3 3-3"/></svg></span>
+        <button id="mobile-split-handle" class="mobile-split-handle" type="button" role="slider" aria-orientation="vertical" aria-valuemin="28" aria-valuemax="72" aria-valuenow="50" aria-expanded="true" title="拖动调整画布与配置区域比例；点击收起或展开预览" aria-label="拖动调整画布与配置区域比例；点击收起或展开预览">
+          <span class="system-symbol mobile-split-icon" data-system-symbol="chevron.up.chevron.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m5 8 5-5 5 5M5 12l5 5 5-5"/></svg></span>
         </button>
       </nav>
       <aside class="sidebar">
@@ -137,28 +148,16 @@
             </select>
           </label>
           <div class="preview-choice glass-module" aria-label="方向">
-            <button class="active" data-orientation-choice="port">竖屏</button>
-            <button data-orientation-choice="land">横屏</button>
-            <button class="mobile-choice-toggle" type="button" data-mobile-choice="orientation" title="切换方向" aria-label="竖屏">
-              <span class="mobile-choice-icons" aria-hidden="true">
-                <span class="mobile-choice-icon" data-mobile-choice-value="port"><span class="system-symbol" data-system-symbol="rectangle.portrait" aria-hidden="true"></span></span>
-                <span class="mobile-choice-icon" data-mobile-choice-value="land"><span class="system-symbol" data-system-symbol="rectangle.landscape" aria-hidden="true"></span></span>
-              </span>
-            </button>
+            <button class="active" data-orientation-choice="port" title="竖屏" aria-label="竖屏"><span class="system-symbol" data-system-symbol="rectangle.portrait" aria-hidden="true"></span></button>
+            <button data-orientation-choice="land" title="横屏" aria-label="横屏"><span class="system-symbol" data-system-symbol="rectangle.landscape" aria-hidden="true"></span></button>
             <select id="orientation" hidden>
               <option value="port">竖屏</option>
               <option value="land">横屏</option>
             </select>
           </div>
           <div class="preview-choice glass-module" aria-label="外观">
-            <button class="active" data-theme-choice="light">浅色</button>
-            <button data-theme-choice="dark">深色</button>
-            <button class="mobile-choice-toggle" type="button" data-mobile-choice="theme" title="切换外观" aria-label="浅色">
-              <span class="mobile-choice-icons" aria-hidden="true">
-                <span class="mobile-choice-icon" data-mobile-choice-value="light"><span class="system-symbol" data-system-symbol="sun.max" aria-hidden="true"></span></span>
-                <span class="mobile-choice-icon" data-mobile-choice-value="dark"><span class="system-symbol" data-system-symbol="moon" aria-hidden="true"></span></span>
-              </span>
-            </button>
+            <button class="active" data-theme-choice="light" title="浅色" aria-label="浅色"><span class="system-symbol" data-system-symbol="sun.max" aria-hidden="true"></span></button>
+            <button data-theme-choice="dark" title="深色" aria-label="深色"><span class="system-symbol" data-system-symbol="moon" aria-hidden="true"></span></button>
             <select id="theme" hidden><option value="light">浅色</option><option value="dark">深色</option></select>
           </div>
           <select id="layout" hidden><option value="py_9.ini">9键</option><option value="py_26.ini">26 键</option></select>
@@ -238,7 +237,9 @@
           </div>
         </div>
         <div id="quick-inspector" hidden>
-          <nav id="mobile-inspector-groups" aria-label="属性分组"></nav>
+          <nav id="mobile-inspector-groups" aria-label="属性分组">
+            <button id="inspector-groups-drag" type="button" aria-label="拖动属性分组栏" title="拖动属性分组栏">⋮⋮</button>
+          </nav>
           <div class="inspector-title key-inspector-title">
             <strong id="selected-key">选择画布中的按键</strong>
             <span>更改会自动写回配置</span>
@@ -293,8 +294,8 @@
               <label>点击动作（CENTER） <input data-key-field="CENTER" list="baidu-action-codes" /><small data-action-meaning="CENTER"></small></label>
             </div>
           </div>
-          <details class="inspector-group inspector-disclosure key-only" open>
-            <summary>布局</summary>
+          <section class="inspector-group inspector-disclosure key-only">
+            <h3>布局</h3>
             <div class="inspector-grid geometry-fields">
               <label>X（VIEW_RECT） <input data-key-field="x" type="number" /></label>
               <label>Y（VIEW_RECT） <input data-key-field="y" type="number" /></label>
@@ -318,9 +319,9 @@
               <button data-layout-action="swap" title="交换位置">交换</button>
               <button data-layout-action="merge" title="合并按键">合并</button>
             </div>
-          </details>
-          <details class="inspector-group inspector-disclosure key-only" open>
-            <summary>样式引用、文字与图片</summary>
+          </section>
+          <section class="inspector-group inspector-disclosure key-only">
+            <h3>样式引用、文字与图片</h3>
             <div class="inspector-grid appearance-fields">
               <label class="style-ref-row" title="按键引用的共享背景样式编号">背景样式引用（BACK_STYLE）
                 <span class="style-field">
@@ -332,6 +333,11 @@
                   <input data-key-field="FORE_STYLE" />
                 </span>
               </label>
+              <label class="style-ref-row" title="按键引用的按键音效样式编号">按键音效样式（SOUND_STYLE）
+                <span class="style-field">
+                  <input data-key-field="SOUND_STYLE" />
+                </span>
+              </label>
               <label data-text-style>字体（FONT_NAME） <input data-style-field="FONT_NAME" /></label>
               <label data-text-style>字重（FONT_WEIGHT） <input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
               <label data-text-style>字号（FONT_SIZE） <input data-style-field="FONT_SIZE" type="number" /></label>
@@ -340,9 +346,9 @@
                 <label>文字按下颜色（HL_COLOR） <span class="color-control"><input data-style-field="HL_COLOR" /><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色（HL_COLOR）"><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度（HL_COLOR）"></span></label>
               </div>
             </div>
-          </details>
-          <details class="inspector-group inspector-disclosure key-only">
-            <summary>滑动与长按</summary>
+          </section>
+          <section class="inspector-group inspector-disclosure key-only">
+            <h3>滑动与长按</h3>
             <div class="direction-editor" aria-label="滑动与长按动作">
               <label class="direction-up"><span>↑ 上滑（UP）</span><input data-key-field="UP" list="baidu-action-codes" /><small data-action-meaning="UP"></small></label>
               <label class="direction-left"><span>← 左滑（LEFT）</span><input data-key-field="LEFT" list="baidu-action-codes" /><small data-action-meaning="LEFT"></small></label>
@@ -350,14 +356,21 @@
               <label class="direction-right"><span>右滑（RIGHT）→</span><input data-key-field="RIGHT" list="baidu-action-codes" /><small data-action-meaning="RIGHT"></small></label>
               <label class="direction-down"><span>↓ 下滑（DOWN）</span><input data-key-field="DOWN" list="baidu-action-codes" /><small data-action-meaning="DOWN"></small></label>
             </div>
-          </details>
+          </section>
         </div>
         <div id="resource-inspector" hidden>
           <div id="resource-list-view">
             <div class="inspector-title">
               <strong id="resource-list-title">皮肤图片</strong>
               <span id="resource-count"></span>
-              <label class="search-control" aria-label="搜索图片"><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"></span><input id="resource-search" type="search" results="0" placeholder="搜索图片"></label>
+              <div class="resource-filters">
+                <select id="resource-category" hidden aria-label="样式分类">
+                  <option value="all">全部样式</option>
+                  <option value="sound">声音样式</option>
+                  <option value="visual">视觉样式</option>
+                </select>
+                <label class="search-control" aria-label="搜索图片"><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"></span><input id="resource-search" type="search" results="0" placeholder="搜索图片"></label>
+              </div>
               <div class="resource-actions">
                 <button id="style-add" class="toolbar-button" type="button" title="新增样式" aria-label="新增样式" hidden><span class="icon system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14"/></svg></span></button>
                 <button id="resource-upload" class="toolbar-button" type="button" title="上传图片" aria-label="上传图片"><span class="icon system-symbol" data-system-symbol="arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 13V4m-4 4 4-4 4 4M4 16h12"/></svg></span></button>
@@ -605,6 +618,8 @@
         <header><h2 id="settings-title">设置</h2><button aria-label="关闭">关闭</button></header>
         <label>软件外观 <select id="app-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
         <label class="settings-switch">窗口玻璃与亚克力材质 <input id="window-material" type="checkbox" role="switch" checked></label>
+        <label class="settings-switch">显示概览/源文件切换 <input id="sidebar-view-visible" type="checkbox" role="switch"></label>
+        <label class="settings-switch">显示属性/源代码切换 <input id="inspector-tabs-visible" type="checkbox" role="switch"></label>
         <label>默认预览设备 <select id="default-device"><option value="canvas">画布</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
         <label>画布背景 <select id="canvas-background"><option value="glass">玻璃</option><option value="checkerboard">马赛克</option><option value="white" selected>白色</option><option value="dark">深色</option></select></label>
         <label>手机竖屏预览位置 <select id="mobile-preview-position"><option value="bottom" selected>下半区</option><option value="top">上半区</option></select></label>
@@ -614,12 +629,12 @@
 
     <dialog id="about-dialog" class="app-dialog" aria-labelledby="about-title">
       <form method="dialog">
-        <header><h2 id="about-title">关于 BdiEditor v0.8.34</h2><button aria-label="关闭">关闭</button></header>
+        <header><h2 id="about-title">关于 BdiEditor v1.0.0</h2><button aria-label="关闭">关闭</button></header>
         <p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
-        <p>版本 0.8.34</p>
+        <p>版本 1.0.0</p>
         <p>支持读取、编辑和导出 BDI、BDS、BDA 皮肤包。</p>
         <p class="about-alpha">阿尔法版本：包含未完成的功能与实验性改动，仅用于测试。</p>
-        <section id="about-update" class="about-update" data-current-version="0.8.34">
+        <section id="about-update" class="about-update" data-current-version="1.0.0">
           <div><strong>版本更新</strong><button id="check-update" type="button">检查更新</button></div>
           <p id="update-status" aria-live="polite">正在检查更新…</p>
           <a id="download-update" href="https://github.com/rekazer0/BdiEditor/releases" target="_blank" rel="noreferrer" hidden>查看最新版本</a>

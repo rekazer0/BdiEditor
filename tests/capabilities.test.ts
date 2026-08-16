@@ -64,3 +64,11 @@ test("Windows release entrypoint hides the console subsystem", () => {
   const entrypoint = readFileSync("src-tauri/src/main.rs", "utf8")
   assert.match(entrypoint, /#!\[cfg_attr\(not\(debug_assertions\), windows_subsystem = "windows"\)\]/)
 })
+
+test("tagged releases build and upload a signed Android APK", () => {
+  const workflow = readFileSync(".github/workflows/release.yml", "utf8")
+  assert.match(workflow, /build-android:/)
+  assert.match(workflow, /android build --apk --ci/)
+  assert.match(workflow, /ANDROID_KEYSTORE_BASE64/)
+  assert.match(workflow, /gh release upload[\s\S]*android\.apk/)
+})
