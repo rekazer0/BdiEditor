@@ -18,6 +18,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" >/dev/null 2>&1 && exit 0
           VERSION="${GITHUB_REF_NAME#v}"
           awk -v version="$VERSION" '
             $0 ~ "^## " version "([[:space:]]|$)" { printing = 1 }

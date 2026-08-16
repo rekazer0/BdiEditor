@@ -48,6 +48,7 @@ test("native window material can be changed without restarting", () => {
   assert.match(rust, /window\.set_effects\(None\)/)
   assert.match(rust, /Effect::Sidebar/)
   assert.match(rust, /Effect::Acrylic/)
+  assert.match(rust, /#\[cfg\(any\(target_os = "macos", target_os = "windows"\)\)\][\s\S]*?window\.set_effects\(None\)/)
   assert.match(rust, /set_window_material[\s\S]*?tauri::generate_handler!/)
 })
 
