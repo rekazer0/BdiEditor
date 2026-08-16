@@ -392,9 +392,12 @@ test("BDA animation frames have a minimal native inspector", () => {
   assert.match(main, /updateBdaAnimationFrame\(/)
 })
 
-test("BDA files are accepted by browser and native open flows", () => {
-  assert.match(html, /accept="[^"]*\.bda/)
-  assert.match(main, /extensions: \["bdi", "bds", "bda", "zip"\]/)
+test("native skin extensions are accepted without collapsing mobile pickers to ZIP", () => {
+  assert.match(html, /accept="\.bdi,\.bds,\.bda"/)
+  assert.match(main, /extensions: \["bdi", "bds", "bda"\]/)
+  assert.doesNotMatch(html, /id="browser-open"[^>]*\.zip/)
+  assert.match(main, /loadNativePath\(path: string\)[\s\S]*?if \(!isSupportedSkinPath\(path\)\) throw/)
+  assert.match(main, /if \(!isSupportedSkinPath\(file\.name\)\) throw/)
 })
 
 test("toolbar configurations expose parsed inspector fields", () => {
@@ -624,8 +627,8 @@ test("key layout supports select, drag-move, merge, and wheel-adjusted geometry 
 })
 
 test("window and about names match the GitHub project and include the version", () => {
-  assert.match(html, /<title>BdiEditor v1\.0\.0<\/title>/)
-  assert.match(html, /关于 BdiEditor v1\.0\.0/)
+  assert.match(html, /<title>BdiEditor v1\.0\.1<\/title>/)
+  assert.match(html, /关于 BdiEditor v1\.0\.1/)
   assert.match(html, /<strong>技术交流与反馈<\/strong><br><button id="copy-qq-group"[^>]*>QQ群：228040912<\/button>/)
 })
 
@@ -645,7 +648,7 @@ test("deleting a mixed inspector value clears every selected key through its inp
 })
 
 test("about dialog automatically checks the canonical GitHub project for updates", () => {
-  assert.match(html, /id="about-update"[^>]*data-current-version="1\.0\.0"/)
+  assert.match(html, /id="about-update"[^>]*data-current-version="1\.0\.1"/)
   assert.match(html, /id="check-update"/)
   assert.match(html, /id="update-status"[^>]*aria-live="polite"/)
   assert.match(html, /id="download-update"[^>]*https:\/\/github\.com\/rekazer0\/BdiEditor\/releases["']/)

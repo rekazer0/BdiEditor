@@ -5227,7 +5227,7 @@ async function openNative(): Promise<boolean> {
   if (!(await prepareDocumentReplacement())) return false
   const path = await open({
     multiple: false,
-    filters: [{ name: "百度输入法皮肤", extensions: ["bdi", "bds", "bda", "zip"] }],
+    filters: [{ name: "百度输入法皮肤", extensions: ["bdi", "bds", "bda"] }],
   })
   if (typeof path !== "string") return false
   await loadNativePath(path)
@@ -5235,6 +5235,7 @@ async function openNative(): Promise<boolean> {
 }
 
 async function loadNativePath(path: string): Promise<boolean> {
+  if (!isSupportedSkinPath(path)) throw new Error("仅支持 .bda、.bdi 或 .bds 皮肤文件")
   const bytes = await invoke<number[]>("read_file", { path })
   await loadArchive(new Uint8Array(bytes), path)
   return true
@@ -5584,6 +5585,7 @@ browserOpen.addEventListener("change", async () => {
   const file = browserOpen.files?.[0]
   if (file) {
     await runFileOperation("打开", async () => {
+      if (!isSupportedSkinPath(file.name)) throw new Error("仅支持 .bda、.bdi 或 .bds 皮肤文件")
       await loadArchive(new Uint8Array(await file.arrayBuffer()), file.name)
       return true
     })

@@ -7,7 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'"
     />
-    <title>BdiEditor v1.0.0</title>
+    <title>BdiEditor v1.0.1</title>
   </head>
   <body>
     <header class="titlebar" data-tauri-drag-region>
@@ -629,12 +629,12 @@
 
     <dialog id="about-dialog" class="app-dialog" aria-labelledby="about-title">
       <form method="dialog">
-        <header><h2 id="about-title">关于 BdiEditor v1.0.0</h2><button aria-label="关闭">关闭</button></header>
+        <header><h2 id="about-title">关于 BdiEditor v1.0.1</h2><button aria-label="关闭">关闭</button></header>
         <p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
-        <p>版本 1.0.0</p>
+        <p>版本 1.0.1</p>
         <p>支持读取、编辑和导出 BDI、BDS、BDA 皮肤包。</p>
         <p class="about-alpha">阿尔法版本：包含未完成的功能与实验性改动，仅用于测试。</p>
-        <section id="about-update" class="about-update" data-current-version="1.0.0">
+        <section id="about-update" class="about-update" data-current-version="1.0.1">
           <div><strong>版本更新</strong><button id="check-update" type="button">检查更新</button></div>
           <p id="update-status" aria-live="polite">正在检查更新…</p>
           <a id="download-update" href="https://github.com/rekazer0/BdiEditor/releases" target="_blank" rel="noreferrer" hidden>查看最新版本</a>
@@ -644,7 +644,7 @@
       </form>
     </dialog>
 
-    <input id="browser-open" type="file" accept=".bdi,.bds,.bda,.zip" hidden />
+    <input id="browser-open" type="file" accept=".bdi,.bds,.bda" hidden />
     <input id="image-open" type="file" accept=".png" hidden />
     <input id="layout-image-open" type="file" accept=".png,image/png" hidden />
     <script type="module" src="/src/main.ts"></script>
