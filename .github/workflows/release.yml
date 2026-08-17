@@ -112,6 +112,8 @@ jobs:
       - run: npm ci
       - name: Initialize Android project
         run: NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION" npm run tauri -- android init --ci --skip-targets-install
+      - name: Sync Android launcher icons
+        run: node scripts/sync-android-icons.mjs
       - name: Configure APK signing
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
