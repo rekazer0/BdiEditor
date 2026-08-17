@@ -1844,9 +1844,8 @@ canvas {
 }
 
 #mobile-inspector-groups button.active {
-  color: var(--text);
-  background: color-mix(in srgb, var(--accent) 18%, var(--control));
-  box-shadow: inset 2px 0 var(--accent);
+  color: #fff;
+  background: var(--accent);
 }
 
 @media (min-width: 761px) {
@@ -3997,21 +3996,6 @@ input[type="search"]:focus {
   box-shadow: none;
 }
 
-#skin-name-input {
-  height: 36px;
-  padding: 0 14px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  color: var(--text);
-  background: color-mix(in srgb, var(--secondary) 12%, transparent);
-}
-
-#skin-name-input:focus {
-  outline: none;
-  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
-}
-
 .style-reference-input > input,
 .inspector-grid .style-reference-input > input,
 .gap-fields input,
@@ -4125,6 +4109,10 @@ input[type="search"]:focus {
     gap: 2px;
   }
 
+  .titlebar > .spacer {
+    display: none;
+  }
+
   .mobile-command-menu > summary {
     width: auto !important;
     min-width: 68px;
@@ -4145,7 +4133,7 @@ input[type="search"]:focus {
 
   .mobile-command-actions {
     width: auto;
-    max-height: calc(100dvh - var(--titlebar-height) - 16px);
+    max-height: calc(100vh - var(--titlebar-height) - 16px);
     position: fixed;
     top: calc(var(--titlebar-height) + 6px);
     right: max(8px, env(safe-area-inset-right));
@@ -4190,14 +4178,19 @@ input[type="search"]:focus {
   .mode-control {
     width: clamp(78px, 22vw, 100px);
     min-width: 0;
+    position: absolute;
+    left: 50%;
+    z-index: 1;
     flex: none;
     padding: 2px;
+    transform: translateX(-50%);
   }
 
   .mobile-title-choices {
     display: flex;
     flex: none;
     gap: 4px;
+    margin-left: auto;
   }
 
   .mode-control > button:not(.mobile-choice-toggle),
@@ -4247,7 +4240,7 @@ input[type="search"]:focus {
   }
 
   main {
-    height: calc(100dvh - var(--titlebar-height));
+    height: calc(100vh - var(--titlebar-height));
     min-height: 0;
     display: block;
     position: relative;
@@ -4633,20 +4626,22 @@ input[type="search"]:focus {
     width: 100%;
     min-height: 36px;
     padding: 4px 2px;
+    display: grid;
+    place-items: center;
     overflow: visible;
-    border-radius: 5px;
+    border-radius: 6px;
     color: var(--secondary);
     background: transparent;
     font-size: 10px;
     line-height: 1.15;
+    text-align: center;
     text-overflow: clip;
     white-space: normal;
   }
 
   .mobile-overview-groups button.active {
-    color: var(--text);
-    background: color-mix(in srgb, var(--accent) 18%, var(--control));
-    box-shadow: inset 2px 0 var(--accent);
+    color: #fff;
+    background: var(--accent);
   }
 
   .sidebar-overview > .nav-group {
@@ -4680,6 +4675,10 @@ input[type="search"]:focus {
   .app-dialog :is(input:not([type="checkbox"]), textarea, select) {
     min-height: 36px;
     font-size: 16px;
+  }
+
+  .source :is(input, textarea, select) {
+    font-size: 13px;
   }
 
   .source :is(button, summary),
@@ -4739,11 +4738,9 @@ input[type="search"]:focus {
     border: 0;
     overflow: visible;
     scroll-margin-top: 4px;
-    display: block !important;
   }
 
   #quick-inspector .mobile-inspector-managed {
-    display: block !important;
     scroll-margin-top: 4px;
   }
 
@@ -4872,7 +4869,7 @@ input[type="search"]:focus {
   }
 
   main {
-    height: calc(100dvh - var(--titlebar-height));
+    height: calc(100vh - var(--titlebar-height));
     grid-template-columns: clamp(116px, 18vw, 150px) minmax(0, 1fr) 0 clamp(190px, 28vw, 240px);
   }
 
@@ -4933,7 +4930,7 @@ input[type="search"]:focus {
 
   .source :is(input, textarea, select) {
     min-height: 36px;
-    font-size: 16px;
+    font-size: 13px;
   }
 
   .workspace-status {

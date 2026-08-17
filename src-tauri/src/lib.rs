@@ -1,13 +1,26 @@
 use std::fs;
+use std::path::Path;
 use std::sync::Mutex;
-use tauri::Manager;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use tauri::window::{Effect, EffectsBuilder};
+use tauri::Manager;
 
 struct OpenedFiles(Mutex<Vec<String>>);
 
 const MAX_ARCHIVE_BYTES: u64 = 64 * 1024 * 1024;
 const RELEASES_URL: &str = "https://github.com/rekazer0/BdiEditor/releases";
+
+fn valid_share_filename(name: &str) -> bool {
+    let path = Path::new(name);
+    path.file_name().and_then(|value| value.to_str()) == Some(name)
+        && matches!(
+            path.extension()
+                .and_then(|value| value.to_str())
+                .map(str::to_ascii_lowercase)
+                .as_deref(),
+            Some("bdi" | "bds" | "bda")
+        )
+}
 
 #[tauri::command]
 fn read_file(path: String) -> Result<Vec<u8>, String> {
@@ -23,6 +36,36 @@ fn read_file(path: String) -> Result<Vec<u8>, String> {
 #[tauri::command]
 fn write_file(path: String, data: Vec<u8>) -> Result<(), String> {
     fs::write(path, data).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn share_file(app: tauri::AppHandle, name: String, data: Vec<u8>) -> Result<(), String> {
+    if !valid_share_filename(&name) {
+        return Err("invalid skin filename".into());
+    }
+    #[cfg(target_os = "android")]
+    {
+        let directory = app
+            .path()
+            .app_cache_dir()
+            .map_err(|error| error.to_string())?
+            .join("shared-skins");
+        fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+        let path = directory.join(&name);
+        fs::write(&path, data).map_err(|error| error.to_string())?;
+        tauri_plugin_native_share::share_file(
+            &app,
+            path.to_string_lossy().into_owned(),
+            name,
+            "application/octet-stream".into(),
+        )?;
+        return Ok(());
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (app, data);
+        Err("native file sharing is only available on Android".into())
+    }
 }
 
 #[tauri::command]
@@ -82,7 +125,7 @@ async fn fetch_release_page() -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{read_file, write_file, MAX_ARCHIVE_BYTES};
+    use super::{read_file, valid_share_filename, write_file, MAX_ARCHIVE_BYTES};
     use std::fs;
 
     #[test]
@@ -116,17 +159,28 @@ mod tests {
         fs::remove_file(oversized).expect("cleanup sparse test file");
     }
 
+    #[test]
+    fn share_filename_accepts_skin_files_without_path_components() {
+        assert!(valid_share_filename("我的皮肤.bds"));
+        assert!(valid_share_filename("sample.BDA"));
+        assert!(!valid_share_filename("../sample.bds"));
+        assert!(!valid_share_filename("sample.zip"));
+        assert!(!valid_share_filename(""));
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_native_share::init())
         .manage(OpenedFiles(Mutex::new(Vec::new())));
     #[cfg(target_os = "macos")]
     let builder = builder.invoke_handler(tauri::generate_handler![
         read_file,
         write_file,
+        share_file,
         take_opened_files,
         quit_app,
         set_window_material,
@@ -136,6 +190,7 @@ pub fn run() {
     let builder = builder.invoke_handler(tauri::generate_handler![
         read_file,
         write_file,
+        share_file,
         take_opened_files,
         quit_app,
         set_window_material,

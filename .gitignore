@@ -1,6 +1,8 @@
 node_modules/
 dist/
 dist-release/
+*.apk
+*.apk.idsig
 src-tauri/target/
 src-tauri/gen/
 .DS_Store

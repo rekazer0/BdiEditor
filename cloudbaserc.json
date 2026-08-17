@@ -1,0 +1,11 @@
+{
+  "version": "2.0",
+  "envId": "bdieditor-d4gdhm3ir22dcc04c",
+  "app": {
+    "serviceName": "bdi-edit",
+    "framework": "vite",
+    "buildCommand": "npm run build",
+    "outputDir": "dist",
+    "deployPath": "/"
+  }
+}

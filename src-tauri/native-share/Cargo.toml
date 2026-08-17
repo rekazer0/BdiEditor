@@ -1,0 +1,16 @@
+[package]
+name = "tauri-plugin-native-share"
+version = "0.1.0"
+edition = "2021"
+links = "tauri-plugin-native-share"
+
+[lib]
+name = "tauri_plugin_native_share"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2", default-features = false }
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

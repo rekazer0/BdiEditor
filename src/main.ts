@@ -3,7 +3,8 @@ import { emitTo, listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { getCurrentWebview } from "@tauri-apps/api/webview"
-import { message, open } from "@tauri-apps/plugin-dialog"
+import { message, open, save } from "@tauri-apps/plugin-dialog"
+import { readFile, writeFile } from "@tauri-apps/plugin-fs"
 import "./style.css"
 import {
   actionDescription,
@@ -31,7 +32,6 @@ import {
 import {
   exportFormatFromPath,
   exportName,
-  isUnnamedSkinName,
   type ExportFormat,
 } from "./export.ts"
 import {
@@ -146,8 +146,6 @@ const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>
 const newButton = $("#new") as HTMLButtonElement
 const newProjectDialog = $("#new-project-dialog") as HTMLDialogElement
 const newProjectForm = $("#new-project-form") as HTMLFormElement
-const skinNameDialog = $("#skin-name-dialog") as HTMLDialogElement
-const skinNameInput = $("#skin-name-input") as HTMLInputElement
 const openButton = $("#open") as HTMLButtonElement
 const saveButton = $("#save") as HTMLButtonElement
 const mobileShareButton = $("#mobile-share") as HTMLButtonElement
@@ -908,7 +906,8 @@ function syncMobileInspectorHeader(): void {
 
 function mobileInspectorGroupLabel(group: HTMLElement): string {
   if (group.classList.contains("document-property-section")) {
-    return group.querySelector(":scope > h3")?.textContent?.trim() ?? "配置"
+    const label = group.querySelector(":scope > h3")?.textContent?.trim() ?? "配置"
+    return label.replace(/\s*[（(][^）)]*[）)]\s*$/, "")
   }
   if (group.classList.contains("primary-key-fields")) return "常用"
   if (group.classList.contains("skin-fields")) return "皮肤"
@@ -4637,7 +4636,7 @@ sourceDownloadButton.addEventListener("click", () => {
     if (!archive || !selection || selection.folder) return false
     const bytes = archive.getBytes(selection.path)
     if (!bytes) return false
-    return Boolean(await writeToChosenDirectory(selection.path.split("/").pop() ?? "download", bytes))
+    return Boolean(await writeToChosenFile(selection.path.split("/").pop() ?? "download", bytes))
   })
 })
 
@@ -5236,13 +5235,15 @@ async function openNative(): Promise<boolean> {
 
 async function loadNativePath(path: string): Promise<boolean> {
   if (!isSupportedSkinPath(path)) throw new Error("仅支持 .bda、.bdi 或 .bds 皮肤文件")
-  const bytes = await invoke<number[]>("read_file", { path })
-  await loadArchive(new Uint8Array(bytes), path)
+  const bytes = path.startsWith("content://")
+    ? await readFile(path)
+    : new Uint8Array(await invoke<number[]>("read_file", { path }))
+  await loadArchive(bytes, path)
   return true
 }
 
 function isSupportedSkinPath(path: string): boolean {
-  return /\.(bdi|bds|bda)$/i.test(path)
+  return path.startsWith("content://") || /\.(bdi|bds|bda)$/i.test(path)
 }
 
 async function loadDroppedFile(file: File): Promise<boolean> {
@@ -5284,12 +5285,12 @@ async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: 
   const exported = exportArchive(format)
   if (!exported) return false
   let path = currentPath
-  if (saveAs || !path || exportFormatFromPath(path) !== format) {
-    const written = await writeToChosenDirectory(suggestedName, exported.bytes)
+  if (saveAs || !path || (!path.startsWith("content://") && exportFormatFromPath(path) !== format)) {
+    const written = await writeToChosenFile(suggestedName, exported.bytes, `${format.toUpperCase()} 皮肤`)
     if (!written) return false
     path = written
   } else {
-    await invoke("write_file", { path, data: Array.from(exported.bytes) })
+    await writeNativePath(path, exported.bytes)
   }
   if (!exported.converted) {
     currentPath = path
@@ -5301,44 +5302,66 @@ async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: 
   return true
 }
 
-type BrowserDirectoryHandle = {
-  getFileHandle(name: string, options: { create: true }): Promise<{
-    createWritable(): Promise<{ write(data: Uint8Array): Promise<void>; close(): Promise<void> }>
-  }>
+type BrowserSaveFileHandle = {
+  name: string
+  createWritable(): Promise<{ write(data: Uint8Array): Promise<void>; close(): Promise<void> }>
 }
 
-async function writeToChosenDirectory(filename: string, bytes: Uint8Array): Promise<string | undefined> {
+async function writeNativePath(path: string, bytes: Uint8Array): Promise<void> {
+  if (path.startsWith("content://")) {
+    await writeFile(path, bytes)
+    return
+  }
+  await invoke("write_file", { path, data: Array.from(bytes) })
+}
+
+async function writeToChosenFile(
+  filename: string,
+  bytes: Uint8Array,
+  description = "文件",
+): Promise<string | undefined> {
+  const extension = filename.match(/\.([^.\\/]+)$/)?.[1]
   if (isTauri()) {
-    const directory = await open({ directory: true, multiple: false, title: "选择下载目录" })
-    if (typeof directory !== "string") return
-    const separator = directory.includes("\\") ? "\\" : "/"
-    const path = `${directory.replace(/[\\/]$/, "")}${separator}${filename}`
-    await invoke("write_file", { path, data: Array.from(bytes) })
+    const path = await save({
+      title: "保存文件",
+      defaultPath: filename,
+      filters: extension ? [{ name: description, extensions: [extension] }] : undefined,
+    })
+    if (!path) return
+    await writeNativePath(path, bytes)
     return path
   }
   const picker = (window as typeof window & {
-    showDirectoryPicker?: () => Promise<BrowserDirectoryHandle>
-  }).showDirectoryPicker
-  if (!picker) throw new Error("当前浏览器不支持系统目录选择，请使用 Chrome 或桌面版")
-  let directory: BrowserDirectoryHandle
+    showSaveFilePicker?: (options: {
+      suggestedName: string
+      types?: Array<{ description: string; accept: Record<string, string[]> }>
+    }) => Promise<BrowserSaveFileHandle>
+  }).showSaveFilePicker
+  if (!picker) throw new Error("当前浏览器不支持系统保存，请使用 Chrome 或桌面版")
+  let file: BrowserSaveFileHandle
   try {
-    directory = await picker.call(window)
+    file = await picker.call(window, {
+      suggestedName: filename,
+      types: extension ? [{
+        description,
+        accept: { "application/octet-stream": [`.${extension}`] },
+      }] : undefined,
+    })
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") return
     throw error
   }
-  const file = await directory.getFileHandle(filename, { create: true })
   const writable = await file.createWritable()
   await writable.write(bytes)
   await writable.close()
-  return filename
+  return file.name
 }
 
 async function downloadArchive(format: ExportFormat, suggestedName: string): Promise<boolean> {
   if (!archive) throw new Error("当前没有可保存的皮肤")
   const exported = exportArchive(format)
   if (!exported) return false
-  const path = await writeToChosenDirectory(suggestedName, exported.bytes)
+  const path = await writeToChosenFile(suggestedName, exported.bytes, `${format.toUpperCase()} 皮肤`)
   if (!path) return false
   if (!exported.converted) {
     currentPath = path
@@ -5350,28 +5373,11 @@ async function downloadArchive(format: ExportFormat, suggestedName: string): Pro
   return true
 }
 
-function chooseSkinName(format: ExportFormat): Promise<string | undefined> {
-  skinNameDialog.returnValue = ""
-  skinNameInput.value = ""
-  skinNameDialog.showModal()
-  skinNameInput.focus()
-  return new Promise((resolve) => {
-    skinNameDialog.addEventListener("close", () => {
-      const name = skinNameInput.value.trim()
-      resolve(skinNameDialog.returnValue === "confirm" && name ? exportName(name, format) : undefined)
-    }, { once: true })
-  })
-}
-
 async function saveArchive(saveAs: boolean, format: ExportFormat): Promise<boolean> {
   const currentName = documentName.textContent?.trim() ?? ""
-  const unnamed = isUnnamedSkinName(currentName)
-  const suggestedName = unnamed
-    ? await chooseSkinName(format)
-    : exportName(currentName, format)
-  if (!suggestedName) return false
+  const suggestedName = exportName(currentName, format)
   return isTauri()
-    ? saveNative(saveAs || unnamed, format, suggestedName)
+    ? saveNative(saveAs, format, suggestedName)
     : downloadArchive(format, suggestedName)
 }
 
@@ -5382,6 +5388,10 @@ async function shareArchiveToMobile(): Promise<boolean> {
   if (!exported) return false
   const currentName = documentName.textContent?.trim() || "皮肤"
   const name = exportName(currentName, format)
+  if (isTauri() && /Android/i.test(navigator.userAgent)) {
+    await invoke("share_file", { name, data: Array.from(exported.bytes) })
+    return true
+  }
   const file = new File([exported.bytes], name, { type: "application/octet-stream" })
   if (!navigator.share || navigator.canShare && !navigator.canShare({ files: [file] })) {
     throw new Error("当前设备不支持系统文件分享")
@@ -6435,12 +6445,12 @@ resourceDownloadButton.addEventListener("click", () => {
       const entry = currentSoundEntries().find((item) => item.id === selectedSoundID)
       const bytes = entry?.path ? archive?.getBytes(entry.path) : undefined
       if (!entry?.path || !bytes) return false
-      return Boolean(await writeToChosenDirectory(entry.filename, bytes))
+      return Boolean(await writeToChosenFile(entry.filename, bytes))
     }
     if (!archive || !selectedResourceGalleryPath) return false
     const bytes = archive.getBytes(selectedResourceGalleryPath)
     if (!bytes) return false
-    return Boolean(await writeToChosenDirectory(
+    return Boolean(await writeToChosenFile(
       selectedResourceGalleryPath.split("/").pop() ?? "image.png",
       bytes,
     ))
