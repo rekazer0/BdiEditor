@@ -1,6 +1,8 @@
 node_modules/
 dist/
 dist-release/
+tests/
+docs/
 *.apk
 *.apk.idsig
 src-tauri/target/
