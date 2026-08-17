@@ -4,8 +4,6 @@
 
 支持 macOS、Windows 与 Android，采用轻量的 Tauri 2 + 原生 HTML/CSS/TypeScript 技术栈。
 
-![BdiEditor v0.3.2 编辑界面](docs/screenshots/bdiedito-v0.3.2-overview.png)
-
 ## v1.0.1 更新
 
 - 新增手机竖屏触控编辑、按键音效、传统按键动画和源文件管理。
@@ -27,8 +25,6 @@
 在右上角“更多 → 设置”中可切换软件外观、默认预览设备和画布背景。
 
 内置皮肤为互联网下载整理，如有侵权请联系作者下架。
-
-![BdiEditor v0.3.2 深色设置](docs/screenshots/bdiedito-v0.3.2-dark-settings.png)
 
 ## 主要特性
 
@@ -87,7 +83,7 @@ npm run tauri build -- --bundles nsis
 
 ## 兼容性
 
-当前保证兼容项目测试样本所属的百度 iOS 皮肤格式家族。所有未知文件和字段会被保留，但其他历史格式仍需真实样本验证。详情见 [皮肤格式规范](docs/skin-format.md)。
+当前保证兼容项目测试样本所属的百度 iOS 皮肤格式家族。所有未知文件和字段会被保留，但其他历史格式仍需真实样本验证。详情见皮肤格式规范。
 
 界面支持跟随系统、浅色和深色模式，并使用轻量毛玻璃；Windows 使用系统 Mica 窗口材质。macOS 发布包使用 ad-hoc 签名，尚未使用 Apple Developer ID 公证；首次打开若被 Gatekeeper 拦截，请在 Finder 中右键应用并选择“打开”。Windows 版本依赖系统 WebView2 Runtime。
 

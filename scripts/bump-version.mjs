@@ -26,7 +26,6 @@ for (const path of [
   "index.html",
   "src-tauri/tauri.conf.json",
   "src-tauri/tauri.windows.conf.json",
-  "tests/ui-structure.test.ts",
 ]) {
   write(path, read(path).replaceAll(previous, next).replaceAll(previous.replaceAll(".", "\\."), next.replaceAll(".", "\\.")))
 }

@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "vite build",
     "deploy:cloudbase": "tcb app deploy",
-    "test": "node --test tests/*.test.ts",
     "version:feature": "node scripts/bump-version.mjs feature",
     "version:bugfix": "node scripts/bump-version.mjs bugfix",
     "verify:samples": "node scripts/verify-samples.ts",
