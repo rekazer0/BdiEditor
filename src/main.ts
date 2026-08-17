@@ -283,6 +283,7 @@ const layout = $("#layout") as HTMLSelectElement
 const mode = $("#mode") as HTMLSelectElement
 const device = $("#device") as HTMLSelectElement
 const toggleGuides = $("#toggle-guides") as HTMLButtonElement
+const mobileToggleGuides = $("#mobile-toggle-guides") as HTMLButtonElement
 const skinStateControl = $("#skin-state-control")
 const skinState = $("#skin-state") as HTMLSelectElement
 const deviceShell = $("#device-shell")
@@ -4706,8 +4707,11 @@ function selectFile(
   styleReturnPath = ""
   resourceConfigActive = resourceMode !== "document"
   resourceInspectorMode = resourceMode === "style" ? "style" : resourceMode === "sound" ? "sound" : "image"
-  toggleGuides.title = resourceInspectorMode === "image" && resourceConfigActive ? "切片网格" : "辅助线"
-  toggleGuides.setAttribute("aria-label", resourceInspectorMode === "image" && resourceConfigActive ? "切片网格" : "辅助线")
+  const guideLabel = resourceInspectorMode === "image" && resourceConfigActive ? "切片网格" : "辅助线"
+  for (const button of [toggleGuides, mobileToggleGuides]) {
+    button.title = guideLabel
+    button.setAttribute("aria-label", guideLabel)
+  }
   if (resourceInspectorMode === "image" && resourceConfigActive) setGuidesVisible(true)
   if (!resourceConfigActive) {
     selectedResourcePath = ""
@@ -5826,8 +5830,10 @@ for (const button of mobileChoiceButtons) {
 }
 function setGuidesVisible(enabled: boolean): void {
   guidesVisible = enabled
-  toggleGuides.classList.toggle("active", guidesVisible)
-  toggleGuides.setAttribute("aria-pressed", String(guidesVisible))
+  for (const button of [toggleGuides, mobileToggleGuides]) {
+    button.classList.toggle("active", guidesVisible)
+    button.setAttribute("aria-pressed", String(guidesVisible))
+  }
   preview.setGuides(guidesVisible)
   toolbarPreview.setGuides(guidesVisible)
   if (!enabled) setDrawingTile(false)
@@ -5835,6 +5841,7 @@ function setGuidesVisible(enabled: boolean): void {
 }
 
 toggleGuides.addEventListener("click", () => setGuidesVisible(!guidesVisible))
+mobileToggleGuides.addEventListener("click", () => setGuidesVisible(!guidesVisible))
 newTileButton.addEventListener("click", () => {
   if (!selectedResourcePath || !isEditing()) return
   if (!guidesVisible) setGuidesVisible(true)

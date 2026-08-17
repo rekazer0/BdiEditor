@@ -947,6 +947,10 @@ h2 {
   box-shadow: 0 1px 5px rgb(10 127 245 / 25%);
 }
 
+.mobile-guides-toggle {
+  display: none;
+}
+
 .canvas-wrap {
   min-height: 0;
   display: grid;
@@ -4512,6 +4516,29 @@ input[type="search"]:focus {
     height: 25px;
   }
 
+  .mobile-guides-toggle {
+    position: absolute;
+    left: 7px;
+    bottom: 30px;
+    z-index: 8;
+    width: 35px;
+    height: 35px;
+    margin: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .mobile-guides-toggle .system-symbol,
+  .mobile-guides-toggle .system-symbol svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .workspace:has(.canvas-wrap.empty) .mobile-guides-toggle,
+  .workspace:has(#workspace-image-figure:not([hidden])) .mobile-guides-toggle {
+    display: none;
+  }
+
   .workspace-status {
     gap: 8px;
     padding-inline: 7px;
@@ -4915,6 +4942,29 @@ input[type="search"]:focus {
   .preview-zoom-control button {
     width: 25px;
     height: 25px;
+  }
+
+  .mobile-guides-toggle {
+    position: absolute;
+    left: 7px;
+    bottom: 30px;
+    z-index: 8;
+    width: 35px;
+    height: 35px;
+    margin: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .mobile-guides-toggle .system-symbol,
+  .mobile-guides-toggle .system-symbol svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .workspace:has(.canvas-wrap.empty) .mobile-guides-toggle,
+  .workspace:has(#workspace-image-figure:not([hidden])) .mobile-guides-toggle {
+    display: none;
   }
 
   #files,
