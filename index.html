@@ -334,6 +334,26 @@
                   <input data-key-field="FORE_STYLE" />
                 </span>
               </label>
+              <label class="style-ref-row" title="状态样式（S状态_样式，多组用 | 分隔；S0 表示无状态样式）">状态样式（STAT_STYLE）
+                <span class="style-field">
+                  <input data-key-field="STAT_STYLE" />
+                </span>
+              </label>
+              <label class="style-ref-row" title="每层前景偏移（x,y；多组用 ; 分隔）">前景偏移（FORE_OFFSET）
+                <span class="style-field">
+                  <input data-key-field="FORE_OFFSET" />
+                </span>
+              </label>
+              <label class="style-ref-row" title="每层前景位置类型（逗号分隔）">前景位置类型（POS_TYPE）
+                <span class="style-field">
+                  <input data-key-field="POS_TYPE" />
+                </span>
+              </label>
+              <div class="fore-layer-controls" data-layer-controls>
+                <label>前景图层 <select data-fore-layer></select></label>
+                <button type="button" data-fore-layer-image="NM_IMG">换正常图</button>
+                <button type="button" data-fore-layer-image="HL_IMG">换按下图</button>
+              </div>
               <label class="style-ref-row" title="按键引用的按键音效样式编号">按键音效样式（SOUND_STYLE）
                 <span class="style-field">
                   <input data-key-field="SOUND_STYLE" />

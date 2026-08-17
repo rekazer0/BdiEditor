@@ -10,6 +10,7 @@
     "version:feature": "node scripts/bump-version.mjs feature",
     "version:bugfix": "node scripts/bump-version.mjs bugfix",
     "verify:samples": "node scripts/verify-samples.ts",
+    "verify:layers": "node scripts/verify-layers.ts",
     "tauri": "tauri"
   },
   "dependencies": {

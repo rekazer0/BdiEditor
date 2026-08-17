@@ -253,10 +253,49 @@ export function effectivePreviewItem(
   item: PreviewItem,
   state?: number,
 ): PreviewItem {
-  if (!/^ICON\d+$/i.test(item.section)) return item
   const tip = stateTipSection(item.statStyle, state)
   if (tip === undefined) return item
   const section = `TIP${tip}`
+  if (!/^ICON\d+$/i.test(item.section)) {
+    const value = (name: string): string | undefined => document.get(section, name)
+    const backStyle = value("BACK_STYLE")
+    const foreStyle = value("FORE_STYLE")
+    const positionType = value("POS_TYPE")
+    const foreOffset = value("FORE_OFFSET")
+    const foreAnimStyle = value("FORE_ANIM_STYLE")
+    const backAnimStyle = value("BACK_ANIM_STYLE")
+    const animStyle = value("ANIM_STYLE")
+    const foreStyles = foreStyle === undefined
+      ? item.foreStyles
+      : foreStyle.split(",").map((token) => token.trim()).filter(Boolean)
+    return {
+      ...item,
+      show: value("SHOW") ?? item.show,
+      center: value("CENTER") ?? item.center,
+      up: value("UP") ?? item.up,
+      down: value("DOWN") ?? item.down,
+      left: value("LEFT") ?? item.left,
+      right: value("RIGHT") ?? item.right,
+      hold: value("HOLD") ?? item.hold,
+      backStyle: backStyle === undefined ? item.backStyle : backStyle.split(",")[0],
+      foreStyle: foreStyles[0] ?? "",
+      foreStyles,
+      foreOffsets: foreOffset === undefined
+        ? item.foreOffsets
+        : foreOffset.split(";").map(parseOffset),
+      positionTypes: positionType === undefined
+        ? item.positionTypes
+        : positionType.split(",").map((token) => token.trim()).filter(Boolean),
+      animStyle: animStyle ?? item.animStyle,
+      backAnimStyle: backAnimStyle ?? item.backAnimStyle,
+      foreAnimStyle: foreAnimStyle === undefined
+        ? item.foreAnimStyle
+        : foreAnimStyle.split(",")[0],
+      foreAnimStyles: foreAnimStyle === undefined
+        ? item.foreAnimStyles
+        : foreAnimStyle.split(",").map((token) => token.trim()).filter(Boolean),
+    }
+  }
   const backStyle = document.get(section, "BACK_STYLE")
   const foreStyle = document.get(section, "FORE_STYLE")
   const positionType = document.get(section, "POS_TYPE")
@@ -1213,9 +1252,17 @@ export class Preview {
 
   private async draw(): Promise<void> {
     const drawID = ++this.drawID
-    const keys = visiblePreviewItems(this.keys, this.skinState).map((key) =>
-      this.document ? effectivePreviewItem(this.document, key, this.skinState ?? 0) : key,
-    )
+    const keys = visiblePreviewItems(this.keys, this.skinState)
+      .map((key) =>
+        this.document ? effectivePreviewItem(this.document, key, this.skinState ?? 0) : key,
+      )
+      .sort((left, right) => {
+        const leftFull = left.rect.x === 0 && left.rect.y === 0 &&
+          left.rect.width === this.panelWidth && left.rect.height === this.panelHeight
+        const rightFull = right.rect.x === 0 && right.rect.y === 0 &&
+          right.rect.width === this.panelWidth && right.rect.height === this.panelHeight
+        return leftFull === rightFull ? 0 : leftFull ? -1 : 1
+      })
     const [panel, visuals, toolbarImages] = await Promise.all([
       this.resolver?.resolve(this.panelStyle, false),
       Promise.all(keys.map(async (key) => {

@@ -2689,6 +2689,31 @@ canvas {
   grid-column: 1 / -1;
 }
 
+.fore-layer-controls {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.fore-layer-controls label {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 6px;
+  align-items: center;
+}
+
+.fore-layer-controls select {
+  flex: 1;
+  min-width: 0;
+}
+
+.fore-layer-controls button {
+  flex: 1;
+  min-width: 0;
+}
+
 .primary-actions {
   grid-template-columns: 1fr 1fr;
 }

@@ -260,6 +260,11 @@ const bdaConfigFields = $("#bda-config-fields")
 const colorPickers = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-picker-for]"))
 const colorAlphas = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-alpha-for]"))
 const keyOnlyGroups = Array.from(document.querySelectorAll<HTMLElement>(".key-only"))
+const foreLayerControls = $("[data-layer-controls]")
+const foreLayerSelect = $("[data-fore-layer]") as HTMLSelectElement
+const foreLayerImageButtons = Array.from(
+  document.querySelectorAll<HTMLButtonElement>("[data-fore-layer-image]"),
+)
 const gapFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-gap-field]"))
 const layoutActionButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-layout-action]"),
@@ -2305,6 +2310,21 @@ function chooseStyleImageSlice(property: "NM_IMG" | "HL_IMG"): void {
   else if (target) openStyleImageResourceChooser(target)
 }
 
+function chooseForeLayerImageSlice(property: "NM_IMG" | "HL_IMG"): void {
+  if (!archive || archive.format === "bda" || !layoutDocument || selectedKeySections.length !== 1 || isListCell(selectedKeySections[0])) return
+  const tokens = (layoutDocument.get(selectedKeySections[0], "FORE_STYLE") ?? "")
+    .split(",").map((token) => token.trim()).filter(Boolean)
+  const token = tokens[Number(foreLayerSelect.value) || 0]
+  if (!token) return
+  const target = styleWriteTarget("FORE_STYLE", property, [token])
+  if (!target.document || !target.sections?.length) return
+  const current = target.document.get(target.sections[0], property)?.split(",")[0]?.trim()
+  const imagePath = resourceImagePaths(archive.names(), theme.value, orientation.value)
+    .find((candidate) => candidate.split("/").pop()?.replace(/\.png$/i, "") === current)
+  if (imagePath) openImageSlicePicker(imagePath, target)
+  else openStyleImageResourceChooser(target)
+}
+
 for (const button of styleDetailImageButtons) {
   button.addEventListener("click", () => chooseStyleImageSlice(button.dataset.styleImageProperty as "NM_IMG" | "HL_IMG"))
 }
@@ -3797,6 +3817,17 @@ function populateKeyInspector(): void {
     const common = values.every((value) => value === values[0]) ? values[0] : ""
     field.value = common
     if (!common && new Set(values).size > 1) field.placeholder = "混合"
+  }
+  const layerTokens = sections.length === 1 && !isListCell(sections[0])
+    ? (document?.get(sections[0], "FORE_STYLE") ?? "").split(",").map((token) => token.trim()).filter(Boolean)
+    : []
+  foreLayerControls.hidden = archive?.format === "bda" || layerTokens.length === 0
+  foreLayerSelect.replaceChildren(...layerTokens.map((token, index) =>
+    new Option(`第 ${index + 1} 层 · STYLE ${token}`, String(index)),
+  ))
+  foreLayerSelect.value = String(Math.min(Number(foreLayerSelect.value) || 0, Math.max(0, layerTokens.length - 1)))
+  for (const button of foreLayerImageButtons) {
+    button.disabled = !isEditing() || layerTokens.length === 0
   }
   for (const field of styleFields) {
     const property = field.dataset.styleField ?? ""
@@ -5722,6 +5753,11 @@ for (const field of keyFields) {
 }
 for (const field of styleFields) {
   field.addEventListener("input", () => updateSelectedStyle(field))
+}
+for (const button of foreLayerImageButtons) {
+  button.addEventListener("click", () => {
+    chooseForeLayerImageSlice(button.dataset.foreLayerImage as "NM_IMG" | "HL_IMG")
+  })
 }
 for (const field of [...keyboardFields, ...styleFields]) {
   if (!field.dataset.keyboardField?.endsWith("COLOR") && !field.dataset.styleField?.endsWith("COLOR")) continue
