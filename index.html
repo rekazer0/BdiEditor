@@ -15,8 +15,8 @@
         <button id="new" class="toolbar-button" title="新建项目" aria-label="新建项目">
           <span class="icon system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" /></svg></span><span>新建项目</span>
         </button>
-        <button id="open" class="toolbar-button" title="打开" aria-label="打开">
-          <span class="icon system-symbol" data-system-symbol="folder" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M2.8 6.5h5l1.7 2h7.7l-1.4 7H4.2z"/><path d="M4 6.5V4.3h5l1.5 2.2" /></svg></span><span>打开</span>
+        <button id="open" class="toolbar-button" type="button" title="打开皮肤文件" aria-label="打开皮肤文件">
+          <span class="icon system-symbol" data-system-symbol="folder" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M2.8 6.5h5l1.7 2h7.7l-1.4 7H4.2z"/><path d="M4 6.5V4.3h5l1.5 2.2" /></svg></span>
         </button>
         <button id="save" class="toolbar-button" disabled title="保存" aria-label="保存">
           <span class="icon system-symbol" data-system-symbol="externaldrive" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M6 3v6h8V3M7 14h6" /></svg></span><span>保存</span>
@@ -133,10 +133,10 @@
           <span class="spacer"></span>
           <button id="toggle-guides" class="preview-tool-toggle glass-module" aria-label="辅助线" title="辅助线" aria-pressed="false"><span class="system-symbol" data-system-symbol="ruler" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="10" rx="2"/><path d="M7 7v5m4-5v3m4-3v5m4-5v3"/></svg></span></button>
           <label id="skin-state-control" class="field-control" hidden>
-            <span>状态</span>
+            <span class="skin-state-value" aria-hidden="true">默认</span>
             <select id="skin-state" aria-label="皮肤 S 状态"><option value="">默认</option></select>
           </label>
-          <label class="field-control">
+          <label id="device-control" class="field-control">
             <span>设备</span>
             <select id="device" aria-label="设备">
               <option value="iphone-17-pro">iPhone 17 Pro · 1206×2622</option>
@@ -625,6 +625,14 @@
       <form method="dialog">
         <header><h2 id="settings-title">设置</h2><button aria-label="关闭">关闭</button></header>
         <label>软件外观 <select id="app-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
+        <label class="source-directory-setting">皮肤源码保存目录
+          <span class="settings-path-control">
+            <input id="source-directory" type="text" autocomplete="off" spellcheck="false">
+            <button id="choose-source-directory" type="button" title="选择目录" aria-label="选择皮肤源码保存目录"><span class="system-symbol" data-system-symbol="folder" aria-hidden="true"></span></button>
+            <button id="reset-source-directory" type="button" title="恢复内置目录" aria-label="恢复内置皮肤源码保存目录"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"></span></button>
+          </span>
+          <small id="source-directory-status"></small>
+        </label>
         <label class="settings-switch">窗口玻璃与亚克力材质 <input id="window-material" type="checkbox" role="switch" checked></label>
         <label class="settings-switch">显示概览/源文件切换 <input id="sidebar-view-visible" type="checkbox" role="switch"></label>
         <label class="settings-switch">显示属性/源代码切换 <input id="inspector-tabs-visible" type="checkbox" role="switch"></label>

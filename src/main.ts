@@ -4,13 +4,14 @@ import { getCurrentWindow } from "@tauri-apps/api/window"
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { getCurrentWebview } from "@tauri-apps/api/webview"
 import { message, open, save } from "@tauri-apps/plugin-dialog"
-import { readFile, writeFile } from "@tauri-apps/plugin-fs"
+import { readFile, watch, writeFile, type UnwatchFn } from "@tauri-apps/plugin-fs"
 import "./style.css"
 import {
   actionDescription,
   isConfiguredSymbolLayout,
   previewPageTransition,
   previewStateFromAction,
+  skinStateLabel,
   shouldSuggestActionCodes,
 } from "./actions.ts"
 import {
@@ -174,6 +175,10 @@ const windowMaterial = $("#window-material") as HTMLInputElement
 const sidebarViewVisible = $("#sidebar-view-visible") as HTMLInputElement
 const inspectorTabsVisible = $("#inspector-tabs-visible") as HTMLInputElement
 const mobilePreviewPosition = $("#mobile-preview-position") as HTMLSelectElement
+const sourceDirectory = $("#source-directory") as HTMLInputElement
+const chooseSourceDirectory = $("#choose-source-directory") as HTMLButtonElement
+const resetSourceDirectory = $("#reset-source-directory") as HTMLButtonElement
+const sourceDirectoryStatus = $("#source-directory-status")
 const mobilePaneButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mobile-pane]"))
 const mobileSplitHandle = $("#mobile-split-handle") as HTMLButtonElement
 const mobilePortraitQuery = matchMedia("(max-width: 760px) and (orientation: portrait)")
@@ -286,6 +291,7 @@ const toggleGuides = $("#toggle-guides") as HTMLButtonElement
 const mobileToggleGuides = $("#mobile-toggle-guides") as HTMLButtonElement
 const skinStateControl = $("#skin-state-control")
 const skinState = $("#skin-state") as HTMLSelectElement
+const skinStateValue = $(".skin-state-value")
 const deviceShell = $("#device-shell")
 const workspaceImageFigure = $("#workspace-image-figure")
 const workspaceImage = $("#workspace-image") as HTMLImageElement
@@ -384,6 +390,14 @@ const stylePickerClose = $("#style-picker-close") as HTMLButtonElement
 let archive: SkinArchive | undefined
 let bdaBase: SkinArchive | undefined
 let currentPath = ""
+let sourceWorkspacePath = ""
+let sourceWorkspacePrefix = ""
+let stopSourceWatch: UnwatchFn | undefined
+let sourceAutosaveTimer: number | undefined
+let sourceAutosaveQueue = Promise.resolve()
+const pendingSourcePaths = new Set<string>()
+const pendingSourceWatchPaths = new Set<string>()
+let sourceWatchTimer: number | undefined
 let selectedPath = ""
 let selectedDocument: IniDocument | undefined
 let layoutPath = ""
@@ -524,6 +538,7 @@ let activeKeyboardGeometry: {
 
 function applySkinState(state?: number, message?: string): void {
   skinState.value = state === undefined ? "" : String(state)
+  skinStateValue.textContent = state === undefined ? "默认" : `S${state}`
   preview.setSkinState(state)
   toolbarPreview.setSkinState(state)
   if (message) eventLog.textContent = message
@@ -1162,11 +1177,161 @@ function selectChoice(select: HTMLSelectElement, value: string): void {
   select.dispatchEvent(new Event("change"))
 }
 
+type SourceFilePayload = { path: string; data: number[] }
+type SourceChangePayload = { path: string; data: number[] | null; directory: boolean }
+
+function sourcePathForWorkspace(path: string): string {
+  return sourceWorkspacePrefix && path.startsWith(sourceWorkspacePrefix)
+    ? path.slice(sourceWorkspacePrefix.length)
+    : path
+}
+
+function sourcePathForArchive(path: string): string {
+  if (!sourceWorkspacePrefix || path === "Info.txt" || path === "demo.png") return path
+  return `${sourceWorkspacePrefix}${path}`
+}
+
+function sourceFilesPayload(value: SkinArchive): SourceFilePayload[] {
+  return value.sourceFiles().map((file) => ({ path: file.path, data: Array.from(file.data) }))
+}
+
+async function flushSourceAutosave(): Promise<void> {
+  if (sourceAutosaveTimer !== undefined) {
+    clearTimeout(sourceAutosaveTimer)
+    sourceAutosaveTimer = undefined
+  }
+  if (archive && sourceWorkspacePath && pendingSourcePaths.size) {
+    const workspace = sourceWorkspacePath
+    const value = archive
+    const paths = [...pendingSourcePaths]
+    pendingSourcePaths.clear()
+    const changes = paths.map((path) => {
+      const data = value.getSourceBytes(sourcePathForArchive(path))
+      return { path, data: data ? Array.from(data) : null }
+    })
+    sourceAutosaveQueue = sourceAutosaveQueue.catch(() => {}).then(() => invoke("apply_source_changes", {
+      path: workspace,
+      changes,
+    }))
+  }
+  try {
+    await sourceAutosaveQueue
+  } catch (error) {
+    showError(error, "自动保存源码")
+  }
+}
+
+function scheduleSourceAutosave(paths: string[]): void {
+  if (!archive || !sourceWorkspacePath) return
+  for (const path of paths) pendingSourcePaths.add(sourcePathForWorkspace(archive.sourcePath(path)))
+  if (sourceAutosaveTimer !== undefined) clearTimeout(sourceAutosaveTimer)
+  sourceAutosaveTimer = window.setTimeout(() => void flushSourceAutosave(), 180)
+}
+
+async function refreshExternalSourceFiles(workspace: string, paths: string[]): Promise<void> {
+  if (!archive || workspace !== sourceWorkspacePath || !paths.length) return
+  const changes = await invoke<SourceChangePayload[]>("read_source_changes", {
+    path: workspace,
+    changedPaths: paths,
+  })
+  if (!archive || workspace !== sourceWorkspacePath) return
+  let changed = false
+  const affected = new Set<string>()
+  const directorySnapshots = changes.filter((change) => change.directory)
+  const presentPaths = new Set(changes.filter((change) => !change.directory && change.data).map((change) => sourcePathForArchive(change.path)))
+  for (const snapshot of directorySnapshots) {
+    const archiveSnapshotPath = sourcePathForArchive(snapshot.path)
+    const prefix = archiveSnapshotPath ? `${archiveSnapshotPath}/` : ""
+    const removed = archive.sourceFiles()
+      .filter((file) => (file.path === archiveSnapshotPath || file.path.startsWith(prefix)) && !presentPaths.has(file.path))
+      .map((file) => archive!.canonicalSourcePath(file.path))
+    for (const canonical of removed) {
+      archive.delete(canonical)
+      affected.add(canonical)
+      changed = true
+    }
+  }
+  for (const change of changes) {
+    if (change.directory) continue
+    pendingSourcePaths.delete(change.path)
+    if (change.data) {
+      const canonical = archive.canonicalSourcePath(sourcePathForArchive(change.path))
+      const before = archive.getBytes(canonical)
+      const after = new Uint8Array(change.data)
+      if (before && before.length === after.length && before.every((byte, index) => byte === after[index])) continue
+      archive.setBytes(canonical, after)
+      affected.add(canonical)
+      changed = true
+      continue
+    }
+    const removed = archive.sourceFiles()
+      .filter((file) => {
+        const archivePath = sourcePathForArchive(change.path)
+        return file.path === archivePath || file.path.startsWith(`${archivePath}/`)
+      })
+      .map((file) => archive!.canonicalSourcePath(file.path))
+    for (const canonical of removed) {
+      archive.delete(canonical)
+      affected.add(canonical)
+      changed = true
+    }
+  }
+  if (!changed) return
+  undoStack = []
+  redoStack = []
+  updateHistoryButtons()
+  renderFiles()
+  try {
+    if (affected.has(layoutPath) && archive.isText(layoutPath)) {
+      layoutDocument = IniDocument.parse(archive.getText(layoutPath))
+    }
+    if (selectedPath && archive.getBytes(selectedPath)) selectFile(selectedPath, sidebarView)
+    else {
+      const next = archive.names().find((path) => archive?.isText(path))
+      if (next) selectFile(next, sidebarView)
+    }
+    refreshBdaLayout()
+    refreshPreview()
+    populateKeyInspector()
+  } catch (error) {
+    showError(error, "刷新外部源码")
+  }
+  updateDirty()
+  showStatus(`已实时刷新 ${affected.size} 个源码文件`)
+}
+
+function queueSourceWatch(paths: string[], workspace: string): void {
+  if (workspace !== sourceWorkspacePath) return
+  for (const path of paths) pendingSourceWatchPaths.add(path)
+  if (sourceWatchTimer !== undefined) clearTimeout(sourceWatchTimer)
+  sourceWatchTimer = window.setTimeout(() => {
+    sourceWatchTimer = undefined
+    const changed = [...pendingSourceWatchPaths]
+    pendingSourceWatchPaths.clear()
+    void refreshExternalSourceFiles(workspace, changed).catch((error) => showError(error, "刷新外部源码"))
+  }, 80)
+}
+
+async function activateSourceWorkspace(path: string, prefix = ""): Promise<void> {
+  stopSourceWatch?.()
+  stopSourceWatch = undefined
+  pendingSourcePaths.clear()
+  pendingSourceWatchPaths.clear()
+  sourceWorkspacePath = path
+  sourceWorkspacePrefix = prefix
+  if (!isTauri() || !path) return
+  stopSourceWatch = await watch(path, (event) => {
+    if (typeof event.type === "object" && "access" in event.type) return
+    queueSourceWatch(event.paths, path)
+  }, { recursive: true, delayMs: 120 })
+}
+
 function hasUnsavedChanges(): boolean {
   return unsavedNew || Boolean(archive?.changed.size)
 }
 
 async function prepareDocumentReplacement(): Promise<boolean> {
+  await flushSourceAutosave()
   if (!hasUnsavedChanges()) return true
   let decision: "save" | "discard" | "cancel"
   if (isTauri()) {
@@ -1200,6 +1365,7 @@ function commitText(path: string, before: string, after: string): void {
   archive.setText(path, after)
   undoStack.push({ kind: "text", path, before, after })
   redoStack = []
+  scheduleSourceAutosave([path])
   updateHistoryButtons()
 }
 
@@ -1208,6 +1374,7 @@ function commitBytes(path: string, before: Uint8Array, after: Uint8Array): void 
   archive.setBytes(path, after)
   undoStack.push({ kind: "bytes", path, before, after })
   redoStack = []
+  scheduleSourceAutosave([path])
   updateHistoryButtons()
 }
 
@@ -1222,12 +1389,14 @@ function commitBatch(changes: Change[]): void {
   }
   undoStack.push({ kind: "batch", changes })
   redoStack = []
+  scheduleSourceAutosave(changes.flatMap((change) => change.kind === "batch" ? [] : [change.path]))
   updateHistoryButtons()
 }
 
 function applyTextSnapshot(path: string, text: string): void {
   if (!archive) return
   archive.setText(path, text)
+  scheduleSourceAutosave([path])
   if (path === layoutPath) layoutDocument = IniDocument.parse(text)
   if (path === selectedPath) {
     selectedDocument = IniDocument.parse(text)
@@ -1284,6 +1453,7 @@ function applyBytesSnapshot(path: string, bytes?: Uint8Array): void {
   if (!archive) return
   if (bytes) archive.setBytes(path, bytes)
   else archive.delete(path)
+  scheduleSourceAutosave([path])
   refreshBdaLayout()
   if (selectedPath === path && bytes && archive.isBdaConfig(path)) setSourceValue(describeBdaConfig(path, bytes))
   refreshPreview()
@@ -1332,6 +1502,7 @@ function createMissingVariant(path: string): boolean {
     return false
   }
   for (const { source, target } of copies) archive.setBytes(target, archive.getBytes(source)!.slice())
+  scheduleSourceAutosave(copies.map(({ target }) => target))
   renderFiles()
   updateDirty()
   showStatus(`${label}已创建。`)
@@ -1824,8 +1995,17 @@ function updatePanelTools(
   fitCanvasPreview()
   const states = availableSkinStates(...skinStateDocuments())
   const selected = skinState.value
-  skinState.replaceChildren(new Option("默认", ""), ...states.map((state) => new Option(`S${state}`, String(state))))
-  skinState.value = states.includes(Number(selected)) ? selected : ""
+  const selectedState = selected ? Number(selected) : undefined
+  if (selectedState && selectedState <= 122 && !states.includes(selectedState)) {
+    states.push(selectedState)
+    states.sort((a, b) => a - b)
+  }
+  skinState.replaceChildren(
+    new Option("默认", ""),
+    ...states.map((state) => new Option(skinStateLabel(state), String(state))),
+  )
+  skinState.value = selectedState && states.includes(selectedState) ? selected : ""
+  skinStateValue.textContent = skinState.value ? `S${Number(skinState.value)}` : "默认"
   skinStateControl.hidden = states.length === 0
   applySkinState(skinState.value ? Number(skinState.value) : undefined)
   requestAnimationFrame(() => {
@@ -2074,6 +2254,7 @@ async function copyPanel(): Promise<boolean> {
   staged.set(targetStylePath, encoder.encode(merged.styles.toString()))
   staged.set(targetPath, encoder.encode(panel.toString()))
   for (const [path, bytes] of staged) archive.setBytes(path, bytes)
+  scheduleSourceAutosave([...staged.keys()])
 
   theme.value = panelTargetTheme.value
   orientation.value = panelTargetOrientation.value as "port" | "land"
@@ -5175,7 +5356,16 @@ function revealSourceFile(path: string): void {
   button.scrollIntoView({ block: "nearest" })
 }
 
-async function loadArchive(bytes: Uint8Array, path: string, isNew = false): Promise<void> {
+async function loadArchive(
+  bytes: Uint8Array,
+  path: string,
+  isNew = false,
+  existingSourceWorkspace = "",
+  displayName = "",
+  sourcePrefix = "",
+): Promise<void> {
+  await flushSourceAutosave()
+  await activateSourceWorkspace("", "")
   releaseKeySound()
   keySoundBuffers.clear()
   const nextArchive = SkinArchive.open(bytes)
@@ -5183,6 +5373,25 @@ async function loadArchive(bytes: Uint8Array, path: string, isNew = false): Prom
     const response = await fetch(new URL("bda-base.bds", document.baseURI))
     if (!response.ok) throw new Error("无法加载 BDA 官方基础布局")
     bdaBase = SkinArchive.open(new Uint8Array(await response.arrayBuffer()))
+  }
+  let nextSourceWorkspace = existingSourceWorkspace
+  if (isTauri() && !nextSourceWorkspace) {
+    const configuredDirectory = localStorage.getItem("source-directory") || null
+    try {
+      nextSourceWorkspace = await invoke<string>("create_source_workspace", {
+        directory: configuredDirectory,
+        name: path || displayName || exportName("未命名", nextArchive.format),
+        files: sourceFilesPayload(nextArchive),
+      })
+    } catch (error) {
+      if (!configuredDirectory) throw error
+      nextSourceWorkspace = await invoke<string>("create_source_workspace", {
+        directory: null,
+        name: path || displayName || exportName("未命名", nextArchive.format),
+        files: sourceFilesPayload(nextArchive),
+      })
+      showStatus("自定义源码目录不可用，本次已保存到内置目录")
+    }
   }
   assetURL = releaseImagePreviewURL(assetURL)
   clearImageSlicePicker()
@@ -5205,7 +5414,7 @@ async function loadArchive(bytes: Uint8Array, path: string, isNew = false): Prom
   updateHistoryButtons()
   documentName.textContent = isNew
     ? exportName("未命名", archive.format)
-    : path.split(/[\\/]/).pop() || "未命名皮肤"
+    : displayName || path.split(/[\\/]/).pop() || "未命名皮肤"
   saveButton.disabled = false
   for (const button of exportButtons) {
     const format = button.dataset.exportFormat as ExportFormat
@@ -5226,6 +5435,7 @@ async function loadArchive(bytes: Uint8Array, path: string, isNew = false): Prom
     layoutPath = initial
     selectFile(initial)
   }
+  await activateSourceWorkspace(nextSourceWorkspace, sourcePrefix)
   updateDirty()
 }
 
@@ -5237,6 +5447,31 @@ async function openNative(): Promise<boolean> {
   })
   if (typeof path !== "string") return false
   await loadNativePath(path)
+  return true
+}
+
+async function loadSourceWorkspace(path: string): Promise<boolean> {
+  const files = await invoke<SourceFilePayload[]>("open_source_workspace", { path })
+  const directoryName = path.split(/[\\/]/).filter(Boolean).pop()?.toLowerCase() ?? ""
+  const sourcePrefix = directoryName === "dark" || directoryName === "light"
+    ? `${directoryName}/`
+    : ""
+  const sourceFiles = files
+    .filter((file) => !file.path.endsWith("/.DS_Store") && file.path !== ".DS_Store")
+    .filter((file) => file.path.includes("/") || !/\.(?:bdi|bds|bda)$/i.test(file.path))
+    .map((file) => ({
+      path: sourcePrefix
+        && file.path !== "Info.txt"
+        && file.path !== "demo.png"
+        && !file.path.startsWith(sourcePrefix)
+        ? `${sourcePrefix}${file.path}`
+        : file.path,
+      data: new Uint8Array(file.data),
+    }))
+  if (!sourceFiles.length) throw new Error("源码文件夹为空")
+  const sourceArchive = SkinArchive.fromSourceFiles(sourceFiles)
+  const name = path.split(/[\\/]/).pop() || "皮肤源码"
+  await loadArchive(sourceArchive.toBytes(), "", false, path, name, sourcePrefix)
   return true
 }
 
@@ -5264,6 +5499,11 @@ async function loadDroppedPath(path: string): Promise<boolean> {
   if (!isSupportedSkinPath(path)) return false
   if (!(await prepareDocumentReplacement())) return false
   return loadNativePath(path)
+}
+
+async function loadDroppedSourceWorkspace(path: string): Promise<boolean> {
+  if (!(await prepareDocumentReplacement())) return false
+  return loadSourceWorkspace(path)
 }
 
 function currentExportFormat(): ExportFormat {
@@ -5521,6 +5761,57 @@ for (const dialog of [settingsDialog, aboutDialog]) {
     if (event.target === dialog) dialog.close()
   })
 }
+
+function setSourceDirectoryState(path: string, custom: boolean, error = ""): void {
+  sourceDirectory.value = path
+  sourceDirectory.closest("label")?.setAttribute("data-invalid", String(Boolean(error)))
+  sourceDirectoryStatus.textContent = error || (custom
+    ? "自定义目录 · 不自动删除源码"
+    : "内置目录 · 保留最近 3 份源码")
+}
+
+async function applySourceDirectory(path: string | null): Promise<void> {
+  const custom = Boolean(path?.trim())
+  try {
+    const resolved = await invoke<string>("prepare_source_directory", { path: custom ? path!.trim() : null })
+    if (custom) localStorage.setItem("source-directory", resolved)
+    else localStorage.removeItem("source-directory")
+    setSourceDirectoryState(resolved, custom)
+  } catch (error) {
+    const text = error instanceof Error ? error.message : String(error)
+    setSourceDirectoryState(path ?? sourceDirectory.value, custom, `目录不可用：${text}`)
+  }
+}
+
+async function initializeSourceDirectory(): Promise<void> {
+  if (!isTauri()) {
+    sourceDirectory.disabled = true
+    chooseSourceDirectory.disabled = true
+    resetSourceDirectory.disabled = true
+    sourceDirectoryStatus.textContent = "源码目录仅桌面版可用"
+    return
+  }
+  const configured = localStorage.getItem("source-directory")
+  await applySourceDirectory(configured)
+}
+
+sourceDirectory.addEventListener("change", () => void applySourceDirectory(sourceDirectory.value))
+sourceDirectory.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return
+  event.preventDefault()
+  void applySourceDirectory(sourceDirectory.value)
+})
+chooseSourceDirectory.addEventListener("click", () => void (async () => {
+  const path = await open({
+    multiple: false,
+    directory: true,
+    title: "选择皮肤源码保存目录",
+    defaultPath: sourceDirectory.value || undefined,
+  })
+  if (typeof path === "string") await applySourceDirectory(path)
+})())
+resetSourceDirectory.addEventListener("click", () => void applySourceDirectory(null))
+void initializeSourceDirectory()
 for (const button of sidebarViewButtons) {
   button.addEventListener("click", () => setSidebarView(button.dataset.sidebarView === "source" ? "source" : "overview"))
 }
@@ -5578,6 +5869,69 @@ windowMaterial.addEventListener("change", () => {
   localStorage.setItem("window-material", windowMaterial.checked ? "on" : "off")
   void applyWindowMaterial()
 })
+
+let windowDragPointerDown = false
+let windowDragMaterialDisabled = false
+let windowDragMaterialTransition: Promise<unknown> | undefined
+
+async function restoreWindowMaterialAfterDrag(): Promise<void> {
+  windowDragPointerDown = false
+  try {
+    await windowDragMaterialTransition
+  } catch {
+    windowDragMaterialDisabled = false
+    document.documentElement.dataset.windowMaterial = windowMaterial.checked ? "on" : "off"
+    return
+  }
+  if (!windowDragMaterialDisabled) {
+    document.documentElement.dataset.windowMaterial = windowMaterial.checked ? "on" : "off"
+    return
+  }
+  windowDragMaterialDisabled = false
+  await applyWindowMaterial()
+}
+
+async function startWindowsWindowDrag(): Promise<void> {
+  windowDragPointerDown = true
+  document.documentElement.dataset.windowMaterial = "off"
+  try {
+    windowDragMaterialTransition = invoke("set_window_material", { enabled: false })
+    await windowDragMaterialTransition
+    windowDragMaterialDisabled = true
+    if (!windowDragPointerDown) {
+      await restoreWindowMaterialAfterDrag()
+      return
+    }
+    await getCurrentWindow().startDragging()
+  } catch (error) {
+    windowDragMaterialTransition = undefined
+    await restoreWindowMaterialAfterDrag()
+    showError(error, "拖动窗口")
+  } finally {
+    windowDragMaterialTransition = undefined
+  }
+}
+
+document.addEventListener("mousedown", (event) => {
+  if (
+    !document.documentElement.classList.contains("windows") ||
+    !windowMaterial.checked ||
+    event.button !== 0 ||
+    event.detail !== 1 ||
+    !(event.target instanceof Element) ||
+    !event.target.closest("[data-tauri-drag-region]") ||
+    event.target.closest("button, input, select, textarea, a, summary, [contenteditable='true'], [role='button'], [role='link']")
+  ) return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  void startWindowsWindowDrag()
+}, true)
+window.addEventListener("mouseup", () => {
+  if (windowDragPointerDown) void restoreWindowMaterialAfterDrag()
+}, true)
+window.addEventListener("blur", () => {
+  if (windowDragPointerDown) void restoreWindowMaterialAfterDrag()
+}, true)
 sidebarViewVisible.checked = localStorage.getItem("sidebar-view-visible") === "on"
 function applySidebarViewVisibility(): void {
   sidebarViewHeading.toggleAttribute("hidden", !sidebarViewVisible.checked)
@@ -6593,28 +6947,34 @@ if (isTauri()) {
         return
       }
       setSourceDropTarget()
-      if (folder !== undefined && archive && isEditing()) {
-        void runFileOperation("上传文件", async () => commitSourceUploads(
-          await Promise.all(payload.paths.map(async (path) => ({
-            name: path,
-            bytes: new Uint8Array(await invoke<number[]>("read_file", { path })),
-          }))),
-          folder,
-        ))
-        return
-      }
-      const pngPath = payload.paths.find((path) => /\.png$/i.test(path))
-      if (pngPath) {
-        void (async () => {
+      void (async () => {
+        for (const path of payload.paths) {
+          if (await invoke<boolean>("path_is_directory", { path })) {
+            await runFileOperation("打开源码文件夹", () => loadDroppedSourceWorkspace(path))
+            return
+          }
+        }
+        if (folder !== undefined && archive && isEditing()) {
+          await runFileOperation("上传文件", async () => commitSourceUploads(
+            await Promise.all(payload.paths.map(async (path) => ({
+              name: path,
+              bytes: new Uint8Array(await invoke<number[]>("read_file", { path })),
+            }))),
+            folder,
+          ))
+          return
+        }
+        const pngPath = payload.paths.find((path) => /\.png$/i.test(path))
+        if (pngPath) {
           if (!archive || archive.format === "bda") return
           const bytes = new Uint8Array(await invoke<number[]>("read_file", { path: pngPath }))
           setLayoutImageBytes(bytes)
           openLayoutImageDialog()
-        })()
-        return
-      }
-      const path = payload.paths.find(isSupportedSkinPath)
-      if (path) void runFileOperation("打开", () => loadDroppedPath(path))
+          return
+        }
+        const path = payload.paths.find(isSupportedSkinPath)
+        if (path) await runFileOperation("打开", () => loadDroppedPath(path))
+      })().catch((error) => showError(error, "处理拖入文件"))
     })
   })()
   void listen<string[]>("opened", async (event) => {

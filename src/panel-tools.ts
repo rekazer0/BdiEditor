@@ -1,4 +1,5 @@
 import { IniDocument } from "./ini.ts"
+import { knownSkinStates } from "./actions.ts"
 
 const pairKeys = new Set(["SIZE", "POS", "CELL_SIZE", "FIX_SIZE"])
 const rectKeys = new Set(["VIEW_RECT", "TOUCH_RECT", "SOURCE_RECT", "INNER_RECT"])
@@ -17,10 +18,11 @@ export function availableSkinStates(...documents: IniDocument[]): number[] {
     const styleStates = key === "STAT_STYLE"
       ? [...value.matchAll(/(?:^|\|)S(\d+)_/g)].map((match) => Number(match[1]))
       : []
-    const actionState = value.trim().match(/^S(\d{1,2})(?:_\d+)?$/)
+    const actionState = value.trim().match(/^S(\d+)(?:_\d+)?$/)
     return [...styleStates, ...(actionState ? [Number(actionState[1])] : [])]
   })
-  return [...new Set(states.filter((state) => state >= 1 && state <= 99))].sort((a, b) => a - b)
+  return [...new Set([...knownSkinStates, ...states].filter((state) => state >= 1 && state <= 122))]
+    .sort((a, b) => a - b)
 }
 
 export function stateStyleValue(value: string | undefined, state: number): number | undefined {
@@ -32,7 +34,7 @@ export function stateTipSection(
   value: string | undefined,
   state: number | undefined,
 ): number | undefined {
-  if (state === undefined || state < 0 || state > 99) return
+  if (state === undefined || state <= 0 || state > 122) return
   return stateStyleValue(value, state)
 }
 

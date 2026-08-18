@@ -307,8 +307,30 @@ export class SkinArchive {
     return new SkinArchive(files, bytes)
   }
 
+  static fromSourceFiles(files: Array<{ path: string; data: Uint8Array }>): SkinArchive {
+    return SkinArchive.open(zipSync(Object.fromEntries(files.map((file) => [file.path, file.data])), { level: 0 }))
+  }
+
   names(): string[] {
     return [...this.canonicalToRaw.keys()].sort()
+  }
+
+  sourceFiles(): Array<{ path: string; data: Uint8Array }> {
+    return [...this.files.entries()]
+      .filter(([path]) => !path.endsWith("/"))
+      .map(([path, data]) => ({ path, data: data.slice() }))
+  }
+
+  sourcePath(path: string): string {
+    return this.canonicalToRaw.get(path) ?? rawPath(path, this.layout)
+  }
+
+  getSourceBytes(path: string): Uint8Array | undefined {
+    return this.files.get(path)
+  }
+
+  canonicalSourcePath(path: string): string {
+    return canonicalPath(path, this.layout)
   }
 
   isText(path: string): boolean {

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict"
+import { actionDescription, previewStateFromAction, skinStateLabel } from "../src/actions.ts"
 import { IniDocument } from "../src/ini.ts"
+import { availableSkinStates, stateTipSection } from "../src/panel-tools.ts"
 import { effectivePreviewItem, previewHitItem, previewItems } from "../src/preview.ts"
 
 // 用真实皮肤里的结构验证：KEY4 通过 STAT_STYLE 切换到 TIP1/TIP2 的前景图层，
@@ -56,6 +58,7 @@ assert.equal(effectivePreviewItem(document, key, 1).rect.width, 196)
 assert.equal(effectivePreviewItem(document, key, 1).up, "F11")
 assert.equal(effectivePreviewItem(document, key, 1).center, "F15", "TIP 未定义 CENTER 时应继承按键自身动作")
 assert.deepEqual(effectivePreviewItem(document, key, 2).foreStyles, ["89", "361"])
+assert.deepEqual(effectivePreviewItem(IniDocument.parse(`${document.toString()}\n[TIP0]\nFORE_STYLE=999`), key, 0).foreStyles, ["89", "31", "432"])
 
 const noStateKey: Parameters<typeof effectivePreviewItem>[1] = {
   ...key,
@@ -148,3 +151,34 @@ assert.equal(
   "TOUCH_RECT=0,0,0,0 不能扩张成全屏热区",
 )
 console.log("✓ TOUCH_RECT=0,0,0,0 忽略，不吞点击")
+
+const tipGeometry = IniDocument.parse(`
+[KEY1]
+VIEW_RECT=170,0,248,149
+CENTER=1
+STAT_STYLE=S1_7
+
+[TIP7]
+VIEW_RECT=183,0,230,99
+CENTER=1
+`)
+assert.deepEqual(
+  previewItems(tipGeometry).map((item) => item.section),
+  ["KEY1"],
+  "带 VIEW_RECT 的 TIP 是状态替换定义，不能作为独立按键叠加绘制",
+)
+console.log("✓ TIP 状态定义即使带 VIEW_RECT 也不作为独立按键渲染")
+
+const extendedStates = IniDocument.parse(`
+[KEY1]
+STAT_STYLE=S122_7
+CENTER=S101
+`)
+assert.equal(previewStateFromAction("S122_7"), 122)
+assert.equal(previewStateFromAction("S123"), undefined)
+assert.equal(stateTipSection("S122_7", 122), 7)
+assert.ok(availableSkinStates(extendedStates).includes(95), "应包含 APK 已知状态")
+assert.ok(availableSkinStates(extendedStates).includes(122), "应保留皮肤自定义状态")
+assert.equal(skinStateLabel(2), "S2（大写锁定）")
+assert.equal(actionDescription("S27"), "百度状态码 S27（回车键：发送）")
+console.log("✓ S 状态：覆盖 S1-S122、补齐 APK 状态并显示中文说明")

@@ -443,6 +443,11 @@ select {
   font-size: 12px;
 }
 
+select option {
+  color: #202124;
+  background: #fff;
+}
+
 .toolbar-more {
   position: relative;
   -webkit-app-region: no-drag;
@@ -923,11 +928,33 @@ h2 {
 
 #skin-state-control {
   left: 45px;
+  width: 72px;
   transform: none;
 }
 
 #skin-state-control[hidden] {
   display: none !important;
+}
+
+#skin-state {
+  width: 100%;
+  min-width: 0;
+  color: transparent;
+  color-scheme: light;
+}
+
+#skin-state-control .skin-state-value {
+  display: block;
+  position: absolute;
+  left: 9px;
+  right: 26px;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 28px;
+  pointer-events: none;
+  white-space: nowrap;
+  text-overflow: clip;
 }
 
 .preview-tool-toggle {
@@ -3417,6 +3444,49 @@ canvas {
   line-height: 1.2;
 }
 
+#settings-dialog {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.settings-path-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px 30px;
+  gap: 6px;
+}
+
+.settings-path-control input {
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--control);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.settings-path-control button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--control);
+  color: var(--text);
+}
+
+.source-directory-setting small {
+  min-height: 15px;
+  color: var(--secondary);
+  font-size: 10px;
+}
+
+.source-directory-setting[data-invalid="true"] small {
+  color: #c62828;
+}
+
 .app-dialog p {
   margin: 0;
   color: var(--secondary);
@@ -4017,6 +4087,26 @@ input[type="search"]:focus {
   .inspector-resize-handle,
   .source {
     display: none;
+  }
+
+  .preview-toolbar .field-control {
+    position: static;
+    min-width: 0;
+    transform: none;
+  }
+
+  #skin-state-control {
+    position: absolute;
+    left: 45px;
+    width: 72px !important;
+    flex: none;
+    transform: none;
+  }
+
+  #device-control {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
   }
 }
 

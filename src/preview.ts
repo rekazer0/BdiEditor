@@ -600,6 +600,7 @@ export function previewItems(
 ): PreviewItem[] {
   const list = listItems(document, defaults)
   const real = document.sections().flatMap((section) => {
+    if (/^TIP\d+$/i.test(section)) return []
     const item = itemFromSection(document, section)
     return item ? [item] : []
   })

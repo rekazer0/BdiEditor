@@ -28,11 +28,46 @@ const functionCodeDescriptions: Record<string, string> = {
   F99: "快速编辑（待定）",
 }
 
+const skinStateDescriptions: Record<number, string> = {
+  1: "首字母自动大写",
+  2: "大写锁定",
+  3: "英文联想开启",
+  4: "存在输入编码",
+  5: "候选单字/全部切换",
+  6: "符号面板锁定",
+  7: "候选已到页首",
+  8: "候选已到页尾",
+  11: "输入中回车键",
+  14: "Shift 按下",
+  17: "回车键：下一项",
+  21: "回车键：搜索",
+  23: "回车键：前往",
+  27: "回车键：发送",
+  32: "语音入口",
+  34: "普通空格键",
+  35: "仓颉模式",
+  36: "空格语音开启",
+  37: "多语言空格键",
+  38: "符号面板更多页",
+  57: "语音面板英文切换",
+  63: "Pad 符号扩展页",
+  94: "AI 输入返回键第一态",
+  95: "AI 输入返回键第二态",
+}
+
+export const knownSkinStates = Object.keys(skinStateDescriptions).map(Number)
+
+export function skinStateLabel(state: number): string {
+  const description = skinStateDescriptions[state]
+  return description ? `S${state}（${description}）` : `S${state}`
+}
+
 export function actionDescription(value: string): string {
   if (!value) return "未配置"
   if (functionCodeDescriptions[value]) return functionCodeDescriptions[value]
   if (/^F\d+$/.test(value)) return `百度功能码 ${value}`
-  if (/^S\d+/.test(value)) return `百度状态码 ${value}`
+  const state = previewStateFromAction(value)
+  if (state !== undefined) return `百度状态码 ${skinStateLabel(state)}`
   return ""
 }
 
@@ -41,10 +76,10 @@ export function shouldSuggestActionCodes(value: string): boolean {
 }
 
 export function previewStateFromAction(code: string): number | undefined {
-  const match = code.trim().match(/^S(\d{1,2})(?:_\d+)?$/)
+  const match = code.trim().match(/^S(\d+)(?:_\d+)?$/)
   if (!match) return
   const state = Number(match[1])
-  return state <= 99 ? state : undefined
+  return state <= 122 ? state : undefined
 }
 
 export function isConfiguredSymbolLayout(path: string, general: IniDocument | undefined): boolean {

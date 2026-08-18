@@ -11,6 +11,7 @@
     "version:bugfix": "node scripts/bump-version.mjs bugfix",
     "verify:samples": "node scripts/verify-samples.ts",
     "verify:layers": "node scripts/verify-layers.ts",
+    "verify:sources": "node scripts/verify-source-workspace.ts",
     "tauri": "tauri"
   },
   "dependencies": {
