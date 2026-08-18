@@ -4,10 +4,11 @@
 
 支持 macOS、Windows 与 Android，采用轻量的 Tauri 2 + 原生 HTML/CSS/TypeScript 技术栈。
 
-## v1.0.4 更新
+## v1.0.5 更新
 
-- 新增手机竖屏触控编辑、按键音效、传统按键动画和源文件管理。
-- 修复候选区几何、状态按键重复渲染、图集方向和触摸反馈等问题。
+- 支持叠层皮肤：按键可使用多层前景样式，并按状态切换对应图层。
+- 修复全屏背景层遮挡前景按键命中，以及无效触摸区域吞点击的问题。
+- 样式缩略图和状态预览改用高分辨率画布，显示更清晰。
 - GitHub Release 新增 Android APK，并继续提供 macOS DMG 与 Windows EXE。
 
 完整记录见 [CHANGELOG.md](CHANGELOG.md)。

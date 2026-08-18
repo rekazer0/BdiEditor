@@ -333,19 +333,52 @@ export function previewSurfaceColor(theme: "light" | "dark", transparent: boolea
   return transparent ? undefined : previewBackground(theme)
 }
 
+export function isFullPanelPreviewItem(
+  item: Pick<PreviewItem, "rect">,
+  panelWidth: number,
+  panelHeight: number,
+): boolean {
+  return item.rect.x === 0 && item.rect.y === 0 &&
+    item.rect.width === panelWidth && item.rect.height === panelHeight
+}
+
 export function shouldDrawItemBackground(
   item: PreviewItem,
   panelStyle: string,
   panelWidth: number,
   panelHeight: number,
 ): boolean {
-  return !(
-    item.backStyle === panelStyle &&
-    item.rect.x === 0 &&
-    item.rect.y === 0 &&
-    item.rect.width === panelWidth &&
-    item.rect.height === panelHeight
-  )
+  return !(item.backStyle === panelStyle && isFullPanelPreviewItem(item, panelWidth, panelHeight))
+}
+
+export function previewHitItem(
+  items: readonly PreviewItem[],
+  point: { x: number; y: number },
+  mode: "edit" | "preview",
+  panelWidth: number,
+  panelHeight: number,
+  state?: number,
+): PreviewItem | undefined {
+  let best: PreviewItem | undefined
+  let fallback: PreviewItem | undefined
+  for (const item of [...visiblePreviewItems(items, state)].reverse()) {
+    if (!item.editable) continue
+    const target = previewHitRect(item, mode)
+    if (
+      point.x < target.x ||
+      point.x > target.x + target.width ||
+      point.y < target.y ||
+      point.y > target.y + target.height
+    ) continue
+    if (isFullPanelPreviewItem(item, panelWidth, panelHeight)) {
+      fallback ??= item
+      continue
+    }
+    const area = item.rect.width * item.rect.height
+    const bestArea = best ? best.rect.width * best.rect.height : Infinity
+    if (area < bestArea) best = item
+  }
+  return best ?? fallback
 }
 
 export function previewSelectionVisible(mode: "edit" | "preview", selected: boolean): boolean {
@@ -416,6 +449,7 @@ function parseRect(value: string | undefined): Rect | undefined {
   const parts = value?.split(",").map(Number)
   if (!parts || parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) return
   const [x, y, width, height] = parts
+  if (width <= 0 || height <= 0) return
   return { x, y, width, height }
 }
 
@@ -852,16 +886,14 @@ export class Preview {
   }
 
   private hit(point: { x: number; y: number }): PreviewItem | undefined {
-    return [...visiblePreviewItems(this.keys, this.skinState)].reverse().find((item) => {
-      const target = previewHitRect(item, this.mode)
-      return (
-        item.editable &&
-        point.x >= target.x &&
-        point.x <= target.x + target.width &&
-        point.y >= target.y &&
-        point.y <= target.y + target.height
-      )
-    })
+    return previewHitItem(
+      this.keys,
+      point,
+      this.mode,
+      this.panelWidth,
+      this.panelHeight,
+      this.skinState,
+    )
   }
 
   private itemSelected(item: PreviewItem): boolean {
@@ -1257,10 +1289,8 @@ export class Preview {
         this.document ? effectivePreviewItem(this.document, key, this.skinState ?? 0) : key,
       )
       .sort((left, right) => {
-        const leftFull = left.rect.x === 0 && left.rect.y === 0 &&
-          left.rect.width === this.panelWidth && left.rect.height === this.panelHeight
-        const rightFull = right.rect.x === 0 && right.rect.y === 0 &&
-          right.rect.width === this.panelWidth && right.rect.height === this.panelHeight
+        const leftFull = isFullPanelPreviewItem(left, this.panelWidth, this.panelHeight)
+        const rightFull = isFullPanelPreviewItem(right, this.panelWidth, this.panelHeight)
         return leftFull === rightFull ? 0 : leftFull ? -1 : 1
       })
     const [panel, visuals, toolbarImages] = await Promise.all([

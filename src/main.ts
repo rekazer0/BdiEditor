@@ -260,11 +260,6 @@ const bdaConfigFields = $("#bda-config-fields")
 const colorPickers = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-picker-for]"))
 const colorAlphas = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-alpha-for]"))
 const keyOnlyGroups = Array.from(document.querySelectorAll<HTMLElement>(".key-only"))
-const foreLayerControls = $("[data-layer-controls]")
-const foreLayerSelect = $("[data-fore-layer]") as HTMLSelectElement
-const foreLayerImageButtons = Array.from(
-  document.querySelectorAll<HTMLButtonElement>("[data-fore-layer-image]"),
-)
 const gapFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-gap-field]"))
 const layoutActionButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-layout-action]"),
@@ -2310,21 +2305,6 @@ function chooseStyleImageSlice(property: "NM_IMG" | "HL_IMG"): void {
   else if (target) openStyleImageResourceChooser(target)
 }
 
-function chooseForeLayerImageSlice(property: "NM_IMG" | "HL_IMG"): void {
-  if (!archive || archive.format === "bda" || !layoutDocument || selectedKeySections.length !== 1 || isListCell(selectedKeySections[0])) return
-  const tokens = (layoutDocument.get(selectedKeySections[0], "FORE_STYLE") ?? "")
-    .split(",").map((token) => token.trim()).filter(Boolean)
-  const token = tokens[Number(foreLayerSelect.value) || 0]
-  if (!token) return
-  const target = styleWriteTarget("FORE_STYLE", property, [token])
-  if (!target.document || !target.sections?.length) return
-  const current = target.document.get(target.sections[0], property)?.split(",")[0]?.trim()
-  const imagePath = resourceImagePaths(archive.names(), theme.value, orientation.value)
-    .find((candidate) => candidate.split("/").pop()?.replace(/\.png$/i, "") === current)
-  if (imagePath) openImageSlicePicker(imagePath, target)
-  else openStyleImageResourceChooser(target)
-}
-
 for (const button of styleDetailImageButtons) {
   button.addEventListener("click", () => chooseStyleImageSlice(button.dataset.styleImageProperty as "NM_IMG" | "HL_IMG"))
 }
@@ -2386,8 +2366,8 @@ async function renderStyleResourceDetail(): Promise<void> {
   styleResourceDetail.hidden = false
   const resolver = visualResolver()
   if (resolver) {
-    drawVisualPreview(styleDetailNormal, [await resolver.resolve(selectedStyleID, false).catch(() => undefined)], false)
-    drawVisualPreview(styleDetailHighlighted, [await resolver.resolve(selectedStyleID, true).catch(() => undefined)], false)
+    drawVisualPreview(retinaThumbnail(styleDetailNormal, 128, 88), [await resolver.resolve(selectedStyleID, false).catch(() => undefined)], false)
+    drawVisualPreview(retinaThumbnail(styleDetailHighlighted, 128, 88), [await resolver.resolve(selectedStyleID, true).catch(() => undefined)], false)
   }
   styleDetailFields.replaceChildren()
   const existing = stylesDocument.entries(section)
@@ -2551,9 +2531,7 @@ async function renderStyleResourceGallery(): Promise<void> {
     const previews = document.createElement("span")
     previews.className = "resource-style-previews"
     for (const highlighted of [false, true]) {
-      const canvas = document.createElement("canvas")
-      canvas.width = 64
-      canvas.height = 44
+      const canvas = retinaThumbnail(document.createElement("canvas"), 128, 88)
       drawVisualPreview(canvas, [await resolver.resolve(styleID, highlighted).catch(() => undefined)], false)
       previews.append(canvas)
     }
@@ -3056,7 +3034,8 @@ function refreshToolbarPreview(
   const height = size?.length === 4 && Number.isFinite(size[3]) ? size[3] : 133
   const inputStyle = gen?.get("SCAND", "BACK_STYLE")?.split(",")[0] ?? ""
   const inputHeight = resolver.sourceSize?.(inputStyle, false)?.height ?? height
-  const backgroundStyle = document.get("CAND", "BACK_STYLE")?.split(",")[0] ?? ""
+  const backgroundStyle = document.get("CAND", "BACK_STYLE")?.split(",")[0] ??
+    gen?.get("SCAND", "BACK_STYLE")?.split(",")[0] ?? ""
   candidateBackgroundCanvas.hidden = false
   candidateBackgroundPreview.setResolver(resolver)
   candidateBackgroundPreview.setTheme(theme.value === "dark" ? "dark" : "light")
@@ -3121,6 +3100,13 @@ function previewDestination(
     : { x: canvas.width - width - 2, y: 2, width, height }
 }
 
+function retinaThumbnail(canvas: HTMLCanvasElement, cssWidth: number, cssHeight: number): HTMLCanvasElement {
+  const ratio = window.devicePixelRatio || 1
+  canvas.width = Math.max(1, Math.round(cssWidth * ratio))
+  canvas.height = Math.max(1, Math.round(cssHeight * ratio))
+  return canvas
+}
+
 function drawVisualPreview(canvas: HTMLCanvasElement, visuals: Array<Visual | undefined>, foreground: boolean): void {
   const context = canvas.getContext("2d")
   if (!context) return
@@ -3145,6 +3131,7 @@ function styleReferenceKey(input: HTMLInputElement): string {
 }
 
 function isStyleReferenceKey(key: string): boolean {
+  if (key === "STAT_STYLE") return false
   return key === "styleID" || /(?:^|\.)(?:[A-Z0-9_]*STYLE|FIRST_BACK|FIRST_FORE)$/i.test(key)
 }
 
@@ -3181,9 +3168,7 @@ function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferen
     for (let index = 0; index < 2; index += 1) {
       const item = document.createElement("span")
       item.className = "style-picker-state"
-      const canvas = document.createElement("canvas")
-      canvas.width = 56
-      canvas.height = 28
+      const canvas = retinaThumbnail(document.createElement("canvas"), 152, 76)
       canvas.setAttribute("aria-hidden", "true")
       item.append(canvas)
       previews.append(item)
@@ -3358,9 +3343,7 @@ async function renderStylePicker(): Promise<void> {
     const previews = document.createElement("span")
     previews.className = "style-picker-previews"
     for (const [index, visual] of visuals.entries()) {
-      const canvas = document.createElement("canvas")
-      canvas.width = 64
-      canvas.height = 44
+      const canvas = retinaThumbnail(document.createElement("canvas"), 128, 88)
       canvas.setAttribute("aria-label", index === 0 ? "正常状态" : "按下状态")
       drawVisualPreview(canvas, [visual], foreground)
       previews.append(canvas)
@@ -3817,17 +3800,6 @@ function populateKeyInspector(): void {
     const common = values.every((value) => value === values[0]) ? values[0] : ""
     field.value = common
     if (!common && new Set(values).size > 1) field.placeholder = "混合"
-  }
-  const layerTokens = sections.length === 1 && !isListCell(sections[0])
-    ? (document?.get(sections[0], "FORE_STYLE") ?? "").split(",").map((token) => token.trim()).filter(Boolean)
-    : []
-  foreLayerControls.hidden = archive?.format === "bda" || layerTokens.length === 0
-  foreLayerSelect.replaceChildren(...layerTokens.map((token, index) =>
-    new Option(`第 ${index + 1} 层 · STYLE ${token}`, String(index)),
-  ))
-  foreLayerSelect.value = String(Math.min(Number(foreLayerSelect.value) || 0, Math.max(0, layerTokens.length - 1)))
-  for (const button of foreLayerImageButtons) {
-    button.disabled = !isEditing() || layerTokens.length === 0
   }
   for (const field of styleFields) {
     const property = field.dataset.styleField ?? ""
@@ -5753,11 +5725,6 @@ for (const field of keyFields) {
 }
 for (const field of styleFields) {
   field.addEventListener("input", () => updateSelectedStyle(field))
-}
-for (const button of foreLayerImageButtons) {
-  button.addEventListener("click", () => {
-    chooseForeLayerImageSlice(button.dataset.foreLayerImage as "NM_IMG" | "HL_IMG")
-  })
 }
 for (const field of [...keyboardFields, ...styleFields]) {
   if (!field.dataset.keyboardField?.endsWith("COLOR") && !field.dataset.styleField?.endsWith("COLOR")) continue
