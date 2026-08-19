@@ -79,12 +79,21 @@ jobs:
           fi
           shopt -s nullglob
           if [ "$RUNNER_OS" = "macOS" ]; then
+            DMGS=(dmg/*.dmg)
+            test "${#DMGS[@]}" -gt 0
+            ARCH="${TARGET%%-*}"
+            OUTPUT="Jianshe-bdiEditor-${GITHUB_REF_NAME}-${ARCH}.dmg"
+            cp "${DMGS[0]}" "$OUTPUT"
             gh release upload "${{ github.ref_name }}" \
-              dmg/*.dmg \
+              "$OUTPUT" \
               --repo "${{ github.repository }}" --clobber
           else
+            EXES=(nsis/*.exe)
+            test "${#EXES[@]}" -gt 0
+            OUTPUT="Jianshe-bdiEditor-${GITHUB_REF_NAME}-x64-setup.exe"
+            cp "${EXES[0]}" "$OUTPUT"
             gh release upload "${{ github.ref_name }}" \
-              nsis/*.exe \
+              "$OUTPUT" \
               --repo "${{ github.repository }}" --clobber
           fi
 
@@ -157,7 +166,7 @@ jobs:
           test "${#APKS[@]}" -gt 0
           for APK in "${APKS[@]}"; do
             ABI=$(basename "$APK" | sed -E 's/^app-(.*)-release\.apk$/\1/')
-            OUTPUT="键设-bdiEditor-${GITHUB_REF_NAME}-${ABI}.apk"
+            OUTPUT="Jianshe-bdiEditor-${GITHUB_REF_NAME}-${ABI}.apk"
             cp "$APK" "$OUTPUT"
             gh release upload "$GITHUB_REF_NAME" "$OUTPUT" \
               --repo "$GITHUB_REPOSITORY" --clobber
