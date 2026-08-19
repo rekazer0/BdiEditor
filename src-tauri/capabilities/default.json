@@ -17,6 +17,12 @@
     "fs:allow-read-file",
     "fs:allow-write-file",
     "fs:allow-watch",
-    "fs:allow-unwatch"
+    "fs:allow-unwatch",
+    "native-share:allow-pickSourceDirectory",
+    "native-share:allow-createSourceWorkspace",
+    "native-share:allow-readSourceWorkspace",
+    "native-share:allow-applySourceChanges",
+    "native-share:allow-startSourceObserver",
+    "native-share:allow-stopSourceObserver"
   ]
 }

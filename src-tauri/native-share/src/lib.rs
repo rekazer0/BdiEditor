@@ -1,7 +1,7 @@
 use tauri::{plugin::TauriPlugin, Runtime};
 
 #[cfg(target_os = "android")]
-use tauri::{plugin::PluginHandle, AppHandle, Manager};
+use tauri::{ipc::Channel, plugin::PluginHandle, AppHandle, Manager};
 
 #[cfg(target_os = "android")]
 struct NativeShare<R: Runtime>(PluginHandle<R>);
@@ -13,6 +13,35 @@ struct ShareFilePayload {
     path: String,
     name: String,
     mime_type: String,
+}
+
+#[cfg(target_os = "android")]
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ObservePayload {
+    uri: String,
+    handler: Channel<String>,
+}
+
+#[cfg(target_os = "android")]
+#[derive(serde::Serialize)]
+struct WorkspacePayload {
+    uri: String,
+}
+
+#[cfg(target_os = "android")]
+#[derive(serde::Serialize)]
+struct CreateWorkspacePayload {
+    uri: String,
+    name: String,
+    files: serde_json::Value,
+}
+
+#[cfg(target_os = "android")]
+#[derive(serde::Serialize)]
+struct ApplyChangesPayload {
+    uri: String,
+    changes: serde_json::Value,
 }
 
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -46,5 +75,69 @@ pub fn share_file<R: Runtime>(
                 mime_type,
             },
         )
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "android")]
+pub fn pick_source_directory<R: Runtime>(app: &AppHandle<R>) -> Result<String, String> {
+    app.state::<NativeShare<R>>()
+        .0
+        .run_mobile_plugin("pickSourceDirectory", ())
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "android")]
+pub fn start_source_observer<R: Runtime>(
+    app: &AppHandle<R>,
+    uri: String,
+    handler: Channel<String>,
+) -> Result<(), String> {
+    app.state::<NativeShare<R>>()
+        .0
+        .run_mobile_plugin::<()>("startSourceObserver", ObservePayload { uri, handler })
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "android")]
+pub fn stop_source_observer<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+    app.state::<NativeShare<R>>()
+        .0
+        .run_mobile_plugin::<()>("stopSourceObserver", ())
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "android")]
+pub fn create_source_workspace<R: Runtime>(
+    app: &AppHandle<R>,
+    uri: String,
+    name: String,
+    files: serde_json::Value,
+) -> Result<String, String> {
+    app.state::<NativeShare<R>>()
+        .0
+        .run_mobile_plugin("createSourceWorkspace", CreateWorkspacePayload { uri, name, files })
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "android")]
+pub fn read_source_workspace<R: Runtime>(
+    app: &AppHandle<R>,
+    uri: String,
+) -> Result<serde_json::Value, String> {
+    app.state::<NativeShare<R>>()
+        .0
+        .run_mobile_plugin("readSourceWorkspace", WorkspacePayload { uri })
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "android")]
+pub fn apply_source_changes<R: Runtime>(
+    app: &AppHandle<R>,
+    uri: String,
+    changes: serde_json::Value,
+) -> Result<(), String> {
+    app.state::<NativeShare<R>>()
+        .0
+        .run_mobile_plugin::<()>("applySourceChanges", ApplyChangesPayload { uri, changes })
         .map_err(|error| error.to_string())
 }

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-readSourceWorkspace"
+description = "Enables the readSourceWorkspace command without any pre-configured scope."
+commands.allow = ["readSourceWorkspace"]
+
+[[permission]]
+identifier = "deny-readSourceWorkspace"
+description = "Denies the readSourceWorkspace command without any pre-configured scope."
+commands.deny = ["readSourceWorkspace"]

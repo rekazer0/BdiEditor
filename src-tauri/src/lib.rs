@@ -229,6 +229,10 @@ fn prune_source_workspaces(root: &Path) -> Result<(), String> {
 
 #[tauri::command]
 fn prepare_source_directory(app: tauri::AppHandle, path: Option<String>) -> Result<String, String> {
+    #[cfg(target_os = "android")]
+    if let Some(uri) = path.as_deref().filter(|value| value.starts_with("content://")) {
+        return Ok(uri.to_string());
+    }
     let directory = source_root(&app, path)?;
     app.fs_scope()
         .allow_directory(&directory, true)
@@ -243,6 +247,15 @@ fn create_source_workspace(
     name: String,
     files: Vec<SourceFile>,
 ) -> Result<String, String> {
+    #[cfg(target_os = "android")]
+    if let Some(uri) = directory.as_deref().filter(|value| value.starts_with("content://")) {
+        return tauri_plugin_native_share::create_source_workspace(
+            &app,
+            uri.to_string(),
+            name,
+            serde_json::to_value(files).map_err(|error| error.to_string())?,
+        );
+    }
     let uses_builtin_directory = directory.as_ref().map_or(true, |value| value.trim().is_empty());
     let root = source_root(&app, directory)?;
     let timestamp = SystemTime::now()
@@ -277,6 +290,13 @@ fn create_source_workspace(
 
 #[tauri::command]
 fn open_source_workspace(app: tauri::AppHandle, path: String) -> Result<Vec<SourceFile>, String> {
+    #[cfg(target_os = "android")]
+    if path.starts_with("content://") {
+        let value = tauri_plugin_native_share::read_source_workspace(&app, path)?;
+        let files: Vec<SourceFile> = serde_json::from_value(value).map_err(|error| error.to_string())?;
+        source_paths(&files)?;
+        return Ok(files);
+    }
     let directory = fs::canonicalize(path).map_err(|error| error.to_string())?;
     let files = read_source_files(&directory)?;
     if files.is_empty() {
@@ -290,7 +310,16 @@ fn open_source_workspace(app: tauri::AppHandle, path: String) -> Result<Vec<Sour
 }
 
 #[tauri::command]
-fn apply_source_changes(path: String, changes: Vec<SourceChange>) -> Result<(), String> {
+fn apply_source_changes(app: tauri::AppHandle, path: String, changes: Vec<SourceChange>) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    if path.starts_with("content://") {
+        return tauri_plugin_native_share::apply_source_changes(
+            &app,
+            path,
+            serde_json::to_value(changes).map_err(|error| error.to_string())?,
+        );
+    }
+    let _ = app;
     let directory = fs::canonicalize(path).map_err(|error| error.to_string())?;
     for change in changes {
         if !safe_source_path(&change.path) {
@@ -321,7 +350,21 @@ fn apply_source_changes(path: String, changes: Vec<SourceChange>) -> Result<(), 
 }
 
 #[tauri::command]
-fn read_source_changes(path: String, changed_paths: Vec<String>) -> Result<Vec<SourceChange>, String> {
+fn read_source_changes(app: tauri::AppHandle, path: String, changed_paths: Vec<String>) -> Result<Vec<SourceChange>, String> {
+    #[cfg(target_os = "android")]
+    if path.starts_with("content://") {
+        let value = tauri_plugin_native_share::read_source_workspace(&app, path)?;
+        let files: Vec<SourceFile> = serde_json::from_value(value).map_err(|error| error.to_string())?;
+        source_paths(&files)?;
+        let mut output = vec![SourceChange { path: String::new(), data: None, directory: true }];
+        output.extend(files.into_iter().map(|file| SourceChange {
+            path: file.path,
+            data: Some(file.data),
+            directory: false,
+        }));
+        return Ok(output);
+    }
+    let _ = app;
     let directory = fs::canonicalize(path).map_err(|error| error.to_string())?;
     let mut output = Vec::new();
     for changed_path in changed_paths {
@@ -364,6 +407,43 @@ fn read_source_changes(path: String, changed_paths: Vec<String>) -> Result<Vec<S
 #[tauri::command]
 fn path_is_directory(path: String) -> bool {
     Path::new(&path).is_dir()
+}
+
+#[tauri::command]
+fn pick_source_directory(app: tauri::AppHandle) -> Result<String, String> {
+    #[cfg(target_os = "android")]
+    return tauri_plugin_native_share::pick_source_directory(&app);
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        Err("SAF directory selection is only available on Android".into())
+    }
+}
+
+#[tauri::command]
+fn start_source_observer(
+    app: tauri::AppHandle,
+    path: String,
+    handler: tauri::ipc::Channel<String>,
+) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    return tauri_plugin_native_share::start_source_observer(&app, path, handler);
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (app, path, handler);
+        Ok(())
+    }
+}
+
+#[tauri::command]
+fn stop_source_observer(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    return tauri_plugin_native_share::stop_source_observer(&app);
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        Ok(())
+    }
 }
 
 fn valid_share_filename(name: &str) -> bool {
@@ -643,7 +723,10 @@ pub fn run() {
         open_source_workspace,
         apply_source_changes,
         read_source_changes,
-        path_is_directory
+        path_is_directory,
+        pick_source_directory,
+        start_source_observer,
+        stop_source_observer
     ]);
     #[cfg(not(target_os = "macos"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
@@ -659,7 +742,10 @@ pub fn run() {
         open_source_workspace,
         apply_source_changes,
         read_source_changes,
-        path_is_directory
+        path_is_directory,
+        pick_source_directory,
+        start_source_observer,
+        stop_source_observer
     ]);
     builder
         .build(tauri::generate_context!())
@@ -670,8 +756,15 @@ pub fn run() {
                 use tauri::Emitter;
                 let paths: Vec<String> = urls
                     .into_iter()
-                    .filter_map(|url| url.to_file_path().ok())
-                    .map(|path| path.to_string_lossy().into_owned())
+                    .filter_map(|url| {
+                        #[cfg(target_os = "android")]
+                        if url.scheme() == "content" {
+                            return Some(url.to_string());
+                        }
+                        url.to_file_path()
+                            .ok()
+                            .map(|path| path.to_string_lossy().into_owned())
+                    })
                     .collect();
                 app.state::<OpenedFiles>()
                     .0

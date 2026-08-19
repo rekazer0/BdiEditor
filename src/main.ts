@@ -1,4 +1,4 @@
-import { invoke, isTauri } from "@tauri-apps/api/core"
+import { Channel, invoke } from "@tauri-apps/api/core"
 import { emitTo, listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
@@ -930,6 +930,10 @@ function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window
 }
 
+function isAndroidTauri(): boolean {
+  return isTauri() && /Android/i.test(navigator.userAgent)
+}
+
 const svgNamespace = "http://www.w3.org/2000/svg"
 const fallbackSymbolPaths: Record<string, string[]> = {
   "info.circle": ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18", "M12 10v7", "M12 7h.01"],
@@ -1478,11 +1482,19 @@ function queueSourceWatch(paths: string[], workspace: string): void {
 async function activateSourceWorkspace(path: string, prefix = ""): Promise<void> {
   stopSourceWatch?.()
   stopSourceWatch = undefined
+  if (isAndroidTauri()) await invoke("stop_source_observer").catch(() => {})
   pendingSourcePaths.clear()
   pendingSourceWatchPaths.clear()
   sourceWorkspacePath = path
   sourceWorkspacePrefix = prefix
   if (!isTauri() || !path) return
+  if (isAndroidTauri() && path.startsWith("content://")) {
+    const handler = new Channel<string>()
+    handler.onmessage = (changedPath) => queueSourceWatch([changedPath || path], path)
+    await invoke("start_source_observer", { path, handler })
+    stopSourceWatch = () => { void invoke("stop_source_observer") }
+    return
+  }
   stopSourceWatch = await watch(path, (event) => {
     if (typeof event.type === "object" && "access" in event.type) return
     queueSourceWatch(event.paths, path)
@@ -6067,6 +6079,14 @@ sourceDirectory.addEventListener("keydown", (event) => {
   void applySourceDirectory(sourceDirectory.value)
 })
 chooseSourceDirectory.addEventListener("click", () => void (async () => {
+  if (isAndroidTauri()) {
+    try {
+      await applySourceDirectory(await invoke<string>("pick_source_directory"))
+    } catch (error) {
+      if (!String(error).toLowerCase().includes("cancel")) showError(error, "选择源码目录")
+    }
+    return
+  }
   const path = await open({
     multiple: false,
     directory: true,

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-pickSourceDirectory"
+description = "Enables the pickSourceDirectory command without any pre-configured scope."
+commands.allow = ["pickSourceDirectory"]
+
+[[permission]]
+identifier = "deny-pickSourceDirectory"
+description = "Denies the pickSourceDirectory command without any pre-configured scope."
+commands.deny = ["pickSourceDirectory"]
