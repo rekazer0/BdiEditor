@@ -50,4 +50,29 @@ assert.deepEqual(
   "缺少 TYPE 的旧版静态列表仍应兼容",
 )
 
-console.log("✓ LIST TYPE=2 不覆盖键盘，TYPE=0/缺省类型静态列表保持显示")
+const candidateSkin = IniDocument.parse(`
+[CAND]
+BACK_STYLE=226
+FORE_STYLE=234
+
+[ICON1]
+FORE_STYLE=361
+SIZE=100,100
+ANCHOR_TYPE=1
+POS=120,9
+KEY=你
+PERSIST=1
+
+[ICON2]
+FORE_STYLE=287
+SIZE=100,100
+ANCHOR_TYPE=6
+POS=-122,-50
+KEY=F9
+PERSIST=2
+`)
+const candidateItems = previewItems(candidateSkin, 1080, 119)
+assert.equal(candidateItems.find((item) => item.section === "ICON1")?.center, "你")
+assert.equal(candidateItems.some((item) => item.section === "ICON2"), false)
+
+console.log("✓ LIST 和 CAND/ICON 静态内容按皮肤配置解析，运行时层不伪装成静态内容")

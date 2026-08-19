@@ -10,6 +10,7 @@ export type PreviewEvent = {
   section: string
   direction: "center" | "hold" | "up" | "down" | "left" | "right"
   code: string
+  holdSymbols?: string
 }
 
 type Rect = { x: number; y: number; width: number; height: number }
@@ -27,6 +28,7 @@ export type PreviewItem = {
   left: string
   right: string
   hold: string
+  holdSymbols: string
   backStyle: string
   foreStyle: string
   foreStyles: string[]
@@ -281,18 +283,21 @@ export function effectivePreviewItem(
     const foreAnimStyle = value("FORE_ANIM_STYLE")
     const backAnimStyle = value("BACK_ANIM_STYLE")
     const animStyle = value("ANIM_STYLE")
+    const center = value("CENTER") ?? item.center
+    const down = value("DOWN") ?? (value("CENTER") === undefined ? item.down : center)
     const foreStyles = foreStyle === undefined
       ? item.foreStyles
       : foreStyle.split(",").map((token) => token.trim()).filter(Boolean)
     return {
       ...item,
       show: value("SHOW") ?? item.show,
-      center: value("CENTER") ?? item.center,
+      center,
       up: value("UP") ?? item.up,
-      down: value("DOWN") ?? item.down,
+      down,
       left: value("LEFT") ?? item.left,
       right: value("RIGHT") ?? item.right,
       hold: value("HOLD") ?? item.hold,
+      holdSymbols: value("HOLDSYM") ?? item.holdSymbols,
       backStyle: backStyle === undefined ? item.backStyle : backStyle.split(",")[0],
       foreStyle: foreStyles[0] ?? "",
       foreStyles,
@@ -416,6 +421,20 @@ export function previewHitItem(
   return best ?? fallback
 }
 
+export function effectivePreviewHitItem(
+  document: IniDocument,
+  items: readonly PreviewItem[],
+  point: { x: number; y: number },
+  mode: "edit" | "preview",
+  panelWidth: number,
+  panelHeight: number,
+  state?: number,
+): PreviewItem | undefined {
+  const item = previewHitItem(items, point, mode, panelWidth, panelHeight, state)
+  if (!item || mode === "edit") return item
+  return effectivePreviewItem(document, item, state)
+}
+
 export function previewSelectionVisible(mode: "edit" | "preview", selected: boolean): boolean {
   return mode === "edit" && selected
 }
@@ -508,6 +527,8 @@ function itemFromSection(document: IniDocument, section: string): PreviewItem | 
   if (!rect) return
   const value = (name: string) => document.get(section, name) ?? ""
   const foreStyles = value("FORE_STYLE").split(",").map((token) => token.trim()).filter(Boolean)
+  const center = value("CENTER")
+  const down = value("DOWN") || center
   return {
     section,
     sections: [section],
@@ -515,12 +536,13 @@ function itemFromSection(document: IniDocument, section: string): PreviewItem | 
     touchRect: parseRect(document.get(section, "TOUCH_RECT")),
     editable: true,
     show: value("SHOW"),
-    center: value("CENTER"),
+    center,
     up: value("UP"),
-    down: value("DOWN"),
+    down,
     left: value("LEFT"),
     right: value("RIGHT"),
     hold: value("HOLD"),
+    holdSymbols: value("HOLDSYM"),
     backStyle: value("BACK_STYLE").split(",")[0],
     foreStyle: foreStyles[0] ?? "",
     foreStyles,
@@ -570,6 +592,7 @@ function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[]
     left: "",
     right: "",
     hold: "",
+    holdSymbols: "",
     backStyle: value("CELL_STYLE")?.split(",")[0] ?? "",
     foreStyle: foreStyles[0] ?? "",
     foreStyles,
@@ -596,6 +619,7 @@ function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[]
     left: "",
     right: "",
     hold: "",
+    holdSymbols: "",
     backStyle: value("BACK_STYLE")?.split(",")[0] ?? "",
     foreStyle: "",
     foreStyles: [],
@@ -702,6 +726,7 @@ export function previewItems(
       left: value("LEFT"),
       right: value("RIGHT"),
       hold: value("HOLD"),
+      holdSymbols: value("HOLDSYM"),
       backStyle,
       foreStyle,
       foreStyles,
@@ -928,14 +953,24 @@ export class Preview {
   }
 
   private hit(point: { x: number; y: number }): PreviewItem | undefined {
-    return previewHitItem(
-      this.keys,
-      point,
-      this.mode,
-      this.panelWidth,
-      this.panelHeight,
-      this.skinState,
-    )
+    return this.document
+      ? effectivePreviewHitItem(
+        this.document,
+        this.keys,
+        point,
+        this.mode,
+        this.panelWidth,
+        this.panelHeight,
+        this.skinState,
+      )
+      : previewHitItem(
+        this.keys,
+        point,
+        this.mode,
+        this.panelWidth,
+        this.panelHeight,
+        this.skinState,
+      )
   }
 
   private itemSelected(item: PreviewItem): boolean {
@@ -1140,9 +1175,19 @@ export class Preview {
     const dx = point.x - startX
     const dy = point.y - startY
     const clearOnHold = key.center.trim() === "F36"
-    const direction = gestureDirection(dx, dy, Date.now() - startedAt, Boolean(key.hold) || clearOnHold)
+    const direction = gestureDirection(
+      dx,
+      dy,
+      Date.now() - startedAt,
+      Boolean(key.hold || key.holdSymbols) || clearOnHold,
+    )
     const code = direction === "hold" && clearOnHold ? "F48" : key[direction]
-    this.onEvent({ section: key.section, direction, code })
+    this.onEvent({
+      section: key.section,
+      direction,
+      code,
+      holdSymbols: direction === "hold" ? key.holdSymbols : undefined,
+    })
     const release = () => {
       if (this.active !== active) return
       this.active = undefined

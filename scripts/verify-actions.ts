@@ -1,5 +1,12 @@
 import assert from "node:assert/strict"
-import { actionDescription, knownFunctionCodes, previewPageTarget, previewPageTransition } from "../src/actions.ts"
+import {
+  actionDescription,
+  knownFunctionCodes,
+  previewPageTarget,
+  previewPageTransition,
+  previewStateTransitionFromAction,
+  previewToggleStateFromAction,
+} from "../src/actions.ts"
 
 const expectedFunctionCodes = [
   1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
@@ -33,13 +40,33 @@ assert.equal(
   "num_symbol_cn26.ini",
 )
 assert.equal(
-  previewPageTarget("F91", "sym_26_cn.ini", "py_26.ini", symbolFiles, "sym_26_cn"),
-  "symbol.ini",
+  previewPageTarget("F90", "symbol.ini", "py_26.ini", symbolFiles, "sym_26_cn"),
+  "sym_26_cn.ini",
+  "F90 应进入 SYM_LAYOUT，而不是在两个符号文件之间互换",
 )
 assert.equal(
-  previewPageTarget("F91", "symbol.ini", "py_26.ini", symbolFiles, "sym_26_cn"),
+  previewPageTarget("F90", "sym_26_cn.ini", "py_26.ini", symbolFiles, "sym_26_cn"),
   "sym_26_cn.ini",
 )
+assert.equal(
+  previewPageTarget("F91", "sym_26_cn.ini", "py_26.ini", symbolFiles, "sym_26_cn"),
+  undefined,
+)
+assert.equal(
+  previewToggleStateFromAction("F91"),
+  38,
+)
+assert.equal(previewToggleStateFromAction("F90"), undefined)
+assert.equal(previewToggleStateFromAction("S38"), undefined)
+assert.equal(previewStateTransitionFromAction("F10"), 1)
+assert.equal(previewStateTransitionFromAction("F10", 1), 2)
+assert.equal(previewStateTransitionFromAction("F11"), 1)
+assert.equal(previewStateTransitionFromAction("F11", 1), 2)
+assert.equal(previewStateTransitionFromAction("F11", 2), null)
+assert.equal(previewStateTransitionFromAction("F25"), 3)
+assert.equal(previewStateTransitionFromAction("F25", 3), null)
+assert.equal(previewStateTransitionFromAction("F27"), 6)
+assert.equal(previewStateTransitionFromAction("F27", 6), null)
 
 const entered = previewPageTransition("F6", "base.ini", "base.ini", files)
 assert.deepEqual(entered, { target: "numbers.ini", returnName: "base.ini" })
@@ -53,7 +80,12 @@ assert.deepEqual(
 )
 assert.deepEqual(
   previewPageTransition("F91", "sym_26_cn.ini", "py_26.ini", symbolFiles, "sym_26_cn"),
-  { target: "symbol.ini", returnName: "py_26.ini" },
+  { target: undefined, returnName: "py_26.ini" },
+)
+assert.deepEqual(
+  previewPageTransition("F90", "py_26.ini", "py_9.ini", symbolFiles, "sym_26_cn"),
+  { target: "sym_26_cn.ini", returnName: "py_26.ini" },
+  "F90 与 F1 一样进入临时符号页，F4 应能返回来源布局",
 )
 
 console.log("✓ 预览切页按实际布局文件解析，支持自定义名称并避免跳转到不存在文件")

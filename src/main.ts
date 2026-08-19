@@ -18,7 +18,9 @@ import {
   isConfiguredSymbolLayout,
   knownFunctionCodes,
   previewPageTransition,
+  previewStateTransitionFromAction,
   previewStateFromAction,
+  previewToggleStateFromAction,
   skinStateLabel,
   shouldSuggestActionCodes,
 } from "./actions.ts"
@@ -33,11 +35,11 @@ import {
   type VisualResolver,
 } from "./atlas.ts"
 import {
-  candidateBackgroundLogicalHeight,
   deviceSpec,
   keyboardPreviewGeometry,
   showsKeyboardAccessories,
 } from "./devices.ts"
+import { resolveCandidateInputStyle } from "./candidate-style.ts"
 import {
   exportFormatFromPath,
   exportName,
@@ -127,7 +129,14 @@ import {
   type PreviewEvent,
 } from "./preview.ts"
 import { firstExistingPath, resourceImagePaths } from "./resources.ts"
-import { candidatePreview, deleteBackward, insertText } from "./simulation.ts"
+import {
+  candidatePreview,
+  deleteBackward,
+  deleteForward,
+  insertText,
+  moveCaret,
+  moveCaretVertical,
+} from "./simulation.ts"
 import { SkinArchive } from "./skin.ts"
 import { resolveSourceArchivePath } from "./source-tree.ts"
 import {
@@ -190,6 +199,7 @@ const downloadUpdate = $("#download-update") as HTMLAnchorElement
 const defaultDevice = $("#default-device") as HTMLSelectElement
 const canvasBackground = $("#canvas-background") as HTMLSelectElement
 const appTheme = $("#app-theme") as HTMLSelectElement
+const sourceFontSize = $("#source-font-size") as HTMLInputElement
 const windowMaterial = $("#window-material") as HTMLInputElement
 const sidebarViewVisible = $("#sidebar-view-visible") as HTMLInputElement
 const inspectorTabsVisible = $("#inspector-tabs-visible") as HTMLInputElement
@@ -376,11 +386,14 @@ const simulatedOutput = $("#simulated-output") as HTMLTextAreaElement
 const clearSimulationButton = $("#clear-simulation") as HTMLButtonElement
 const toolbarStrip = $("#toolbar-strip") as HTMLDivElement
 const candidateArea = $("#candidate-area")
+const candidateInputBackgroundCanvas = $("#candidate-input-background") as HTMLCanvasElement
 const candidateBackgroundCanvas = $("#candidate-background") as HTMLCanvasElement
 const toolbarCanvas = $("#toolbar-preview") as HTMLCanvasElement
 const candidateComposition = $("#candidate-composition")
 const candidateInput = $("#candidate-input")
 const candidateWords = $("#candidate-words")
+let simulatedComposition = ""
+let lastSimulationLanguage: "zh" | "en" | undefined
 const modeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mode-choice]"))
 const themeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-theme-choice]"))
 const orientationChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-orientation-choice]"))
@@ -548,6 +561,7 @@ const preview = new Preview(
 )
 
 const toolbarPreview = new Preview(toolbarCanvas, () => {}, () => {}, true)
+const candidateInputBackgroundPreview = new Preview(candidateInputBackgroundCanvas, () => {}, () => {})
 const candidateBackgroundPreview = new Preview(candidateBackgroundCanvas, () => {}, () => {})
 let activeKeyboardGeometry: {
   panelWidth: number
@@ -692,12 +706,35 @@ function handlePreviewEvent(event: PreviewEvent): void {
   if (soundPath) playSoundPath(soundPath)
   eventLog.textContent =
     `${event.section} · ${event.direction.toUpperCase()} · ${event.code || "未配置"}`
+  if (event.direction === "hold" && event.holdSymbols) {
+    eventLog.textContent = `${event.section} · HOLD · 长按符号候选：${event.holdSymbols}`
+    return
+  }
   const code = event.code.trim()
   const state = previewStateFromAction(code)
   if (state !== undefined) {
     activateSkinState(
       state || undefined,
       `${eventLog.textContent} → ${state ? skinStatePreviewMessage(state) : "皮肤状态：默认"}`,
+    )
+    return
+  }
+  const toggleState = previewToggleStateFromAction(code)
+  if (toggleState !== undefined) {
+    const currentState = skinState.value ? Number(skinState.value) : undefined
+    const nextState = currentState === toggleState ? undefined : toggleState
+    activateSkinState(
+      nextState,
+      `${eventLog.textContent} → ${nextState ? skinStatePreviewMessage(nextState) : "皮肤状态：默认"}`,
+    )
+    return
+  }
+  const currentState = skinState.value ? Number(skinState.value) : undefined
+  const transitionedState = previewStateTransitionFromAction(code, currentState)
+  if (transitionedState !== undefined) {
+    activateSkinState(
+      transitionedState === null ? undefined : transitionedState,
+      `${eventLog.textContent} → ${transitionedState === null ? "皮肤状态：默认" : skinStatePreviewMessage(transitionedState)}`,
     )
     return
   }
@@ -720,12 +757,19 @@ function handlePreviewEvent(event: PreviewEvent): void {
     const path = currentConfigPath(target)
     if (archive?.isText(path) || isBdaLayoutPath(path)) {
       previewReturnName = transition.returnName
+      if (code === "F15" || code === "F16") simulatedComposition = ""
+      if (skinState.value === "38") activateSkinState(undefined)
       selectFile(path, "overview")
       eventLog.textContent += ` → 已切换预览到 ${target}`
       return
     }
   }
   if (code === "F36") {
+    if (simulatedComposition) {
+      simulatedComposition = Array.from(simulatedComposition).slice(0, -1).join("")
+      refreshSimulationPreview()
+      return
+    }
     const result = deleteBackward(
       simulatedOutput.value,
       simulatedOutput.selectionStart ?? simulatedOutput.value.length,
@@ -737,15 +781,79 @@ function handlePreviewEvent(event: PreviewEvent): void {
     refreshSimulationPreview()
     return
   }
+  if (code === "F37") {
+    const result = deleteForward(
+      simulatedOutput.value,
+      simulatedOutput.selectionStart ?? simulatedOutput.value.length,
+      simulatedOutput.selectionEnd ?? simulatedOutput.value.length,
+    )
+    simulatedOutput.value = result.value
+    simulatedOutput.focus()
+    simulatedOutput.setSelectionRange(result.caret, result.caret)
+    refreshSimulationPreview()
+    return
+  }
+  if (code === "F38") {
+    if (simulatedComposition) {
+      simulatedComposition = ""
+      refreshSimulationPreview()
+      return
+    }
+    insertSimulatedText(" ")
+    return
+  }
+  if (code === "F39") {
+    simulatedComposition = ""
+    insertSimulatedText("\n")
+    return
+  }
+  if (code === "F40") {
+    simulatedComposition = ""
+    refreshSimulationPreview()
+    return
+  }
+  if (code === "F47") {
+    simulatedOutput.focus()
+    simulatedOutput.setSelectionRange(0, simulatedOutput.value.length)
+    refreshSimulationPreview()
+    return
+  }
+  if (code === "F49" || code === "F50" || code === "F51" || code === "F52") {
+    const direction = code === "F49" || code === "F51" ? -1 : 1
+    const result = code === "F49" || code === "F50"
+      ? moveCaretVertical(
+        simulatedOutput.value,
+        simulatedOutput.selectionStart ?? simulatedOutput.value.length,
+        simulatedOutput.selectionEnd ?? simulatedOutput.value.length,
+        direction,
+      )
+      : moveCaret(
+      simulatedOutput.value,
+      simulatedOutput.selectionStart ?? simulatedOutput.value.length,
+      simulatedOutput.selectionEnd ?? simulatedOutput.value.length,
+      direction,
+      )
+    simulatedOutput.focus()
+    simulatedOutput.setSelectionRange(result.start, result.end)
+    refreshSimulationPreview()
+    return
+  }
   if (code === "F48") {
     clearSimulatedOutput()
     return
   }
   if (!code || /^(F\d+|S\d+|Z\+)/.test(code)) return
+  if (simulationLanguage() === "zh" && /^[A-Za-z']$/.test(code)) {
+    simulatedComposition += code.toLowerCase()
+    refreshSimulationPreview()
+    return
+  }
+  simulatedComposition = ""
   insertSimulatedText(code)
 }
 
 function clearSimulatedOutput(): void {
+  simulatedComposition = ""
   simulatedOutput.value = ""
   simulatedOutput.setSelectionRange(0, 0)
   refreshSimulationPreview()
@@ -1638,13 +1746,23 @@ function applyCandidateTextVisual(
 }
 
 function renderCandidateState(): boolean {
+  const language = simulationLanguage()
+  if (lastSimulationLanguage !== undefined && lastSimulationLanguage !== language) {
+    simulatedComposition = ""
+  }
+  lastSimulationLanguage = language
+  const candidateSource = language === "en" ? simulatedOutput.value : simulatedComposition
+  const candidateCaret = language === "en"
+    ? simulatedOutput.selectionStart ?? simulatedOutput.value.length
+    : simulatedComposition.length
   const state = candidatePreview(
-    simulatedOutput.value,
-    simulatedOutput.selectionStart ?? simulatedOutput.value.length,
-    simulationLanguage(),
+    candidateSource,
+    candidateCaret,
+    language,
     skinState.value ? Number(skinState.value) : undefined,
   )
   candidateComposition.hidden = !state.composing
+  candidateInput.hidden = !state.input
   candidateInput.textContent = state.input
   candidateWords.replaceChildren(...state.candidates.map((value) => {
     const item = document.createElement("span")
@@ -1769,7 +1887,14 @@ function refreshPreview(): void {
     firstCandidateTextVisual = firstCandidateVisual
     candidateTextWidth = config.width
     applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth)
-    applyCandidateTextVisual(candidateWords, candidateVisual, candidateTextWidth)
+    // Overlay skins often leave the candidate background transparent. Use the
+    // first-candidate style as the readable base for hard-coded preview text;
+    // it is the skin's guaranteed visible candidate foreground.
+    applyCandidateTextVisual(
+      candidateWords,
+      firstCandidateVisual ?? candidateVisual ?? { color: "#ffffff" },
+      candidateTextWidth,
+    )
     const firstCandidate = candidateWords.firstElementChild as HTMLElement | null
     if (firstCandidate) {
       applyCandidateTextVisual(firstCandidate, firstCandidateTextVisual, candidateTextWidth)
@@ -1803,7 +1928,11 @@ function refreshPreview(): void {
     candidateTextWidth = panelWidth
     firstCandidateTextVisual = firstVisual
     applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth)
-    applyCandidateTextVisual(candidateWords, candidateVisual, candidateTextWidth)
+    applyCandidateTextVisual(
+      candidateWords,
+      firstVisual ?? candidateVisual ?? { color: "#ffffff" },
+      candidateTextWidth,
+    )
     const firstCandidate = candidateWords.firstElementChild as HTMLElement | null
     if (firstCandidate) applyCandidateTextVisual(firstCandidate, firstVisual, candidateTextWidth)
     preview.setPanel(
@@ -1891,9 +2020,7 @@ function fitCanvasPreview(): void {
   const toolbarWidth = Number(toolbarCanvas.style.getPropertyValue("--toolbar-width") || "0")
   if (toolbarWidth > 0 && toolbarHeight > 0) {
     deviceShell.style.setProperty("--toolbar-viewport-height", `${Math.round(toolbarHeight * scale)}px`)
-    const inputHeight = candidateComposition.hidden
-      ? 0
-      : Number(toolbarCanvas.style.getPropertyValue("--candidate-input-height") || "0")
+    const inputHeight = Number(toolbarCanvas.style.getPropertyValue("--candidate-input-height") || "0")
     deviceShell.style.setProperty("--candidate-input-height", `${Math.round(inputHeight * scale)}px`)
     deviceShell.style.setProperty(
       "--candidate-viewport-height",
@@ -3247,6 +3374,7 @@ function refreshToolbarPreview(
   if (isConfiguredSymbolLayout(layoutPath, textDocument(genConfigPath()))) {
     delete toolbarStrip.dataset.path
     toolbarStrip.hidden = true
+    candidateInputBackgroundCanvas.hidden = true
     candidateBackgroundCanvas.hidden = true
     return
   }
@@ -3255,6 +3383,7 @@ function refreshToolbarPreview(
   if (!archive || !path || !document) {
     delete toolbarStrip.dataset.path
     toolbarStrip.hidden = true
+    candidateInputBackgroundCanvas.hidden = true
     candidateBackgroundCanvas.hidden = true
     return
   }
@@ -3269,8 +3398,8 @@ function refreshToolbarPreview(
   toolbarPreview.setTransparent(true)
   const width = size?.length === 4 && Number.isFinite(size[2]) ? size[2] : DEFAULT_PANEL_WIDTH
   const height = size?.length === 4 && Number.isFinite(size[3]) ? size[3] : DEFAULT_CANDIDATE_HEIGHT
-  const inputStyle = gen?.get("SCAND", "BACK_STYLE")?.split(",")[0] ?? ""
-  const inputHeight = resolver.sourceSize?.(inputStyle, false)?.height ?? height
+  const inputStyle = resolveCandidateInputStyle(gen, resolver, height)
+  const inputHeight = inputStyle.height
   const backgroundStyle = document.get("CAND", "BACK_STYLE")?.split(",")[0] ??
     gen?.get("SCAND", "BACK_STYLE")?.split(",")[0] ?? ""
   candidateBackgroundCanvas.hidden = false
@@ -3280,9 +3409,15 @@ function refreshToolbarPreview(
   candidateBackgroundPreview.setPanel(
     backgroundStyle,
     width,
-    candidateBackgroundLogicalHeight(height, composing ? inputHeight : 0),
+    height,
   )
   candidateBackgroundPreview.setDocument(undefined)
+  candidateInputBackgroundCanvas.hidden = false
+  candidateInputBackgroundPreview.setResolver(resolver)
+  candidateInputBackgroundPreview.setTheme(theme.value === "dark" ? "dark" : "light")
+  candidateInputBackgroundPreview.setTransparent(devicePreviewTransparent())
+  candidateInputBackgroundPreview.setPanel(inputStyle.backgroundStyle, width, inputHeight)
+  candidateInputBackgroundPreview.setDocument(undefined)
   toolbarCanvas.style.setProperty("--toolbar-width", String(width))
   toolbarCanvas.style.setProperty("--toolbar-height", String(height))
   toolbarCanvas.style.setProperty("--candidate-input-height", String(inputHeight))
@@ -4135,6 +4270,80 @@ function updateSkinInfo(field: HTMLInputElement): void {
   setSourceValue(text)
   updateDirty()
 }
+
+function renameDocumentTitle(): void {
+  const currentNode = $("#document-name")
+  const currentArchive = archive
+  if (!currentArchive || currentNode.parentElement?.querySelector("input")) return
+  const current = currentNode.textContent?.trim() ?? ""
+  if (!current || current === "未打开皮肤") return
+  const input = document.createElement("input")
+  input.type = "text"
+  input.value = current
+  input.setAttribute("aria-label", "皮肤名称")
+  const title = documentName.parentElement
+  if (!title) return
+  currentNode.replaceWith(input)
+  input.select()
+  input.focus()
+
+  let finished = false
+  const finish = (save: boolean): void => {
+    if (finished) return
+    finished = true
+    const next = save ? input.value.trim() : current
+    const label = document.createElement("strong")
+    label.id = "document-name"
+    label.setAttribute("role", "button")
+    label.tabIndex = 0
+    label.title = "点击修改皮肤名称"
+    label.textContent = next || current
+    input.replaceWith(label)
+    if (!save || !next || next === current) return
+    // Keep the archive's skin metadata in sync with the title when available.
+    const infoPath = currentArchive.names().includes(`${theme.value}/skin/Info.txt`)
+      ? `${theme.value}/skin/Info.txt`
+      : currentArchive.names().includes("Info.txt") ? "Info.txt" : undefined
+    if (infoPath && currentArchive.isText(infoPath)) {
+      const info = infoPath === selectedPath && selectedDocument
+        ? selectedDocument
+        : IniDocument.parse(currentArchive.getText(infoPath))
+      const before = info.toString()
+      info.set("", "Name", next)
+      const after = info.toString()
+      if (before !== after) {
+        commitText(infoPath, before, after)
+        if (infoPath === selectedPath) {
+          selectedDocument = info
+          setSourceValue(after)
+          populateKeyInspector()
+        }
+      }
+    }
+    updateDirty()
+  }
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault()
+      finish(true)
+    } else if (event.key === "Escape") {
+      event.preventDefault()
+      finish(false)
+    }
+  })
+  input.addEventListener("blur", () => finish(true), { once: true })
+}
+
+documentName.parentElement?.addEventListener("click", (event) => {
+  if ((event.target as HTMLElement).id === "document-name") renameDocumentTitle()
+})
+documentName.parentElement?.addEventListener("keydown", (event) => {
+  if ((event.target as HTMLElement).id !== "document-name") return
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault()
+    renameDocumentTitle()
+  }
+})
 
 function updateKeyboard(field: HTMLInputElement): void {
   if (!archive) return
@@ -5906,6 +6115,30 @@ appTheme.addEventListener("change", () => {
   applyAppTheme()
 })
 systemTheme.addEventListener("change", applyAppTheme)
+function applySourceFontSize(): void {
+  const size = Number(sourceFontSize.value)
+  if (!Number.isFinite(size) || size < 8 || size > 32) return
+  sourceEditor.style.setProperty("--source-font-size", `${size}px`)
+}
+const savedSourceFontSize = localStorage.getItem("source-font-size")
+if (savedSourceFontSize && Number.isFinite(Number(savedSourceFontSize)) && Number(savedSourceFontSize) >= 8 && Number(savedSourceFontSize) <= 32) {
+  sourceFontSize.value = savedSourceFontSize
+}
+applySourceFontSize()
+function saveSourceFontSize(): void {
+  const size = Number(sourceFontSize.value)
+  if (!Number.isInteger(size) || size < 8 || size > 32) {
+    sourceFontSize.value = localStorage.getItem("source-font-size") || "11"
+    applySourceFontSize()
+    return
+  }
+  sourceFontSize.value = String(size)
+  localStorage.setItem("source-font-size", sourceFontSize.value)
+  applySourceFontSize()
+}
+sourceFontSize.addEventListener("input", applySourceFontSize)
+sourceFontSize.addEventListener("change", saveSourceFontSize)
+sourceFontSize.addEventListener("blur", saveSourceFontSize)
 async function applyWindowMaterial(): Promise<void> {
   const enabled = windowMaterial.checked
   document.documentElement.dataset.windowMaterial = enabled ? "on" : "off"
@@ -5988,7 +6221,7 @@ window.addEventListener("mouseup", () => {
 window.addEventListener("blur", () => {
   if (windowDragPointerDown) void restoreWindowMaterialAfterDrag()
 }, true)
-sidebarViewVisible.checked = localStorage.getItem("sidebar-view-visible") === "on"
+sidebarViewVisible.checked = localStorage.getItem("sidebar-view-visible") !== "off"
 function applySidebarViewVisibility(): void {
   sidebarViewHeading.toggleAttribute("hidden", !sidebarViewVisible.checked)
 }
@@ -5997,7 +6230,7 @@ sidebarViewVisible.addEventListener("change", () => {
   localStorage.setItem("sidebar-view-visible", sidebarViewVisible.checked ? "on" : "off")
   applySidebarViewVisibility()
 })
-inspectorTabsVisible.checked = localStorage.getItem("inspector-tabs-visible") === "on"
+inspectorTabsVisible.checked = localStorage.getItem("inspector-tabs-visible") !== "off"
 function applyInspectorTabsVisibility(): void {
   inspectorTabs.toggleAttribute("hidden", !inspectorTabsVisible.checked)
 }

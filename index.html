@@ -7,7 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'"
     />
-    <title>BdiEditor v1.0.5</title>
+    <title>键设-bdiEditor v1.1.6</title>
   </head>
   <body>
     <header class="titlebar" data-tauri-drag-region>
@@ -62,7 +62,7 @@
         <button id="mobile-redo" class="toolbar-button" type="button" title="重做" aria-label="重做"><span class="system-symbol" data-system-symbol="arrow.uturn.forward" aria-hidden="true"></span></button>
       </div>
       <div class="document-title" data-tauri-drag-region>
-        <strong id="document-name">未打开皮肤</strong>
+        <strong id="document-name" role="button" tabindex="0" title="点击修改皮肤名称">未打开皮肤</strong>
         <span id="dirty" hidden>已编辑</span>
       </div>
       <span class="spacer" data-tauri-drag-region></span>
@@ -194,6 +194,7 @@
               </div>
               <div class="keyboard-dock">
                 <div id="candidate-area">
+                  <canvas id="candidate-input-background" width="1125" height="65" hidden></canvas>
                   <canvas id="candidate-background" width="1125" height="133" hidden></canvas>
                   <div id="candidate-composition" hidden aria-live="polite">
                     <div id="candidate-input"></div>
@@ -625,6 +626,7 @@
       <form method="dialog">
         <header><h2 id="settings-title">设置</h2><button aria-label="关闭">关闭</button></header>
         <label>软件外观 <select id="app-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
+        <label>源代码编辑器字号 <input id="source-font-size" type="number" min="8" max="32" step="1" value="11" inputmode="numeric" aria-describedby="source-font-size-hint"><small id="source-font-size-hint">8–32 px</small></label>
         <label class="source-directory-setting">皮肤源码保存目录
           <span class="settings-path-control">
             <input id="source-directory" type="text" autocomplete="off" spellcheck="false">
@@ -634,8 +636,8 @@
           <small id="source-directory-status"></small>
         </label>
         <label class="settings-switch">窗口玻璃与亚克力材质 <input id="window-material" type="checkbox" role="switch" checked></label>
-        <label class="settings-switch">显示概览/源文件切换 <input id="sidebar-view-visible" type="checkbox" role="switch"></label>
-        <label class="settings-switch">显示属性/源代码切换 <input id="inspector-tabs-visible" type="checkbox" role="switch"></label>
+        <label class="settings-switch">显示概览/源文件切换 <input id="sidebar-view-visible" type="checkbox" role="switch" checked></label>
+        <label class="settings-switch">显示属性/源代码切换 <input id="inspector-tabs-visible" type="checkbox" role="switch" checked></label>
         <label class="settings-switch">检查器侧边栏分组展示 <input id="inspector-grouped-display" type="checkbox" role="switch" checked></label>
         <label>默认预览设备 <select id="default-device"><option value="canvas">画布</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
         <label>画布背景 <select id="canvas-background"><option value="glass">玻璃</option><option value="checkerboard">马赛克</option><option value="white" selected>白色</option><option value="dark">深色</option></select></label>
@@ -646,12 +648,12 @@
 
     <dialog id="about-dialog" class="app-dialog" aria-labelledby="about-title">
       <form method="dialog">
-        <header><h2 id="about-title">关于 BdiEditor v1.0.5</h2><button aria-label="关闭">关闭</button></header>
+        <header><h2 id="about-title">关于 键设-bdiEditor v1.1.6</h2><button aria-label="关闭">关闭</button></header>
         <p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
-        <p>版本 1.0.5</p>
+        <p>版本 1.1.6</p>
         <p>支持读取、编辑和导出 BDI、BDS、BDA 皮肤包。</p>
         <p class="about-alpha">阿尔法版本：包含未完成的功能与实验性改动，仅用于测试。</p>
-        <section id="about-update" class="about-update" data-current-version="1.0.5">
+        <section id="about-update" class="about-update" data-current-version="1.1.6">
           <div><strong>版本更新</strong><button id="check-update" type="button">检查更新</button></div>
           <p id="update-status" aria-live="polite">正在检查更新…</p>
           <a id="download-update" href="https://github.com/rekazer0/BdiEditor/releases" target="_blank" rel="noreferrer" hidden>查看最新版本</a>

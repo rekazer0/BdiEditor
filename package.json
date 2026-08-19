@@ -1,7 +1,7 @@
 {
   "name": "bdi-edit",
   "private": true,
-  "version": "1.0.5",
+  "version": "1.1.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,6 +15,7 @@
     "verify:layout": "node scripts/verify-layout.ts",
     "verify:actions": "node scripts/verify-actions.ts",
     "verify:preview-lists": "node scripts/verify-preview-lists.ts",
+    "verify:candidate-style": "node scripts/verify-candidate-style.ts",
     "verify:inspector-groups": "node scripts/verify-inspector-groups.ts",
     "verify:sources": "node scripts/verify-source-workspace.ts",
     "tauri": "tauri"

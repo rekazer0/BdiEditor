@@ -3,7 +3,7 @@ import { IniDocument } from "./ini.ts"
 const functionCodeDescriptions: Record<string, string> = {
   F1: "切换到符号面板", F3: "切换到拇指/全键盘", F4: "返回", F5: "切换到软键盘",
   F6: "切换到数字面板", F7: "切换到表情面板", F8: "隐藏面板", F9: "查看更多候选字",
-  F10: "切换小写和首字母大写", F11: "切换小写和大写锁定", F12: "切换到网络面板",
+  F10: "切换大小写状态", F11: "切换大小写状态", F12: "切换到网络面板",
   F13: "一键换皮肤", F14: "面板切换功能容器", F15: "切换到中文输入状态",
   F16: "切换到英文输入状态", F17: "切换到拨号界面", F21: "菜单", F22: "候选字上翻",
   F23: "候选字下翻", F24: "中文输入方式选择菜单", F25: "切换字母/联想",
@@ -26,6 +26,12 @@ const functionCodeDescriptions: Record<string, string> = {
   F92: "关闭联想状态", F93: "长按的符号", F94: "国际化输入空格键左划",
   F95: "国际化输入空格键右划", F96: "悬浮键盘（待定）", F97: "通知中心（待定）",
   F99: "快速编辑（待定）",
+}
+
+// These function codes mutate a skin state in-place instead of loading another layout.
+// Keep this separate from page routing: the APK handles F91 as Global.n0[38] toggle.
+const skinStateToggleActions: Record<string, number> = {
+  F91: 38,
 }
 
 export const knownFunctionCodes = Object.keys(functionCodeDescriptions)
@@ -111,37 +117,28 @@ export function previewStateFromAction(code: string): number | undefined {
   return state >= MIN_SKIN_STATE && state <= MAX_SKIN_STATE ? state : undefined
 }
 
+export function previewToggleStateFromAction(code: string): number | undefined {
+  return skinStateToggleActions[code.trim().toUpperCase()]
+}
+
+/** Simulates actions whose native handler updates a boolean input-state bit. */
+export function previewStateTransitionFromAction(code: string, currentState?: number): number | null | undefined {
+  const value = code.trim().toUpperCase()
+  if (value === "F10" || value === "F11") {
+    if (currentState === 1) return 2
+    if (currentState === 2) return null
+    return 1
+  }
+  if (value === "F25") return currentState === 3 ? null : 3
+  if (value === "F27") return currentState === 6 ? null : 6
+}
+
 export function isConfiguredSymbolLayout(path: string, general: IniDocument | undefined): boolean {
   const current = path.split("/").pop()?.replace(/\.ini$/i, "").toLowerCase()
   const configured = (general?.get("MORE", "SYM_LAYOUT")?.trim() || "symbol")
     .replace(/\.ini$/i, "")
     .toLowerCase()
   return Boolean(current && current === configured)
-}
-
-function symbolPageTarget(
-  currentName: string,
-  symbolLayout: string,
-  existing: (name: string) => string | undefined,
-  available: Map<string, string> | undefined,
-): string | undefined {
-  const current = currentName.split("/").pop()?.replace(/\.ini$/i, "").toLowerCase() ?? ""
-  const configured = symbolLayout.replace(/\.ini$/i, "").toLowerCase()
-  const preferred = current === configured
-    ? ["symbol"]
-    : current === "symbol"
-      ? [configured]
-      : ["symbol", configured]
-  for (const name of preferred) {
-    const match = existing(name)
-    if (match && match.toLowerCase() !== `${current}.ini`) return match
-  }
-  if (!available) return
-  const matches = [...available.values()].filter((name) => {
-    const base = name.replace(/\.ini$/i, "")
-    return /^(?:sym|symbol)(?:[_-]|$)/i.test(base) || /(?:^|[_-])symbol(?:[_-]|$)/i.test(base)
-  })
-  return matches.find((name) => name.toLowerCase() !== `${current}.ini`)
 }
 
 export function previewPageTarget(
@@ -174,11 +171,10 @@ export function previewPageTarget(
     suffix ? [`num_${suffix}`] : ["num_9", "num_26"],
     /^(?:num|numbers?|numeric)(?:[_-]|$)/i,
   )
-  if (value === "F1") return firstMatching(
+  if (value === "F1" || value === "F90") return firstMatching(
     [symbolLayout, "symbol", suffix ? `sym_${suffix}_cn` : ""].filter(Boolean),
     /^(?:sym|symbol)(?:[_-]|$)|(?:^|[_-])symbol(?:[_-]|$)/i,
   )
-  if (value === "F90" || value === "F91") return symbolPageTarget(currentName, symbolLayout, existing, available)
   if (value === "F16") return firstMatching(
     suffix ? [`en_${suffix}`] : ["en_26", "en_9"],
     /^(?:en|english|letter|letters)(?:[_-]|$)/i,
@@ -205,9 +201,8 @@ export function previewPageTransition(
     value === "F15" ||
     ((value === "F6" || value === "F16") &&
       requestedTarget?.toLowerCase() === currentName.toLowerCase())
-  const switchingSymbolPage = value === "F90" || value === "F91"
   const enteringTransientPage =
-    !returnsToOrigin && !switchingSymbolPage && Boolean(requestedTarget)
+    !returnsToOrigin && Boolean(requestedTarget)
   const nextReturnName = enteringTransientPage ? currentName : returnName
   return {
     target: returnsToOrigin

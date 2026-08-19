@@ -3,6 +3,7 @@ import { actionDescription, previewStateFromAction, skinStateLabel } from "../sr
 import { IniDocument } from "../src/ini.ts"
 import { availableSkinStates, stateTipSection } from "../src/panel-tools.ts"
 import {
+  effectivePreviewHitItem,
   effectivePreviewItem,
   isFullPanelPreviewItem,
   previewHitItem,
@@ -48,6 +49,7 @@ const key: Parameters<typeof effectivePreviewItem>[1] = {
   left: "",
   right: "",
   hold: "",
+  holdSymbols: "",
   backStyle: "38",
   foreStyle: "89",
   foreStyles: ["89", "31", "432"],
@@ -74,7 +76,66 @@ const noStateKey: Parameters<typeof effectivePreviewItem>[1] = {
 }
 assert.deepEqual(effectivePreviewItem(document, noStateKey, 1).foreStyles, noStateKey.foreStyles)
 
-console.log("✓ STAT_STYLE→TIP 状态换层：S0 不换、S1→TIP1、S2→TIP2、几何继承")
+const officialFallbacks = IniDocument.parse(`
+[KEY1]
+VIEW_RECT=0,0,100,100
+CENTER=a
+HOLDSYM=aāá
+STAT_STYLE=S1_1
+
+[TIP1]
+CENTER=A
+HOLDSYM=AĀÁ
+`)
+const fallbackItem = previewItems(officialFallbacks, 100, 100)[0]
+assert.equal(fallbackItem.down, "a", "官方解析器在 DOWN 缺失时回退 CENTER")
+assert.equal(fallbackItem.holdSymbols, "aāá")
+const fallbackStateItem = effectivePreviewItem(officialFallbacks, fallbackItem, 1)
+assert.equal(fallbackStateItem.center, "A")
+assert.equal(fallbackStateItem.down, "A", "TIP 覆盖 CENTER 时，缺失 DOWN 也应跟随新的 CENTER")
+assert.equal(fallbackStateItem.holdSymbols, "AĀÁ")
+
+const stateActionDocument = IniDocument.parse(`
+[PANEL]
+SIZE=1080,532
+
+[KEY27]
+VIEW_RECT=5,266,131,133
+CENTER=F91
+STAT_STYLE=S38_27
+
+[TIP27]
+CENTER=F4
+`)
+const stateActionItems = previewItems(stateActionDocument, 1080, 532)
+assert.equal(
+  effectivePreviewHitItem(
+    stateActionDocument,
+    stateActionItems,
+    { x: 50, y: 300 },
+    "preview",
+    1080,
+    532,
+    38,
+  )?.center,
+  "F4",
+  "状态层生效后，交互必须读取 TIP 动作而不是原始 KEY 动作",
+)
+assert.equal(
+  effectivePreviewHitItem(
+    stateActionDocument,
+    stateActionItems,
+    { x: 50, y: 300 },
+    "edit",
+    1080,
+    532,
+    38,
+  )?.center,
+  "F91",
+  "编辑模式仍应选中并编辑原始 KEY 定义",
+)
+
+console.log("✓ STAT_STYLE→TIP 状态换层：渲染和交互均使用 TIP，编辑仍定位原始 KEY")
 
 // 蒋·Grid M：全屏背景 KEY99 写在字母键之后，命中必须落到前景键。
 const stacked = IniDocument.parse(`

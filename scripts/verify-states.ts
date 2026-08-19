@@ -5,13 +5,17 @@ import {
   knownSkinStates,
   previewStateFromAction,
   skinStateFallbackText,
-  skinStateForcesComposition,
   skinStateLabel,
 } from "../src/actions.ts"
 import { IniDocument } from "../src/ini.ts"
 import { availableSkinStates, stateTipSection } from "../src/panel-tools.ts"
 import { effectivePreviewItem, previewItems, previewStateImpact } from "../src/preview.ts"
-import { candidatePreview } from "../src/simulation.ts"
+import {
+  candidatePreview,
+  deleteForward,
+  moveCaret,
+  moveCaretVertical,
+} from "../src/simulation.ts"
 
 assert.equal(knownSkinStates.length, 122)
 assert.equal(knownSkinStates[0], MIN_SKIN_STATE)
@@ -89,12 +93,30 @@ for (const state of [11, 17, 21, 23, 27]) {
 }
 console.log("✓ 缺失 TIP 的旧皮肤回车状态使用语义文字兜底")
 
-assert.equal(skinStateForcesComposition(4), true)
-assert.equal(candidatePreview("", 0, "zh").composing, false)
+assert.deepEqual(candidatePreview("hello", 5, "en"), {
+  composing: true,
+  input: "",
+  candidates: ["hello", "Hello", "world", "thanks", "good"],
+}, "英文状态不显示拼音，但展示硬编码英文候选")
+assert.deepEqual(candidatePreview("ni", 2, "zh"), {
+  composing: true,
+  input: "ni",
+  candidates: ["你好", "不会", "不回", "不好", "你会"],
+}, "中文输入码展示硬编码中文候选")
 assert.deepEqual(candidatePreview("", 0, "zh", 4), {
   composing: true,
   input: "ni",
   candidates: ["你好", "不会", "不回", "不好", "你会"],
-})
-assert.equal(candidatePreview("hello", 5, "en", 4).input, "hello", "真实输入优先于 S4 示例")
-console.log("✓ S4 强制展示输入编码与候选，但不覆盖真实模拟输入")
+}, "S4 使用固定中文输入示例")
+console.log("✓ 中文和英文候选使用固定预览数据，英文候选不显示拼音")
+
+assert.deepEqual(deleteForward("A😀B", 1, 1), { value: "AB", caret: 1 })
+assert.deepEqual(deleteForward("abc", 0, 2), { value: "c", caret: 0 })
+assert.deepEqual(moveCaret("A😀B", 3, 3, -1), { start: 1, end: 1 })
+assert.deepEqual(moveCaret("A😀B", 1, 1, 1), { start: 3, end: 3 })
+assert.deepEqual(moveCaret("abcd", 1, 3, -1), { start: 1, end: 1 })
+assert.deepEqual(moveCaret("abcd", 1, 3, 1), { start: 3, end: 3 })
+assert.deepEqual(moveCaretVertical("ab\nc😀d\nxy", 6, 6, -1), { start: 2, end: 2 })
+assert.deepEqual(moveCaretVertical("ab\nc😀d\nxy", 1, 1, 1), { start: 4, end: 4 })
+assert.deepEqual(moveCaretVertical("abcd\nx", 3, 3, 1), { start: 6, end: 6 })
+console.log("✓ APK 编辑功能码所需的删除、清输入码和光标移动遵循 Unicode/选区边界")
