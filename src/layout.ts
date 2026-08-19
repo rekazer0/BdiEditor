@@ -173,8 +173,13 @@ export function applyLayoutAction(rects: LayoutRect[], action: LayoutAction): La
   if (next.length < 2) return next
   if (action === "swap") {
     if (next.length !== 2) return next
-    ;[next[0].x, next[1].x] = [next[1].x, next[0].x]
-    ;[next[0].y, next[1].y] = [next[1].y, next[0].y]
+    const [first, second] = next
+    const firstCenter = [first.x + first.width / 2, first.y + first.height / 2]
+    const secondCenter = [second.x + second.width / 2, second.y + second.height / 2]
+    first.x = secondCenter[0] - first.width / 2
+    first.y = secondCenter[1] - first.height / 2
+    second.x = firstCenter[0] - second.width / 2
+    second.y = firstCenter[1] - second.height / 2
   } else if (action === "left") {
     const x = Math.min(...next.map((rect) => rect.x))
     next.forEach((rect) => (rect.x = x))

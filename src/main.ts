@@ -7,8 +7,16 @@ import { message, open, save } from "@tauri-apps/plugin-dialog"
 import { readFile, watch, writeFile, type UnwatchFn } from "@tauri-apps/plugin-fs"
 import "./style.css"
 import {
+  DEFAULT_BDA_PANEL_HEIGHT,
+  DEFAULT_BDA_PANEL_WIDTH,
+  DEFAULT_CANDIDATE_HEIGHT,
+  DEFAULT_PANEL_HEIGHT,
+  DEFAULT_PANEL_WIDTH,
+} from "./keyboard.ts"
+import {
   actionDescription,
   isConfiguredSymbolLayout,
+  knownFunctionCodes,
   previewPageTransition,
   previewStateFromAction,
   skinStateLabel,
@@ -35,6 +43,7 @@ import {
   exportName,
   type ExportFormat,
 } from "./export.ts"
+import { inspectorGroupPositionPercent } from "./inspector-groups.ts"
 import {
   BdaResolver,
   bdaAppearancePath,
@@ -93,6 +102,7 @@ import {
   type LayoutRect,
 } from "./layout.ts"
 import { shouldClearMixedInput } from "./mixed-input.ts"
+import { installNumberInputWheel } from "./number-input-wheel.ts"
 import { loadBuiltInProjectTemplate, operationError } from "./operations.ts"
 import {
   availableSkinStates,
@@ -108,10 +118,18 @@ import {
   validPanelFilename,
   variantCopyPaths,
 } from "./panel-tools.ts"
-import { Preview, parseLegacyAnimation, previewContentVerticalBounds, previewItems, type PreviewEvent } from "./preview.ts"
+import {
+  Preview,
+  parseLegacyAnimation,
+  previewContentVerticalBounds,
+  previewItems,
+  previewStateImpact,
+  type PreviewEvent,
+} from "./preview.ts"
 import { firstExistingPath, resourceImagePaths } from "./resources.ts"
 import { candidatePreview, deleteBackward, insertText } from "./simulation.ts"
 import { SkinArchive } from "./skin.ts"
+import { resolveSourceArchivePath } from "./source-tree.ts"
 import {
   SOUND_ACCEPT,
   decodeAiffPcm,
@@ -142,6 +160,7 @@ import { checkForUpdate } from "./update.ts"
 
 document.documentElement.classList.toggle("macos", isTauri() && navigator.userAgent.includes("Macintosh"))
 document.documentElement.classList.toggle("windows", isTauri() && navigator.userAgent.includes("Windows"))
+installNumberInputWheel()
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 const newButton = $("#new") as HTMLButtonElement
@@ -174,6 +193,7 @@ const appTheme = $("#app-theme") as HTMLSelectElement
 const windowMaterial = $("#window-material") as HTMLInputElement
 const sidebarViewVisible = $("#sidebar-view-visible") as HTMLInputElement
 const inspectorTabsVisible = $("#inspector-tabs-visible") as HTMLInputElement
+const inspectorGroupedDisplay = $("#inspector-grouped-display") as HTMLInputElement
 const mobilePreviewPosition = $("#mobile-preview-position") as HTMLSelectElement
 const sourceDirectory = $("#source-directory") as HTMLInputElement
 const chooseSourceDirectory = $("#choose-source-directory") as HTMLButtonElement
@@ -424,7 +444,7 @@ let layoutImageObjectURL = ""
 let layoutImageHighlight = false
 let fileOperationRunning = false
 let firstCandidateTextVisual: TextVisual | undefined
-let candidateTextWidth = 1125
+let candidateTextWidth = DEFAULT_PANEL_WIDTH
 let canvasLogicalSize: {
   width: number
   height: number
@@ -542,6 +562,19 @@ function applySkinState(state?: number, message?: string): void {
   preview.setSkinState(state)
   toolbarPreview.setSkinState(state)
   if (message) eventLog.textContent = message
+}
+
+function skinStatePreviewMessage(state: number): string {
+  const impact = previewStateImpact(layoutDocument, state)
+  if (impact.resolved) return `皮肤状态：S${state}`
+  if (impact.mapped) return `皮肤状态：S${state} · 当前布局的状态定义缺少 TIP 内容`
+  if (state === 4) return `皮肤状态：S4 · 已进入输入编码预览，当前布局未配置按键换层`
+  return `皮肤状态：S${state} · 当前布局未配置按键换层`
+}
+
+function activateSkinState(state?: number, message?: string): void {
+  applySkinState(state, message ?? (state ? skinStatePreviewMessage(state) : "皮肤状态：默认"))
+  refreshSimulationPreview()
 }
 
 let keySoundAudio: HTMLAudioElement | undefined
@@ -662,14 +695,26 @@ function handlePreviewEvent(event: PreviewEvent): void {
   const code = event.code.trim()
   const state = previewStateFromAction(code)
   if (state !== undefined) {
-    applySkinState(
+    activateSkinState(
       state || undefined,
-      `${eventLog.textContent} → ${state ? `皮肤状态：S${state}` : "皮肤状态：默认"}`,
+      `${eventLog.textContent} → ${state ? skinStatePreviewMessage(state) : "皮肤状态：默认"}`,
     )
     return
   }
   const currentName = layoutPath.split("/").pop() ?? ""
-  const transition = previewPageTransition(code, currentName, previewReturnName)
+  const currentDirectory = layoutPath.slice(0, layoutPath.lastIndexOf("/") + 1)
+  const availableNames = archive
+    ? archive.format === "bda"
+      ? bdaAvailableLayoutPaths().map((path) => path.slice(path.lastIndexOf("/") + 1))
+      : archive.names()
+        .filter((path) => path.startsWith(currentDirectory) && path.slice(currentDirectory.length).includes("/") === false)
+        .map((path) => path.slice(currentDirectory.length))
+    : undefined
+  const general = archive && archive.isText(genConfigPath())
+    ? IniDocument.parse(archive.getText(genConfigPath()))
+    : undefined
+  const symbolLayout = general?.get("MORE", "SYM_LAYOUT")?.trim()?.replace(/\.ini$/i, "") || "symbol"
+  const transition = previewPageTransition(code, currentName, previewReturnName, availableNames, symbolLayout)
   const target = transition.target
   if (target) {
     const path = currentConfigPath(target)
@@ -947,7 +992,7 @@ function setMobileInspectorGroup(id: string, scroll = true): void {
     button.classList.toggle("active", active)
     button.setAttribute("aria-pressed", String(active))
   }
-  if (scroll && mobilePortraitQuery.matches) {
+  if (scroll && (mobilePortraitQuery.matches || !inspectorGroupedDisplay.checked)) {
     const group = quickInspector.querySelector<HTMLElement>(`.mobile-inspector-managed[data-mobile-inspector-group="${CSS.escape(id)}"]`)
     group?.scrollIntoView({ behavior: "smooth", block: "start" })
   } else if (scroll) quickInspector.scrollTop = 0
@@ -984,6 +1029,7 @@ function syncMobileInspectorGroups(): void {
 {
   let dragging = false
   let pointerId = -1
+  let pointerToCenterY = 0
   const savedPosition = Number(localStorage.getItem("desktop-inspector-groups-y"))
   if (Number.isFinite(savedPosition) && savedPosition >= 15 && savedPosition <= 85) {
     quickInspector.style.setProperty("--desktop-inspector-groups-y", `${savedPosition}%`)
@@ -995,6 +1041,8 @@ function syncMobileInspectorGroups(): void {
     if (mobilePortraitQuery.matches) return
     dragging = true
     pointerId = event.pointerId
+    const groupRect = mobileInspectorGroups.getBoundingClientRect()
+    pointerToCenterY = event.clientY - (groupRect.top + groupRect.height / 2)
     mobileInspectorGroups.classList.add("dragging")
     inspectorGroupsDrag.setPointerCapture(pointerId)
     event.preventDefault()
@@ -1002,9 +1050,13 @@ function syncMobileInspectorGroups(): void {
   inspectorGroupsDrag.addEventListener("pointermove", (event) => {
     if (!dragging || event.pointerId !== pointerId) return
     const rect = quickInspector.getBoundingClientRect()
-    const half = mobileInspectorGroups.offsetHeight / 2
-    const y = Math.min(Math.max(event.clientY - rect.top, half), rect.height - half)
-    const percent = rect.height ? y / rect.height * 100 : 50
+    const percent = inspectorGroupPositionPercent(
+      event.clientY,
+      rect.top,
+      rect.height,
+      mobileInspectorGroups.offsetHeight,
+      pointerToCenterY,
+    )
     quickInspector.style.setProperty("--desktop-inspector-groups-y", `${percent}%`)
   })
   const stopDragging = (event: PointerEvent) => {
@@ -1187,8 +1239,11 @@ function sourcePathForWorkspace(path: string): string {
 }
 
 function sourcePathForArchive(path: string): string {
-  if (!sourceWorkspacePrefix || path === "Info.txt" || path === "demo.png") return path
-  return `${sourceWorkspacePrefix}${path}`
+  return resolveSourceArchivePath(
+    path,
+    sourceWorkspacePrefix,
+    archive?.sourceFiles().map((file) => file.path) ?? [],
+  )
 }
 
 function sourceFilesPayload(value: SkinArchive): SourceFilePayload[] {
@@ -1205,9 +1260,9 @@ async function flushSourceAutosave(): Promise<void> {
     const value = archive
     const paths = [...pendingSourcePaths]
     pendingSourcePaths.clear()
-    const changes = paths.map((path) => {
+    const changes: SourceChangePayload[] = paths.map((path) => {
       const data = value.getSourceBytes(sourcePathForArchive(path))
-      return { path, data: data ? Array.from(data) : null }
+      return { path, data: data ? Array.from(data) : null, directory: false }
     })
     sourceAutosaveQueue = sourceAutosaveQueue.catch(() => {}).then(() => invoke("apply_source_changes", {
       path: workspace,
@@ -1240,7 +1295,7 @@ async function refreshExternalSourceFiles(workspace: string, paths: string[]): P
   const directorySnapshots = changes.filter((change) => change.directory)
   const presentPaths = new Set(changes.filter((change) => !change.directory && change.data).map((change) => sourcePathForArchive(change.path)))
   for (const snapshot of directorySnapshots) {
-    const archiveSnapshotPath = sourcePathForArchive(snapshot.path)
+    const archiveSnapshotPath = sourcePathForArchive(snapshot.path).replace(/\/$/, "")
     const prefix = archiveSnapshotPath ? `${archiveSnapshotPath}/` : ""
     const removed = archive.sourceFiles()
       .filter((file) => (file.path === archiveSnapshotPath || file.path.startsWith(prefix)) && !presentPaths.has(file.path))
@@ -1285,7 +1340,7 @@ async function refreshExternalSourceFiles(workspace: string, paths: string[]): P
     if (affected.has(layoutPath) && archive.isText(layoutPath)) {
       layoutDocument = IniDocument.parse(archive.getText(layoutPath))
     }
-    if (selectedPath && archive.getBytes(selectedPath)) selectFile(selectedPath, sidebarView)
+    if (selectedPath && archive.getBytes(selectedPath)) selectFile(selectedPath, sidebarView, "document", true)
     else {
       const next = archive.names().find((path) => archive?.isText(path))
       if (next) selectFile(next, sidebarView)
@@ -1587,6 +1642,7 @@ function renderCandidateState(): boolean {
     simulatedOutput.value,
     simulatedOutput.selectionStart ?? simulatedOutput.value.length,
     simulationLanguage(),
+    skinState.value ? Number(skinState.value) : undefined,
   )
   candidateComposition.hidden = !state.composing
   candidateInput.textContent = state.input
@@ -1731,8 +1787,8 @@ function refreshPreview(): void {
     applyDeviceKeyboardGeometry(config.width, config.height, candidateHeight, candidateInputHeight)
   } else if (bdaGen && layoutDocument) {
     const size = bdaGen.get("PANEL", "SIZE")?.split(",").map(Number)
-    const panelWidth = size?.[0] || 1080
-    const panelHeight = size?.[1] || 641
+    const panelWidth = size?.[0] || DEFAULT_BDA_PANEL_WIDTH
+    const panelHeight = size?.[1] || DEFAULT_BDA_PANEL_HEIGHT
     const panel = currentBdaAppearance()?.appearance.panels.get(layout.value.replace(/\.ini$/i, ""))
     const candidateDocument = toolbarConfigPath() ? textDocument(toolbarConfigPath()!) : undefined
     const inputVisual = resolver?.resolveText(
@@ -3211,8 +3267,8 @@ function refreshToolbarPreview(
   toolbarPreview.setDefaults(gen)
   toolbarPreview.setTheme(theme.value === "dark" ? "dark" : "light")
   toolbarPreview.setTransparent(true)
-  const width = size?.length === 4 && Number.isFinite(size[2]) ? size[2] : 1125
-  const height = size?.length === 4 && Number.isFinite(size[3]) ? size[3] : 133
+  const width = size?.length === 4 && Number.isFinite(size[2]) ? size[2] : DEFAULT_PANEL_WIDTH
+  const height = size?.length === 4 && Number.isFinite(size[3]) ? size[3] : DEFAULT_CANDIDATE_HEIGHT
   const inputStyle = gen?.get("SCAND", "BACK_STYLE")?.split(",")[0] ?? ""
   const inputHeight = resolver.sourceSize?.(inputStyle, false)?.height ?? height
   const backgroundStyle = document.get("CAND", "BACK_STYLE")?.split(",")[0] ??
@@ -3646,8 +3702,7 @@ function updateBdaRefs(refs: BdaStyleRef[], property: string, value: string): bo
   return true
 }
 
-baiduActionCodes.replaceChildren(...Array.from({ length: 99 }, (_, index) => {
-  const value = `F${index + 1}`
+baiduActionCodes.replaceChildren(...knownFunctionCodes.map((value) => {
   return new Option(actionDescription(value), value)
 }))
 
@@ -4887,7 +4942,9 @@ function selectFile(
   path: string,
   preferredSidebarView = sidebarView,
   resourceMode: "document" | "image" | "style" | "sound" = "document",
+  preserveInspectorView = false,
 ): void {
+  const previousInspectorTab = inspectorTab
   styleReturnPath = ""
   resourceConfigActive = resourceMode !== "document"
   resourceInspectorMode = resourceMode === "style" ? "style" : resourceMode === "sound" ? "sound" : "image"
@@ -4934,7 +4991,6 @@ function selectFile(
     source.disabled = true
     sourceName.textContent = `${path} · 几何来自百度输入法安装包`
     inspectorTab = "properties"
-    if (previewLayout) refreshPreview()
   } else if (archive?.isImage(path)) {
     inspectorTab = "properties"
     selectedDocument = undefined
@@ -4955,7 +5011,6 @@ function selectFile(
       selectedKeySections = []
       preview.setSelected([])
       inspectorTab = "properties"
-      refreshPreview()
     } else if (preferredSidebarView === "overview") {
       inspectorTab = "properties"
     } else if (path !== layoutPath) {
@@ -4978,6 +5033,7 @@ function selectFile(
   if (preferredSidebarView === "source" && (archive?.isText(path) || archive?.isBdaConfig(path))) {
     inspectorTab = "source"
   }
+  if (preserveInspectorView) inspectorTab = previousInspectorTab
   updateInspectorView()
   if (resourceConfigActive) renderResourceInspector()
   if (!quickInspector.hidden) populateKeyInspector()
@@ -5950,6 +6006,16 @@ inspectorTabsVisible.addEventListener("change", () => {
   localStorage.setItem("inspector-tabs-visible", inspectorTabsVisible.checked ? "on" : "off")
   applyInspectorTabsVisibility()
 })
+inspectorGroupedDisplay.checked = localStorage.getItem("inspector-grouped-display") !== "off"
+function applyInspectorGroupedDisplay(): void {
+  quickInspector.dataset.inspectorGroupDisplay = inspectorGroupedDisplay.checked ? "grouped" : "all"
+  if (inspectorGroupedDisplay.checked) quickInspector.scrollTop = 0
+}
+applyInspectorGroupedDisplay()
+inspectorGroupedDisplay.addEventListener("change", () => {
+  localStorage.setItem("inspector-grouped-display", inspectorGroupedDisplay.checked ? "on" : "off")
+  applyInspectorGroupedDisplay()
+})
 undoButton.addEventListener("click", undo)
 redoButton.addEventListener("click", redo)
 browserOpen.addEventListener("change", async () => {
@@ -6068,14 +6134,6 @@ for (const field of keyFields) {
     syncActionCodeSuggestions(field)
     updateSelectedKey(field)
   })
-  if (field.type === "number") {
-    field.addEventListener("wheel", (event) => {
-      if (field.disabled) return
-      event.preventDefault()
-      event.deltaY < 0 ? field.stepUp() : field.stepDown()
-      field.dispatchEvent(new Event("input", { bubbles: true }))
-    }, { passive: false })
-  }
 }
 for (const field of styleFields) {
   field.addEventListener("input", () => updateSelectedStyle(field))
@@ -6142,9 +6200,13 @@ for (const control of [theme, orientation, layout]) {
   control.addEventListener("change", () => {
     const path = preferredPath()
     if (control !== layout && !createMissingVariant(path)) return
+    let selected = false
     if (archive?.format === "bda") {
       renderFiles()
-      if (bdaAvailableLayoutPaths().includes(path)) selectFile(path)
+      if (bdaAvailableLayoutPaths().includes(path)) {
+        selectFile(path)
+        selected = true
+      }
     } else if (archive?.names().includes(path)) {
       layoutPath = path
       layoutDocument = IniDocument.parse(archive.getText(path))
@@ -6152,10 +6214,11 @@ for (const control of [theme, orientation, layout]) {
       preview.setSelected([])
       renderFiles()
       selectFile(path)
+      selected = true
     }
     updateDevicePreview()
     syncSegmentedControls()
-    refreshPreview()
+    if (!selected) refreshPreview()
   })
 }
 mode.addEventListener("change", () => {
@@ -6297,7 +6360,7 @@ for (const field of [...tileSourceFields, ...tileInnerFields]) {
 }
 skinState.addEventListener("change", () => {
   const state = skinState.value ? Number(skinState.value) : undefined
-  applySkinState(state, state ? `皮肤状态：S${state}` : "皮肤状态：默认")
+  activateSkinState(state)
 })
 panelScaleButton.addEventListener("click", openPanelCopyDialog)
 adaptIos26Button.addEventListener("click", () => ios26Dialog.showModal())

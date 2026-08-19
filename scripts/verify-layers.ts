@@ -2,7 +2,12 @@ import assert from "node:assert/strict"
 import { actionDescription, previewStateFromAction, skinStateLabel } from "../src/actions.ts"
 import { IniDocument } from "../src/ini.ts"
 import { availableSkinStates, stateTipSection } from "../src/panel-tools.ts"
-import { effectivePreviewItem, previewHitItem, previewItems } from "../src/preview.ts"
+import {
+  effectivePreviewItem,
+  isFullPanelPreviewItem,
+  previewHitItem,
+  previewItems,
+} from "../src/preview.ts"
 
 // 用真实皮肤里的结构验证：KEY4 通过 STAT_STYLE 切换到 TIP1/TIP2 的前景图层，
 // 同时保留 KEY4 自身的 VIEW_RECT。
@@ -131,6 +136,17 @@ assert.equal(
 )
 
 console.log("✓ 叠层命中：全屏背景让路，编辑/预览都能点到前景键")
+
+assert.equal(
+  isFullPanelPreviewItem(
+    { rect: { x: 0, y: 0, width: 1242, height: 634 } },
+    1242,
+    631,
+  ),
+  true,
+  "略大于面板的背景层仍应按全屏层处理，否则会遮住先绘制的底排空格键",
+)
+console.log("✓ 覆盖面板的超尺寸背景层按全屏层处理")
 
 const touchTrap = IniDocument.parse(`
 [KEY83]

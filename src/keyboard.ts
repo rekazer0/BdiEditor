@@ -1,5 +1,11 @@
 import { IniDocument } from "./ini.ts"
 
+export const DEFAULT_PANEL_WIDTH = 1125
+export const DEFAULT_PANEL_HEIGHT = 648
+export const DEFAULT_CANDIDATE_HEIGHT = 133
+export const DEFAULT_BDA_PANEL_WIDTH = 1080
+export const DEFAULT_BDA_PANEL_HEIGHT = 641
+
 export type KeyboardConfig = {
   width: number
   height: number
@@ -29,8 +35,8 @@ export function keyboardConfig(gen: IniDocument, styles: IniDocument): KeyboardC
   const styleID = gen.get("PANEL", "BACK_STYLE")?.split(",")[0].trim() ?? ""
   const section = styleID ? `STYLE${styleID}` : ""
   return {
-    width: Number.isFinite(size[0]) ? size[0] : 1125,
-    height: Number.isFinite(size[1]) ? size[1] : 648,
+    width: Number.isFinite(size[0]) ? size[0] : DEFAULT_PANEL_WIDTH,
+    height: Number.isFinite(size[1]) ? size[1] : DEFAULT_PANEL_HEIGHT,
     styleID,
     normalImage: styles.get(section, "NM_IMG") ?? "",
     pressedImage: styles.get(section, "HL_IMG") ?? "",
@@ -64,8 +70,8 @@ export function resolvePanelConfig(
   const styleID = panelStyleID(layout) ?? panelStyleID(gen) ?? ""
   const section = styleID ? `STYLE${styleID}` : ""
   return {
-    width: layoutWidth ?? generalWidth ?? 1125,
-    height: layoutHeight ?? generalHeight ?? 648,
+    width: layoutWidth ?? generalWidth ?? DEFAULT_PANEL_WIDTH,
+    height: layoutHeight ?? generalHeight ?? DEFAULT_PANEL_HEIGHT,
     styleID,
     normalImage: styles.get(section, "NM_IMG") ?? "",
     pressedImage: styles.get(section, "HL_IMG") ?? "",
@@ -77,7 +83,7 @@ export function resolvePanelConfig(
 export function setKeyboardHeight(gen: IniDocument, height: number): boolean {
   if (!Number.isFinite(height) || height <= 0) return false
   const size = gen.get("PANEL", "SIZE")?.split(",").map(Number) ?? []
-  const width = Number.isFinite(size[0]) ? size[0] : 1125
+  const width = Number.isFinite(size[0]) ? size[0] : DEFAULT_PANEL_WIDTH
   return gen.set("PANEL", "SIZE", `${Math.round(width)},${Math.round(height)}`)
 }
 

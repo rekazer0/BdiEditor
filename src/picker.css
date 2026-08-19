@@ -9,6 +9,7 @@
   --control: #fff;
   --hover: rgb(0 0 0 / 5%);
   --accent: #0a7ff5;
+  --search-font-size: 12px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -56,6 +57,7 @@ button, input { font: inherit; color: inherit; }
   border-radius: 999px;
   background: color-mix(in srgb, var(--secondary) 12%, transparent);
   box-shadow: none;
+  font-size: var(--search-font-size);
 }
 .picker-toolbar input::placeholder { color: var(--secondary); }
 .picker-toolbar input:focus { outline: 3px solid color-mix(in srgb, var(--accent) 16%, transparent); }

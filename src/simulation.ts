@@ -1,3 +1,5 @@
+import { skinStateForcesComposition } from "./actions.ts"
+
 export function insertText(
   value: string,
   start: number,
@@ -37,12 +39,13 @@ export function candidatePreview(
   value: string,
   caret = value.length,
   language: "zh" | "en" = "zh",
+  skinState?: number,
 ): {
   composing: boolean
   input: string
   candidates: string[]
 } {
-  const input = compositionBeforeCaret(value, caret)
+  const input = compositionBeforeCaret(value, caret) || (skinStateForcesComposition(skinState) ? "ni" : "")
   return input
     ? {
         composing: true,

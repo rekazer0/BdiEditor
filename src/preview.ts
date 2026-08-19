@@ -1,5 +1,7 @@
 import { canvasFontFamily, isTransparentColor, type StyleTextVisual, type TextVisual, type Visual, type VisualResolver } from "./atlas.ts"
+import { skinStateFallbackText } from "./actions.ts"
 import { IniDocument } from "./ini.ts"
+import { DEFAULT_CANDIDATE_HEIGHT, DEFAULT_PANEL_HEIGHT, DEFAULT_PANEL_WIDTH } from "./keyboard.ts"
 import { gestureDirection } from "./layout.ts"
 import { stateStyleValue, stateTipSection } from "./panel-tools.ts"
 import type { BdaAnimation, BdaAnimationSequence } from "./bda.ts"
@@ -256,6 +258,20 @@ export function effectivePreviewItem(
   const tip = stateTipSection(item.statStyle, state)
   if (tip === undefined) return item
   const section = `TIP${tip}`
+  const hasTip = document.sections().includes(section)
+  const fallbackText = hasTip ? undefined : skinStateFallbackText(state)
+  if (fallbackText) {
+    return {
+      ...item,
+      show: fallbackText,
+      foreStyle: "",
+      foreStyles: [],
+      foreOffsets: [],
+      positionTypes: [],
+      foreAnimStyle: undefined,
+      foreAnimStyles: [],
+    }
+  }
   if (!/^ICON\d+$/i.test(item.section)) {
     const value = (name: string): string | undefined => document.get(section, name)
     const backStyle = value("BACK_STYLE")
@@ -313,6 +329,24 @@ export function effectivePreviewItem(
   }
 }
 
+export function previewStateImpact(
+  document: IniDocument | undefined,
+  state: number | undefined,
+): { mapped: boolean; resolved: boolean } {
+  if (!document || state === undefined) return { mapped: false, resolved: false }
+  const tips = document.entries().flatMap(({ key, value }) => {
+    if (key !== "STAT_STYLE") return []
+    const tip = stateStyleValue(value, state)
+    return tip === undefined ? [] : [tip]
+  })
+  if (!tips.length) return { mapped: false, resolved: false }
+  const sections = new Set(document.sections())
+  return {
+    mapped: true,
+    resolved: Boolean(skinStateFallbackText(state)) || tips.some((tip) => sections.has(`TIP${tip}`)),
+  }
+}
+
 export function animationSequenceForKey(
   animation: BdaAnimation | undefined,
   item: PreviewItem,
@@ -338,8 +372,9 @@ export function isFullPanelPreviewItem(
   panelWidth: number,
   panelHeight: number,
 ): boolean {
-  return item.rect.x === 0 && item.rect.y === 0 &&
-    item.rect.width === panelWidth && item.rect.height === panelHeight
+  return item.rect.x <= 0 && item.rect.y <= 0 &&
+    item.rect.x + item.rect.width >= panelWidth &&
+    item.rect.y + item.rect.height >= panelHeight
 }
 
 export function shouldDrawItemBackground(
@@ -501,6 +536,12 @@ function itemFromSection(document: IniDocument, section: string): PreviewItem | 
 
 function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[] {
   const value = (name: string) => document.get("LIST", name) ?? defaults?.get("LIST", name)
+  const type = value("TYPE")?.trim()
+  // TYPE=2 is the runtime scrolling-list container used by some Android skins.
+  // It is not a static key/candidate strip and must not be painted over the
+  // keyboard in the preview. TYPE=0, missing TYPE, and other legacy values
+  // remain renderable for compatibility with existing skins.
+  if (type === "2") return []
   const cell = value("CELL_SIZE")?.split(",").map(Number)
   const position = value("POS")?.split(",").map(Number)
   const count = Number(value("LIST_NUM"))
@@ -594,8 +635,8 @@ export function dynamicToolbarRect(
 
 export function previewItems(
   document: IniDocument,
-  panelWidth = 1125,
-  panelHeight = 133,
+  panelWidth = DEFAULT_PANEL_WIDTH,
+  panelHeight = DEFAULT_CANDIDATE_HEIGHT,
   defaults?: IniDocument,
 ): PreviewItem[] {
   const list = listItems(document, defaults)
@@ -699,8 +740,8 @@ export class Preview {
   private offsets?: IniDocument
   private resolver?: VisualResolver
   private panelStyle = ""
-  private panelWidth = 1125
-  private panelHeight = 650
+  private panelWidth = DEFAULT_PANEL_WIDTH
+  private panelHeight = DEFAULT_PANEL_HEIGHT
   private theme: "light" | "dark" = "light"
   private transparent = false
   private keys: PreviewItem[] = []

@@ -39,6 +39,20 @@ fn safe_source_path(path: &str) -> bool {
             .all(|part| matches!(part, Component::Normal(_)))
 }
 
+fn canonical_event_path(path: PathBuf) -> PathBuf {
+    fs::canonicalize(&path).unwrap_or_else(|_| {
+        let Some(parent) = path.parent() else {
+            return path.clone();
+        };
+        let Some(name) = path.file_name() else {
+            return path.clone();
+        };
+        fs::canonicalize(parent)
+            .map(|canonical| canonical.join(name))
+            .unwrap_or(path)
+    })
+}
+
 fn source_root(app: &tauri::AppHandle, path: Option<String>) -> Result<PathBuf, String> {
     let directory = match path.filter(|value| !value.trim().is_empty()) {
         Some(value) => PathBuf::from(value),
@@ -311,23 +325,26 @@ fn read_source_changes(path: String, changed_paths: Vec<String>) -> Result<Vec<S
     let directory = fs::canonicalize(path).map_err(|error| error.to_string())?;
     let mut output = Vec::new();
     for changed_path in changed_paths {
-        let target = PathBuf::from(&changed_path);
+        let target = canonical_event_path(PathBuf::from(&changed_path));
         let relative = target
             .strip_prefix(&directory)
             .map_err(|_| "源码变动路径不属于当前工作区".to_string())?
             .to_string_lossy()
             .replace('\\', "/");
-        if relative.is_empty()
-            || relative == SOURCE_MARKER
+        if relative == SOURCE_MARKER
             || relative == SOURCE_MANIFEST
             || relative == ".DS_Store"
-            || !safe_source_path(&relative)
+            || (!relative.is_empty() && !safe_source_path(&relative))
         {
             continue;
         }
         if target.is_dir() {
             for file in read_source_files(&target)? {
-                let nested = format!("{}/{}", relative.trim_end_matches('/'), file.path);
+                let nested = if relative.is_empty() {
+                    file.path
+                } else {
+                    format!("{}/{}", relative.trim_end_matches('/'), file.path)
+                };
                 output.push(SourceChange { path: nested, data: Some(file.data), directory: false });
             }
             output.insert(0, SourceChange { path: relative, data: None, directory: true });
@@ -473,9 +490,9 @@ async fn fetch_release_page() -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_source_changes, prune_source_workspaces, read_file, read_source_files,
-        safe_source_path, valid_share_filename, write_file, write_source_files, MAX_ARCHIVE_BYTES,
-        SOURCE_MARKER,
+        apply_source_changes, prune_source_workspaces, read_file, read_source_changes,
+        read_source_files, safe_source_path, valid_share_filename, write_file, write_source_files,
+        MAX_ARCHIVE_BYTES, SOURCE_MARKER,
     };
     use std::fs;
     use std::thread;
@@ -573,6 +590,34 @@ mod tests {
         assert!(safe_source_path("skin/port/layout.ini"));
         assert!(!safe_source_path("../outside"));
         assert!(!safe_source_path("/absolute"));
+        fs::remove_dir_all(root).expect("cleanup source root");
+    }
+
+    #[test]
+    fn source_reader_expands_workspace_root_events() {
+        let root = std::env::temp_dir().join(format!("bdi-edit-root-event-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).expect("create source root");
+        fs::write(root.join("Info.txt"), b"Name=changed").expect("write info");
+        let changes = read_source_changes(
+            root.to_string_lossy().into_owned(),
+            vec![root.to_string_lossy().into_owned()],
+        )
+        .expect("read root event");
+        assert!(changes
+            .iter()
+            .any(|change| change.path == "Info.txt" && change.data.is_some()));
+        assert!(changes
+            .iter()
+            .any(|change| change.path.is_empty() && change.directory));
+        let deleted = read_source_changes(
+            root.to_string_lossy().into_owned(),
+            vec![root.join("removed.tmp").to_string_lossy().into_owned()],
+        )
+        .expect("read missing file event");
+        assert!(deleted
+            .iter()
+            .any(|change| change.path == "removed.tmp" && change.data.is_none()));
         fs::remove_dir_all(root).expect("cleanup source root");
     }
 }

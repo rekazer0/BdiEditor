@@ -28,6 +28,8 @@ const functionCodeDescriptions: Record<string, string> = {
   F99: "快速编辑（待定）",
 }
 
+export const knownFunctionCodes = Object.keys(functionCodeDescriptions)
+
 const skinStateDescriptions: Record<number, string> = {
   1: "首字母自动大写",
   2: "大写锁定",
@@ -37,12 +39,14 @@ const skinStateDescriptions: Record<number, string> = {
   6: "符号面板锁定",
   7: "候选已到页首",
   8: "候选已到页尾",
+  9: "候选栏展开",
   11: "输入中回车键",
   14: "Shift 按下",
   17: "回车键：下一项",
   21: "回车键：搜索",
   23: "回车键：前往",
   27: "回车键：发送",
+  30: "输入码清除键",
   32: "语音入口",
   34: "普通空格键",
   35: "仓颉模式",
@@ -55,7 +59,32 @@ const skinStateDescriptions: Record<number, string> = {
   95: "AI 输入返回键第二态",
 }
 
-export const knownSkinStates = Object.keys(skinStateDescriptions).map(Number)
+export const MIN_SKIN_STATE = 1
+export const MAX_SKIN_STATE = 122
+export const knownSkinStates = Array.from(
+  { length: MAX_SKIN_STATE - MIN_SKIN_STATE + 1 },
+  (_, index) => index + MIN_SKIN_STATE,
+)
+
+const skinStateFallbackTexts: Record<number, string> = {
+  11: "换行",
+  17: "下一项",
+  21: "搜索",
+  23: "前往",
+  27: "发送",
+}
+
+export function skinStateDescription(state: number): string | undefined {
+  return skinStateDescriptions[state]
+}
+
+export function skinStateFallbackText(state: number | undefined): string | undefined {
+  return state === undefined ? undefined : skinStateFallbackTexts[state]
+}
+
+export function skinStateForcesComposition(state: number | undefined): boolean {
+  return state === 4
+}
 
 export function skinStateLabel(state: number): string {
   const description = skinStateDescriptions[state]
@@ -79,7 +108,7 @@ export function previewStateFromAction(code: string): number | undefined {
   const match = code.trim().match(/^S(\d+)(?:_\d+)?$/)
   if (!match) return
   const state = Number(match[1])
-  return state <= 122 ? state : undefined
+  return state >= MIN_SKIN_STATE && state <= MAX_SKIN_STATE ? state : undefined
 }
 
 export function isConfiguredSymbolLayout(path: string, general: IniDocument | undefined): boolean {
@@ -90,36 +119,100 @@ export function isConfiguredSymbolLayout(path: string, general: IniDocument | un
   return Boolean(current && current === configured)
 }
 
+function symbolPageTarget(
+  currentName: string,
+  symbolLayout: string,
+  existing: (name: string) => string | undefined,
+  available: Map<string, string> | undefined,
+): string | undefined {
+  const current = currentName.split("/").pop()?.replace(/\.ini$/i, "").toLowerCase() ?? ""
+  const configured = symbolLayout.replace(/\.ini$/i, "").toLowerCase()
+  const preferred = current === configured
+    ? ["symbol"]
+    : current === "symbol"
+      ? [configured]
+      : ["symbol", configured]
+  for (const name of preferred) {
+    const match = existing(name)
+    if (match && match.toLowerCase() !== `${current}.ini`) return match
+  }
+  if (!available) return
+  const matches = [...available.values()].filter((name) => {
+    const base = name.replace(/\.ini$/i, "")
+    return /^(?:sym|symbol)(?:[_-]|$)/i.test(base) || /(?:^|[_-])symbol(?:[_-]|$)/i.test(base)
+  })
+  return matches.find((name) => name.toLowerCase() !== `${current}.ini`)
+}
+
 export function previewPageTarget(
   code: string,
   currentName: string,
   baseName = "py_9.ini",
+  availableNames?: Iterable<string>,
+  symbolLayout = "symbol",
 ): string | undefined {
   const value = code.trim()
+  const available = availableNames ? new Map(
+    [...availableNames].map((name) => [name.toLowerCase(), name]),
+  ) : undefined
+  const existing = (name: string): string | undefined => {
+    const filename = name.replace(/\.ini$/i, "") + ".ini"
+    return available ? available.get(filename.toLowerCase()) : filename
+  }
+  const firstMatching = (preferred: string[], pattern: RegExp): string | undefined => {
+    for (const name of preferred) {
+      const match = existing(name)
+      if (match) return match
+    }
+    return available && [...available.values()].find((name) => pattern.test(name.replace(/\.ini$/i, "")))
+  }
+  const suffix = currentName.match(/(?:^|[_-])(9|14|26)(?:\.ini)?$/i)?.[1]
   const explicit = value.match(/^Z\+([A-Za-z0-9_-]+)$/)
-  if (explicit) return `${explicit[1]}.ini`
-  if (value === "F4" || value === "F15") return baseName
-  if (value === "F6") return currentName === "num_9.ini" ? baseName : "num_9.ini"
-  if (value === "F1") return "symbol.ini"
-  if (value === "F16") return currentName === "en_26.ini" ? baseName : "en_26.ini"
+  if (explicit) return existing(explicit[1])
+  if (value === "F4" || value === "F15") return existing(baseName)
+  if (value === "F6") return firstMatching(
+    suffix ? [`num_${suffix}`] : ["num_9", "num_26"],
+    /^(?:num|numbers?|numeric)(?:[_-]|$)/i,
+  )
+  if (value === "F1") return firstMatching(
+    [symbolLayout, "symbol", suffix ? `sym_${suffix}_cn` : ""].filter(Boolean),
+    /^(?:sym|symbol)(?:[_-]|$)|(?:^|[_-])symbol(?:[_-]|$)/i,
+  )
+  if (value === "F90" || value === "F91") return symbolPageTarget(currentName, symbolLayout, existing, available)
+  if (value === "F16") return firstMatching(
+    suffix ? [`en_${suffix}`] : ["en_26", "en_9"],
+    /^(?:en|english|letter|letters)(?:[_-]|$)/i,
+  )
 }
 
 export function previewPageTransition(
   code: string,
   currentName: string,
   returnName: string,
+  availableNames?: Iterable<string>,
+  symbolLayout = "symbol",
 ): { target: string | undefined; returnName: string } {
   const value = code.trim()
+  const requestedTarget = previewPageTarget(
+    value,
+    currentName,
+    returnName,
+    availableNames,
+    symbolLayout,
+  )
   const returnsToOrigin =
     value === "F4" ||
     value === "F15" ||
-    (value === "F6" && currentName === "num_9.ini") ||
-    (value === "F16" && currentName === "en_26.ini")
+    ((value === "F6" || value === "F16") &&
+      requestedTarget?.toLowerCase() === currentName.toLowerCase())
+  const switchingSymbolPage = value === "F90" || value === "F91"
   const enteringTransientPage =
-    !returnsToOrigin && Boolean(previewPageTarget(value, currentName, returnName))
+    !returnsToOrigin && !switchingSymbolPage && Boolean(requestedTarget)
   const nextReturnName = enteringTransientPage ? currentName : returnName
   return {
-    target: previewPageTarget(value, currentName, nextReturnName),
+    target: returnsToOrigin
+      ? previewPageTarget(value, currentName, nextReturnName, availableNames, symbolLayout)
+      : requestedTarget,
     returnName: returnsToOrigin ? returnName : nextReturnName,
   }
 }

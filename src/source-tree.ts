@@ -9,3 +9,14 @@ export function sourceFolderDescription(path: string): string {
   if (name === "logo") return "输入法工具栏资源"
   return "资源文件夹"
 }
+
+export function resolveSourceArchivePath(
+  path: string,
+  workspacePrefix: string,
+  archivePaths: readonly string[],
+): string {
+  const rootMetadata = /^(?:info\.txt|demo\.png)$/i.test(path)
+  const candidate = workspacePrefix && !rootMetadata ? `${workspacePrefix}${path}` : path
+  const normalized = candidate.toLowerCase()
+  return archivePaths.find((existing) => existing.toLowerCase() === normalized) ?? candidate
+}

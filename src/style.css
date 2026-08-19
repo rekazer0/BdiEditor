@@ -10,6 +10,7 @@
   --secondary: #74747b;
   --tertiary: #95959c;
   --accent: #0a7ff5;
+  --search-font-size: 12px;
   --window: rgb(255 255 255 / 64%);
   --toolbar: rgb(255 255 255 / 44%);
   --sidebar: rgb(238 244 250 / 36%);
@@ -1935,7 +1936,7 @@ canvas {
   grid-row: 1;
 }
 
-#quick-inspector > .mobile-inspector-managed {
+#quick-inspector[data-inspector-group-display="grouped"] > .mobile-inspector-managed {
   grid-column: 1;
   grid-row: 2;
   margin: 0;
@@ -1944,7 +1945,7 @@ canvas {
   overflow: auto;
 }
 
-#quick-inspector > .document-fields:has(.mobile-inspector-managed) {
+#quick-inspector[data-inspector-group-display="grouped"] > .document-fields:has(.mobile-inspector-managed) {
   grid-column: 1;
   grid-row: 2;
   margin: 0;
@@ -1953,12 +1954,30 @@ canvas {
   overflow: auto;
 }
 
-.mobile-inspector-managed:not(.mobile-inspector-active) {
+#quick-inspector[data-inspector-group-display="grouped"] .mobile-inspector-managed:not(.mobile-inspector-active) {
   display: none !important;
 }
 
-.mobile-inspector-managed > :is(h3, summary) {
+#quick-inspector[data-inspector-group-display="grouped"] .mobile-inspector-managed > :is(h3, summary) {
   display: none;
+}
+
+@media (min-width: 761px) {
+  #quick-inspector[data-inspector-group-display="all"] {
+    overflow: auto;
+  }
+
+  #quick-inspector[data-inspector-group-display="all"] #mobile-inspector-groups {
+    position: sticky;
+    top: var(--desktop-inspector-groups-y, 50%);
+    right: auto;
+    float: right;
+    margin-right: -76px;
+  }
+
+  #quick-inspector[data-inspector-group-display="all"] .mobile-inspector-managed {
+    scroll-margin-top: 14px;
+  }
 }
 
 #resource-inspector {
@@ -4028,6 +4047,7 @@ input[type="search"] {
   color: var(--text);
   background: color-mix(in srgb, var(--secondary) 12%, transparent);
   box-shadow: none;
+  font-size: var(--search-font-size);
 }
 
 input[type="search"]::placeholder {
@@ -4070,6 +4090,13 @@ input[type="search"]:focus {
   border: 0;
   background: transparent;
   box-shadow: none;
+  font-size: var(--search-font-size);
+}
+
+.search-control input[type="search"]::-webkit-search-decoration,
+.search-control input[type="search"]::-webkit-search-results-button,
+.search-control input[type="search"]::-webkit-search-results-decoration {
+  display: none;
 }
 
 .style-reference-input > input,

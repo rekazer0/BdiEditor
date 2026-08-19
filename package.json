@@ -11,6 +11,11 @@
     "version:bugfix": "node scripts/bump-version.mjs bugfix",
     "verify:samples": "node scripts/verify-samples.ts",
     "verify:layers": "node scripts/verify-layers.ts",
+    "verify:states": "node scripts/verify-states.ts",
+    "verify:layout": "node scripts/verify-layout.ts",
+    "verify:actions": "node scripts/verify-actions.ts",
+    "verify:preview-lists": "node scripts/verify-preview-lists.ts",
+    "verify:inspector-groups": "node scripts/verify-inspector-groups.ts",
     "verify:sources": "node scripts/verify-source-workspace.ts",
     "tauri": "tauri"
   },
