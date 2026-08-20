@@ -74,5 +74,10 @@ PERSIST=2
 const candidateItems = previewItems(candidateSkin, 1080, 119)
 assert.equal(candidateItems.find((item) => item.section === "ICON1")?.center, "你")
 assert.equal(candidateItems.some((item) => item.section === "ICON2"), false)
+assert.deepEqual(
+  previewItems(candidateSkin, 1080, 119, undefined, true).map((item) => item.section),
+  ["ICON2"],
+  "输入时只应保留 PERSIST=2 的最右侧工具图标",
+)
 
 console.log("✓ LIST 和 CAND/ICON 静态内容按皮肤配置解析，运行时层不伪装成静态内容")

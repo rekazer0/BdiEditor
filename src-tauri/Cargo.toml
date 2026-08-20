@@ -8,6 +8,9 @@ edition = "2021"
 name = "bdi_edit_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[profile.release]
+strip = true
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

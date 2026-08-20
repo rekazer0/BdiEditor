@@ -56,11 +56,15 @@ fn canonical_event_path(path: PathBuf) -> PathBuf {
 fn source_root(app: &tauri::AppHandle, path: Option<String>) -> Result<PathBuf, String> {
     let directory = match path.filter(|value| !value.trim().is_empty()) {
         Some(value) => PathBuf::from(value),
-        None => app
-            .path()
-            .app_data_dir()
-            .map_err(|error| error.to_string())?
-            .join("skin-sources"),
+        None => {
+            #[cfg(target_os = "android")]
+            return Err("请先选择用户可访问的源码保存目录".into());
+            #[cfg(not(target_os = "android"))]
+            app.path()
+                .app_data_dir()
+                .map_err(|error| error.to_string())?
+                .join("skin-sources")
+        }
     };
     fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
     if !directory.is_dir() {
@@ -241,7 +245,7 @@ fn prepare_source_directory(app: tauri::AppHandle, path: Option<String>) -> Resu
 }
 
 #[tauri::command]
-fn create_source_workspace(
+async fn create_source_workspace(
     app: tauri::AppHandle,
     directory: Option<String>,
     name: String,
@@ -254,7 +258,7 @@ fn create_source_workspace(
             uri.to_string(),
             name,
             serde_json::to_value(files).map_err(|error| error.to_string())?,
-        );
+        ).await;
     }
     let uses_builtin_directory = directory.as_ref().map_or(true, |value| value.trim().is_empty());
     let root = source_root(&app, directory)?;
@@ -289,10 +293,10 @@ fn create_source_workspace(
 }
 
 #[tauri::command]
-fn open_source_workspace(app: tauri::AppHandle, path: String) -> Result<Vec<SourceFile>, String> {
+async fn open_source_workspace(app: tauri::AppHandle, path: String) -> Result<Vec<SourceFile>, String> {
     #[cfg(target_os = "android")]
     if path.starts_with("content://") {
-        let value = tauri_plugin_native_share::read_source_workspace(&app, path)?;
+        let value = tauri_plugin_native_share::read_source_workspace(&app, path).await?;
         let files: Vec<SourceFile> = serde_json::from_value(value).map_err(|error| error.to_string())?;
         source_paths(&files)?;
         return Ok(files);
@@ -310,16 +314,30 @@ fn open_source_workspace(app: tauri::AppHandle, path: String) -> Result<Vec<Sour
 }
 
 #[tauri::command]
-fn apply_source_changes(app: tauri::AppHandle, path: String, changes: Vec<SourceChange>) -> Result<(), String> {
+async fn open_source_workspace_archive(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    #[cfg(target_os = "android")]
+    if path.starts_with("content://") {
+        return tauri_plugin_native_share::read_source_workspace_archive(&app, path).await;
+    }
+    let _ = (app, path);
+    Err("Compact source archives are only available for Android content URIs".into())
+}
+
+#[tauri::command]
+async fn apply_source_changes(app: tauri::AppHandle, path: String, changes: Vec<SourceChange>) -> Result<(), String> {
     #[cfg(target_os = "android")]
     if path.starts_with("content://") {
         return tauri_plugin_native_share::apply_source_changes(
             &app,
             path,
             serde_json::to_value(changes).map_err(|error| error.to_string())?,
-        );
+        ).await;
     }
     let _ = app;
+    apply_source_changes_path(path, changes)
+}
+
+fn apply_source_changes_path(path: String, changes: Vec<SourceChange>) -> Result<(), String> {
     let directory = fs::canonicalize(path).map_err(|error| error.to_string())?;
     for change in changes {
         if !safe_source_path(&change.path) {
@@ -350,10 +368,10 @@ fn apply_source_changes(app: tauri::AppHandle, path: String, changes: Vec<Source
 }
 
 #[tauri::command]
-fn read_source_changes(app: tauri::AppHandle, path: String, changed_paths: Vec<String>) -> Result<Vec<SourceChange>, String> {
+async fn read_source_changes(app: tauri::AppHandle, path: String, changed_paths: Vec<String>) -> Result<Vec<SourceChange>, String> {
     #[cfg(target_os = "android")]
     if path.starts_with("content://") {
-        let value = tauri_plugin_native_share::read_source_workspace(&app, path)?;
+        let value = tauri_plugin_native_share::read_source_workspace(&app, path).await?;
         let files: Vec<SourceFile> = serde_json::from_value(value).map_err(|error| error.to_string())?;
         source_paths(&files)?;
         let mut output = vec![SourceChange { path: String::new(), data: None, directory: true }];
@@ -365,6 +383,10 @@ fn read_source_changes(app: tauri::AppHandle, path: String, changed_paths: Vec<S
         return Ok(output);
     }
     let _ = app;
+    read_source_changes_path(path, changed_paths)
+}
+
+fn read_source_changes_path(path: String, changed_paths: Vec<String>) -> Result<Vec<SourceChange>, String> {
     let directory = fs::canonicalize(path).map_err(|error| error.to_string())?;
     let mut output = Vec::new();
     for changed_path in changed_paths {
@@ -570,7 +592,7 @@ async fn fetch_release_page() -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_source_changes, prune_source_workspaces, read_file, read_source_changes,
+        apply_source_changes_path, prune_source_workspaces, read_file, read_source_changes_path,
         read_source_files, safe_source_path, valid_share_filename, write_file, write_source_files,
         MAX_ARCHIVE_BYTES, SOURCE_MARKER,
     };
@@ -628,7 +650,7 @@ mod tests {
             &root,
             &[super::SourceFile { path: "skin/a.txt".into(), data: b"a".to_vec() }],
         ).expect("write managed file");
-        apply_source_changes(
+        apply_source_changes_path(
             root.to_string_lossy().into_owned(),
             vec![super::SourceChange { path: "skin/a.txt".into(), data: None, directory: false }],
         ).expect("delete managed file");
@@ -679,7 +701,7 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).expect("create source root");
         fs::write(root.join("Info.txt"), b"Name=changed").expect("write info");
-        let changes = read_source_changes(
+        let changes = read_source_changes_path(
             root.to_string_lossy().into_owned(),
             vec![root.to_string_lossy().into_owned()],
         )
@@ -690,7 +712,7 @@ mod tests {
         assert!(changes
             .iter()
             .any(|change| change.path.is_empty() && change.directory));
-        let deleted = read_source_changes(
+        let deleted = read_source_changes_path(
             root.to_string_lossy().into_owned(),
             vec![root.join("removed.tmp").to_string_lossy().into_owned()],
         )
@@ -721,6 +743,7 @@ pub fn run() {
         prepare_source_directory,
         create_source_workspace,
         open_source_workspace,
+        open_source_workspace_archive,
         apply_source_changes,
         read_source_changes,
         path_is_directory,
@@ -740,6 +763,7 @@ pub fn run() {
         prepare_source_directory,
         create_source_workspace,
         open_source_workspace,
+        open_source_workspace_archive,
         apply_source_changes,
         read_source_changes,
         path_is_directory,

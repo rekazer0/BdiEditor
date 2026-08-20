@@ -17,6 +17,7 @@
     "verify:preview-lists": "node scripts/verify-preview-lists.ts",
     "verify:candidate-style": "node scripts/verify-candidate-style.ts",
     "verify:inspector-groups": "node scripts/verify-inspector-groups.ts",
+    "verify:mobile-share": "node scripts/verify-mobile-share.ts",
     "verify:sources": "node scripts/verify-source-workspace.ts",
     "tauri": "tauri"
   },

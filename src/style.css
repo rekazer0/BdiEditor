@@ -1185,14 +1185,125 @@ h2 {
   container-type: inline-size;
   border-radius: 32px;
   background:
-    radial-gradient(circle at 18% 72%, rgb(78 183 255 / 20%), transparent 28%),
-    radial-gradient(circle at 78% 68%, rgb(121 224 154 / 18%), transparent 30%),
-    radial-gradient(circle at 55% 55%, rgb(255 169 102 / 14%), transparent 34%),
+    radial-gradient(circle at 10% 68%, rgb(102 181 238 / 8%), transparent 36%),
+    radial-gradient(circle at 52% 56%, rgb(235 172 136 / 8%), transparent 40%),
+    radial-gradient(circle at 92% 76%, rgb(117 203 145 / 10%), transparent 38%),
+    radial-gradient(circle at 48% 94%, rgb(155 174 231 / 6%), transparent 34%),
     #f5f5f7;
 }
 
 .device-shell[data-family="android"] .device-screen {
   border-radius: 28px;
+}
+
+.device-reference-background {
+  display: none;
+}
+
+.device-shell[data-family="iphone"][data-orientation="port"][data-theme="light"]:not(.canvas-only) .device-screen {
+  background: #fff;
+}
+
+.device-shell[data-reference-frame="true"] {
+  border-radius: 14% / 6.44%;
+  corner-shape: round;
+}
+
+.device-shell[data-reference-frame="true"] .device-screen {
+  inset: 0;
+  border-radius: 14% / 6.44%;
+  corner-shape: round;
+}
+
+.device-shell[data-reference-frame="true"]::after {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 4px #171719;
+  content: "";
+  pointer-events: none;
+}
+
+.device-shell[data-reference-frame="true"] .device-screen::before {
+  width: 30.5%;
+  height: 3.65%;
+  top: 1.89%;
+  border-radius: 999px;
+}
+
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .device-reference-background {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  display: block;
+  background: center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+
+.device-shell[data-reference-frame="true"][data-theme="light"] {
+  --phone-keyboard-glass: rgb(209 212 218 / 62%);
+}
+
+.device-shell[data-reference-frame="true"][data-theme="light"] .device-reference-background {
+  background-image:
+    radial-gradient(circle at 10% 68%, rgb(102 181 238 / 8%), transparent 36%),
+    radial-gradient(circle at 52% 56%, rgb(235 172 136 / 8%), transparent 40%),
+    radial-gradient(circle at 92% 76%, rgb(117 203 145 / 10%), transparent 38%),
+    radial-gradient(circle at 48% 94%, rgb(155 174 231 / 6%), transparent 34%),
+    url("/iphone-notes-reference-blank.png");
+}
+
+.device-shell[data-reference-frame="true"][data-theme="dark"] {
+  --phone-keyboard-glass: rgb(42 42 46 / 52%);
+}
+
+.device-shell[data-reference-frame="true"][data-theme="dark"] .device-reference-background {
+  background-image:
+    radial-gradient(circle at 10% 68%, rgb(48 125 174 / 14%), transparent 36%),
+    radial-gradient(circle at 52% 56%, rgb(145 91 62 / 13%), transparent 40%),
+    radial-gradient(circle at 92% 76%, rgb(51 130 76 / 15%), transparent 38%),
+    radial-gradient(circle at 48% 94%, rgb(77 89 151 / 10%), transparent 34%),
+    url("/iphone-notes-reference-dark-blank.png");
+}
+
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .device-status,
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .phone-navigation,
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .simulation,
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .phone-editing-toolbar {
+  display: none;
+}
+
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .keyboard-dock {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 9% 9% 0 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .keyboard-dock::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+}
+
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .keyboard-dock::after {
+  z-index: -1;
+  border-top: 1px solid rgb(255 255 255 / 42%);
+  background: var(--phone-keyboard-glass);
+  box-shadow: inset 0 1px rgb(255 255 255 / 22%);
+  -webkit-backdrop-filter: saturate(145%) blur(22px);
+  backdrop-filter: saturate(145%) blur(22px);
+}
+
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .keyboard-accessories {
+  visibility: visible;
+  background: transparent;
 }
 
 .device-screen::before {
@@ -1405,7 +1516,9 @@ h2 {
   grid-row: 1;
   min-height: 0;
   display: grid;
-  grid-template-rows: var(--candidate-inset-row, 0fr) var(--candidate-content-row, 133fr);
+  grid-template-rows:
+    minmax(0, var(--candidate-inset-row, 0fr))
+    minmax(0, var(--candidate-content-row, 133fr));
   position: relative;
   overflow: hidden;
   container-type: inline-size;
@@ -1415,16 +1528,11 @@ h2 {
   display: none;
 }
 
-#candidate-input-background,
 #candidate-background {
   grid-column: 1;
   width: 100%;
   height: 100%;
   pointer-events: none;
-}
-
-#candidate-input-background {
-  grid-row: 1;
 }
 
 #candidate-background {
@@ -1435,6 +1543,9 @@ h2 {
 #candidate-composition {
   min-height: 0;
   grid-column: 1;
+}
+
+#toolbar-strip {
   grid-row: 2;
 }
 
@@ -1455,22 +1566,24 @@ h2 {
 }
 
 #candidate-input {
+  min-height: 0;
   grid-column: 1;
   grid-row: 1;
   display: flex;
   align-items: center;
-  padding: 0 var(--candidate-input-leading, 0cqw);
+  padding: 0 var(--candidate-cell-inset, 0cqw);
   overflow: hidden;
   line-height: 1.15;
   white-space: nowrap;
 }
 
 #candidate-words {
+  min-height: 0;
   grid-column: 1;
   grid-row: 2;
   display: flex;
-  align-items: flex-start;
-  gap: 4.8cqw;
+  align-items: center;
+  gap: var(--candidate-cell-width, 0);
   padding: var(--candidate-padding, 0);
   padding-inline-start: var(--candidate-left-padding, 0cqw);
   padding-inline-end: var(--candidate-more-width, 3.2cqw);
@@ -1479,12 +1592,8 @@ h2 {
   white-space: nowrap;
 }
 
-#candidate-words > span {
-  flex: 0 0 var(--candidate-cell-width, auto);
-}
-
 #candidate-words > span:first-child {
-  margin-inline-start: var(--candidate-first-gap, 0);
+  margin-inline-start: calc(var(--candidate-first-gap, 0cqw) + var(--candidate-cell-inset, 0cqw));
 }
 
 .keyboard-accessories {
@@ -1507,9 +1616,10 @@ h2 {
 
 .device-shell[data-theme="dark"] .device-screen {
   background:
-    radial-gradient(circle at 18% 72%, rgb(35 125 181 / 28%), transparent 30%),
-    radial-gradient(circle at 78% 68%, rgb(43 130 82 / 22%), transparent 30%),
-    radial-gradient(circle at 55% 55%, rgb(151 77 48 / 20%), transparent 34%),
+    radial-gradient(circle at 10% 68%, rgb(48 125 174 / 14%), transparent 36%),
+    radial-gradient(circle at 52% 56%, rgb(145 91 62 / 13%), transparent 40%),
+    radial-gradient(circle at 92% 76%, rgb(51 130 76 / 15%), transparent 38%),
+    radial-gradient(circle at 48% 94%, rgb(77 89 151 / 10%), transparent 34%),
     #2c2c30;
 }
 
@@ -1635,7 +1745,7 @@ h2 {
 
 .device-shell.canvas-only #candidate-area {
   height: auto;
-  grid-template-rows: var(--candidate-input-height, 0px) var(--toolbar-viewport-height, auto);
+  grid-template-rows: var(--candidate-input-height, 0px) minmax(0, calc(var(--toolbar-viewport-height, 0px) - var(--candidate-input-height, 0px)));
   overflow: hidden;
 }
 
@@ -1711,7 +1821,7 @@ canvas {
 
 .device-shell.canvas-only #toolbar-preview {
   width: 100%;
-  height: var(--toolbar-viewport-height, auto);
+  height: calc(var(--toolbar-viewport-height, 0px) - var(--candidate-input-height, 0px));
 }
 
 .canvas-only canvas {
@@ -3495,7 +3605,94 @@ canvas {
 }
 
 #settings-dialog {
-  width: min(560px, calc(100vw - 32px));
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: hidden;
+}
+
+#settings-dialog form {
+  max-height: calc(100dvh - 34px);
+  gap: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+#settings-dialog header {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.settings-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.settings-section {
+  min-width: 0;
+  padding: 13px 14px 4px;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--control) 46%, transparent);
+}
+
+.settings-storage {
+  padding-bottom: 12px;
+}
+
+.settings-section-heading {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 7px;
+}
+
+.settings-section-heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-section-heading p {
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.settings-list {
+  display: grid;
+}
+
+.app-dialog .settings-row {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--text);
+}
+
+.settings-row select {
+  width: 146px;
+  min-width: 0;
+}
+
+.settings-inline-control {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--secondary);
+}
+
+.settings-inline-control input[type="number"] {
+  width: 64px;
+}
+
+.settings-inline-control small {
+  font-size: 10px;
 }
 
 .settings-path-control {
@@ -4173,6 +4370,51 @@ input[type="search"]:focus {
 }
 
 @media (max-width: 600px) {
+  #settings-dialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    border-radius: 16px;
+  }
+
+  #settings-dialog form {
+    max-height: calc(100dvh - 18px);
+  }
+
+  #settings-dialog header {
+    padding: 12px 14px;
+  }
+
+  .settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .settings-section {
+    padding: 12px 12px 3px;
+  }
+
+  .settings-storage {
+    padding-bottom: 11px;
+  }
+
+  .app-dialog .settings-row {
+    min-height: 48px;
+  }
+
+  .settings-row select {
+    width: min(46vw, 168px);
+  }
+
+  .settings-path-control {
+    grid-template-columns: minmax(0, 1fr) 36px 36px;
+  }
+
+  .settings-path-control button {
+    width: 36px;
+    height: 36px;
+  }
+
   .titlebar {
     gap: 6px;
     overflow: visible;

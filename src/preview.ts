@@ -662,10 +662,12 @@ export function previewItems(
   panelWidth = DEFAULT_PANEL_WIDTH,
   panelHeight = DEFAULT_CANDIDATE_HEIGHT,
   defaults?: IniDocument,
+  persistentOnly = false,
 ): PreviewItem[] {
-  const list = listItems(document, defaults)
+  const list = persistentOnly ? [] : listItems(document, defaults)
   const real = document.sections().flatMap((section) => {
     if (/^TIP\d+$/i.test(section)) return []
+    if (persistentOnly !== (document.get(section, "PERSIST") === "2")) return []
     const item = itemFromSection(document, section)
     return item ? [item] : []
   })
@@ -676,7 +678,10 @@ export function previewItems(
   )
   if (!sections.length) return list
   return [...sections.flatMap((section) => {
-    if (/^TIP\d+$/.test(section) || document.get(section, "PERSIST") === "2") return []
+    if (
+      /^TIP\d+$/.test(section) ||
+      persistentOnly !== (document.get(section, "PERSIST") === "2")
+    ) return []
     const backStyle = document.get(section, "BACK_STYLE")?.split(",")[0] ?? ""
     const foreStyles = document.get(section, "FORE_STYLE")?.split(",").map((token) => token.trim()).filter(Boolean) ?? []
     const foreStyle = foreStyles[0] ?? ""
@@ -801,6 +806,7 @@ export class Preview {
   private selectionAnchor?: string
   private guides = false
   private skinState?: number
+  private persistentOnly = false
   private animation?: BdaAnimation
   private animationVisual?: { key: PreviewItem; visual: Visual }
   private animationTimer?: number
@@ -879,7 +885,13 @@ export class Preview {
   setDefaults(defaults?: IniDocument): void {
     this.defaults = defaults
     this.keys = this.document
-      ? previewItems(this.document, this.panelWidth, this.panelHeight, defaults)
+      ? previewItems(
+          this.document,
+          this.panelWidth,
+          this.panelHeight,
+          defaults,
+          this.persistentOnly,
+        )
       : []
     this.fitCanvas()
     void this.draw()
@@ -902,6 +914,21 @@ export class Preview {
 
   setSkinState(state?: number): void {
     this.skinState = state
+    void this.draw()
+  }
+
+  setPersistentOnly(persistentOnly: boolean): void {
+    if (this.persistentOnly === persistentOnly) return
+    this.persistentOnly = persistentOnly
+    this.keys = this.document
+      ? previewItems(
+          this.document,
+          this.panelWidth,
+          this.panelHeight,
+          this.defaults,
+          persistentOnly,
+        )
+      : []
     void this.draw()
   }
 
@@ -930,14 +957,24 @@ export class Preview {
     this.panelStyle = styleID
     this.panelWidth = width
     this.panelHeight = height
-    this.keys = this.document ? previewItems(this.document, width, height, this.defaults) : []
+    this.keys = this.document
+      ? previewItems(this.document, width, height, this.defaults, this.persistentOnly)
+      : []
     this.fitCanvas()
     void this.draw()
   }
 
   setDocument(document?: IniDocument): void {
     this.document = document
-    this.keys = document ? previewItems(document, this.panelWidth, this.panelHeight, this.defaults) : []
+    this.keys = document
+      ? previewItems(
+          document,
+          this.panelWidth,
+          this.panelHeight,
+          this.defaults,
+          this.persistentOnly,
+        )
+      : []
     const available = new Set(this.keys.map((key) => key.section))
     this.selected = new Set([...this.selected].filter((section) => available.has(section)))
     this.fitCanvas()
@@ -1396,7 +1433,7 @@ export class Preview {
           ),
         }
       })),
-      this.toolbarSlots
+      this.toolbarSlots && !this.persistentOnly
         ? this.resolver?.resolveToolbarImages() ?? Promise.resolve([])
         : Promise.resolve([]),
     ])

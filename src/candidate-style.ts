@@ -1,35 +1,49 @@
-import type { VisualResolver } from "./atlas.ts"
+import type { TextVisual, VisualResolver } from "./atlas.ts"
 import type { IniDocument } from "./ini.ts"
 
-export const OFFICIAL_INPUT_VERTICAL_PADDING = 5
-
-function firstStyle(value: string | undefined): string {
-  return value?.split(",")[0]?.trim() ?? ""
+function inputInset(width: number): number {
+  const density = width <= 240 ? 0.75
+    : width < 360 ? 1
+    : width < 480 ? 1.2
+    : width < 600 ? 1.5
+    : width < 720 ? 2
+    : width < 800 ? 2.25
+    : width < 960 ? 2.5
+    : width < 1080 ? 3
+    : width < 1152 ? 3.3
+    : width < 1280 ? 3.6
+    : 4.4
+  return Math.trunc(density * 2.5)
 }
 
 export type CandidateInputStyle = {
-  backgroundStyle: string
   foregroundStyle: string
   height: number
+}
+
+export function resolveCandidateTextVisuals(
+  candidate: IniDocument | undefined,
+  general: IniDocument | undefined,
+  resolver: VisualResolver,
+): { normal: TextVisual | undefined; first: TextVisual | undefined } {
+  return {
+    normal: resolver.resolveText(
+      candidate?.get("CAND", "FORE_STYLE") ?? general?.get("SCAND", "SCAND_STYLE") ?? "",
+      false,
+    ),
+    first: resolver.resolveText(candidate?.get("CAND", "FIRST_FORE") ?? "", false),
+  }
 }
 
 export function resolveCandidateInputStyle(
   general: IniDocument | undefined,
   resolver: VisualResolver,
-  fallbackHeight: number,
+  width: number,
 ): CandidateInputStyle {
-  const backgroundStyle = firstStyle(
-    general?.get("SCAND", "BACK_STYLE") ?? general?.get("INPUT", "BACK_STYLE"),
-  )
   const foregroundStyle = (
     general?.get("SCAND", "INPUT_STYLE") ?? general?.get("INPUT", "FORE_STYLE") ?? ""
   ).trim()
   const fontSize = resolver.resolveText(foregroundStyle, false)?.fontSize
-  const sourceHeight = resolver.sourceSize?.(backgroundStyle, false)?.height
-  const height = fontSize && fontSize > 0
-    ? fontSize + OFFICIAL_INPUT_VERTICAL_PADDING
-    : sourceHeight && sourceHeight > 0
-      ? sourceHeight
-      : fallbackHeight
-  return { backgroundStyle, foregroundStyle, height }
+  const height = fontSize && fontSize > 0 ? fontSize + (inputInset(width) * 2) : 0
+  return { foregroundStyle, height }
 }

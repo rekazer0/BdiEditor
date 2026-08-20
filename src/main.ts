@@ -29,7 +29,6 @@ import {
   canvasFontFamily,
   drawVisualSource,
   isTransparentColor,
-  resolveTextVisual,
   type TextVisual,
   type Visual,
   type VisualResolver,
@@ -39,7 +38,10 @@ import {
   keyboardPreviewGeometry,
   showsKeyboardAccessories,
 } from "./devices.ts"
-import { resolveCandidateInputStyle } from "./candidate-style.ts"
+import {
+  resolveCandidateInputStyle,
+  resolveCandidateTextVisuals,
+} from "./candidate-style.ts"
 import {
   exportFormatFromPath,
   exportName,
@@ -67,7 +69,7 @@ import {
 } from "./bda.ts"
 import { convertBdaArchive } from "./bda-convert.ts"
 import { IniDocument } from "./ini.ts"
-import { adaptIos26KeyboardLayout, adaptIos26Variant, isIos26Adapted } from "./ios26.ts"
+import { adaptIos26KeyboardLayout, adaptIos26Variant } from "./ios26.ts"
 import { highlightIni } from "./highlight.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
 import {
@@ -188,6 +190,9 @@ const mobileRedoButton = $("#mobile-redo") as HTMLButtonElement
 const mobileCommandButtons = Array.from(
   mobileCommandMenu.querySelectorAll<HTMLButtonElement>("[data-mobile-command], [data-mobile-export-format]"),
 )
+const mobileShareMenuLabel = mobileCommandMenu.querySelector<HTMLElement>(
+  '[data-mobile-command="mobile-share"] span:last-child',
+)!
 const appDialogButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-app-dialog]"))
 const settingsDialog = $("#settings-dialog") as HTMLDialogElement
 const aboutDialog = $("#about-dialog") as HTMLDialogElement
@@ -205,6 +210,8 @@ const sidebarViewVisible = $("#sidebar-view-visible") as HTMLInputElement
 const inspectorTabsVisible = $("#inspector-tabs-visible") as HTMLInputElement
 const inspectorGroupedDisplay = $("#inspector-grouped-display") as HTMLInputElement
 const mobilePreviewPosition = $("#mobile-preview-position") as HTMLSelectElement
+const sourceDirectoryEnabledSetting = $("#source-directory-enabled-setting")
+const sourceDirectoryEnabled = $("#source-directory-enabled") as HTMLInputElement
 const sourceDirectory = $("#source-directory") as HTMLInputElement
 const chooseSourceDirectory = $("#choose-source-directory") as HTMLButtonElement
 const resetSourceDirectory = $("#reset-source-directory") as HTMLButtonElement
@@ -386,7 +393,6 @@ const simulatedOutput = $("#simulated-output") as HTMLTextAreaElement
 const clearSimulationButton = $("#clear-simulation") as HTMLButtonElement
 const toolbarStrip = $("#toolbar-strip") as HTMLDivElement
 const candidateArea = $("#candidate-area")
-const candidateInputBackgroundCanvas = $("#candidate-input-background") as HTMLCanvasElement
 const candidateBackgroundCanvas = $("#candidate-background") as HTMLCanvasElement
 const toolbarCanvas = $("#toolbar-preview") as HTMLCanvasElement
 const candidateComposition = $("#candidate-composition")
@@ -425,6 +431,8 @@ let bdaBase: SkinArchive | undefined
 let currentPath = ""
 let sourceWorkspacePath = ""
 let sourceWorkspacePrefix = ""
+let sourceWorkspacePendingArchive: SkinArchive | undefined
+const LAST_SOURCE_WORKSPACE_KEY = "last-source-workspace"
 let stopSourceWatch: UnwatchFn | undefined
 let sourceAutosaveTimer: number | undefined
 let sourceAutosaveQueue = Promise.resolve()
@@ -543,6 +551,8 @@ const deviceFrameProperties = [
   "--device-island-offset",
 ] as const
 
+const REFERENCE_PHONE_WIDTH_SCALE = 1
+
 const preview = new Preview(
   $("#preview") as HTMLCanvasElement,
   (event) => {
@@ -561,7 +571,6 @@ const preview = new Preview(
 )
 
 const toolbarPreview = new Preview(toolbarCanvas, () => {}, () => {}, true)
-const candidateInputBackgroundPreview = new Preview(candidateInputBackgroundCanvas, () => {}, () => {})
 const candidateBackgroundPreview = new Preview(candidateBackgroundCanvas, () => {}, () => {})
 let activeKeyboardGeometry: {
   panelWidth: number
@@ -933,6 +942,26 @@ function isTauri(): boolean {
 function isAndroidTauri(): boolean {
   return isTauri() && /Android/i.test(navigator.userAgent)
 }
+
+function isAndroidWeb(): boolean {
+  return !isTauri() && /Android/i.test(navigator.userAgent)
+}
+
+function isIOSWeb(): boolean {
+  return !isTauri() && (/iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+    navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+}
+
+const mobileShareLabel = isAndroidTauri()
+  ? "导入百度输入法"
+  : isAndroidWeb()
+    ? "分享 Android 皮肤"
+    : isIOSWeb()
+      ? "分享 iOS 皮肤"
+      : "分享皮肤"
+mobileShareButton.title = mobileShareLabel
+mobileShareButton.setAttribute("aria-label", mobileShareLabel)
+mobileShareMenuLabel.textContent = mobileShareLabel
 
 const svgNamespace = "http://www.w3.org/2000/svg"
 const fallbackSymbolPaths: Record<string, string[]> = {
@@ -1362,6 +1391,13 @@ function sourceFilesPayload(value: SkinArchive): SourceFilePayload[] {
   return value.sourceFiles().map((file) => ({ path: file.path, data: Array.from(file.data) }))
 }
 
+function decodeBase64Archive(value: string): Uint8Array {
+  const binary = atob(value)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
+  return bytes
+}
+
 async function flushSourceAutosave(): Promise<void> {
   if (sourceAutosaveTimer !== undefined) {
     clearTimeout(sourceAutosaveTimer)
@@ -1389,8 +1425,9 @@ async function flushSourceAutosave(): Promise<void> {
 }
 
 function scheduleSourceAutosave(paths: string[]): void {
-  if (!archive || !sourceWorkspacePath) return
+  if (!archive || (!sourceWorkspacePath && sourceWorkspacePendingArchive !== archive)) return
   for (const path of paths) pendingSourcePaths.add(sourcePathForWorkspace(archive.sourcePath(path)))
+  if (!sourceWorkspacePath) return
   if (sourceAutosaveTimer !== undefined) clearTimeout(sourceAutosaveTimer)
   sourceAutosaveTimer = window.setTimeout(() => void flushSourceAutosave(), 180)
 }
@@ -1493,6 +1530,9 @@ async function activateSourceWorkspace(path: string, prefix = ""): Promise<void>
     handler.onmessage = (changedPath) => queueSourceWatch([changedPath || path], path)
     await invoke("start_source_observer", { path, handler })
     stopSourceWatch = () => { void invoke("stop_source_observer") }
+    if (localStorage.getItem("source-directory-enabled") === "true") {
+      localStorage.setItem(LAST_SOURCE_WORKSPACE_KEY, path)
+    }
     return
   }
   stopSourceWatch = await watch(path, (event) => {
@@ -1792,7 +1832,8 @@ function refreshSimulationState(): boolean {
   const composing = renderCandidateState()
   const symbolPanel = isConfiguredSymbolLayout(layoutPath, textDocument(genConfigPath()))
   candidateArea.hidden = symbolPanel
-  toolbarStrip.hidden = symbolPanel || composing || !toolbarStrip.dataset.path
+  toolbarStrip.hidden = symbolPanel || !toolbarStrip.dataset.path
+  toolbarPreview.setPersistentOnly(composing)
   return composing
 }
 
@@ -1827,19 +1868,8 @@ function applyDeviceKeyboardGeometry(
   deviceShell.style.setProperty("--safe-row", `${geometry.safeBottomHeight}fr`)
 }
 
-function activeIos26Adapted(): boolean {
-  if (!archive) return false
-  const candidatePath = toolbarConfigPath()
-  const generalPath = genConfigPath()
-  return isIos26Adapted(
-    candidatePath && archive.isText(candidatePath) ? archive.getText(candidatePath) : undefined,
-    archive.isText(generalPath) ? archive.getText(generalPath) : undefined,
-  )
-}
-
 function devicePreviewTransparent(): boolean {
-  if (device.value === "canvas") return false
-  return deviceSpec(device.value)?.family !== "iphone" || activeIos26Adapted()
+  return true
 }
 
 function refreshPreview(): void {
@@ -1876,9 +1906,26 @@ function refreshPreview(): void {
   preview.setTheme(theme.value === "dark" ? "dark" : "light")
   preview.setTransparent(devicePreviewTransparent())
   if (context && layoutDocument) {
-    const config = resolvePanelConfig(layoutDocument, context.gen, context.styles)
-    const inputVisual = resolveTextVisual(
+    const symbolPanel = candidateArea.hidden
+    const candidateRect = context.gen.get("CAND", "VIEW_RECT")?.split(",").map(Number)
+    const generalConfig = keyboardConfig(context.gen, context.styles)
+    const candidateWidth = candidateRect?.length === 4 && Number.isFinite(candidateRect[2])
+      ? candidateRect[2]
+      : generalConfig.width
+    const candidateContentHeight = candidateRect?.length === 4 && Number.isFinite(candidateRect[3])
+      ? candidateRect[3]
+      : DEFAULT_CANDIDATE_HEIGHT
+    const minimumSymbolHeight = symbolPanel
+      ? generalConfig.height + candidateContentHeight +
+        resolveCandidateInputStyle(context.gen, resolver, candidateWidth).height
+      : 0
+    const config = resolvePanelConfig(
+      layoutDocument,
+      context.gen,
       context.styles,
+      minimumSymbolHeight,
+    )
+    const inputVisual = resolver.resolveText(
       context.gen.get("SCAND", "INPUT_STYLE") ?? context.gen.get("INPUT", "FORE_STYLE") ?? "",
       false,
     )
@@ -1886,25 +1933,14 @@ function refreshPreview(): void {
     const candidateLayout = candidatePath && archive.isText(candidatePath)
       ? IniDocument.parse(archive.getText(candidatePath))
       : undefined
-    const candidateVisual = resolveTextVisual(
-      context.styles,
-      candidateLayout?.get("CAND", "FORE_STYLE") ?? context.gen.get("SCAND", "SCAND_STYLE") ?? "",
-      false,
-    )
-    const firstCandidateVisual = resolveTextVisual(
-      context.styles,
-      candidateLayout?.get("CAND", "FIRST_FORE") ?? "",
-      false,
-    )
+    const { normal: candidateVisual, first: firstCandidateVisual } =
+      resolveCandidateTextVisuals(candidateLayout, context.gen, resolver)
     firstCandidateTextVisual = firstCandidateVisual
     candidateTextWidth = config.width
     applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth)
-    // Overlay skins often leave the candidate background transparent. Use the
-    // first-candidate style as the readable base for hard-coded preview text;
-    // it is the skin's guaranteed visible candidate foreground.
     applyCandidateTextVisual(
       candidateWords,
-      firstCandidateVisual ?? candidateVisual ?? { color: "#ffffff" },
+      candidateVisual ?? { color: "#ffffff" },
       candidateTextWidth,
     )
     const firstCandidate = candidateWords.firstElementChild as HTMLElement | null
@@ -1926,17 +1962,26 @@ function refreshPreview(): void {
     const size = bdaGen.get("PANEL", "SIZE")?.split(",").map(Number)
     const panelWidth = size?.[0] || DEFAULT_BDA_PANEL_WIDTH
     const panelHeight = size?.[1] || DEFAULT_BDA_PANEL_HEIGHT
+    const candidateRect = bdaGen.get("CAND", "VIEW_RECT")?.split(",").map(Number)
+    const candidateWidth = candidateRect?.length === 4 && Number.isFinite(candidateRect[2])
+      ? candidateRect[2]
+      : panelWidth
+    const candidateContentHeight = candidateRect?.length === 4 && Number.isFinite(candidateRect[3])
+      ? candidateRect[3]
+      : DEFAULT_CANDIDATE_HEIGHT
+    const effectivePanelHeight = candidateArea.hidden && resolver
+      ? panelHeight + candidateContentHeight +
+        resolveCandidateInputStyle(bdaGen, resolver, candidateWidth).height
+      : panelHeight
     const panel = currentBdaAppearance()?.appearance.panels.get(layout.value.replace(/\.ini$/i, ""))
     const candidateDocument = toolbarConfigPath() ? textDocument(toolbarConfigPath()!) : undefined
     const inputVisual = resolver?.resolveText(
       bdaGen.get("SCAND", "INPUT_STYLE") ?? bdaGen.get("INPUT", "FORE_STYLE") ?? "",
       false,
     )
-    const candidateVisual = resolver?.resolveText(
-      candidateDocument?.get("CAND", "FORE_STYLE") ?? bdaGen.get("SCAND", "SCAND_STYLE") ?? "",
-      false,
-    )
-    const firstVisual = resolver?.resolveText(candidateDocument?.get("CAND", "FIRST_FORE") ?? "", false)
+    const { normal: candidateVisual, first: firstVisual } = resolver
+      ? resolveCandidateTextVisuals(candidateDocument, bdaGen, resolver)
+      : { normal: undefined, first: undefined }
     candidateTextWidth = panelWidth
     firstCandidateTextVisual = firstVisual
     applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth)
@@ -1950,18 +1995,18 @@ function refreshPreview(): void {
     preview.setPanel(
       bdaStyleID(panel?.wholeBackStyle ?? panel?.backStyle),
       panelWidth,
-      panelHeight,
+      effectivePanelHeight,
     )
-    updatePanelTools(panelWidth, panelHeight, toolbarSize?.height)
+    updatePanelTools(panelWidth, effectivePanelHeight, toolbarSize?.height)
     const candidateHeight = toolbarSize?.height ?? 0
     const candidateInputHeight = toolbarSize?.inputHeight ?? 0
     activeKeyboardGeometry = {
       panelWidth,
-      panelHeight,
+      panelHeight: effectivePanelHeight,
       candidateHeight,
       candidateInputHeight,
     }
-    applyDeviceKeyboardGeometry(panelWidth, panelHeight, candidateHeight, candidateInputHeight)
+    applyDeviceKeyboardGeometry(panelWidth, effectivePanelHeight, candidateHeight, candidateInputHeight)
   } else {
     activeKeyboardGeometry = undefined
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
@@ -2036,7 +2081,7 @@ function fitCanvasPreview(): void {
     deviceShell.style.setProperty("--candidate-input-height", `${Math.round(inputHeight * scale)}px`)
     deviceShell.style.setProperty(
       "--candidate-viewport-height",
-      `${Math.round((toolbarHeight + inputHeight) * scale)}px`,
+      `${Math.round(toolbarHeight * scale)}px`,
     )
   }
   if (device.value === "canvas") updateCanvasPanelStatus(renderedWidth)
@@ -2217,6 +2262,8 @@ function updateDevicePreview(): void {
   deviceShell.dataset.theme = theme.value
   deviceShell.classList.toggle("canvas-only", device.value === "canvas")
   const spec = deviceSpec(device.value)
+  const referenceFrame = spec?.family === "iphone" && orientation.value === "port"
+  deviceShell.dataset.referenceFrame = String(referenceFrame)
   deviceShell.dataset.accessories = showsKeyboardAccessories(spec, orientation.value)
     ? "visible"
     : "hidden"
@@ -2225,7 +2272,7 @@ function updateDevicePreview(): void {
     const portrait = orientation.value === "port"
     const frame = spec.frame
     deviceShell.style.aspectRatio = portrait
-      ? `${frame?.width ?? spec.width} / ${frame?.height ?? spec.height}`
+      ? `${referenceFrame ? spec.width * REFERENCE_PHONE_WIDTH_SCALE : frame?.width ?? spec.width} / ${referenceFrame ? spec.height : frame?.height ?? spec.height}`
       : `${frame?.height ?? spec.height} / ${frame?.width ?? spec.width}`
     for (const property of deviceFrameProperties) deviceShell.style.removeProperty(property)
     if (frame) {
@@ -3348,7 +3395,6 @@ function candidateCssLength(value: string | undefined, width: number): string | 
 
 function applyCandidateGeometry(
   document: IniDocument,
-  general: IniDocument | undefined,
   width: number,
 ): void {
   const padding = document.get("CAND", "PADDING")?.split(",").map((value) => candidateCssLength(value, width))
@@ -3365,18 +3411,21 @@ function applyCandidateGeometry(
   if (padding?.[0]) candidateArea.style.setProperty("--candidate-left-padding", padding[0])
   else candidateArea.style.removeProperty("--candidate-left-padding")
   const firstGap = candidateCssLength(document.get("CAND", "FIRST_GAP"), width)
+  const rawCellWidth = Number(document.get("CAND", "CELL_W"))
   const cellWidth = candidateCssLength(document.get("CAND", "CELL_W"), width)
+  const cellInset = candidateCssLength(
+    Number.isFinite(rawCellWidth) ? String(rawCellWidth / 2) : undefined,
+    width,
+  )
   const moreWidth = candidateCssLength(document.get("CAND", "MORE_W"), width)
   if (firstGap) candidateArea.style.setProperty("--candidate-first-gap", firstGap)
   else candidateArea.style.removeProperty("--candidate-first-gap")
   if (cellWidth) candidateArea.style.setProperty("--candidate-cell-width", cellWidth)
   else candidateArea.style.removeProperty("--candidate-cell-width")
+  if (cellInset) candidateArea.style.setProperty("--candidate-cell-inset", cellInset)
+  else candidateArea.style.removeProperty("--candidate-cell-inset")
   if (moreWidth) candidateArea.style.setProperty("--candidate-more-width", moreWidth)
   else candidateArea.style.removeProperty("--candidate-more-width")
-  const inputPadding = general?.get("SCAND", "PADDING")?.split(",")
-  const inputLeading = candidateCssLength(inputPadding?.[0], width) ?? firstGap
-  if (inputLeading) candidateArea.style.setProperty("--candidate-input-leading", inputLeading)
-  else candidateArea.style.removeProperty("--candidate-input-leading")
 }
 
 function refreshToolbarPreview(
@@ -3386,7 +3435,6 @@ function refreshToolbarPreview(
   if (isConfiguredSymbolLayout(layoutPath, textDocument(genConfigPath()))) {
     delete toolbarStrip.dataset.path
     toolbarStrip.hidden = true
-    candidateInputBackgroundCanvas.hidden = true
     candidateBackgroundCanvas.hidden = true
     return
   }
@@ -3395,23 +3443,24 @@ function refreshToolbarPreview(
   if (!archive || !path || !document) {
     delete toolbarStrip.dataset.path
     toolbarStrip.hidden = true
-    candidateInputBackgroundCanvas.hidden = true
     candidateBackgroundCanvas.hidden = true
     return
   }
   const gen = textDocument(genConfigPath())
   const size = gen?.get("CAND", "VIEW_RECT")?.split(",").map(Number)
-  toolbarStrip.hidden = composing
+  toolbarStrip.hidden = false
   toolbarStrip.dataset.path = path
   toolbarPreview.setResolver(resolver)
   toolbarPreview.setOffsets(gen)
   toolbarPreview.setDefaults(gen)
+  toolbarPreview.setPersistentOnly(composing)
   toolbarPreview.setTheme(theme.value === "dark" ? "dark" : "light")
   toolbarPreview.setTransparent(true)
   const width = size?.length === 4 && Number.isFinite(size[2]) ? size[2] : DEFAULT_PANEL_WIDTH
   const height = size?.length === 4 && Number.isFinite(size[3]) ? size[3] : DEFAULT_CANDIDATE_HEIGHT
-  const inputStyle = resolveCandidateInputStyle(gen, resolver, height)
+  const inputStyle = resolveCandidateInputStyle(gen, resolver, width)
   const inputHeight = inputStyle.height
+  const totalHeight = height + inputHeight
   const backgroundStyle = document.get("CAND", "BACK_STYLE")?.split(",")[0] ??
     gen?.get("SCAND", "BACK_STYLE")?.split(",")[0] ?? ""
   candidateBackgroundCanvas.hidden = false
@@ -3424,22 +3473,16 @@ function refreshToolbarPreview(
     height,
   )
   candidateBackgroundPreview.setDocument(undefined)
-  candidateInputBackgroundCanvas.hidden = false
-  candidateInputBackgroundPreview.setResolver(resolver)
-  candidateInputBackgroundPreview.setTheme(theme.value === "dark" ? "dark" : "light")
-  candidateInputBackgroundPreview.setTransparent(devicePreviewTransparent())
-  candidateInputBackgroundPreview.setPanel(inputStyle.backgroundStyle, width, inputHeight)
-  candidateInputBackgroundPreview.setDocument(undefined)
   toolbarCanvas.style.setProperty("--toolbar-width", String(width))
-  toolbarCanvas.style.setProperty("--toolbar-height", String(height))
+  toolbarCanvas.style.setProperty("--toolbar-height", String(totalHeight))
   toolbarCanvas.style.setProperty("--candidate-input-height", String(inputHeight))
-  applyCandidateGeometry(document, gen, width)
+  applyCandidateGeometry(document, width)
   const toolbarDocument = IniDocument.parse(document.toString())
   toolbarDocument.set("CAND", "BACK_STYLE", "")
   toolbarPreview.setPanel("", width, height)
   toolbarPreview.setDocument(toolbarDocument)
   toolbarPreview.setMode("preview")
-  return { width, height, inputHeight }
+  return { width, height: totalHeight, inputHeight }
 }
 
 function commonSelectedStyle(name: "BACK_STYLE" | "FORE_STYLE"): string | undefined {
@@ -5643,6 +5686,7 @@ async function loadArchive(
 ): Promise<void> {
   await flushSourceAutosave()
   await activateSourceWorkspace("", "")
+  sourceWorkspacePendingArchive = undefined
   releaseKeySound()
   keySoundBuffers.clear()
   const nextArchive = SkinArchive.open(bytes)
@@ -5652,22 +5696,28 @@ async function loadArchive(
     bdaBase = SkinArchive.open(new Uint8Array(await response.arrayBuffer()))
   }
   let nextSourceWorkspace = existingSourceWorkspace
-  if (isTauri() && !nextSourceWorkspace) {
-    const configuredDirectory = localStorage.getItem("source-directory") || null
-    try {
-      nextSourceWorkspace = await invoke<string>("create_source_workspace", {
-        directory: configuredDirectory,
-        name: path || displayName || exportName("未命名", nextArchive.format),
-        files: sourceFilesPayload(nextArchive),
-      })
-    } catch (error) {
-      if (!configuredDirectory) throw error
-      nextSourceWorkspace = await invoke<string>("create_source_workspace", {
-        directory: null,
-        name: path || displayName || exportName("未命名", nextArchive.format),
-        files: sourceFilesPayload(nextArchive),
-      })
-      showStatus("自定义源码目录不可用，本次已保存到内置目录")
+  let pendingAndroidSourceDirectory = ""
+  const sourceDirectoryActive = !isAndroidTauri() || localStorage.getItem("source-directory-enabled") === "true"
+  const configuredDirectory = sourceDirectoryActive ? localStorage.getItem("source-directory") || null : null
+  if (isTauri() && !nextSourceWorkspace && (!isAndroidTauri() || configuredDirectory)) {
+    if (isAndroidTauri()) {
+      pendingAndroidSourceDirectory = configuredDirectory!
+    } else {
+      try {
+        nextSourceWorkspace = await invoke<string>("create_source_workspace", {
+          directory: configuredDirectory,
+          name: path || displayName || exportName("未命名", nextArchive.format),
+          files: sourceFilesPayload(nextArchive),
+        })
+      } catch (error) {
+        if (!configuredDirectory) throw error
+        nextSourceWorkspace = await invoke<string>("create_source_workspace", {
+          directory: null,
+          name: path || displayName || exportName("未命名", nextArchive.format),
+          files: sourceFilesPayload(nextArchive),
+        })
+        showStatus("自定义源码目录不可用，本次已保存到内置目录")
+      }
     }
   }
   assetURL = releaseImagePreviewURL(assetURL)
@@ -5713,6 +5763,29 @@ async function loadArchive(
     selectFile(initial)
   }
   await activateSourceWorkspace(nextSourceWorkspace, sourcePrefix)
+  if (pendingAndroidSourceDirectory) {
+    const pendingArchive = nextArchive
+    sourceWorkspacePendingArchive = pendingArchive
+    void invoke<string>("create_source_workspace", {
+      directory: pendingAndroidSourceDirectory,
+      name: path || displayName || exportName("未命名", nextArchive.format),
+      files: sourceFilesPayload(nextArchive),
+    }).then(async (workspace) => {
+      if (archive !== pendingArchive || sourceWorkspacePendingArchive !== pendingArchive) return
+      const pendingPaths = [...pendingSourcePaths]
+      await activateSourceWorkspace(workspace, sourcePrefix)
+      if (archive !== pendingArchive || sourceWorkspacePendingArchive !== pendingArchive) return
+      pendingPaths.forEach((changedPath) => pendingSourcePaths.add(changedPath))
+      await flushSourceAutosave()
+      sourceWorkspacePendingArchive = undefined
+      showStatus("源码已保存到授权目录")
+    }).catch((error) => {
+      if (archive !== pendingArchive || sourceWorkspacePendingArchive !== pendingArchive) return
+      sourceWorkspacePendingArchive = undefined
+      pendingSourcePaths.clear()
+      showError(error, "保存源码到授权目录")
+    })
+  }
   updateDirty()
 }
 
@@ -5728,6 +5801,17 @@ async function openNative(): Promise<boolean> {
 }
 
 async function loadSourceWorkspace(path: string): Promise<boolean> {
+  if (isAndroidTauri() && path.startsWith("content://")) {
+    const encoded = await invoke<string>("open_source_workspace_archive", { path })
+    const decodedPath = decodeURIComponent(path)
+    const directoryName = decodedPath.split(/[\\/:]/).filter(Boolean).pop()?.toLowerCase() ?? ""
+    const sourcePrefix = directoryName === "dark" || directoryName === "light"
+      ? `${directoryName}/`
+      : ""
+    const name = decodedPath.split(/[\\/]/).filter(Boolean).pop() || "皮肤源码"
+    await loadArchive(decodeBase64Archive(encoded), "", false, path, name, sourcePrefix)
+    return true
+  }
   const files = await invoke<SourceFilePayload[]>("open_source_workspace", { path })
   const directoryName = path.split(/[\\/]/).filter(Boolean).pop()?.toLowerCase() ?? ""
   const sourcePrefix = directoryName === "dark" || directoryName === "light"
@@ -5750,6 +5834,23 @@ async function loadSourceWorkspace(path: string): Promise<boolean> {
   const name = path.split(/[\\/]/).pop() || "皮肤源码"
   await loadArchive(sourceArchive.toBytes(), "", false, path, name, sourcePrefix)
   return true
+}
+
+async function restoreLastSourceWorkspace(): Promise<void> {
+  if (!isAndroidTauri() || localStorage.getItem("source-directory-enabled") !== "true") return
+  const lastSourceWorkspace = localStorage.getItem(LAST_SOURCE_WORKSPACE_KEY)
+  if (!lastSourceWorkspace) return
+  setFileOperationBusy(true)
+  showStatus("正在恢复上次皮肤源码…", "progress")
+  try {
+    await loadSourceWorkspace(lastSourceWorkspace)
+    showStatus("已恢复上次编辑的皮肤源码")
+  } catch {
+    localStorage.removeItem(LAST_SOURCE_WORKSPACE_KEY)
+    showStatus("上次皮肤源码已不可用，请重新打开")
+  } finally {
+    setFileOperationBusy(false)
+  }
 }
 
 async function loadNativePath(path: string): Promise<boolean> {
@@ -5785,6 +5886,12 @@ async function loadDroppedSourceWorkspace(path: string): Promise<boolean> {
 
 function currentExportFormat(): ExportFormat {
   return exportFormatFromPath(currentPath) ?? archive?.format ?? "bdi"
+}
+
+function mobileShareFormat(): ExportFormat {
+  if (isIOSWeb()) return "bdi"
+  if (isAndroidTauri() || isAndroidWeb()) return archive?.format === "bda" ? "bda" : "bds"
+  return currentExportFormat()
 }
 
 function exportArchive(format: ExportFormat): {
@@ -5907,12 +6014,12 @@ async function saveArchive(saveAs: boolean, format: ExportFormat): Promise<boole
 
 async function shareArchiveToMobile(): Promise<boolean> {
   if (!archive) return false
-  const format = currentExportFormat()
+  const format = mobileShareFormat()
   const exported = exportArchive(format)
   if (!exported) return false
   const currentName = documentName.textContent?.trim() || "皮肤"
   const name = exportName(currentName, format)
-  if (isTauri() && /Android/i.test(navigator.userAgent)) {
+  if (isAndroidTauri()) {
     await invoke("share_file", { name, data: Array.from(exported.bytes) })
     return true
   }
@@ -6049,9 +6156,16 @@ function setSourceDirectoryState(path: string, custom: boolean, error = ""): voi
 
 async function applySourceDirectory(path: string | null): Promise<void> {
   const custom = Boolean(path?.trim())
+  const previous = localStorage.getItem("source-directory")
   try {
     const resolved = await invoke<string>("prepare_source_directory", { path: custom ? path!.trim() : null })
-    if (custom) localStorage.setItem("source-directory", resolved)
+    if (custom) {
+      localStorage.setItem("source-directory", resolved)
+      if (isAndroidTauri() && previous !== resolved) {
+        localStorage.removeItem(LAST_SOURCE_WORKSPACE_KEY)
+        await activateSourceWorkspace("", "")
+      }
+    }
     else localStorage.removeItem("source-directory")
     setSourceDirectoryState(resolved, custom)
   } catch (error) {
@@ -6062,6 +6176,7 @@ async function applySourceDirectory(path: string | null): Promise<void> {
 
 async function initializeSourceDirectory(): Promise<void> {
   if (!isTauri()) {
+    sourceDirectoryEnabledSetting.hidden = true
     sourceDirectory.disabled = true
     chooseSourceDirectory.disabled = true
     resetSourceDirectory.disabled = true
@@ -6069,8 +6184,63 @@ async function initializeSourceDirectory(): Promise<void> {
     return
   }
   const configured = localStorage.getItem("source-directory")
+  if (isAndroidTauri()) {
+    sourceDirectory.readOnly = true
+    sourceDirectory.placeholder = "/storage/emulated/0/BdiEditor"
+    resetSourceDirectory.hidden = true
+    const enabled = localStorage.getItem("source-directory-enabled") === "true" && Boolean(configured)
+    sourceDirectoryEnabled.checked = enabled
+    sourceDirectory.disabled = !enabled
+    chooseSourceDirectory.disabled = !enabled
+    if (!enabled) {
+      localStorage.removeItem("source-directory-enabled")
+      localStorage.removeItem("source-directory")
+      localStorage.removeItem(LAST_SOURCE_WORKSPACE_KEY)
+      sourceDirectory.value = ""
+      sourceDirectoryStatus.textContent = "已关闭 · 不会写入源码文件"
+      return
+    }
+    await applySourceDirectory(configured)
+    return
+  }
+  sourceDirectoryEnabledSetting.hidden = true
   await applySourceDirectory(configured)
 }
+
+async function chooseAndroidSourceDirectory(): Promise<boolean> {
+  try {
+    await message("开启后，编辑器会把皮肤源码保存到你授权的文件夹。下一步请在系统文件选择器中选择或新建 BdiEditor 文件夹。", {
+      title: "授权皮肤源码目录",
+      kind: "info",
+    })
+    await applySourceDirectory(await invoke<string>("pick_source_directory"))
+    return true
+  } catch (error) {
+    if (!String(error).toLowerCase().includes("cancel")) showError(error, "选择源码目录")
+    return false
+  }
+}
+
+sourceDirectoryEnabled.addEventListener("change", () => void (async () => {
+  if (!isAndroidTauri()) return
+  if (!sourceDirectoryEnabled.checked) {
+    localStorage.removeItem("source-directory-enabled")
+    localStorage.removeItem("source-directory")
+    localStorage.removeItem(LAST_SOURCE_WORKSPACE_KEY)
+    await activateSourceWorkspace("", "")
+    sourceDirectory.disabled = true
+    chooseSourceDirectory.disabled = true
+    sourceDirectory.value = ""
+    sourceDirectoryStatus.textContent = "已关闭 · 不会写入源码文件"
+    return
+  }
+  const granted = await chooseAndroidSourceDirectory()
+  sourceDirectoryEnabled.checked = granted
+  sourceDirectory.disabled = !granted
+  chooseSourceDirectory.disabled = !granted
+  if (granted) localStorage.setItem("source-directory-enabled", "true")
+  else sourceDirectoryStatus.textContent = "未授权 · 不会写入源码文件"
+})())
 
 sourceDirectory.addEventListener("change", () => void applySourceDirectory(sourceDirectory.value))
 sourceDirectory.addEventListener("keydown", (event) => {
@@ -6080,11 +6250,7 @@ sourceDirectory.addEventListener("keydown", (event) => {
 })
 chooseSourceDirectory.addEventListener("click", () => void (async () => {
   if (isAndroidTauri()) {
-    try {
-      await applySourceDirectory(await invoke<string>("pick_source_directory"))
-    } catch (error) {
-      if (!String(error).toLowerCase().includes("cancel")) showError(error, "选择源码目录")
-    }
+    await chooseAndroidSourceDirectory()
     return
   }
   const path = await open({
@@ -6096,7 +6262,7 @@ chooseSourceDirectory.addEventListener("click", () => void (async () => {
   if (typeof path === "string") await applySourceDirectory(path)
 })())
 resetSourceDirectory.addEventListener("click", () => void applySourceDirectory(null))
-void initializeSourceDirectory()
+const sourceDirectoryInitialization = initializeSourceDirectory()
 for (const button of sidebarViewButtons) {
   button.addEventListener("click", () => setSidebarView(button.dataset.sidebarView === "source" ? "source" : "overview"))
 }
@@ -7300,8 +7466,13 @@ if (isTauri()) {
     }
   })
   void invoke<string[]>("take_opened_files")
-    .then((paths) => {
-      if (paths[0]) void runFileOperation("打开", () => loadNativePath(paths[0]))
+    .then(async (paths) => {
+      if (paths[0]) {
+        await runFileOperation("打开", () => loadNativePath(paths[0]))
+        return
+      }
+      await sourceDirectoryInitialization
+      await restoreLastSourceWorkspace()
     })
     .catch((error) => showError(error, "读取启动文件"))
 }

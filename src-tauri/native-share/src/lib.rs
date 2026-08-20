@@ -107,7 +107,7 @@ pub fn stop_source_observer<R: Runtime>(app: &AppHandle<R>) -> Result<(), String
 }
 
 #[cfg(target_os = "android")]
-pub fn create_source_workspace<R: Runtime>(
+pub async fn create_source_workspace<R: Runtime>(
     app: &AppHandle<R>,
     uri: String,
     name: String,
@@ -115,29 +115,44 @@ pub fn create_source_workspace<R: Runtime>(
 ) -> Result<String, String> {
     app.state::<NativeShare<R>>()
         .0
-        .run_mobile_plugin("createSourceWorkspace", CreateWorkspacePayload { uri, name, files })
+        .run_mobile_plugin_async("createSourceWorkspace", CreateWorkspacePayload { uri, name, files })
+        .await
         .map_err(|error| error.to_string())
 }
 
 #[cfg(target_os = "android")]
-pub fn read_source_workspace<R: Runtime>(
+pub async fn read_source_workspace<R: Runtime>(
     app: &AppHandle<R>,
     uri: String,
 ) -> Result<serde_json::Value, String> {
     app.state::<NativeShare<R>>()
         .0
-        .run_mobile_plugin("readSourceWorkspace", WorkspacePayload { uri })
+        .run_mobile_plugin_async("readSourceWorkspace", WorkspacePayload { uri })
+        .await
         .map_err(|error| error.to_string())
 }
 
 #[cfg(target_os = "android")]
-pub fn apply_source_changes<R: Runtime>(
+pub async fn read_source_workspace_archive<R: Runtime>(
+    app: &AppHandle<R>,
+    uri: String,
+) -> Result<String, String> {
+    app.state::<NativeShare<R>>()
+        .0
+        .run_mobile_plugin_async("readSourceWorkspaceArchive", WorkspacePayload { uri })
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "android")]
+pub async fn apply_source_changes<R: Runtime>(
     app: &AppHandle<R>,
     uri: String,
     changes: serde_json::Value,
 ) -> Result<(), String> {
     app.state::<NativeShare<R>>()
         .0
-        .run_mobile_plugin::<()>("applySourceChanges", ApplyChangesPayload { uri, changes })
+        .run_mobile_plugin_async::<()>("applySourceChanges", ApplyChangesPayload { uri, changes })
+        .await
         .map_err(|error| error.to_string())
 }
