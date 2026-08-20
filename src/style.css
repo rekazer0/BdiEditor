@@ -1242,7 +1242,7 @@ h2 {
 }
 
 .device-shell[data-reference-frame="true"][data-theme="light"] {
-  --phone-keyboard-glass: rgb(209 212 218 / 62%);
+  --phone-keyboard-glass: rgb(203 206 212 / 62%);
 }
 
 .device-shell[data-reference-frame="true"][data-theme="light"] .device-reference-background {
