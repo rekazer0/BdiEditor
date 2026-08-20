@@ -1776,7 +1776,11 @@ h2 {
   margin: 0;
   overflow: visible;
   border-radius: 0;
+  border-top: 0;
   background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .device-shell.canvas-only #candidate-area {

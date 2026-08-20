@@ -154,6 +154,10 @@ assert.match(
 )
 assert.match(css, /\.keyboard-dock \{[^}]*background:\s*var\(--phone-keyboard-glass\)/s)
 assert.match(css, /\.keyboard-dock \{[^}]*backdrop-filter:\s*saturate\(165%\) blur\(20px\)/s)
+assert.match(
+  css,
+  /\.device-shell\.canvas-only \.keyboard-dock \{[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;[^}]*backdrop-filter:\s*none;/s,
+)
 assert.doesNotMatch(main, /candidateInputBackground/)
 assert.match(main, /const REFERENCE_PHONE_WIDTH_SCALE = 1/)
 assert.match(main, /spec\.width \* REFERENCE_PHONE_WIDTH_SCALE/)
