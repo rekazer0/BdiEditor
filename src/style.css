@@ -1064,6 +1064,12 @@ h2 {
   border-radius: 38px;
   background: #171719;
   box-shadow: 0 18px 44px rgb(0 0 0 / 22%);
+  --phone-keyboard-glass:
+    linear-gradient(180deg, rgb(255 255 255 / 34%), rgb(217 220 227 / 18%)),
+    radial-gradient(120% 72% at 50% -18%, rgb(255 255 255 / 20%), transparent 64%),
+    rgb(203 206 212 / 72%);
+  --phone-keyboard-border: rgb(255 255 255 / 68%);
+  --phone-keyboard-shadow: inset 0 1px rgb(255 255 255 / 48%), 0 -10px 28px rgb(82 103 135 / 10%);
   transition: aspect-ratio 180ms ease;
 }
 
@@ -1108,6 +1114,19 @@ h2 {
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.canvas-wrap[data-background="checkerboard"] ~ .preview-zoom-control {
+  border-color: rgb(32 33 36 / 22%);
+  background: rgb(255 255 255 / 88%);
+  color: #202124;
+  box-shadow: 0 8px 20px rgb(32 33 36 / 18%), inset 0 1px rgb(255 255 255 / 80%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.canvas-wrap[data-background="checkerboard"] ~ .preview-zoom-control button {
+  color: #202124;
 }
 
 .workspace:has(.canvas-wrap.empty) .preview-zoom-control,
@@ -1185,10 +1204,10 @@ h2 {
   container-type: inline-size;
   border-radius: 32px;
   background:
-    radial-gradient(circle at 10% 68%, rgb(102 181 238 / 8%), transparent 36%),
-    radial-gradient(circle at 52% 56%, rgb(235 172 136 / 8%), transparent 40%),
-    radial-gradient(circle at 92% 76%, rgb(117 203 145 / 10%), transparent 38%),
-    radial-gradient(circle at 48% 94%, rgb(155 174 231 / 6%), transparent 34%),
+    radial-gradient(ellipse 45% 36% at 8% 100%, rgb(102 181 238 / 24%), transparent 100%),
+    radial-gradient(circle at 52% 56%, rgb(235 172 136 / 24%), transparent 52%),
+    radial-gradient(ellipse 45% 36% at 92% 100%, rgb(117 203 145 / 30%), transparent 100%),
+    radial-gradient(circle at 48% 94%, rgb(155 174 231 / 18%), transparent 46%),
     #f5f5f7;
 }
 
@@ -1242,28 +1261,36 @@ h2 {
 }
 
 .device-shell[data-reference-frame="true"][data-theme="light"] {
-  --phone-keyboard-glass: rgb(203 206 212 / 62%);
+  --phone-keyboard-glass:
+    linear-gradient(180deg, rgb(255 255 255 / 34%), rgb(217 220 227 / 18%)),
+    radial-gradient(120% 72% at 50% -18%, rgb(255 255 255 / 20%), transparent 64%),
+    rgb(203 206 212 / 72%);
 }
 
 .device-shell[data-reference-frame="true"][data-theme="light"] .device-reference-background {
   background-image:
-    radial-gradient(circle at 10% 68%, rgb(102 181 238 / 8%), transparent 36%),
-    radial-gradient(circle at 52% 56%, rgb(235 172 136 / 8%), transparent 40%),
-    radial-gradient(circle at 92% 76%, rgb(117 203 145 / 10%), transparent 38%),
-    radial-gradient(circle at 48% 94%, rgb(155 174 231 / 6%), transparent 34%),
+    radial-gradient(ellipse 45% 36% at 8% 100%, rgb(102 181 238 / 24%), transparent 100%),
+    radial-gradient(circle at 52% 56%, rgb(235 172 136 / 24%), transparent 52%),
+    radial-gradient(ellipse 45% 36% at 92% 100%, rgb(117 203 145 / 30%), transparent 100%),
+    radial-gradient(circle at 48% 94%, rgb(155 174 231 / 18%), transparent 46%),
     url("/iphone-notes-reference-blank.png");
 }
 
 .device-shell[data-reference-frame="true"][data-theme="dark"] {
-  --phone-keyboard-glass: rgb(42 42 46 / 52%);
+  --phone-keyboard-glass:
+    linear-gradient(180deg, rgb(90 96 110 / 32%), rgb(23 25 29 / 22%)),
+    radial-gradient(120% 72% at 50% -18%, rgb(255 255 255 / 8%), transparent 64%),
+    rgb(42 42 46 / 86%);
+  --phone-keyboard-border: rgb(255 255 255 / 34%);
+  --phone-keyboard-shadow: inset 0 1px rgb(255 255 255 / 20%), 0 -10px 28px rgb(0 0 0 / 24%);
 }
 
 .device-shell[data-reference-frame="true"][data-theme="dark"] .device-reference-background {
   background-image:
-    radial-gradient(circle at 10% 68%, rgb(48 125 174 / 14%), transparent 36%),
-    radial-gradient(circle at 52% 56%, rgb(145 91 62 / 13%), transparent 40%),
-    radial-gradient(circle at 92% 76%, rgb(51 130 76 / 15%), transparent 38%),
-    radial-gradient(circle at 48% 94%, rgb(77 89 151 / 10%), transparent 34%),
+    radial-gradient(ellipse 45% 36% at 8% 100%, rgb(48 125 174 / 32%), transparent 100%),
+    radial-gradient(circle at 52% 56%, rgb(145 91 62 / 30%), transparent 52%),
+    radial-gradient(ellipse 45% 36% at 92% 100%, rgb(51 130 76 / 34%), transparent 100%),
+    radial-gradient(circle at 48% 94%, rgb(77 89 151 / 24%), transparent 46%),
     url("/iphone-notes-reference-dark-blank.png");
 }
 
@@ -1508,8 +1535,11 @@ h2 {
   grid-template-rows: var(--candidate-row, 0fr) var(--panel-row, 648fr) var(--safe-row, 220fr);
   overflow: hidden;
   border-radius: 6.65cqw 6.65cqw 0 0;
-  background: rgb(209 212 218 / 62%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 46%);
+  border-top: 1px solid var(--phone-keyboard-border);
+  background: var(--phone-keyboard-glass);
+  box-shadow: var(--phone-keyboard-shadow);
+  -webkit-backdrop-filter: saturate(165%) blur(20px);
+  backdrop-filter: saturate(165%) blur(20px);
 }
 
 #candidate-area {
@@ -1615,11 +1645,17 @@ h2 {
 }
 
 .device-shell[data-theme="dark"] .device-screen {
+  --phone-keyboard-glass:
+    linear-gradient(180deg, rgb(90 96 110 / 32%), rgb(23 25 29 / 22%)),
+    radial-gradient(120% 72% at 50% -18%, rgb(255 255 255 / 8%), transparent 64%),
+    rgb(42 42 46 / 86%);
+  --phone-keyboard-border: rgb(255 255 255 / 34%);
+  --phone-keyboard-shadow: inset 0 1px rgb(255 255 255 / 20%), 0 -10px 28px rgb(0 0 0 / 24%);
   background:
-    radial-gradient(circle at 10% 68%, rgb(48 125 174 / 14%), transparent 36%),
-    radial-gradient(circle at 52% 56%, rgb(145 91 62 / 13%), transparent 40%),
-    radial-gradient(circle at 92% 76%, rgb(51 130 76 / 15%), transparent 38%),
-    radial-gradient(circle at 48% 94%, rgb(77 89 151 / 10%), transparent 34%),
+    radial-gradient(ellipse 45% 36% at 8% 100%, rgb(48 125 174 / 32%), transparent 100%),
+    radial-gradient(circle at 52% 56%, rgb(145 91 62 / 30%), transparent 52%),
+    radial-gradient(ellipse 45% 36% at 92% 100%, rgb(51 130 76 / 34%), transparent 100%),
+    radial-gradient(circle at 48% 94%, rgb(77 89 151 / 24%), transparent 46%),
     #2c2c30;
 }
 
@@ -1664,7 +1700,7 @@ h2 {
 
 .device-shell[data-theme="dark"] .keyboard-dock,
 .device-shell[data-theme="dark"] .keyboard-accessories {
-  background: rgb(28 28 30 / 72%);
+  background: var(--phone-keyboard-glass);
 }
 
 .device-shell[data-theme="dark"] canvas {
@@ -1783,6 +1819,11 @@ h2 {
   max-width: 100%;
   max-height: 100%;
   margin: auto;
+}
+
+#candidate-area[hidden] + #panel-viewport #preview {
+  width: 100%;
+  height: 100%;
 }
 
 canvas {

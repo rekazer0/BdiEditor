@@ -21,6 +21,14 @@ export type CandidateInputStyle = {
   height: number
 }
 
+export function candidateInputForegroundStyle(general: IniDocument | undefined): string {
+  return [
+    general?.get("SCAND", "INPUT_STYLE"),
+    general?.get("INPUT", "FORE_STYLE"),
+    general?.get("SCAND", "FORE_STYLE"),
+  ].map((value) => value?.trim() ?? "").find(Boolean) ?? ""
+}
+
 export function resolveCandidateTextVisuals(
   candidate: IniDocument | undefined,
   general: IniDocument | undefined,
@@ -40,9 +48,7 @@ export function resolveCandidateInputStyle(
   resolver: VisualResolver,
   width: number,
 ): CandidateInputStyle {
-  const foregroundStyle = (
-    general?.get("SCAND", "INPUT_STYLE") ?? general?.get("INPUT", "FORE_STYLE") ?? ""
-  ).trim()
+  const foregroundStyle = candidateInputForegroundStyle(general)
   const fontSize = resolver.resolveText(foregroundStyle, false)?.fontSize
   const height = fontSize && fontSize > 0 ? fontSize + (inputInset(width) * 2) : 0
   return { foregroundStyle, height }

@@ -39,6 +39,7 @@ import {
   showsKeyboardAccessories,
 } from "./devices.ts"
 import {
+  candidateInputForegroundStyle,
   resolveCandidateInputStyle,
   resolveCandidateTextVisuals,
 } from "./candidate-style.ts"
@@ -1915,18 +1916,19 @@ function refreshPreview(): void {
     const candidateContentHeight = candidateRect?.length === 4 && Number.isFinite(candidateRect[3])
       ? candidateRect[3]
       : DEFAULT_CANDIDATE_HEIGHT
-    const minimumSymbolHeight = symbolPanel
-      ? generalConfig.height + candidateContentHeight +
-        resolveCandidateInputStyle(context.gen, resolver, candidateWidth).height
+    const symbolInputHeight = symbolPanel
+      ? resolveCandidateInputStyle(context.gen, resolver, candidateWidth).height
       : 0
     const config = resolvePanelConfig(
       layoutDocument,
       context.gen,
       context.styles,
-      minimumSymbolHeight,
     )
+    const devicePanelHeight = symbolPanel
+      ? Math.max(config.height, generalConfig.height + candidateContentHeight + symbolInputHeight)
+      : config.height
     const inputVisual = resolver.resolveText(
-      context.gen.get("SCAND", "INPUT_STYLE") ?? context.gen.get("INPUT", "FORE_STYLE") ?? "",
+      candidateInputForegroundStyle(context.gen),
       false,
     )
     const candidatePath = toolbarConfigPath()
@@ -1949,19 +1951,27 @@ function refreshPreview(): void {
     }
     preview.setPanel(config.styleID, config.width, config.height)
     updatePanelTools(config.width, config.height, toolbarSize?.height)
-    const candidateHeight = toolbarSize?.height ?? 0
-    const candidateInputHeight = toolbarSize?.inputHeight ?? 0
+    const candidateHeight = symbolPanel ? 0 : (toolbarSize?.height ?? 0)
+    const candidateInputHeight = symbolPanel ? 0 : (toolbarSize?.inputHeight ?? 0)
     activeKeyboardGeometry = {
       panelWidth: config.width,
-      panelHeight: config.height,
+      panelHeight: devicePanelHeight,
       candidateHeight,
       candidateInputHeight,
     }
-    applyDeviceKeyboardGeometry(config.width, config.height, candidateHeight, candidateInputHeight)
+    applyDeviceKeyboardGeometry(
+      config.width,
+      devicePanelHeight,
+      candidateHeight,
+      candidateInputHeight,
+    )
   } else if (bdaGen && layoutDocument) {
-    const size = bdaGen.get("PANEL", "SIZE")?.split(",").map(Number)
-    const panelWidth = size?.[0] || DEFAULT_BDA_PANEL_WIDTH
-    const panelHeight = size?.[1] || DEFAULT_BDA_PANEL_HEIGHT
+    const generalSize = bdaGen.get("PANEL", "SIZE")?.split(",").map(Number)
+    const layoutSize = layoutDocument.get("PANEL", "SIZE")?.split(",").map(Number)
+    const generalPanelWidth = generalSize?.[0] || DEFAULT_BDA_PANEL_WIDTH
+    const generalPanelHeight = generalSize?.[1] || DEFAULT_BDA_PANEL_HEIGHT
+    const panelWidth = layoutSize?.[0] || generalPanelWidth
+    const panelHeight = layoutSize?.[1] || generalPanelHeight
     const candidateRect = bdaGen.get("CAND", "VIEW_RECT")?.split(",").map(Number)
     const candidateWidth = candidateRect?.length === 4 && Number.isFinite(candidateRect[2])
       ? candidateRect[2]
@@ -1969,14 +1979,16 @@ function refreshPreview(): void {
     const candidateContentHeight = candidateRect?.length === 4 && Number.isFinite(candidateRect[3])
       ? candidateRect[3]
       : DEFAULT_CANDIDATE_HEIGHT
-    const effectivePanelHeight = candidateArea.hidden && resolver
-      ? panelHeight + candidateContentHeight +
-        resolveCandidateInputStyle(bdaGen, resolver, candidateWidth).height
+    const symbolInputHeight = candidateArea.hidden && resolver
+      ? resolveCandidateInputStyle(bdaGen, resolver, candidateWidth).height
+      : 0
+    const effectivePanelHeight = candidateArea.hidden
+      ? Math.max(panelHeight, generalPanelHeight + candidateContentHeight + symbolInputHeight)
       : panelHeight
     const panel = currentBdaAppearance()?.appearance.panels.get(layout.value.replace(/\.ini$/i, ""))
     const candidateDocument = toolbarConfigPath() ? textDocument(toolbarConfigPath()!) : undefined
     const inputVisual = resolver?.resolveText(
-      bdaGen.get("SCAND", "INPUT_STYLE") ?? bdaGen.get("INPUT", "FORE_STYLE") ?? "",
+      candidateInputForegroundStyle(bdaGen),
       false,
     )
     const { normal: candidateVisual, first: firstVisual } = resolver
@@ -1995,18 +2007,24 @@ function refreshPreview(): void {
     preview.setPanel(
       bdaStyleID(panel?.wholeBackStyle ?? panel?.backStyle),
       panelWidth,
-      effectivePanelHeight,
+      panelHeight,
     )
-    updatePanelTools(panelWidth, effectivePanelHeight, toolbarSize?.height)
-    const candidateHeight = toolbarSize?.height ?? 0
-    const candidateInputHeight = toolbarSize?.inputHeight ?? 0
+    updatePanelTools(panelWidth, panelHeight, toolbarSize?.height)
+    const bdaSymbolPanel = candidateArea.hidden
+    const candidateHeight = bdaSymbolPanel ? 0 : (toolbarSize?.height ?? 0)
+    const candidateInputHeight = bdaSymbolPanel ? 0 : (toolbarSize?.inputHeight ?? 0)
     activeKeyboardGeometry = {
       panelWidth,
       panelHeight: effectivePanelHeight,
       candidateHeight,
       candidateInputHeight,
     }
-    applyDeviceKeyboardGeometry(panelWidth, effectivePanelHeight, candidateHeight, candidateInputHeight)
+    applyDeviceKeyboardGeometry(
+      panelWidth,
+      effectivePanelHeight,
+      candidateHeight,
+      candidateInputHeight,
+    )
   } else {
     activeKeyboardGeometry = undefined
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
@@ -2027,8 +2045,9 @@ function refreshSimulationPreview(): void {
   const resolver = visualResolver()
   if (!resolver) return
   const toolbarSize = refreshToolbarPreview(composing, resolver)
-  const candidateHeight = toolbarSize?.height ?? activeKeyboardGeometry.candidateHeight
-  const candidateInputHeight = toolbarSize?.inputHeight ?? activeKeyboardGeometry.candidateInputHeight
+  const symbolPanel = candidateArea.hidden
+  const candidateHeight = symbolPanel ? 0 : (toolbarSize?.height ?? activeKeyboardGeometry.candidateHeight)
+  const candidateInputHeight = symbolPanel ? 0 : (toolbarSize?.inputHeight ?? activeKeyboardGeometry.candidateInputHeight)
   if (
     candidateHeight !== activeKeyboardGeometry.candidateHeight ||
     candidateInputHeight !== activeKeyboardGeometry.candidateInputHeight
@@ -2208,7 +2227,7 @@ canvasWrap.addEventListener("pointercancel", finishPreviewPan)
 
 function updateCanvasCandidateGeometry(candidateHeight: number): void {
   if (!canvasLogicalSize) return
-  canvasLogicalSize.height = canvasLogicalSize.panelVisibleHeight + candidateHeight
+  canvasLogicalSize.height = canvasLogicalSize.panelHeight + candidateHeight
   fitCanvasPreview()
 }
 
@@ -2228,7 +2247,7 @@ function updatePanelTools(
   deviceShell.style.removeProperty("--panel-crop-offset")
   canvasLogicalSize = {
     width,
-    height: content.height + candidateHeight,
+    height: height + candidateHeight,
     panelHeight: height,
     panelVisibleHeight: content.height,
   }

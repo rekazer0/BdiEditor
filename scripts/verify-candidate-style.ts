@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import type { VisualResolver } from "../src/atlas.ts"
 import {
+  candidateInputForegroundStyle,
   resolveCandidateInputStyle,
   resolveCandidateTextVisuals,
 } from "../src/candidate-style.ts"
@@ -41,6 +42,15 @@ assert.deepEqual(resolveCandidateInputStyle(scandOverride, resolver(54), 1125), 
   height: 70,
 })
 
+const legacyScand = IniDocument.parse(`
+[SCAND]
+FORE_STYLE=1
+`)
+assert.equal(candidateInputForegroundStyle(legacyScand), "1")
+assert.deepEqual(resolveCandidateInputStyle(legacyScand, resolver(46), 1125), {
+  foregroundStyle: "1",
+  height: 62,
+})
 assert.equal(resolveCandidateInputStyle(ios, resolver(), 1125).height, 0)
 
 const generalPanel = IniDocument.parse("[PANEL]\nSIZE=480,312\n")
@@ -89,6 +99,17 @@ assert.equal(
     0,
   ).totalHeight,
 )
+assert.equal(
+  geometry.totalHeight,
+  keyboardPreviewGeometry(
+    { width: 1206, height: 2622, family: "iphone" },
+    "port",
+    1125,
+    595 + 194,
+    0,
+    0,
+  ).totalHeight,
+)
 
 const candidate = IniDocument.parse(`
 [CAND]
@@ -111,6 +132,15 @@ assert.deepEqual(resolveCandidateTextVisuals(undefined, general, textResolver), 
 
 const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8")
 const main = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8")
+assert.equal(
+  [...main.matchAll(/(?:generalConfig\.height|generalPanelHeight) \+ candidateContentHeight \+ symbolInputHeight/g)].length,
+  2,
+)
+assert.match(main, /const layoutSize = layoutDocument\.get\("PANEL", "SIZE"\)/)
+assert.match(
+  css,
+  /#candidate-area\[hidden\] \+ #panel-viewport #preview \{[^}]*width:\s*100%;[^}]*height:\s*100%;/s,
+)
 const candidateWordsCss = [...css.matchAll(/#candidate-words \{([^}]*)}/g)]
   .map((match) => match[1])
   .find((rule) => rule.includes("display: flex")) ?? ""
@@ -122,7 +152,8 @@ assert.match(
   main,
   /function devicePreviewTransparent\(\): boolean \{\s*return true\s*\}/,
 )
-assert.match(css, /\.keyboard-dock \{[^}]*background:\s*rgb\(209 212 218 \/ 62%\)/s)
+assert.match(css, /\.keyboard-dock \{[^}]*background:\s*var\(--phone-keyboard-glass\)/s)
+assert.match(css, /\.keyboard-dock \{[^}]*backdrop-filter:\s*saturate\(165%\) blur\(20px\)/s)
 assert.doesNotMatch(main, /candidateInputBackground/)
 assert.match(main, /const REFERENCE_PHONE_WIDTH_SCALE = 1/)
 assert.match(main, /spec\.width \* REFERENCE_PHONE_WIDTH_SCALE/)
