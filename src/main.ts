@@ -114,6 +114,7 @@ import {
   canvasFitWidth,
   copiedResourceBase,
   copyablePanelPaths,
+  effectivePanelSection,
   mergePanelStyles,
   panelStyleIDs,
   previewScalePercent,
@@ -601,6 +602,9 @@ function skinStatePreviewMessage(state: number): string {
 function activateSkinState(state?: number, message?: string): void {
   applySkinState(state, message ?? (state ? skinStatePreviewMessage(state) : "皮肤状态：默认"))
   refreshSimulationPreview()
+  populateKeyInspector()
+  updateSourceHighlight()
+  scrollSelectedSource()
 }
 
 let keySoundAudio: HTMLAudioElement | undefined
@@ -3285,7 +3289,26 @@ function selectedSourceSections(): string[] {
   if (resourceConfigActive && selectedResourcePath) {
     return selectedTileIndex === undefined ? [] : [`IMG${selectedTileIndex}`]
   }
-  return selectedPath === layoutPath ? selectedKeySections : []
+  return selectedPath === layoutPath ? effectiveSelectedSections() : []
+}
+
+function currentSkinState(): number | undefined {
+  return skinState.value ? Number(skinState.value) : undefined
+}
+
+function effectiveKeySection(section: string): string {
+  if (!layoutDocument || isListCell(section)) return section
+  return effectivePanelSection(layoutDocument, section, currentSkinState())
+}
+
+function effectiveSelectedSections(): string[] {
+  return selectedKeySections.map(effectiveKeySection)
+}
+
+function effectiveKeyValue(section: string, key: string): string | undefined {
+  if (!layoutDocument) return
+  const effective = effectiveKeySection(section)
+  return layoutDocument.get(effective, key) ?? layoutDocument.get(section, key)
 }
 
 function scrollSelectedSource(): void {
@@ -3512,7 +3535,7 @@ function commonSelectedStyle(name: "BACK_STYLE" | "FORE_STYLE"): string | undefi
   const values = selectedKeySections.map((section) =>
     isListCell(section)
       ? (layoutDocument?.get("LIST", name) ?? "").trim()
-      : layoutDocument?.get(section, name)?.trim() ?? "",
+      : effectiveKeyValue(section, name)?.trim() ?? "",
   )
   return values.every((value) => value === values[0]) ? values[0] : undefined
 }
@@ -3855,7 +3878,7 @@ function selectedStylePropertyContext(property: string):
     selectedKeySections.map((section) =>
       isListCell(section)
         ? (layoutDocument?.get("LIST", "FORE_STYLE") ?? "").trim()
-        : layoutDocument?.get(section, "FORE_STYLE") ?? "",
+        : effectiveKeyValue(section, "FORE_STYLE") ?? "",
     ),
     property,
   )
@@ -4174,7 +4197,7 @@ function populateKeyInspector(): void {
     : sections.length === 1
       ? isListCell(sections[0])
         ? "LIST · 候选栏"
-        : `${sections[0]} · ${document?.get(sections[0], "CENTER") || "未配置点击动作"}`
+        : `${effectiveKeySection(sections[0])} · ${effectiveKeyValue(sections[0], "CENTER") || "未配置点击动作"}`
       : `已选择 ${sections.length} 个按键`
   syncMobileInspectorHeader()
   for (const field of skinFields) {
@@ -4239,9 +4262,15 @@ function populateKeyInspector(): void {
     }
     const rectIndex = ["x", "y", "width", "height"].indexOf(name)
     const values = sections.map((section) => {
-      if (rectIndex < 0) return name === "SOUND_STYLE"
-        ? soundStyleForKey(document!, section, soundGeneral) ?? ""
-        : document?.get(section, name) ?? ""
+      if (rectIndex < 0) {
+        if (name === "STAT_STYLE") return document?.get(section, name) ?? ""
+        if (name === "SOUND_STYLE") {
+          const effective = effectiveKeySection(section)
+          return soundStyleForKey(document!, effective, soundGeneral)
+            ?? (effective === section ? "" : soundStyleForKey(document!, section, soundGeneral) ?? "")
+        }
+        return effectiveKeyValue(section, name) ?? ""
+      }
       const rect = document?.get(section, "VIEW_RECT")?.split(",").map(Number)
       return rect?.length === 4 ? String(Math.round(rect[rectIndex])) : ""
     })
@@ -4322,7 +4351,7 @@ function populateKeyInspector(): void {
   }
   for (const node of actionMeaningNodes) {
     const name = node.dataset.actionMeaning ?? ""
-    const values = selectedKeySections.map((section) => document?.get(section, name) ?? "")
+    const values = selectedKeySections.map((section) => effectiveKeyValue(section, name) ?? "")
     node.textContent =
       !hasSelection || !values.every((value) => value === values[0])
         ? hasSelection
@@ -4506,7 +4535,8 @@ function updateSelectedKey(field: HTMLInputElement): void {
       rect[rectIndex] = value
       layoutDocument.set(section, "VIEW_RECT", rect.map(Math.round).join(","))
     } else {
-      layoutDocument.set(section, name, field.value)
+      const target = name === "STAT_STYLE" ? section : effectiveKeySection(section)
+      layoutDocument.set(target, name, field.value)
     }
   }
   const text = layoutDocument.toString()
@@ -4546,14 +4576,14 @@ function selectedStyleImageSections(source: "BACK_STYLE" | "FORE_STYLE"): { docu
     ? [...new Set(selectedKeySections.flatMap((key) => {
         const backStyle = isListCell(key)
           ? layoutDocument?.get("LIST", "BACK_STYLE") ?? ""
-          : layoutDocument?.get(key, source) ?? ""
+          : effectiveKeyValue(key, source) ?? ""
         const id = backStyle.split(",")[0]?.trim()
         return id && /^\d+$/.test(id) ? [`STYLE${id}`] : []
       }))]
     : [...new Set(selectedKeySections.flatMap((key) => {
         const foreStyle = isListCell(key)
           ? layoutDocument?.get("LIST", "FORE_STYLE") ?? ""
-          : layoutDocument?.get(key, source) ?? ""
+          : effectiveKeyValue(key, source) ?? ""
         return foreStyle.split(",").map((token) => token.trim()).flatMap((token) => {
           const value = Number(token)
           return [`STYLE${token}`, Number.isFinite(value) ? `STYLE${Math.floor(value / 100)}` : ""]

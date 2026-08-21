@@ -8,7 +8,7 @@ import {
   skinStateLabel,
 } from "../src/actions.ts"
 import { IniDocument } from "../src/ini.ts"
-import { availableSkinStates, stateTipSection } from "../src/panel-tools.ts"
+import { availableSkinStates, effectivePanelSection, stateTipSection } from "../src/panel-tools.ts"
 import { effectivePreviewItem, previewItems, previewStateImpact } from "../src/preview.ts"
 import {
   candidatePreview,
@@ -29,6 +29,19 @@ assert.equal(previewStateFromAction("S0"), undefined)
 assert.equal(previewStateFromAction("S123"), undefined)
 assert.deepEqual(availableSkinStates(IniDocument.parse("[KEY1]\nSTAT_STYLE=S122_1")), knownSkinStates)
 console.log("✓ S1-S122 全量解析、标签和发现契约")
+
+const inspectorTarget = IniDocument.parse(`
+[KEY17]
+STAT_STYLE=S38_17
+FORE_STYLE=104
+
+[TIP17]
+FORE_STYLE=130
+`)
+assert.equal(effectivePanelSection(inspectorTarget, "KEY17", 38), "TIP17")
+assert.equal(effectivePanelSection(inspectorTarget, "KEY17", 37), "KEY17")
+assert.equal(effectivePanelSection(IniDocument.parse("[KEY17]\nSTAT_STYLE=S38_17"), "KEY17", 38), "KEY17")
+console.log("✓ 状态编辑目标解析到已存在的 TIP，未命中或缺失 TIP 时保留原 KEY")
 
 const generated = IniDocument.parse([
   "[KEY1]",

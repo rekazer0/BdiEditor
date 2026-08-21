@@ -38,6 +38,16 @@ export function stateTipSection(
   return stateStyleValue(value, state)
 }
 
+export function effectivePanelSection(
+  document: IniDocument,
+  section: string,
+  state: number | undefined,
+): string {
+  const tip = stateTipSection(document.get(section, "STAT_STYLE"), state)
+  const target = tip === undefined ? undefined : `TIP${tip}`
+  return target && document.sections().includes(target) ? target : section
+}
+
 export function previewScalePercent(
   renderedWidth: number,
   renderedHeight: number,
