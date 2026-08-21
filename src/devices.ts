@@ -50,6 +50,7 @@ export function keyboardPreviewGeometry(
   candidateInputLogicalHeight = 0,
 ): {
   candidateHeight: number
+  topInsetHeight: number
   candidateInsetHeight: number
   candidateContentHeight: number
   panelHeight: number
@@ -66,17 +67,19 @@ export function keyboardPreviewGeometry(
     : androidPortrait
       ? device.width * 0.06
       : 0
+  const topInsetHeight = iphonePortrait ? device.width * (38 / 1206) : 0
   const totalLogicalHeight = candidateLogicalHeight + panelLogicalHeight
   const widthScale = screenWidth / skinWidth
-  const heightScale = (screenHeight - safeLogicalHeight) / totalLogicalHeight
+  const heightScale = (screenHeight - safeLogicalHeight - topInsetHeight) / totalLogicalHeight
   const scale = Math.min(widthScale, heightScale)
   const candidateInsetHeight = candidateInputHeight * scale
   const candidateContentHeight = (candidateLogicalHeight - candidateInputHeight) * scale
-  const candidateHeight = candidateLogicalHeight * scale
+  const candidateHeight = topInsetHeight + candidateLogicalHeight * scale
   const panelHeight = panelLogicalHeight * scale
   const safeBottomHeight = safeLogicalHeight
   return {
     candidateHeight,
+    topInsetHeight,
     candidateInsetHeight,
     candidateContentHeight,
     panelHeight,

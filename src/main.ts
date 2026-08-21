@@ -211,6 +211,7 @@ const sidebarViewVisible = $("#sidebar-view-visible") as HTMLInputElement
 const inspectorTabsVisible = $("#inspector-tabs-visible") as HTMLInputElement
 const inspectorGroupedDisplay = $("#inspector-grouped-display") as HTMLInputElement
 const mobilePreviewPosition = $("#mobile-preview-position") as HTMLSelectElement
+const settingsStorageSection = $("#settings-storage-section")
 const sourceDirectoryEnabledSetting = $("#source-directory-enabled-setting")
 const sourceDirectoryEnabled = $("#source-directory-enabled") as HTMLInputElement
 const sourceDirectory = $("#source-directory") as HTMLInputElement
@@ -536,6 +537,7 @@ const deviceGeometryProperties = [
   "--keyboard-height-port",
   "--keyboard-height-land",
   "--candidate-row",
+  "--candidate-top-inset-row",
   "--candidate-inset-row",
   "--candidate-content-row",
   "--panel-row",
@@ -1863,6 +1865,7 @@ function applyDeviceKeyboardGeometry(
     `${(geometry.totalHeight / screenHeight) * 100}%`,
   )
   deviceShell.style.setProperty("--candidate-row", `${geometry.candidateHeight}fr`)
+  deviceShell.style.setProperty("--candidate-top-inset-row", `${geometry.topInsetHeight}fr`)
   deviceShell.style.setProperty("--candidate-inset-row", `${geometry.candidateInsetHeight}fr`)
   deviceShell.style.setProperty("--candidate-content-row", `${geometry.candidateContentHeight}fr`)
   deviceShell.style.setProperty("--panel-row", `${geometry.panelHeight}fr`)
@@ -6174,6 +6177,7 @@ function setSourceDirectoryState(path: string, custom: boolean, error = ""): voi
 }
 
 async function applySourceDirectory(path: string | null): Promise<void> {
+  if (!isTauri()) return
   const custom = Boolean(path?.trim())
   const previous = localStorage.getItem("source-directory")
   try {
@@ -6195,11 +6199,7 @@ async function applySourceDirectory(path: string | null): Promise<void> {
 
 async function initializeSourceDirectory(): Promise<void> {
   if (!isTauri()) {
-    sourceDirectoryEnabledSetting.hidden = true
-    sourceDirectory.disabled = true
-    chooseSourceDirectory.disabled = true
-    resetSourceDirectory.disabled = true
-    sourceDirectoryStatus.textContent = "源码目录仅桌面版可用"
+    settingsStorageSection.hidden = true
     return
   }
   const configured = localStorage.getItem("source-directory")

@@ -1278,19 +1278,17 @@ h2 {
 
 .device-shell[data-reference-frame="true"][data-theme="dark"] {
   --phone-keyboard-glass:
-    linear-gradient(180deg, rgb(90 96 110 / 32%), rgb(23 25 29 / 22%)),
-    radial-gradient(120% 72% at 50% -18%, rgb(255 255 255 / 8%), transparent 64%),
-    rgb(42 42 46 / 86%);
-  --phone-keyboard-border: rgb(255 255 255 / 34%);
-  --phone-keyboard-shadow: inset 0 1px rgb(255 255 255 / 20%), 0 -10px 28px rgb(0 0 0 / 24%);
+    linear-gradient(180deg, rgb(54 58 66 / 9%), rgb(6 8 10 / 16%)),
+    rgb(13 15 18 / 62%);
+  --phone-keyboard-border: rgb(255 255 255 / 18%);
+  --phone-keyboard-shadow: none;
 }
 
 .device-shell[data-reference-frame="true"][data-theme="dark"] .device-reference-background {
   background-image:
-    radial-gradient(ellipse 45% 36% at 8% 100%, rgb(48 125 174 / 32%), transparent 100%),
-    radial-gradient(circle at 52% 56%, rgb(145 91 62 / 30%), transparent 52%),
-    radial-gradient(ellipse 45% 36% at 92% 100%, rgb(51 130 76 / 34%), transparent 100%),
-    radial-gradient(circle at 48% 94%, rgb(77 89 151 / 24%), transparent 46%),
+    radial-gradient(ellipse 64% 54% at 2% 94%, rgb(38 91 161 / 34%), transparent 78%),
+    radial-gradient(ellipse 80% 72% at 51% 61%, rgb(131 61 32 / 32%), transparent 79%),
+    radial-gradient(ellipse 64% 54% at 98% 94%, rgb(34 104 61 / 36%), transparent 78%),
     url("/iphone-notes-reference-dark-blank.png");
 }
 
@@ -1307,25 +1305,31 @@ h2 {
   margin-top: auto;
   overflow: hidden;
   isolation: isolate;
-  border-radius: 9% 9% 0 0;
+  border-radius: 6.65% 6.65% 0 0;
+  border-top: 0;
   background: transparent;
   box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .device-shell[data-reference-frame="true"]:not(.canvas-only) .keyboard-dock::after {
   position: absolute;
   inset: 0;
+  border-radius: inherit;
+  box-sizing: border-box;
   content: "";
   pointer-events: none;
 }
 
 .device-shell[data-reference-frame="true"]:not(.canvas-only) .keyboard-dock::after {
   z-index: -1;
-  border-top: 1px solid rgb(255 255 255 / 42%);
+  border: 1px solid rgb(255 255 255 / 34%);
+  border-bottom: 0;
   background: var(--phone-keyboard-glass);
-  box-shadow: inset 0 1px rgb(255 255 255 / 22%);
-  -webkit-backdrop-filter: saturate(145%) blur(22px);
-  backdrop-filter: saturate(145%) blur(22px);
+  box-shadow: none;
+  -webkit-backdrop-filter: saturate(118%) blur(34px);
+  backdrop-filter: saturate(118%) blur(34px);
 }
 
 .device-shell[data-reference-frame="true"]:not(.canvas-only) .keyboard-accessories {
@@ -1547,6 +1551,7 @@ h2 {
   min-height: 0;
   display: grid;
   grid-template-rows:
+    minmax(0, var(--candidate-top-inset-row, 0fr))
     minmax(0, var(--candidate-inset-row, 0fr))
     minmax(0, var(--candidate-content-row, 133fr));
   position: relative;
@@ -1566,7 +1571,7 @@ h2 {
 }
 
 #candidate-background {
-  grid-row: 2;
+  grid-row: 3;
 }
 
 #toolbar-strip,
@@ -1576,7 +1581,7 @@ h2 {
 }
 
 #toolbar-strip {
-  grid-row: 2;
+  grid-row: 3;
 }
 
 #toolbar-strip,
@@ -1598,7 +1603,7 @@ h2 {
 #candidate-input {
   min-height: 0;
   grid-column: 1;
-  grid-row: 1;
+  grid-row: 2;
   display: flex;
   align-items: center;
   padding: 0 var(--candidate-cell-inset, 0cqw);
@@ -1610,7 +1615,7 @@ h2 {
 #candidate-words {
   min-height: 0;
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 3;
   display: flex;
   align-items: center;
   gap: var(--candidate-cell-width, 0);
@@ -1635,9 +1640,11 @@ h2 {
   background: transparent;
 }
 
-.keyboard-accessories > .system-symbol {
+.keyboard-accessory-icon {
   width: 27px;
   height: 27px;
+  object-fit: contain;
+  filter: brightness(0);
 }
 
 .device-shell[data-accessories="hidden"] .keyboard-accessories {
@@ -1646,16 +1653,14 @@ h2 {
 
 .device-shell[data-theme="dark"] .device-screen {
   --phone-keyboard-glass:
-    linear-gradient(180deg, rgb(90 96 110 / 32%), rgb(23 25 29 / 22%)),
-    radial-gradient(120% 72% at 50% -18%, rgb(255 255 255 / 8%), transparent 64%),
-    rgb(42 42 46 / 86%);
-  --phone-keyboard-border: rgb(255 255 255 / 34%);
-  --phone-keyboard-shadow: inset 0 1px rgb(255 255 255 / 20%), 0 -10px 28px rgb(0 0 0 / 24%);
+    linear-gradient(180deg, rgb(54 58 66 / 9%), rgb(6 8 10 / 16%)),
+    rgb(13 15 18 / 62%);
+  --phone-keyboard-border: rgb(255 255 255 / 18%);
+  --phone-keyboard-shadow: none;
   background:
-    radial-gradient(ellipse 45% 36% at 8% 100%, rgb(48 125 174 / 32%), transparent 100%),
-    radial-gradient(circle at 52% 56%, rgb(145 91 62 / 30%), transparent 52%),
-    radial-gradient(ellipse 45% 36% at 92% 100%, rgb(51 130 76 / 34%), transparent 100%),
-    radial-gradient(circle at 48% 94%, rgb(77 89 151 / 24%), transparent 46%),
+    radial-gradient(ellipse 64% 54% at 2% 94%, rgb(38 91 161 / 34%), transparent 78%),
+    radial-gradient(ellipse 80% 72% at 51% 61%, rgb(131 61 32 / 32%), transparent 79%),
+    radial-gradient(ellipse 64% 54% at 98% 94%, rgb(34 104 61 / 36%), transparent 78%),
     #2c2c30;
 }
 
@@ -1701,6 +1706,15 @@ h2 {
 .device-shell[data-theme="dark"] .keyboard-dock,
 .device-shell[data-theme="dark"] .keyboard-accessories {
   background: var(--phone-keyboard-glass);
+}
+
+.device-shell[data-theme="dark"] .keyboard-dock {
+  -webkit-backdrop-filter: saturate(118%) blur(34px);
+  backdrop-filter: saturate(118%) blur(34px);
+}
+
+.device-shell[data-theme="dark"] .keyboard-accessory-icon {
+  filter: none;
 }
 
 .device-shell[data-theme="dark"] canvas {

@@ -85,7 +85,8 @@ const geometry = keyboardPreviewGeometry(
   61,
 )
 const scale = 1206 / 1125
-assert.equal(Math.round(geometry.candidateHeight / scale), 194)
+assert.equal(geometry.topInsetHeight, 38)
+assert.equal(Math.round((geometry.candidateHeight - geometry.topInsetHeight) / scale), 194)
 assert.equal(Math.round(geometry.candidateInsetHeight / scale), 61)
 assert.equal(Math.round(geometry.candidateContentHeight / scale), 133)
 assert.equal(
@@ -190,7 +191,9 @@ assert.match(
   css,
   /data-reference-frame="true"\]\[data-theme="dark"\][^{]*\.device-reference-background \{[^}]*radial-gradient[^}]*iphone-notes-reference-dark-blank\.png/s,
 )
-assert.match(css, /data-reference-frame="true"[^}]*\.keyboard-dock::after \{[^}]*backdrop-filter:\s*saturate\(145%\) blur\(22px\)/s)
+assert.match(css, /data-reference-frame="true"[^}]*\.keyboard-dock::after \{[^}]*backdrop-filter:\s*saturate\(118%\) blur\(34px\)/s)
+assert.match(css, /data-reference-frame="true"[^}]*\.keyboard-dock::after \{[^}]*border:\s*1px solid rgb\(255 255 255 \/ 34%\)/s)
+assert.match(css, /data-reference-frame="true"[^}]*\.keyboard-dock::after \{[^}]*border-radius:\s*inherit;[^}]*box-sizing:\s*border-box;/s)
 assert.match(css, /data-reference-frame="true"[^}]*\.keyboard-accessories \{[^}]*visibility:\s*visible;[^}]*background:\s*transparent;/s)
 
 assert.deepEqual(candidatePreview("ni", 2, "zh"), {

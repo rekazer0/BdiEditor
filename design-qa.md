@@ -1,35 +1,34 @@
 # Design QA
 
-- Source visual truth: `/var/folders/67/r7lgztzs46ggm1c3zc3lh6580000gn/T/codex-clipboard-06aa14ae-95bd-4159-b4d9-145851a00cc6.jpg`
+- Source visual truth: `/var/folders/67/r7lgztzs46ggm1c3zc3lh6580000gn/T/codex-clipboard-fc3520f6-8931-44fd-b0b0-f6c2b6e37876.jpg`
 - Test skin: `/Users/kaze/Downloads/孤岛记录_特别版智能深色-26+9键.bdi`
-- Browser implementation: `/Users/kaze/work/bdi-edit/island-skin-final-light.png`
-- Full browser capture: `/Users/kaze/work/bdi-edit/island-skin-final-light-full.png`
-- Combined comparison: `/Users/kaze/work/bdi-edit/design-qa-island-light-glass.png`
-- Browser viewport: 1280 x 720 CSS px, device scale factor 2
-- Source pixels: 1206 x 1136; implementation crop: 264 x 574; source normalized to 610 x 574 for comparison
-- State: light theme, imported `孤岛记录_特别版智能深色-26+9键.bdi`, iPhone 17 Pro portrait
+- Browser capture: `/Users/kaze/work/bdi-edit/design-qa-keyboard-geometry-full.png`
+- Browser viewport: 1395 x 768 px
+- Source pixels: 1206 x 2622; focused source keyboard crop: 1206 x 1130; implementation shown at 56% editor preview scale
+- State: dark theme, iPhone 17 Pro portrait, imported user skin, active pinyin composition
 
 ## Findings
 
-- No actionable P0/P1/P2 mismatch remains for the requested background intensity and layering.
-- Fonts and copy: the existing Notes chrome and imported skin labels remain unchanged; this iteration does not alter typography or content.
-- Spacing and layout: phone proportions, toolbar position, dock height, radii, and keyboard geometry are unchanged.
-- Colors and tokens: the page is predominantly neutral white/gray. Low-opacity blue, warm, green, and violet light is limited to the lower background. The light keyboard glass is a cool gray `rgba(203, 206, 212, 0.62)`.
-- Image quality: the existing keyboard-cleared Notes asset remains sharp and is not duplicated behind the generated keyboard.
-- Glass: `.keyboard-dock` stays transparent. Its pseudo-element uses the cool gray overlay with `saturate(1.45) blur(22px)`, so the background color remains visible through a clearly gray material.
+- No actionable P0/P1/P2 mismatch remains for the requested dock geometry.
+- Root cause: the preview accounted for candidate content, the skin panel, and the iPhone bottom safe area, but omitted the iPhone keyboard's 38px rounded top cap. The phone itself was not adding an unexplained lift.
+- The iPhone portrait geometry now includes a separate 38px top inset. It extends the glass upward and adds the intended space above pinyin without moving the candidate words or skin panel.
+- The dock top radius is 6.65%, matching the reference's rounded shoulder more closely.
+- The dock has a continuous 1px, 34%-white edge highlight. It remains much quieter than the removed broad reflection layer.
+- The existing dark frosted glass, three-color background, imported key artwork, labels, and bottom safe area remain unchanged.
+- Fonts/copy and image quality are inherited from the imported skin and were not changed in this iteration.
 
 ## Verification
 
-- Primary interaction: imported the user-supplied skin and switched the device to iPhone 17 Pro.
-- Browser console errors: 0.
-- Focused comparison was required because the subtle background color and keyboard translucency are difficult to judge in a full editor screenshot.
+- Loaded the supplied skin in the running editor and switched to iPhone 17 Pro portrait and dark appearance.
+- Activated pinyin composition and compared the rounded top, pinyin inset, candidate row, panel position, and bottom safe area with the supplied iOS reference.
+- Focused comparison was required because these differences are not readable in a full-phone fit-to-window capture.
 - `npm run build`: passed.
 - `npm run verify:candidate-style`: passed.
 
 ## Comparison history
 
-- Earlier P1: the keyboard overlay was too transparent and read as a colored layer rather than gray glass.
-- Fix: kept color on the lower phone background at `z-index: 0`, restored the keyboard to `z-index: 1`, and tuned the light overlay to 62% cool gray while retaining background blur.
-- Post-fix evidence: `design-qa-island-light-glass.png` shows the supplied skin over a uniform cool gray glass surface with faint background color visible through it.
+- Earlier P1: the keyboard was too short and the top radius was too flat because the iPhone top cap was missing from the geometry model.
+- Fix: added a 38px iPhone portrait top inset as a distinct grid row, restored the 6.65% radius, and added the requested thin edge highlight.
+- Post-fix evidence: `design-qa-keyboard-geometry-full.png` shows the glass extending upward while the candidate words and key panel retain their previous alignment.
 
 final result: passed

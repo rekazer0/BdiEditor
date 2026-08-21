@@ -43,6 +43,16 @@ assert.match(html, /id="source-directory"/)
 assert.match(html, /id="source-directory-enabled"/, "设置中应提供源码目录同步开关")
 assert.match(
   main,
+  /if \(!isTauri\(\)\) \{\s+settingsStorageSection\.hidden = true\s+return/,
+  "网页版应隐藏源码存储设置",
+)
+assert.match(
+  main,
+  /async function applySourceDirectory[\s\S]+?if \(!isTauri\(\)\) return/,
+  "网页版不应调用原生源码目录功能",
+)
+assert.match(
+  main,
   /selectFile\(selectedPath, sidebarView, "document", true\)/,
   "外部源码刷新应保留当前检查器选项卡",
 )
