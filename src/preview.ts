@@ -796,10 +796,14 @@ export class Preview {
     longPressTimer?: number
   }
   private active?: {
+    pointerId: number
     key: PreviewItem
     startX: number
     startY: number
     startedAt: number
+    clearOnHold: boolean
+    holdTriggered: boolean
+    holdTimer?: number
   }
   private selected = new Set<string>()
   private mobileMultiSelect = false
@@ -832,6 +836,7 @@ export class Preview {
     canvas.addEventListener("pointerup", (event) => this.pointerUp(event))
     canvas.addEventListener("contextmenu", (event) => event.preventDefault())
     canvas.addEventListener("pointercancel", () => {
+      if (this.active?.holdTimer !== undefined) window.clearTimeout(this.active.holdTimer)
       this.active = undefined
       this.cancelEditTouch()
       this.cancelEditDrag()
@@ -843,6 +848,7 @@ export class Preview {
   setMode(mode: "edit" | "preview"): void {
     this.mode = mode
     this.mobileMultiSelect = false
+    if (this.active?.holdTimer !== undefined) window.clearTimeout(this.active.holdTimer)
     this.active = undefined
     this.cancelEditTouch()
     this.cancelEditDrag()
@@ -851,6 +857,7 @@ export class Preview {
   }
 
   cancelPointerInteraction(): void {
+    if (this.active?.holdTimer !== undefined) window.clearTimeout(this.active.holdTimer)
     this.active = undefined
     this.cancelEditTouch()
     this.cancelEditDrag()
@@ -1075,10 +1082,21 @@ export class Preview {
     }
     this.canvas.setPointerCapture(event.pointerId)
     this.active = {
+      pointerId: event.pointerId,
       key,
       startX: point.x,
       startY: point.y,
       startedAt: Date.now(),
+      clearOnHold: key.center.trim() === "F36",
+      holdTriggered: false,
+    }
+    if (this.active.clearOnHold) {
+      const active = this.active
+      active.holdTimer = window.setTimeout(() => {
+        if (this.active !== active) return
+        active.holdTriggered = true
+        this.onEvent({ section: key.section, direction: "hold", code: "F48" })
+      }, 450)
     }
     void this.playAnimation(key)
     void this.draw()
@@ -1110,6 +1128,16 @@ export class Preview {
   }
 
   private pointerMove(event: PointerEvent): void {
+    if (this.active && event.pointerId === this.active.pointerId) {
+      const point = this.point(event)
+      if (Math.max(
+        Math.abs(point.x - this.active.startX),
+        Math.abs(point.y - this.active.startY),
+      ) >= 20 && this.active.holdTimer !== undefined) {
+        window.clearTimeout(this.active.holdTimer)
+        this.active.holdTimer = undefined
+      }
+    }
     if (this.editTouch?.pointerId === event.pointerId && !this.editTouch.longPress) {
       const distance = Math.hypot(event.clientX - this.editTouch.clientX, event.clientY - this.editTouch.clientY)
       if (distance > 12 && this.editTouch.longPressTimer !== undefined) {
@@ -1209,6 +1237,12 @@ export class Preview {
     const point = this.point(event)
     const active = this.active
     const { key, startX, startY, startedAt } = active
+    if (active.holdTimer !== undefined) window.clearTimeout(active.holdTimer)
+    if (active.holdTriggered) {
+      this.active = undefined
+      void this.draw()
+      return
+    }
     const dx = point.x - startX
     const dy = point.y - startY
     const clearOnHold = key.center.trim() === "F36"

@@ -2,14 +2,14 @@
   "app": {
     "windows": [
       {
-        "title": "键设-bdiEditor v1.1.15",
+        "title": "键设-bdiEditor v1.1.19",
         "width": 1440,
         "height": 900,
         "minWidth": 900,
         "minHeight": 600,
         "transparent": true,
         "windowEffects": {
-          "effects": ["acrylic"]
+          "effects": ["mica"]
         }
       }
     ]

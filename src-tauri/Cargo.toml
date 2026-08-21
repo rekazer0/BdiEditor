@@ -1,6 +1,6 @@
 [package]
 name = "bdi-edit"
-version = "1.1.15"
+version = "1.1.19"
 description = "百度 iOS 输入法皮肤编辑器"
 edition = "2021"
 
@@ -27,3 +27,6 @@ tauri-plugin-native-share = { path = "native-share" }
 objc2 = "0.6.4"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSBitmapImageRep", "NSImage", "NSImageRep"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["NSData", "NSDictionary", "NSString"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-version = "0.1.7"

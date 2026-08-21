@@ -549,19 +549,15 @@ fn set_window_material(window: tauri::WebviewWindow, enabled: bool) -> Result<()
             .map_err(|error| error.to_string());
         #[cfg(target_os = "windows")]
         {
-            let mica = window.set_effects(
-                EffectsBuilder::new().effect(Effect::Mica).build(),
-            );
-            if mica.is_ok() {
-                return mica.map_err(|error| error.to_string());
-            }
+            let effect = if windows_version::OsVersion::current().build >= 22_000 {
+                EffectsBuilder::new().effect(Effect::Mica)
+            } else {
+                EffectsBuilder::new()
+                    .effect(Effect::Acrylic)
+                    .color(tauri::window::Color(32, 34, 38, 235))
+            };
             return window
-                .set_effects(
-                    EffectsBuilder::new()
-                        .effect(Effect::Acrylic)
-                        .color(tauri::window::Color(32, 34, 38, 210))
-                        .build(),
-                )
+                .set_effects(effect.build())
                 .map_err(|error| error.to_string());
         }
     }

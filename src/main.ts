@@ -142,7 +142,7 @@ import {
   moveCaretVertical,
 } from "./simulation.ts"
 import { SkinArchive } from "./skin.ts"
-import { resolveSourceArchivePath } from "./source-tree.ts"
+import { consumeSourceWriteSnapshot, resolveSourceArchivePath, type SourceWriteSnapshot } from "./source-tree.ts"
 import {
   SOUND_ACCEPT,
   decodeAiffPcm,
@@ -440,6 +440,8 @@ let stopSourceWatch: UnwatchFn | undefined
 let sourceAutosaveTimer: number | undefined
 let sourceAutosaveQueue = Promise.resolve()
 const pendingSourcePaths = new Set<string>()
+const sourceWriteSnapshots = new Map<string, SourceWriteSnapshot[]>()
+let sourceWriteSnapshotTimer: number | undefined
 const pendingSourceWatchPaths = new Set<string>()
 let sourceWatchTimer: number | undefined
 let selectedPath = ""
@@ -1142,7 +1144,10 @@ function setMobileInspectorGroup(id: string, scroll = true): void {
   }
   if (scroll && (mobilePortraitQuery.matches || !inspectorGroupedDisplay.checked)) {
     const group = quickInspector.querySelector<HTMLElement>(`.mobile-inspector-managed[data-mobile-inspector-group="${CSS.escape(id)}"]`)
-    group?.scrollIntoView({ behavior: "smooth", block: "start" })
+    if (group) {
+      const top = group.getBoundingClientRect().top - quickInspector.getBoundingClientRect().top + quickInspector.scrollTop
+      quickInspector.scrollTo({ top, behavior: "smooth" })
+    }
   } else if (scroll) quickInspector.scrollTop = 0
 }
 
@@ -1394,6 +1399,23 @@ function sourcePathForArchive(path: string): string {
   )
 }
 
+function sourceWriteKey(path: string): string {
+  const normalized = path.replaceAll("\\", "/")
+  return navigator.userAgent.includes("Windows") ? normalized.toLowerCase() : normalized
+}
+
+function rememberSourceWrite(path: string, data: SourceWriteSnapshot): void {
+  const key = sourceWriteKey(path)
+  const snapshots = sourceWriteSnapshots.get(key) ?? []
+  snapshots.push(data)
+  sourceWriteSnapshots.set(key, snapshots.slice(-4))
+  if (sourceWriteSnapshotTimer !== undefined) clearTimeout(sourceWriteSnapshotTimer)
+  sourceWriteSnapshotTimer = window.setTimeout(() => {
+    sourceWriteSnapshots.clear()
+    sourceWriteSnapshotTimer = undefined
+  }, 10_000)
+}
+
 function sourceFilesPayload(value: SkinArchive): SourceFilePayload[] {
   return value.sourceFiles().map((file) => ({ path: file.path, data: Array.from(file.data) }))
 }
@@ -1419,10 +1441,10 @@ async function flushSourceAutosave(): Promise<void> {
       const data = value.getSourceBytes(sourcePathForArchive(path))
       return { path, data: data ? Array.from(data) : null, directory: false }
     })
-    sourceAutosaveQueue = sourceAutosaveQueue.catch(() => {}).then(() => invoke("apply_source_changes", {
-      path: workspace,
-      changes,
-    }))
+    sourceAutosaveQueue = sourceAutosaveQueue.catch(() => {}).then(() => {
+      for (const change of changes) rememberSourceWrite(change.path, change.data ? new Uint8Array(change.data) : null)
+      return invoke("apply_source_changes", { path: workspace, changes })
+    })
   }
   try {
     await sourceAutosaveQueue
@@ -1434,9 +1456,8 @@ async function flushSourceAutosave(): Promise<void> {
 function scheduleSourceAutosave(paths: string[]): void {
   if (!archive || (!sourceWorkspacePath && sourceWorkspacePendingArchive !== archive)) return
   for (const path of paths) pendingSourcePaths.add(sourcePathForWorkspace(archive.sourcePath(path)))
-  if (!sourceWorkspacePath) return
-  if (sourceAutosaveTimer !== undefined) clearTimeout(sourceAutosaveTimer)
-  sourceAutosaveTimer = window.setTimeout(() => void flushSourceAutosave(), 180)
+  if (!sourceWorkspacePath || sourceAutosaveTimer !== undefined) return
+  sourceAutosaveTimer = window.setTimeout(() => void flushSourceAutosave(), 3 * 60_000)
 }
 
 async function refreshExternalSourceFiles(workspace: string, paths: string[]): Promise<void> {
@@ -1448,7 +1469,11 @@ async function refreshExternalSourceFiles(workspace: string, paths: string[]): P
   if (!archive || workspace !== sourceWorkspacePath) return
   let changed = false
   const affected = new Set<string>()
-  const directorySnapshots = changes.filter((change) => change.directory)
+  const ignoredChanges = new Set(changes.filter((change) => {
+    const data = change.data ? new Uint8Array(change.data) : null
+    return consumeSourceWriteSnapshot(sourceWriteSnapshots, sourceWriteKey(change.path), data)
+  }))
+  const directorySnapshots = changes.filter((change) => change.directory && !ignoredChanges.has(change))
   const presentPaths = new Set(changes.filter((change) => !change.directory && change.data).map((change) => sourcePathForArchive(change.path)))
   for (const snapshot of directorySnapshots) {
     const archiveSnapshotPath = sourcePathForArchive(snapshot.path).replace(/\/$/, "")
@@ -1463,12 +1488,13 @@ async function refreshExternalSourceFiles(workspace: string, paths: string[]): P
     }
   }
   for (const change of changes) {
-    if (change.directory) continue
+    if (change.directory || ignoredChanges.has(change)) continue
     pendingSourcePaths.delete(change.path)
+    const data = change.data ? new Uint8Array(change.data) : null
     if (change.data) {
       const canonical = archive.canonicalSourcePath(sourcePathForArchive(change.path))
       const before = archive.getBytes(canonical)
-      const after = new Uint8Array(change.data)
+      const after = data!
       if (before && before.length === after.length && before.every((byte, index) => byte === after[index])) continue
       archive.setBytes(canonical, after)
       affected.add(canonical)
@@ -1528,6 +1554,9 @@ async function activateSourceWorkspace(path: string, prefix = ""): Promise<void>
   stopSourceWatch = undefined
   if (isAndroidTauri()) await invoke("stop_source_observer").catch(() => {})
   pendingSourcePaths.clear()
+  sourceWriteSnapshots.clear()
+  if (sourceWriteSnapshotTimer !== undefined) clearTimeout(sourceWriteSnapshotTimer)
+  sourceWriteSnapshotTimer = undefined
   pendingSourceWatchPaths.clear()
   sourceWorkspacePath = path
   sourceWorkspacePrefix = prefix
@@ -1923,8 +1952,12 @@ function refreshPreview(): void {
     const candidateContentHeight = candidateRect?.length === 4 && Number.isFinite(candidateRect[3])
       ? candidateRect[3]
       : DEFAULT_CANDIDATE_HEIGHT
+    const candidatePath = toolbarConfigPath()
+    const candidateLayout = candidatePath && archive.isText(candidatePath)
+      ? IniDocument.parse(archive.getText(candidatePath))
+      : undefined
     const symbolInputHeight = symbolPanel
-      ? resolveCandidateInputStyle(context.gen, resolver, candidateWidth).height
+      ? resolveCandidateInputStyle(context.gen, resolver, candidateWidth, candidateLayout).height
       : 0
     const config = resolvePanelConfig(
       layoutDocument,
@@ -1935,13 +1968,9 @@ function refreshPreview(): void {
       ? Math.max(config.height, generalConfig.height + candidateContentHeight + symbolInputHeight)
       : config.height
     const inputVisual = resolver.resolveText(
-      candidateInputForegroundStyle(context.gen),
+      candidateInputForegroundStyle(context.gen, candidateLayout),
       false,
     )
-    const candidatePath = toolbarConfigPath()
-    const candidateLayout = candidatePath && archive.isText(candidatePath)
-      ? IniDocument.parse(archive.getText(candidatePath))
-      : undefined
     const { normal: candidateVisual, first: firstCandidateVisual } =
       resolveCandidateTextVisuals(candidateLayout, context.gen, resolver)
     firstCandidateTextVisual = firstCandidateVisual
@@ -1957,9 +1986,9 @@ function refreshPreview(): void {
       applyCandidateTextVisual(firstCandidate, firstCandidateTextVisual, candidateTextWidth)
     }
     preview.setPanel(config.styleID, config.width, config.height)
-    updatePanelTools(config.width, config.height, toolbarSize?.height)
     const candidateHeight = symbolPanel ? 0 : (toolbarSize?.height ?? 0)
     const candidateInputHeight = symbolPanel ? 0 : (toolbarSize?.inputHeight ?? 0)
+    updatePanelTools(config.width, devicePanelHeight, candidateHeight)
     activeKeyboardGeometry = {
       panelWidth: config.width,
       panelHeight: devicePanelHeight,
@@ -1986,16 +2015,16 @@ function refreshPreview(): void {
     const candidateContentHeight = candidateRect?.length === 4 && Number.isFinite(candidateRect[3])
       ? candidateRect[3]
       : DEFAULT_CANDIDATE_HEIGHT
+    const candidateDocument = toolbarConfigPath() ? textDocument(toolbarConfigPath()!) : undefined
     const symbolInputHeight = candidateArea.hidden && resolver
-      ? resolveCandidateInputStyle(bdaGen, resolver, candidateWidth).height
+      ? resolveCandidateInputStyle(bdaGen, resolver, candidateWidth, candidateDocument).height
       : 0
     const effectivePanelHeight = candidateArea.hidden
       ? Math.max(panelHeight, generalPanelHeight + candidateContentHeight + symbolInputHeight)
       : panelHeight
     const panel = currentBdaAppearance()?.appearance.panels.get(layout.value.replace(/\.ini$/i, ""))
-    const candidateDocument = toolbarConfigPath() ? textDocument(toolbarConfigPath()!) : undefined
     const inputVisual = resolver?.resolveText(
-      candidateInputForegroundStyle(bdaGen),
+      candidateInputForegroundStyle(bdaGen, candidateDocument),
       false,
     )
     const { normal: candidateVisual, first: firstVisual } = resolver
@@ -2016,10 +2045,10 @@ function refreshPreview(): void {
       panelWidth,
       panelHeight,
     )
-    updatePanelTools(panelWidth, panelHeight, toolbarSize?.height)
     const bdaSymbolPanel = candidateArea.hidden
     const candidateHeight = bdaSymbolPanel ? 0 : (toolbarSize?.height ?? 0)
     const candidateInputHeight = bdaSymbolPanel ? 0 : (toolbarSize?.inputHeight ?? 0)
+    updatePanelTools(panelWidth, effectivePanelHeight, candidateHeight)
     activeKeyboardGeometry = {
       panelWidth,
       panelHeight: effectivePanelHeight,
@@ -3503,7 +3532,7 @@ function refreshToolbarPreview(
   toolbarPreview.setTransparent(true)
   const width = size?.length === 4 && Number.isFinite(size[2]) ? size[2] : DEFAULT_PANEL_WIDTH
   const height = size?.length === 4 && Number.isFinite(size[3]) ? size[3] : DEFAULT_CANDIDATE_HEIGHT
-  const inputStyle = resolveCandidateInputStyle(gen, resolver, width)
+  const inputStyle = resolveCandidateInputStyle(gen, resolver, width, document)
   const inputHeight = inputStyle.height
   const totalHeight = height + inputHeight
   const backgroundStyle = document.get("CAND", "BACK_STYLE")?.split(",")[0] ??
@@ -5748,33 +5777,16 @@ async function loadArchive(
     bdaBase = SkinArchive.open(new Uint8Array(await response.arrayBuffer()))
   }
   let nextSourceWorkspace = existingSourceWorkspace
-  let pendingAndroidSourceDirectory = ""
+  let pendingSourceDirectory: string | null | undefined
   const sourceDirectoryActive = !isAndroidTauri() || localStorage.getItem("source-directory-enabled") === "true"
   const configuredDirectory = sourceDirectoryActive ? localStorage.getItem("source-directory") || null : null
   if (isTauri() && !nextSourceWorkspace && (!isAndroidTauri() || configuredDirectory)) {
-    if (isAndroidTauri()) {
-      pendingAndroidSourceDirectory = configuredDirectory!
-    } else {
-      try {
-        nextSourceWorkspace = await invoke<string>("create_source_workspace", {
-          directory: configuredDirectory,
-          name: path || displayName || exportName("未命名", nextArchive.format),
-          files: sourceFilesPayload(nextArchive),
-        })
-      } catch (error) {
-        if (!configuredDirectory) throw error
-        nextSourceWorkspace = await invoke<string>("create_source_workspace", {
-          directory: null,
-          name: path || displayName || exportName("未命名", nextArchive.format),
-          files: sourceFilesPayload(nextArchive),
-        })
-        showStatus("自定义源码目录不可用，本次已保存到内置目录")
-      }
-    }
+    pendingSourceDirectory = configuredDirectory
   }
   assetURL = releaseImagePreviewURL(assetURL)
   clearImageSlicePicker()
   archive = nextArchive
+  if (pendingSourceDirectory !== undefined) sourceWorkspacePendingArchive = nextArchive
   sourceTransfer = undefined
   const availableThemes = ["light", "dark"].filter((value) =>
     archive?.names().some((name) => name.startsWith(`${value}/skin/`)),
@@ -5815,14 +5827,27 @@ async function loadArchive(
     selectFile(initial)
   }
   await activateSourceWorkspace(nextSourceWorkspace, sourcePrefix)
-  if (pendingAndroidSourceDirectory) {
+  if (pendingSourceDirectory !== undefined) {
     const pendingArchive = nextArchive
-    sourceWorkspacePendingArchive = pendingArchive
-    void invoke<string>("create_source_workspace", {
-      directory: pendingAndroidSourceDirectory,
-      name: path || displayName || exportName("未命名", nextArchive.format),
-      files: sourceFilesPayload(nextArchive),
-    }).then(async (workspace) => {
+    void (async () => {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
+      try {
+        return await invoke<string>("create_source_workspace", {
+          directory: pendingSourceDirectory,
+          name: path || displayName || exportName("未命名", nextArchive.format),
+          files: sourceFilesPayload(nextArchive),
+        })
+      } catch (error) {
+        if (isAndroidTauri() || !pendingSourceDirectory) throw error
+        const workspace = await invoke<string>("create_source_workspace", {
+          directory: null,
+          name: path || displayName || exportName("未命名", nextArchive.format),
+          files: sourceFilesPayload(nextArchive),
+        })
+        showStatus("自定义源码目录不可用，本次已保存到内置目录")
+        return workspace
+      }
+    })().then(async (workspace) => {
       if (archive !== pendingArchive || sourceWorkspacePendingArchive !== pendingArchive) return
       const pendingPaths = [...pendingSourcePaths]
       await activateSourceWorkspace(workspace, sourcePrefix)
@@ -5830,7 +5855,7 @@ async function loadArchive(
       pendingPaths.forEach((changedPath) => pendingSourcePaths.add(changedPath))
       await flushSourceAutosave()
       sourceWorkspacePendingArchive = undefined
-      showStatus("源码已保存到授权目录")
+      showStatus(isAndroidTauri() ? "源码已保存到授权目录" : "源码工作区已就绪")
     }).catch((error) => {
       if (archive !== pendingArchive || sourceWorkspacePendingArchive !== pendingArchive) return
       sourceWorkspacePendingArchive = undefined
@@ -6661,6 +6686,7 @@ for (const button of keyActionButtons) {
 for (const button of inspectorTabButtons) {
   button.addEventListener("click", () => {
     inspectorTab = button.dataset.inspectorTab === "source" ? "source" : "properties"
+    if (mobilePortraitQuery.matches) setMobilePane("inspector")
     updateInspectorView()
   })
 }

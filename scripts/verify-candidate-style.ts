@@ -53,6 +53,16 @@ assert.deepEqual(resolveCandidateInputStyle(legacyScand, resolver(46), 1125), {
 })
 assert.equal(resolveCandidateInputStyle(ios, resolver(), 1125).height, 0)
 
+const candidateInput = IniDocument.parse(`
+[CAND]
+INPUT_STYLE=260
+`)
+assert.deepEqual(resolveCandidateInputStyle(ios, resolver(48), 1125, candidateInput), {
+  foregroundStyle: "260",
+  height: 64,
+})
+assert.equal(candidateInputForegroundStyle(ios, candidateInput), "260")
+
 const generalPanel = IniDocument.parse("[PANEL]\nSIZE=480,312\n")
 const inheritedSymbolPanel = resolvePanelConfig(
   IniDocument.parse("[PANEL]\nKEY_NUM=7\n"),
@@ -137,6 +147,8 @@ assert.equal(
   [...main.matchAll(/(?:generalConfig\.height|generalPanelHeight) \+ candidateContentHeight \+ symbolInputHeight/g)].length,
   2,
 )
+assert.match(main, /updatePanelTools\(config\.width, devicePanelHeight, candidateHeight\)/)
+assert.match(main, /updatePanelTools\(panelWidth, effectivePanelHeight, candidateHeight\)/)
 assert.match(main, /const layoutSize = layoutDocument\.get\("PANEL", "SIZE"\)/)
 assert.match(
   css,
@@ -147,6 +159,9 @@ const candidateWordsCss = [...css.matchAll(/#candidate-words \{([^}]*)}/g)]
   .find((rule) => rule.includes("display: flex")) ?? ""
 assert.match(candidateWordsCss, /align-items:\s*center/)
 assert.match(candidateWordsCss, /gap:\s*var\(--candidate-cell-width,\s*0\)/)
+assert.match(css, /\.device-shell\.canvas-only #candidate-input \{[^}]*grid-row:\s*1;/s)
+assert.match(css, /\.device-shell\.canvas-only #candidate-words \{[^}]*grid-row:\s*3;/s)
+assert.match(css, /\.device-shell\.canvas-only #candidate-area \{[^}]*grid-template-rows:[^}]*0px[^}]*minmax/s)
 assert.match(css, /margin-inline-start:\s*calc\(var\(--candidate-first-gap,[^)]*\) \+ var\(--candidate-cell-inset,/)
 assert.doesNotMatch(css, /#candidate-words > span \{[^}]*flex:/s)
 assert.match(

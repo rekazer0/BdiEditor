@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import { SkinArchive } from "../src/skin.ts"
-import { resolveSourceArchivePath } from "../src/source-tree.ts"
+import { consumeSourceWriteSnapshot, resolveSourceArchivePath } from "../src/source-tree.ts"
 
 for (const path of ["public/default-template.bds", "public/default-template.bda"]) {
   const archive = SkinArchive.open(fs.readFileSync(path))
@@ -30,6 +30,20 @@ assert.equal(
   resolveSourceArchivePath("info.txt", "", ["Info.txt", "light/skin/py_26.ini"]),
   "Info.txt",
   "外部文件事件的路径大小写应匹配归档中的现有源码路径",
+)
+
+const writes = new Map<string, Array<Uint8Array | null>>([
+  ["skin/port/layout.ini", [new Uint8Array([1]), new Uint8Array([2])]],
+])
+assert.equal(
+  consumeSourceWriteSnapshot(writes, "skin/port/layout.ini", new Uint8Array([1])),
+  true,
+  "源码监听应忽略应用自身的落盘回声",
+)
+assert.equal(
+  consumeSourceWriteSnapshot(writes, "skin/port/layout.ini", new Uint8Array([3])),
+  false,
+  "源码监听不应吞掉真正的外部修改",
 )
 
 const html = fs.readFileSync("index.html", "utf8")
@@ -66,7 +80,7 @@ assert.match(main, /localStorage\.getItem\("source-directory-enabled"\) === "tru
 assert.match(main, /await message\([\s\S]+await invoke<string>\("pick_source_directory"\)/, "请求目录授权前应先告知用户")
 assert.match(
   main,
-  /if \(isAndroidTauri\(\)\) \{\s+pendingAndroidSourceDirectory = configuredDirectory!/,
+  /if \(isAndroidTauri\(\) \|\| !pendingSourceDirectory\) throw error/,
   "Android 用户目录失效时不应回退到私有目录",
 )
 assert.match(androidShare, /DocumentsContract\.EXTRA_INITIAL_URI/, "Android 目录选择器应优先定位默认源码目录")
@@ -87,7 +101,9 @@ assert.match(tauri, /open_source_workspace_archive[\s\S]+read_source_workspace_a
 assert.match(main, /decodeBase64Archive/, "前端应直接解码原生源码包")
 assert.match(main, /open_source_workspace_archive/, "Android 前端应调用紧凑源码包命令")
 assert.match(main, /sourceWorkspacePendingArchive/, "Android 源码后台复制期间应保留编辑变更")
-assert.match(main, /void invoke<string>\("create_source_workspace"/, "Android 打开皮肤不应等待源码复制完成")
+assert.match(main, /void \(async \(\) => \{[\s\S]+invoke<string>\("create_source_workspace"/, "打开皮肤不应等待源码复制完成")
+assert.match(main, /3 \* 60_000/, "源码自动保存应在停止编辑三分钟后执行")
+assert.match(main, /consumeSourceWriteSnapshot/, "源码监听应过滤应用自身的写入回声")
 assert.match(main, /const LAST_SOURCE_WORKSPACE_KEY = "last-source-workspace"/, "应记录上次编辑的源码工作区")
 assert.match(main, /localStorage\.setItem\(LAST_SOURCE_WORKSPACE_KEY, path\)/, "成功打开源码工作区后应保存其 URI")
 assert.match(main, /await loadSourceWorkspace\(lastSourceWorkspace\)/, "启动时应恢复上次源码工作区")
