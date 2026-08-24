@@ -1094,8 +1094,8 @@ h2 {
   inset: 0;
   overflow: hidden;
   background:
-    linear-gradient(var(--crosshair-color, #111) 0 0) 0 calc(var(--crosshair-y) - 1px) / 100% 2px no-repeat,
-    linear-gradient(var(--crosshair-color, #111) 0 0) calc(var(--crosshair-x) - 1px) 0 / 2px 100% no-repeat;
+    linear-gradient(#ff9500 0 0) 0 calc(var(--crosshair-y) - 1px) / 100% 2px no-repeat,
+    linear-gradient(#ff9500 0 0) calc(var(--crosshair-x) - 1px) 0 / 2px 100% no-repeat;
 }
 
 #panel-viewport {
@@ -1131,7 +1131,7 @@ h2 {
 
 .preview-guides text {
   fill: currentColor;
-  font: 15px system-ui;
+  font: var(--preview-guide-font-size, 15px) system-ui;
   dominant-baseline: hanging;
 }
 
@@ -2212,6 +2212,7 @@ canvas {
 
   #mobile-inspector-groups {
     width: 64px;
+    max-height: calc(100% - 16px);
     position: absolute;
     top: var(--desktop-inspector-groups-y, 50%);
     right: 8px;
@@ -2228,6 +2229,12 @@ canvas {
     transform: translateY(-50%);
     backdrop-filter: blur(24px) saturate(140%);
     cursor: grab;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  #mobile-inspector-groups::-webkit-scrollbar {
+    display: none;
   }
 
   #mobile-inspector-groups.dragging {
@@ -2246,7 +2253,11 @@ canvas {
 
   #mobile-inspector-groups #inspector-groups-drag {
     display: block;
+    position: sticky;
+    top: 0;
+    z-index: 1;
     min-height: 28px;
+    background: color-mix(in srgb, var(--sidebar) 96%, transparent);
     color: var(--secondary);
     cursor: grab;
     letter-spacing: 2px;
@@ -3041,6 +3052,121 @@ canvas {
 .document-property-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgb(10 127 245 / 14%);
+}
+
+.particle-property-section {
+  display: grid;
+  gap: 10px;
+}
+
+.particle-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  border-radius: 8px;
+  color: var(--secondary);
+  background: color-mix(in srgb, var(--accent) 7%, var(--control));
+  font-size: 10px;
+}
+
+.particle-preview-toolbar button {
+  min-width: 74px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--control);
+}
+
+.particle-property-group {
+  min-width: 0;
+  margin: 0;
+  padding: 4px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.particle-property-group legend {
+  padding: 0 5px 0 0;
+  color: var(--secondary);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.particle-slider-input,
+.particle-range-inputs {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.particle-slider-input {
+  grid-template-columns: minmax(80px, 1fr) 72px;
+  align-items: center;
+}
+
+.particle-range-inputs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.particle-range-inputs input,
+.particle-slider-input input {
+  width: 100%;
+  min-width: 0;
+}
+
+.particle-slider-input input[type="range"] {
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  accent-color: var(--accent);
+}
+
+.particle-image-previews {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 5px;
+}
+
+.particle-image-preview {
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: var(--control);
+}
+
+.particle-image-preview canvas {
+  width: 100%;
+  height: 44px;
+  object-fit: contain;
+}
+
+.particle-image-preview small {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--tertiary);
+  font-size: 9px;
+  text-overflow: ellipsis;
+}
+
+.particle-advanced-properties {
+  border-top: 1px solid var(--line-soft);
+}
+
+.particle-advanced-properties summary {
+  padding: 8px 0 2px;
+  color: var(--secondary);
+  font-size: 10px;
+  cursor: pointer;
 }
 
 .style-reference-field {

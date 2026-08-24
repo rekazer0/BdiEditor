@@ -508,6 +508,20 @@
       </form>
     </dialog>
 
+    <dialog id="unsaved-dialog" class="project-dialog" aria-labelledby="unsaved-title">
+      <form method="dialog">
+        <header>
+          <h2 id="unsaved-title">未保存的皮肤</h2>
+          <p>当前皮肤尚未保存。是否先保存修改？</p>
+        </header>
+        <footer>
+          <button value="cancel" autofocus>取消</button>
+          <button value="discard">不保存</button>
+          <button class="primary" value="save">保存</button>
+        </footer>
+      </form>
+    </dialog>
+
     <dialog id="panel-scale-dialog" class="project-dialog" aria-labelledby="panel-scale-title">
       <form id="panel-scale-form" method="dialog">
         <header><h2 id="panel-scale-title">面板复制</h2><p>复制一个面板及其样式与图片资源，可跨主题和屏幕方向。</p></header>

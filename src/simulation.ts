@@ -3,6 +3,10 @@ import { skinStateForcesComposition } from "./actions.ts"
 const chinesePreviewCandidates = ["你好", "不会", "不回", "不好", "你会"]
 const englishPreviewCandidates = ["hello", "Hello", "world", "thanks", "good"]
 
+export function compositionSkinState(value: string, current?: number): number | undefined {
+  return value ? 4 : current === 4 ? undefined : current
+}
+
 export function insertText(
   value: string,
   start: number,

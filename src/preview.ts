@@ -42,18 +42,52 @@ export type PreviewItem = {
 }
 
 type LegacyAnimationFrame = {
-  type: "opacity" | "translate" | "scale"
+  type: "opacity" | "translate" | "scale" | "rotate"
   start: number
   duration: number
   delay: number
   repeat: number
   reverse: boolean
+  relative: boolean
   easing: readonly [number, number]
   from: readonly [number, number]
   to: readonly [number, number]
 }
 
-export type LegacyAnimation = Map<string, LegacyAnimationFrame[]>
+export type LegacyParticleEmitter = {
+  images: string[]
+  life: readonly [number, number]
+  emitRegion: readonly [number, number, number, number]
+  totalNumber: number
+  birthRate: number
+  velocity: readonly [number, number]
+  velocityDirection: readonly [number, number]
+  acceleration: readonly [number, number]
+  accelerationDirection: readonly [number, number]
+  initialScale: readonly [number, number]
+  scaleSpeed: readonly [number, number]
+  initialRotation: readonly [number, number]
+  rotationSpeed: readonly [number, number]
+  initialAlpha: readonly [number, number]
+  alphaSpeed: readonly [number, number]
+}
+
+export type LegacyParticleFrame = {
+  styleID: string
+  x: number
+  y: number
+  scale: number
+  rotation: number
+  opacity: number
+}
+
+type LegacyAnimationEffect = {
+  frames: LegacyAnimationFrame[]
+  particles: LegacyParticleEmitter[]
+  parallel: boolean
+}
+
+export type LegacyAnimation = Map<string, LegacyAnimationEffect>
 
 function animationEasing(type: number, progress: number): number {
   if (type === 1) return progress * progress
@@ -93,6 +127,95 @@ function opacityPair(value: string | undefined): [number, number] | undefined {
   return [opacity, opacity]
 }
 
+function scalarPair(value: string | undefined): [number, number] | undefined {
+  const number = Number(value?.split(",")[0])
+  return Number.isFinite(number) ? [number, number] : undefined
+}
+
+function numberRange(value: string | undefined, fallback: readonly [number, number]): [number, number] {
+  const parts = value?.split(",").map(Number).filter(Number.isFinite) ?? []
+  return [parts[0] ?? fallback[0], parts[1] ?? parts[0] ?? fallback[1]]
+}
+
+export function parseLegacyParticleEmitter(animations: IniDocument, section: string): LegacyParticleEmitter | undefined {
+  const images = (animations.get(section, "PARTICLE_IMAGE") ?? "")
+    .split(",").map((value) => value.trim()).filter(Boolean)
+  if (!images.length) return
+  const region = (animations.get(section, "EMIT_REGION") ?? "0,0,1,1").split(",").map(Number)
+  return {
+    images,
+    life: numberRange(animations.get(section, "LIFE"), [1000, 1000]),
+    emitRegion: region.length === 4 && region.every(Number.isFinite)
+      ? region as [number, number, number, number]
+      : [0, 0, 1, 1],
+    totalNumber: Math.max(1, Number(animations.get(section, "TOTAL_NUMBER")) || 1),
+    birthRate: Math.max(0.1, Number(animations.get(section, "BIRTH_RATE")) || 1),
+    velocity: numberRange(animations.get(section, "VELOCITY"), [0, 0]),
+    velocityDirection: numberRange(animations.get(section, "VELOCITY_DIRECTION"), [0, 0]),
+    acceleration: numberRange(animations.get(section, "ACCELERATION"), [0, 0]),
+    accelerationDirection: numberRange(animations.get(section, "ACCELERATION_DIRECTION"), [90, 90]),
+    initialScale: numberRange(animations.get(section, "INIT_SCALE"), [1, 1]),
+    scaleSpeed: numberRange(animations.get(section, "SCALE_SPEED"), [0, 0]),
+    initialRotation: numberRange(animations.get(section, "INIT_ROTATE"), [0, 0]),
+    rotationSpeed: numberRange(animations.get(section, "ROTATE_SPEED"), [0, 0]),
+    initialAlpha: numberRange(animations.get(section, "INIT_ALPHA"), [255, 255]),
+    alphaSpeed: numberRange(animations.get(section, "ALPHA_SPEED"), [0, 0]),
+  }
+}
+
+function seededUnit(seed: number): number {
+  let value = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b)
+  value = Math.imul(value ^ value >>> 13, 0xc2b2ae35)
+  return ((value ^ value >>> 16) >>> 0) / 0x1_0000_0000
+}
+
+function ranged(range: readonly [number, number], seed: number): number {
+  return range[0] + (range[1] - range[0]) * seededUnit(seed)
+}
+
+export function legacyParticleFrames(
+  emitter: LegacyParticleEmitter,
+  elapsed: number,
+  panelWidth: number,
+  panelHeight: number,
+): LegacyParticleFrame[] {
+  // ponytail: deterministic ballistic preview; add EMIT_TYPE modes when a real skin needs distinct emitters.
+  const interval = 1000 / emitter.birthRate
+  const emitted = Math.min(emitter.totalNumber, Math.max(0, Math.floor(elapsed / interval)))
+  const maxLife = Math.max(...emitter.life)
+  const first = Math.max(0, emitted - Math.ceil(maxLife / interval) - 1)
+  const normalized = emitter.emitRegion.every((value) => Math.abs(value) <= 1)
+  const [regionX, regionY, regionWidth, regionHeight] = normalized
+    ? [
+        emitter.emitRegion[0] * panelWidth,
+        emitter.emitRegion[1] * panelHeight,
+        emitter.emitRegion[2] * panelWidth,
+        emitter.emitRegion[3] * panelHeight,
+      ]
+    : emitter.emitRegion
+  const result: LegacyParticleFrame[] = []
+  for (let index = first; index < emitted; index++) {
+    const age = elapsed - (index + 1) * interval
+    const life = ranged(emitter.life, index * 17 + 1)
+    if (age < 0 || age > life) continue
+    const seconds = age / 1000
+    const velocity = ranged(emitter.velocity, index * 17 + 2)
+    const velocityDirection = ranged(emitter.velocityDirection, index * 17 + 3) * Math.PI / 180
+    const acceleration = ranged(emitter.acceleration, index * 17 + 2)
+    const direction = ranged(emitter.accelerationDirection, index * 17 + 3) * Math.PI / 180
+    const distance = acceleration * seconds * seconds / 2
+    result.push({
+      styleID: emitter.images[Math.floor(seededUnit(index * 17 + 4) * emitter.images.length)],
+      x: regionX + seededUnit(index * 17 + 5) * regionWidth + Math.cos(velocityDirection) * velocity * seconds + Math.cos(direction) * distance,
+      y: regionY + seededUnit(index * 17 + 6) * regionHeight + Math.sin(velocityDirection) * velocity * seconds + Math.sin(direction) * distance,
+      scale: Math.max(0, ranged(emitter.initialScale, index * 17 + 7) + ranged(emitter.scaleSpeed, index * 17 + 8) * seconds),
+      rotation: ranged(emitter.initialRotation, index * 17 + 9) + ranged(emitter.rotationSpeed, index * 17 + 10) * seconds,
+      opacity: Math.max(0, Math.min(1, (ranged(emitter.initialAlpha, index * 17 + 11) + ranged(emitter.alphaSpeed, index * 17 + 12) * seconds) / 255)),
+    })
+  }
+  return result
+}
+
 export function parseLegacyAnimation(
   styles: IniDocument,
   animations: IniDocument,
@@ -107,20 +230,32 @@ export function parseLegacyAnimation(
       .split(",").map((value) => value.trim()).filter(Boolean)
     const parallel = animations.get(build, "BUILD_METHOD") === "0"
     let start = 0
+    const particles: LegacyParticleEmitter[] = []
     const frames = ids.flatMap((id) => {
       const frame = `ANIM${id}`
+      const particle = parseLegacyParticleEmitter(animations, frame)
+      if (particle) {
+        particles.push(particle)
+        return []
+      }
       const type = animations.get(frame, "TYPE")
+      const fromPixels = animations.get(frame, "FROM_PX")
+      const toPixels = animations.get(frame, "TO_PX")
       const from = type === "0"
         ? opacityPair(animations.get(frame, "FROM"))
+        : type === "1"
+          ? scalarPair(animations.get(frame, "FROM"))
         : type === "2"
-          ? pixelPair(animations.get(frame, "FROM_PX") ?? animations.get(frame, "FROM"))
+          ? pixelPair(fromPixels ?? animations.get(frame, "FROM"))
           : scalePair(animations.get(frame, "FROM"))
       const to = type === "0"
         ? opacityPair(animations.get(frame, "TO"))
+        : type === "1"
+          ? scalarPair(animations.get(frame, "TO"))
         : type === "2"
-          ? pixelPair(animations.get(frame, "TO_PX") ?? animations.get(frame, "TO"))
+          ? pixelPair(toPixels ?? animations.get(frame, "TO"))
           : scalePair(animations.get(frame, "TO"))
-      if (!["0", "2", "3", "4"].includes(type ?? "") || !from || !to) return []
+      if (!["0", "1", "2", "3", "4"].includes(type ?? "") || !from || !to) return []
       const duration = Math.max(0, Number(animations.get(frame, "DURATION")) || 0)
       const delay = Math.max(0, Number(animations.get(frame, "DELAY")) || 0)
       const repeat = Math.max(1, Number(animations.get(frame, "REPEAT_CNT")) || 1)
@@ -128,12 +263,19 @@ export function parseLegacyAnimation(
       const easingValues = (animations.get(frame, "INTPOL") ?? "0")
         .split(",").map((value) => Number(value.trim()) || 0)
       const parsed = {
-        type: type === "0" ? "opacity" as const : type === "2" ? "translate" as const : "scale" as const,
+        type: type === "0"
+          ? "opacity" as const
+          : type === "1"
+            ? "rotate" as const
+            : type === "2"
+              ? "translate" as const
+              : "scale" as const,
         start: parallel ? 0 : start,
         duration,
         delay,
         repeat,
         reverse,
+        relative: type === "2" && fromPixels === undefined && toPixels === undefined,
         easing: [easingValues[0] ?? 0, easingValues[1] ?? easingValues[0] ?? 0] as const,
         from,
         to,
@@ -141,7 +283,7 @@ export function parseLegacyAnimation(
       if (!parallel) start += delay + animationDuration(parsed)
       return [parsed]
     })
-    if (frames.length) result.set(styleID, frames)
+    if (frames.length || particles.length) result.set(styleID, { frames, particles, parallel })
   }
   return result
 }
@@ -152,35 +294,60 @@ function legacyAnimationPair(
   animation: LegacyAnimation | undefined,
   styleID: string | undefined,
   elapsed: number,
-  type: "opacity" | "translate" | "scale",
+  type: "opacity" | "translate" | "scale" | "rotate",
+  relativeSize?: Pick<Rect, "width" | "height">,
 ): readonly [number, number] | undefined {
-  const frames = styleID ? animation?.get(styleID) : undefined
-  if (!frames) return
+  const effect = styleID ? animation?.get(styleID) : undefined
+  const frames = effect?.frames
+  if (!frames?.length) return
   const total = Math.max(...frames.map((frame) => frame.start + frame.delay + animationDuration(frame)))
   if (elapsed > total) return
+  const relativeValue = (
+    frame: LegacyAnimationFrame,
+    value: readonly [number, number],
+  ): readonly [number, number] => frame.relative && relativeSize
+    ? [value[0] * relativeSize.width / 100, value[1] * relativeSize.height / 100]
+    : value
+  const valueAt = (frame: LegacyAnimationFrame): readonly [number, number] => {
+    const start = frame.start + frame.delay
+    const duration = animationDuration(frame)
+    if (elapsed < start) return relativeValue(frame, frame.from)
+    if (elapsed > start + duration) return relativeValue(frame, frame.reverse ? frame.from : frame.to)
+    let progress = duration ? (elapsed - start) / duration : 1
+    if (progress < 1 && frame.repeat > 1) progress = (progress * frame.repeat) % 1
+    if (frame.reverse) {
+      progress *= 2
+      if (progress > 1) progress = 2 - progress
+    }
+    const x = animationEasing(frame.easing[0], progress)
+    const y = animationEasing(frame.easing[1], progress)
+    return relativeValue(frame, [
+      frame.from[0] + (frame.to[0] - frame.from[0]) * x,
+      frame.from[1] + (frame.to[1] - frame.from[1]) * y,
+    ])
+  }
+  const matching = frames.filter((frame) => frame.type === type)
+  if (effect?.parallel && matching.length) {
+    const multiply = type === "scale" || type === "opacity"
+    return matching.reduce<readonly [number, number]>((combined, frame) => {
+      const value = valueAt(frame)
+      return multiply
+        ? [combined[0] * value[0], combined[1] * value[1]]
+        : [combined[0] + value[0], combined[1] + value[1]]
+    }, multiply ? [1, 1] : [0, 0])
+  }
   let previous: (typeof frames)[number] | undefined
-  for (const frame of frames.filter((frame) => frame.type === type)) {
+  for (const frame of matching) {
     const start = frame.start + frame.delay
     const duration = animationDuration(frame)
     const end = start + duration
-    if (elapsed < start) return previous ? (previous.reverse ? previous.from : previous.to) : frame.from
-    if (elapsed <= end) {
-      let progress = duration ? (elapsed - start) / duration : 1
-      if (progress < 1 && frame.repeat > 1) progress = (progress * frame.repeat) % 1
-      if (frame.reverse) {
-        progress *= 2
-        if (progress > 1) progress = 2 - progress
-      }
-      const x = animationEasing(frame.easing[0], progress)
-      const y = animationEasing(frame.easing[1], progress)
-      return [
-        frame.from[0] + (frame.to[0] - frame.from[0]) * x,
-        frame.from[1] + (frame.to[1] - frame.from[1]) * y,
-      ]
-    }
+    if (elapsed < start) return previous
+      ? relativeValue(previous, previous.reverse ? previous.from : previous.to)
+      : relativeValue(frame, frame.from)
+    if (elapsed <= end) return valueAt(frame)
     previous = frame
   }
-  return previous ? (previous.reverse ? previous.from : previous.to) : undefined
+  return previous ? relativeValue(previous, previous.reverse ? previous.from : previous.to) : undefined
 }
 
 export function legacyAnimationScale(
@@ -195,8 +362,9 @@ export function legacyAnimationTranslation(
   animation: LegacyAnimation | undefined,
   styleID: string | undefined,
   elapsed: number,
+  relativeSize?: Pick<Rect, "width" | "height">,
 ): readonly [number, number] | undefined {
-  return legacyAnimationPair(animation, styleID, elapsed, "translate")
+  return legacyAnimationPair(animation, styleID, elapsed, "translate", relativeSize)
 }
 
 export function legacyAnimationOpacity(
@@ -205,6 +373,14 @@ export function legacyAnimationOpacity(
   elapsed: number,
 ): number | undefined {
   return legacyAnimationPair(animation, styleID, elapsed, "opacity")?.[0]
+}
+
+export function legacyAnimationRotation(
+  animation: LegacyAnimation | undefined,
+  styleID: string | undefined,
+  elapsed: number,
+): number | undefined {
+  return legacyAnimationPair(animation, styleID, elapsed, "rotate")?.[0]
 }
 
 export function previewStateActive(item: PreviewItem, state: number | undefined): boolean {
@@ -382,6 +558,18 @@ export function isFullPanelPreviewItem(
     item.rect.y + item.rect.height >= panelHeight
 }
 
+export function previewDrawOrder(
+  items: readonly PreviewItem[],
+  panelWidth: number,
+  panelHeight: number,
+  topSection?: string,
+): PreviewItem[] {
+  const layer = (item: PreviewItem) => item.section === topSection
+    ? 2
+    : isFullPanelPreviewItem(item, panelWidth, panelHeight) ? 0 : 1
+  return [...items].sort((left, right) => layer(left) - layer(right))
+}
+
 export function shouldDrawItemBackground(
   item: PreviewItem,
   panelStyle: string,
@@ -444,8 +632,7 @@ export function previewFallbackText(
   mode: "edit" | "preview",
   hasForeground: boolean,
 ): string {
-  if (hasForeground) return ""
-  return item.show
+  return ""
 }
 
 export function foregroundLayerRect(
@@ -818,6 +1005,10 @@ export class Preview {
   private legacyAnimation?: LegacyAnimation
   private legacyAnimationState?: { key: PreviewItem; startedAt: number }
   private legacyAnimationTimer?: number
+  private particlePreview?: LegacyParticleEmitter
+  private panelAnimationStyle = ""
+  private legacyPanelAnimationStartedAt = 0
+  private legacyPanelAnimationTimer?: number
   private drawID = 0
   private readonly resizeObserver: ResizeObserver
 
@@ -961,17 +1152,27 @@ export class Preview {
     this.legacyAnimation = animation
     this.legacyAnimationState = undefined
     if (this.legacyAnimationTimer) window.cancelAnimationFrame(this.legacyAnimationTimer)
+    this.restartLegacyPanelAnimation()
     void this.draw()
   }
 
-  setPanel(styleID: string, width: number, height: number): void {
+  setParticlePreview(emitter?: LegacyParticleEmitter): void {
+    this.particlePreview = emitter
+    this.restartLegacyPanelAnimation()
+    void this.draw()
+  }
+
+  setPanel(styleID: string, width: number, height: number, animationStyle = ""): void {
+    const animationChanged = this.panelAnimationStyle !== animationStyle
     this.panelStyle = styleID
+    this.panelAnimationStyle = animationStyle
     this.panelWidth = width
     this.panelHeight = height
     this.keys = this.document
       ? previewItems(this.document, width, height, this.defaults, this.persistentOnly)
       : []
     this.fitCanvas()
+    if (animationChanged) this.restartLegacyPanelAnimation()
     void this.draw()
   }
 
@@ -1217,11 +1418,36 @@ export class Preview {
     await play(0)
   }
 
+  private restartLegacyPanelAnimation(): void {
+    if (this.legacyPanelAnimationTimer) window.cancelAnimationFrame(this.legacyPanelAnimationTimer)
+    this.legacyPanelAnimationTimer = undefined
+    const particles = this.particlePreview
+      ? [this.particlePreview]
+      : this.legacyAnimation?.get(this.panelAnimationStyle)?.particles ?? []
+    if (!particles.length) {
+      this.legacyPanelAnimationStartedAt = 0
+      return
+    }
+    this.legacyPanelAnimationStartedAt = Date.now()
+    const duration = Math.max(...particles.map((particle) =>
+      particle.totalNumber / particle.birthRate * 1000 + Math.max(...particle.life)
+    ))
+    const tick = () => {
+      const elapsed = Date.now() - this.legacyPanelAnimationStartedAt
+      void this.draw()
+      if (elapsed <= duration) this.legacyPanelAnimationTimer = window.requestAnimationFrame(tick)
+      else this.legacyPanelAnimationTimer = undefined
+    }
+    this.legacyPanelAnimationTimer = window.requestAnimationFrame(tick)
+  }
+
   private playLegacyAnimation(key: PreviewItem): void {
     const styles = [key.animStyle, key.backAnimStyle, ...key.foreAnimStyles].filter(Boolean) as string[]
     const duration = Math.max(0, ...styles.flatMap((style) => {
-      const frames = this.legacyAnimation?.get(style)
-      return frames ? [Math.max(...frames.map((frame) => frame.start + frame.delay + animationDuration(frame)))] : []
+      const frames = this.legacyAnimation?.get(style)?.frames
+      return frames?.length
+        ? [Math.max(...frames.map((frame) => frame.start + frame.delay + animationDuration(frame)))]
+        : []
     }))
     if (!duration) return
     if (this.legacyAnimationTimer) window.cancelAnimationFrame(this.legacyAnimationTimer)
@@ -1366,6 +1592,7 @@ export class Preview {
     }
     overlay.hidden = false
     overlay.setAttribute("viewBox", `0 0 ${this.panelWidth} ${this.panelHeight}`)
+    overlay.style.setProperty("--preview-guide-font-size", `${15 * this.panelWidth / DEFAULT_PANEL_WIDTH}px`)
     overlay.replaceChildren(...keys.map((key) => {
       const group = document.createElementNS("http://www.w3.org/2000/svg", "g")
       const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect")
@@ -1509,10 +1736,11 @@ export class Preview {
     rect: Rect,
     scale: readonly [number, number] | undefined,
     translation: readonly [number, number] | undefined,
+    rotation: number | undefined,
     opacity: number | undefined,
     draw: () => void,
   ): void {
-    if (!scale && !translation && opacity === undefined) {
+    if (!scale && !translation && rotation === undefined && opacity === undefined) {
       draw()
       return
     }
@@ -1521,9 +1749,10 @@ export class Preview {
     context.save()
     if (opacity !== undefined) context.globalAlpha *= opacity
     if (translation) context.translate(translation[0], translation[1])
-    if (scale) {
+    if (scale || rotation !== undefined) {
       context.translate(centerX, centerY)
-      context.scale(scale[0], scale[1])
+      if (rotation !== undefined) context.rotate(rotation * Math.PI / 180)
+      if (scale) context.scale(scale[0], scale[1])
       context.translate(-centerX, -centerY)
     }
     draw()
@@ -1532,16 +1761,23 @@ export class Preview {
 
   private async draw(): Promise<void> {
     const drawID = ++this.drawID
-    const keys = visiblePreviewItems(this.keys, this.skinState)
+    const panelAnimationElapsed = this.legacyPanelAnimationStartedAt
+      ? Date.now() - this.legacyPanelAnimationStartedAt
+      : -1
+    const particles = this.particlePreview
+      ? [this.particlePreview]
+      : this.legacyAnimation?.get(this.panelAnimationStyle)?.particles ?? []
+    const particleFrames = panelAnimationElapsed < 0
+      ? []
+      : particles.flatMap((particle) =>
+          legacyParticleFrames(particle, panelAnimationElapsed, this.panelWidth, this.panelHeight)
+        )
+    const particleStyleIDs = [...new Set(particleFrames.map((frame) => frame.styleID))]
+    const keys = previewDrawOrder(visiblePreviewItems(this.keys, this.skinState)
       .map((key) =>
         this.document ? effectivePreviewItem(this.document, key, this.skinState ?? 0) : key,
-      )
-      .sort((left, right) => {
-        const leftFull = isFullPanelPreviewItem(left, this.panelWidth, this.panelHeight)
-        const rightFull = isFullPanelPreviewItem(right, this.panelWidth, this.panelHeight)
-        return leftFull === rightFull ? 0 : leftFull ? -1 : 1
-      })
-    const [panel, visuals, toolbarImages] = await Promise.all([
+      ), this.panelWidth, this.panelHeight, this.legacyAnimationState?.key.section)
+    const [panel, visuals, toolbarImages, particleVisuals] = await Promise.all([
       this.resolver?.resolve(this.panelStyle, false),
       Promise.all(keys.map(async (key) => {
         const highlighted = this.active?.key.section === key.section ||
@@ -1560,6 +1796,7 @@ export class Preview {
       this.toolbarSlots && !this.persistentOnly
         ? this.resolver?.resolveToolbarImages() ?? Promise.resolve([])
         : Promise.resolve([]),
+      Promise.all(particleStyleIDs.map((styleID) => this.resolver?.resolve(styleID, false))),
     ])
     if (drawID !== this.drawID) return
     const context = this.canvas.getContext("2d")
@@ -1592,7 +1829,10 @@ export class Preview {
         ? legacyAnimationScale(this.legacyAnimation, backAnimationStyle, animationElapsed)
         : undefined
       const backTranslation = animationElapsed >= 0
-        ? legacyAnimationTranslation(this.legacyAnimation, backAnimationStyle, animationElapsed)
+        ? legacyAnimationTranslation(this.legacyAnimation, backAnimationStyle, animationElapsed, key.rect)
+        : undefined
+      const backRotation = animationElapsed >= 0
+        ? legacyAnimationRotation(this.legacyAnimation, backAnimationStyle, animationElapsed)
         : undefined
       const backOpacity = animationElapsed >= 0
         ? legacyAnimationOpacity(this.legacyAnimation, backAnimationStyle, animationElapsed)
@@ -1601,7 +1841,7 @@ export class Preview {
       const styleTexts = visuals[index].styleTexts
       const hasForeground = foregrounds.some(Boolean) || styleTexts.some(Boolean)
       if (shouldDrawItemBackground(key, this.panelStyle, this.panelWidth, this.panelHeight)) {
-        this.withTransform(context, key.rect, backScale, backTranslation, backOpacity, () => {
+        this.withTransform(context, key.rect, backScale, backTranslation, backRotation, backOpacity, () => {
           this.drawVisual(context, visuals[index].back, key.rect, true)
         })
       }
@@ -1611,7 +1851,10 @@ export class Preview {
           ? legacyAnimationScale(this.legacyAnimation, animationStyle, animationElapsed)
           : undefined
         const foreTranslation = animationElapsed >= 0
-          ? legacyAnimationTranslation(this.legacyAnimation, animationStyle, animationElapsed)
+          ? legacyAnimationTranslation(this.legacyAnimation, animationStyle, animationElapsed, key.rect)
+          : undefined
+        const foreRotation = animationElapsed >= 0
+          ? legacyAnimationRotation(this.legacyAnimation, animationStyle, animationElapsed)
           : undefined
         const foreOpacity = animationElapsed >= 0
           ? legacyAnimationOpacity(this.legacyAnimation, animationStyle, animationElapsed)
@@ -1621,7 +1864,7 @@ export class Preview {
           `OFFSET${key.positionTypes[layer] ?? ""}`,
         )
         const destination = key.foreRect ?? foregroundLayerRect(key.rect, fore?.source, offset)
-        this.withTransform(context, key.rect, foreScale, foreTranslation, foreOpacity, () => {
+        this.withTransform(context, key.rect, foreScale, foreTranslation, foreRotation, foreOpacity, () => {
           this.drawVisual(context, fore, destination, false)
         })
       }
@@ -1633,7 +1876,10 @@ export class Preview {
           ? legacyAnimationScale(this.legacyAnimation, animationStyle, animationElapsed)
           : undefined
         const foreTranslation = animationElapsed >= 0
-          ? legacyAnimationTranslation(this.legacyAnimation, animationStyle, animationElapsed)
+          ? legacyAnimationTranslation(this.legacyAnimation, animationStyle, animationElapsed, key.rect)
+          : undefined
+        const foreRotation = animationElapsed >= 0
+          ? legacyAnimationRotation(this.legacyAnimation, animationStyle, animationElapsed)
           : undefined
         const foreOpacity = animationElapsed >= 0
           ? legacyAnimationOpacity(this.legacyAnimation, animationStyle, animationElapsed)
@@ -1643,7 +1889,7 @@ export class Preview {
           `OFFSET${key.positionTypes[layer] ?? ""}`,
         )
         const point = foregroundTextPoint(key.foreRect ?? key.rect, offset)
-        this.withTransform(context, key.rect, foreScale, foreTranslation, foreOpacity, () => {
+        this.withTransform(context, key.rect, foreScale, foreTranslation, foreRotation, foreOpacity, () => {
           this.drawStyleText(context, styleText, point)
         })
       }
@@ -1668,12 +1914,15 @@ export class Preview {
           ? legacyAnimationScale(this.legacyAnimation, animationStyle, animationElapsed)
           : undefined
         const foreTranslation = animationElapsed >= 0
-          ? legacyAnimationTranslation(this.legacyAnimation, animationStyle, animationElapsed)
+          ? legacyAnimationTranslation(this.legacyAnimation, animationStyle, animationElapsed, key.rect)
+          : undefined
+        const foreRotation = animationElapsed >= 0
+          ? legacyAnimationRotation(this.legacyAnimation, animationStyle, animationElapsed)
           : undefined
         const foreOpacity = animationElapsed >= 0
           ? legacyAnimationOpacity(this.legacyAnimation, animationStyle, animationElapsed)
           : undefined
-        this.withTransform(context, key.rect, foreScale, foreTranslation, foreOpacity, () => {
+        this.withTransform(context, key.rect, foreScale, foreTranslation, foreRotation, foreOpacity, () => {
           context.fillText(
             fallbackText,
             key.rect.x + key.rect.width / 2,
@@ -1682,6 +1931,22 @@ export class Preview {
         })
       }
 
+    }
+
+    const particleVisualByStyle = new Map(
+      particleStyleIDs.map((styleID, index) => [styleID, particleVisuals[index]]),
+    )
+    for (const frame of particleFrames) {
+      const visual = particleVisualByStyle.get(frame.styleID)
+      if (!visual?.image || !visual.source || frame.scale <= 0 || frame.opacity <= 0) continue
+      const [sx, sy, width, height] = visual.source
+      context.save()
+      context.globalAlpha *= frame.opacity
+      context.translate(frame.x, frame.y)
+      context.rotate(frame.rotation * Math.PI / 180)
+      context.scale(frame.scale, frame.scale)
+      context.drawImage(visual.image, sx, sy, width, height, -width / 2, -height / 2, width, height)
+      context.restore()
     }
 
     if (this.animationVisual) {

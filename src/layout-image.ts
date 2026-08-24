@@ -106,7 +106,7 @@ export function planLayoutImageSlices(target: LayoutImageTarget, keys: readonly 
   const indices = new Map<string, number>()
   let index = start
   for (let i = 0; i < ordered.length; i += 1) {
-    const cell = cells[i] ?? ordered[i].rect
+    const cell = cells[i] ?? (cells.length === 1 ? cells[0] : ordered[i].rect)
     indices.set(ordered[i].section, index)
     slices.push({ index, source: cell })
     index += 1

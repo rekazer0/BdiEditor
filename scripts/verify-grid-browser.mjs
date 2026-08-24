@@ -41,9 +41,18 @@ const shiftY = (285 + 150 / 2) / 631
 
 await page.click('[data-mode-choice="edit"]')
 await sleep(200)
+await page.evaluate(() => {
+  const getImageData = CanvasRenderingContext2D.prototype.getImageData
+  window.__crosshairPixelReads = 0
+  CanvasRenderingContext2D.prototype.getImageData = function (...args) {
+    window.__crosshairPixelReads++
+    return getImageData.apply(this, args)
+  }
+})
 const canvasBox = await (await page.$("#preview")).boundingBox()
 if (!canvasBox) throw new Error("no canvas box")
 await page.mouse.move(canvasBox.x + canvasBox.width * qx, canvasBox.y + canvasBox.height * qy)
+await sleep(20)
 const crosshair = await page.$eval("#preview-coordinates", (el) => ({
   hidden: el.hidden,
   x: document.querySelector("#preview-coordinate-x")?.textContent,
@@ -55,13 +64,13 @@ const crosshair = await page.$eval("#preview-coordinates", (el) => ({
   cursor: getComputedStyle(document.querySelector("#preview")).cursor,
   background: getComputedStyle(document.querySelector(".preview-crosshair")).backgroundImage,
   blendMode: getComputedStyle(document.querySelector(".preview-crosshair")).mixBlendMode,
-  color: el.style.getPropertyValue("--crosshair-color"),
+  pixelReads: window.__crosshairPixelReads,
 }))
 if (crosshair.hidden || crosshair.x !== String(Math.round(26 + 119 / 2)) || crosshair.y !== String(Math.round(5 + 150 / 2)) ||
   crosshair.bounds.x !== crosshair.wrapBounds.x || crosshair.bounds.y !== crosshair.wrapBounds.y ||
   crosshair.bounds.width !== crosshair.wrapBounds.width || crosshair.bounds.height !== crosshair.wrapBounds.height || crosshair.cursor !== "none" ||
   crosshair.background.split("linear-gradient").length !== 3 || crosshair.blendMode !== "normal" ||
-  !["#111", "#ffd60a"].includes(crosshair.color)) {
+  crosshair.pixelReads !== 0) {
   throw new Error("edit crosshair missed key center snap: " + JSON.stringify(crosshair))
 }
 await page.click("#toggle-guides")

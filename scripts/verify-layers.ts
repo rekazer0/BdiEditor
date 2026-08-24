@@ -6,6 +6,11 @@ import {
   effectivePreviewHitItem,
   effectivePreviewItem,
   isFullPanelPreviewItem,
+  legacyAnimationScale,
+  legacyAnimationTranslation,
+  legacyParticleFrames,
+  parseLegacyAnimation,
+  previewDrawOrder,
   previewHitItem,
   previewItems,
 } from "../src/preview.ts"
@@ -259,3 +264,105 @@ assert.ok(availableSkinStates(extendedStates).includes(122), "应保留皮肤自
 assert.equal(skinStateLabel(2), "S2（大写锁定）")
 assert.equal(actionDescription("S27"), "百度状态码 S27（回车键：发送）")
 console.log("✓ S 状态：覆盖 S1-S122、补齐 APK 状态并显示中文说明")
+
+const particleAnimations = parseLegacyAnimation(
+  IniDocument.parse(`
+[STYLE310]
+SHOW_ANIM=1
+
+[STYLE315]
+PRESS_ANIM=33
+`),
+  IniDocument.parse(`
+[ANIM1]
+TYPE=1
+CATEGORY=3
+LIFE=5000,5000
+EMIT_REGION=0,0,1,1
+TOTAL_NUMBER=2000
+BIRTH_RATE=5
+PARTICLE_IMAGE=304,305,306,307,308
+VELOCITY=50,50
+VELOCITY_DIRECTION=270,270
+ACCELERATION=50,50
+ACCELERATION_DIRECTION=50,50
+INIT_SCALE=0.4,0.6
+SCALE_SPEED=-0.1,0.1
+INIT_ROTATE=0,180
+ROTATE_SPEED=-25,25
+INIT_ALPHA=300,300
+ALPHA_SPEED=-100,-20
+
+[ANIM33]
+TYPE=1
+DURATION=500
+FROM=360
+TO=10
+`),
+)
+const particle = particleAnimations.get("310")?.particles[0]
+assert.deepEqual(particle?.images, ["304", "305", "306", "307", "308"])
+assert.deepEqual(particle?.life, [5000, 5000])
+assert.deepEqual(particle?.emitRegion, [0, 0, 1, 1])
+assert.equal(particle?.birthRate, 5)
+assert.deepEqual(particle?.velocity, [50, 50])
+assert.deepEqual(particle?.velocityDirection, [270, 270])
+assert.equal(particleAnimations.get("315")?.frames[0].type, "rotate")
+const particleFrame = legacyParticleFrames(particle!, 1000, 360, 258)
+assert.ok(particleFrame.length > 0 && particleFrame.length <= 5)
+assert.ok(particleFrame.every((item) => [item.x, item.y, item.scale, item.rotation, item.opacity].every(Number.isFinite)))
+const stationaryParticleFrame = legacyParticleFrames({ ...particle!, velocity: [0, 0] }, 1000, 360, 258)
+assert.ok(particleFrame.some((item, index) => item.x !== stationaryParticleFrame[index].x || item.y !== stationaryParticleFrame[index].y))
+assert.deepEqual(particleFrame, legacyParticleFrames(particle!, 1000, 360, 258), "同一时间点的粒子帧必须稳定")
+console.log("✓ 旧版粒子与旋转动效解析，粒子帧可重复")
+
+const parallelScale = parseLegacyAnimation(
+  IniDocument.parse("[STYLE1]\nPRESS_ANIM=3"),
+  IniDocument.parse(`
+[ANIM1]
+TYPE=4
+DURATION=100
+FROM=100,100
+TO=80,80
+
+[ANIM2]
+TYPE=3
+DURATION=100
+FROM=50,50
+TO=50,50
+
+[ANIM3]
+BUILD_LIST=1,2
+BUILD_METHOD=0
+`),
+)
+assert.deepEqual(legacyAnimationScale(parallelScale, "1", 0), [0.5, 0.5], "并行缩放应按官方 AnimationSet 语义叠加")
+
+const relativeTranslation = parseLegacyAnimation(
+  IniDocument.parse("[STYLE1]\nPRESS_ANIM=1\n[STYLE2]\nPRESS_ANIM=2"),
+  IniDocument.parse(`
+[ANIM1]
+TYPE=2
+DURATION=100
+FROM=0,0
+TO=-12,-12
+[ANIM2]
+TYPE=2
+DURATION=100
+FROM_PX=0,0
+TO_PX=-12,-12
+`),
+)
+assert.deepEqual(legacyAnimationTranslation(relativeTranslation, "1", 100, { width: 100, height: 50 }), [-12, -6])
+assert.deepEqual(legacyAnimationTranslation(relativeTranslation, "2", 100, { width: 100, height: 50 }), [-12, -12])
+
+const stackedKeys = previewItems(IniDocument.parse(`
+[KEY1]
+VIEW_RECT=0,0,50,50
+CENTER=a
+[KEY2]
+VIEW_RECT=50,0,50,50
+CENTER=b
+`), 100, 50)
+assert.equal(previewDrawOrder(stackedKeys, 100, 50, "KEY1").at(-1)?.section, "KEY1", "正在动画的按键应置于顶层")
+console.log("✓ 并行按键动画叠加，动画按键保持顶层")

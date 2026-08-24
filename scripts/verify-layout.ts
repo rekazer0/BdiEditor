@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import { pushChange, type Change } from "../src/history.ts"
+import { planLayoutImageSlices } from "../src/layout-image.ts"
 import { applyLayoutAction, snapPointToRects, snapRectDelta, type LayoutRect } from "../src/layout.ts"
+import { IniDocument } from "../src/ini.ts"
 
 const first: LayoutRect = { section: "KEY1", x: 10, y: 20, width: 80, height: 40 }
 const second: LayoutRect = { section: "KEY2", x: 120, y: 100, width: 140, height: 100 }
@@ -55,3 +57,17 @@ assert.deepEqual(
 )
 
 console.log("✓ 十字轴与拖动分别吸附到按键边缘和中心关键点")
+
+const singleKeySlice = [2, 3, 40, 20] as [number, number, number, number]
+const singleKeyPlan = planLayoutImageSlices(
+  "key-normal",
+  [
+    { section: "KEY1", rect: [10, 20, 80, 40] },
+    { section: "KEY2", rect: [120, 20, 80, 40] },
+  ],
+  [singleKeySlice],
+  IniDocument.parse(""),
+)
+assert.deepEqual(singleKeyPlan.slices.map(({ source }) => source), [singleKeySlice, singleKeySlice])
+
+console.log("✓ 单个按键素材会复用到所有目标按键")

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict"
 import { IniDocument } from "../src/ini.ts"
-import { previewItems } from "../src/preview.ts"
+import { previewFallbackText, previewItems } from "../src/preview.ts"
+
+assert.equal(
+  previewFallbackText({ show: "9" } as Parameters<typeof previewFallbackText>[0], "preview", false),
+  "",
+  "键级 SHOW 是按键数组名，前景缺失时也不能作为键帽文字绘制",
+)
 
 const runtimeList = IniDocument.parse(`
 [LIST]

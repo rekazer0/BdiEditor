@@ -12,6 +12,7 @@ import { availableSkinStates, effectivePanelSection, stateTipSection } from "../
 import { effectivePreviewItem, previewItems, previewStateImpact } from "../src/preview.ts"
 import {
   candidatePreview,
+  compositionSkinState,
   deleteForward,
   moveCaret,
   moveCaretVertical,
@@ -121,6 +122,9 @@ assert.deepEqual(candidatePreview("", 0, "zh", 4), {
   input: "ni",
   candidates: ["你好", "不会", "不回", "不好", "你会"],
 }, "S4 使用固定中文输入示例")
+assert.equal(compositionSkinState("ni"), 4, "中文输入码应进入 S4")
+assert.equal(compositionSkinState("", 4), undefined, "清空输入码应退出 S4")
+assert.equal(compositionSkinState("", 38), 38, "清空输入码不应清除其他手动状态")
 console.log("✓ 中文和英文候选使用固定预览数据，英文候选不显示拼音")
 
 assert.deepEqual(deleteForward("A😀B", 1, 1), { value: "AB", caret: 1 })
