@@ -1869,6 +1869,10 @@ canvas {
   touch-action: none;
 }
 
+#preview {
+  -webkit-tap-highlight-color: transparent;
+}
+
 #toolbar-strip {
   grid-column: 1;
   width: 100%;
