@@ -72,6 +72,7 @@ import { convertBdaArchive } from "./bda-convert.ts"
 import { IniDocument } from "./ini.ts"
 import { adaptIos26KeyboardLayout, adaptIos26Variant } from "./ios26.ts"
 import { findTextMatches, highlightIni, insertedTextRange, replaceTextMatches } from "./highlight.ts"
+import { pushChange, type Change } from "./history.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
 import {
   applyCandidateImageStyles,
@@ -106,7 +107,7 @@ import {
   type LayoutAction,
   type LayoutRect,
 } from "./layout.ts"
-import { shouldClearMixedInput } from "./mixed-input.ts"
+import { mixedCoordinateDelta, shouldClearMixedInput } from "./mixed-input.ts"
 import { installNumberInputWheel } from "./number-input-wheel.ts"
 import { loadBuiltInProjectTemplate, operationError } from "./operations.ts"
 import {
@@ -464,10 +465,6 @@ let assetReturnPath = ""
 let inspectorTab: "properties" | "source" = "properties"
 let sourceSearchIndex = -1
 let sourceHistoryHighlight: readonly [number, number] | undefined
-type Change =
-  | { kind: "text"; path: string; before: string; after: string }
-  | { kind: "bytes"; path: string; before?: Uint8Array; after?: Uint8Array }
-  | { kind: "batch"; changes: Change[] }
 type LayoutImageConfig = "none" | "image-follows-layout" | "layout-follows-image"
 let undoStack: Change[] = []
 let redoStack: Change[] = []
@@ -1632,11 +1629,11 @@ function updateHistoryButtons(): void {
   redoButton.disabled = redoStack.length === 0
 }
 
-function commitText(path: string, before: string, after: string): void {
+function commitText(path: string, before: string, after: string, coalesce = false): void {
   if (!archive || before === after) return
   sourceHistoryHighlight = undefined
   archive.setText(path, after)
-  undoStack.push({ kind: "text", path, before, after })
+  pushChange(undoStack, { kind: "text", path, before, after }, coalesce)
   redoStack = []
   scheduleSourceAutosave([path])
   updateHistoryButtons()
@@ -4997,6 +4994,7 @@ function moveSelectedKeys(
   deltaX: number,
   deltaY: number,
   sections: readonly string[] = selectedKeySections,
+  coalesce = false,
 ): void {
   if (!archive || !layoutDocument) return
   const rects = moveRects(sections.flatMap((section) => {
@@ -5015,7 +5013,7 @@ function moveSelectedKeys(
     )
   }
   const text = layoutDocument.toString()
-  commitText(layoutPath, before, text)
+  commitText(layoutPath, before, text, coalesce)
   if (selectedPath === layoutPath) setSourceValue(text)
   preview.setDocument(layoutDocument)
   populateKeyInspector()
@@ -5035,7 +5033,7 @@ function atlasPoint(event: Pick<PointerEvent, "clientX" | "clientY">): TilePoint
   }
 }
 
-function commitTile(slice: TileSlice): void {
+function commitTile(slice: TileSlice, coalesce = false): void {
   if (!archive || !selectedResourcePath || !isEditing()) return
   const [x, y, width, height] = slice.source
   if (
@@ -5044,7 +5042,7 @@ function commitTile(slice: TileSlice): void {
   ) return
   const before = tileDocument.toString()
   updateTileSlice(tileDocument, slice)
-  commitText(tilePath, before, tileDocument.toString())
+  commitText(tilePath, before, tileDocument.toString(), coalesce)
   setSourceValue(tileDocument.toString())
   slices = tileSlices(tileDocument)
   selectedTileIndex = slice.index
@@ -5078,7 +5076,7 @@ function setDrawingTile(active: boolean): void {
   drawAtlas()
 }
 
-function moveSelectedTile(deltaX: number, deltaY: number): void {
+function moveSelectedTile(deltaX: number, deltaY: number, coalesce = false): void {
   if (!archive || !selectedResourcePath || !isEditing()) return
   const existing = slices.find((slice) => slice.index === selectedTileIndex)
   if (!existing) return
@@ -5089,7 +5087,7 @@ function moveSelectedTile(deltaX: number, deltaY: number): void {
   const inner = existing.inner
     ? moveTileRect(existing.inner, actualX, actualY, atlasCanvas.width, atlasCanvas.height)
     : undefined
-  commitTile({ index: existing.index, source, ...(inner ? { inner } : {}) })
+  commitTile({ index: existing.index, source, ...(inner ? { inner } : {}) }, coalesce)
 }
 
 function deleteSelectedTile(): void {
@@ -6708,9 +6706,31 @@ for (const field of skinFields) {
 for (const field of gapFields) {
   field.addEventListener("change", () => applyExactGap(field))
 }
+function moveMixedCoordinate(field: HTMLInputElement, direction: number, coalesce = false): boolean {
+  const delta = mixedCoordinateDelta(
+    field.dataset.keyField ?? "",
+    field.placeholder,
+    field.disabled,
+    direction,
+  )
+  if (!delta) return false
+  moveSelectedKeys(delta[0], delta[1], selectedKeySections, coalesce)
+  return true
+}
+quickInspector.addEventListener("wheel", (event) => {
+  const field = event.target
+  if (!(field instanceof HTMLInputElement) || !moveMixedCoordinate(field, -event.deltaY)) return
+  event.preventDefault()
+  event.stopPropagation()
+}, { passive: false })
 quickInspector.addEventListener("keydown", (event) => {
   const field = event.target
   if (!(field instanceof HTMLInputElement)) return
+  const direction = event.key === "ArrowUp" ? 1 : event.key === "ArrowDown" ? -1 : 0
+  if (moveMixedCoordinate(field, direction, event.repeat)) {
+    event.preventDefault()
+    return
+  }
   if (!shouldClearMixedInput(event.key, field.placeholder, field.disabled)) return
   event.preventDefault()
   field.value = ""
@@ -7470,13 +7490,13 @@ window.addEventListener("keydown", (event) => {
       if (selectedTileIndex === undefined || !isEditing()) return
       event.preventDefault()
       const distance = event.shiftKey ? 10 : 1
-      moveSelectedTile(direction[0] * distance, direction[1] * distance)
+      moveSelectedTile(direction[0] * distance, direction[1] * distance, event.repeat)
       return
     }
     if (!isEditing() || !selectedKeySections.length || isTextEditingTarget(event.target)) return
     event.preventDefault()
     const distance = event.shiftKey ? 10 : 1
-    moveSelectedKeys(direction[0] * distance, direction[1] * distance)
+    moveSelectedKeys(direction[0] * distance, direction[1] * distance, selectedKeySections, event.repeat)
     return
   }
   if (resourceConfigActive && !isTextEditingTarget(event.target)) {

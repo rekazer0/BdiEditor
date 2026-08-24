@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { pushChange, type Change } from "../src/history.ts"
 import { applyLayoutAction, type LayoutRect } from "../src/layout.ts"
 
 const first: LayoutRect = { section: "KEY1", x: 10, y: 20, width: 80, height: 40 }
@@ -24,3 +25,14 @@ assert.deepEqual(first, { section: "KEY1", x: 10, y: 20, width: 80, height: 40 }
 assert.deepEqual(second, { section: "KEY2", x: 120, y: 100, width: 140, height: 100 })
 
 console.log("✓ 不同尺寸按键交换中心位置，且保持各自尺寸不变")
+
+const history: Change[] = []
+pushChange(history, { kind: "text", path: "layout.ini", before: "x=0", after: "x=1" })
+pushChange(history, { kind: "text", path: "layout.ini", before: "x=1", after: "x=2" }, true)
+assert.deepEqual(history, [
+  { kind: "text", path: "layout.ini", before: "x=0", after: "x=2" },
+])
+pushChange(history, { kind: "text", path: "layout.ini", before: "x=2", after: "x=3" })
+assert.equal(history.length, 2)
+
+console.log("✓ 方向键自动重复移动合并为一次撤销记录")
