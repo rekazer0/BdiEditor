@@ -1,6 +1,7 @@
 import puppeteer from "puppeteer-core"
 
-const skin = "/Users/kaze/Downloads/蒋·Grid M版.bds"
+const skin = process.argv[2]
+if (!skin) throw new Error("usage: node scripts/verify-grid-browser.mjs <skin.bds>")
 const chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
