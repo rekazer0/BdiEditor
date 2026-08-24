@@ -2,7 +2,6 @@
 
 - Source visual truth: `/var/folders/67/r7lgztzs46ggm1c3zc3lh6580000gn/T/codex-clipboard-fc3520f6-8931-44fd-b0b0-f6c2b6e37876.jpg`
 - Test skin: `/Users/kaze/Downloads/孤岛记录_特别版智能深色-26+9键.bdi`
-- Browser capture: `/Users/kaze/work/bdi-edit/design-qa-keyboard-geometry-full.png`
 - Browser viewport: 1395 x 768 px
 - Source pixels: 1206 x 2622; focused source keyboard crop: 1206 x 1130; implementation shown at 56% editor preview scale
 - State: dark theme, iPhone 17 Pro portrait, imported user skin, active pinyin composition
@@ -29,6 +28,6 @@
 
 - Earlier P1: the keyboard was too short and the top radius was too flat because the iPhone top cap was missing from the geometry model.
 - Fix: added a 38px iPhone portrait top inset as a distinct grid row, restored the 6.65% radius, and added the requested thin edge highlight.
-- Post-fix evidence: `design-qa-keyboard-geometry-full.png` shows the glass extending upward while the candidate words and key panel retain their previous alignment.
+- Post-fix verification confirmed the glass extends upward while the candidate words and key panel retain their previous alignment.
 
 final result: passed
