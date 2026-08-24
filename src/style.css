@@ -3,7 +3,7 @@
   color: #202124;
   color-scheme: light;
   background: transparent;
-  --titlebar-height: 52px;
+  --titlebar-height: calc(52px + env(safe-area-inset-top));
   --line: rgb(0 0 0 / 10%);
   --line-soft: rgb(0 0 0 / 6%);
   --text: #202124;
@@ -28,7 +28,7 @@
 }
 
 :root.macos {
-  --titlebar-height: 86px;
+  --titlebar-height: calc(86px + env(safe-area-inset-top));
 }
 
 :root[data-app-theme="dark"] {
@@ -234,7 +234,7 @@ summary:focus-visible {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 12px;
+  padding: calc(6px + env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 6px max(12px, env(safe-area-inset-left));
   border-bottom: 1px solid var(--line);
   background: var(--toolbar);
   box-shadow: inset 0 1px rgb(255 255 255 / 32%), 0 1px 18px rgb(35 65 70 / 7%);
@@ -244,7 +244,7 @@ summary:focus-visible {
 }
 
 :root.macos .titlebar {
-  padding-top: 40px;
+  padding-top: calc(40px + env(safe-area-inset-top));
 }
 
 .toolbar-group {
@@ -4699,7 +4699,7 @@ input[type="search"]:focus {
   .titlebar {
     height: var(--titlebar-height);
     gap: 4px;
-    padding-top: max(6px, env(safe-area-inset-top));
+    padding-top: calc(6px + env(safe-area-inset-top));
     padding-inline: max(6px, env(safe-area-inset-left)) max(6px, env(safe-area-inset-right));
   }
 
@@ -5490,19 +5490,6 @@ input[type="search"]:focus {
     font-size: 10px;
   }
 
-  :root:has(.source :is(input, textarea, select):focus) .workspace {
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  :root:has(.source :is(input, textarea, select):focus) .mobile-workspace-tabs {
-    top: 0;
-  }
-
-  :root:has(.source :is(input, textarea, select):focus) :is(aside, .source) {
-    top: 18px;
-    height: calc(100% - 18px);
-  }
 }
 
 @media (max-width: 950px) and (max-height: 600px) and (orientation: landscape) {
@@ -5514,7 +5501,7 @@ input[type="search"]:focus {
   .titlebar {
     height: var(--titlebar-height);
     gap: 4px;
-    padding: max(4px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) 4px max(6px, env(safe-area-inset-left));
+    padding: calc(4px + env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) 4px max(6px, env(safe-area-inset-left));
   }
 
   .titlebar > .toolbar-group {
