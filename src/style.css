@@ -1060,25 +1060,104 @@ h2 {
 
 #preview-coordinates {
   position: absolute;
-  left: 14px;
-  bottom: 14px;
+  left: 0;
+  top: 0;
   z-index: 8;
+  width: 0;
+  height: 0;
+  color: var(--canvas-secondary);
+  font: 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+#preview-coordinates[data-crosshair="off"] {
+  left: 14px;
+  top: auto;
+  bottom: 14px;
+  width: auto;
+  height: auto;
+}
+
+#preview-coordinates[data-crosshair="off"] .preview-crosshair {
+  display: none;
+}
+
+#preview-coordinates[data-crosshair="off"] .preview-coordinate-label {
+  position: static;
+  display: block;
+  transform: none;
+}
+
+.preview-crosshair {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(var(--crosshair-color, #111) 0 0) 0 calc(var(--crosshair-y) - 1px) / 100% 2px no-repeat,
+    linear-gradient(var(--crosshair-color, #111) 0 0) calc(var(--crosshair-x) - 1px) 0 / 2px 100% no-repeat;
+}
+
+#panel-viewport {
+  position: relative;
+}
+
+.preview-guides {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: #ef3e52;
+  pointer-events: none;
+}
+
+.preview-guides[hidden] {
+  display: none;
+}
+
+.preview-guides g.selected {
+  color: #087ff5;
+}
+
+.preview-guides rect {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-dasharray: 7 5;
+  vector-effect: non-scaling-stroke;
+}
+
+.preview-guides text {
+  fill: currentColor;
+  font: 15px system-ui;
+  dominant-baseline: hanging;
+}
+
+.preview-coordinate-label {
+  position: absolute;
+  left: var(--coordinate-label-x);
+  top: var(--coordinate-label-y);
   width: 112px;
   padding: 5px 8px;
   border: 1px solid var(--glass-border);
   border-radius: 7px;
-  color: var(--canvas-secondary);
+  transform: translateY(-50%);
   background: var(--glass-surface);
   box-shadow: var(--glass-shadow);
-  font: 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-variant-numeric: tabular-nums;
   white-space: pre;
-  pointer-events: none;
   -webkit-backdrop-filter: saturate(180%) blur(16px);
   backdrop-filter: saturate(180%) blur(16px);
 }
 
-#preview-coordinates span {
+.device-shell[data-mode="edit"][data-crosshair="on"] #preview,
+.device-shell[data-mode="edit"][data-crosshair="on"] #toolbar-strip {
+  cursor: none !important;
+}
+
+#preview-coordinate-x,
+#preview-coordinate-y {
   width: 4ch;
   display: inline-block;
   text-align: left;
@@ -1151,6 +1230,7 @@ h2 {
   stroke-linejoin: round;
 }
 
+.canvas-wrap[data-background="checkerboard"] .preview-coordinate-label,
 .canvas-wrap[data-background="checkerboard"] ~ .preview-zoom-control {
   border-color: rgb(32 33 36 / 22%);
   background: rgb(255 255 255 / 88%);

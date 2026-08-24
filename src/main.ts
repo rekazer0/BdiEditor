@@ -213,6 +213,7 @@ const sidebarViewVisible = $("#sidebar-view-visible") as HTMLInputElement
 const inspectorTabsVisible = $("#inspector-tabs-visible") as HTMLInputElement
 const inspectorGroupedDisplay = $("#inspector-grouped-display") as HTMLInputElement
 const mobilePreviewPosition = $("#mobile-preview-position") as HTMLSelectElement
+const editorCrosshair = $("#editor-crosshair") as HTMLInputElement
 const settingsStorageSection = $("#settings-storage-section")
 const sourceDirectoryEnabledSetting = $("#source-directory-enabled-setting")
 const sourceDirectoryEnabled = $("#source-directory-enabled") as HTMLInputElement
@@ -269,6 +270,7 @@ const sourceName = $("#source-name")
 const dirty = $("#dirty")
 const eventLog = $("#event-log")
 const panelStatus = $("#panel-status")
+const previewCoordinates = $("#preview-coordinates")
 const previewCoordinateX = $("#preview-coordinate-x")
 const previewCoordinateY = $("#preview-coordinate-y")
 const previewZoomOut = $("#preview-zoom-out") as HTMLButtonElement
@@ -583,18 +585,99 @@ const preview = new Preview(
   (sections, deltaX, deltaY) => moveSelectedKeys(deltaX, deltaY, sections),
 )
 
+function updatePointerCoordinates(
+  event: PointerEvent,
+  target: HTMLElement,
+  canvas: HTMLCanvasElement,
+): void {
+  if (event.pointerType !== "mouse" || editorCrosshair.checked && !isEditing()) {
+    if (editorCrosshair.checked) previewCoordinates.hidden = true
+    return
+  }
+  const bounds = target.getBoundingClientRect()
+  if (!bounds.width || !bounds.height) return
+  const wrapBounds = canvasWrap.getBoundingClientRect()
+  let x = Math.min(bounds.width - 1, Math.max(0, event.clientX - bounds.left))
+  let y = Math.min(bounds.height - 1, Math.max(0, event.clientY - bounds.top))
+  const snapPreview = canvas === previewCanvas ? preview : canvas === toolbarCanvas ? toolbarPreview : undefined
+  const logicalSize = snapPreview?.logicalSize() ?? { width: canvas.width, height: canvas.height }
+  const point = editorCrosshair.checked && snapPreview
+    ? snapPreview.snapPoint({ x: x / bounds.width * logicalSize.width, y: y / bounds.height * logicalSize.height })
+    : { x: x / bounds.width * logicalSize.width, y: y / bounds.height * logicalSize.height }
+  const snappedX = Math.min(logicalSize.width - 1, Math.max(0, point.x))
+  const snappedY = Math.min(logicalSize.height - 1, Math.max(0, point.y))
+  const logicalX = Math.floor(snappedX)
+  const logicalY = Math.floor(snappedY)
+  x = snappedX / logicalSize.width * bounds.width
+  y = snappedY / logicalSize.height * bounds.height
+  previewCoordinateX.textContent = String(logicalX)
+  previewCoordinateY.textContent = String(logicalY)
+  if (!editorCrosshair.checked) {
+    previewCoordinates.hidden = false
+    return
+  }
+  const crosshairX = Math.round(bounds.left - wrapBounds.left + x)
+  const crosshairY = Math.round(bounds.top - wrapBounds.top + y)
+  previewCoordinates.style.left = `${canvasWrap.scrollLeft}px`
+  previewCoordinates.style.top = `${canvasWrap.scrollTop}px`
+  previewCoordinates.style.width = `${canvasWrap.clientWidth}px`
+  previewCoordinates.style.height = `${canvasWrap.clientHeight}px`
+  previewCoordinates.style.setProperty("--crosshair-x", `${crosshairX}px`)
+  previewCoordinates.style.setProperty("--crosshair-y", `${crosshairY}px`)
+  const labelWidth = 130
+  previewCoordinates.style.setProperty(
+    "--coordinate-label-x",
+    `${crosshairX + labelWidth + 8 <= canvasWrap.clientWidth ? crosshairX + 8 : Math.max(0, crosshairX - labelWidth - 8)}px`,
+  )
+  previewCoordinates.style.setProperty(
+    "--coordinate-label-y",
+    `${Math.min(canvasWrap.clientHeight - 14, Math.max(14, crosshairY))}px`,
+  )
+  let pixel: Uint8ClampedArray | undefined
+  for (const sample of canvas === toolbarCanvas ? [canvas, candidateBackgroundCanvas] : [canvas]) {
+    try {
+      const data = sample.getContext("2d")?.getImageData(
+        Math.min(sample.width - 1, Math.floor(snappedX / logicalSize.width * sample.width)),
+        Math.min(sample.height - 1, Math.floor(snappedY / logicalSize.height * sample.height)),
+        1,
+        1,
+      ).data
+      if (data && data[3] > 32) {
+        pixel = data
+        break
+      }
+    } catch {}
+  }
+  const luminance = pixel ? (pixel[0] * 0.2126 + pixel[1] * 0.7152 + pixel[2] * 0.0722) / 255 : 1
+  previewCoordinates.style.setProperty("--crosshair-color", luminance > 0.45 ? "#111" : "#ffd60a")
+  previewCoordinates.hidden = false
+}
+
 previewCanvas.addEventListener("pointermove", (event) => {
-  const bounds = previewCanvas.getBoundingClientRect()
-  previewCoordinateX.textContent = String(Math.floor((event.clientX - bounds.left) / bounds.width * previewCanvas.width))
-  previewCoordinateY.textContent = String(Math.floor((event.clientY - bounds.top) / bounds.height * previewCanvas.height))
+  updatePointerCoordinates(event, previewCanvas, previewCanvas)
 })
-previewCanvas.addEventListener("pointerleave", () => {
-  previewCoordinateX.textContent = "—"
-  previewCoordinateY.textContent = "—"
+toolbarStrip.addEventListener("pointermove", (event) => {
+  updatePointerCoordinates(event, toolbarStrip, toolbarCanvas)
+})
+document.addEventListener("pointermove", (event) => {
+  const target = event.target as Node
+  if (event.pointerType === "mouse" && !previewCanvas.contains(target) && !toolbarStrip.contains(target)) {
+    if (editorCrosshair.checked) previewCoordinates.hidden = true
+    else {
+      previewCoordinateX.textContent = "—"
+      previewCoordinateY.textContent = "—"
+    }
+  }
 })
 
 const toolbarPreview = new Preview(toolbarCanvas, () => {}, () => {}, true)
 const candidateBackgroundPreview = new Preview(candidateBackgroundCanvas, () => {}, () => {})
+
+function resizeKeyboardPreviews(): void {
+  preview.resize()
+  toolbarPreview.resize()
+  candidateBackgroundPreview.resize()
+}
 let activeKeyboardGeometry: {
   panelWidth: number
   panelHeight: number
@@ -1376,6 +1459,7 @@ function updatePanelToolButtons(): void {
 
 function applyModeState(): void {
   const editing = isEditing()
+  if (!editing && editorCrosshair.checked) previewCoordinates.hidden = true
   deviceShell.dataset.mode = editing ? "edit" : "preview"
   preview.setMode(editing ? "edit" : "preview")
   preview.setEditTool(keyMode)
@@ -2162,6 +2246,7 @@ function fitCanvasPreview(): void {
     )
   }
   if (device.value === "canvas") updateCanvasPanelStatus(renderedWidth)
+  requestAnimationFrame(resizeKeyboardPreviews)
 }
 
 function updateCanvasPanelStatus(renderedWidth: number): void {
@@ -2205,6 +2290,7 @@ function applyPreviewZoom(value: number, anchor?: { x: number; y: number }): voi
       panelStatus.textContent = `面板：${Math.round(canvasLogicalSize!.width)} × ${Math.round(canvasLogicalSize!.panelHeight)} · 预览缩放：${previewScalePercent(bounds.width, bounds.height, canvasLogicalSize!.width, canvasLogicalSize!.panelHeight)}%`
     })
   }
+  requestAnimationFrame(resizeKeyboardPreviews)
 }
 
 function scheduleFitCanvasPreview(): void {
@@ -6401,6 +6487,21 @@ document.documentElement.dataset.mobilePreviewPosition = mobilePreviewPosition.v
 mobilePreviewPosition.addEventListener("change", () => {
   localStorage.setItem("mobile-preview-position", mobilePreviewPosition.value)
   document.documentElement.dataset.mobilePreviewPosition = mobilePreviewPosition.value
+})
+editorCrosshair.checked = localStorage.getItem("editor-crosshair") !== "off"
+function applyEditorCrosshairSetting(): void {
+  const state = editorCrosshair.checked ? "on" : "off"
+  deviceShell.dataset.crosshair = state
+  previewCoordinates.dataset.crosshair = state
+  previewCoordinates.hidden = editorCrosshair.checked
+  if (!editorCrosshair.checked) {
+    for (const property of ["left", "top", "width", "height"]) previewCoordinates.style.removeProperty(property)
+  }
+}
+applyEditorCrosshairSetting()
+editorCrosshair.addEventListener("change", () => {
+  localStorage.setItem("editor-crosshair", editorCrosshair.checked ? "on" : "off")
+  applyEditorCrosshairSetting()
 })
 const systemTheme = matchMedia("(prefers-color-scheme: dark)")
 function applyAppTheme(): void {

@@ -41,8 +41,90 @@ const shiftY = (285 + 150 / 2) / 631
 
 await page.click('[data-mode-choice="edit"]')
 await sleep(200)
+const canvasBox = await (await page.$("#preview")).boundingBox()
+if (!canvasBox) throw new Error("no canvas box")
+await page.mouse.move(canvasBox.x + canvasBox.width * qx, canvasBox.y + canvasBox.height * qy)
+const crosshair = await page.$eval("#preview-coordinates", (el) => ({
+  hidden: el.hidden,
+  x: document.querySelector("#preview-coordinate-x")?.textContent,
+  y: document.querySelector("#preview-coordinate-y")?.textContent,
+  width: Number(document.querySelector("#preview")?.dataset.logicalWidth),
+  height: Number(document.querySelector("#preview")?.dataset.logicalHeight),
+  bounds: el.getBoundingClientRect().toJSON(),
+  wrapBounds: document.querySelector(".canvas-wrap")?.getBoundingClientRect().toJSON(),
+  cursor: getComputedStyle(document.querySelector("#preview")).cursor,
+  background: getComputedStyle(document.querySelector(".preview-crosshair")).backgroundImage,
+  blendMode: getComputedStyle(document.querySelector(".preview-crosshair")).mixBlendMode,
+  color: el.style.getPropertyValue("--crosshair-color"),
+}))
+if (crosshair.hidden || crosshair.x !== String(Math.round(26 + 119 / 2)) || crosshair.y !== String(Math.round(5 + 150 / 2)) ||
+  crosshair.bounds.x !== crosshair.wrapBounds.x || crosshair.bounds.y !== crosshair.wrapBounds.y ||
+  crosshair.bounds.width !== crosshair.wrapBounds.width || crosshair.bounds.height !== crosshair.wrapBounds.height || crosshair.cursor !== "none" ||
+  crosshair.background.split("linear-gradient").length !== 3 || crosshair.blendMode !== "normal" ||
+  !["#111", "#ffd60a"].includes(crosshair.color)) {
+  throw new Error("edit crosshair missed key center snap: " + JSON.stringify(crosshair))
+}
+await page.click("#toggle-guides")
+const guides = await page.$eval("#panel-viewport .preview-guides", (el) => ({
+  hidden: el.hidden,
+  rects: el.querySelectorAll("rect").length,
+  vectorEffect: getComputedStyle(el.querySelector("rect")).vectorEffect,
+}))
+if (guides.hidden || guides.rects === 0 || guides.vectorEffect !== "non-scaling-stroke") {
+  throw new Error("guides are not rendered as a scalable vector overlay: " + JSON.stringify(guides))
+}
+for (let index = 0; index < 10; index++) await page.click("#preview-zoom-in")
+await sleep(200)
+const canvasResolution = await page.$eval("#preview", (el) => {
+  const bounds = el.getBoundingClientRect()
+  return { width: el.width, height: el.height, displayWidth: bounds.width, displayHeight: bounds.height, pixelRatio: devicePixelRatio }
+})
+if (canvasResolution.width < Math.round(canvasResolution.displayWidth * canvasResolution.pixelRatio) ||
+  canvasResolution.height < Math.round(canvasResolution.displayHeight * canvasResolution.pixelRatio)) {
+  throw new Error("zoomed keyboard canvas is below display resolution: " + JSON.stringify(canvasResolution))
+}
+await page.click("#preview-zoom-fit")
+await sleep(200)
+await page.$eval("#editor-crosshair", (el) => el.click())
+await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2)
+const staticCoordinates = await page.$eval("#preview-coordinates", (el) => ({
+  hidden: el.hidden,
+  x: document.querySelector("#preview-coordinate-x")?.textContent,
+  y: document.querySelector("#preview-coordinate-y")?.textContent,
+  crosshair: getComputedStyle(document.querySelector(".preview-crosshair")).display,
+  left: getComputedStyle(el).left,
+  bottom: getComputedStyle(el).bottom,
+}))
+if (staticCoordinates.hidden || staticCoordinates.x !== String(Math.floor(crosshair.width / 2)) ||
+  staticCoordinates.y !== String(Math.floor(crosshair.height / 2)) || staticCoordinates.crosshair !== "none" ||
+  staticCoordinates.left !== "14px" || staticCoordinates.bottom !== "14px") {
+  throw new Error("crosshair setting did not restore static coordinates: " + JSON.stringify(staticCoordinates))
+}
+await page.$eval("#editor-crosshair", (el) => el.click())
+const candidateBox = await (await page.$("#toolbar-strip")).boundingBox()
+if (!candidateBox) throw new Error("no candidate box")
+const candidateSize = await page.$eval("#toolbar-preview", (el) => ({
+  width: Number(el.dataset.logicalWidth),
+  height: Number(el.dataset.logicalHeight),
+}))
+await page.mouse.move(
+  candidateBox.x + candidateBox.width * (0.5 + 4 / candidateSize.width),
+  candidateBox.y + candidateBox.height * (0.5 + 4 / candidateSize.height),
+)
+const candidateCrosshair = await page.$eval("#preview-coordinates", (el) => ({
+  hidden: el.hidden,
+  x: document.querySelector("#preview-coordinate-x")?.textContent,
+  y: document.querySelector("#preview-coordinate-y")?.textContent,
+  width: Number(document.querySelector("#toolbar-preview")?.dataset.logicalWidth),
+  height: Number(document.querySelector("#toolbar-preview")?.dataset.logicalHeight),
+}))
+if (candidateCrosshair.hidden || candidateCrosshair.x !== String(Math.round(candidateCrosshair.width / 2)) ||
+  candidateCrosshair.y !== String(Math.round(candidateCrosshair.height / 2))) {
+  throw new Error("candidate crosshair missed center snap: " + JSON.stringify(candidateCrosshair))
+}
 await clickCanvas(qx, qy)
 await sleep(400)
+if (await page.$eval("#preview-coordinates", (el) => el.hidden)) throw new Error("crosshair flashed off after key click")
 const editQ = await page.$eval('input[data-key-field="CENTER"]', (el) => el.value)
 console.log("edit q CENTER", JSON.stringify(editQ))
 await page.screenshot({ path: "/tmp/grid-edit-q.png" })
@@ -54,6 +136,8 @@ console.log("edit m CENTER", JSON.stringify(editM))
 
 await page.click('[data-mode-choice="preview"]')
 await sleep(200)
+await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2)
+if (!await page.$eval("#preview-coordinates", (el) => el.hidden)) throw new Error("crosshair visible in preview mode")
 await clickCanvas(qx, qy)
 await sleep(400)
 const previewQ = await page.$eval("#event-log", (el) => el.textContent ?? "")

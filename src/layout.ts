@@ -156,6 +156,59 @@ export function moveRects(rects: LayoutRect[], deltaX: number, deltaY: number): 
   return rects.map((rect) => ({ ...rect, x: rect.x + deltaX, y: rect.y + deltaY }))
 }
 
+function keyPoints(start: number, size: number): number[] {
+  return [start, Math.round(start + size / 2), start + size]
+}
+
+function snapValue(value: number, targets: readonly number[], threshold: number): number {
+  let best = value
+  let distance = Infinity
+  for (const target of targets) {
+    const next = Math.abs(target - value)
+    if (next <= threshold && next < distance) {
+      best = target
+      distance = next
+    }
+  }
+  return best
+}
+
+export function snapPointToRects(
+  point: { x: number; y: number },
+  rects: readonly Pick<LayoutRect, "x" | "y" | "width" | "height">[],
+  threshold: { x: number; y: number },
+): { x: number; y: number } {
+  return {
+    x: snapValue(point.x, rects.flatMap((rect) => keyPoints(rect.x, rect.width)), threshold.x),
+    y: snapValue(point.y, rects.flatMap((rect) => keyPoints(rect.y, rect.height)), threshold.y),
+  }
+}
+
+export function snapRectDelta(
+  moving: readonly Pick<LayoutRect, "x" | "y" | "width" | "height">[],
+  fixed: readonly Pick<LayoutRect, "x" | "y" | "width" | "height">[],
+  delta: { x: number; y: number },
+  threshold: { x: number; y: number },
+): { x: number; y: number } {
+  if (!delta.x && !delta.y) return delta
+  return {
+    x: snapValue(
+      delta.x,
+      fixed.flatMap((target) => keyPoints(target.x, target.width)
+        .flatMap((targetPoint) => moving.flatMap((source) => keyPoints(source.x, source.width)
+          .map((sourcePoint) => targetPoint - sourcePoint)))),
+      threshold.x,
+    ),
+    y: snapValue(
+      delta.y,
+      fixed.flatMap((target) => keyPoints(target.y, target.height)
+        .flatMap((targetPoint) => moving.flatMap((source) => keyPoints(source.y, source.height)
+          .map((sourcePoint) => targetPoint - sourcePoint)))),
+      threshold.y,
+    ),
+  }
+}
+
 export function mergeLayoutRects(first: LayoutRect, second: LayoutRect): LayoutRect {
   const x = Math.min(first.x, second.x)
   const y = Math.min(first.y, second.y)

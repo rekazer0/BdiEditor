@@ -2,7 +2,7 @@ import { canvasFontFamily, isTransparentColor, type StyleTextVisual, type TextVi
 import { skinStateFallbackText } from "./actions.ts"
 import { IniDocument } from "./ini.ts"
 import { DEFAULT_CANDIDATE_HEIGHT, DEFAULT_PANEL_HEIGHT, DEFAULT_PANEL_WIDTH } from "./keyboard.ts"
-import { gestureDirection } from "./layout.ts"
+import { gestureDirection, snapPointToRects, snapRectDelta } from "./layout.ts"
 import { stateStyleValue, stateTipSection } from "./panel-tools.ts"
 import type { BdaAnimation, BdaAnimationSequence } from "./bda.ts"
 
@@ -809,6 +809,7 @@ export class Preview {
   private mobileMultiSelect = false
   private selectionAnchor?: string
   private guides = false
+  private guidesOverlay?: SVGSVGElement
   private skinState?: number
   private persistentOnly = false
   private animation?: BdaAnimation
@@ -818,6 +819,7 @@ export class Preview {
   private legacyAnimationState?: { key: PreviewItem; startedAt: number }
   private legacyAnimationTimer?: number
   private drawID = 0
+  private readonly resizeObserver: ResizeObserver
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -843,6 +845,8 @@ export class Preview {
       this.updateCursor()
       void this.draw()
     })
+    this.resizeObserver = new ResizeObserver(() => this.resize())
+    this.resizeObserver.observe(canvas)
   }
 
   setMode(mode: "edit" | "preview"): void {
@@ -991,9 +995,46 @@ export class Preview {
   private point(event: Pick<MouseEvent, "clientX" | "clientY">): { x: number; y: number } {
     const bounds = this.canvas.getBoundingClientRect()
     return {
-      x: ((event.clientX - bounds.left) / bounds.width) * this.canvas.width,
-      y: ((event.clientY - bounds.top) / bounds.height) * this.canvas.height,
+      x: ((event.clientX - bounds.left) / bounds.width) * this.panelWidth,
+      y: ((event.clientY - bounds.top) / bounds.height) * this.panelHeight,
     }
+  }
+
+  private snapThreshold(): { x: number; y: number } {
+    const bounds = this.canvas.getBoundingClientRect()
+    return {
+      x: bounds.width ? 8 * this.panelWidth / bounds.width : 0,
+      y: bounds.height ? 8 * this.panelHeight / bounds.height : 0,
+    }
+  }
+
+  logicalSize(): { width: number; height: number } {
+    return { width: this.panelWidth, height: this.panelHeight }
+  }
+
+  snapPoint(point: { x: number; y: number }): { x: number; y: number } {
+    return snapPointToRects(
+      point,
+      visiblePreviewItems(this.keys, this.skinState)
+        .filter((key) => key.editable || this.toolbarSlots)
+        .map((key) => key.rect),
+      this.snapThreshold(),
+    )
+  }
+
+  private dragDelta(point: { x: number; y: number }): { x: number; y: number } {
+    if (!this.editDrag) return { x: 0, y: 0 }
+    return snapRectDelta(
+      [...this.editDrag.original.values()],
+      visiblePreviewItems(this.keys, this.skinState)
+        .filter((key) => key.editable && !this.editDrag?.original.has(key.section))
+        .map((key) => key.rect),
+      {
+        x: Math.round(point.x - this.editDrag.startX),
+        y: Math.round(point.y - this.editDrag.startY),
+      },
+      this.snapThreshold(),
+    )
   }
 
   private hit(point: { x: number; y: number }): PreviewItem | undefined {
@@ -1147,8 +1188,7 @@ export class Preview {
     }
     if (!this.editDrag || this.editDrag.pointerId !== event.pointerId) return
     const point = this.point(event)
-    const dx = Math.round(point.x - this.editDrag.startX)
-    const dy = Math.round(point.y - this.editDrag.startY)
+    const { x: dx, y: dy } = this.dragDelta(point)
     for (const key of this.keys) {
       const original = this.editDrag.original.get(key.section)
       if (original) key.rect = { ...original, x: original.x + dx, y: original.y + dy }
@@ -1223,12 +1263,11 @@ export class Preview {
     if (this.editDrag?.pointerId === event.pointerId) {
       const drag = this.editDrag
       const point = this.point(event)
-      const dx = point.x - drag.startX
-      const dy = point.y - drag.startY
+      const { x: dx, y: dy } = this.dragDelta(point)
       this.editDrag = undefined
       this.updateCursor()
-      if (Math.round(dx) || Math.round(dy)) {
-        this.onMove([...drag.original.keys()], Math.round(dx), Math.round(dy))
+      if (dx || dy) {
+        this.onMove([...drag.original.keys()], dx, dy)
       }
       else void this.draw()
       return
@@ -1289,8 +1328,59 @@ export class Preview {
   private fitCanvas(): void {
     const width = Math.ceil(this.panelWidth)
     const height = Math.ceil(this.panelHeight)
-    if (this.canvas.width !== width) this.canvas.width = width
-    if (this.canvas.height !== height) this.canvas.height = height
+    const changed = this.canvas.dataset.logicalWidth !== String(width) ||
+      this.canvas.dataset.logicalHeight !== String(height)
+    this.canvas.dataset.logicalWidth = String(width)
+    this.canvas.dataset.logicalHeight = String(height)
+    this.canvas.style.aspectRatio = `${width} / ${height}`
+    if (changed) {
+      this.canvas.width = width
+      this.canvas.height = height
+    }
+    requestAnimationFrame(() => this.resize())
+  }
+
+  resize(): void {
+    const bounds = this.canvas.getBoundingClientRect()
+    if (!bounds.width || !bounds.height) return
+    const ratio = devicePixelRatio || 1
+    const width = Math.max(1, Math.round(bounds.width * ratio))
+    const height = Math.max(1, Math.round(bounds.height * ratio))
+    if (this.canvas.width === width && this.canvas.height === height) return
+    this.canvas.width = width
+    this.canvas.height = height
+    void this.draw()
+  }
+
+  private drawGuides(keys: readonly PreviewItem[]): void {
+    if (!this.guides) {
+      if (this.guidesOverlay) this.guidesOverlay.hidden = true
+      return
+    }
+    const overlay = this.guidesOverlay ?? document.createElementNS("http://www.w3.org/2000/svg", "svg")
+    if (!this.guidesOverlay) {
+      overlay.classList.add("preview-guides")
+      overlay.setAttribute("aria-hidden", "true")
+      this.canvas.insertAdjacentElement("afterend", overlay)
+      this.guidesOverlay = overlay
+    }
+    overlay.hidden = false
+    overlay.setAttribute("viewBox", `0 0 ${this.panelWidth} ${this.panelHeight}`)
+    overlay.replaceChildren(...keys.map((key) => {
+      const group = document.createElementNS("http://www.w3.org/2000/svg", "g")
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect")
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text")
+      group.classList.toggle("selected", this.itemSelected(key))
+      rect.setAttribute("x", String(key.rect.x))
+      rect.setAttribute("y", String(key.rect.y))
+      rect.setAttribute("width", String(key.rect.width))
+      rect.setAttribute("height", String(key.rect.height))
+      text.setAttribute("x", String(key.rect.x + 4))
+      text.setAttribute("y", String(key.rect.y + 4))
+      text.textContent = key.section
+      group.append(rect, text)
+      return group
+    }))
   }
 
   private drawNineSlice(
@@ -1474,16 +1564,20 @@ export class Preview {
     if (drawID !== this.drawID) return
     const context = this.canvas.getContext("2d")
     if (!context) return
+    context.setTransform(1, 0, 0, 1, 0, 0)
     context.clearRect(0, 0, this.canvas.width, this.canvas.height)
+    context.setTransform(this.canvas.width / this.panelWidth, 0, 0, this.canvas.height / this.panelHeight, 0, 0)
+    context.imageSmoothingEnabled = true
+    context.imageSmoothingQuality = "high"
     const surfaceColor = previewSurfaceColor(this.theme, this.transparent)
     if (surfaceColor) {
       context.fillStyle = surfaceColor
-      context.fillRect(0, 0, this.canvas.width, this.canvas.height)
+      context.fillRect(0, 0, this.panelWidth, this.panelHeight)
     }
     this.drawVisual(
       context,
       panel,
-      { x: 0, y: 0, width: this.canvas.width, height: this.canvas.height },
+      { x: 0, y: 0, width: this.panelWidth, height: this.panelHeight },
       true,
     )
 
@@ -1609,21 +1703,7 @@ export class Preview {
       })
     }
 
-    if (this.guides) {
-      context.save()
-      context.setLineDash([7, 5])
-      context.lineWidth = 1.5
-      context.font = "15px system-ui"
-      context.textAlign = "left"
-      context.textBaseline = "top"
-      for (const key of visiblePreviewItems(this.keys, this.skinState)) {
-        context.strokeStyle = this.itemSelected(key) ? "#087ff5" : "#ef3e52"
-        context.fillStyle = context.strokeStyle
-        context.strokeRect(key.rect.x + 0.75, key.rect.y + 0.75, key.rect.width - 1.5, key.rect.height - 1.5)
-        context.fillText(key.section, key.rect.x + 4, key.rect.y + 4)
-      }
-      context.restore()
-    }
+    this.drawGuides(visiblePreviewItems(this.keys, this.skinState))
   }
 
   private drawStyleText(

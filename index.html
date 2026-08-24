@@ -215,7 +215,7 @@
             <canvas id="atlas-canvas" aria-label="皮肤图集切片画布"></canvas>
             <figcaption id="workspace-image-error" hidden>无法预览此 PNG</figcaption>
           </figure>
-          <output id="preview-coordinates" aria-label="鼠标坐标">x: <span id="preview-coordinate-x">—</span>  y: <span id="preview-coordinate-y">—</span></output>
+          <output id="preview-coordinates" aria-label="鼠标坐标" hidden><span class="preview-crosshair" aria-hidden="true"></span><span class="preview-coordinate-label">x: <span id="preview-coordinate-x">—</span>  y: <span id="preview-coordinate-y">—</span></span></output>
         </div>
         <button id="mobile-toggle-guides" class="preview-tool-toggle glass-module mobile-guides-toggle" aria-label="辅助线" title="辅助线" aria-pressed="false"><span class="system-symbol" data-system-symbol="ruler" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="10" rx="2"/><path d="M7 7v5m4-5v3m4-3v5m4-5v3"/></svg></span></button>
         <div class="preview-zoom-control" aria-label="画布缩放">
@@ -671,6 +671,7 @@
               <label class="settings-row"><span>默认预览设备</span><select id="default-device"><option value="canvas">画布</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
               <label class="settings-row"><span>画布背景</span><select id="canvas-background"><option value="glass">玻璃</option><option value="checkerboard">马赛克</option><option value="white" selected>白色</option><option value="dark">深色</option></select></label>
               <label class="settings-row"><span>手机竖屏预览位置</span><select id="mobile-preview-position"><option value="bottom" selected>下半区</option><option value="top">上半区</option></select></label>
+              <label class="settings-row settings-switch"><span>编辑模式鼠标十字轴</span><input id="editor-crosshair" type="checkbox" role="switch" checked></label>
             </div>
           </section>
 

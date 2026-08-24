@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { pushChange, type Change } from "../src/history.ts"
-import { applyLayoutAction, type LayoutRect } from "../src/layout.ts"
+import { applyLayoutAction, snapPointToRects, snapRectDelta, type LayoutRect } from "../src/layout.ts"
 
 const first: LayoutRect = { section: "KEY1", x: 10, y: 20, width: 80, height: 40 }
 const second: LayoutRect = { section: "KEY2", x: 120, y: 100, width: 140, height: 100 }
@@ -36,3 +36,22 @@ pushChange(history, { kind: "text", path: "layout.ini", before: "x=2", after: "x
 assert.equal(history.length, 2)
 
 console.log("✓ 方向键自动重复移动合并为一次撤销记录")
+
+assert.deepEqual(
+  snapPointToRects({ x: 118, y: 148 }, [second], { x: 4, y: 4 }),
+  { x: 120, y: 150 },
+)
+assert.deepEqual(
+  snapRectDelta([first], [second], { x: 24, y: 34 }, { x: 6, y: 6 }),
+  { x: 30, y: 40 },
+)
+assert.deepEqual(
+  snapRectDelta([first], [second], { x: 24, y: 34 }, { x: 5, y: 5 }),
+  { x: 24, y: 34 },
+)
+assert.deepEqual(
+  snapRectDelta([{ ...first, x: 31 }], [first], { x: 0, y: 0 }, { x: 8, y: 8 }),
+  { x: 0, y: 0 },
+)
+
+console.log("✓ 十字轴与拖动分别吸附到按键边缘和中心关键点")
