@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
+import { findTextMatches, highlightIni, insertedTextRange, replaceTextMatches } from "../src/highlight.ts"
 import { SkinArchive } from "../src/skin.ts"
 import { consumeSourceWriteSnapshot, resolveSourceArchivePath } from "../src/source-tree.ts"
 
@@ -48,6 +49,7 @@ assert.equal(
 
 const html = fs.readFileSync("index.html", "utf8")
 const main = fs.readFileSync("src/main.ts", "utf8")
+const styles = fs.readFileSync("src/style.css", "utf8")
 const androidShare = fs.readFileSync("src-tauri/native-share/android/src/main/java/SharePlugin.kt", "utf8")
 const nativeShare = fs.readFileSync("src-tauri/native-share/src/lib.rs", "utf8")
 const tauri = fs.readFileSync("src-tauri/src/lib.rs", "utf8")
@@ -70,6 +72,44 @@ assert.match(
   /selectFile\(selectedPath, sidebarView, "document", true\)/,
   "外部源码刷新应保留当前检查器选项卡",
 )
+assert.match(
+  main,
+  /const preserveCurrentInspectorView = preserveInspectorView \|\| path === selectedPath/,
+  "重新选择当前文件时应保留源代码选项卡",
+)
+const sourceBefore = "[KEY1]\nCENTER=F1\n"
+const sourceAfter = "[KEY1]\nCENTER=F1\nVIEW_RECT=0,0,10,10\n"
+const insertedRange = insertedTextRange(sourceBefore, sourceAfter)
+assert.ok(insertedRange, "应识别撤销/重做目标文本中的新增代码")
+assert.match(
+  highlightIni(sourceAfter, [], insertedRange),
+  /<span class="token-selected"><span class="token-key">VIEW_RECT<\/span>/,
+  "新增代码应复用按键源码的选中高亮样式",
+)
+assert.equal(insertedTextRange(sourceAfter, sourceBefore), undefined, "仅删除代码时不应留下新增高亮")
+const searchableSource = "[A]\nVALUE=foo foo\nOTHER=foo"
+assert.deepEqual(findTextMatches(searchableSource, "FOO"), [10, 14, 24], "源码搜索应忽略大小写并返回全部命中")
+const searchHighlight = highlightIni(searchableSource, [], undefined, "foo", 1)
+assert.equal(searchHighlight.match(/token-search-match/g)?.length, 3, "每个搜索关键字都应单独高亮")
+assert.match(searchHighlight, /token-search-line active/, "当前关键字所在行应显示活动行高亮")
+assert.match(searchHighlight, /token-search-match active/, "当前关键字应显示活动高亮")
+assert.equal(
+  replaceTextMatches(searchableSource, "foo", "bar", 1),
+  "[A]\nVALUE=foo bar\nOTHER=foo",
+  "单个替换应只更新当前关键字",
+)
+assert.equal(
+  replaceTextMatches(searchableSource, "foo", "bar"),
+  "[A]\nVALUE=bar bar\nOTHER=bar",
+  "全部替换应更新所有关键字",
+)
+assert.match(html, /id="source-search-previous"/, "源码搜索应提供上一个按钮")
+assert.match(html, /id="source-search-next"/, "源码搜索应提供下一个按钮")
+assert.match(html, /id="source-replace-toggle"[^>]+aria-expanded="false"/, "替换栏应通过默认收起的图标按钮展开")
+assert.match(html, /class="source-replace-row" hidden/, "替换栏应默认隐藏")
+assert.match(html, /id="source-replace-all"/, "源码搜索应提供全部替换")
+assert.match(styles, /\.search-control > input:focus\s*\{[^}]*box-shadow: none/, "搜索框聚焦时只应显示外层焦点环")
+assert.match(styles, /\.source-replace-row\[hidden]/, "替换栏隐藏状态不应被 flex 样式覆盖")
 assert.match(
   main,
   /!isAndroidTauri\(\) \|\| configuredDirectory/,

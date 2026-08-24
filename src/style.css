@@ -1058,6 +1058,37 @@ h2 {
   --canvas-tertiary: #858991;
 }
 
+#preview-coordinates {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 8;
+  width: 112px;
+  padding: 5px 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: 7px;
+  color: var(--canvas-secondary);
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
+  font: 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+  pointer-events: none;
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+}
+
+#preview-coordinates span {
+  width: 4ch;
+  display: inline-block;
+  text-align: left;
+}
+
+.workspace:has(.canvas-wrap.empty) #preview-coordinates,
+.workspace:has(#workspace-image-figure:not([hidden])) #preview-coordinates {
+  display: none;
+}
+
 .device-shell {
   place-self: center;
   height: min(calc(100vh - 145px), 720px);
@@ -4004,12 +4035,23 @@ canvas {
 
 .source-toolbar {
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: grid;
+  gap: 6px;
   padding: 7px 10px;
   border-bottom: 1px solid var(--line-soft);
   background: var(--toolbar);
+}
+
+.source-find-row,
+.source-replace-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.source-replace-row[hidden] {
+  display: none;
 }
 
 .source-toolbar .search-control {
@@ -4017,11 +4059,62 @@ canvas {
   flex: 1;
 }
 
+.source-toolbar .search-control > input {
+  min-height: 0;
+}
+
 #source-search-count {
-  min-width: 32px;
+  min-width: 30px;
+  flex: none;
   color: var(--secondary);
   font-size: 10px;
   text-align: right;
+}
+
+.source-search-actions {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--control);
+}
+
+.source-toolbar button {
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--control);
+  font-size: 10px;
+}
+
+.source-search-actions button {
+  width: 28px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.source-search-actions button + button {
+  border-left: 1px solid var(--line);
+}
+
+.source-search-actions button[aria-expanded="true"] {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.source-toolbar button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.source-toolbar button:disabled {
+  opacity: 0.35;
+}
+
+.source-toolbar button .system-symbol {
+  width: 14px;
+  height: 14px;
 }
 
 .source-code {
@@ -4119,12 +4212,14 @@ canvas {
   color: #087f8c;
 }
 
-.token-selected {
+.token-selected,
+.token-search-line {
   position: relative;
   z-index: 0;
 }
 
-.token-selected::before {
+.token-selected::before,
+.token-search-line::before {
   content: "";
   position: absolute;
   z-index: -1;
@@ -4132,8 +4227,38 @@ canvas {
   bottom: -0.2em;
   left: -16px;
   width: calc(100vw + 16px);
+}
+
+.token-selected::before {
   background: rgb(10 127 245 / 16%);
   box-shadow: inset 3px 0 var(--accent);
+}
+
+.token-search-line::before {
+  background: color-mix(in srgb, #ffd60a 10%, transparent);
+}
+
+.token-search-line.active::before {
+  background: color-mix(in srgb, #ffd60a 18%, transparent);
+  box-shadow: inset 3px 0 #d49b00;
+}
+
+.token-selected.token-search-line::before {
+  background: color-mix(in srgb, var(--accent) 12%, #ffd60a 10%);
+}
+
+.token-search-match {
+  padding: 0 1px;
+  border-radius: 3px;
+  color: inherit;
+  background: color-mix(in srgb, #ffd60a 58%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #a66b00 22%, transparent);
+}
+
+.token-search-match.active {
+  color: #2c2100;
+  background: #ffd60a;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #805500 48%, transparent);
 }
 
 #asset {
@@ -4392,7 +4517,7 @@ input[type="search"]:focus {
   height: 15px;
 }
 
-.search-control input[type="search"] {
+.search-control > input {
   width: 100%;
   min-width: 0;
   height: 100%;
@@ -4401,6 +4526,12 @@ input[type="search"]:focus {
   background: transparent;
   box-shadow: none;
   font-size: var(--search-font-size);
+}
+
+.search-control > input:focus {
+  border-color: transparent;
+  outline: none;
+  box-shadow: none;
 }
 
 .search-control input[type="search"]::-webkit-search-decoration,
@@ -4986,6 +5117,10 @@ input[type="search"]:focus {
 
   .canvas-wrap {
     padding: 6px;
+  }
+
+  #preview-coordinates {
+    display: none;
   }
 
   .preview-zoom-control {

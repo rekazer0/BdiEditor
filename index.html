@@ -215,6 +215,7 @@
             <canvas id="atlas-canvas" aria-label="皮肤图集切片画布"></canvas>
             <figcaption id="workspace-image-error" hidden>无法预览此 PNG</figcaption>
           </figure>
+          <output id="preview-coordinates" aria-label="鼠标坐标">x: <span id="preview-coordinate-x">—</span>  y: <span id="preview-coordinate-y">—</span></output>
         </div>
         <button id="mobile-toggle-guides" class="preview-tool-toggle glass-module mobile-guides-toggle" aria-label="辅助线" title="辅助线" aria-pressed="false"><span class="system-symbol" data-system-symbol="ruler" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="10" rx="2"/><path d="M7 7v5m4-5v3m4-3v5m4-5v3"/></svg></span></button>
         <div class="preview-zoom-control" aria-label="画布缩放">
@@ -444,8 +445,19 @@
         </div>
         <div id="source-editor" hidden>
           <div class="source-toolbar">
-            <label class="search-control" aria-label="搜索源代码"><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"></span><input id="source-search" type="search" results="0" placeholder="搜索源代码"></label>
-            <span id="source-search-count" aria-live="polite"></span>
+            <div class="source-find-row">
+              <label class="search-control" aria-label="搜索源代码"><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"></span><input id="source-search" type="search" results="0" placeholder="查找"><span id="source-search-count" aria-live="polite"></span></label>
+              <div class="source-search-actions">
+                <button id="source-search-previous" type="button" title="上一个（Shift + Enter）" aria-label="上一个搜索结果"><span class="system-symbol" data-system-symbol="chevron.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m5 12 5-5 5 5"/></svg></span></button>
+                <button id="source-search-next" type="button" title="下一个（Enter）" aria-label="下一个搜索结果"><span class="system-symbol" data-system-symbol="chevron.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m5 8 5 5 5-5"/></svg></span></button>
+                <button id="source-replace-toggle" type="button" title="展开替换" aria-label="展开替换" aria-expanded="false"><span class="system-symbol" data-system-symbol="arrow.triangle.2.circlepath" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 7a6 6 0 0 1 10-2l2 2M16 13a6 6 0 0 1-10 2l-2-2M16 3v4h-4M4 17v-4h4"/></svg></span></button>
+              </div>
+            </div>
+            <div class="source-replace-row" hidden>
+              <label class="search-control" aria-label="替换为"><input id="source-replacement" type="text" placeholder="替换为"></label>
+              <button id="source-replace" type="button">替换</button>
+              <button id="source-replace-all" type="button">全部</button>
+            </div>
           </div>
           <div class="source-code">
             <pre id="source-line-numbers" aria-hidden="true"></pre>

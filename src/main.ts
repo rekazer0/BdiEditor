@@ -71,7 +71,7 @@ import {
 import { convertBdaArchive } from "./bda-convert.ts"
 import { IniDocument } from "./ini.ts"
 import { adaptIos26KeyboardLayout, adaptIos26Variant } from "./ios26.ts"
-import { highlightIni } from "./highlight.ts"
+import { findTextMatches, highlightIni, insertedTextRange, replaceTextMatches } from "./highlight.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
 import {
   applyCandidateImageStyles,
@@ -231,6 +231,13 @@ const sourceHighlight = $("#source-highlight code")
 const sourceLineNumbers = $("#source-line-numbers")
 const sourceSearch = $("#source-search") as HTMLInputElement
 const sourceSearchCount = $("#source-search-count")
+const sourceSearchPrevious = $("#source-search-previous") as HTMLButtonElement
+const sourceSearchNext = $("#source-search-next") as HTMLButtonElement
+const sourceReplaceToggle = $("#source-replace-toggle") as HTMLButtonElement
+const sourceReplaceRow = $(".source-replace-row")
+const sourceReplacement = $("#source-replacement") as HTMLInputElement
+const sourceReplace = $("#source-replace") as HTMLButtonElement
+const sourceReplaceAll = $("#source-replace-all") as HTMLButtonElement
 const canvasWrap = $(".canvas-wrap")
 const previewCanvas = $("#preview") as HTMLCanvasElement
 const previewPanelViewport = $("#panel-viewport")
@@ -261,6 +268,8 @@ const sourceName = $("#source-name")
 const dirty = $("#dirty")
 const eventLog = $("#event-log")
 const panelStatus = $("#panel-status")
+const previewCoordinateX = $("#preview-coordinate-x")
+const previewCoordinateY = $("#preview-coordinate-y")
 const previewZoomOut = $("#preview-zoom-out") as HTMLButtonElement
 const previewZoomFit = $("#preview-zoom-fit") as HTMLButtonElement
 const previewZoomIn = $("#preview-zoom-in") as HTMLButtonElement
@@ -454,6 +463,7 @@ let assetURL = ""
 let assetReturnPath = ""
 let inspectorTab: "properties" | "source" = "properties"
 let sourceSearchIndex = -1
+let sourceHistoryHighlight: readonly [number, number] | undefined
 type Change =
   | { kind: "text"; path: string; before: string; after: string }
   | { kind: "bytes"; path: string; before?: Uint8Array; after?: Uint8Array }
@@ -575,6 +585,16 @@ const preview = new Preview(
   false,
   (sections, deltaX, deltaY) => moveSelectedKeys(deltaX, deltaY, sections),
 )
+
+previewCanvas.addEventListener("pointermove", (event) => {
+  const bounds = previewCanvas.getBoundingClientRect()
+  previewCoordinateX.textContent = String(Math.floor((event.clientX - bounds.left) / bounds.width * previewCanvas.width))
+  previewCoordinateY.textContent = String(Math.floor((event.clientY - bounds.top) / bounds.height * previewCanvas.height))
+})
+previewCanvas.addEventListener("pointerleave", () => {
+  previewCoordinateX.textContent = "—"
+  previewCoordinateY.textContent = "—"
+})
 
 const toolbarPreview = new Preview(toolbarCanvas, () => {}, () => {}, true)
 const candidateBackgroundPreview = new Preview(candidateBackgroundCanvas, () => {}, () => {})
@@ -1373,6 +1393,7 @@ function applyModeState(): void {
   }
   updatePanelToolButtons()
   updateSourceFileActions()
+  updateSourceSearchStatus()
   syncSegmentedControls()
 }
 
@@ -1613,6 +1634,7 @@ function updateHistoryButtons(): void {
 
 function commitText(path: string, before: string, after: string): void {
   if (!archive || before === after) return
+  sourceHistoryHighlight = undefined
   archive.setText(path, after)
   undoStack.push({ kind: "text", path, before, after })
   redoStack = []
@@ -1646,6 +1668,7 @@ function commitBatch(changes: Change[]): void {
 
 function applyTextSnapshot(path: string, text: string): void {
   if (!archive) return
+  if (path === selectedPath) sourceHistoryHighlight = insertedTextRange(archive.getText(path), text)
   archive.setText(path, text)
   scheduleSourceAutosave([path])
   if (path === layoutPath) layoutDocument = IniDocument.parse(text)
@@ -1671,6 +1694,7 @@ function applyTextSnapshot(path: string, text: string): void {
 function undo(): void {
   const change = undoStack.pop()
   if (!change) return
+  sourceHistoryHighlight = undefined
   redoStack.push(change)
   if (change.kind === "batch") {
     for (const child of [...change.changes].reverse()) {
@@ -1687,6 +1711,7 @@ function undo(): void {
 function redo(): void {
   const change = redoStack.pop()
   if (!change) return
+  sourceHistoryHighlight = undefined
   undoStack.push(change)
   if (change.kind === "batch") {
     for (const child of change.changes) {
@@ -3260,7 +3285,14 @@ function updateInspectorView(): void {
 }
 
 function updateSourceHighlight(): void {
-  sourceHighlight.innerHTML = `${highlightIni(source.value, selectedSourceSections())}\n`
+  const sections = selectedSourceSections()
+  sourceHighlight.innerHTML = `${highlightIni(
+    source.value,
+    sections,
+    sections.length ? undefined : sourceHistoryHighlight,
+    sourceSearch.value.trim(),
+    sourceSearchIndex,
+  )}\n`
   sourceLineNumbers.textContent = Array.from(
     { length: source.value.split(/\r\n|\n|\r/).length },
     (_, index) => String(index + 1),
@@ -3269,14 +3301,7 @@ function updateSourceHighlight(): void {
 }
 
 function sourceSearchMatches(): number[] {
-  const query = sourceSearch.value.trim().toLocaleLowerCase()
-  if (!query) return []
-  const text = source.value.toLocaleLowerCase()
-  const matches: number[] = []
-  for (let index = text.indexOf(query); index >= 0; index = text.indexOf(query, index + query.length)) {
-    matches.push(index)
-  }
-  return matches
+  return findTextMatches(source.value, sourceSearch.value.trim())
 }
 
 function updateSourceSearchStatus(): void {
@@ -3285,6 +3310,9 @@ function updateSourceSearchStatus(): void {
   sourceSearchCount.textContent = sourceSearch.value.trim()
     ? `${sourceSearchIndex < 0 ? 0 : sourceSearchIndex + 1}/${matches.length}`
     : ""
+  sourceSearchPrevious.disabled = sourceSearchNext.disabled = !matches.length
+  const replaceable = Boolean(matches.length) && !source.disabled && !source.readOnly
+  sourceReplacement.disabled = sourceReplace.disabled = sourceReplaceAll.disabled = !replaceable
 }
 
 function syncSourceScroll(): void {
@@ -3298,7 +3326,7 @@ function findSourceMatch(direction: 1 | -1): void {
   const matches = sourceSearchMatches()
   if (!matches.length) {
     sourceSearchIndex = -1
-    updateSourceSearchStatus()
+    updateSourceHighlight()
     return
   }
   sourceSearchIndex = sourceSearchIndex < 0
@@ -3310,8 +3338,19 @@ function findSourceMatch(direction: 1 | -1): void {
   const style = getComputedStyle(source)
   const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.6
   source.scrollTop = Math.max(0, line * lineHeight - source.clientHeight / 3)
+  updateSourceHighlight()
   syncSourceScroll()
-  updateSourceSearchStatus()
+}
+
+function replaceSourceMatches(replaceAll: boolean): void {
+  const query = sourceSearch.value.trim()
+  const matches = sourceSearchMatches()
+  if (!query || !matches.length || source.disabled || source.readOnly) return
+  const index = sourceSearchIndex < 0 ? 0 : sourceSearchIndex
+  source.value = replaceTextMatches(source.value, query, sourceReplacement.value, replaceAll ? undefined : index)
+  sourceSearchIndex = replaceAll ? -1 : index
+  source.dispatchEvent(new Event("input", { bubbles: true }))
+  if (!replaceAll) findSourceMatch(1)
 }
 
 function selectedSourceSections(): string[] {
@@ -3342,12 +3381,14 @@ function effectiveKeyValue(section: string, key: string): string | undefined {
 
 function scrollSelectedSource(): void {
   const sections = selectedSourceSections()
-  if (sourceEditor.hidden || !sections.length) return
+  if (sourceEditor.hidden || !sections.length && !sourceHistoryHighlight) return
   const selected = new Set(sections)
-  const line = source.value.split(/\r\n|\n|\r/).findIndex((value) => {
-    const section = value.match(/^\s*\[([^\]]+)]\s*$/)?.[1]
-    return Boolean(section && selected.has(section))
-  })
+  const line = sections.length
+    ? source.value.split(/\r\n|\n|\r/).findIndex((value) => {
+      const section = value.match(/^\s*\[([^\]]+)]\s*$/)?.[1]
+      return Boolean(section && selected.has(section))
+    })
+    : source.value.slice(0, sourceHistoryHighlight?.[0]).split(/\r\n|\n|\r/).length - 1
   if (line < 0) return
   const style = getComputedStyle(source)
   const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.6
@@ -5290,6 +5331,8 @@ function selectFile(
   preserveInspectorView = false,
 ): void {
   const previousInspectorTab = inspectorTab
+  const preserveCurrentInspectorView = preserveInspectorView || path === selectedPath
+  if (path !== selectedPath) sourceHistoryHighlight = undefined
   styleReturnPath = ""
   resourceConfigActive = resourceMode !== "document"
   resourceInspectorMode = resourceMode === "style" ? "style" : resourceMode === "sound" ? "sound" : "image"
@@ -5378,7 +5421,7 @@ function selectFile(
   if (preferredSidebarView === "source" && (archive?.isText(path) || archive?.isBdaConfig(path))) {
     inspectorTab = "source"
   }
-  if (preserveInspectorView) inspectorTab = previousInspectorTab
+  if (preserveCurrentInspectorView) inspectorTab = previousInspectorTab
   updateInspectorView()
   if (resourceConfigActive) renderResourceInspector()
   if (!quickInspector.hidden) populateKeyInspector()
@@ -5404,6 +5447,7 @@ function selectFile(
     files.querySelector<HTMLButtonElement>(`.mobile-overview-groups button[data-overview-group="${CSS.escape(group ?? "")}"]`)?.click()
   }
   updateSourceFileActions()
+  updateSourceSearchStatus()
 }
 
 const overviewGroupState = new Map<string, boolean>()
@@ -6621,6 +6665,22 @@ sourceSearch.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return
   event.preventDefault()
   findSourceMatch(event.shiftKey ? -1 : 1)
+})
+sourceSearchPrevious.addEventListener("click", () => findSourceMatch(-1))
+sourceSearchNext.addEventListener("click", () => findSourceMatch(1))
+sourceReplaceToggle.addEventListener("click", () => {
+  const expanded = sourceReplaceRow.hidden
+  sourceReplaceRow.hidden = !expanded
+  sourceReplaceToggle.setAttribute("aria-expanded", String(expanded))
+  sourceReplaceToggle.title = sourceReplaceToggle.ariaLabel = expanded ? "收起替换" : "展开替换"
+  if (expanded) sourceReplacement.focus()
+})
+sourceReplace.addEventListener("click", () => replaceSourceMatches(false))
+sourceReplaceAll.addEventListener("click", () => replaceSourceMatches(true))
+sourceReplacement.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return
+  event.preventDefault()
+  replaceSourceMatches(event.metaKey || event.ctrlKey)
 })
 for (const field of keyFields) {
   field.addEventListener("input", () => {
