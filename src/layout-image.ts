@@ -1,5 +1,5 @@
 import { IniDocument } from "./ini.ts"
-import type { TileRect, TileSlice } from "./tiles.ts"
+import { updateTileSlice, type TileRect, type TileSlice } from "./tiles.ts"
 
 export type LayoutKeyGeometry = { section: string; rect: TileRect }
 export type LayoutImageTarget = "panel" | "key-normal" | "key-highlight" | "fore-normal" | "fore-highlight" | "candidate"
@@ -65,6 +65,12 @@ export function planLayoutImage(target: LayoutImageTarget, keys: readonly Layout
     index += 1
   }
   return { target, keys: [...keys], slices, indices }
+}
+
+export function layoutImageTileDocument(plan: LayoutImagePlan): IniDocument {
+  const tiles = IniDocument.parse(`[GLOBAL]\r\nUSE_ALPHA=2\r\nTILE_NUM=${plan.slices.length}\r\n\r\n`)
+  for (const slice of plan.slices) updateTileSlice(tiles, slice)
+  return tiles
 }
 
 // 图片跟随布局 / 布局跟随图片：切片源改为图像里检测到的网格单元，按键按索引取对应切片

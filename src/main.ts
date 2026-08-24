@@ -78,6 +78,7 @@ import {
   applyCandidateImageStyles,
   applyLayoutImageRects,
   applyLayoutImageStyles,
+  layoutImageTileDocument,
   layoutKeyRects,
   matchLayoutKeysToCells,
   planLayoutImage,
@@ -7412,8 +7413,7 @@ async function applyLayoutImage(): Promise<void> {
     }
     const base = nextResourceBase()
     const plan = planLayoutImage(layoutImageTarget, [], IniDocument.parse(""), panel.width, panel.height)
-    const tilesDoc = IniDocument.parse("")
-    for (const slice of plan.slices) updateTileSlice(tilesDoc, slice)
+    const tilesDoc = layoutImageTileDocument(plan)
     const stylesDoc = IniDocument.parse(styles.toString())
     const candDoc = IniDocument.parse(cand.toString())
     applyCandidateImageStyles(stylesDoc, candDoc, plan, base.split("/").pop()!)
@@ -7476,8 +7476,7 @@ async function applyLayoutImage(): Promise<void> {
     sourceHeight = scan.height
   }
   const base = nextResourceBase()
-  const tilesDoc = IniDocument.parse("")
-  for (const slice of plan.slices) updateTileSlice(tilesDoc, slice)
+  const tilesDoc = layoutImageTileDocument(plan)
   const stylesDoc = IniDocument.parse(styles.toString())
   if (layoutImageConfig === "layout-follows-image" && layoutImageTarget !== "panel") {
     // 布局跟随图片：把按键矩形与面板尺寸改写为图片网格
