@@ -30,6 +30,7 @@ export type PreviewItem = {
   hold: string
   holdSymbols: string
   backStyle: string
+  highlightBackStyle?: string
   foreStyle: string
   foreStyles: string[]
   foreOffsets: Array<[number, number] | undefined>
@@ -475,6 +476,7 @@ export function effectivePreviewItem(
       hold: value("HOLD") ?? item.hold,
       holdSymbols: value("HOLDSYM") ?? item.holdSymbols,
       backStyle: backStyle === undefined ? item.backStyle : backStyle.split(",")[0],
+      highlightBackStyle: value("HL_BACK_STYLE")?.split(",")[0] ?? item.highlightBackStyle,
       foreStyle: foreStyles[0] ?? "",
       foreStyles,
       foreOffsets: foreOffset === undefined
@@ -502,6 +504,7 @@ export function effectivePreviewItem(
   return {
     ...item,
     backStyle: backStyle === undefined ? item.backStyle : backStyle.split(",")[0],
+    highlightBackStyle: document.get(section, "HL_BACK_STYLE")?.split(",")[0] ?? item.highlightBackStyle,
     foreStyle: foreStyles[0] ?? "",
     foreStyles,
     positionTypes: positionType === undefined
@@ -536,7 +539,10 @@ export function animationSequenceForKey(
   const candidates = [item.section, item.center, item.down, `KEY_${item.center}`]
     .map((value) => value.trim().toUpperCase()).filter(Boolean)
   const target = animation.targets.find((value) => candidates.includes(value.toUpperCase()))
-  if (target) return animation.sequences.get(target) ?? animation.sequences.get(target.replace(/^KEY_/, ""))
+  if (target) {
+    const sequence = animation.bindings.get(target)
+    return animation.sequences.get(sequence ?? target) ?? animation.sequences.get(target.replace(/^KEY_/, ""))
+  }
   if (animation.sequences.size === 1) return animation.sequences.values().next().value
 }
 
@@ -632,7 +638,7 @@ export function previewFallbackText(
   mode: "edit" | "preview",
   hasForeground: boolean,
 ): string {
-  return ""
+  return !hasForeground && item.section?.startsWith("LIST:") ? item.show : ""
 }
 
 export function foregroundLayerRect(
@@ -731,6 +737,7 @@ function itemFromSection(document: IniDocument, section: string): PreviewItem | 
     hold: value("HOLD"),
     holdSymbols: value("HOLDSYM"),
     backStyle: value("BACK_STYLE").split(",")[0],
+    highlightBackStyle: value("HL_BACK_STYLE").split(",")[0] || undefined,
     foreStyle: foreStyles[0] ?? "",
     foreStyles,
     foreOffsets: value("FORE_OFFSET").split(";").map(parseOffset),
@@ -921,6 +928,7 @@ export function previewItems(
       hold: value("HOLD"),
       holdSymbols: value("HOLDSYM"),
       backStyle,
+      highlightBackStyle: value("HL_BACK_STYLE").split(",")[0] || undefined,
       foreStyle,
       foreStyles,
       foreOffsets: [],
@@ -1412,11 +1420,12 @@ export class Preview {
         void this.draw()
         return
       }
+      if (frame.resourceID === undefined) return void play(index + 1)
       const visual = await this.resolver?.resolveResource?.(frame.resourceID)
       if (!visual) return
       this.animationVisual = { key, visual }
       void this.draw()
-      this.animationTimer = window.setTimeout(() => void play(index + 1), Math.max(16, frame.duration))
+      this.animationTimer = window.setTimeout(() => void play(index + 1), Math.max(16, frame.duration ?? 0))
     }
     await play(0)
   }
@@ -1795,7 +1804,10 @@ export class Preview {
         const highlighted = this.active?.key.section === key.section ||
           this.legacyAnimationState?.key.section === key.section
         return {
-          back: await this.resolver?.resolve(key.backStyle, highlighted),
+          back: await this.resolver?.resolve(
+            highlighted ? key.highlightBackStyle ?? key.backStyle : key.backStyle,
+            highlighted,
+          ),
           fore: await Promise.all(
             key.foreStyles.map((style) => this.resolver?.resolve(style, highlighted)),
           ),

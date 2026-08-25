@@ -163,6 +163,19 @@ await sleep(400)
 const previewShift = await page.$eval("#event-log", (el) => el.textContent ?? "")
 console.log("preview shift/F10", previewShift)
 
+await page.click("#preview-zoom-fit", { clickCount: 2 })
+if (!await page.$eval("#preview-zoom-fit", (el) => el.getAttribute("aria-pressed") === "true")) {
+  throw new Error("double-click did not lock canvas panning")
+}
+const lockedCanvasBox = await (await page.$("#preview")).boundingBox()
+if (!lockedCanvasBox) throw new Error("no locked canvas box")
+await page.mouse.move(lockedCanvasBox.x + lockedCanvasBox.width * qx, lockedCanvasBox.y + lockedCanvasBox.height * qy)
+await page.mouse.down()
+await page.mouse.move(lockedCanvasBox.x + lockedCanvasBox.width * qx + 40, lockedCanvasBox.y + lockedCanvasBox.height * qy)
+await page.mouse.up()
+const lockedSwipe = await page.$eval("#event-log", (el) => el.textContent ?? "")
+if (!lockedSwipe.includes("RIGHT")) throw new Error("locked key drag missed RIGHT swipe: " + lockedSwipe)
+
 await browser.close()
 
 if (editQ !== "q") throw new Error("edit did not select q, got " + editQ)

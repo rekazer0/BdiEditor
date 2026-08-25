@@ -9,51 +9,166 @@ type ProtoField = {
 export type BdaResource = { type: number; resourceID: string }
 export type BdaStyleRef = { type: "image" | "color" | "text"; key: number }
 export type BdaRect = { x: number; y: number; width: number; height: number }
+export type BdaScaledOffset = { x: number; y: number }
+export type BdaFontAdaptInfo = {
+  fontSize?: number
+  normalColor?: number
+  highlightColor?: number
+  contentText?: string
+  scaledOffset?: BdaScaledOffset
+  drawType?: number
+}
 export type BdaImageAtom = {
   resource?: BdaResource
   innerRect?: BdaRect
   contentInset?: { top: number; left: number; bottom: number; right: number }
-  alpha: number
-  filterColor: number
+  alpha?: number
+  filterColor?: number
 }
 export type BdaImageStyle = {
   normalImage?: BdaImageAtom
   highlightImage?: BdaImageAtom
+  fontInfo?: BdaFontAdaptInfo
 }
 export type BdaTextStyle = {
   resource?: BdaResource
-  fontName: string
-  fontSize: number
-  normalColor: number
-  highlightColor: number
-  contentText: string
+  fontName?: string
+  fontSize?: number
+  normalColor?: number
+  highlightColor?: number
+  contentText?: string
 }
-export type BdaColorStyle = { normalColor: number; highlightColor: number }
+export type BdaColorStyle = { normalColor?: number; highlightColor?: number }
 export type BdaKey = {
   backStyle?: BdaStyleRef
   foreStyles: BdaStyleRef[]
   foreStyleOffsets: Array<{ x: number; y: number }>
   backStyleState?: BdaStyleRef
 }
-export type BdaPanel = {
-  keys: Map<string, BdaKey>
+export type BdaBar = { backStyle?: BdaStyleRef }
+export type BdaTab = {
   backStyle?: BdaStyleRef
+  cellForeStyle?: BdaStyleRef
+  cellBackStyle?: BdaStyleRef
+  decoratorBackStyle?: BdaStyleRef
+}
+export type BdaCorpusList = {
+  backStyle?: BdaStyleRef
+  cellForeStyle?: BdaStyleRef
+  cellBackStyle?: BdaStyleRef
+  corpusSecondTab?: BdaTab
+}
+export type BdaGamePanel = {
+  backStyle?: BdaStyleRef
+  corpusFirstTab?: BdaTab
+  corpusList?: BdaCorpusList
+  functionBar?: BdaBar
+  keys: Map<string, BdaKey>
+}
+export type BdaSwitch = {
+  normalBack?: BdaStyleRef
+  selectBack?: BdaStyleRef
+  normalFore?: BdaStyleRef
+  selectFore?: BdaStyleRef
+}
+export type BdaCand = {
+  candBarStyle?: BdaStyleRef
+  candOnBarStyle?: BdaStyleRef
+  cellBackStyle?: BdaStyleRef
+  cellForeStyle?: BdaStyleRef
+  firstCellForeStyle?: BdaStyleRef
+  firstCellBackStyle?: BdaStyleRef
+  subCandCellForeStyle?: BdaStyleRef
+  subCandCellBackStyle?: BdaStyleRef
+  switch?: BdaSwitch
+  candKeys: Map<string, BdaKey>
+  subCandBackStyle?: BdaStyleRef
+  menuKeys: Map<string, BdaKey>
+  aiIcon?: BdaKey
+  accessoryBackStyle?: BdaStyleRef
+  gridLeftForeStyle?: BdaStyleRef
+  gridRightForeStyle?: BdaStyleRef
+}
+export type BdaList = {
+  backStyle?: BdaStyleRef
+  cellBackStyle?: BdaStyleRef
+  cellForeStyle?: BdaStyleRef
+  foreStyles: BdaStyleRef[]
+  foreStyleOffsets: BdaScaledOffset[]
+}
+export type BdaHint = {
+  offset?: BdaScaledOffset
+  backStyle?: BdaStyleRef
+  barStyle?: BdaStyleRef
+  barOffset?: BdaScaledOffset
+  foreStyle?: BdaStyleRef
+  cellStyle?: BdaStyleRef
+}
+export type BdaInputTile = { backStyle?: BdaStyleRef; textStyle?: BdaStyleRef }
+export type BdaGrid = {
+  backStyle?: BdaStyleRef
+  cellForeStyle?: BdaStyleRef
+  cellBackStyle?: BdaStyleRef
+}
+export type BdaPanel = {
+  hints: Map<string, BdaHint>
+  lists: Map<string, BdaList>
+  keys: Map<string, BdaKey>
+  cand?: BdaCand
+  input?: BdaInputTile
+  more?: BdaGrid
+  backStyle?: BdaStyleRef
+  shouldBgBlur?: boolean
   wholeBackStyle?: BdaStyleRef
+  shouldKeySlotting?: boolean
   inputRegionBackStyle?: BdaStyleRef
-  trackColor: number
+  trackColor?: number
+}
+export type BdaColorPalette = {
+  labelColor?: number
+  secondaryLabelColor?: number
+  tertiaryLabelColor?: number
+  quaternaryLabelColor?: number
+  brandColor?: number
+  systemBackgroundColor?: number
+  secondarySystemBackgroundColor?: number
+  tertiarySystemBackgroundColor?: number
+  elevatedSystemBackgroundColor?: number
+  secondaryElevatedSystemBackgroundColor?: number
+  tertiaryElevatedSystemBackgroundColor?: number
+  systemGroupedBackgroundColor?: number
+  secondarySystemGroupedBackgroundColor?: number
+  tertiarySystemGroupedBackgroundColor?: number
+  separatorColor?: number
+  opaqueSeparatorColor?: number
+  systemFillColor?: number
+  secondarySystemFillColor?: number
+  tertiarySystemFillColor?: number
+  quaternarySystemFillColor?: number
+  maskColor?: number
+  maskBlurColor?: number
+  bulletWindowColor?: number
+  opaqueBulletWindowColor?: number
+  editBlueColor?: number
+  editDeepBlueColor?: number
+  editRedColor?: number
 }
 export type BdaAppearance = {
-  designWidth: number
+  designWidth?: number
   imageStyles: Map<number, BdaImageStyle>
   textStyles: Map<number, BdaTextStyle>
   colorStyles: Map<number, BdaColorStyle>
   panels: Map<string, BdaPanel>
+  colorPalette?: BdaColorPalette
+  gamePanel?: BdaGamePanel
+  dragBar?: BdaBar
 }
-export type BdaAnimationFrame = { resourceID: string; duration: number }
+export type BdaAnimationFrame = { resourceID?: string; duration?: number }
 export type BdaAnimationSequence = { name: string; frames: BdaAnimationFrame[] }
 export type BdaAnimation = {
   targets: string[]
   sequences: Map<string, BdaAnimationSequence>
+  bindings: Map<string, string>
 }
 export type BdaSoundConfig = {
   keySounds: Map<string, BdaResource>
@@ -99,25 +214,122 @@ export function bdaPanelKeyName(action: string): string {
   return `KEY_${action.trim().toUpperCase()}`
 }
 
+function bdaCandKeyName(action: string): string {
+  return `CAND_${action.trim().toUpperCase()}`
+}
+
+function setBdaStyle(document: IniDocument, section: string, property: string, style: BdaStyleRef | undefined): void {
+  if (style) document.set(section, property, bdaStyleID(style))
+}
+
+function applyBdaKey(document: IniDocument, section: string, key: BdaKey): void {
+  setBdaStyle(document, section, "BACK_STYLE", key.backStyle)
+  setBdaStyle(document, section, "HL_BACK_STYLE", key.backStyleState)
+  if (key.foreStyles.length) document.set(section, "FORE_STYLE", key.foreStyles.map(bdaStyleID).join(","))
+  if (!key.foreStyleOffsets.length) return
+  const rect = (document.get(section, "VIEW_RECT") ?? document.get(section, "SIZE"))?.split(",").map(Number)
+  const width = rect?.at(-2) ?? 0
+  const height = rect?.at(-1) ?? 0
+  document.set(section, "FORE_OFFSET", key.foreStyleOffsets
+    .map(({ x, y }) => `${Math.trunc(x * width)},${Math.trunc(y * height)}`)
+    .join(";"))
+}
+
+function applyBdaStateKeys(
+  document: IniDocument,
+  sections: string[],
+  keys: Map<string, BdaKey>,
+  name: (action: string) => string,
+): void {
+  for (const section of sections) {
+    const action = document.get(section, /^ICON|^TIP/.test(section) ? "KEY" : "CENTER") ??
+      document.get(section, "DOWN")
+    const states = document.get(section, "STAT_STYLE")
+    if (!action || !states) continue
+    for (const match of states.matchAll(/S(\d+)_(\d+)/g)) {
+      const key = keys.get(`${name(action)}_S${match[1]}`)
+      if (key) applyBdaKey(document, `TIP${match[2]}`, key)
+    }
+  }
+}
+
 export function bdaLayoutDocument(base: IniDocument, appearance: BdaAppearance, layout: string): IniDocument {
   const document = IniDocument.parse(base.toString())
   const panel = appearance.panels.get(layout.replace(/\.ini$/i, ""))
   if (!panel) return document
-  for (const section of document.sections().filter((name) => /^KEY\d+$/.test(name))) {
+  const sections = document.sections()
+  const keySections = sections.filter((name) => /^KEY\d+$/.test(name))
+  for (const section of keySections) {
     const actions = [document.get(section, "CENTER"), document.get(section, "DOWN")]
       .filter((value): value is string => Boolean(value))
     const key = actions.map(bdaPanelKeyName).map((name) => panel.keys.get(name)).find(Boolean)
-    if (!key) continue
-    document.set(section, "BACK_STYLE", bdaStyleID(key.backStyle))
-    document.set(section, "FORE_STYLE", key.foreStyles.map(bdaStyleID).join(","))
-    if (key.foreStyleOffsets.length) {
-      const rect = document.get(section, "VIEW_RECT")?.split(",").map(Number)
-      const width = rect?.[2] ?? 0
-      const height = rect?.[3] ?? 0
-      document.set(section, "FORE_OFFSET", key.foreStyleOffsets
-        .map(({ x, y }) => `${x * width},${y * height}`)
-        .join(";"))
+    if (key) applyBdaKey(document, section, key)
+  }
+  applyBdaStateKeys(document, keySections, panel.keys, bdaPanelKeyName)
+
+  setBdaStyle(document, "PANEL", "BACK_STYLE", panel.backStyle)
+  setBdaStyle(document, "INPUT", "BACK_STYLE", panel.input?.backStyle)
+  setBdaStyle(document, "INPUT", "FORE_STYLE", panel.input?.textStyle)
+  setBdaStyle(document, "MORE", "BACK_STYLE", panel.more?.backStyle)
+  setBdaStyle(document, "MORE", "FORE_STYLE", panel.more?.cellForeStyle)
+  setBdaStyle(document, "MORE", "CELL_STYLE", panel.more?.cellBackStyle)
+
+  const list = panel.lists.get("port") ?? panel.lists.values().next().value
+  setBdaStyle(document, "LIST", "BACK_STYLE", list?.backStyle)
+  setBdaStyle(document, "LIST", "FORE_STYLE", list?.cellForeStyle)
+  setBdaStyle(document, "LIST", "CELL_STYLE", list?.cellBackStyle)
+
+  const cand = panel.cand
+  setBdaStyle(document, "CAND", "BACK_STYLE", cand?.candBarStyle)
+  setBdaStyle(document, "CAND", "FORE_STYLE", cand?.cellForeStyle)
+  setBdaStyle(document, "CAND", "CELL_STYLE", cand?.cellBackStyle)
+  setBdaStyle(document, "CAND", "FIRST_FORE", cand?.firstCellForeStyle)
+  setBdaStyle(document, "SWITCH", "NML_BACK_STYLE", cand?.switch?.normalBack)
+  setBdaStyle(document, "SWITCH", "SEL_BACK_STYLE", cand?.switch?.selectBack)
+  setBdaStyle(document, "SWITCH", "NML_FONT_STYLE", cand?.switch?.normalFore)
+  setBdaStyle(document, "SWITCH", "SEL_FONT_STYLE", cand?.switch?.selectFore)
+  const candSections = sections.filter((name) => /^(?:ICON|TIP)\d+$/.test(name))
+  for (const section of candSections) {
+    const action = document.get(section, "KEY")
+    const key = action && cand?.candKeys.get(bdaCandKeyName(action))
+    if (key) applyBdaKey(document, section, key)
+  }
+  if (cand) applyBdaStateKeys(document, candSections, cand.candKeys, bdaCandKeyName)
+
+  const fallbackHint = panel.hints.get("port") ?? panel.hints.values().next().value
+  const shortHint = panel.hints.get("short") ?? fallbackHint
+  const longHint = panel.hints.get("long") ?? fallbackHint
+  if ((shortHint || longHint) && sections.includes("GLOBAL")) {
+    const backIcon = document.get("HINT", "BACK_ICON")
+    if (backIcon && shortHint) {
+      const section = `ICON${backIcon}`
+      setBdaStyle(document, section, "BACK_STYLE", shortHint.backStyle)
+      setBdaStyle(document, section, "FORE_STYLE", shortHint.foreStyle)
+      const size = document.get(section, "SIZE")?.split(",").map(Number)
+      if (shortHint.offset && size?.length === 2) {
+        document.set(section, "POS", `${Math.trunc(shortHint.offset.x * size[0])},${Math.trunc(shortHint.offset.y * size[1])}`)
+      }
     }
+    const longIcon = document.get("BAR", "BACK_ICON")
+    if (longIcon && longHint) {
+      const section = `ICON${longIcon}`
+      setBdaStyle(document, section, "BACK_STYLE", longHint.backStyle)
+      setBdaStyle(document, section, "FORE_STYLE", longHint.foreStyle)
+      const size = document.get(section, "SIZE")?.split(",").map(Number)
+      if (longHint.offset && size?.length === 2) {
+        document.set(section, "POS", `${Math.trunc(longHint.offset.x * size[0])},${Math.trunc(longHint.offset.y * size[1])}`)
+      }
+    }
+    const barIcon = document.get("BAR", "ARROW_ICON")
+    if (barIcon && longHint) {
+      const section = `ICON${barIcon}`
+      setBdaStyle(document, section, "BACK_STYLE", longHint.barStyle)
+      const size = document.get(section, "SIZE")?.split(",").map(Number)
+      if (longHint.barOffset && size?.length === 2) {
+        document.set(section, "POS", `${Math.trunc(longHint.barOffset.x * size[0])},${Math.trunc(longHint.barOffset.y * size[1])}`)
+      }
+    }
+    setBdaStyle(document, "BAR", "CELL_STYLE", longHint?.cellStyle)
   }
   return document
 }
@@ -205,8 +417,28 @@ function styleRef(field: ProtoField | undefined): BdaStyleRef | undefined {
   return { type: types[first(value, 1)?.varint ?? 0] ?? "image", key: first(value, 2)?.varint ?? 0 }
 }
 
+function styleRefs(value: ProtoField[], number: number): BdaStyleRef[] {
+  return value.filter((item) => item.number === number).flatMap((item) => {
+    const style = styleRef(item)
+    return style ? [style] : []
+  })
+}
+
 function float(value: ProtoField[], number: number): number {
   return first(value, number)?.fixed32 ?? 0
+}
+
+function scaledOffset(field: ProtoField | undefined): BdaScaledOffset | undefined {
+  if (!field) return
+  const value = message(field)
+  return { x: float(value, 1), y: float(value, 2) }
+}
+
+function stringMap<T>(value: ProtoField[], number: number, decode: (field: ProtoField | undefined) => T): Map<string, T> {
+  return new Map(mapEntries(value, number).map((entry) => [
+    string(first(entry, 1)),
+    decode(first(entry, 2)),
+  ]))
 }
 
 function rect(field: ProtoField | undefined): BdaRect | undefined {
@@ -235,16 +467,25 @@ function imageAtom(field: ProtoField | undefined): BdaImageAtom | undefined {
       bottom: float(inset, 3),
       right: float(inset, 4),
     } : undefined,
-    alpha: float(value, 4),
-    filterColor: first(value, 5)?.varint ?? 0,
+    alpha: first(value, 4)?.fixed32,
+    filterColor: first(value, 5)?.varint,
   }
 }
 
 function imageStyle(field: ProtoField | undefined): BdaImageStyle {
   const value = message(field)
+  const font = message(first(value, 3))
   return {
     normalImage: imageAtom(first(value, 1)),
     highlightImage: imageAtom(first(value, 2)),
+    fontInfo: font.length ? {
+      fontSize: first(font, 1)?.varint,
+      normalColor: first(font, 2)?.varint,
+      highlightColor: first(font, 3)?.varint,
+      contentText: first(font, 4) ? string(first(font, 4)) : undefined,
+      scaledOffset: scaledOffset(first(font, 5)),
+      drawType: first(font, 6)?.varint,
+    } : undefined,
   }
 }
 
@@ -252,19 +493,19 @@ function textStyle(field: ProtoField | undefined): BdaTextStyle {
   const value = message(field)
   return {
     resource: resource(first(value, 1)),
-    fontName: string(first(value, 2)),
-    fontSize: first(value, 3)?.varint ?? 0,
-    normalColor: first(value, 4)?.varint ?? 0,
-    highlightColor: first(value, 5)?.varint ?? 0,
-    contentText: string(first(value, 6)),
+    fontName: first(value, 2) ? string(first(value, 2)) : undefined,
+    fontSize: first(value, 3)?.varint,
+    normalColor: first(value, 4)?.varint,
+    highlightColor: first(value, 5)?.varint,
+    contentText: first(value, 6) ? string(first(value, 6)) : undefined,
   }
 }
 
 function colorStyle(field: ProtoField | undefined): BdaColorStyle {
   const value = message(field)
   return {
-    normalColor: first(value, 1)?.varint ?? 0,
-    highlightColor: first(value, 2)?.varint ?? 0,
+    normalColor: first(value, 1)?.varint,
+    highlightColor: first(value, 2)?.varint,
   }
 }
 
@@ -272,30 +513,163 @@ function key(field: ProtoField | undefined): BdaKey {
   const value = message(field)
   return {
     backStyle: styleRef(first(value, 1)),
-    foreStyles: value.filter((item) => item.number === 2).flatMap((item) => {
-      const style = styleRef(item)
-      return style ? [style] : []
-    }),
-    foreStyleOffsets: value.filter((item) => item.number === 3).map((item) => {
-      const offset = message(item)
-      return { x: float(offset, 1), y: float(offset, 2) }
+    foreStyles: styleRefs(value, 2),
+    foreStyleOffsets: value.filter((item) => item.number === 3).flatMap((item) => {
+      const offset = scaledOffset(item)
+      return offset ? [offset] : []
     }),
     backStyleState: styleRef(first(value, 4)),
   }
 }
 
+function bar(field: ProtoField | undefined): BdaBar | undefined {
+  const value = message(field)
+  return value.length ? { backStyle: styleRef(first(value, 1)) } : undefined
+}
+
+function tab(field: ProtoField | undefined): BdaTab | undefined {
+  const value = message(field)
+  return value.length ? {
+    backStyle: styleRef(first(value, 1)),
+    cellForeStyle: styleRef(first(value, 2)),
+    cellBackStyle: styleRef(first(value, 3)),
+    decoratorBackStyle: styleRef(first(value, 4)),
+  } : undefined
+}
+
+function corpusList(field: ProtoField | undefined): BdaCorpusList | undefined {
+  const value = message(field)
+  return value.length ? {
+    backStyle: styleRef(first(value, 1)),
+    cellForeStyle: styleRef(first(value, 2)),
+    cellBackStyle: styleRef(first(value, 3)),
+    corpusSecondTab: tab(first(value, 4)),
+  } : undefined
+}
+
+function gamePanel(field: ProtoField | undefined): BdaGamePanel | undefined {
+  const value = message(field)
+  return value.length ? {
+    backStyle: styleRef(first(value, 1)),
+    corpusFirstTab: tab(first(value, 2)),
+    corpusList: corpusList(first(value, 3)),
+    functionBar: bar(first(value, 4)),
+    keys: stringMap(value, 5, key),
+  } : undefined
+}
+
+function switchStyle(field: ProtoField | undefined): BdaSwitch | undefined {
+  const value = message(field)
+  return value.length ? {
+    normalBack: styleRef(first(value, 1)),
+    selectBack: styleRef(first(value, 2)),
+    normalFore: styleRef(first(value, 3)),
+    selectFore: styleRef(first(value, 4)),
+  } : undefined
+}
+
+function cand(field: ProtoField | undefined): BdaCand | undefined {
+  const value = message(field)
+  return value.length ? {
+    candBarStyle: styleRef(first(value, 1)),
+    candOnBarStyle: styleRef(first(value, 2)),
+    cellBackStyle: styleRef(first(value, 3)),
+    cellForeStyle: styleRef(first(value, 4)),
+    firstCellForeStyle: styleRef(first(value, 5)),
+    firstCellBackStyle: styleRef(first(value, 6)),
+    subCandCellForeStyle: styleRef(first(value, 7)),
+    subCandCellBackStyle: styleRef(first(value, 8)),
+    switch: switchStyle(first(value, 9)),
+    candKeys: stringMap(value, 10, key),
+    subCandBackStyle: styleRef(first(value, 11)),
+    menuKeys: stringMap(value, 12, key),
+    aiIcon: first(value, 13) ? key(first(value, 13)) : undefined,
+    accessoryBackStyle: styleRef(first(value, 14)),
+    gridLeftForeStyle: styleRef(first(value, 15)),
+    gridRightForeStyle: styleRef(first(value, 16)),
+  } : undefined
+}
+
+function list(field: ProtoField | undefined): BdaList {
+  const value = message(field)
+  return {
+    backStyle: styleRef(first(value, 1)),
+    cellBackStyle: styleRef(first(value, 2)),
+    cellForeStyle: styleRef(first(value, 3)),
+    foreStyles: styleRefs(value, 4),
+    foreStyleOffsets: value.filter((item) => item.number === 5).flatMap((item) => {
+      const offset = scaledOffset(item)
+      return offset ? [offset] : []
+    }),
+  }
+}
+
+function hint(field: ProtoField | undefined): BdaHint {
+  const value = message(field)
+  return {
+    offset: scaledOffset(first(value, 1)),
+    backStyle: styleRef(first(value, 2)),
+    barStyle: styleRef(first(value, 3)),
+    barOffset: scaledOffset(first(value, 4)),
+    foreStyle: styleRef(first(value, 5)),
+    cellStyle: styleRef(first(value, 6)),
+  }
+}
+
+function inputTile(field: ProtoField | undefined): BdaInputTile | undefined {
+  const value = message(field)
+  return value.length ? {
+    backStyle: styleRef(first(value, 1)),
+    textStyle: styleRef(first(value, 2)),
+  } : undefined
+}
+
+function grid(field: ProtoField | undefined): BdaGrid | undefined {
+  const value = message(field)
+  return value.length ? {
+    backStyle: styleRef(first(value, 1)),
+    cellForeStyle: styleRef(first(value, 2)),
+    cellBackStyle: styleRef(first(value, 3)),
+  } : undefined
+}
+
 function panel(field: ProtoField | undefined): BdaPanel {
   const value = message(field)
   return {
-    keys: new Map(mapEntries(value, 3).map((entry) => [
-      string(first(entry, 1)),
-      key(first(entry, 2)),
-    ])),
+    hints: stringMap(value, 1, hint),
+    lists: stringMap(value, 2, list),
+    keys: stringMap(value, 3, key),
+    cand: cand(first(value, 4)),
+    input: inputTile(first(value, 5)),
+    more: grid(first(value, 6)),
     backStyle: styleRef(first(value, 7)),
-    trackColor: first(value, 9)?.varint ?? 0,
+    shouldBgBlur: first(value, 8) ? first(value, 8)?.varint !== 0 : undefined,
+    trackColor: first(value, 9)?.varint,
     wholeBackStyle: styleRef(first(value, 10)),
+    shouldKeySlotting: first(value, 11) ? first(value, 11)?.varint !== 0 : undefined,
     inputRegionBackStyle: styleRef(first(value, 12)),
   }
+}
+
+const paletteFields = [
+  "labelColor", "secondaryLabelColor", "tertiaryLabelColor", "quaternaryLabelColor", "brandColor",
+  "systemBackgroundColor", "secondarySystemBackgroundColor", "tertiarySystemBackgroundColor",
+  "elevatedSystemBackgroundColor", "secondaryElevatedSystemBackgroundColor", "tertiaryElevatedSystemBackgroundColor",
+  "systemGroupedBackgroundColor", "secondarySystemGroupedBackgroundColor", "tertiarySystemGroupedBackgroundColor",
+  "separatorColor", "opaqueSeparatorColor", "systemFillColor", "secondarySystemFillColor", "tertiarySystemFillColor",
+  "quaternarySystemFillColor", "maskColor", "maskBlurColor", "bulletWindowColor", "opaqueBulletWindowColor",
+  "editBlueColor", "editDeepBlueColor", "editRedColor",
+] as const satisfies readonly (keyof BdaColorPalette)[]
+
+function colorPalette(field: ProtoField | undefined): BdaColorPalette | undefined {
+  const value = message(field)
+  if (!value.length) return
+  const result: BdaColorPalette = {}
+  paletteFields.forEach((name, index) => {
+    const color = first(value, index + 1)?.varint
+    if (color !== undefined) result[name] = color
+  })
+  return result
 }
 
 function numericMap<T>(root: ProtoField[], number: number, decode: (field: ProtoField | undefined) => T): Map<number, T> {
@@ -308,7 +682,7 @@ function numericMap<T>(root: ProtoField[], number: number, decode: (field: Proto
 export function decodeBdaAppearance(bytes: Uint8Array): BdaAppearance {
   const root = fields(bytes)
   return {
-    designWidth: first(root, 6)?.varint ?? 0,
+    designWidth: first(root, 6)?.varint,
     imageStyles: numericMap(root, 1, imageStyle),
     textStyles: numericMap(root, 2, textStyle),
     colorStyles: numericMap(root, 3, colorStyle),
@@ -316,6 +690,9 @@ export function decodeBdaAppearance(bytes: Uint8Array): BdaAppearance {
       string(first(entry, 1)),
       panel(first(entry, 2)),
     ])),
+    colorPalette: colorPalette(first(root, 5)),
+    gamePanel: gamePanel(first(root, 7)),
+    dragBar: bar(first(root, 8)),
   }
 }
 
@@ -327,15 +704,44 @@ export function decodeBdaAnimation(bytes: Uint8Array): BdaAnimation {
     const frames = sequence.filter((field) => field.number === 5).map((field) => {
       const frame = message(field)
       return {
-        resourceID: string(first(message(first(frame, 1)), 2)),
-        duration: first(frame, 2)?.varint ?? 0,
+        resourceID: first(message(first(frame, 1)), 2)
+          ? string(first(message(first(frame, 1)), 2))
+          : undefined,
+        duration: first(frame, 2)?.varint,
       }
     })
     return [name, { name, frames }] as const
   })
+  const animationMap = mapEntries(root, 1).map((entry) => {
+    const target = string(first(entry, 1))
+    const list = message(first(entry, 2))
+    const base = list.filter((field) => field.number === 1).map(message)
+      .find((item) => first(item, 3)?.varint === 1)
+    const isolated = list.filter((field) => field.number === 2).map(message)
+      .find((item) => first(item, 2)?.varint === 1)
+    return {
+      target,
+      sequence: string(first(base ?? [], 4)) || string(first(isolated ?? [], 3)),
+      delegate: string(first(list, 3)),
+    }
+  }).filter(({ target }) => Boolean(target))
+  const direct = new Map(animationMap.flatMap(({ target, sequence }) => sequence ? [[target, sequence] as const] : []))
+  const delegates = new Map(animationMap.flatMap(({ target, delegate }) => delegate ? [[target, delegate] as const] : []))
+  const binding = (target: string, seen = new Set<string>()): string | undefined => {
+    if (seen.has(target)) return
+    const sequence = direct.get(target)
+    if (sequence) return sequence
+    seen.add(target)
+    const delegate = delegates.get(target)
+    return delegate ? binding(delegate, seen) : undefined
+  }
   return {
-    targets: mapEntries(root, 1).map((entry) => string(first(entry, 1))).filter(Boolean),
+    targets: animationMap.map(({ target }) => target),
     sequences: new Map(sequences.filter(([name]) => Boolean(name))),
+    bindings: new Map(animationMap.flatMap(({ target }) => {
+      const sequence = binding(target)
+      return sequence ? [[target, sequence] as const] : []
+    })),
   }
 }
 
@@ -473,7 +879,8 @@ export class BdaResolver implements VisualResolver {
     if (!ref) return
     if (ref.type === "color") {
       const style = this.appearance.colorStyles.get(ref.key)
-      return style ? { color: bdaCssColor(highlighted ? style.highlightColor || style.normalColor : style.normalColor) } : undefined
+      const normalColor = style?.normalColor ?? 0
+      return style ? { color: bdaCssColor(highlighted ? style.highlightColor ?? normalColor : normalColor) } : undefined
     }
     if (ref.type === "text") return
     const style = this.appearance.imageStyles.get(ref.key)
@@ -510,10 +917,11 @@ export class BdaResolver implements VisualResolver {
     }).find(Boolean)
     if (!ref) return
     const style = this.appearance.textStyles.get(ref.key)
+    const normalColor = style?.normalColor ?? 0
     return style ? {
       fontName: style.fontName || undefined,
       fontSize: style.fontSize || undefined,
-      color: bdaCssColor(highlighted ? style.highlightColor || style.normalColor : style.normalColor),
+      color: bdaCssColor(highlighted ? style.highlightColor ?? normalColor : normalColor),
     } : undefined
   }
 
@@ -629,7 +1037,7 @@ export function updateBdaKeySound(
     if (field.number !== fieldNumber || !field.bytes) return false
     return rawString(rawFields(field.bytes).find((item) => item.number === 1)) === key
   })
-  const encodeResource = (original = new Uint8Array()) => replaceField(
+  const encodeResource = (original: Uint8Array = new Uint8Array()) => replaceField(
     replaceField(original, 1, 0, encodeVarint(sound.type)),
     2,
     2,
@@ -755,6 +1163,159 @@ export function updateBdaStyle(
   })
 }
 
+function mapObject<K extends string | number, V>(
+  values: Map<K, V>,
+  encode: (value: V) => unknown = (value) => value,
+): Record<string, unknown> {
+  return Object.fromEntries([...values].map(([key, value]) => [String(key), encode(value)]))
+}
+
+function decodedAppearanceSource(appearance: BdaAppearance, panelName?: string): Record<string, unknown> {
+  const styleRef = (value: BdaStyleRef | undefined) => value && { type: value.type, key: value.key }
+  const imageAtomSource = (value: BdaImageAtom | undefined) => value && {
+    resource: value.resource,
+    innerRect: value.innerRect,
+    contentInset: value.contentInset,
+    alpha: value.alpha,
+    filterColor: value.filterColor === undefined ? undefined : bdaColorHex(value.filterColor),
+  }
+  const keySource = (value: BdaKey) => ({
+    backStyle: styleRef(value.backStyle),
+    foreStyles: value.foreStyles.length ? value.foreStyles.map(styleRef) : undefined,
+    foreStyleOffsets: value.foreStyleOffsets.length ? value.foreStyleOffsets : undefined,
+    backStyleState: styleRef(value.backStyleState),
+  })
+  const hintSource = (value: BdaHint) => ({
+    offset: value.offset,
+    backStyle: styleRef(value.backStyle),
+    barStyle: styleRef(value.barStyle),
+    barOffset: value.barOffset,
+    foreStyle: styleRef(value.foreStyle),
+    cellStyle: styleRef(value.cellStyle),
+  })
+  const listSource = (value: BdaList) => ({
+    backStyle: styleRef(value.backStyle),
+    cellBackStyle: styleRef(value.cellBackStyle),
+    cellForeStyle: styleRef(value.cellForeStyle),
+    foreStyles: value.foreStyles.length ? value.foreStyles.map(styleRef) : undefined,
+    foreStyleOffsets: value.foreStyleOffsets.length ? value.foreStyleOffsets : undefined,
+  })
+  const candSource = (value: BdaCand | undefined) => value && ({
+    candBarStyle: styleRef(value.candBarStyle),
+    candOnBarStyle: styleRef(value.candOnBarStyle),
+    cellBackStyle: styleRef(value.cellBackStyle),
+    cellForeStyle: styleRef(value.cellForeStyle),
+    firstCellForeStyle: styleRef(value.firstCellForeStyle),
+    firstCellBackStyle: styleRef(value.firstCellBackStyle),
+    subCandCellForeStyle: styleRef(value.subCandCellForeStyle),
+    subCandCellBackStyle: styleRef(value.subCandCellBackStyle),
+    switch: value.switch && {
+      normalBack: styleRef(value.switch.normalBack), selectBack: styleRef(value.switch.selectBack),
+      normalFore: styleRef(value.switch.normalFore), selectFore: styleRef(value.switch.selectFore),
+    },
+    candKeys: mapObject(value.candKeys, keySource),
+    subCandBackStyle: styleRef(value.subCandBackStyle),
+    menuKeys: mapObject(value.menuKeys, keySource),
+    aiIcon: value.aiIcon && keySource(value.aiIcon),
+    accessoryBackStyle: styleRef(value.accessoryBackStyle),
+    gridLeftForeStyle: styleRef(value.gridLeftForeStyle),
+    gridRightForeStyle: styleRef(value.gridRightForeStyle),
+  })
+  const panelSource = (value: BdaPanel) => ({
+    hints: mapObject(value.hints, hintSource),
+    lists: mapObject(value.lists, listSource),
+    backStyle: styleRef(value.backStyle),
+    wholeBackStyle: styleRef(value.wholeBackStyle),
+    inputRegionBackStyle: styleRef(value.inputRegionBackStyle),
+    shouldBgBlur: value.shouldBgBlur,
+    shouldKeySlotting: value.shouldKeySlotting,
+    trackColor: value.trackColor === undefined ? undefined : bdaColorHex(value.trackColor),
+    keys: mapObject(value.keys, keySource),
+    cand: candSource(value.cand),
+    input: value.input && { backStyle: styleRef(value.input.backStyle), textStyle: styleRef(value.input.textStyle) },
+    more: value.more && {
+      backStyle: styleRef(value.more.backStyle),
+      cellForeStyle: styleRef(value.more.cellForeStyle),
+      cellBackStyle: styleRef(value.more.cellBackStyle),
+    },
+  })
+  if (panelName) {
+    const panel = appearance.panels.get(panelName.replace(/\.ini$/i, ""))
+    return panel ? { panel: panelName.replace(/\.ini$/i, ""), ...panelSource(panel) } : { panel: panelName }
+  }
+  return {
+    designWidth: appearance.designWidth,
+    imageStyles: mapObject(appearance.imageStyles, (style) => ({
+      normalImage: imageAtomSource(style.normalImage),
+      highlightImage: imageAtomSource(style.highlightImage),
+      fontInfo: style.fontInfo && {
+        ...style.fontInfo,
+        normalColor: style.fontInfo.normalColor === undefined ? undefined : bdaColorHex(style.fontInfo.normalColor),
+        highlightColor: style.fontInfo.highlightColor === undefined ? undefined : bdaColorHex(style.fontInfo.highlightColor),
+      },
+    })),
+    textStyles: mapObject(appearance.textStyles, (style) => ({
+      resource: style.resource,
+      fontName: style.fontName,
+      fontSize: style.fontSize,
+      normalColor: style.normalColor === undefined ? undefined : bdaColorHex(style.normalColor),
+      highlightColor: style.highlightColor === undefined ? undefined : bdaColorHex(style.highlightColor),
+      contentText: style.contentText,
+    })),
+    colorStyles: mapObject(appearance.colorStyles, (style) => ({
+      normalColor: style.normalColor === undefined ? undefined : bdaColorHex(style.normalColor),
+      highlightColor: style.highlightColor === undefined ? undefined : bdaColorHex(style.highlightColor),
+    })),
+    panels: mapObject(appearance.panels, panelSource),
+    colorPalette: appearance.colorPalette && Object.fromEntries(Object.entries(appearance.colorPalette)
+      .map(([name, color]) => [name, bdaColorHex(color)])),
+    gamePanel: appearance.gamePanel && {
+      backStyle: styleRef(appearance.gamePanel.backStyle),
+      corpusFirstTab: appearance.gamePanel.corpusFirstTab,
+      corpusList: appearance.gamePanel.corpusList,
+      functionBar: appearance.gamePanel.functionBar,
+      keys: mapObject(appearance.gamePanel.keys, keySource),
+    },
+    dragBar: appearance.dragBar && { backStyle: styleRef(appearance.dragBar.backStyle) },
+  }
+}
+
+function genericBdaSource(bytes: Uint8Array): unknown[] {
+  return fields(bytes).map((field) => ({
+    field: field.number,
+    wire: field.wire,
+    value: field.varint ?? field.fixed32 ?? (
+      field.bytes
+        ? string(field) || `<${field.bytes.length} bytes>`
+        : undefined
+    ),
+  }))
+}
+
+export function decodedBdaSource(path: string, bytes: Uint8Array, panelName?: string): string {
+  const name = path.split("/").pop() ?? path
+  let value: unknown
+  if (/^\d*appearanceConfig$/i.test(name)) {
+    value = decodedAppearanceSource(decodeBdaAppearance(bytes), panelName)
+  } else if (/animationConfig$/i.test(name)) {
+    const animation = decodeBdaAnimation(bytes)
+    value = {
+      targets: animation.targets.length ? animation.targets : undefined,
+      bindings: animation.bindings.size ? mapObject(animation.bindings) : undefined,
+      sequences: mapObject(animation.sequences, (sequence) => ({ frames: sequence.frames })),
+    }
+  } else if (/^\d*soundConfig$/i.test(name)) {
+    const sound = decodeBdaSoundConfig(bytes)
+    value = {
+      keySounds: mapObject(sound.keySounds),
+      iosKeySounds: sound.iosKeySounds.size ? mapObject(sound.iosKeySounds) : undefined,
+    }
+  } else {
+    value = { fields: genericBdaSource(bytes) }
+  }
+  return JSON.stringify(value, null, 2)
+}
+
 export function describeBdaConfig(path: string, bytes: Uint8Array): string {
   const name = path.split("/").pop() ?? path
   const header = `${name} · BDA Protocol Buffers · ${bytes.length} 字节`
@@ -791,7 +1352,7 @@ export function describeBdaConfig(path: string, bytes: Uint8Array): string {
     `颜色样式：${appearance.colorStyles.size}`,
     `资源引用：${resources.length}`,
     `布局：${appearance.panels.size}`,
-    ...appearance.panels.keys().map((layout) => `- ${layout}（${appearance.panels.get(layout)?.keys.size ?? 0} 个按键）`),
+    ...[...appearance.panels.keys()].map((layout) => `- ${layout}（${appearance.panels.get(layout)?.keys.size ?? 0} 个按键）`),
     "",
     "已按百度官方 protobuf 字段解析；保存时保留原始配置和未知字段。",
   ].join("\n")

@@ -26,7 +26,7 @@ function pngSize(bytes: Uint8Array): [number, number] {
 }
 
 function staticResourceID(resourceID: string, animation: BdaAnimation): string {
-  return animation.sequences.get(resourceID)?.frames.find((frame) => frame.resourceID)?.resourceID || resourceID
+  return animation.sequences.get(resourceID)?.frames.find((frame) => frame.resourceID)?.resourceID ?? resourceID
 }
 
 function sourceImage(
@@ -76,7 +76,7 @@ export function convertBdaArchive(source: SkinArchive, base: SkinArchive): BdaCo
       const animationBytes = animationPath && source.getBytes(animationPath)
       const animation = animationBytes
         ? decodeBdaAnimation(animationBytes)
-        : { targets: [], sequences: new Map() }
+        : { targets: [], sequences: new Map(), bindings: new Map() }
 
       const basePrefix = `light/skin/${orientation}/`
       const targetPrefix = `${theme}/skin/${orientation}/`
@@ -128,8 +128,8 @@ export function convertBdaArchive(source: SkinArchive, base: SkinArchive): BdaCo
       for (const [key, style] of appearance.colorStyles) {
         styles.push(
           `[STYLE${bdaStyleID({ type: "color", key })}]`,
-          `NM_COLOR=${bdaColorHex(style.normalColor)}`,
-          `HL_COLOR=${bdaColorHex(style.highlightColor || style.normalColor)}`,
+          `NM_COLOR=${bdaColorHex(style.normalColor ?? 0)}`,
+          `HL_COLOR=${bdaColorHex(style.highlightColor ?? style.normalColor ?? 0)}`,
           "",
         )
       }
@@ -138,8 +138,8 @@ export function convertBdaArchive(source: SkinArchive, base: SkinArchive): BdaCo
           `[STYLE${bdaStyleID({ type: "text", key })}]`,
           ...(style.fontName ? [`FONT_NAME=${style.fontName}`] : []),
           ...(style.fontSize ? [`FONT_SIZE=${style.fontSize}`] : []),
-          `NM_COLOR=${bdaColorHex(style.normalColor)}`,
-          `HL_COLOR=${bdaColorHex(style.highlightColor || style.normalColor)}`,
+          `NM_COLOR=${bdaColorHex(style.normalColor ?? 0)}`,
+          `HL_COLOR=${bdaColorHex(style.highlightColor ?? style.normalColor ?? 0)}`,
           "",
         )
       }

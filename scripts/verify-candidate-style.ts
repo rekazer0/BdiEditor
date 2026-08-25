@@ -68,23 +68,20 @@ const inheritedSymbolPanel = resolvePanelConfig(
   IniDocument.parse("[PANEL]\nKEY_NUM=7\n"),
   generalPanel,
   IniDocument.parse(""),
-  372,
 )
-assert.equal(inheritedSymbolPanel.height, 372)
+assert.equal(inheritedSymbolPanel.height, 312)
 const sizedSymbolPanel = resolvePanelConfig(
   IniDocument.parse("[PANEL]\nSIZE=480,372\n"),
   generalPanel,
   IniDocument.parse(""),
-  372,
 )
 assert.equal(sizedSymbolPanel.height, 372)
 const undersizedSymbolPanel = resolvePanelConfig(
   IniDocument.parse("[PANEL]\nSIZE=480,350\n"),
   generalPanel,
   IniDocument.parse(""),
-  372,
 )
-assert.equal(undersizedSymbolPanel.height, 372)
+assert.equal(undersizedSymbolPanel.height, 350)
 
 const geometry = keyboardPreviewGeometry(
   { width: 1206, height: 2622, family: "iphone" },
@@ -98,7 +95,7 @@ const scale = 1206 / 1125
 assert.equal(geometry.topInsetHeight, 38)
 assert.equal(Math.round((geometry.candidateHeight - geometry.topInsetHeight) / scale), 194)
 assert.equal(Math.round(geometry.candidateInsetHeight / scale), 61)
-assert.equal(Math.round(geometry.candidateContentHeight / scale), 133)
+assert.equal(Math.round(geometry.candidateContentHeight / scale), 194)
 assert.equal(
   geometry.totalHeight,
   keyboardPreviewGeometry(
@@ -143,13 +140,13 @@ assert.deepEqual(resolveCandidateTextVisuals(undefined, general, textResolver), 
 
 const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8")
 const main = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8")
-assert.equal(
-  [...main.matchAll(/(?:generalConfig\.height|generalPanelHeight) \+ candidateContentHeight \+ symbolInputHeight/g)].length,
-  2,
-)
-assert.match(main, /updatePanelTools\(config\.width, devicePanelHeight, candidateHeight\)/)
-assert.match(main, /updatePanelTools\(panelWidth, effectivePanelHeight, candidateHeight\)/)
+assert.doesNotMatch(main, /devicePanelHeight|effectivePanelHeight|symbolInputHeight/)
+assert.match(main, /updatePanelTools\(config\.width, config\.height, candidateHeight\)/)
+assert.match(main, /updatePanelTools\(panelWidth, panelHeight, candidateHeight\)/)
 assert.match(main, /const layoutSize = layoutDocument\.get\("PANEL", "SIZE"\)/)
+assert.doesNotMatch(main, /const totalHeight = height \+ inputHeight/)
+assert.match(main, /toolbarCanvas\.style\.setProperty\("--toolbar-height", String\(height\)\)/)
+assert.match(main, /return \{ width, height, inputHeight \}/)
 assert.match(
   css,
   /#candidate-area\[hidden\] \+ #panel-viewport #preview \{[^}]*width:\s*100%;[^}]*height:\s*100%;/s,
@@ -161,7 +158,9 @@ assert.match(candidateWordsCss, /align-items:\s*center/)
 assert.match(candidateWordsCss, /gap:\s*var\(--candidate-cell-width,\s*0\)/)
 assert.match(css, /\.device-shell\.canvas-only #candidate-input \{[^}]*grid-row:\s*1;/s)
 assert.match(css, /\.device-shell\.canvas-only #candidate-words \{[^}]*grid-row:\s*3;/s)
-assert.match(css, /\.device-shell\.canvas-only #candidate-area \{[^}]*grid-template-rows:[^}]*0px[^}]*minmax/s)
+assert.match(css, /#candidate-input \{[^}]*position:\s*absolute;[^}]*bottom:\s*100%;[^}]*height:\s*var\(--candidate-input-height/s)
+assert.match(css, /\.device-shell\.canvas-only #candidate-area \{[^}]*overflow:\s*visible;/s)
+assert.match(main, /deviceShell\.style\.setProperty\("--candidate-input-height", `\$\{geometry\.candidateInsetHeight\}px`\)/)
 assert.match(css, /margin-inline-start:\s*calc\(var\(--candidate-first-gap,[^)]*\) \+ var\(--candidate-cell-inset,/)
 assert.doesNotMatch(css, /#candidate-words > span \{[^}]*flex:/s)
 assert.match(

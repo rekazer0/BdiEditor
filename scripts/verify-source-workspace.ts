@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
-import { findTextMatches, highlightIni, insertedTextRange, replaceTextMatches } from "../src/highlight.ts"
+import { findTextMatches, highlightIni, highlightJson, insertedTextRange, replaceTextMatches } from "../src/highlight.ts"
 import { SkinArchive } from "../src/skin.ts"
 import { consumeSourceWriteSnapshot, resolveSourceArchivePath } from "../src/source-tree.ts"
 
@@ -93,6 +93,12 @@ const searchHighlight = highlightIni(searchableSource, [], undefined, "foo", 1)
 assert.equal(searchHighlight.match(/token-search-match/g)?.length, 3, "每个搜索关键字都应单独高亮")
 assert.match(searchHighlight, /token-search-line active/, "当前关键字所在行应显示活动行高亮")
 assert.match(searchHighlight, /token-search-match active/, "当前关键字应显示活动高亮")
+const jsonHighlight = highlightJson('{"name":"BDA","count":2,"enabled":true}', "BDA", 0)
+assert.match(jsonHighlight, /token-key[^>]*>&quot;name&quot;/, "BDA JSON 属性名应高亮")
+assert.match(jsonHighlight, /token-action[^>]*>&quot;<mark[^>]*>BDA/, "BDA JSON 字符串应高亮")
+assert.match(jsonHighlight, /token-number[^>]*>2/, "BDA JSON 数字应高亮")
+assert.match(jsonHighlight, /token-section[^>]*>true/, "BDA JSON 字面量应高亮")
+assert.match(jsonHighlight, /token-search-match active/, "BDA JSON 搜索结果应继续高亮")
 assert.equal(
   replaceTextMatches(searchableSource, "foo", "bar", 1),
   "[A]\nVALUE=foo bar\nOTHER=foo",

@@ -4,6 +4,7 @@ import fs from "node:fs"
 const main = fs.readFileSync("src/main.ts", "utf8")
 const plugin = fs.readFileSync("src-tauri/native-share/android/src/main/java/SharePlugin.kt", "utf8")
 const html = fs.readFileSync("index.html", "utf8")
+const css = fs.readFileSync("src/style.css", "utf8")
 
 assert.match(main, /function isAndroidWeb\(\): boolean/)
 assert.match(main, /function isIOSWeb\(\): boolean/)
@@ -21,5 +22,8 @@ assert.match(plugin, /activity\.startActivity\(viewIntent\)/)
 assert.doesNotMatch(plugin, /Intent\.createChooser\(sendIntent/)
 assert.match(html, />分享皮肤<\/span>/)
 assert.doesNotMatch(html, />分享到百度输入法<\/span>/)
+assert.match(css, /\.mobile-command-menu\s*\{[^}]*position: static;/)
+assert.match(css, /\.mobile-command-actions\s*\{[^}]*position: absolute;/)
+assert.doesNotMatch(css, /\.mobile-command-actions\s*\{[^}]*position: fixed;/)
 
 console.log("✓ 移动网页支持普通下载，iOS、Android 网页与 Android APK 使用各自的分享路径和皮肤格式")

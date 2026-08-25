@@ -47,6 +47,11 @@ assert.deepEqual(
   ["LIST", "LIST:1", "LIST:2"],
   "TYPE=0 的静态列表仍应显示候选单元",
 )
+assert.equal(
+  previewFallbackText(previewItems(staticList, 1080, 532)[1], "edit", false),
+  "+",
+  "NAMES 应作为静态列表单元的预览文字",
+)
 
 const horizontalList = IniDocument.parse(`
 [LIST]

@@ -64,7 +64,6 @@ export function resolvePanelConfig(
   layout: IniDocument,
   gen: IniDocument,
   styles: IniDocument,
-  minimumHeight = 0,
 ): KeyboardConfig {
   const [layoutWidth, layoutHeight] = panelSize(layout)
   const [generalWidth, generalHeight] = panelSize(gen)
@@ -72,7 +71,7 @@ export function resolvePanelConfig(
   const section = styleID ? `STYLE${styleID}` : ""
   return {
     width: layoutWidth ?? generalWidth ?? DEFAULT_PANEL_WIDTH,
-    height: Math.max(layoutHeight ?? generalHeight ?? DEFAULT_PANEL_HEIGHT, minimumHeight),
+    height: layoutHeight ?? generalHeight ?? DEFAULT_PANEL_HEIGHT,
     styleID,
     normalImage: styles.get(section, "NM_IMG") ?? "",
     pressedImage: styles.get(section, "HL_IMG") ?? "",

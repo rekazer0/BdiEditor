@@ -11,9 +11,10 @@ function isEditableNumberInput(target: EventTarget | null): target is HTMLInputE
 export function installNumberInputWheel(root: NumberInputRoot = document): void {
   root.addEventListener("wheel", (event) => {
     if (!isEditableNumberInput(event.target)) return
-    if (event.deltaY === 0) return
+    const wheel = event as WheelEvent
+    if (wheel.deltaY === 0) return
     event.preventDefault()
-    if (event.deltaY < 0) event.target.stepUp()
+    if (wheel.deltaY < 0) event.target.stepUp()
     else event.target.stepDown()
     event.target.dispatchEvent(new Event("input", { bubbles: true }))
     event.target.dispatchEvent(new Event("change", { bubbles: true }))

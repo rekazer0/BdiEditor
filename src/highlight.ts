@@ -105,6 +105,40 @@ export function insertedTextRange(before: string, after: string): readonly [numb
   return afterEnd > start ? [start, afterEnd] : undefined
 }
 
+export function highlightJson(source: string, searchQuery = "", activeSearchIndex = -1): string {
+  const matches = findTextMatches(source, searchQuery)
+  const token = /"(?:\\.|[^"\\])*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|\b(?:true|false|null)\b|[{}[\],:]/g
+  let offset = 0
+  return source
+    .split(/(\r\n|\n|\r)/)
+    .map((part) => {
+      const start = offset
+      offset += part.length
+      if (/^\r?\n$|^\r$/.test(part)) return part
+      let line = ""
+      let cursor = 0
+      for (const match of part.matchAll(token)) {
+        const index = match.index ?? 0
+        line += highlightText(part.slice(cursor, index), start + cursor, matches, searchQuery.length, activeSearchIndex)
+        const type = match[0].startsWith('"')
+          ? /^\s*:/.test(part.slice(index + match[0].length)) ? "key" : "action"
+          : /^-?\d/.test(match[0]) ? "number"
+            : /^[{}[\],:]$/.test(match[0]) ? "operator" : "section"
+        line += highlightText(match[0], start + index, matches, searchQuery.length, activeSearchIndex, `token-${type}`)
+        cursor = index + match[0].length
+      }
+      line += highlightText(part.slice(cursor), start + cursor, matches, searchQuery.length, activeSearchIndex)
+      const lineMatch = matches.findIndex((value) => value < offset && value + searchQuery.length > start)
+      const activeMatch = matches[activeSearchIndex]
+      const classes = [
+        lineMatch >= 0 ? "token-search-line" : "",
+        activeMatch !== undefined && activeMatch < offset && activeMatch + searchQuery.length > start ? "active" : "",
+      ].filter(Boolean).join(" ")
+      return classes ? `<span class="${classes}">${line}</span>` : line
+    })
+    .join("")
+}
+
 export function highlightIni(
   source: string,
   selectedSections: readonly string[] = [],

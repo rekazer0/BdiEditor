@@ -59,19 +59,22 @@ import {
   bdaPanelKeyName,
   bdaStyleID,
   bdaStyleRef,
+  decodedBdaSource,
   decodeBdaAnimation,
   decodeBdaAppearance,
   decodeBdaSoundConfig,
-  describeBdaConfig,
   updateBdaAnimationFrame,
+  updateBdaDesignWidth,
   updateBdaStyle,
   type BdaAppearance,
+  type BdaKey,
   type BdaStyleRef,
 } from "./bda.ts"
+import { renderBdaConfigEditor, renderBdaLayoutEditor, renderBdaMetadataEditor } from "./bda-editor.ts"
 import { convertBdaArchive } from "./bda-convert.ts"
 import { IniDocument } from "./ini.ts"
 import { adaptIos26KeyboardLayout, adaptIos26Variant } from "./ios26.ts"
-import { findTextMatches, highlightIni, insertedTextRange, replaceTextMatches } from "./highlight.ts"
+import { findTextMatches, highlightIni, highlightJson, insertedTextRange, replaceTextMatches } from "./highlight.ts"
 import { pushChange, type Change } from "./history.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
 import {
@@ -510,6 +513,7 @@ type StyleImagePickerTarget = {
   sections?: string[]
 }
 let pickerTarget: StyleImagePickerTarget | undefined
+let resourcePickerSelect: ((resourceID: string) => void) | undefined
 type NativeImagePickerPayload = {
   path: string
   dataURL: string
@@ -562,6 +566,7 @@ const deviceGeometryProperties = [
   "--candidate-top-inset-row",
   "--candidate-inset-row",
   "--candidate-content-row",
+  "--candidate-input-height",
   "--panel-row",
   "--safe-row",
 ] as const
@@ -757,12 +762,12 @@ async function playDecodedSound(path: string, bytes: Uint8Array): Promise<void> 
   let buffer = keySoundBuffers.get(path)
   if (!buffer) {
     try {
-      buffer = await keySoundContext.decodeAudioData(bytes.slice().buffer)
+      buffer = await keySoundContext.decodeAudioData(new Uint8Array(bytes).buffer)
     } catch (error) {
       if (/^FORM$/.test(new TextDecoder("ascii").decode(bytes.subarray(0, 4)))) {
         const decoded = decodeAiffPcm(bytes)
         buffer = keySoundContext.createBuffer(decoded.channelData.length, decoded.samplesDecoded, decoded.sampleRate)
-        decoded.channelData.forEach((channel, index) => buffer!.copyToChannel(channel, index))
+        decoded.channelData.forEach((channel, index) => buffer!.copyToChannel(new Float32Array(channel), index))
       } else {
         const ogg = /^OggS$/.test(new TextDecoder("ascii").decode(bytes.subarray(0, 4))) || /\.ogg$/i.test(path)
         if (!ogg) throw error
@@ -773,7 +778,7 @@ async function playDecodedSound(path: string, bytes: Uint8Array): Promise<void> 
         decoder.free()
         if (!decoded.samplesDecoded || !decoded.channelData.length) throw new Error("OGG 文件没有可播放的音频")
         buffer = keySoundContext.createBuffer(decoded.channelData.length, decoded.samplesDecoded, decoded.sampleRate)
-        decoded.channelData.forEach((channel, index) => buffer!.copyToChannel(channel, index))
+        decoded.channelData.forEach((channel, index) => buffer!.copyToChannel(new Float32Array(channel), index))
       }
       if (!buffer) {
         throw error
@@ -1819,13 +1824,7 @@ function undo(): void {
   if (!change) return
   sourceHistoryHighlight = undefined
   redoStack.push(change)
-  if (change.kind === "batch") {
-    for (const child of [...change.changes].reverse()) {
-      if (child.kind === "text") applyTextSnapshot(child.path, child.before)
-      else applyBytesSnapshot(child.path, child.before)
-    }
-  } else if (change.kind === "text") applyTextSnapshot(change.path, change.before)
-  else applyBytesSnapshot(change.path, change.before)
+  applyChangeSnapshot(change, "before")
   renderFiles()
   if (selectedPath && archive?.getBytes(selectedPath)) selectFile(selectedPath, sidebarView)
   updateHistoryButtons()
@@ -1836,16 +1835,18 @@ function redo(): void {
   if (!change) return
   sourceHistoryHighlight = undefined
   undoStack.push(change)
-  if (change.kind === "batch") {
-    for (const child of change.changes) {
-      if (child.kind === "text") applyTextSnapshot(child.path, child.after)
-      else applyBytesSnapshot(child.path, child.after)
-    }
-  } else if (change.kind === "text") applyTextSnapshot(change.path, change.after)
-  else applyBytesSnapshot(change.path, change.after)
+  applyChangeSnapshot(change, "after")
   renderFiles()
   if (selectedPath && archive?.getBytes(selectedPath)) selectFile(selectedPath, sidebarView)
   updateHistoryButtons()
+}
+
+function applyChangeSnapshot(change: Change, side: "before" | "after"): void {
+  if (change.kind === "batch") {
+    const changes = side === "before" ? [...change.changes].reverse() : change.changes
+    for (const child of changes) applyChangeSnapshot(child, side)
+  } else if (change.kind === "text") applyTextSnapshot(change.path, change[side])
+  else applyBytesSnapshot(change.path, change[side])
 }
 
 function applyBytesSnapshot(path: string, bytes?: Uint8Array): void {
@@ -1854,7 +1855,7 @@ function applyBytesSnapshot(path: string, bytes?: Uint8Array): void {
   else archive.delete(path)
   scheduleSourceAutosave([path])
   refreshBdaLayout()
-  if (selectedPath === path && bytes && archive.isBdaConfig(path)) setSourceValue(describeBdaConfig(path, bytes))
+  if (selectedPath === path && bytes && archive.isBdaConfig(path)) setSourceValue(decodedBdaSource(path, bytes))
   refreshPreview()
   populateKeyInspector()
   updateDirty()
@@ -1919,6 +1920,18 @@ function currentBdaAppearance(): { path: string; bytes: Uint8Array; appearance: 
   return path && bytes ? { path, bytes, appearance: decodeBdaAppearance(bytes) } : undefined
 }
 
+function refreshSelectedBdaSource(): void {
+  if (!archive || archive.format !== "bda") return
+  if (archive.isBdaConfig(selectedPath)) {
+    const bytes = archive.getBytes(selectedPath)
+    if (bytes) setSourceValue(decodedBdaSource(selectedPath, bytes))
+    return
+  }
+  if (!isBdaVirtualTextPath(selectedPath)) return
+  const info = currentBdaAppearance()
+  if (info) setSourceValue(decodedBdaSource(info.path, info.bytes, selectedPath.split("/").pop()))
+}
+
 function bdaAvailableLayoutPaths(): string[] {
   if (!archive || archive.format !== "bda") return []
   const path = bdaAppearancePath(archive, theme.value, orientation.value)
@@ -1940,7 +1953,11 @@ function isBdaLayoutPath(path: string): boolean {
 
 function textDocument(path: string): IniDocument | undefined {
   if (archive?.isText(path)) return IniDocument.parse(archive.getText(path))
-  if (isBdaVirtualTextPath(path)) return IniDocument.parse(bdaBase!.getText(bdaBasePath(path)))
+  if (isBdaVirtualTextPath(path)) {
+    const base = IniDocument.parse(bdaBase!.getText(bdaBasePath(path)))
+    const info = currentBdaAppearance()
+    return info ? bdaLayoutDocument(base, info.appearance, layout.value) : base
+  }
 }
 
 function refreshBdaLayout(path = preferredPath()): boolean {
@@ -2047,8 +2064,9 @@ function applyDeviceKeyboardGeometry(
   )
   deviceShell.style.setProperty("--candidate-row", `${geometry.candidateHeight}fr`)
   deviceShell.style.setProperty("--candidate-top-inset-row", `${geometry.topInsetHeight}fr`)
-  deviceShell.style.setProperty("--candidate-inset-row", `${geometry.candidateInsetHeight}fr`)
+  deviceShell.style.setProperty("--candidate-inset-row", "0fr")
   deviceShell.style.setProperty("--candidate-content-row", `${geometry.candidateContentHeight}fr`)
+  deviceShell.style.setProperty("--candidate-input-height", `${geometry.candidateInsetHeight}px`)
   deviceShell.style.setProperty("--panel-row", `${geometry.panelHeight}fr`)
   deviceShell.style.setProperty("--safe-row", `${geometry.safeBottomHeight}fr`)
 }
@@ -2086,31 +2104,17 @@ function refreshPreview(): void {
   preview.setDefaults(context?.gen ?? bdaGen)
   preview.setTheme(theme.value === "dark" ? "dark" : "light")
   preview.setTransparent(devicePreviewTransparent())
-  if (context && layoutDocument) {
+  if (context && layoutDocument && resolver) {
     const symbolPanel = candidateArea.hidden
-    const candidateRect = context.gen.get("CAND", "VIEW_RECT")?.split(",").map(Number)
-    const generalConfig = keyboardConfig(context.gen, context.styles)
-    const candidateWidth = candidateRect?.length === 4 && Number.isFinite(candidateRect[2])
-      ? candidateRect[2]
-      : generalConfig.width
-    const candidateContentHeight = candidateRect?.length === 4 && Number.isFinite(candidateRect[3])
-      ? candidateRect[3]
-      : DEFAULT_CANDIDATE_HEIGHT
     const candidatePath = toolbarConfigPath()
     const candidateLayout = candidatePath && archive.isText(candidatePath)
       ? IniDocument.parse(archive.getText(candidatePath))
       : undefined
-    const symbolInputHeight = symbolPanel
-      ? resolveCandidateInputStyle(context.gen, resolver, candidateWidth, candidateLayout).height
-      : 0
     const config = resolvePanelConfig(
       layoutDocument,
       context.gen,
       context.styles,
     )
-    const devicePanelHeight = symbolPanel
-      ? Math.max(config.height, generalConfig.height + candidateContentHeight + symbolInputHeight)
-      : config.height
     const inputVisual = resolver.resolveText(
       candidateInputForegroundStyle(context.gen, candidateLayout),
       false,
@@ -2137,16 +2141,16 @@ function refreshPreview(): void {
     )
     const candidateHeight = symbolPanel ? 0 : (toolbarSize?.height ?? 0)
     const candidateInputHeight = symbolPanel ? 0 : (toolbarSize?.inputHeight ?? 0)
-    updatePanelTools(config.width, devicePanelHeight, candidateHeight)
+    updatePanelTools(config.width, config.height, candidateHeight)
     activeKeyboardGeometry = {
       panelWidth: config.width,
-      panelHeight: devicePanelHeight,
+      panelHeight: config.height,
       candidateHeight,
       candidateInputHeight,
     }
     applyDeviceKeyboardGeometry(
       config.width,
-      devicePanelHeight,
+      config.height,
       candidateHeight,
       candidateInputHeight,
     )
@@ -2154,23 +2158,9 @@ function refreshPreview(): void {
     const generalSize = bdaGen.get("PANEL", "SIZE")?.split(",").map(Number)
     const layoutSize = layoutDocument.get("PANEL", "SIZE")?.split(",").map(Number)
     const generalPanelWidth = generalSize?.[0] || DEFAULT_BDA_PANEL_WIDTH
-    const generalPanelHeight = generalSize?.[1] || DEFAULT_BDA_PANEL_HEIGHT
     const panelWidth = layoutSize?.[0] || generalPanelWidth
-    const panelHeight = layoutSize?.[1] || generalPanelHeight
-    const candidateRect = bdaGen.get("CAND", "VIEW_RECT")?.split(",").map(Number)
-    const candidateWidth = candidateRect?.length === 4 && Number.isFinite(candidateRect[2])
-      ? candidateRect[2]
-      : panelWidth
-    const candidateContentHeight = candidateRect?.length === 4 && Number.isFinite(candidateRect[3])
-      ? candidateRect[3]
-      : DEFAULT_CANDIDATE_HEIGHT
+    const panelHeight = layoutSize?.[1] || generalSize?.[1] || DEFAULT_BDA_PANEL_HEIGHT
     const candidateDocument = toolbarConfigPath() ? textDocument(toolbarConfigPath()!) : undefined
-    const symbolInputHeight = candidateArea.hidden && resolver
-      ? resolveCandidateInputStyle(bdaGen, resolver, candidateWidth, candidateDocument).height
-      : 0
-    const effectivePanelHeight = candidateArea.hidden
-      ? Math.max(panelHeight, generalPanelHeight + candidateContentHeight + symbolInputHeight)
-      : panelHeight
     const panel = currentBdaAppearance()?.appearance.panels.get(layout.value.replace(/\.ini$/i, ""))
     const inputVisual = resolver?.resolveText(
       candidateInputForegroundStyle(bdaGen, candidateDocument),
@@ -2184,7 +2174,7 @@ function refreshPreview(): void {
     applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth)
     applyCandidateTextVisual(
       candidateWords,
-      firstVisual ?? candidateVisual ?? { color: "#ffffff" },
+      candidateVisual ?? { color: "#ffffff" },
       candidateTextWidth,
     )
     const firstCandidate = candidateWords.firstElementChild as HTMLElement | null
@@ -2197,16 +2187,16 @@ function refreshPreview(): void {
     const bdaSymbolPanel = candidateArea.hidden
     const candidateHeight = bdaSymbolPanel ? 0 : (toolbarSize?.height ?? 0)
     const candidateInputHeight = bdaSymbolPanel ? 0 : (toolbarSize?.inputHeight ?? 0)
-    updatePanelTools(panelWidth, effectivePanelHeight, candidateHeight)
+    updatePanelTools(panelWidth, panelHeight, candidateHeight)
     activeKeyboardGeometry = {
       panelWidth,
-      panelHeight: effectivePanelHeight,
+      panelHeight,
       candidateHeight,
       candidateInputHeight,
     }
     applyDeviceKeyboardGeometry(
       panelWidth,
-      effectivePanelHeight,
+      panelHeight,
       candidateHeight,
       candidateInputHeight,
     )
@@ -2300,6 +2290,7 @@ function updateCanvasPanelStatus(renderedWidth: number): void {
 let fitCanvasDebounce: ReturnType<typeof setTimeout> | undefined
 let canvasFitFrozen = false
 let previewZoom = 1
+let previewPanLocked = false
 let previewPanX = 0
 let previewPanY = 0
 let previewPanStart: { x: number; y: number; panX: number; panY: number } | undefined
@@ -2351,6 +2342,13 @@ previewZoomFit.addEventListener("click", () => {
   setPreviewPan(0, 0)
   applyPreviewZoom(1)
 })
+previewZoomFit.addEventListener("dblclick", () => {
+  previewPanLocked = !previewPanLocked
+  previewZoomFit.ariaPressed = String(previewPanLocked)
+  previewZoomFit.ariaLabel = previewPanLocked ? "适配窗口，画布已锁定，双击解锁" : "适配窗口，双击锁定画布"
+  previewZoomFit.title = previewPanLocked ? "画布已锁定（双击解锁）" : "适配窗口（双击锁定画布）"
+  finishPreviewPan()
+})
 previewZoomIn.addEventListener("click", () => applyPreviewZoom(previewZoom + 0.1))
 canvasWrap.addEventListener("wheel", (event) => {
   if (deviceShell.hidden) return
@@ -2370,6 +2368,7 @@ window.addEventListener("blur", () => {
 canvasWrap.addEventListener("pointerdown", (event) => {
   if (
     event.button !== 0 ||
+    previewPanLocked ||
     event.pointerType === "touch" ||
     deviceShell.hidden ||
     isEditing() && keyMode === "move" && previewPanelViewport.contains(event.target as Node)
@@ -2439,10 +2438,11 @@ function updatePanelTools(
     panelVisibleHeight: content.height,
   }
   fitCanvasPreview()
-  const states = availableSkinStates(...skinStateDocuments())
+  const bdaSkin = archive?.format === "bda"
+  const states = bdaSkin ? [] : availableSkinStates(...skinStateDocuments())
   const selected = skinState.value
   const selectedState = selected ? Number(selected) : undefined
-  if (selectedState && selectedState <= 122 && !states.includes(selectedState)) {
+  if (!bdaSkin && selectedState && selectedState <= 122 && !states.includes(selectedState)) {
     states.push(selectedState)
     states.sort((a, b) => a - b)
   }
@@ -2620,12 +2620,13 @@ function openPanelCopyDialog(): void {
 
 async function copyPanel(): Promise<boolean> {
   if (!archive) return false
+  const currentArchive = archive
   const sourcePath = panelCopySource.value
-  if (!copyablePanelPaths(archive.names()).includes(sourcePath)) throw new Error("请选择有效的源面板")
+  if (!copyablePanelPaths(currentArchive.names()).includes(sourcePath)) throw new Error("请选择有效的源面板")
   if (!validPanelFilename(panelTargetFile.value.trim())) throw new Error("目标文件名必须是安全的 .ini 文件名")
   const targetPath = panelCopyTargetPath()
   if (sourcePath === targetPath) throw new Error("源面板和目标面板不能相同")
-  if (archive.getBytes(targetPath) && !window.confirm(`目标面板 ${targetPath} 已存在，是否覆盖？`)) return false
+  if (currentArchive.getBytes(targetPath) && !window.confirm(`目标面板 ${targetPath} 已存在，是否覆盖？`)) return false
 
   let xRatio = 1
   let yRatio = 1
@@ -2641,14 +2642,14 @@ async function copyPanel(): Promise<boolean> {
     yRatio = targetHeight / sourceHeight
   }
 
-  const sourcePanel = IniDocument.parse(archive.getText(sourcePath))
+  const sourcePanel = IniDocument.parse(currentArchive.getText(sourcePath))
   const sourceRoots = panelResourceRoots(sourcePath)
   const targetRoots = panelResourceRoots(targetPath)
-  const sourceStylePath = sourceRoots.map((root) => `${root}/default.css`).find((path) => archive.isText(path))
+  const sourceStylePath = sourceRoots.map((root) => `${root}/default.css`).find((path) => currentArchive.isText(path))
   if (!sourceStylePath) throw new Error("源面板缺少 default.css")
-  const targetStylePath = targetRoots.map((root) => `${root}/default.css`).find((path) => archive.isText(path)) ?? `${targetRoots[0]}/default.css`
-  const sourceStyles = IniDocument.parse(archive.getText(sourceStylePath))
-  const targetStyles = archive.isText(targetStylePath) ? IniDocument.parse(archive.getText(targetStylePath)) : IniDocument.parse("")
+  const targetStylePath = targetRoots.map((root) => `${root}/default.css`).find((path) => currentArchive.isText(path)) ?? `${targetRoots[0]}/default.css`
+  const sourceStyles = IniDocument.parse(currentArchive.getText(sourceStylePath))
+  const targetStyles = currentArchive.isText(targetStylePath) ? IniDocument.parse(currentArchive.getText(targetStylePath)) : IniDocument.parse("")
   const styleIDs = panelStyleIDs(sourcePanel)
   const imageBases = new Set<string>()
   for (const styleID of styleIDs) {
@@ -2661,15 +2662,15 @@ async function copyPanel(): Promise<boolean> {
   const targetPairs = new Map<string, { png?: Uint8Array; til?: Uint8Array }>()
   for (const root of targetRoots) {
     const prefix = `${root}/`
-    const bases = archive.names().flatMap((path) => {
+    const bases = currentArchive.names().flatMap((path) => {
       if (!path.startsWith(prefix)) return []
       const match = path.slice(prefix.length).match(/^(.*)\.(?:png|til)$/i)
       return match ? [match[1]] : []
     })
     for (const base of new Set(bases)) {
       if (targetPairs.has(base)) continue
-      const png = archive.getBytes(`${root}/${base}.png`)
-      const til = archive.getBytes(`${root}/${base}.til`)
+      const png = currentArchive.getBytes(`${root}/${base}.png`)
+      const til = currentArchive.getBytes(`${root}/${base}.til`)
       if (png && til) targetPairs.set(base, { png, til })
     }
   }
@@ -2678,14 +2679,14 @@ async function copyPanel(): Promise<boolean> {
   const resourceNames = new Map<string, string>()
   const encoder = new TextEncoder()
   for (const base of imageBases) {
-    const sourceRoot = sourceRoots.find((root) => archive.getBytes(`${root}/${base}.png`) && archive.getBytes(`${root}/${base}.til`))
+    const sourceRoot = sourceRoots.find((root) => currentArchive.getBytes(`${root}/${base}.png`) && currentArchive.getBytes(`${root}/${base}.til`))
     if (!sourceRoot) throw new Error(`源样式引用的资源不完整：${base}.png / ${base}.til`)
-    const sourcePng = archive.getBytes(`${sourceRoot}/${base}.png`)!
-    const sourceTil = archive.getBytes(`${sourceRoot}/${base}.til`)!
+    const sourcePng = currentArchive.getBytes(`${sourceRoot}/${base}.png`)!
+    const sourceTil = currentArchive.getBytes(`${sourceRoot}/${base}.til`)!
     const scaled = xRatio !== 1 || yRatio !== 1
     const png = scaled ? await resizePng(sourcePng, xRatio, yRatio) : sourcePng.slice()
     const til = scaled
-      ? encoder.encode(scaleIniDocument(IniDocument.parse(archive.getText(`${sourceRoot}/${base}.til`)), xRatio, yRatio).toString())
+      ? encoder.encode(scaleIniDocument(IniDocument.parse(currentArchive.getText(`${sourceRoot}/${base}.til`)), xRatio, yRatio).toString())
       : sourceTil.slice()
     const targetBase = copiedResourceBase(base, png, til, targetPairs)
     resourceNames.set(base, targetBase)
@@ -2701,7 +2702,7 @@ async function copyPanel(): Promise<boolean> {
     : merged.panel
   staged.set(targetStylePath, encoder.encode(merged.styles.toString()))
   staged.set(targetPath, encoder.encode(panel.toString()))
-  for (const [path, bytes] of staged) archive.setBytes(path, bytes)
+  for (const [path, bytes] of staged) currentArchive.setBytes(path, bytes)
   scheduleSourceAutosave([...staged.keys()])
 
   theme.value = panelTargetTheme.value
@@ -2933,7 +2934,15 @@ function loadTiles(path: string): void {
 }
 
 function openStyleImageResourceChooser(target: StyleImagePickerTarget): void {
+  resourcePickerSelect = undefined
   pickerTarget = target
+  if (isTauri()) openResourcePickerWindow()
+  else openStyleImageResourcePicker()
+}
+
+function openBdaAnimationResourceChooser(onSelect: (resourceID: string) => void): void {
+  pickerTarget = undefined
+  resourcePickerSelect = onSelect
   if (isTauri()) openResourcePickerWindow()
   else openStyleImageResourcePicker()
 }
@@ -3427,13 +3436,11 @@ function updateInspectorView(): void {
 
 function updateSourceHighlight(): void {
   const sections = selectedSourceSections()
-  sourceHighlight.innerHTML = `${highlightIni(
-    source.value,
-    sections,
-    sections.length ? undefined : sourceHistoryHighlight,
-    sourceSearch.value.trim(),
-    sourceSearchIndex,
-  )}\n`
+  const query = sourceSearch.value.trim()
+  const highlighted = archive?.format === "bda" && (archive.isBdaConfig(selectedPath) || isBdaVirtualTextPath(selectedPath))
+    ? highlightJson(source.value, query, sourceSearchIndex)
+    : highlightIni(source.value, sections, sections.length ? undefined : sourceHistoryHighlight, query, sourceSearchIndex)
+  sourceHighlight.innerHTML = `${highlighted}\n`
   sourceLineNumbers.textContent = Array.from(
     { length: source.value.split(/\r\n|\n|\r/).length },
     (_, index) => String(index + 1),
@@ -3724,7 +3731,6 @@ function refreshToolbarPreview(
   const height = size?.length === 4 && Number.isFinite(size[3]) ? size[3] : DEFAULT_CANDIDATE_HEIGHT
   const inputStyle = resolveCandidateInputStyle(gen, resolver, width, document)
   const inputHeight = inputStyle.height
-  const totalHeight = height + inputHeight
   const backgroundStyle = document.get("CAND", "BACK_STYLE")?.split(",")[0] ??
     gen?.get("SCAND", "BACK_STYLE")?.split(",")[0] ?? ""
   candidateBackgroundCanvas.hidden = false
@@ -3738,7 +3744,7 @@ function refreshToolbarPreview(
   )
   candidateBackgroundPreview.setDocument(undefined)
   toolbarCanvas.style.setProperty("--toolbar-width", String(width))
-  toolbarCanvas.style.setProperty("--toolbar-height", String(totalHeight))
+  toolbarCanvas.style.setProperty("--toolbar-height", String(height))
   toolbarCanvas.style.setProperty("--candidate-input-height", String(inputHeight))
   applyCandidateGeometry(document, width)
   const toolbarDocument = IniDocument.parse(document.toString())
@@ -3746,7 +3752,7 @@ function refreshToolbarPreview(
   toolbarPreview.setPanel("", width, height)
   toolbarPreview.setDocument(toolbarDocument)
   toolbarPreview.setMode("preview")
-  return { width, height: totalHeight, inputHeight }
+  return { width, height, inputHeight }
 }
 
 function commonSelectedStyle(name: "BACK_STYLE" | "FORE_STYLE"): string | undefined {
@@ -4134,10 +4140,10 @@ function bdaStyleValue(appearance: BdaAppearance, ref: BdaStyleRef, property: st
   }
   const style = appearance.textStyles.get(ref.key)
   if (!style) return ""
-  if (property === "FONT_NAME") return style.fontName
-  if (property === "FONT_SIZE") return String(style.fontSize)
-  if (property === "NM_COLOR") return bdaColorHex(style.normalColor)
-  if (property === "HL_COLOR") return bdaColorHex(style.highlightColor)
+  if (property === "FONT_NAME") return style.fontName ?? ""
+  if (property === "FONT_SIZE") return style.fontSize === undefined ? "" : String(style.fontSize)
+  if (property === "NM_COLOR") return style.normalColor === undefined ? "" : bdaColorHex(style.normalColor)
+  if (property === "HL_COLOR") return style.highlightColor === undefined ? "" : bdaColorHex(style.highlightColor)
   return ""
 }
 
@@ -4150,6 +4156,7 @@ function updateBdaRefs(refs: BdaStyleRef[], property: string, value: string): bo
   }
   commitBytes(info.path, info.bytes, bytes)
   refreshBdaLayout(layoutPath)
+  refreshSelectedBdaSource()
   refreshPreview()
   populateKeyInspector()
   updateDirty()
@@ -4271,7 +4278,7 @@ const particleFieldGroups = [
   ["运动", ["VELOCITY", "VELOCITY_DIRECTION", "ACCELERATION", "ACCELERATION_DIRECTION"]],
   ["外观", ["INIT_SCALE", "SCALE_SPEED", "INIT_ROTATE", "ROTATE_SPEED", "INIT_ALPHA", "ALPHA_SPEED"]],
 ] as const
-const particlePairFields = new Set(particleFieldGroups.flatMap(([, keys]) => keys).filter((key) =>
+const particlePairFields = new Set<string>(particleFieldGroups.flatMap(([, keys]) => keys).filter((key) =>
   !["PARTICLE_IMAGE", "EMIT_REGION", "TOTAL_NUMBER", "BIRTH_RATE", "EMIT_TYPE"].includes(key),
 ))
 let particlePreviewSection = ""
@@ -4306,7 +4313,7 @@ function particleNumberStep(key: string): string {
 function populateDocumentInspector(): void {
   documentFields.replaceChildren()
   const hasSelection = selectedPath === layoutPath && selectedKeySections.length > 0
-  if (!selectedDocument || hasSelection || !archive?.isText(selectedPath)) {
+  if (archive?.format === "bda" || !selectedDocument || hasSelection || !archive?.isText(selectedPath)) {
     documentFieldsGroup.hidden = true
     particlePreviewSection = ""
     preview.setParticlePreview()
@@ -4502,58 +4509,84 @@ function populateDocumentInspector(): void {
   documentFieldsGroup.dataset.path = selectedPath
 }
 
+function selectedBdaKeys(appearance: BdaAppearance): Array<{ name: string; key: BdaKey }> {
+  if (!layoutDocument || !selectedKeySections.length) return []
+  const panel = appearance.panels.get(layoutPath.split("/").pop()?.replace(/\.ini$/i, "") ?? "")
+  if (!panel) return []
+  const found = selectedKeySections.flatMap((section) => {
+    const effective = effectiveKeySection(section)
+    const actions = [layoutDocument?.get(effective, "CENTER"), layoutDocument?.get(section, "CENTER"), layoutDocument?.get(section, "DOWN")]
+      .filter((value): value is string => Boolean(value))
+    return actions.flatMap((action) => {
+      const name = bdaPanelKeyName(action)
+      const key = panel.keys.get(name)
+      return key ? [{ name, key }] : []
+    })
+  })
+  return [...new Map(found.map((item) => [item.name, item])).values()]
+}
+
 function populateBdaConfigInspector(): void {
   bdaConfigFields.replaceChildren()
-  const bytes = archive?.isBdaConfig(selectedPath) ? archive.getBytes(selectedPath) : undefined
-  bdaConfigFieldsGroup.hidden = !bytes
-  if (!bytes) return
-  if (!/^\d*animationConfig$/.test(selectedPath.split("/").pop() ?? "")) {
-    const summary = document.createElement("pre")
-    summary.className = "bda-config-summary"
-    summary.textContent = describeBdaConfig(selectedPath, bytes)
-    bdaConfigFields.append(summary)
+  if (!archive || archive.format !== "bda") {
+    bdaConfigFieldsGroup.hidden = true
     return
   }
-
-  const animation = decodeBdaAnimation(bytes)
-  const targets = document.createElement("label")
-  targets.textContent = "动画目标"
-  const targetInput = document.createElement("input")
-  targetInput.value = animation.targets.join(", ")
-  targetInput.readOnly = true
-  targets.append(targetInput)
-  bdaConfigFields.append(targets)
-  for (const sequence of animation.sequences.values()) {
-    for (const [frameIndex, frame] of sequence.frames.entries()) {
-      const resourceLabel = document.createElement("label")
-      resourceLabel.textContent = `${sequence.name} · 第 ${frameIndex + 1} 帧资源`
-      const resourceInput = document.createElement("input")
-      resourceInput.value = frame.resourceID
-      resourceInput.disabled = !isEditing()
-      const durationLabel = document.createElement("label")
-      durationLabel.textContent = `${sequence.name} · 第 ${frameIndex + 1} 帧时长`
-      const durationInput = document.createElement("input")
-      durationInput.type = "number"
-      durationInput.min = "0"
-      durationInput.value = String(frame.duration)
-      durationInput.disabled = !isEditing()
-      const update = (property: "resourceID" | "duration", value: string | number) => {
-        const before = archive?.getBytes(selectedPath)
-        if (!before) return
-        const after = updateBdaAnimationFrame(before, sequence.name, frameIndex, property, value)
-        commitBytes(selectedPath, before, after)
-        setSourceValue(describeBdaConfig(selectedPath, after))
+  const info = currentBdaAppearance()
+  if (isSkinInfoPath(selectedPath) && selectedDocument) {
+    bdaConfigFieldsGroup.hidden = false
+    renderBdaMetadataEditor(bdaConfigFields, {
+      entries: selectedDocument.entries("").map(({ key, value }) => ({ key, value })),
+      editable: isEditing(),
+      onChange: (key, value) => {
+        if (!selectedDocument) return
+        const before = selectedDocument.toString()
+        if (!selectedDocument.set("", key, value)) return
+        const after = selectedDocument.toString()
+        commitText(selectedPath, before, after)
+        setSourceValue(after)
         populateBdaConfigInspector()
-        refreshPreview()
         updateDirty()
-      }
-      resourceInput.addEventListener("change", () => update("resourceID", resourceInput.value))
-      durationInput.addEventListener("change", () => update("duration", Number(durationInput.value)))
-      resourceLabel.append(resourceInput)
-      durationLabel.append(durationInput)
-      bdaConfigFields.append(resourceLabel, durationLabel)
-    }
+      },
+    })
+    return
   }
+  if (isBdaLayoutPath(selectedPath) && info) {
+    bdaConfigFieldsGroup.hidden = false
+    renderBdaLayoutEditor(bdaConfigFields, {
+      appearance: info.appearance,
+      panelName: selectedPath.split("/").pop() ?? "",
+      keys: selectedBdaKeys(info.appearance),
+      resolver: visualResolver(),
+      editable: isEditing(),
+      onStyleChange: (ref, property, value) => { updateBdaRefs([ref], property, value) },
+    })
+    return
+  }
+  const bytes = archive.isBdaConfig(selectedPath) ? archive.getBytes(selectedPath) : undefined
+  bdaConfigFieldsGroup.hidden = !bytes
+  if (!bytes) return
+  const update = (after: Uint8Array) => {
+    commitBytes(selectedPath, bytes, after)
+    if (/appearanceConfig$/i.test(selectedPath)) refreshBdaLayout(layoutPath)
+    refreshSelectedBdaSource()
+    refreshPreview()
+    populateBdaConfigInspector()
+    updateDirty()
+  }
+  renderBdaConfigEditor(bdaConfigFields, {
+    path: selectedPath,
+    bytes,
+    resolver: visualResolver(),
+    editable: isEditing(),
+    onDesignWidth: (value) => update(updateBdaDesignWidth(bytes, value)),
+    onAnimationFrame: (sequence, frame, property, value) => update(
+      updateBdaAnimationFrame(bytes, sequence, frame, property, value),
+    ),
+    onPickAnimationResource: (sequence, frame) => openBdaAnimationResourceChooser((resourceID) => update(
+      updateBdaAnimationFrame(bytes, sequence, frame, "resourceID", resourceID),
+    )),
+  })
 }
 
 function addNavButton(
@@ -4607,10 +4640,11 @@ function populateKeyInspector(): void {
   const skinSelected = isSkinInfoPath(selectedPath)
   const toolbarSelected = isToolbarPath(selectedPath)
   const bdaConfigSelected = Boolean(archive?.isBdaConfig(selectedPath))
-  skinFieldsGroup.hidden = !skinSelected
-  toolbarFieldsGroup.hidden = !toolbarSelected
-  keyboardFieldsGroup.hidden = skinSelected || toolbarSelected || bdaConfigSelected || selectedPath !== layoutPath || hasSelection
-  for (const group of keyOnlyGroups) group.hidden = skinSelected || bdaConfigSelected || !hasSelection
+  const bdaSelected = archive?.format === "bda"
+  skinFieldsGroup.hidden = !skinSelected || bdaSelected
+  toolbarFieldsGroup.hidden = !toolbarSelected || bdaSelected
+  keyboardFieldsGroup.hidden = bdaSelected || skinSelected || toolbarSelected || bdaConfigSelected || selectedPath !== layoutPath || hasSelection
+  for (const group of keyOnlyGroups) group.hidden = bdaSelected || skinSelected || bdaConfigSelected || !hasSelection
   selectedKeyName.textContent = skinSelected
     ? "皮肤信息"
     : bdaConfigSelected
@@ -4683,7 +4717,7 @@ function populateKeyInspector(): void {
       } else {
         field.value = name === "SOUND_STYLE"
           ? soundStyleForKey(document!, "LIST", soundGeneral) ?? ""
-          : listCellValue(document, sections[0], name)
+          : listCellValue(document!, sections[0], name)
       }
       continue
     }
@@ -5117,7 +5151,7 @@ async function showPickerWindow(
 }
 
 function openResourcePickerWindow(): void {
-  if (!archive || !pickerTarget) return
+  if (!archive || (!pickerTarget && !resourcePickerSelect)) return
   nativeResourcePickerPayload = resourceImagePaths(archive.names(), theme.value, orientation.value).flatMap((path) => {
     const bytes = archive?.getBytes(path)
     return bytes ? [{ path, dataURL: imageDataURL(bytes) }] : []
@@ -5128,6 +5162,18 @@ function openResourcePickerWindow(): void {
 function closeStyleImageResourcePicker(): void {
   styleImageResourcePicker.hidden = true
   styleImageResourceSearch.value = ""
+  resourcePickerSelect = undefined
+}
+
+function selectImageResource(path: string): void {
+  const select = resourcePickerSelect
+  if (select) {
+    const resourceID = path.split("/").pop()?.replace(/\.png$/i, "") ?? path
+    closeStyleImageResourcePicker()
+    select(resourceID)
+    return
+  }
+  if (pickerTarget) openImageSlicePicker(path, pickerTarget)
 }
 
 function renderStyleImageResources(): void {
@@ -5150,8 +5196,11 @@ function renderStyleImageResources(): void {
     button.append(image, name)
     button.classList.toggle("active", path === pickerPath)
     button.addEventListener("click", () => {
-      closeStyleImageResourcePicker()
-      if (pickerTarget) openImageSlicePicker(path, pickerTarget)
+      if (resourcePickerSelect) selectImageResource(path)
+      else {
+        closeStyleImageResourcePicker()
+        if (pickerTarget) openImageSlicePicker(path, pickerTarget)
+      }
     })
     styleImageImgList.append(button)
   }
@@ -5161,7 +5210,7 @@ function renderStyleImageResources(): void {
 }
 
 function openStyleImageResourcePicker(): void {
-  if (isTauri() || !archive || !pickerTarget) return
+  if (isTauri() || !archive || (!pickerTarget && !resourcePickerSelect)) return
   styleImageResourcePicker.hidden = false
   renderStyleImageResources()
   styleImageResourceSearch.focus()
@@ -5174,6 +5223,7 @@ function clearImageSlicePicker(): void {
   pickerSlices = []
   pickerPath = ""
   pickerTarget = undefined
+  resourcePickerSelect = undefined
   pickerSelectedIndex = undefined
   styleImagePicker.hidden = true
   styleImagePreview.hidden = false
@@ -5229,7 +5279,7 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
   const bytes = archive.getBytes(path)
   if (!bytes) return
   if (pickerURL) URL.revokeObjectURL(pickerURL)
-  pickerURL = URL.createObjectURL(new Blob([bytes], { type: "image/png" }))
+  pickerURL = URL.createObjectURL(new Blob([new Uint8Array(bytes).buffer], { type: "image/png" }))
   pickerPath = path
   pickerTarget = target
   const tilePathForPicker = path.replace(/\.png$/i, ".til")
@@ -5268,12 +5318,13 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
 
 function selectedRects(): LayoutRect[] {
   if (!layoutDocument) return []
+  const document = layoutDocument
   return selectedKeySections.flatMap((section) => {
     if (isListCell(section)) {
-      const rect = listCellRect(layoutDocument, section)
+      const rect = listCellRect(document, section)
       return rect ? [rect] : []
     }
-    const values = layoutDocument?.get(section, "VIEW_RECT")?.split(",").map(Number)
+    const values = document.get(section, "VIEW_RECT")?.split(",").map(Number)
     if (!values || values.length !== 4 || values.some((value) => !Number.isFinite(value))) return []
     const [x, y, width, height] = values
     return [{ section, x, y, width, height }]
@@ -5733,9 +5784,10 @@ function selectFile(
       selectedKeySections = []
       preview.setSelected([])
     }
-    setSourceValue(`# BDA 官方基础布局（只读几何）\n\n${selectedDocument?.toString() ?? ""}`)
+    const info = currentBdaAppearance()
+    setSourceValue(info ? decodedBdaSource(info.path, info.bytes, path.split("/").pop()) : "{}")
     source.disabled = true
-    sourceName.textContent = `${path} · 几何来自百度输入法安装包`
+    sourceName.textContent = info ? `${info.path} · ${path.split("/").pop()} · 解码源码` : path
     inspectorTab = "properties"
   } else if (archive?.isImage(path)) {
     inspectorTab = "properties"
@@ -5765,9 +5817,9 @@ function selectFile(
   } else if (archive?.isBdaConfig(path)) {
     hideImageWorkspace()
     selectedDocument = undefined
-    setSourceValue(describeBdaConfig(path, archive.getBytes(path)!))
+    setSourceValue(decodedBdaSource(path, archive.getBytes(path)!))
     source.disabled = true
-    sourceName.textContent = path
+    sourceName.textContent = `${path} · 解码源码`
     inspectorTab = "properties"
   } else {
     return
@@ -5916,7 +5968,7 @@ function renderFiles(): void {
     entries.push({ ...info, path })
   }
 
-  const candidatePath = toolbarConfigPath()
+  const candidatePath = archive.format === "bda" ? undefined : toolbarConfigPath()
   if (candidatePath) entries.push({ group: "键盘组件", label: "候选栏与工具栏", path: candidatePath, className: "nav-component", icon: "text.bubble" })
   const hintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
   if (hintPath) entries.push({ group: "键盘组件", label: "按键气泡", path: hintPath, className: "nav-component", icon: "rectangle.and.hand.point" })
@@ -5925,8 +5977,8 @@ function renderFiles(): void {
     entries.push({ group: "资源配置", label: "图片资源", path: stylePath, className: "nav-resource", icon: "photo", navMode: "resource" })
     if (archive.format !== "bda") {
       entries.push({ group: "资源配置", label: "样式配置", path: stylePath, className: "nav-style", icon: "paintpalette", navMode: "style" })
+      entries.push({ group: "资源配置", label: "按键音效", path: stylePath, className: "nav-resource", icon: "speaker.wave.2", navMode: "sound" })
     }
-    entries.push({ group: "资源配置", label: "按键音效", path: stylePath, className: "nav-resource", icon: "speaker.wave.2", navMode: "sound" })
   }
   const legacyAnimationPath = archive.format === "bda" ? undefined : legacyAnimationConfigPath()
   if (legacyAnimationPath) {
@@ -5940,7 +5992,14 @@ function renderFiles(): void {
       ["switch", "开关配置"],
     ] as const) {
       const path = bdaConfigPath(archive, theme.value, orientation.value, kind)
-      if (path) entries.push({ group: "扩展配置", label, path, className: "nav-style", icon: "gearshape" })
+      if (path) entries.push({
+        group: "扩展配置",
+        label,
+        path,
+        className: kind === "sound" ? "nav-resource" : "nav-style",
+        icon: kind === "sound" ? "speaker.wave.2" : "gearshape",
+        navMode: kind === "sound" ? "sound" : undefined,
+      })
     }
   }
   for (const group of ["皮肤", "资源配置", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "扩展配置", "扩展布局"]) {
@@ -6554,7 +6613,7 @@ async function shareArchiveToMobile(): Promise<boolean> {
     await invoke("share_file", { name, data: Array.from(exported.bytes) })
     return true
   }
-  const file = new File([exported.bytes], name, { type: "application/octet-stream" })
+  const file = new File([new Uint8Array(exported.bytes).buffer], name, { type: "application/octet-stream" })
   if (!navigator.share || navigator.canShare && !navigator.canShare({ files: [file] })) {
     throw new Error("当前设备不支持系统文件分享")
   }
@@ -7210,6 +7269,7 @@ for (const button of inspectorTabButtons) {
     inspectorTab = button.dataset.inspectorTab === "source" ? "source" : "properties"
     if (mobilePortraitQuery.matches) setMobilePane("inspector")
     updateInspectorView()
+    if (!quickInspector.hidden) populateKeyInspector()
   })
 }
 for (const control of [theme, orientation, layout]) {
@@ -7437,7 +7497,7 @@ function openLayoutImageDialog(): void {
   const layout = currentLayoutDocument()
   const styles = currentStyleDocument()
   if (!layout || !styles) return
-  layoutImageLayout.textContent = `当前布局：${layoutPath.split("/").pop() ?? layout.value}（${orientation.value}）`
+  layoutImageLayout.textContent = `当前布局：${layoutPath.split("/").pop() ?? "布局"}（${orientation.value}）`
   layoutImageScope.textContent = selectedKeySections.length
     ? `已选中 ${selectedKeySections.length} 个按键，将只替换这些按键。`
     : "未选中按键，将替换当前布局的全部按键。"
@@ -7454,7 +7514,7 @@ function openLayoutImageDialog(): void {
 
 function setLayoutImageBytes(bytes: Uint8Array): void {
   if (layoutImageObjectURL) URL.revokeObjectURL(layoutImageObjectURL)
-  layoutImageObjectURL = URL.createObjectURL(new Blob([bytes], { type: "image/png" }))
+  layoutImageObjectURL = URL.createObjectURL(new Blob([new Uint8Array(bytes).buffer], { type: "image/png" }))
   layoutImageBytes = bytes
   const image = new Image()
   image.onload = () => {
@@ -7732,7 +7792,7 @@ if (isTauri()) {
   })
   void listen("resource-picker-open", openResourcePickerWindow)
   void listen<{ path: string }>("resource-picker-select", (event) => {
-    if (pickerTarget) openImageSlicePicker(event.payload.path, pickerTarget)
+    selectImageResource(event.payload.path)
   })
 }
 
