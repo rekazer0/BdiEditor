@@ -320,6 +320,10 @@ export function renderBdaConfigEditor(container: HTMLElement, options: ConfigEdi
   }
   if (/animationConfig$/i.test(name)) {
     const animation = decodeBdaAnimation(options.bytes)
+    const summary = element("article", "bda-animation-card")
+    const kinds = new Set([...animation.effects.values()].map((effect) => effect.kind))
+    summary.append(heading("动画配置", `${animation.targets.length} 个目标 · ${animation.effects.size} 个定义 · ${[...kinds].join(" / ") || "无动画"}`))
+    container.append(summary)
     for (const sequence of animation.sequences.values()) {
       const card = element("article", "bda-animation-card")
       card.append(heading(sequence.name, `${sequence.frames.length} 帧`), animationPlayer(sequence.frames, options.resolver))
@@ -353,6 +357,15 @@ export function renderBdaConfigEditor(container: HTMLElement, options: ConfigEdi
         strip.append(item)
       })
       card.append(strip)
+      container.append(card)
+    }
+    for (const effect of animation.effects.values()) {
+      if (effect.kind === "image") continue
+      const card = element("article", "bda-animation-card")
+      const resource = "resource" in effect ? effect.resource?.resourceID : effect.kind === "emitter"
+        ? effect.resources.map((item) => item.resourceID).join("、")
+        : effect.kind === "group" ? effect.items.map((item) => `${item.kind}:${item.key}`).join("、") : undefined
+      card.append(heading(effect.key, `${effect.kind}${resource ? ` · ${resource}` : ""}`))
       container.append(card)
     }
     return

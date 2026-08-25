@@ -4,7 +4,14 @@ import { IniDocument } from "./ini.ts"
 import { DEFAULT_CANDIDATE_HEIGHT, DEFAULT_PANEL_HEIGHT, DEFAULT_PANEL_WIDTH } from "./keyboard.ts"
 import { gestureDirection, snapPointToRects, snapRectDelta } from "./layout.ts"
 import { stateStyleValue, stateTipSection } from "./panel-tools.ts"
-import type { BdaAnimation, BdaAnimationSequence } from "./bda.ts"
+import type {
+  BdaAnimation,
+  BdaAnimationBinding,
+  BdaAnimationEffect,
+  BdaAnimationSequence,
+  BdaEmitterAnimation,
+  BdaTransformAnimation,
+} from "./bda.ts"
 
 export type PreviewEvent = {
   section: string
@@ -536,14 +543,122 @@ export function animationSequenceForKey(
   item: PreviewItem,
 ): BdaAnimationSequence | undefined {
   if (!animation) return
-  const candidates = [item.section, item.center, item.down, `KEY_${item.center}`]
-    .map((value) => value.trim().toUpperCase()).filter(Boolean)
-  const target = animation.targets.find((value) => candidates.includes(value.toUpperCase()))
+  const target = bdaTargetForKey(animation, item)
   if (target) {
     const sequence = animation.bindings.get(target)
     return animation.sequences.get(sequence ?? target) ?? animation.sequences.get(target.replace(/^KEY_/, ""))
   }
   if (animation.sequences.size === 1) return animation.sequences.values().next().value
+}
+
+function bdaTargetForKey(animation: BdaAnimation, item: PreviewItem): string | undefined {
+  const candidates = [item.section, item.center, item.down, `KEY_${item.center}`]
+    .map((value) => value.trim().toUpperCase()).filter(Boolean)
+  const exact = animation.targets.find((value) => candidates.includes(value.toUpperCase()))
+  if (exact) return exact
+  const main = /^[A-Z]$/i.test(item.center.trim())
+  const semantic = main ? "MAIN_KEY" : "FUNCTION_KEY"
+  return animation.targets.find((value) => value.toUpperCase() === semantic)
+}
+
+export function bdaAnimationBindingsForKey(
+  animation: BdaAnimation | undefined,
+  item: PreviewItem,
+  event = 1,
+): BdaAnimationBinding[] {
+  if (!animation) return []
+  const target = bdaTargetForKey(animation, item)
+  return target ? (animation.targetBindings.get(target) ?? []).filter((binding) => binding.event === event) : []
+}
+
+function bdaBindingEffects(animation: BdaAnimation, binding: BdaAnimationBinding): BdaAnimationEffect[] {
+  const effect = animation.effects.get(`${binding.kind}:${binding.key}`)
+  if (!effect) return []
+  if (effect.kind !== "group") return [effect]
+  return effect.items.flatMap((item) => {
+    const child = animation.effects.get(`${item.kind}:${item.key}`)
+    return child ? [child] : []
+  })
+}
+
+function bdaEffectDuration(effect: BdaAnimationEffect): number {
+  if (effect.kind === "emitter") return Math.max(
+    effect.duration * 1000,
+    effect.totalNumber / Math.max(0.1, effect.birthRate) * 1000 + effect.life[1],
+  )
+  if (["alpha", "scale", "shift", "rotate"].includes(effect.kind)) {
+    const transform = effect as BdaTransformAnimation
+    return transform.delay + transform.duration * Math.max(1, transform.repeatCount) * (transform.repeatMode === 1 ? 2 : 1)
+  }
+  if (effect.kind === "image") return effect.sequence.frames.reduce((sum, frame) => sum + Math.max(16, frame.duration ?? 100), 0)
+  return 0
+}
+
+type BdaTransformState = {
+  scale?: readonly [number, number]
+  translation?: readonly [number, number]
+  rotation?: number
+  opacity?: number
+}
+
+function bdaTransforms(
+  animation: BdaAnimation | undefined,
+  item: PreviewItem,
+  elapsed: number,
+  scope: "back" | "fore",
+): BdaTransformState {
+  if (!animation || elapsed < 0) return {}
+  const result: BdaTransformState = {}
+  const accepts = (binding: BdaAnimationBinding) => binding.scope === 2 || binding.scope === (scope === "back" ? 1 : 0)
+  for (const binding of bdaAnimationBindingsForKey(animation, item).filter(accepts)) {
+    for (const effect of bdaBindingEffects(animation, binding)) {
+      if (!["alpha", "scale", "shift", "rotate"].includes(effect.kind)) continue
+      const transform = effect as BdaTransformAnimation
+      const start = transform.delay
+      const repetitions = Math.max(1, transform.repeatCount)
+      const cycles = repetitions * (transform.repeatMode === 1 ? 2 : 1)
+      const total = transform.duration * cycles
+      if (elapsed < start || elapsed > start + total) continue
+      const raw = transform.duration ? (elapsed - start) / transform.duration : cycles
+      let progress = raw >= cycles ? (transform.repeatMode === 1 ? 0 : 1) : raw % (transform.repeatMode === 1 ? 2 : 1)
+      if (transform.repeatMode === 1 && progress > 1) progress = 2 - progress
+      progress = animationEasing(transform.interpolation, Math.max(0, Math.min(1, progress)))
+      // ponytail: random protobuf ranges use their midpoint for a stable editor preview.
+      const midpoint = (range: readonly [number, number]) => (range[0] + range[1]) / 2
+      const value = (axis: 0 | 1) => midpoint(transform.from[axis]) + (midpoint(transform.to[axis]) - midpoint(transform.from[axis])) * progress
+      if (transform.kind === "alpha") result.opacity = value(0) / 255
+      else if (transform.kind === "scale") result.scale = [value(0) / 100, value(1) / 100]
+      else if (transform.kind === "rotate") result.rotation = value(0)
+      else result.translation = transform.relative
+        ? [value(0) * item.rect.width / 100, value(1) * item.rect.height / 100]
+        : [value(0), value(1)]
+    }
+  }
+  return result
+}
+
+export function bdaParticleEmitter(effect: BdaEmitterAnimation): LegacyParticleEmitter {
+  const [left, top, right, bottom] = effect.emitRegion
+  const region: [number, number, number, number] = left === 0 && top === 0 && right === 0 && bottom === 0
+    ? [0, 0, 1, 1]
+    : [left, top, right - left, bottom - top]
+  return {
+    images: effect.resources.map((item) => item.resourceID),
+    life: effect.life,
+    emitRegion: region,
+    totalNumber: Math.max(1, effect.totalNumber),
+    birthRate: Math.max(0.1, effect.birthRate),
+    velocity: effect.velocity,
+    velocityDirection: effect.velocityDirection,
+    acceleration: effect.acceleration,
+    accelerationDirection: effect.accelerationDirection,
+    initialScale: effect.scale,
+    scaleSpeed: effect.scaleSpeed,
+    initialRotation: effect.rotation,
+    rotationSpeed: effect.spin,
+    initialAlpha: effect.alpha,
+    alphaSpeed: effect.alphaSpeed,
+  }
 }
 
 export function previewBackground(theme: "light" | "dark"): string {
@@ -1011,6 +1126,8 @@ export class Preview {
   private animation?: BdaAnimation
   private animationVisual?: { key: PreviewItem; visual: Visual }
   private animationTimer?: number
+  private bdaAnimationState?: { key: PreviewItem; startedAt: number }
+  private bdaAnimationTimer?: number
   private legacyAnimation?: LegacyAnimation
   private legacyAnimationState?: { key: PreviewItem; startedAt: number }
   private legacyAnimationTimer?: number
@@ -1155,7 +1272,9 @@ export class Preview {
   setAnimation(animation?: BdaAnimation): void {
     this.animation = animation
     this.animationVisual = undefined
+    this.bdaAnimationState = undefined
     if (this.animationTimer) window.clearTimeout(this.animationTimer)
+    if (this.bdaAnimationTimer) window.cancelAnimationFrame(this.bdaAnimationTimer)
     void this.draw()
   }
 
@@ -1410,6 +1529,25 @@ export class Preview {
 
   private async playAnimation(key: PreviewItem): Promise<void> {
     this.playLegacyAnimation(key)
+    const effects = this.animation
+      ? bdaAnimationBindingsForKey(this.animation, key).flatMap((binding) => bdaBindingEffects(this.animation!, binding))
+      : []
+    const duration = Math.max(0, ...effects.map(bdaEffectDuration))
+    if (duration) {
+      if (this.bdaAnimationTimer) window.cancelAnimationFrame(this.bdaAnimationTimer)
+      this.bdaAnimationState = { key, startedAt: Date.now() }
+      const tick = () => {
+        const elapsed = this.bdaAnimationState ? Date.now() - this.bdaAnimationState.startedAt : duration + 1
+        void this.draw()
+        if (elapsed <= duration) this.bdaAnimationTimer = window.requestAnimationFrame(tick)
+        else {
+          this.bdaAnimationState = undefined
+          this.bdaAnimationTimer = undefined
+          void this.draw()
+        }
+      }
+      this.bdaAnimationTimer = window.requestAnimationFrame(tick)
+    }
     const sequence = animationSequenceForKey(this.animation, key)
     if (!sequence?.frames.length || !this.resolver?.resolveResource) return
     if (this.animationTimer) window.clearTimeout(this.animationTimer)
@@ -1793,7 +1931,24 @@ export class Preview {
       : particles.flatMap((particle) =>
           legacyParticleFrames(particle, panelAnimationElapsed, this.panelWidth, this.panelHeight)
         )
-    const particleStyleIDs = [...new Set(particleFrames.map((frame) => frame.styleID))]
+    const bdaAnimationElapsed = this.bdaAnimationState ? Date.now() - this.bdaAnimationState.startedAt : -1
+    const bdaParticleFrames = this.animation && this.bdaAnimationState && bdaAnimationElapsed >= 0
+      ? bdaAnimationBindingsForKey(this.animation, this.bdaAnimationState.key).flatMap((binding) =>
+          bdaBindingEffects(this.animation!, binding).flatMap((effect) => {
+            if (effect.kind !== "emitter" || !effect.resources.length) return []
+            return legacyParticleFrames(
+              bdaParticleEmitter(effect), bdaAnimationElapsed,
+              this.bdaAnimationState!.key.rect.width, this.bdaAnimationState!.key.rect.height,
+            ).map((frame) => ({
+              ...frame,
+              x: frame.x + this.bdaAnimationState!.key.rect.x,
+              y: frame.y + this.bdaAnimationState!.key.rect.y,
+            }))
+          })
+        )
+      : []
+    const allParticleFrames = [...particleFrames, ...bdaParticleFrames]
+    const particleStyleIDs = [...new Set(allParticleFrames.map((frame) => frame.styleID))]
     const keys = previewDrawOrder(visiblePreviewItems(this.keys, this.skinState)
       .map((key) =>
         this.document ? effectivePreviewItem(this.document, key, this.skinState ?? 0) : key,
@@ -1820,7 +1975,9 @@ export class Preview {
       this.toolbarSlots && !this.persistentOnly
         ? this.resolver?.resolveToolbarImages() ?? Promise.resolve([])
         : Promise.resolve([]),
-      Promise.all(particleStyleIDs.map((styleID) => this.resolver?.resolve(styleID, false))),
+      Promise.all(particleStyleIDs.map(async (styleID) =>
+        await this.resolver?.resolveResource?.(styleID) ?? this.resolver?.resolve(styleID, false)
+      )),
     ])
     if (drawID !== this.drawID) return
     const context = this.canvas.getContext("2d")
@@ -1848,19 +2005,22 @@ export class Preview {
       const animationElapsed = this.legacyAnimationState?.key.section === key.section
         ? Date.now() - this.legacyAnimationState.startedAt
         : -1
+      const activeBdaElapsed = this.bdaAnimationState?.key.section === key.section ? bdaAnimationElapsed : -1
+      const bdaBack = bdaTransforms(this.animation, key, activeBdaElapsed, "back")
+      const bdaFore = bdaTransforms(this.animation, key, activeBdaElapsed, "fore")
       const backAnimationStyle = key.backAnimStyle || key.animStyle
       const backScale = animationElapsed >= 0
         ? legacyAnimationScale(this.legacyAnimation, backAnimationStyle, animationElapsed)
-        : undefined
+        : bdaBack.scale
       const backTranslation = animationElapsed >= 0
         ? legacyAnimationTranslation(this.legacyAnimation, backAnimationStyle, animationElapsed, key.rect)
-        : undefined
+        : bdaBack.translation
       const backRotation = animationElapsed >= 0
         ? legacyAnimationRotation(this.legacyAnimation, backAnimationStyle, animationElapsed)
-        : undefined
+        : bdaBack.rotation
       const backOpacity = animationElapsed >= 0
         ? legacyAnimationOpacity(this.legacyAnimation, backAnimationStyle, animationElapsed)
-        : undefined
+        : bdaBack.opacity
       const foregrounds = phoneForegroundLayers(visuals[index].fore)
       const styleTexts = visuals[index].styleTexts
       const hasForeground = foregrounds.some(Boolean) || styleTexts.some(Boolean)
@@ -1873,16 +2033,16 @@ export class Preview {
         const animationStyle = key.foreAnimStyles[layer] || key.foreAnimStyle || key.animStyle
         const foreScale = animationElapsed >= 0
           ? legacyAnimationScale(this.legacyAnimation, animationStyle, animationElapsed)
-          : undefined
+          : bdaFore.scale
         const foreTranslation = animationElapsed >= 0
           ? legacyAnimationTranslation(this.legacyAnimation, animationStyle, animationElapsed, key.rect)
-          : undefined
+          : bdaFore.translation
         const foreRotation = animationElapsed >= 0
           ? legacyAnimationRotation(this.legacyAnimation, animationStyle, animationElapsed)
-          : undefined
+          : bdaFore.rotation
         const foreOpacity = animationElapsed >= 0
           ? legacyAnimationOpacity(this.legacyAnimation, animationStyle, animationElapsed)
-          : undefined
+          : bdaFore.opacity
         const offset = key.foreOffsets[layer] ?? offsetFromSection(
           this.offsets,
           `OFFSET${key.positionTypes[layer] ?? ""}`,
@@ -1898,16 +2058,16 @@ export class Preview {
         const animationStyle = key.foreAnimStyles[layer] || key.foreAnimStyle || key.animStyle
         const foreScale = animationElapsed >= 0
           ? legacyAnimationScale(this.legacyAnimation, animationStyle, animationElapsed)
-          : undefined
+          : bdaFore.scale
         const foreTranslation = animationElapsed >= 0
           ? legacyAnimationTranslation(this.legacyAnimation, animationStyle, animationElapsed, key.rect)
-          : undefined
+          : bdaFore.translation
         const foreRotation = animationElapsed >= 0
           ? legacyAnimationRotation(this.legacyAnimation, animationStyle, animationElapsed)
-          : undefined
+          : bdaFore.rotation
         const foreOpacity = animationElapsed >= 0
           ? legacyAnimationOpacity(this.legacyAnimation, animationStyle, animationElapsed)
-          : undefined
+          : bdaFore.opacity
         const offset = key.foreOffsets[layer] ?? offsetFromSection(
           this.offsets,
           `OFFSET${key.positionTypes[layer] ?? ""}`,
@@ -1936,16 +2096,16 @@ export class Preview {
         const animationStyle = key.foreAnimStyle || key.animStyle
         const foreScale = animationElapsed >= 0
           ? legacyAnimationScale(this.legacyAnimation, animationStyle, animationElapsed)
-          : undefined
+          : bdaFore.scale
         const foreTranslation = animationElapsed >= 0
           ? legacyAnimationTranslation(this.legacyAnimation, animationStyle, animationElapsed, key.rect)
-          : undefined
+          : bdaFore.translation
         const foreRotation = animationElapsed >= 0
           ? legacyAnimationRotation(this.legacyAnimation, animationStyle, animationElapsed)
-          : undefined
+          : bdaFore.rotation
         const foreOpacity = animationElapsed >= 0
           ? legacyAnimationOpacity(this.legacyAnimation, animationStyle, animationElapsed)
-          : undefined
+          : bdaFore.opacity
         this.withTransform(context, key.rect, foreScale, foreTranslation, foreRotation, foreOpacity, () => {
           context.fillText(
             fallbackText,
@@ -1960,7 +2120,7 @@ export class Preview {
     const particleVisualByStyle = new Map(
       particleStyleIDs.map((styleID, index) => [styleID, particleVisuals[index]]),
     )
-    for (const frame of particleFrames) {
+    for (const frame of allParticleFrames) {
       const visual = particleVisualByStyle.get(frame.styleID)
       if (!visual?.image || !visual.source || frame.scale <= 0 || frame.opacity <= 0) continue
       const [sx, sy, width, height] = visual.source

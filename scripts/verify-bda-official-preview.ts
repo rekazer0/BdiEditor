@@ -1,12 +1,13 @@
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
-import { bdaAppearancePath, bdaLayoutDocument, bdaStyleRef, decodeBdaAppearance, decodedBdaSource } from "../src/bda.ts"
+import { existsSync, readFileSync } from "node:fs"
+import { bdaAppearancePath, bdaConfigPaths, bdaLayoutDocument, bdaStyleRef, decodeBdaAnimation, decodeBdaAppearance, decodedBdaSource } from "../src/bda.ts"
 import { IniDocument } from "../src/ini.ts"
 import { previewItems } from "../src/preview.ts"
 import { SkinArchive } from "../src/skin.ts"
 
 const skin = SkinArchive.open(readFileSync("public/default-template.bda"), "bda")
 const base = SkinArchive.open(readFileSync("public/bda-base.bds"), "bds")
+assert.notEqual(base.getText("light/skin/port/en_26.ini"), base.getText("light/skin/port/en_26s.ini"), "小写与 Shift 大写布局不能混用")
 let panels = 0
 let adaptedStyles = 0
 
@@ -44,4 +45,11 @@ for (const orientation of ["port", "land"]) {
 
 assert.ok(panels >= 40, `官方横竖屏布局覆盖不足：${panels}`)
 assert.ok(adaptedStyles >= 1000, `官方样式适配覆盖不足：${adaptedStyles}`)
+const whalePath = "/Users/kaze/Downloads/3鲸鱼IOS.bda"
+if (existsSync(whalePath)) {
+  const whale = SkinArchive.open(readFileSync(whalePath), "bda")
+  const paths = bdaConfigPaths(whale, "dark", "port", "animation")
+  assert.deepEqual(paths.map((path) => path.split("/").pop()), ["animationConfig", "2animationConfig"])
+  for (const path of paths) assert.ok(decodeBdaAnimation(whale.getBytes(path)!).effects.size >= 3)
+}
 console.log(`✓ 官方 BDA ${panels} 个横竖屏布局与 ${adaptedStyles} 个样式引用可通过共享预览模型解析`)

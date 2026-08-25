@@ -76,7 +76,7 @@ export function convertBdaArchive(source: SkinArchive, base: SkinArchive): BdaCo
       const animationBytes = animationPath && source.getBytes(animationPath)
       const animation = animationBytes
         ? decodeBdaAnimation(animationBytes)
-        : { targets: [], sequences: new Map(), bindings: new Map() }
+        : { targets: [], sequences: new Map(), bindings: new Map(), targetBindings: new Map(), effects: new Map() }
 
       const basePrefix = `light/skin/${orientation}/`
       const targetPrefix = `${theme}/skin/${orientation}/`

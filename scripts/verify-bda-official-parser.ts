@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { bdaLayoutDocument, decodeBdaAnimation, decodeBdaAppearance } from "../src/bda.ts"
 import { IniDocument } from "../src/ini.ts"
-import { previewItems } from "../src/preview.ts"
+import { bdaAnimationBindingsForKey, bdaParticleEmitter, legacyParticleFrames, previewItems } from "../src/preview.ts"
 
 function join(...parts: Uint8Array[]): Uint8Array {
   const output = new Uint8Array(parts.reduce((size, part) => size + part.length, 0))
@@ -193,14 +193,62 @@ assert.equal(hintDocument.get("BAR", "CELL_STYLE"), "1000043")
 
 const animationItem = join(bytes(1, join(scalar(1, 1), bytes(2, "spark_1"))), scalar(2, 80))
 const imageAnimation = bytes(5, animationItem)
-const baseAnimation = join(scalar(3, 1), bytes(4, "spark"), scalar(5, 1))
-const animationList = bytes(1, baseAnimation)
+const baseAnimation = join(scalar(1, 2), scalar(3, 1), bytes(4, "spark"), scalar(5, 1))
+const scaleBinding = join(scalar(1, 2), scalar(2, 2), bytes(4, "press_scale"), scalar(5, 1))
+const emitterBinding = join(scalar(1, 0), scalar(2, 2), bytes(3, "stars"), scalar(4, 1))
+const animationList = join(bytes(1, baseAnimation), bytes(1, scaleBinding), bytes(2, emitterBinding))
+const random = (min: number, max: number) => join(scalar(1, min), scalar(2, max))
+const point = (x: Uint8Array, y: Uint8Array) => join(bytes(1, x), bytes(2, y))
+const range = (location: number, length: number) => join(float(1, location), float(2, length))
+const pressScale = join(
+  scalar(1, 1), bytes(5, point(random(100, 100), random(100, 100))),
+  bytes(6, point(random(85, 85), random(85, 85))), scalar(7, 50),
+)
+const stars = join(
+  float(6, 1.5), scalar(7, 12), scalar(8, 24),
+  bytes(12, join(float(1, 0), float(2, 0), float(3, 1), float(4, 1))),
+  bytes(13, join(scalar(1, 0), bytes(2, "star"))), bytes(14, range(800, 200)),
+  bytes(17, range(0.5, 0.5)), bytes(19, range(180, 75)), bytes(21, range(20, 10)),
+)
 const animation = decodeBdaAnimation(join(
   stringMap(1, "KEY_A", animationList),
+  stringMap(5, "press_scale", pressScale),
   stringMap(9, "spark", imageAnimation),
+  stringMap(10, "stars", stars),
+  stringMap(11, "badge", join(scalar(1, 2), bytes(3, join(scalar(1, 7), bytes(2, "badge_json"))))),
+  stringMap(13, "movie", join(scalar(1, 1), bytes(3, join(scalar(1, 3), bytes(2, "movie_mp4"))))),
+  scalar(12, 1242),
 ))
 assert.deepEqual(animation.targets, ["KEY_A"])
 assert.equal(animation.bindings.get("KEY_A"), "spark")
 assert.deepEqual(animation.sequences.get("spark")?.frames, [{ resourceID: "spark_1", duration: 80 }])
+assert.equal(animation.designWidth, 1242)
+assert.deepEqual(animation.targetBindings.get("KEY_A")?.map(({ kind, key, scope, isolated }) => ({ kind, key, scope, isolated })), [
+  { kind: "image", key: "spark", scope: 2, isolated: false },
+  { kind: "scale", key: "press_scale", scope: 2, isolated: false },
+  { kind: "emitter", key: "stars", scope: 0, isolated: true },
+])
+assert.deepEqual(animation.effects.get("scale:press_scale"), {
+  kind: "scale", key: "press_scale", repeatCount: 1, repeatMode: 0, delay: 0,
+  removeOnFinish: false, duration: 50, interpolation: 0,
+  from: [[100, 100], [100, 100]], to: [[85, 85], [85, 85]], relative: true,
+})
+assert.deepEqual(animation.effects.get("emitter:stars"), {
+  kind: "emitter", key: "stars", repeatCount: 0, repeatMode: 0, removeOnFinish: false,
+  duration: 1.5, birthRate: 12, totalNumber: 24, emitRegion: [0, 0, 1, 1],
+  resources: [{ type: 0, resourceID: "star" }], life: [800, 1000], rotation: [0, 0],
+  spin: [0, 0], scale: [0.5, 1], scaleSpeed: [0, 0], alpha: [180, 255], alphaSpeed: [0, 0],
+  velocity: [20, 30], velocityDirection: [0, 0], acceleration: [0, 0], accelerationDirection: [0, 0],
+})
+assert.equal(animation.effects.get("lottie:badge")?.kind, "lottie")
+assert.equal(animation.effects.get("video:movie")?.kind, "video")
+const emitter = animation.effects.get("emitter:stars")
+assert.ok(emitter?.kind === "emitter")
+const particleFrames = legacyParticleFrames(bdaParticleEmitter(emitter), 500, 100, 50)
+assert.ok(particleFrames.length > 0)
+assert.ok(particleFrames.every((frame) => frame.styleID === "star" && Number.isFinite(frame.x) && Number.isFinite(frame.y)))
+animation.targets.push("MAIN_KEY")
+animation.targetBindings.set("MAIN_KEY", animation.targetBindings.get("KEY_A")!)
+assert.deepEqual(bdaAnimationBindingsForKey(animation, { section: "KEY1", center: "a", down: "" } as never).map(({ kind }) => kind), ["image", "scale", "emitter"])
 
-console.log("✓ 官方 BDA appearanceConfig 完整解析并适配布局、候选栏与提示气泡")
+console.log("✓ 官方 BDA appearanceConfig 与 10 类 animationConfig 字段解析通过")

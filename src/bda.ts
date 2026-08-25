@@ -165,10 +165,92 @@ export type BdaAppearance = {
 }
 export type BdaAnimationFrame = { resourceID?: string; duration?: number }
 export type BdaAnimationSequence = { name: string; frames: BdaAnimationFrame[] }
+export type BdaAnimationKind = "group" | "alpha" | "scale" | "shift" | "rotate" | "frame" | "image" | "emitter" | "lottie" | "video"
+export type BdaNumberRange = [number, number]
+export type BdaVectorRange = [BdaNumberRange, BdaNumberRange]
+export type BdaAnimationBinding = {
+  kind: BdaAnimationKind
+  key: string
+  scope: number
+  event: number
+  isolated: boolean
+  location?: number
+  condition?: string
+  removeOnInteraction?: boolean
+}
+export type BdaTransformAnimation = {
+  kind: "alpha" | "scale" | "shift" | "rotate"
+  key: string
+  repeatCount: number
+  repeatMode: number
+  delay: number
+  removeOnFinish: boolean
+  duration: number
+  interpolation: number
+  from: BdaVectorRange
+  to: BdaVectorRange
+  relative: boolean
+}
+export type BdaEmitterAnimation = {
+  kind: "emitter"
+  key: string
+  repeatCount: number
+  repeatMode: number
+  removeOnFinish: boolean
+  duration: number
+  birthRate: number
+  totalNumber: number
+  emitRegion: [number, number, number, number]
+  resources: BdaResource[]
+  life: BdaNumberRange
+  rotation: BdaNumberRange
+  spin: BdaNumberRange
+  scale: BdaNumberRange
+  scaleSpeed: BdaNumberRange
+  alpha: BdaNumberRange
+  alphaSpeed: BdaNumberRange
+  velocity: BdaNumberRange
+  velocityDirection: BdaNumberRange
+  acceleration: BdaNumberRange
+  accelerationDirection: BdaNumberRange
+}
+export type BdaGroupAnimation = {
+  kind: "group"
+  key: string
+  buildMode: number
+  repeatCount: number
+  repeatMode: number
+  removeOnFinish: boolean
+  delay: number
+  items: Array<{ kind: BdaAnimationKind; key: string }>
+}
+export type BdaResourceAnimation = {
+  kind: "frame" | "lottie" | "video"
+  key: string
+  repeatCount: number
+  removeOnFinish: boolean
+  resource?: BdaResource
+  placeholder?: BdaResource
+  startRepeatFrame?: number
+}
+export type BdaImageAnimation = {
+  kind: "image"
+  key: string
+  repeatCount: number
+  repeatMode: number
+  removeOnFinish: boolean
+  loopForever: boolean
+  startRepeatFrame: number
+  sequence: BdaAnimationSequence
+}
+export type BdaAnimationEffect = BdaTransformAnimation | BdaEmitterAnimation | BdaGroupAnimation | BdaResourceAnimation | BdaImageAnimation
 export type BdaAnimation = {
+  designWidth?: number
   targets: string[]
   sequences: Map<string, BdaAnimationSequence>
   bindings: Map<string, string>
+  targetBindings: Map<string, BdaAnimationBinding[]>
+  effects: Map<string, BdaAnimationEffect>
 }
 export type BdaSoundConfig = {
   keySounds: Map<string, BdaResource>
@@ -205,9 +287,19 @@ export function bdaConfigPath(
   orientation: string,
   kind: BdaConfigKind,
 ): string | undefined {
+  return bdaConfigPaths(archive, theme, orientation, kind)[0]
+}
+
+export function bdaConfigPaths(
+  archive: SkinArchive,
+  theme: string,
+  orientation: string,
+  kind: BdaConfigKind,
+): string[] {
   const prefix = `${theme}/skin/${orientation}/`
   const config = new RegExp(`^\\d*${kind}Config$`)
-  return archive.names().find((path) => path.startsWith(prefix) && config.test(path.slice(prefix.length)))
+  return archive.names().filter((path) => path.startsWith(prefix) && config.test(path.slice(prefix.length)))
+    .sort((a, b) => (Number(a.slice(prefix.length).match(/^\d+/)?.[0]) || 0) - (Number(b.slice(prefix.length).match(/^\d+/)?.[0]) || 0))
 }
 
 export function bdaPanelKeyName(action: string): string {
@@ -698,49 +790,170 @@ export function decodeBdaAppearance(bytes: Uint8Array): BdaAppearance {
 
 export function decodeBdaAnimation(bytes: Uint8Array): BdaAnimation {
   const root = fields(bytes)
-  const sequences = mapEntries(root, 9).map((entry) => {
-    const name = string(first(entry, 1))
-    const sequence = message(first(entry, 2))
-    const frames = sequence.filter((field) => field.number === 5).map((field) => {
-      const frame = message(field)
-      return {
-        resourceID: first(message(first(frame, 1)), 2)
-          ? string(first(message(first(frame, 1)), 2))
-          : undefined,
-        duration: first(frame, 2)?.varint,
-      }
-    })
-    return [name, { name, frames }] as const
+  const numberRange = (field: ProtoField | undefined): BdaNumberRange => {
+    const value = message(field)
+    const min = first(value, 1)?.varint ?? 0
+    return [min, first(value, 2)?.varint ?? min]
+  }
+  const vectorRange = (field: ProtoField | undefined): BdaVectorRange => {
+    const value = message(field)
+    return [numberRange(first(value, 1)), numberRange(first(value, 2))]
+  }
+  const range = (field: ProtoField | undefined): BdaNumberRange => {
+    const value = message(field)
+    const location = float(value, 1)
+    return [location, location + float(value, 2)]
+  }
+  const common = (value: ProtoField[]) => ({
+    repeatCount: first(value, 1)?.varint ?? 0,
+    repeatMode: first(value, 2)?.varint ?? 0,
+    delay: first(value, 3)?.varint ?? 0,
+    removeOnFinish: (first(value, 4)?.varint ?? 0) !== 0,
+    duration: first(value, 7)?.varint ?? 0,
+    interpolation: first(value, 8)?.varint ?? 0,
   })
+  const effects = new Map<string, BdaAnimationEffect>()
+  const addMap = (fieldNumber: number, kind: BdaAnimationKind, decode: (key: string, value: ProtoField[]) => BdaAnimationEffect) => {
+    for (const entry of mapEntries(root, fieldNumber)) {
+      const key = string(first(entry, 1))
+      if (key) effects.set(`${kind}:${key}`, decode(key, message(first(entry, 2))))
+    }
+  }
+  const transform = (kind: BdaTransformAnimation["kind"]) => (key: string, value: ProtoField[]): BdaTransformAnimation => {
+    const scalar = kind === "alpha" || kind === "rotate"
+    const pixel = kind === "shift" && first(value, 9) !== undefined && first(value, 10) !== undefined
+    const from = pixel ? vectorRange(first(value, 9)) : scalar
+      ? [numberRange(first(value, 5)), numberRange(first(value, 5))] as BdaVectorRange
+      : vectorRange(first(value, 5))
+    const to = pixel ? vectorRange(first(value, 10)) : scalar
+      ? [numberRange(first(value, 6)), numberRange(first(value, 6))] as BdaVectorRange
+      : vectorRange(first(value, 6))
+    return { kind, key, ...common(value), from, to, relative: kind === "scale" || kind === "shift" && !pixel }
+  }
+  const simpleKinds = ["group", "alpha", "scale", "shift", "rotate"] as const
+  const complexKinds = ["frame", "image", "emitter", "lottie", "video"] as const
+  addMap(3, "group", (key, value): BdaGroupAnimation => ({
+    kind: "group", key,
+    buildMode: first(value, 1)?.varint ?? 0,
+    repeatCount: first(value, 2)?.varint ?? 0,
+    repeatMode: first(value, 3)?.varint ?? 0,
+    removeOnFinish: (first(value, 4)?.varint ?? 0) !== 0,
+    delay: first(value, 5)?.varint ?? 0,
+    items: value.filter((field) => field.number === 6).map(message).map((item) => ({
+      kind: simpleKinds[first(item, 1)?.varint ?? 0] ?? "group",
+      key: string(first(item, 2)),
+    })).filter((item) => Boolean(item.key)),
+  }))
+  addMap(4, "alpha", transform("alpha"))
+  addMap(5, "scale", transform("scale"))
+  addMap(6, "shift", transform("shift"))
+  addMap(7, "rotate", transform("rotate"))
+
+  const media = (kind: BdaResourceAnimation["kind"]) => (key: string, value: ProtoField[]): BdaResourceAnimation => ({
+    kind, key,
+    repeatCount: first(value, 1)?.varint ?? 0,
+    removeOnFinish: (first(value, 2)?.varint ?? 0) !== 0,
+    resource: resource(first(value, 3)),
+    startRepeatFrame: first(value, 4)?.varint,
+    placeholder: kind === "video" ? resource(first(value, 5)) : undefined,
+  })
+  addMap(8, "frame", media("frame"))
+
+  const sequences = new Map<string, BdaAnimationSequence>()
+  addMap(9, "image", (key, value): BdaImageAnimation => {
+    const sequence = {
+      name: key,
+      frames: value.filter((field) => field.number === 5).map((field) => {
+        const frame = message(field)
+        return { resourceID: resource(first(frame, 1))?.resourceID, duration: first(frame, 2)?.varint }
+      }),
+    }
+    sequences.set(key, sequence)
+    return {
+      kind: "image", key, sequence,
+      repeatCount: first(value, 1)?.varint ?? 0,
+      repeatMode: first(value, 2)?.varint ?? 0,
+      removeOnFinish: (first(value, 4)?.varint ?? 0) !== 0,
+      loopForever: (first(value, 6)?.varint ?? 0) !== 0,
+      startRepeatFrame: first(value, 7)?.varint ?? 0,
+    }
+  })
+  addMap(10, "emitter", (key, value): BdaEmitterAnimation => {
+    const edge = message(first(value, 12))
+    return {
+      kind: "emitter", key,
+      repeatCount: first(value, 3)?.varint ?? 0,
+      repeatMode: first(value, 4)?.varint ?? 0,
+      removeOnFinish: (first(value, 5)?.varint ?? 0) !== 0,
+      duration: float(value, 6),
+      birthRate: first(value, 7)?.varint ?? 0,
+      totalNumber: first(value, 8)?.varint ?? 0,
+      emitRegion: [float(edge, 2), float(edge, 1), float(edge, 4), float(edge, 3)],
+      resources: value.filter((field) => field.number === 13).flatMap((field) => {
+        const item = resource(field)
+        return item ? [item] : []
+      }),
+      life: range(first(value, 14)), rotation: range(first(value, 15)), spin: range(first(value, 16)),
+      scale: range(first(value, 17)), scaleSpeed: range(first(value, 18)), alpha: range(first(value, 19)),
+      alphaSpeed: range(first(value, 20)), velocity: range(first(value, 21)),
+      velocityDirection: range(first(value, 22)), acceleration: range(first(value, 23)),
+      accelerationDirection: range(first(value, 24)),
+    }
+  })
+  addMap(11, "lottie", media("lottie"))
+  addMap(13, "video", media("video"))
+
   const animationMap = mapEntries(root, 1).map((entry) => {
     const target = string(first(entry, 1))
     const list = message(first(entry, 2))
-    const base = list.filter((field) => field.number === 1).map(message)
-      .find((item) => first(item, 3)?.varint === 1)
-    const isolated = list.filter((field) => field.number === 2).map(message)
-      .find((item) => first(item, 2)?.varint === 1)
+    const bindings: BdaAnimationBinding[] = list.flatMap((field): BdaAnimationBinding[] => {
+      const item = message(field)
+      if (field.number === 1) {
+        const simple = first(item, 2)?.varint
+        const complex = first(item, 3)?.varint
+        const kind = simple !== undefined ? simpleKinds[simple] : complex !== undefined ? complexKinds[complex] : undefined
+        const key = string(first(item, 4))
+        return kind && key ? [{
+          kind, key, scope: first(item, 1)?.varint ?? 0, event: first(item, 5)?.varint ?? 0,
+          isolated: false, condition: string(first(item, 6)) || undefined,
+        }] : []
+      }
+      if (field.number === 2) {
+        const kind = complexKinds[first(item, 2)?.varint ?? 0]
+        const key = string(first(item, 3))
+        return kind && key ? [{
+          kind, key, scope: 0, event: first(item, 4)?.varint ?? 0, isolated: true,
+          location: first(item, 1)?.varint ?? 0, condition: string(first(item, 5)) || undefined,
+          removeOnInteraction: (first(item, 6)?.varint ?? 0) !== 0,
+        }] : []
+      }
+      return []
+    })
     return {
       target,
-      sequence: string(first(base ?? [], 4)) || string(first(isolated ?? [], 3)),
+      bindings,
       delegate: string(first(list, 3)),
     }
   }).filter(({ target }) => Boolean(target))
-  const direct = new Map(animationMap.flatMap(({ target, sequence }) => sequence ? [[target, sequence] as const] : []))
+  const direct = new Map(animationMap.map(({ target, bindings }) => [target, bindings] as const))
   const delegates = new Map(animationMap.flatMap(({ target, delegate }) => delegate ? [[target, delegate] as const] : []))
-  const binding = (target: string, seen = new Set<string>()): string | undefined => {
-    if (seen.has(target)) return
-    const sequence = direct.get(target)
-    if (sequence) return sequence
+  const targetBinding = (target: string, seen = new Set<string>()): BdaAnimationBinding[] => {
+    if (seen.has(target)) return []
+    const own = direct.get(target) ?? []
     seen.add(target)
     const delegate = delegates.get(target)
-    return delegate ? binding(delegate, seen) : undefined
+    return [...own, ...(delegate ? targetBinding(delegate, seen) : [])]
   }
+  const targetBindings = new Map(animationMap.map(({ target }) => [target, targetBinding(target)]))
   return {
+    designWidth: first(root, 12)?.varint,
     targets: animationMap.map(({ target }) => target),
-    sequences: new Map(sequences.filter(([name]) => Boolean(name))),
+    sequences,
+    targetBindings,
+    effects,
     bindings: new Map(animationMap.flatMap(({ target }) => {
-      const sequence = binding(target)
-      return sequence ? [[target, sequence] as const] : []
+      const image = targetBinding(target).find((binding) => binding.kind === "image")
+      return image ? [[target, image.key] as const] : []
     })),
   }
 }
@@ -1300,8 +1513,11 @@ export function decodedBdaSource(path: string, bytes: Uint8Array, panelName?: st
   } else if (/animationConfig$/i.test(name)) {
     const animation = decodeBdaAnimation(bytes)
     value = {
+      designWidth: animation.designWidth,
       targets: animation.targets.length ? animation.targets : undefined,
       bindings: animation.bindings.size ? mapObject(animation.bindings) : undefined,
+      targetBindings: animation.targetBindings.size ? mapObject(animation.targetBindings) : undefined,
+      effects: animation.effects.size ? mapObject(animation.effects) : undefined,
       sequences: mapObject(animation.sequences, (sequence) => ({ frames: sequence.frames })),
     }
   } else if (/^\d*soundConfig$/i.test(name)) {
@@ -1322,11 +1538,13 @@ export function describeBdaConfig(path: string, bytes: Uint8Array): string {
   if (/^\d*animationConfig$/.test(name)) {
     const animation = decodeBdaAnimation(bytes)
     const frames = [...animation.sequences.values()].reduce((sum, sequence) => sum + sequence.frames.length, 0)
+    const kinds = new Set([...animation.effects.values()].map((effect) => effect.kind))
     return [
       header,
       "",
       `动画目标：${animation.targets.length}`,
-      `动画序列：${animation.sequences.size}`,
+      `动画定义：${animation.effects.size}（${[...kinds].join("、") || "无"}）`,
+      `图片序列：${animation.sequences.size}`,
       `序列帧：${frames}`,
       ...[...animation.sequences.values()].map((sequence) => `- ${sequence.name}（${sequence.frames.length} 帧）`),
       "",

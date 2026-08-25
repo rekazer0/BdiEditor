@@ -54,6 +54,7 @@ import {
   bdaAppearancePath,
   bdaColorHex,
   bdaConfigPath,
+  bdaConfigPaths,
   bdaLayoutDocument,
   bdaLayoutNames,
   bdaPanelKeyName,
@@ -5984,15 +5985,15 @@ function renderFiles(): void {
   }
   if (archive.format === "bda") {
     for (const [kind, label] of [
-      ["animation", "序列帧动画"],
+      ["animation", "动画配置"],
       ["lightAnimation", "轻量动画"],
       ["sound", "声音配置"],
       ["switch", "开关配置"],
     ] as const) {
-      const path = bdaConfigPath(archive, theme.value, orientation.value, kind)
-      if (path) entries.push({
+      const paths = bdaConfigPaths(archive, theme.value, orientation.value, kind)
+      for (const path of paths) entries.push({
         group: "扩展配置",
-        label,
+        label: paths.length > 1 ? `${label} · ${path.split("/").pop()}` : label,
         path,
         className: kind === "sound" ? "nav-resource" : "nav-style",
         icon: kind === "sound" ? "speaker.wave.2" : "gearshape",
