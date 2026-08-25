@@ -760,14 +760,15 @@ function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[]
     !position || position.length !== 2 || position.some((value) => !Number.isFinite(value)) ||
     !Number.isFinite(count) || count <= 0
   ) return []
+  const horizontal = value("LIST_ORDER")?.trim() === "1"
   const foreStyles = value("FORE_STYLE")?.split(",").map((token) => token.trim()).filter(Boolean) ?? []
   // 每个标点只负责文字渲染，不可单独选中
   const cells: PreviewItem[] = names.slice(0, count).map((show, index) => ({
     section: `LIST:${index + 1}`,
     sections: [`LIST:${index + 1}`],
     rect: {
-      x: position[0],
-      y: position[1] + index * cell[1],
+      x: position[0] + (horizontal ? index * cell[0] : 0),
+      y: position[1] + (horizontal ? 0 : index * cell[1]),
       width: cell[0],
       height: cell[1],
     },
@@ -795,8 +796,8 @@ function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[]
     rect: {
       x: position[0],
       y: position[1],
-      width: cell[0],
-      height: cell[1] * count,
+      width: cell[0] * (horizontal ? count : 1),
+      height: cell[1] * (horizontal ? 1 : count),
     },
     editable: true,
     show: "",
@@ -1010,6 +1011,7 @@ export class Preview {
   private legacyPanelAnimationStartedAt = 0
   private legacyPanelAnimationTimer?: number
   private drawID = 0
+  private drawQueued = false
   private readonly resizeObserver: ResizeObserver
 
   constructor(
@@ -1111,6 +1113,7 @@ export class Preview {
 
   setGuides(enabled: boolean): void {
     this.guides = enabled
+    this.guidesOverlay?.toggleAttribute("hidden", !enabled)
     void this.draw()
   }
 
@@ -1580,7 +1583,7 @@ export class Preview {
 
   private drawGuides(keys: readonly PreviewItem[]): void {
     if (!this.guides) {
-      if (this.guidesOverlay) this.guidesOverlay.hidden = true
+      this.guidesOverlay?.toggleAttribute("hidden", true)
       return
     }
     const overlay = this.guidesOverlay ?? document.createElementNS("http://www.w3.org/2000/svg", "svg")
@@ -1590,7 +1593,7 @@ export class Preview {
       this.canvas.insertAdjacentElement("afterend", overlay)
       this.guidesOverlay = overlay
     }
-    overlay.hidden = false
+    overlay.toggleAttribute("hidden", false)
     overlay.setAttribute("viewBox", `0 0 ${this.panelWidth} ${this.panelHeight}`)
     overlay.style.setProperty("--preview-guide-font-size", `${15 * this.panelWidth / DEFAULT_PANEL_WIDTH}px`)
     overlay.replaceChildren(...keys.map((key) => {
@@ -1759,7 +1762,16 @@ export class Preview {
     context.restore()
   }
 
-  private async draw(): Promise<void> {
+  private draw(): void {
+    if (this.drawQueued) return
+    this.drawQueued = true
+    queueMicrotask(() => {
+      this.drawQueued = false
+      void this.render()
+    })
+  }
+
+  private async render(): Promise<void> {
     const drawID = ++this.drawID
     const panelAnimationElapsed = this.legacyPanelAnimationStartedAt
       ? Date.now() - this.legacyPanelAnimationStartedAt

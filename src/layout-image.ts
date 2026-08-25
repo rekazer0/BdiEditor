@@ -108,11 +108,19 @@ export function matchLayoutKeysToCells(layout: IniDocument, keys: readonly Layou
 export function planLayoutImageSlices(target: LayoutImageTarget, keys: readonly LayoutKeyGeometry[], cells: readonly TileRect[], tileDocument: IniDocument): LayoutImagePlan {
   const start = nextTileIndex(tileDocument)
   const ordered = keysInReadingOrder(keys)
+  if (cells.length === 1) {
+    return {
+      target,
+      keys: ordered,
+      slices: [{ index: start, source: cells[0] }],
+      indices: new Map(ordered.map((key) => [key.section, start])),
+    }
+  }
   const slices: TileSlice[] = []
   const indices = new Map<string, number>()
   let index = start
   for (let i = 0; i < ordered.length; i += 1) {
-    const cell = cells[i] ?? (cells.length === 1 ? cells[0] : ordered[i].rect)
+    const cell = cells[i] ?? ordered[i].rect
     indices.set(ordered[i].section, index)
     slices.push({ index, source: cell })
     index += 1

@@ -1,4 +1,6 @@
-use std::fs;
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -8,6 +10,7 @@ use tauri::Manager;
 use tauri_plugin_fs::FsExt;
 
 struct OpenedFiles(Mutex<Vec<String>>);
+struct ClientLog(Mutex<()>);
 
 const MAX_ARCHIVE_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_SOURCE_BYTES: usize = 256 * 1024 * 1024;
@@ -16,12 +19,76 @@ const SOURCE_MARKER: &str = ".bdi-editor-source";
 const SOURCE_MANIFEST: &str = ".bdi-editor-files.json";
 const SOURCE_LIMIT: usize = 3;
 const RELEASES_URL: &str = "https://github.com/rekazer0/BdiEditor/releases";
+const CLIENT_LOG_FILE: &str = "client.jsonl";
+const CLIENT_LOG_PREVIOUS_FILE: &str = "client.previous.jsonl";
+const MAX_CLIENT_LOG_BYTES: u64 = 4 * 1024 * 1024;
+const MAX_CLIENT_LOG_BATCH_BYTES: usize = 256 * 1024;
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ClientLogFile {
+    name: String,
+    data: Vec<u8>,
+}
+
+fn append_client_log_path(directory: &Path, lines: &str, max_bytes: u64) -> Result<(), String> {
+    if lines.is_empty() {
+        return Ok(());
+    }
+    fs::create_dir_all(directory).map_err(|error| error.to_string())?;
+    let current = directory.join(CLIENT_LOG_FILE);
+    let previous = directory.join(CLIENT_LOG_PREVIOUS_FILE);
+    let incoming = lines.len() as u64 + u64::from(!lines.ends_with('\n'));
+    if fs::metadata(&current).map(|value| value.len()).unwrap_or(0) + incoming > max_bytes {
+        if previous.exists() {
+            fs::remove_file(&previous).map_err(|error| error.to_string())?;
+        }
+        if current.exists() {
+            fs::rename(&current, &previous).map_err(|error| error.to_string())?;
+        }
+    }
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(current)
+        .map_err(|error| error.to_string())?;
+    file.write_all(lines.as_bytes())
+        .map_err(|error| error.to_string())?;
+    if !lines.ends_with('\n') {
+        file.write_all(b"\n").map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn read_client_log_path(directory: &Path) -> Result<Vec<ClientLogFile>, String> {
+    [CLIENT_LOG_PREVIOUS_FILE, CLIENT_LOG_FILE]
+        .into_iter()
+        .filter_map(|name| {
+            let path = directory.join(name);
+            path.is_file().then(|| {
+                fs::read(path)
+                    .map(|data| ClientLogFile {
+                        name: name.into(),
+                        data,
+                    })
+                    .map_err(|error| error.to_string())
+            })
+        })
+        .collect()
+}
 
 #[derive(Clone, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SourceFile {
     path: String,
     data: Vec<u8>,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EncodedSourceFile {
+    path: String,
+    data: String,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -95,6 +162,21 @@ fn source_paths(files: &[SourceFile]) -> Result<Vec<String>, String> {
         paths.push(file.path.clone());
     }
     Ok(paths)
+}
+
+fn decode_source_files(files: Vec<EncodedSourceFile>) -> Result<Vec<SourceFile>, String> {
+    let mut output = Vec::with_capacity(files.len());
+    for file in files {
+        let data = BASE64_STANDARD
+            .decode(&file.data)
+            .map_err(|_| format!("皮肤源码数据无效：{}", file.path))?;
+        output.push(SourceFile {
+            path: file.path,
+            data,
+        });
+    }
+    source_paths(&output)?;
+    Ok(output)
 }
 
 fn remove_empty_parents(mut path: PathBuf, root: &Path) -> Result<(), String> {
@@ -249,7 +331,7 @@ async fn create_source_workspace(
     app: tauri::AppHandle,
     directory: Option<String>,
     name: String,
-    files: Vec<SourceFile>,
+    files: Vec<EncodedSourceFile>,
 ) -> Result<String, String> {
     #[cfg(target_os = "android")]
     if let Some(uri) = directory.as_deref().filter(|value| value.starts_with("content://")) {
@@ -260,6 +342,7 @@ async fn create_source_workspace(
             serde_json::to_value(files).map_err(|error| error.to_string())?,
         ).await;
     }
+    let files = decode_source_files(files)?;
     let uses_builtin_directory = directory.as_ref().map_or(true, |value| value.trim().is_empty());
     let root = source_root(&app, directory)?;
     let timestamp = SystemTime::now()
@@ -497,6 +580,36 @@ fn write_file(path: String, data: Vec<u8>) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn append_client_log(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ClientLog>,
+    lines: String,
+) -> Result<(), String> {
+    if lines.len() > MAX_CLIENT_LOG_BATCH_BYTES {
+        return Err("client log batch exceeds 256 KiB".into());
+    }
+    let _guard = state.0.lock().map_err(|error| error.to_string())?;
+    let directory = app
+        .path()
+        .app_log_dir()
+        .map_err(|error| error.to_string())?;
+    append_client_log_path(&directory, &lines, MAX_CLIENT_LOG_BYTES)
+}
+
+#[tauri::command]
+fn read_client_logs(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ClientLog>,
+) -> Result<Vec<ClientLogFile>, String> {
+    let _guard = state.0.lock().map_err(|error| error.to_string())?;
+    let directory = app
+        .path()
+        .app_log_dir()
+        .map_err(|error| error.to_string())?;
+    read_client_log_path(&directory)
+}
+
+#[tauri::command]
 fn share_file(app: tauri::AppHandle, name: String, data: Vec<u8>) -> Result<(), String> {
     if !valid_share_filename(&name) {
         return Err("invalid skin filename".into());
@@ -588,9 +701,10 @@ async fn fetch_release_page() -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_source_changes_path, prune_source_workspaces, read_file, read_source_changes_path,
-        read_source_files, safe_source_path, valid_share_filename, write_file, write_source_files,
-        MAX_ARCHIVE_BYTES, SOURCE_MARKER,
+        append_client_log_path, apply_source_changes_path, prune_source_workspaces,
+        read_client_log_path, read_file, read_source_changes_path, read_source_files,
+        safe_source_path, valid_share_filename, write_file, write_source_files, MAX_ARCHIVE_BYTES,
+        SOURCE_MARKER,
     };
     use std::fs;
     use std::thread;
@@ -625,6 +739,20 @@ mod tests {
             .expect("size sparse test file");
         assert!(read_file(oversized.to_string_lossy().into_owned()).is_err());
         fs::remove_file(oversized).expect("cleanup sparse test file");
+    }
+
+    #[test]
+    fn client_log_rotates_and_keeps_current_and_previous_files() {
+        let root = std::env::temp_dir().join(format!("bdi-edit-client-log-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        append_client_log_path(&root, "first", 8).expect("append first log");
+        append_client_log_path(&root, "second", 8).expect("rotate log");
+        append_client_log_path(&root, "third", 8).expect("rotate log again");
+        let logs = read_client_log_path(&root).expect("read logs");
+        assert_eq!(logs.len(), 2);
+        assert_eq!(String::from_utf8_lossy(&logs[0].data), "second\n");
+        assert_eq!(String::from_utf8_lossy(&logs[1].data), "third\n");
+        fs::remove_dir_all(root).expect("cleanup logs");
     }
 
     #[test]
@@ -726,11 +854,14 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_native_share::init())
+        .manage(ClientLog(Mutex::new(())))
         .manage(OpenedFiles(Mutex::new(Vec::new())));
     #[cfg(target_os = "macos")]
     let builder = builder.invoke_handler(tauri::generate_handler![
         read_file,
         write_file,
+        append_client_log,
+        read_client_logs,
         share_file,
         take_opened_files,
         quit_app,
@@ -751,6 +882,8 @@ pub fn run() {
     let builder = builder.invoke_handler(tauri::generate_handler![
         read_file,
         write_file,
+        append_client_log,
+        read_client_logs,
         share_file,
         take_opened_files,
         quit_app,

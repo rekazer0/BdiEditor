@@ -45,7 +45,7 @@ class ObserveSourceArgs {
 @Keep
 class SourceFileArg {
   var path: String = ""
-  var data: List<Int> = emptyList()
+  var data: String = ""
 }
 
 @InvokeArg
@@ -291,10 +291,21 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
     }
   }
 
+  private fun writeBytes(file: DocumentFile, data: ByteArray) {
+    activity.contentResolver.openOutputStream(file.uri, "wt")!!.use { it.write(data) }
+  }
+
   private fun writeNewFiles(root: DocumentFile, files: List<SourceFileArg>) {
+    if (files.size > MAX_SOURCE_FILES) throw IllegalArgumentException("Skin source contains too many files")
     val directories = mutableMapOf("" to root)
+    val paths = mutableSetOf<String>()
+    var totalBytes = 0L
     for (file in files) {
       val parts = safeParts(file.path)
+      if (!paths.add(file.path)) throw IllegalArgumentException("Skin source contains duplicate paths")
+      val data = Base64.decode(file.data, Base64.DEFAULT)
+      totalBytes += data.size
+      if (totalBytes > MAX_SOURCE_BYTES) throw IllegalArgumentException("Skin source exceeds 256 MB")
       var parent = root
       var parentPath = ""
       for (part in parts.dropLast(1)) {
@@ -305,7 +316,7 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
       }
       val target = parent.createFile("application/octet-stream", parts.last())
         ?: throw IllegalStateException("Unable to create file: ${file.path}")
-      writeBytes(target, file.data)
+      writeBytes(target, data)
     }
   }
 

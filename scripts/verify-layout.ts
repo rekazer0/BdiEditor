@@ -68,12 +68,13 @@ const singleKeyPlan = planLayoutImageSlices(
   [singleKeySlice],
   IniDocument.parse(""),
 )
-assert.deepEqual(singleKeyPlan.slices.map(({ source }) => source), [singleKeySlice, singleKeySlice])
+assert.deepEqual(singleKeyPlan.slices.map(({ source }) => source), [singleKeySlice])
+assert.deepEqual([...singleKeyPlan.indices.values()], [1, 1])
 
 console.log("✓ 单个按键素材会复用到所有目标按键")
 
 const generatedTiles = layoutImageTileDocument(singleKeyPlan).toString()
-assert.match(generatedTiles, /^\[GLOBAL\]\r\nUSE_ALPHA=2\r\nTILE_NUM=2\r\n\r\n\[IMG1\]\r\n/)
+assert.match(generatedTiles, /^\[GLOBAL\]\r\nUSE_ALPHA=2\r\nTILE_NUM=1\r\n\r\n\[IMG1\]\r\n/)
 assert.doesNotMatch(generatedTiles, /(^|[^\r])\n/)
 
 console.log("✓ 一键替换生成 iOS 可解析的 TIL 头部与 CRLF 换行")

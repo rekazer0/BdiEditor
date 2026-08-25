@@ -174,6 +174,9 @@ import {
 } from "./tiles.ts"
 import { unsavedDecision, type UnsavedDecision } from "./unsaved.ts"
 import { checkForUpdate } from "./update.ts"
+import { clientLog, clientLogZip, flushClientLogs, installClientLogging } from "./client-log.ts"
+
+installClientLogging(document.querySelector<HTMLElement>("#about-update")?.dataset.currentVersion ?? "unknown")
 
 document.documentElement.classList.toggle("macos", isTauri() && navigator.userAgent.includes("Macintosh"))
 document.documentElement.classList.toggle("windows", isTauri() && navigator.userAgent.includes("Windows"))
@@ -208,6 +211,9 @@ const aboutUpdate = $("#about-update")
 const checkUpdateButton = $("#check-update") as HTMLButtonElement
 const updateStatus = $("#update-status")
 const downloadUpdate = $("#download-update") as HTMLAnchorElement
+const aboutDiagnostics = $("#about-diagnostics")
+const exportLogsButton = $("#export-logs") as HTMLButtonElement
+const exportLogsStatus = $("#export-logs-status")
 const defaultDevice = $("#default-device") as HTMLSelectElement
 const canvasBackground = $("#canvas-background") as HTMLSelectElement
 const appTheme = $("#app-theme") as HTMLSelectElement
@@ -1501,7 +1507,8 @@ function selectChoice(select: HTMLSelectElement, value: string): void {
   select.dispatchEvent(new Event("change"))
 }
 
-type SourceFilePayload = { path: string; data: number[] }
+type SourceFilePayload = { path: string; data: string }
+type SourceReadFilePayload = { path: string; data: number[] }
 type SourceChangePayload = { path: string; data: number[] | null; directory: boolean }
 
 function sourcePathForWorkspace(path: string): string {
@@ -1536,7 +1543,15 @@ function rememberSourceWrite(path: string, data: SourceWriteSnapshot): void {
 }
 
 function sourceFilesPayload(value: SkinArchive): SourceFilePayload[] {
-  return value.sourceFiles().map((file) => ({ path: file.path, data: Array.from(file.data) }))
+  return value.sourceFiles().map((file) => ({ path: file.path, data: encodeBase64(file.data) }))
+}
+
+function encodeBase64(bytes: Uint8Array): string {
+  let binary = ""
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000))
+  }
+  return btoa(binary)
 }
 
 function decodeBase64Archive(value: string): Uint8Array {
@@ -2720,6 +2735,8 @@ function showStatus(text: string, kind: "progress" | "success" = "success"): voi
 
 function showError(error: unknown, action = "操作"): void {
   const text = operationError(action, error)
+  clientLog.error("operation.error", { action }, error)
+  void flushClientLogs()
   eventLog.dataset.kind = "error"
   eventLog.textContent = text
   if (isTauri()) {
@@ -2784,10 +2801,23 @@ async function runFileOperation(
   if (fileOperationRunning) return
   setFileOperationBusy(true)
   showStatus(`正在${action}…`, "progress")
+  const started = performance.now()
+  clientLog.info("operation.start", { action })
   try {
-    if (await operation()) showStatus(`${action}完成。`)
+    const completed = await operation()
+    clientLog.info("operation.finish", {
+      action,
+      outcome: completed ? "completed" : "cancelled",
+      durationMs: Math.round(performance.now() - started),
+    })
+    if (completed) showStatus(`${action}完成。`)
     else showStatus(`${action}已取消。`)
   } catch (error) {
+    clientLog.info("operation.finish", {
+      action,
+      outcome: "failed",
+      durationMs: Math.round(performance.now() - started),
+    })
     showError(error, action)
   } finally {
     setFileOperationBusy(false)
@@ -5754,6 +5784,7 @@ function selectFile(
   if (resourceConfigActive) renderResourceInspector()
   if (!quickInspector.hidden) populateKeyInspector()
   selectedFileButton?.classList.remove("selected")
+  if (preferredSidebarView === "source") ensureSourcePathRendered(path)
   const preferredContainer = files.querySelector(preferredSidebarView === "overview" ? ".sidebar-overview" : ".raw-files")
   const navMode = resourceInspectorMode === "style" && resourceConfigActive
     ? "style"
@@ -5988,7 +6019,12 @@ function renderFiles(): void {
       children.className = "source-tree-group"
       children.setAttribute("role", "group")
       folder.append(folderSummary, children)
-      appendNode(children, child, path)
+      let populated = false
+      const populate = () => {
+        if (populated) return
+        populated = true
+        appendNode(children, child, path)
+      }
       disclosure.addEventListener("click", (event) => {
         event.preventDefault()
         event.stopPropagation()
@@ -6003,6 +6039,7 @@ function renderFiles(): void {
         folder.open = !folder.open
       })
       folder.addEventListener("toggle", () => {
+        if (folder.open) populate()
         folderSummary.setAttribute("aria-expanded", String(folder.open))
       })
       parent.append(folder)
@@ -6121,7 +6158,19 @@ function renderFiles(): void {
   setSidebarView(sidebarView)
 }
 
+function ensureSourcePathRendered(path: string): void {
+  const parts = path.split("/").slice(0, -1)
+  for (let index = 1; index <= parts.length; index += 1) {
+    const folderPath = parts.slice(0, index).join("/")
+    const folder = files.querySelector<HTMLDetailsElement>(`details.raw-folder[data-folder-path="${CSS.escape(folderPath)}"]`)
+    if (!folder) return
+    folder.open = true
+    folder.dispatchEvent(new Event("toggle"))
+  }
+}
+
 function revealSourceFile(path: string): void {
+  ensureSourcePathRendered(path)
   const button = Array.from(files.querySelectorAll<HTMLButtonElement>(".raw-files button[data-path]"))
     .find((item) => item.dataset.path === path)
   if (!button) return
@@ -6141,12 +6190,29 @@ async function loadArchive(
   displayName = "",
   sourcePrefix = "",
 ): Promise<void> {
+  const started = performance.now()
+  clientLog.info("archive.load.start", {
+    name: (displayName || path).split(/[\\/]/).pop() || (isNew ? "new-project" : "unnamed"),
+    sizeBytes: bytes.byteLength,
+    sourceWorkspace: Boolean(existingSourceWorkspace),
+  })
   await flushSourceAutosave()
   await activateSourceWorkspace("", "")
   sourceWorkspacePendingArchive = undefined
   releaseKeySound()
   keySoundBuffers.clear()
-  const nextArchive = SkinArchive.open(bytes)
+  let nextArchive: SkinArchive
+  try {
+    nextArchive = SkinArchive.open(bytes, exportFormatFromPath(displayName || path))
+  } catch (error) {
+    clientLog.error("archive.parse.error", {
+      name: (displayName || path).split(/[\\/]/).pop() || "unnamed",
+      sizeBytes: bytes.byteLength,
+      durationMs: Math.round(performance.now() - started),
+    }, error)
+    void flushClientLogs()
+    throw error
+  }
   if (nextArchive.format === "bda" && !bdaBase) {
     const response = await fetch(new URL("bda-base.bds", document.baseURI))
     if (!response.ok) throw new Error("无法加载 BDA 官方基础布局")
@@ -6240,6 +6306,11 @@ async function loadArchive(
     })
   }
   updateDirty()
+  clientLog.info("archive.load.finish", {
+    format: nextArchive.format,
+    fileCount: nextArchive.names().length,
+    durationMs: Math.round(performance.now() - started),
+  })
 }
 
 async function openNative(): Promise<boolean> {
@@ -6265,7 +6336,7 @@ async function loadSourceWorkspace(path: string): Promise<boolean> {
     await loadArchive(decodeBase64Archive(encoded), "", false, path, name, sourcePrefix)
     return true
   }
-  const files = await invoke<SourceFilePayload[]>("open_source_workspace", { path })
+  const files = await invoke<SourceReadFilePayload[]>("open_source_workspace", { path })
   const directoryName = path.split(/[\\/]/).filter(Boolean).pop()?.toLowerCase() ?? ""
   const sourcePrefix = directoryName === "dark" || directoryName === "light"
     ? `${directoryName}/`
@@ -6421,7 +6492,14 @@ async function writeToChosenFile(
       types?: Array<{ description: string; accept: Record<string, string[]> }>
     }) => Promise<BrowserSaveFileHandle>
   }).showSaveFilePicker
-  if (!picker) throw new Error("当前浏览器不支持系统保存，请使用 Chrome 或桌面版")
+  if (!picker) {
+    const link = document.createElement("a")
+    link.href = URL.createObjectURL(new Blob([bytes.slice().buffer], { type: "application/octet-stream" }))
+    link.download = filename
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000)
+    return filename
+  }
   let file: BrowserSaveFileHandle
   try {
     file = await picker.call(window, {
@@ -6566,6 +6644,21 @@ async function refreshUpdateStatus(): Promise<void> {
 }
 
 checkUpdateButton.addEventListener("click", () => void refreshUpdateStatus())
+aboutDiagnostics.hidden = !isTauri()
+exportLogsButton.addEventListener("click", async () => {
+  exportLogsButton.disabled = true
+  exportLogsStatus.textContent = "正在整理日志…"
+  try {
+    const date = new Date().toISOString().slice(0, 10)
+    const path = await writeToChosenFile(`bdi-editor-logs-${date}.zip`, await clientLogZip(), "诊断日志")
+    exportLogsStatus.textContent = path ? "日志已导出。" : "已取消导出。"
+  } catch (error) {
+    exportLogsStatus.textContent = `导出失败：${error instanceof Error ? error.message : String(error)}`
+    clientLog.error("logs.export_failed", {}, error)
+  } finally {
+    exportLogsButton.disabled = false
+  }
+})
 copyQqGroupButton.addEventListener("click", async () => {
   const value = "228040912"
   try {
@@ -7462,11 +7555,29 @@ async function applyLayoutImage(): Promise<void> {
   } else {
     // 图片跟随布局 / 布局跟随图片：按图片空白检测按键网格，切片源取自图片
     const scan = await decodePngMask(layoutImageBytes)
-    const cells = detectGridCells(scan.mask, scan.width, scan.height)
+    let cells = detectGridCells(scan.mask, scan.width, scan.height)
     if (!cells.length) {
       layoutImageError.textContent = "无法在图片中识别按键区域，请检查图片是否包含透明间隔。"
       layoutImageError.hidden = false
       return
+    }
+    if (layoutImageConfig === "image-follows-layout" && cells.length === 1 && keys.length) {
+      const maxWidth = Math.max(...keys.map(({ rect }) => rect[2]))
+      const maxHeight = Math.max(...keys.map(({ rect }) => rect[3]))
+      const scale = Math.min(1, maxWidth / scan.width, maxHeight / scan.height)
+      if (scale < 1) {
+        const width = Math.max(1, Math.round(scan.width * scale))
+        const height = Math.max(1, Math.round(scan.height * scale))
+        layoutImageBytes = await fitPngTo(layoutImageBytes, width, height)
+        layoutImageWidth = width
+        layoutImageHeight = height
+        cells = cells.map(([x, y, cellWidth, cellHeight]) => [
+          Math.round(x * scale),
+          Math.round(y * scale),
+          Math.max(1, Math.round(cellWidth * scale)),
+          Math.max(1, Math.round(cellHeight * scale)),
+        ])
+      }
     }
     const matchedKeys = layoutImageConfig === "layout-follows-image"
       ? matchLayoutKeysToCells(layoutDoc, keys, cells)

@@ -20,6 +20,8 @@
     "verify:particle-inspector": "node scripts/verify-particle-inspector.ts",
     "verify:mobile-share": "node scripts/verify-mobile-share.ts",
     "verify:sources": "node scripts/verify-source-workspace.ts",
+    "verify:bda-import": "node scripts/verify-bda-import.ts",
+    "verify:logging": "node scripts/verify-client-logging.ts",
     "tauri": "tauri"
   },
   "dependencies": {

@@ -3,6 +3,35 @@ import { readFileSync } from "node:fs"
 import { IniDocument } from "../src/ini.ts"
 import { SkinArchive } from "../src/skin.ts"
 
+function zipMethod(bytes: Uint8Array, path: string): number | undefined {
+  const data = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  let end = bytes.length - 22
+  while (end >= 0 && data.getUint32(end, true) !== 0x06054b50) end -= 1
+  if (end < 0) return
+  const count = data.getUint16(end + 10, true)
+  let offset = data.getUint32(end + 16, true)
+  const decoder = new TextDecoder()
+  for (let index = 0; index < count; index += 1) {
+    const nameLength = data.getUint16(offset + 28, true)
+    const extraLength = data.getUint16(offset + 30, true)
+    const commentLength = data.getUint16(offset + 32, true)
+    const name = decoder.decode(bytes.subarray(offset + 46, offset + 46 + nameLength))
+    if (name === path) return data.getUint16(offset + 10, true)
+    offset += 46 + nameLength + extraLength + commentLength
+  }
+}
+
+const additive = SkinArchive.fromSourceFiles([
+  { path: "Info.txt", data: new TextEncoder().encode("Name=test") },
+  { path: "port/gen.ini", data: new TextEncoder().encode("[PANEL]\nSIZE=1,1") },
+  { path: "res/base.png", data: new Uint8Array([1]) },
+])
+assert.equal(zipMethod(additive.toBytes(), "Info.txt"), 0)
+additive.setBytes("light/skin/res/added.png", new Uint8Array([2]))
+const additiveBytes = additive.toBytes()
+assert.equal(zipMethod(additiveBytes, "Info.txt"), 0, "新增资源不应重压缩原 ZIP 条目")
+assert.deepEqual(SkinArchive.open(additiveBytes).getBytes("light/skin/res/added.png"), new Uint8Array([2]))
+
 const paths = process.argv.slice(2)
 if (!paths.length) throw new Error("用法：npm run verify:samples -- <皮肤.bdi> [皮肤.bds]")
 

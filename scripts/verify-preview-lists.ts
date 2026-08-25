@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
+import fs from "node:fs"
 import { IniDocument } from "../src/ini.ts"
-import { previewFallbackText, previewItems } from "../src/preview.ts"
+import { Preview, previewFallbackText, previewItems } from "../src/preview.ts"
 
 assert.equal(
   previewFallbackText({ show: "9" } as Parameters<typeof previewFallbackText>[0], "preview", false),
@@ -27,6 +28,10 @@ assert.deepEqual(
   "TYPE=2 的运行时滚动列表不能作为静态预览层覆盖按键",
 )
 
+const previewSource = fs.readFileSync("src/preview.ts", "utf8")
+assert.match(previewSource, /private draw\(\): void[\s\S]+queueMicrotask/, "同步预览状态更新应合并绘制")
+assert.match(previewSource, /setResolver\([\s\S]+this\.draw\(\)/, "切换解析器应走合并绘制")
+
 const staticList = IniDocument.parse(`
 [LIST]
 TYPE=0
@@ -41,6 +46,50 @@ assert.deepEqual(
   previewItems(staticList, 1080, 532).map((item) => item.section),
   ["LIST", "LIST:1", "LIST:2"],
   "TYPE=0 的静态列表仍应显示候选单元",
+)
+
+const horizontalList = IniDocument.parse(`
+[LIST]
+TYPE=1
+LIST_ORDER=1
+CELL_SIZE=217,87
+POS=0,0
+LIST_NUM=5
+NAMES=, 。 ？ / :
+`)
+const horizontalItems = previewItems(horizontalList, 1080, 680)
+assert.deepEqual(
+  horizontalItems.map(({ section, rect }) => ({ section, rect })),
+  [
+    { section: "LIST", rect: { x: 0, y: 0, width: 1085, height: 87 } },
+    { section: "LIST:1", rect: { x: 0, y: 0, width: 217, height: 87 } },
+    { section: "LIST:2", rect: { x: 217, y: 0, width: 217, height: 87 } },
+    { section: "LIST:3", rect: { x: 434, y: 0, width: 217, height: 87 } },
+    { section: "LIST:4", rect: { x: 651, y: 0, width: 217, height: 87 } },
+    { section: "LIST:5", rect: { x: 868, y: 0, width: 217, height: 87 } },
+  ],
+  "TYPE=1 的静态列表应横向排列",
+)
+
+const verticalConditionalList = IniDocument.parse(`
+[LIST]
+TYPE=1
+LIST_ORDER=0
+CELL_SIZE=80,60
+POS=900,100
+LIST_NUM=2
+NAMES=， 。
+`)
+assert.deepEqual(
+  previewItems(verticalConditionalList, 1080, 680)
+    .filter(({ section }) => section.startsWith("LIST"))
+    .map(({ section, rect }) => ({ section, rect })),
+  [
+    { section: "LIST", rect: { x: 900, y: 100, width: 80, height: 120 } },
+    { section: "LIST:1", rect: { x: 900, y: 100, width: 80, height: 60 } },
+    { section: "LIST:2", rect: { x: 900, y: 160, width: 80, height: 60 } },
+  ],
+  "TYPE=1 只控制显示条件，LIST_ORDER=0 仍应纵向排列",
 )
 
 const legacyList = IniDocument.parse(`
@@ -85,5 +134,32 @@ assert.deepEqual(
   ["ICON2"],
   "输入时只应保留 PERSIST=2 的最右侧工具图标",
 )
+
+Object.defineProperty(globalThis, "ResizeObserver", {
+  value: class {
+    observe(): void {}
+  },
+})
+const scheduledPreview = new Preview(
+  { addEventListener() {} } as unknown as HTMLCanvasElement,
+  () => {},
+  () => {},
+)
+let renders = 0
+const internalPreview = scheduledPreview as unknown as { render: () => Promise<void> }
+internalPreview.render = async () => { renders++ }
+scheduledPreview.setTheme("dark")
+scheduledPreview.setTransparent(true)
+await Promise.resolve()
+assert.equal(renders, 1, "同一事件循环中的多次 draw 应只渲染一次")
+
+internalPreview.render = async () => {
+  renders++
+  if (renders === 2) scheduledPreview.setTheme("light")
+}
+scheduledPreview.setTheme("dark")
+await Promise.resolve()
+await Promise.resolve()
+assert.equal(renders, 3, "渲染期间触发的新 draw 不应丢失")
 
 console.log("✓ LIST 和 CAND/ICON 静态内容按皮肤配置解析，运行时层不伪装成静态内容")

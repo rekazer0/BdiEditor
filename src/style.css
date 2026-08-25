@@ -4063,6 +4063,10 @@ canvas {
   border-block: 1px solid var(--line);
 }
 
+.about-diagnostics[hidden] {
+  display: none;
+}
+
 .about-update > div {
   display: flex;
   align-items: center;

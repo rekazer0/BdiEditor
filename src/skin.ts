@@ -28,6 +28,9 @@ type PackageLayout =
   | "bda-single"
   | "legacy-ios"
 
+type BdaTheme = "light" | "dark"
+type PackageInfo = { layout: PackageLayout; bdaRoots?: Map<BdaTheme, string> }
+
 const view = (bytes: Uint8Array) =>
   new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
@@ -85,6 +88,10 @@ function parseZip(bytes: Uint8Array): { entries: ZipEntry[]; end: Uint8Array } {
 
 function writeUint32(bytes: Uint8Array, offset: number, value: number): void {
   view(bytes).setUint32(offset, value, true)
+}
+
+function writeUint16(bytes: Uint8Array, offset: number, value: number): void {
+  view(bytes).setUint16(offset, value, true)
 }
 
 function compressedPayload(data: Uint8Array, level: 0 | 6): {
@@ -166,22 +173,57 @@ function validateArchiveLimits(bytes: Uint8Array): void {
   }
 }
 
-function packageLayout(files: Map<string, Uint8Array>): PackageLayout {
+function bdaThemeRoots(files: Map<string, Uint8Array>): Map<BdaTheme, string> | undefined {
   const names = [...files.keys()]
-  if (names.some((name) => /^(?:dark|light)\/(?:land|port)\/\d*appearanceConfig$/.test(name))) {
-    return "bda-dual"
+  const roots = [...new Set(names.flatMap((name) => {
+    const match = name.match(/^(?:(.*)\/)?(?:land|port)\/\d*appearanceConfig$/)
+    return match ? [match[1] ?? ""] : []
+  }))]
+  if (!roots.length) return
+
+  // A complete skin copied below another skin is a resource, not another editable theme.
+  const candidates = roots.filter((root) => !roots.some((parent) => parent !== root && (!parent || root.startsWith(`${parent}/`))))
+  const result = new Map<BdaTheme, string>()
+  for (const theme of ["light", "dark"] as const) {
+    if (candidates.includes(theme)) result.set(theme, theme)
   }
-  if (names.some((name) => /^(?:land|port)\/\d*appearanceConfig$/.test(name))) {
-    return "bda-single"
+
+  const infoPaths = ["Info.txt", ...candidates.filter(Boolean).map((root) => `${root}/Info.txt`)]
+  const declared = infoPaths.flatMap((path) => {
+    const bytes = files.get(path)
+    const value = bytes && strFromU8(bytes).match(/^AtomSkinName=(.*)$/mi)?.[1]
+    return value ? value.split(",").map((item) => item.trim()).filter(Boolean) : []
+  })
+  const declaredRoots = [...new Set(declared.flatMap((value) => {
+    const root = candidates.find((candidate) => candidate === value || candidate.split("/").pop() === value)
+    return root === undefined ? [] : [root]
+  }))]
+  for (const [index, theme] of (["light", "dark"] as const).entries()) {
+    if (!result.has(theme) && declaredRoots[index] !== undefined) result.set(theme, declaredRoots[index])
   }
-  if (names.some((name) => /^skin\/(?:dark|light)\/skin\//.test(name))) return "bdi-dual"
-  if (names.some((name) => /^skin\/(?:land|port|res)\//.test(name))) return "bdi-single"
-  if (names.some((name) => /^(?:dark|light)\/(?:land|port|res)\//.test(name))) return "bds-dual"
-  if (names.some((name) => /^(?:land|port|res)\//.test(name))) return "bds-single"
-  return "legacy-ios"
+
+  const used = new Set(result.values())
+  // ponytail: undeclared theme semantics use stable path order; add a theme picker if such packages appear.
+  const remaining = candidates.filter((root) => !used.has(root)).sort()
+  for (const theme of ["light", "dark"] as const) {
+    if (!result.has(theme) && remaining.length) result.set(theme, remaining.shift()!)
+  }
+  return result
 }
 
-function canonicalPath(path: string, layout: PackageLayout): string {
+function packageInfo(files: Map<string, Uint8Array>, formatHint?: ExportFormat): PackageInfo {
+  const names = [...files.keys()]
+  const bdaRoots = bdaThemeRoots(files)
+  if (formatHint === "bda" && !bdaRoots) throw new Error("BDA 皮肤缺少 port/land appearanceConfig")
+  if (bdaRoots) return { layout: bdaRoots.size > 1 ? "bda-dual" : "bda-single", bdaRoots }
+  if (names.some((name) => /^skin\/(?:dark|light)\/skin\//.test(name))) return { layout: "bdi-dual" }
+  if (names.some((name) => /^skin\/(?:land|port|res)\//.test(name))) return { layout: "bdi-single" }
+  if (names.some((name) => /^(?:dark|light)\/(?:land|port|res)\//.test(name))) return { layout: "bds-dual" }
+  if (names.some((name) => /^(?:land|port|res)\//.test(name))) return { layout: "bds-single" }
+  return { layout: "legacy-ios" }
+}
+
+function canonicalPath(path: string, layout: PackageLayout, bdaRoots?: Map<BdaTheme, string>): string {
   if (layout === "bdi-dual") {
     if (path === "skin/") return ""
     if (path === "skin/Info.txt") return "Info.txt"
@@ -198,18 +240,26 @@ function canonicalPath(path: string, layout: PackageLayout): string {
     if (path === "skin/demo.png") return "demo.png"
     return path.startsWith("skin/") ? `light/skin/${path.slice(5)}` : path
   }
-  if (layout === "bds-dual" || layout === "bda-dual") {
+  if (layout === "bda-dual" || layout === "bda-single") {
+    for (const [theme, root] of bdaRoots ?? []) {
+      if (root && path === `${root}/`) return `${theme}/skin/`
+      if (root && path.startsWith(`${root}/`)) return `${theme}/skin/${path.slice(root.length + 1)}`
+      if (!root && path !== "Info.txt" && path !== "demo.png") return `${theme}/skin/${path}`
+    }
+    return path
+  }
+  if (layout === "bds-dual") {
     const themed = path.match(/^(dark|light)(?:\/(.*))?$/)
     if (themed) return `${themed[1]}/skin/${themed[2] ?? ""}`
   }
-  if (layout === "bds-single" || layout === "bda-single") {
+  if (layout === "bds-single") {
     if (path === "Info.txt" || path === "demo.png") return path
     return `light/skin/${path}`
   }
   return path
 }
 
-function rawPath(path: string, layout: PackageLayout): string {
+function rawPath(path: string, layout: PackageLayout, bdaRoots?: Map<BdaTheme, string>): string {
   if (layout === "bdi-dual") {
     if (path === "Info.txt" || path === "demo.png") return `skin/${path}`
     return path.replace(/^(dark|light)\/skin\//, "skin/$1/skin/")
@@ -218,10 +268,16 @@ function rawPath(path: string, layout: PackageLayout): string {
     if (path === "Info.txt" || path === "demo.png") return `skin/${path}`
     return path.replace(/^light\/skin\//, "skin/")
   }
-  if (layout === "bds-dual" || layout === "bda-dual") {
+  if (layout === "bda-dual" || layout === "bda-single") {
+    const themed = path.match(/^(light|dark)\/skin\/(.*)$/)
+    if (!themed) return path
+    const root = bdaRoots?.get(themed[1] as BdaTheme) ?? ""
+    return root ? `${root}/${themed[2]}` : themed[2]
+  }
+  if (layout === "bds-dual") {
     return path.replace(/^(dark|light)\/skin\//, "$1/")
   }
-  if (layout === "bds-single" || layout === "bda-single") {
+  if (layout === "bds-single") {
     return path.replace(/^light\/skin\//, "")
   }
   return path
@@ -260,15 +316,18 @@ export class SkinArchive {
   private sourceBytes: Uint8Array
   private sourceZip?: ReturnType<typeof parseZip>
   private layout: PackageLayout
+  private bdaRoots?: Map<BdaTheme, string>
   private canonicalToRaw = new Map<string, string>()
   private changedRaw = new Set<string>()
   readonly changed = new Set<string>()
 
-  private constructor(files: Map<string, Uint8Array>, sourceBytes: Uint8Array) {
+  private constructor(files: Map<string, Uint8Array>, sourceBytes: Uint8Array, formatHint?: ExportFormat) {
     this.files = files
     this.originals = new Map(files)
     this.sourceBytes = sourceBytes.slice()
-    this.layout = packageLayout(files)
+    const info = packageInfo(files, formatHint)
+    this.layout = info.layout
+    this.bdaRoots = info.bdaRoots
     this.rebuildPathMap()
     try {
       this.sourceZip = parseZip(this.sourceBytes)
@@ -280,7 +339,7 @@ export class SkinArchive {
   private rebuildPathMap(): void {
     this.canonicalToRaw.clear()
     for (const raw of this.files.keys()) {
-      const canonical = canonicalPath(raw, this.layout)
+      const canonical = canonicalPath(raw, this.layout, this.bdaRoots)
       if (canonical && !this.canonicalToRaw.has(canonical)) this.canonicalToRaw.set(canonical, raw)
     }
   }
@@ -290,7 +349,7 @@ export class SkinArchive {
     return this.layout.startsWith("bds") ? "bds" : "bdi"
   }
 
-  static open(bytes: Uint8Array): SkinArchive {
+  static open(bytes: Uint8Array, formatHint?: ExportFormat): SkinArchive {
     validateArchiveLimits(bytes)
     const unpacked = unzipSync(bytes)
     const names = Object.keys(unpacked)
@@ -304,7 +363,7 @@ export class SkinArchive {
       if (total > MAX_UNPACKED_BYTES) throw new Error("皮肤解压后超过 256 MB")
       files.set(name, unpacked[name])
     }
-    return new SkinArchive(files, bytes)
+    return new SkinArchive(files, bytes, formatHint)
   }
 
   static fromSourceFiles(files: Array<{ path: string; data: Uint8Array }>): SkinArchive {
@@ -322,7 +381,7 @@ export class SkinArchive {
   }
 
   sourcePath(path: string): string {
-    return this.canonicalToRaw.get(path) ?? rawPath(path, this.layout)
+    return this.canonicalToRaw.get(path) ?? rawPath(path, this.layout, this.bdaRoots)
   }
 
   getSourceBytes(path: string): Uint8Array | undefined {
@@ -330,7 +389,7 @@ export class SkinArchive {
   }
 
   canonicalSourcePath(path: string): string {
-    return canonicalPath(path, this.layout)
+    return canonicalPath(path, this.layout, this.bdaRoots)
   }
 
   isText(path: string): boolean {
@@ -361,7 +420,7 @@ export class SkinArchive {
   }
 
   setBytes(path: string, bytes: Uint8Array): void {
-    const raw = this.canonicalToRaw.get(path) ?? rawPath(path, this.layout)
+    const raw = this.canonicalToRaw.get(path) ?? rawPath(path, this.layout, this.bdaRoots)
     const current = this.files.get(raw)
     if (current && current.length === bytes.length && current.every((byte, index) => byte === bytes[index])) {
       return
@@ -393,12 +452,13 @@ export class SkinArchive {
 
   markSaved(bytes?: Uint8Array): void {
     if (bytes) {
-      const reopened = SkinArchive.open(bytes)
+      const reopened = SkinArchive.open(bytes, this.format)
       this.files = reopened.files
       this.originals = reopened.originals
       this.sourceBytes = reopened.sourceBytes
       this.sourceZip = reopened.sourceZip
       this.layout = reopened.layout
+      this.bdaRoots = reopened.bdaRoots
       this.canonicalToRaw = reopened.canonicalToRaw
       this.changedRaw.clear()
       this.changed.clear()
@@ -446,22 +506,28 @@ export class SkinArchive {
       return this.packagedBytes(format)
     }
     if (this.changed.size === 0) return this.sourceBytes.slice()
-    if (
-      !this.sourceZip ||
-      this.sourceZip.entries.length !== this.files.size ||
-      this.sourceZip.entries.some((entry) => !this.files.has(entry.name))
-    ) {
+    if (!this.sourceZip) {
       return zipSync(Object.fromEntries(this.files), { level: 6 })
     }
 
     const locals: Uint8Array[] = []
     const centrals: Uint8Array[] = []
     let localOffset = 0
-    for (const entry of this.sourceZip.entries) {
+    const sourceNames = new Set(this.sourceZip.entries.map((entry) => entry.name))
+    const added = [...this.files.entries()]
+      .filter(([name]) => !sourceNames.has(name))
+      .map(([name, data]) => parseZip(zipSync({
+        [name]: [data, { level: 6, mtime: new Date(1980, 0, 1) }],
+      })).entries[0])
+    const entries = [
+      ...this.sourceZip.entries.filter((entry) => this.files.has(entry.name)),
+      ...added,
+    ]
+    for (const entry of entries) {
       let local = entry.local
       let crc: number | undefined
       let compressedSize: number | undefined
-      if (this.changedRaw.has(entry.name)) {
+      if (sourceNames.has(entry.name) && this.changedRaw.has(entry.name)) {
         const changed = changedLocal(entry, this.files.get(entry.name)!)
         local = changed.local
         crc = changed.crc
@@ -480,6 +546,8 @@ export class SkinArchive {
     }
     const centralSize = centrals.reduce((total, bytes) => total + bytes.length, 0)
     const end = this.sourceZip.end.slice()
+    writeUint16(end, 8, entries.length)
+    writeUint16(end, 10, entries.length)
     writeUint32(end, 12, centralSize)
     writeUint32(end, 16, localOffset)
     const total = localOffset + centralSize + end.length
