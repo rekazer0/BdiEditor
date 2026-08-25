@@ -1,5 +1,30 @@
 import type { TextVisual, VisualResolver } from "./atlas.ts"
 import type { IniDocument } from "./ini.ts"
+import { DEFAULT_CANDIDATE_HEIGHT, DEFAULT_PANEL_WIDTH } from "./keyboard.ts"
+
+export type CandidateRect = { x: number; y: number; width: number; height: number }
+
+function candidateRect(document: IniDocument | undefined): CandidateRect | undefined {
+  const values = document?.get("CAND", "VIEW_RECT")?.split(",").map(Number)
+  if (!values || values.length !== 4 || values.some((value) => !Number.isFinite(value))) return
+  const [x, y, width, height] = values
+  return width > 0 && height > 0 ? { x, y, width, height } : undefined
+}
+
+export function resolveCandidateRect(
+  candidate: IniDocument | undefined,
+  general: IniDocument | undefined,
+): CandidateRect {
+  const configured = candidateRect(candidate) ?? candidateRect(general)
+  if (configured) return configured
+  const panelWidth = Number(general?.get("PANEL", "SIZE")?.split(",")[0])
+  return {
+    x: 0,
+    y: 0,
+    width: Number.isFinite(panelWidth) && panelWidth > 0 ? panelWidth : DEFAULT_PANEL_WIDTH,
+    height: DEFAULT_CANDIDATE_HEIGHT,
+  }
+}
 
 function inputInset(width: number): number {
   const density = width <= 240 ? 0.75

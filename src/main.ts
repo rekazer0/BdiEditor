@@ -9,7 +9,6 @@ import "./style.css"
 import {
   DEFAULT_BDA_PANEL_HEIGHT,
   DEFAULT_BDA_PANEL_WIDTH,
-  DEFAULT_CANDIDATE_HEIGHT,
   DEFAULT_PANEL_HEIGHT,
   DEFAULT_PANEL_WIDTH,
 } from "./keyboard.ts"
@@ -40,6 +39,7 @@ import {
 } from "./devices.ts"
 import {
   candidateInputForegroundStyle,
+  resolveCandidateRect,
   resolveCandidateInputStyle,
   resolveCandidateTextVisuals,
 } from "./candidate-style.ts"
@@ -3718,7 +3718,6 @@ function refreshToolbarPreview(
     return
   }
   const gen = textDocument(genConfigPath())
-  const size = gen?.get("CAND", "VIEW_RECT")?.split(",").map(Number)
   toolbarStrip.hidden = false
   toolbarStrip.dataset.path = path
   toolbarPreview.setResolver(resolver)
@@ -3727,8 +3726,7 @@ function refreshToolbarPreview(
   toolbarPreview.setPersistentOnly(composing)
   toolbarPreview.setTheme(theme.value === "dark" ? "dark" : "light")
   toolbarPreview.setTransparent(true)
-  const width = size?.length === 4 && Number.isFinite(size[2]) ? size[2] : DEFAULT_PANEL_WIDTH
-  const height = size?.length === 4 && Number.isFinite(size[3]) ? size[3] : DEFAULT_CANDIDATE_HEIGHT
+  const { width, height } = resolveCandidateRect(document, gen)
   const inputStyle = resolveCandidateInputStyle(gen, resolver, width, document)
   const inputHeight = inputStyle.height
   const backgroundStyle = document.get("CAND", "BACK_STYLE")?.split(",")[0] ??
@@ -7559,13 +7557,14 @@ async function applyLayoutImage(): Promise<void> {
       layoutImageError.hidden = false
       return
     }
-    if (layoutImageWidth !== panel.width || layoutImageHeight !== panel.height) {
-      layoutImageBytes = await fitPngTo(layoutImageBytes, panel.width, panel.height)
-      layoutImageWidth = panel.width
-      layoutImageHeight = panel.height
+    const candidateRect = resolveCandidateRect(cand, gen)
+    if (layoutImageWidth !== candidateRect.width || layoutImageHeight !== candidateRect.height) {
+      layoutImageBytes = await fitPngTo(layoutImageBytes, candidateRect.width, candidateRect.height)
+      layoutImageWidth = candidateRect.width
+      layoutImageHeight = candidateRect.height
     }
     const base = nextResourceBase()
-    const plan = planLayoutImage(layoutImageTarget, [], IniDocument.parse(""), panel.width, panel.height)
+    const plan = planLayoutImage(layoutImageTarget, [], IniDocument.parse(""), candidateRect.width, candidateRect.height)
     const tilesDoc = layoutImageTileDocument(plan)
     const stylesDoc = IniDocument.parse(styles.toString())
     const candDoc = IniDocument.parse(cand.toString())

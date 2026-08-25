@@ -1,8 +1,9 @@
 import assert from "node:assert/strict"
 import { pushChange, type Change } from "../src/history.ts"
 import { layoutImageTileDocument, planLayoutImageSlices } from "../src/layout-image.ts"
-import { applyLayoutAction, snapPointToRects, snapRectDelta, type LayoutRect } from "../src/layout.ts"
+import { applyLayoutAction, gestureDirection, snapPointToRects, snapRectDelta, type LayoutRect } from "../src/layout.ts"
 import { IniDocument } from "../src/ini.ts"
+import { previewItems } from "../src/preview.ts"
 
 const first: LayoutRect = { section: "KEY1", x: 10, y: 20, width: 80, height: 40 }
 const second: LayoutRect = { section: "KEY2", x: 120, y: 100, width: 140, height: 100 }
@@ -57,6 +58,26 @@ assert.deepEqual(
 )
 
 console.log("✓ 十字轴与拖动分别吸附到按键边缘和中心关键点")
+
+const swipeKey = previewItems(IniDocument.parse(`
+[KEY9]
+VIEW_RECT=438,155,250,143
+CENTER=k
+UP=5
+DOWN=.
+LEFT=j
+RIGHT=l
+`), 1125, 595)[0]
+assert.deepEqual(
+  [swipeKey.center, swipeKey.up, swipeKey.down, swipeKey.left, swipeKey.right],
+  ["k", "5", ".", "j", "l"],
+)
+assert.deepEqual(
+  [[0, -40], [0, 40], [-40, 0], [40, 0]].map(([x, y]) => gestureDirection(x, y, 100, false)),
+  ["up", "down", "left", "right"],
+)
+
+console.log("✓ 自定义按键的上下左右动作均被解析并用于拖动预览")
 
 const singleKeySlice = [2, 3, 40, 20] as [number, number, number, number]
 const singleKeyPlan = planLayoutImageSlices(

@@ -169,12 +169,21 @@ if (!await page.$eval("#preview-zoom-fit", (el) => el.getAttribute("aria-pressed
 }
 const lockedCanvasBox = await (await page.$("#preview")).boundingBox()
 if (!lockedCanvasBox) throw new Error("no locked canvas box")
-await page.mouse.move(lockedCanvasBox.x + lockedCanvasBox.width * qx, lockedCanvasBox.y + lockedCanvasBox.height * qy)
-await page.mouse.down()
-await page.mouse.move(lockedCanvasBox.x + lockedCanvasBox.width * qx + 40, lockedCanvasBox.y + lockedCanvasBox.height * qy)
-await page.mouse.up()
-const lockedSwipe = await page.$eval("#event-log", (el) => el.textContent ?? "")
-if (!lockedSwipe.includes("RIGHT")) throw new Error("locked key drag missed RIGHT swipe: " + lockedSwipe)
+for (const [direction, dx, dy] of [
+  ["UP", 0, -40],
+  ["DOWN", 0, 40],
+  ["LEFT", -40, 0],
+  ["RIGHT", 40, 0],
+]) {
+  const x = lockedCanvasBox.x + lockedCanvasBox.width * qx
+  const y = lockedCanvasBox.y + lockedCanvasBox.height * qy
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + dx, y + dy)
+  await page.mouse.up()
+  const lockedSwipe = await page.$eval("#event-log", (el) => el.textContent ?? "")
+  if (!lockedSwipe.includes(direction)) throw new Error(`locked key drag missed ${direction} swipe: ${lockedSwipe}`)
+}
 
 await browser.close()
 

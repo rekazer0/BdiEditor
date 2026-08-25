@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs"
 import type { VisualResolver } from "../src/atlas.ts"
 import {
   candidateInputForegroundStyle,
+  resolveCandidateRect,
   resolveCandidateInputStyle,
   resolveCandidateTextVisuals,
 } from "../src/candidate-style.ts"
@@ -62,6 +63,32 @@ assert.deepEqual(resolveCandidateInputStyle(ios, resolver(48), 1125, candidateIn
   height: 64,
 })
 assert.equal(candidateInputForegroundStyle(ios, candidateInput), "260")
+
+const generalCandidate = IniDocument.parse(`
+[PANEL]
+SIZE=1080,641
+[CAND]
+VIEW_RECT=0,0,1080,102
+`)
+assert.deepEqual(resolveCandidateRect(undefined, generalCandidate), { x: 0, y: 0, width: 1080, height: 102 })
+assert.deepEqual(resolveCandidateRect(IniDocument.parse("[CAND]\nVIEW_RECT=4,6,880,96\n"), generalCandidate), {
+  x: 4,
+  y: 6,
+  width: 880,
+  height: 96,
+})
+assert.deepEqual(resolveCandidateRect(IniDocument.parse("[CAND]\nVIEW_RECT=0,0,0,-1\n"), generalCandidate), {
+  x: 0,
+  y: 0,
+  width: 1080,
+  height: 102,
+})
+assert.deepEqual(resolveCandidateRect(undefined, IniDocument.parse("[PANEL]\nSIZE=880,360\n")), {
+  x: 0,
+  y: 0,
+  width: 880,
+  height: 133,
+})
 
 const generalPanel = IniDocument.parse("[PANEL]\nSIZE=480,312\n")
 const inheritedSymbolPanel = resolvePanelConfig(
@@ -147,6 +174,9 @@ assert.match(main, /const layoutSize = layoutDocument\.get\("PANEL", "SIZE"\)/)
 assert.doesNotMatch(main, /const totalHeight = height \+ inputHeight/)
 assert.match(main, /toolbarCanvas\.style\.setProperty\("--toolbar-height", String\(height\)\)/)
 assert.match(main, /return \{ width, height, inputHeight \}/)
+assert.doesNotMatch(main, /gen\?\.get\("CAND", "VIEW_RECT"\)/)
+assert.match(main, /resolveCandidateRect\(document, gen\)/)
+assert.match(main, /resolveCandidateRect\(cand, gen\)/)
 assert.match(
   css,
   /#candidate-area\[hidden\] \+ #panel-viewport #preview \{[^}]*width:\s*100%;[^}]*height:\s*100%;/s,
