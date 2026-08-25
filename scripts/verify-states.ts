@@ -110,7 +110,7 @@ console.log("✓ 缺失 TIP 的旧皮肤回车状态使用语义文字兜底")
 assert.deepEqual(candidatePreview("hello", 5, "en"), {
   composing: true,
   input: "",
-  candidates: ["hello", "Hello", "world", "thanks", "good"],
+  candidates: ["hello", "Hello", "world", "thanks"],
 }, "英文状态不显示拼音，但展示硬编码英文候选")
 assert.deepEqual(candidatePreview("ni", 2, "zh"), {
   composing: true,

@@ -5829,8 +5829,13 @@ input[type="search"]:focus {
   #quick-inspector:not([hidden]) {
     grid-template-columns: minmax(0, 1fr) 58px;
     grid-template-rows: auto;
+    grid-auto-flow: row dense;
     align-content: start;
     column-gap: 8px;
+  }
+
+  #quick-inspector > .keyboard-fields:empty {
+    display: none;
   }
 
   #quick-inspector[data-inspector-group-display="grouped"] {

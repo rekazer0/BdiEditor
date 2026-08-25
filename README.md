@@ -4,6 +4,11 @@
 
 桌面端采用文件导航、实时画布与属性检查器三栏布局；移动端改为可调节的上下分屏，方便在文件、画布和属性之间切换。界面支持浅色/深色模式、设备安全区与轻量毛玻璃效果，皮肤文件始终在本地处理。
 
+## 在线版本
+
+- 国内：[https://bdieditor-bdieditor-d4gdhm3ir22dcc04c.webapps.tcloudbase.com/](https://bdieditor-bdieditor-d4gdhm3ir22dcc04c.webapps.tcloudbase.com/)
+- 海外：[https://rekazer0.github.io/BdiEditor/](https://rekazer0.github.io/BdiEditor/)
+
 ## 界面预览
 
 ### PC 端
