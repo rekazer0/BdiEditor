@@ -1,13 +1,10 @@
 export function resolveSafeAreaTop(options: {
   measured: number
   cached: number
-  keyboardOpen: boolean
-  viewportOffsetTop?: number
 }): { top: number; cached: number } {
   const measured = Math.max(0, options.measured)
   const cached = measured > 1 ? measured : Math.max(0, options.cached)
-  if (options.keyboardOpen && measured <= 1) return { top: cached, cached }
-  return { top: measured, cached }
+  return { top: measured > 1 ? measured : cached, cached }
 }
 
 export function resolveViewportFrame(options: {
@@ -24,6 +21,15 @@ export function resolveViewportFrame(options: {
     offsetTop: Math.max(0, options.viewportOffsetTop),
     offsetLeft: Math.max(0, options.viewportOffsetLeft),
   }
+}
+
+export function isKeyboardViewportOpen(options: {
+  viewportHeight: number
+  baselineHeight: number
+}): boolean {
+  const baseline = Math.max(1, options.baselineHeight)
+  const threshold = Math.max(80, baseline * 0.15)
+  return baseline - Math.max(1, options.viewportHeight) > threshold
 }
 
 export function isTextInput(target: EventTarget | null): boolean {
@@ -52,14 +58,31 @@ function revealFocusedInput(): void {
   else if (activeRect.bottom > visibleBottom) scroller.scrollTop += activeRect.bottom - visibleBottom
 }
 
+function resetPageOffset(): void {
+  document.documentElement.scrollTop = 0
+  document.documentElement.scrollLeft = 0
+  document.body.scrollTop = 0
+  document.body.scrollLeft = 0
+  if (window.scrollX || window.scrollY) window.scrollTo(0, 0)
+}
+
 export function installSafeAreaLock(root: HTMLElement = document.documentElement): () => void {
   let cached = 0
+  let baselineViewportHeight = window.visualViewport?.height ?? window.innerHeight
+  let keyboardWasOpen = false
+  let restoreTimers: number[] = []
   const probe = document.createElement("div")
   probe.setAttribute("aria-hidden", "true")
   probe.style.cssText = "position:absolute;left:-9999px;top:0;width:0;height:0;padding-top:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none"
   root.append(probe)
 
   const measure = () => Number.parseFloat(getComputedStyle(probe).paddingTop) || 0
+  const restoreAfterKeyboard = () => {
+    const active = document.activeElement
+    if (active instanceof HTMLElement && isTextInput(active)) active.blur()
+    for (const timer of restoreTimers) window.clearTimeout(timer)
+    restoreTimers = [0, 120, 360].map((delay) => window.setTimeout(resetPageOffset, delay))
+  }
   const sync = (reveal = false) => {
     const viewport = window.visualViewport
     const frame = resolveViewportFrame({
@@ -70,21 +93,20 @@ export function installSafeAreaLock(root: HTMLElement = document.documentElement
       layoutHeight: window.innerHeight,
       layoutWidth: window.innerWidth,
     })
-    const keyboardOpen = isTextInput(document.activeElement)
-    const resolved = resolveSafeAreaTop({
-      measured: measure(),
-      cached,
-      keyboardOpen,
-      viewportOffsetTop: frame.offsetTop,
+    baselineViewportHeight = Math.max(baselineViewportHeight, frame.height)
+    const focusedInput = isTextInput(document.activeElement)
+    const viewportShrunk = isKeyboardViewportOpen({
+      viewportHeight: frame.height,
+      baselineHeight: baselineViewportHeight,
     })
+    const keyboardOpen = viewportShrunk && (focusedInput || keyboardWasOpen)
+    const resolved = resolveSafeAreaTop({ measured: measure(), cached })
     cached = resolved.cached
     root.style.setProperty("--safe-area-top", `${resolved.top}px`)
-    root.style.setProperty("--app-height", `${frame.height}px`)
-    root.style.setProperty("--vv-top", `${frame.offsetTop}px`)
-    root.style.setProperty("--vv-left", `${frame.offsetLeft}px`)
-    root.style.setProperty("--vv-width", `${frame.width}px`)
     root.dataset.keyboardOpen = keyboardOpen ? "true" : "false"
     if (reveal && keyboardOpen) revealFocusedInput()
+    if (keyboardWasOpen && !keyboardOpen) restoreAfterKeyboard()
+    keyboardWasOpen = keyboardOpen
   }
   const schedule = () => {
     window.requestAnimationFrame(() => sync(false))
@@ -92,10 +114,16 @@ export function installSafeAreaLock(root: HTMLElement = document.documentElement
   const reveal = () => {
     window.requestAnimationFrame(() => sync(true))
   }
+  const resetOrientation = () => {
+    cached = 0
+    baselineViewportHeight = window.visualViewport?.height ?? window.innerHeight
+    schedule()
+    window.setTimeout(schedule, 250)
+  }
 
   const listeners: Array<[EventTarget, string, EventListener]> = [
     [window, "resize", schedule],
-    [window, "orientationchange", schedule],
+    [window, "orientationchange", resetOrientation],
     [document, "focusin", reveal],
     [document, "focusout", schedule],
   ]
@@ -105,10 +133,9 @@ export function installSafeAreaLock(root: HTMLElement = document.documentElement
   sync(false)
   return () => {
     for (const [target, type, listener] of listeners) target.removeEventListener(type, listener)
+    for (const timer of restoreTimers) window.clearTimeout(timer)
     probe.remove()
     delete root.dataset.keyboardOpen
-    for (const name of ["--safe-area-top", "--app-height", "--vv-top", "--vv-left", "--vv-width"]) {
-      root.style.removeProperty(name)
-    }
+    root.style.removeProperty("--safe-area-top")
   }
 }

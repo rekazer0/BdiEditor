@@ -1,18 +1,20 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
-import { resolveSafeAreaTop, resolveViewportFrame } from "../src/safe-area.ts"
+import { isKeyboardViewportOpen, resolveSafeAreaTop, resolveViewportFrame } from "../src/safe-area.ts"
 
 const css = fs.readFileSync("src/style.css", "utf8")
 const main = fs.readFileSync("src/main.ts", "utf8")
 const moduleSource = fs.readFileSync("src/safe-area.ts", "utf8")
 
-assert.equal(resolveSafeAreaTop({ measured: 47, cached: 0, keyboardOpen: false }).top, 47)
-assert.equal(resolveSafeAreaTop({ measured: 47, cached: 0, keyboardOpen: false }).cached, 47)
-assert.equal(resolveSafeAreaTop({ measured: 0, cached: 47, keyboardOpen: true }).top, 47)
-assert.equal(resolveSafeAreaTop({ measured: 0, cached: 47, keyboardOpen: false }).top, 0)
-assert.equal(resolveSafeAreaTop({ measured: 34, cached: 47, keyboardOpen: true }).top, 34)
-assert.equal(resolveSafeAreaTop({ measured: 0, cached: 0, keyboardOpen: true }).top, 0)
-assert.equal(resolveSafeAreaTop({ measured: 0, cached: 47, keyboardOpen: true, viewportOffsetTop: 47 }).top, 47)
+assert.equal(resolveSafeAreaTop({ measured: 47, cached: 0 }).top, 47)
+assert.equal(resolveSafeAreaTop({ measured: 47, cached: 0 }).cached, 47)
+assert.equal(resolveSafeAreaTop({ measured: 0, cached: 47 }).top, 47)
+assert.equal(resolveSafeAreaTop({ measured: 34, cached: 47 }).top, 34)
+assert.equal(resolveSafeAreaTop({ measured: 0, cached: 0 }).top, 0)
+
+assert.equal(isKeyboardViewportOpen({ viewportHeight: 430, baselineHeight: 844 }), true)
+assert.equal(isKeyboardViewportOpen({ viewportHeight: 780, baselineHeight: 844 }), false)
+assert.equal(isKeyboardViewportOpen({ viewportHeight: 844, baselineHeight: 844 }), false)
 
 assert.deepEqual(
   resolveViewportFrame({
@@ -43,7 +45,11 @@ assert.match(main, /installSafeAreaLock\(\)/)
 assert.match(moduleSource, /visualViewport/)
 assert.match(moduleSource, /dataset\.keyboardOpen/)
 assert.match(moduleSource, /scroller\.scrollTop/)
+assert.match(moduleSource, /keyboardWasOpen && !keyboardOpen/)
+assert.match(moduleSource, /active\.blur\(\)/)
+assert.match(moduleSource, /window\.scrollTo\(0, 0\)/)
+assert.match(moduleSource, /\[0, 120, 360\]/)
 assert.doesNotMatch(moduleSource, /scrollIntoView/)
-assert.doesNotMatch(moduleSource, /window\.scrollTo\(0, 0\)/)
+assert.doesNotMatch(moduleSource, /--app-height|--vv-top|--vv-left|--vv-width/)
 
-console.log("✓ 输入法弹出后保持顶部安全区，并给输入框让出可视区域")
+console.log("✓ 输入法弹出时保持预览与安全区，收起后复位顶部点击区域")
