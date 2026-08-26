@@ -63,6 +63,7 @@ import {
   bdaStyleID,
   bdaStyleRef,
   decodedBdaSource,
+  decodedBdaEditorSource,
   decodedBdaAppearancePart,
   decodeBdaAnimation,
   decodeBdaAppearance,
@@ -1906,7 +1907,7 @@ function applyBytesSnapshot(path: string, bytes?: Uint8Array): void {
   else archive.delete(path)
   scheduleSourceAutosave([path])
   refreshBdaLayout()
-  if (selectedPath === path && bytes && archive.isBdaConfig(path)) setSourceValue(decodedBdaSource(path, bytes))
+  if (selectedPath === path && bytes && archive.isBdaConfig(path)) setSourceValue(decodedBdaEditorSource(path, bytes))
   refreshPreview()
   populateKeyInspector()
   updateDirty()
@@ -2007,7 +2008,7 @@ function refreshSelectedBdaSource(): void {
   }
   if (archive.isBdaConfig(selectedPath)) {
     const bytes = archive.getBytes(selectedPath)
-    if (bytes) setSourceValue(decodedBdaSource(selectedPath, bytes))
+    if (bytes) setSourceValue(decodedBdaEditorSource(selectedPath, bytes))
     return
   }
   if (!isBdaVirtualTextPath(selectedPath)) return
@@ -2042,12 +2043,12 @@ function commitBdaSourceEdit(): void {
     const after = applyDecodedBdaSource(selectedPath, before, source.value)
     commitBytes(selectedPath, before, after)
     if (/appearanceConfig$/i.test(selectedPath)) refreshBdaLayout(layoutPath)
-    setSourceValue(decodedBdaSource(selectedPath, after))
+    setSourceValue(decodedBdaEditorSource(selectedPath, after))
     refreshPreview()
     populateKeyInspector()
     updateDirty()
   } catch (error) {
-    setSourceValue(decodedBdaSource(selectedPath, before))
+    setSourceValue(decodedBdaEditorSource(selectedPath, before))
     showError(error, "编辑 BDA JSON")
   }
 }
@@ -6094,7 +6095,7 @@ function selectFile(
   } else if (archive?.isBdaConfig(path)) {
     hideImageWorkspace()
     selectedDocument = undefined
-    setSourceValue(decodedBdaSource(path, archive.getBytes(path)!))
+    setSourceValue(decodedBdaEditorSource(path, archive.getBytes(path)!))
     source.disabled = false
     sourceName.textContent = `${path} · 解码源码`
     inspectorTab = "properties"

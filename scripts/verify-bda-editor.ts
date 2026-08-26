@@ -6,6 +6,7 @@ import {
   bdaAppearancePath,
   decodeBdaAppearance,
   decodedBdaAppearancePart,
+  decodedBdaEditorSource,
   decodedBdaSource,
 } from "../src/bda.ts"
 import { bdaAnimationDurations, bdaLayoutStyleGroups } from "../src/bda-editor.ts"
@@ -18,7 +19,10 @@ const appearanceBytes = archive.getBytes(appearancePath)!
 const source = JSON.parse(decodedBdaSource(appearancePath, appearanceBytes))
 
 assert.equal(source.designWidth, 1080)
-assert.ok(Array.isArray(source.$protobuf) && source.$protobuf.length > 0, "解码源码应保留完整 protobuf 字段树")
+assert.ok(Array.isArray(source.$protobuf) && source.$protobuf.length > 0, "工作区解码源码应保留完整 protobuf 字段树")
+const editorSource = JSON.parse(decodedBdaEditorSource(appearancePath, appearanceBytes))
+assert.ok(!("$protobuf" in editorSource), "应用内普通源码不应显示内部 protobuf 备份")
+assert.ok(editorSource.panels.py_9.keys.KEY_AS, "应用内普通源码仍应包含完整语义配置")
 assert.equal(
   source.$protobuf.map((field: { encodedHex: string }) => field.encodedHex).join(""),
   Buffer.from(appearanceBytes).toString("hex"),
@@ -112,6 +116,7 @@ const editor = fs.readFileSync("src/bda-editor.ts", "utf8")
 const styles = fs.readFileSync("src/style.css", "utf8")
 assert.match(main, /decodedBdaSource\(info\.path, info\.bytes, (?:selectedPath\.split|panelName)/)
 assert.match(main, /source\.\$bdiEditorRaw = encodeBase64\(bytes\)/, "BDA 源码工作区应保存可编辑 JSON")
+assert.match(main, /setSourceValue\(decodedBdaEditorSource\(/, "应用内源码视图应隐藏 protobuf 备份")
 assert.match(main, /applyDecodedBdaSource\(canonical, before/, "外部 BDA JSON 改动应编译回 protobuf")
 const bdaSourceSelection = main.match(/else if \(archive\?\.isBdaConfig\(path\)\) \{[\s\S]*?\n  \} else \{/)?.[0] ?? ""
 assert.match(bdaSourceSelection, /source\.disabled = false/, "编辑模式应允许编辑 BDA 解码 JSON")

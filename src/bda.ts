@@ -1556,14 +1556,14 @@ function genericBdaSource(bytes: Uint8Array, compact = false): unknown[] {
   return decode(bytes, 0)
 }
 
-export function decodedBdaSource(path: string, bytes: Uint8Array, panelName?: string): string {
+function decodedBdaValue(path: string, bytes: Uint8Array, panelName?: string): unknown {
   const name = path.split("/").pop() ?? path
-  let value: unknown
   if (/^\d*appearanceConfig$/i.test(name)) {
-    value = decodedAppearanceSource(decodeBdaAppearance(bytes), panelName)
-  } else if (/animationConfig$/i.test(name)) {
+    return decodedAppearanceSource(decodeBdaAppearance(bytes), panelName)
+  }
+  if (/animationConfig$/i.test(name)) {
     const animation = decodeBdaAnimation(bytes)
-    value = {
+    return {
       designWidth: animation.designWidth,
       targets: animation.targets.length ? animation.targets : undefined,
       bindings: animation.bindings.size ? mapObject(animation.bindings) : undefined,
@@ -1571,15 +1571,27 @@ export function decodedBdaSource(path: string, bytes: Uint8Array, panelName?: st
       effects: animation.effects.size ? mapObject(animation.effects) : undefined,
       sequences: mapObject(animation.sequences, (sequence) => ({ frames: sequence.frames })),
     }
-  } else if (/^\d*soundConfig$/i.test(name)) {
+  }
+  if (/^\d*soundConfig$/i.test(name)) {
     const sound = decodeBdaSoundConfig(bytes)
-    value = {
+    return {
       keySounds: mapObject(sound.keySounds),
       iosKeySounds: sound.iosKeySounds.size ? mapObject(sound.iosKeySounds) : undefined,
     }
-  } else {
-    value = { fields: genericBdaSource(bytes) }
   }
+  return { fields: genericBdaSource(bytes) }
+}
+
+export function decodedBdaEditorSource(path: string, bytes: Uint8Array, panelName?: string): string {
+  return JSON.stringify(decodedBdaValue(path, bytes, panelName), null, 2)
+}
+
+function normalizedDecodedBdaObject(path: string, bytes: Uint8Array): JsonObject {
+  return JSON.parse(decodedBdaEditorSource(path, bytes)) as JsonObject
+}
+
+export function decodedBdaSource(path: string, bytes: Uint8Array, panelName?: string): string {
+  const value = decodedBdaValue(path, bytes, panelName)
   const object = jsonObject(value)
   if (!panelName && object && !("fields" in object)) object.$protobuf = genericBdaSource(bytes, true)
   return JSON.stringify(value, null, 2)
@@ -1770,8 +1782,7 @@ export function applyDecodedBdaSource(path: string, bytes: Uint8Array, text: str
   if (!desired) throw new Error("BDA 解码源码必须是 JSON 对象")
   delete desired.$bdiEditorRaw
   delete desired.$protobuf
-  const current = JSON.parse(decodedBdaSource(path, bytes)) as JsonObject
-  delete current.$protobuf
+  const current = normalizedDecodedBdaObject(path, bytes)
   const name = path.split("/").pop() ?? path
   let output = bytes
   const changedSequences = new Set<string>()
@@ -1854,8 +1865,7 @@ export function applyDecodedBdaSource(path: string, bytes: Uint8Array, text: str
     }
   }
 
-  const actual = JSON.parse(decodedBdaSource(path, output)) as JsonObject
-  delete actual.$protobuf
+  const actual = normalizedDecodedBdaObject(path, output)
   for (const sequence of changedSequences) {
     const wantedEffect = jsonObject(jsonObject(desired.effects)?.[`image:${sequence}`])
     const actualEffect = jsonObject(jsonObject(actual.effects)?.[`image:${sequence}`])
@@ -1875,7 +1885,7 @@ export function applyDecodedBdaAppearancePart(
 ): Uint8Array {
   const desiredPart = jsonObject(JSON.parse(text))
   if (!desiredPart) throw new Error("BDA appearanceConfig 片段必须是 JSON 对象")
-  const full = JSON.parse(decodedBdaSource(path, bytes)) as JsonObject
+  const full = normalizedDecodedBdaObject(path, bytes)
   if (part.kind === "styles") {
     const styles = jsonObject(desiredPart[part.group])
     if (!styles || Object.keys(desiredPart).some((key) => key !== part.group)) {
