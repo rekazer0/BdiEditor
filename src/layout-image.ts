@@ -73,6 +73,10 @@ export function layoutImageTileDocument(plan: LayoutImagePlan): IniDocument {
   return tiles
 }
 
+export function layoutImageTileBytes(plan: LayoutImagePlan): Uint8Array {
+  return new TextEncoder().encode(`\uFEFF${layoutImageTileDocument(plan).toString()}`)
+}
+
 // 图片跟随布局 / 布局跟随图片：切片源改为图像里检测到的网格单元，按键按索引取对应切片
 // 布局文件里的 KEY 顺序不一定是屏幕阅读顺序（大小写锁定键常排在 Z 附近之外），
 // 先按坐标（y 优先、x 次之）排序再与阅读顺序的网格单元配对。

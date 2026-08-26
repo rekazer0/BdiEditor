@@ -99,6 +99,23 @@ assert.match(jsonHighlight, /token-action[^>]*>&quot;<mark[^>]*>BDA/, "BDA JSON 
 assert.match(jsonHighlight, /token-number[^>]*>2/, "BDA JSON 数字应高亮")
 assert.match(jsonHighlight, /token-section[^>]*>true/, "BDA JSON 字面量应高亮")
 assert.match(jsonHighlight, /token-search-match active/, "BDA JSON 搜索结果应继续高亮")
+const largeJson = Array.from(
+  { length: 4_000 },
+  (_, index) => `  "image${index}": {"resource": "image${index}.png"},`,
+).join("\n")
+const largeJsonStart = performance.now()
+const largeJsonHighlight = highlightJson(largeJson, ":", 0)
+assert.ok(performance.now() - largeJsonStart < 600, "BDA 大型图片资源源码搜索不应随行数平方级变慢")
+assert.match(largeJsonHighlight, /token-key/, "大型源码应保留语法着色")
+const visibleJsonHighlight = (highlightJson as (...args: unknown[]) => string)(largeJson, "", -1, [], [0, 2_000])
+assert.ok((visibleJsonHighlight.match(/token-key/g)?.length ?? 0) < 100, "大型源码应只为可视区创建语法节点")
+assert.match(main, /source\.setDecorations/, "源码搜索应使用 CodeMirror 装饰避免重建全文 DOM")
+assert.match(styles, /\.cm-source-search-match/, "CodeMirror 源码搜索结果应保持可见")
+assert.match(main, /scheduleSourceInputHighlight\(true\)/, "源码输入应合并刷新装饰与派生预览")
+assert.match(styles, /#source \.cm-scroller/, "源码应由 CodeMirror 视口承载滚动")
+const sourceSearchInput = main.match(/sourceSearch\.addEventListener\("input"[\s\S]+?\n\}\)/)?.[0] ?? ""
+assert.doesNotMatch(sourceSearchInput, /findSourceMatch/, "输入搜索词时不应强制滚动大型源码")
+assert.match(sourceSearchInput, /scheduleSourceSearch/, "源码搜索应在停止输入后合并刷新")
 assert.equal(
   replaceTextMatches(searchableSource, "foo", "bar", 1),
   "[A]\nVALUE=foo bar\nOTHER=foo",
@@ -147,7 +164,7 @@ assert.match(tauri, /open_source_workspace_archive[\s\S]+read_source_workspace_a
 assert.match(main, /decodeBase64Archive/, "前端应直接解码原生源码包")
 assert.match(main, /open_source_workspace_archive/, "Android 前端应调用紧凑源码包命令")
 assert.doesNotMatch(main, /Array\.from\(file\.data\)/, "完整源码工作区不应把每个字节展开成 JSON 数字")
-assert.match(main, /data: encodeBase64\(file\.data\)/, "完整源码工作区应使用紧凑 Base64 数据")
+assert.match(main, /data: encodeBase64\(data\)/, "完整源码工作区应使用紧凑 Base64 数据")
 assert.match(tauri, /BASE64_STANDARD[\s\S]+decode\(&file\.data\)/, "桌面端应解码紧凑源码数据")
 assert.match(androidShare, /Base64\.decode\(file\.data, Base64\.DEFAULT\)/, "Android 应解码紧凑源码数据")
 assert.match(main, /sourceWorkspacePendingArchive/, "Android 源码后台复制期间应保留编辑变更")

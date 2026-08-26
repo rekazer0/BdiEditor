@@ -50,6 +50,8 @@ import {
 } from "./export.ts"
 import { inspectorGroupPositionPercent } from "./inspector-groups.ts"
 import {
+  applyDecodedBdaAppearancePart,
+  applyDecodedBdaSource,
   BdaResolver,
   bdaAppearancePath,
   bdaColorHex,
@@ -61,6 +63,7 @@ import {
   bdaStyleID,
   bdaStyleRef,
   decodedBdaSource,
+  decodedBdaAppearancePart,
   decodeBdaAnimation,
   decodeBdaAppearance,
   decodeBdaSoundConfig,
@@ -68,21 +71,28 @@ import {
   updateBdaDesignWidth,
   updateBdaStyle,
   type BdaAppearance,
+  type BdaAppearancePart,
+  type BdaAppearanceStyleGroup,
   type BdaKey,
   type BdaStyleRef,
 } from "./bda.ts"
-import { renderBdaConfigEditor, renderBdaLayoutEditor, renderBdaMetadataEditor } from "./bda-editor.ts"
+import {
+  renderBdaConfigEditor,
+  renderBdaLayoutEditor,
+  renderBdaMetadataEditor,
+  renderBdaStyleEditor,
+} from "./bda-editor.ts"
 import { convertBdaArchive } from "./bda-convert.ts"
 import { IniDocument } from "./ini.ts"
 import { adaptIos26KeyboardLayout, adaptIos26Variant } from "./ios26.ts"
-import { findTextMatches, highlightIni, highlightJson, insertedTextRange, replaceTextMatches } from "./highlight.ts"
+import { findTextMatches, iniSectionRanges, insertedTextRange, jsonPropertyRanges, replaceTextMatches } from "./highlight.ts"
 import { pushChange, type Change } from "./history.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
 import {
   applyCandidateImageStyles,
   applyLayoutImageRects,
   applyLayoutImageStyles,
-  layoutImageTileDocument,
+  layoutImageTileBytes,
   layoutKeyRects,
   matchLayoutKeysToCells,
   planLayoutImage,
@@ -151,6 +161,7 @@ import {
 } from "./simulation.ts"
 import { SkinArchive } from "./skin.ts"
 import { consumeSourceWriteSnapshot, resolveSourceArchivePath, type SourceWriteSnapshot } from "./source-tree.ts"
+import { SourceCodeEditor } from "./source-editor.ts"
 import {
   SOUND_ACCEPT,
   decodeAiffPcm,
@@ -241,10 +252,8 @@ const mobilePortraitQuery = matchMedia("(max-width: 760px) and (orientation: por
 const exportButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-export-format]"),
 )
-const source = $("#source") as HTMLTextAreaElement
+const source = new SourceCodeEditor($("#source"))
 const sourceEditor = $("#source-editor")
-const sourceHighlight = $("#source-highlight code")
-const sourceLineNumbers = $("#source-line-numbers")
 const sourceSearch = $("#source-search") as HTMLInputElement
 const sourceSearchCount = $("#source-search-count")
 const sourceSearchPrevious = $("#source-search-previous") as HTMLButtonElement
@@ -369,6 +378,7 @@ const resourceListTitle = $("#resource-list-title")
 const resourceDetail = $("#resource-detail")
 const imageResourceDetail = $("#image-resource-detail")
 const styleResourceDetail = $("#style-resource-detail")
+const styleDetailPreviews = $("#style-detail-previews")
 const styleDetailFields = $("#style-detail-fields")
 const styleDetailNormal = $("#style-detail-normal") as HTMLCanvasElement
 const styleDetailHighlighted = $("#style-detail-highlighted") as HTMLCanvasElement
@@ -480,6 +490,9 @@ let assetURL = ""
 let assetReturnPath = ""
 let inspectorTab: "properties" | "source" = "properties"
 let sourceSearchIndex = -1
+let sourceInputHighlightTimer: number | undefined
+let sourceInputRefreshPending = false
+let sourceSearchTimer: number | undefined
 let sourceHistoryHighlight: readonly [number, number] | undefined
 type LayoutImageConfig = "none" | "image-follows-layout" | "layout-follows-image"
 let undoStack: Change[] = []
@@ -1549,7 +1562,11 @@ function rememberSourceWrite(path: string, data: SourceWriteSnapshot): void {
 }
 
 function sourceFilesPayload(value: SkinArchive): SourceFilePayload[] {
-  return value.sourceFiles().map((file) => ({ path: file.path, data: encodeBase64(file.data) }))
+  return value.sourceFiles().map((file) => {
+    const canonical = value.canonicalSourcePath(file.path)
+    const data = value.isBdaConfig(canonical) ? bdaWorkspaceData(canonical, file.data) : file.data
+    return { path: file.path, data: encodeBase64(data) }
+  })
 }
 
 function encodeBase64(bytes: Uint8Array): string {
@@ -1567,6 +1584,24 @@ function decodeBase64Archive(value: string): Uint8Array {
   return bytes
 }
 
+function bdaWorkspaceData(path: string, bytes: Uint8Array): Uint8Array {
+  const source = JSON.parse(decodedBdaSource(path, bytes)) as Record<string, unknown>
+  source.$bdiEditorRaw = encodeBase64(bytes)
+  return new TextEncoder().encode(JSON.stringify(source, null, 2))
+}
+
+function sourceArchiveFromFiles(files: Array<{ path: string; data: Uint8Array }>): SkinArchive {
+  const decoder = new TextDecoder()
+  return SkinArchive.fromSourceFiles(files.map((file) => {
+    if (!/\/\d*(?:appearance|animation|lightAnimation|sound|switch|sticker|scene)Config$/i.test(`/${file.path}`)) return file
+    const text = decoder.decode(file.data)
+    if (!/^\s*\{/.test(text)) return file
+    const raw = (JSON.parse(text) as Record<string, unknown>).$bdiEditorRaw
+    if (typeof raw !== "string") throw new Error(`BDA 解码源码缺少 $bdiEditorRaw：${file.path}`)
+    return { path: file.path, data: applyDecodedBdaSource(file.path, decodeBase64Archive(raw), text) }
+  }))
+}
+
 async function flushSourceAutosave(): Promise<void> {
   if (sourceAutosaveTimer !== undefined) {
     clearTimeout(sourceAutosaveTimer)
@@ -1578,7 +1613,10 @@ async function flushSourceAutosave(): Promise<void> {
     const paths = [...pendingSourcePaths]
     pendingSourcePaths.clear()
     const changes: SourceChangePayload[] = paths.map((path) => {
-      const data = value.getSourceBytes(sourcePathForArchive(path))
+      const archivePath = sourcePathForArchive(path)
+      const canonical = value.canonicalSourcePath(archivePath)
+      const bytes = value.getSourceBytes(archivePath)
+      const data = bytes && value.isBdaConfig(canonical) ? bdaWorkspaceData(canonical, bytes) : bytes
       return { path, data: data ? Array.from(data) : null, directory: false }
     })
     sourceAutosaveQueue = sourceAutosaveQueue.catch(() => {}).then(() => {
@@ -1634,7 +1672,9 @@ async function refreshExternalSourceFiles(workspace: string, paths: string[]): P
     if (change.data) {
       const canonical = archive.canonicalSourcePath(sourcePathForArchive(change.path))
       const before = archive.getBytes(canonical)
-      const after = data!
+      const after = before && archive.isBdaConfig(canonical)
+        ? applyDecodedBdaSource(canonical, before, new TextDecoder().decode(data!))
+        : data!
       if (before && before.length === after.length && before.every((byte, index) => byte === after[index])) continue
       archive.setBytes(canonical, after)
       affected.add(canonical)
@@ -1662,7 +1702,9 @@ async function refreshExternalSourceFiles(workspace: string, paths: string[]): P
     if (affected.has(layoutPath) && archive.isText(layoutPath)) {
       layoutDocument = IniDocument.parse(archive.getText(layoutPath))
     }
-    if (selectedPath && archive.getBytes(selectedPath)) selectFile(selectedPath, sidebarView, "document", true)
+    if (selectedPath && (archive.getBytes(selectedPath) || isBdaAppearancePartPath(selectedPath))) {
+      selectFile(selectedPath, sidebarView, "document", true)
+    }
     else {
       const next = archive.names().find((path) => archive?.isText(path))
       if (next) selectFile(next, sidebarView)
@@ -1827,7 +1869,9 @@ function undo(): void {
   redoStack.push(change)
   applyChangeSnapshot(change, "before")
   renderFiles()
-  if (selectedPath && archive?.getBytes(selectedPath)) selectFile(selectedPath, sidebarView)
+  if (selectedPath && (archive?.getBytes(selectedPath) || isBdaAppearancePartPath(selectedPath))) {
+    selectFile(selectedPath, sidebarView)
+  }
   updateHistoryButtons()
 }
 
@@ -1838,7 +1882,9 @@ function redo(): void {
   undoStack.push(change)
   applyChangeSnapshot(change, "after")
   renderFiles()
-  if (selectedPath && archive?.getBytes(selectedPath)) selectFile(selectedPath, sidebarView)
+  if (selectedPath && (archive?.getBytes(selectedPath) || isBdaAppearancePartPath(selectedPath))) {
+    selectFile(selectedPath, sidebarView)
+  }
   updateHistoryButtons()
 }
 
@@ -1921,8 +1967,40 @@ function currentBdaAppearance(): { path: string; bytes: Uint8Array; appearance: 
   return path && bytes ? { path, bytes, appearance: decodeBdaAppearance(bytes) } : undefined
 }
 
+const bdaAppearanceStyleGroups = [
+  ["imageStyles", "样式配置", "图片样式", "photo"],
+  ["textStyles", "样式配置", "文字样式", "textformat"],
+  ["colorStyles", "样式配置", "颜色样式", "paintpalette"],
+] as const satisfies ReadonlyArray<readonly [BdaAppearanceStyleGroup, string, string, string]>
+
+function bdaAppearanceStylePath(group: BdaAppearanceStyleGroup): string {
+  return `${theme.value}/skin/${orientation.value}/.appearance/${group}.json`
+}
+
+function bdaAppearancePart(path: string): BdaAppearancePart | undefined {
+  if (!archive || archive.format !== "bda") return
+  const prefix = `${theme.value}/skin/${orientation.value}/`
+  if (!path.startsWith(prefix)) return
+  const style = path.slice(prefix.length).match(/^\.appearance\/(imageStyles|textStyles|colorStyles)\.json$/)
+  if (style) return { kind: "styles", group: style[1] as BdaAppearanceStyleGroup }
+  if (path.slice(prefix.length).includes("/")) return
+  const panelName = path.slice(prefix.length).replace(/\.ini$/i, "")
+  if (!/\.ini$/i.test(path) || !currentBdaAppearance()?.appearance.panels.has(panelName)) return
+  return { kind: "panel", name: panelName }
+}
+
+function isBdaAppearancePartPath(path: string): boolean {
+  return Boolean(bdaAppearancePart(path))
+}
+
 function refreshSelectedBdaSource(): void {
   if (!archive || archive.format !== "bda") return
+  const part = bdaAppearancePart(selectedPath)
+  if (part) {
+    const info = currentBdaAppearance()
+    if (info) setSourceValue(decodedBdaAppearancePart(info.bytes, part))
+    return
+  }
   if (archive.isBdaConfig(selectedPath)) {
     const bytes = archive.getBytes(selectedPath)
     if (bytes) setSourceValue(decodedBdaSource(selectedPath, bytes))
@@ -1931,6 +2009,43 @@ function refreshSelectedBdaSource(): void {
   if (!isBdaVirtualTextPath(selectedPath)) return
   const info = currentBdaAppearance()
   if (info) setSourceValue(decodedBdaSource(info.path, info.bytes, selectedPath.split("/").pop()))
+}
+
+function commitBdaSourceEdit(): void {
+  if (!isEditing() || !archive) return
+  const part = bdaAppearancePart(selectedPath)
+  if (part) {
+    const info = currentBdaAppearance()
+    if (!info) return
+    try {
+      const after = applyDecodedBdaAppearancePart(info.path, info.bytes, source.value, part)
+      commitBytes(info.path, info.bytes, after)
+      refreshBdaLayout(layoutPath)
+      setSourceValue(decodedBdaAppearancePart(after, part))
+      refreshPreview()
+      populateKeyInspector()
+      updateDirty()
+    } catch (error) {
+      setSourceValue(decodedBdaAppearancePart(info.bytes, part))
+      showError(error, "编辑 appearanceConfig 片段")
+    }
+    return
+  }
+  if (!archive.isBdaConfig(selectedPath)) return
+  const before = archive.getBytes(selectedPath)
+  if (!before) return
+  try {
+    const after = applyDecodedBdaSource(selectedPath, before, source.value)
+    commitBytes(selectedPath, before, after)
+    if (/appearanceConfig$/i.test(selectedPath)) refreshBdaLayout(layoutPath)
+    setSourceValue(decodedBdaSource(selectedPath, after))
+    refreshPreview()
+    populateKeyInspector()
+    updateDirty()
+  } catch (error) {
+    setSourceValue(decodedBdaSource(selectedPath, before))
+    showError(error, "编辑 BDA JSON")
+  }
 }
 
 function bdaAvailableLayoutPaths(): string[] {
@@ -3010,6 +3125,25 @@ function bindStyleDetailColor(
 }
 
 async function renderStyleResourceDetail(): Promise<void> {
+  const appearancePart = bdaAppearancePart(selectedPath)
+  const appearanceInfo = currentBdaAppearance()
+  if (archive?.format === "bda" && appearancePart?.kind === "styles" && appearanceInfo && selectedStyleID) {
+    const type = appearancePart.group === "imageStyles" ? "image" : appearancePart.group === "textStyles" ? "text" : "color"
+    const ref: BdaStyleRef = { type, key: Number(selectedStyleID) }
+    resourceName.textContent = `STYLE ${selectedStyleID}`
+    resourceMeta.textContent = appearancePart.group
+    imageResourceDetail.hidden = true
+    styleResourceDetail.hidden = false
+    styleDetailPreviews.hidden = true
+    renderBdaStyleEditor(styleDetailFields, {
+      appearance: appearanceInfo.appearance,
+      ref,
+      resolver: visualResolver(),
+      editable: isEditing(),
+      onStyleChange: (styleRef, property, value) => { updateBdaRefs([styleRef], property, value) },
+    })
+    return
+  }
   const path = styleConfigPath()
   if (!archive?.isText(path) || !selectedStyleID) return
   const stylesDocument = IniDocument.parse(archive.getText(path))
@@ -3018,6 +3152,7 @@ async function renderStyleResourceDetail(): Promise<void> {
   resourceMeta.textContent = path
   imageResourceDetail.hidden = true
   styleResourceDetail.hidden = false
+  styleDetailPreviews.hidden = false
   const resolver = visualResolver()
   if (resolver) {
     drawVisualPreview(retinaThumbnail(styleDetailNormal, 128, 88), [await resolver.resolve(selectedStyleID, false).catch(() => undefined)], false)
@@ -3106,7 +3241,17 @@ async function renderStyleResourceDetail(): Promise<void> {
 }
 
 function selectStyleResource(styleID: string): void {
-  if (!availableStyleIDs().includes(styleID)) return
+  if (archive?.format === "bda") {
+    const part = bdaAppearancePart(selectedPath)
+    const appearance = currentBdaAppearance()?.appearance
+    if (part?.kind !== "styles" || !appearance) return
+    const styles = part.group === "imageStyles"
+      ? appearance.imageStyles
+      : part.group === "textStyles"
+        ? appearance.textStyles
+        : appearance.colorStyles
+    if (!styles.has(Number(styleID))) return
+  } else if (!availableStyleIDs().includes(styleID)) return
   selectedStyleID = styleID
   resourceListView.hidden = true
   resourceDetail.hidden = false
@@ -3140,6 +3285,10 @@ function releaseResourceURLs(): void {
 }
 
 async function renderStyleResourceGallery(): Promise<void> {
+  if (archive?.format === "bda") {
+    await renderBdaStyleResourceGallery()
+    return
+  }
   if (!archive?.isText(styleConfigPath())) return
   const query = resourceSearch.value.trim().toLowerCase()
   const stylesDocument = IniDocument.parse(archive.getText(styleConfigPath()))
@@ -3206,6 +3355,58 @@ async function renderStyleResourceGallery(): Promise<void> {
       selectGalleryItem(`STYLE${styleID}`, resourceGallery)
       selectStyleResource(styleID)
     })
+    resourceGallery.append(button)
+  }
+  if (selectedResourceGalleryPath) selectGalleryItem(selectedResourceGalleryPath, resourceGallery)
+}
+
+async function renderBdaStyleResourceGallery(): Promise<void> {
+  const info = currentBdaAppearance()
+  const part = bdaAppearancePart(selectedPath)
+  if (!info || part?.kind !== "styles") return
+  const definitions = {
+    imageStyles: { label: "图片样式", type: "image", styles: info.appearance.imageStyles },
+    textStyles: { label: "文字样式", type: "text", styles: info.appearance.textStyles },
+    colorStyles: { label: "颜色样式", type: "color", styles: info.appearance.colorStyles },
+  } as const
+  const definition = definitions[part.group]
+  const query = resourceSearch.value.trim().toLowerCase()
+  const keys = [...definition.styles.keys()].filter((key) => !query || String(key).includes(query))
+  resourceListTitle.textContent = definition.label
+  resourceSearch.placeholder = "搜索样式"
+  resourceSearch.setAttribute("aria-label", "搜索样式")
+  resourceSearchControl.setAttribute("aria-label", "搜索样式")
+  resourceCategory.hidden = true
+  resourceCount.textContent = `${keys.length} 个样式`
+  resourceUploadButton.hidden = true
+  styleAddButton.hidden = true
+  resourceDownloadButton.hidden = true
+  resourceDeleteButton.hidden = true
+  resourceListView.hidden = Boolean(selectedStyleID)
+  resourceDetail.hidden = !selectedStyleID
+  const resolver = visualResolver()
+  for (const key of keys) {
+    const ref: BdaStyleRef = { type: definition.type, key }
+    const button = document.createElement("button")
+    button.className = "resource-item style-resource-item"
+    button.dataset.path = `STYLE${key}`
+    button.title = `STYLE ${key}`
+    const previews = document.createElement("span")
+    previews.className = "resource-style-previews"
+    for (const highlighted of [false, true]) {
+      const canvas = retinaThumbnail(document.createElement("canvas"), 128, 88)
+      previews.append(canvas)
+      void resolver?.resolve(bdaStyleID(ref), highlighted)
+        .then((visual) => { if (canvas.isConnected) drawVisualPreview(canvas, [visual], false) })
+        .catch(() => {})
+    }
+    const name = document.createElement("strong")
+    name.textContent = `STYLE ${key}`
+    const meta = document.createElement("small")
+    meta.textContent = definition.label
+    button.append(previews, name, meta)
+    button.addEventListener("click", () => selectGalleryItem(`STYLE${key}`, resourceGallery))
+    button.addEventListener("dblclick", () => selectStyleResource(String(key)))
     resourceGallery.append(button)
   }
   if (selectedResourceGalleryPath) selectGalleryItem(selectedResourceGalleryPath, resourceGallery)
@@ -3401,7 +3602,10 @@ function updateInspectorView(): void {
     files.querySelector(`.sidebar-overview button[data-path="${CSS.escape(selectedPath)}"]`),
   )
   const propertiesAvailable = Boolean(
-    selectedPath && (archive?.isText(selectedPath) || archive?.isBdaConfig(selectedPath) || isBdaLayoutPath(selectedPath)) && overviewSelected && !imageSelected,
+    selectedPath && (
+      archive?.isText(selectedPath) || archive?.isBdaConfig(selectedPath) || isBdaLayoutPath(selectedPath) ||
+      bdaAppearancePart(selectedPath)
+    ) && overviewSelected && !imageSelected,
   )
   for (const button of inspectorTabButtons) {
     const tab = button.dataset.inspectorTab
@@ -3432,29 +3636,68 @@ function updateInspectorView(): void {
   asset.hidden = true
   quickInspector.hidden = inspectorTab !== "properties" || !propertiesAvailable
   sourceEditor.hidden = inspectorTab !== "source"
-  if (!sourceEditor.hidden) requestAnimationFrame(scrollSelectedSource)
+  if (!sourceEditor.hidden) requestAnimationFrame(() => {
+    source.requestMeasure()
+    scrollSelectedSource()
+    updateSourceHighlight()
+  })
+}
+
+const SOURCE_SEARCH_HIGHLIGHT_LIMIT = 20_000
+
+function scheduleSourceInputHighlight(refreshInspector = false): void {
+  sourceInputRefreshPending ||= refreshInspector
+  if (sourceInputHighlightTimer !== undefined) window.clearTimeout(sourceInputHighlightTimer)
+  sourceInputHighlightTimer = window.setTimeout(() => {
+    sourceInputHighlightTimer = undefined
+    updateSourceHighlight()
+  }, 100)
+}
+
+function scheduleSourceSearch(): void {
+  if (sourceSearchTimer !== undefined) window.clearTimeout(sourceSearchTimer)
+  sourceSearchTimer = window.setTimeout(() => {
+    sourceSearchTimer = undefined
+    updateSourceHighlight()
+  }, 80)
 }
 
 function updateSourceHighlight(): void {
+  if (sourceSearchTimer !== undefined) window.clearTimeout(sourceSearchTimer)
+  sourceSearchTimer = undefined
+  if (sourceInputHighlightTimer !== undefined) window.clearTimeout(sourceInputHighlightTimer)
+  sourceInputHighlightTimer = undefined
+  if (sourceInputRefreshPending) {
+    sourceInputRefreshPending = false
+    refreshPreview()
+    populateKeyInspector()
+  }
   const sections = selectedSourceSections()
   const query = sourceSearch.value.trim()
-  const highlighted = archive?.format === "bda" && (archive.isBdaConfig(selectedPath) || isBdaVirtualTextPath(selectedPath))
-    ? highlightJson(source.value, query, sourceSearchIndex)
-    : highlightIni(source.value, sections, sections.length ? undefined : sourceHistoryHighlight, query, sourceSearchIndex)
-  sourceHighlight.innerHTML = `${highlighted}\n`
-  sourceLineNumbers.textContent = Array.from(
-    { length: source.value.split(/\r\n|\n|\r/).length },
-    (_, index) => String(index + 1),
-  ).join("\n")
-  updateSourceSearchStatus()
+  const bdaSource = Boolean(archive?.format === "bda" && (
+    archive.isBdaConfig(selectedPath) || isBdaVirtualTextPath(selectedPath) || isBdaAppearancePartPath(selectedPath)
+  ))
+  source.setLanguage(bdaSource ? "json" : "ini")
+  const matches = sourceSearchMatches()
+  updateSourceSearchStatus(matches)
+  const selectedRanges = bdaSource
+    ? jsonPropertyRanges(source.value, selectedBdaSourceKeys())
+    : sections.length ? iniSectionRanges(source.value, sections) : sourceHistoryHighlight ? [sourceHistoryHighlight] : []
+  const searchRanges = matches.slice(0, SOURCE_SEARCH_HIGHLIGHT_LIMIT)
+    .map((start) => [start, start + query.length] as const)
+  const activeStart = matches[sourceSearchIndex]
+  source.setDecorations({
+    selectedRanges,
+    searchRanges,
+    activeSearchRange: activeStart === undefined ? undefined : [activeStart, activeStart + query.length],
+  })
 }
 
 function sourceSearchMatches(): number[] {
   return findTextMatches(source.value, sourceSearch.value.trim())
 }
 
-function updateSourceSearchStatus(): void {
-  const matches = sourceSearchMatches()
+function updateSourceSearchStatus(matches = sourceSearchMatches()): void {
   if (sourceSearchIndex >= matches.length) sourceSearchIndex = -1
   sourceSearchCount.textContent = sourceSearch.value.trim()
     ? `${sourceSearchIndex < 0 ? 0 : sourceSearchIndex + 1}/${matches.length}`
@@ -3462,13 +3705,6 @@ function updateSourceSearchStatus(): void {
   sourceSearchPrevious.disabled = sourceSearchNext.disabled = !matches.length
   const replaceable = Boolean(matches.length) && !source.disabled && !source.readOnly
   sourceReplacement.disabled = sourceReplace.disabled = sourceReplaceAll.disabled = !replaceable
-}
-
-function syncSourceScroll(): void {
-  const highlight = $("#source-highlight")
-  highlight.scrollTop = source.scrollTop
-  highlight.scrollLeft = source.scrollLeft
-  sourceLineNumbers.scrollTop = source.scrollTop
 }
 
 function findSourceMatch(direction: 1 | -1): void {
@@ -3483,12 +3719,7 @@ function findSourceMatch(direction: 1 | -1): void {
     : (sourceSearchIndex + direction + matches.length) % matches.length
   const start = matches[sourceSearchIndex]
   source.setSelectionRange(start, start + sourceSearch.value.trim().length)
-  const line = source.value.slice(0, start).split(/\r\n|\n|\r/).length - 1
-  const style = getComputedStyle(source)
-  const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.6
-  source.scrollTop = Math.max(0, line * lineHeight - source.clientHeight / 3)
   updateSourceHighlight()
-  syncSourceScroll()
 }
 
 function replaceSourceMatches(replaceAll: boolean): void {
@@ -3499,6 +3730,7 @@ function replaceSourceMatches(replaceAll: boolean): void {
   source.value = replaceTextMatches(source.value, query, sourceReplacement.value, replaceAll ? undefined : index)
   sourceSearchIndex = replaceAll ? -1 : index
   source.dispatchEvent(new Event("input", { bubbles: true }))
+  if (archive?.isBdaConfig(selectedPath) || isBdaAppearancePartPath(selectedPath)) commitBdaSourceEdit()
   if (!replaceAll) findSourceMatch(1)
 }
 
@@ -3531,18 +3763,10 @@ function effectiveKeyValue(section: string, key: string): string | undefined {
 function scrollSelectedSource(): void {
   const sections = selectedSourceSections()
   if (sourceEditor.hidden || !sections.length && !sourceHistoryHighlight) return
-  const selected = new Set(sections)
-  const line = sections.length
-    ? source.value.split(/\r\n|\n|\r/).findIndex((value) => {
-      const section = value.match(/^\s*\[([^\]]+)]\s*$/)?.[1]
-      return Boolean(section && selected.has(section))
-    })
-    : source.value.slice(0, sourceHistoryHighlight?.[0]).split(/\r\n|\n|\r/).length - 1
-  if (line < 0) return
-  const style = getComputedStyle(source)
-  const lineHeight = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.6
-  source.scrollTop = Math.max(0, line * lineHeight - source.clientHeight / 3)
-  syncSourceScroll()
+  const bdaRange = jsonPropertyRanges(source.value, selectedBdaSourceKeys())[0]
+  const iniRange = iniSectionRanges(source.value, sections)[0]
+  const range = bdaRange ?? iniRange ?? sourceHistoryHighlight
+  if (range) source.revealRange(range[0], range[1])
 }
 
 function setSourceValue(text: string): void {
@@ -4508,21 +4732,27 @@ function populateDocumentInspector(): void {
   documentFieldsGroup.dataset.path = selectedPath
 }
 
-function selectedBdaKeys(appearance: BdaAppearance): Array<{ name: string; key: BdaKey }> {
+function selectedBdaKeyNames(): string[] {
   if (!layoutDocument || !selectedKeySections.length) return []
+  return [...new Set(selectedKeySections.flatMap((section) => {
+    const effective = effectiveKeySection(section)
+    return [layoutDocument?.get(effective, "CENTER"), layoutDocument?.get(section, "CENTER"), layoutDocument?.get(section, "DOWN")]
+      .filter((value): value is string => Boolean(value))
+      .map(bdaPanelKeyName)
+  }))]
+}
+
+function selectedBdaKeys(appearance: BdaAppearance): Array<{ name: string; key: BdaKey }> {
   const panel = appearance.panels.get(layoutPath.split("/").pop()?.replace(/\.ini$/i, "") ?? "")
   if (!panel) return []
-  const found = selectedKeySections.flatMap((section) => {
-    const effective = effectiveKeySection(section)
-    const actions = [layoutDocument?.get(effective, "CENTER"), layoutDocument?.get(section, "CENTER"), layoutDocument?.get(section, "DOWN")]
-      .filter((value): value is string => Boolean(value))
-    return actions.flatMap((action) => {
-      const name = bdaPanelKeyName(action)
-      const key = panel.keys.get(name)
-      return key ? [{ name, key }] : []
-    })
+  return selectedBdaKeyNames().flatMap((name) => {
+    const key = panel.keys.get(name)
+    return key ? [{ name, key }] : []
   })
-  return [...new Map(found.map((item) => [item.name, item])).values()]
+}
+
+function selectedBdaSourceKeys(): string[] {
+  return isBdaLayoutPath(selectedPath) ? selectedBdaKeyNames() : []
 }
 
 function populateBdaConfigInspector(): void {
@@ -4550,7 +4780,7 @@ function populateBdaConfigInspector(): void {
     })
     return
   }
-  if (isBdaLayoutPath(selectedPath) && info) {
+  if (bdaAppearancePart(selectedPath)?.kind === "panel" && info) {
     bdaConfigFieldsGroup.hidden = false
     renderBdaLayoutEditor(bdaConfigFields, {
       appearance: info.appearance,
@@ -4595,8 +4825,9 @@ function addNavButton(
   className: string,
   icon?: string,
   navMode = className === "nav-resource" ? "resource" : "document",
+  meta = path.split("/").pop() ?? path,
 ): void {
-  if (!archive?.names().includes(path) && !isBdaVirtualTextPath(path)) return
+  if (!archive?.names().includes(path) && !isBdaVirtualTextPath(path) && !isBdaAppearancePartPath(path)) return
   const button = document.createElement("button")
   button.className = `nav-item ${className}`
   button.dataset.path = path
@@ -4615,7 +4846,7 @@ function addNavButton(
   button.append(labelNode)
   const metaNode = document.createElement("span")
   metaNode.className = "nav-meta"
-  metaNode.textContent = path.split("/").pop() ?? path
+  metaNode.textContent = meta
   button.append(metaNode)
   button.addEventListener("click", () => {
     if (path.endsWith("py_9.ini") || path.endsWith("py_26.ini")) {
@@ -5738,6 +5969,7 @@ function selectFile(
   resourceMode: "document" | "image" | "style" | "sound" = "document",
   preserveInspectorView = false,
 ): void {
+  if (path !== selectedPath) source.commit()
   const previousInspectorTab = inspectorTab
   const preserveCurrentInspectorView = preserveInspectorView || path === selectedPath
   if (path !== selectedPath) sourceHistoryHighlight = undefined
@@ -5773,8 +6005,30 @@ function selectFile(
     selectedKeySections = []
     preview.setSelected([])
   }
-  if (isBdaVirtualTextPath(path)) {
+  const appearancePart = bdaAppearancePart(path)
+  if (appearancePart) {
     hideImageWorkspace()
+    const info = currentBdaAppearance()
+    if (!info) return
+    const basePath = bdaBasePath(path)
+    const base = appearancePart.kind === "panel" && bdaBase?.isText(basePath)
+      ? IniDocument.parse(bdaBase.getText(basePath))
+      : undefined
+    const previewLayout = Boolean(base && previewItems(base).some((item) => item.editable))
+    if (previewLayout && !refreshBdaLayout(path)) return
+    selectedDocument = previewLayout ? layoutDocument : undefined
+    if (previewLayout) {
+      selectedKeySections = []
+      preview.setSelected([])
+    }
+    setSourceValue(decodedBdaAppearancePart(info.bytes, appearancePart))
+    source.disabled = false
+    const partName = appearancePart.kind === "panel" ? appearancePart.name : appearancePart.group
+    sourceName.textContent = `${info.path} · ${partName} · 解码源码`
+    inspectorTab = "properties"
+  } else if (isBdaVirtualTextPath(path)) {
+    hideImageWorkspace()
+    const panelName = path.split("/").pop()?.replace(/\.ini$/i, "") ?? path
     const base = IniDocument.parse(bdaBase!.getText(bdaBasePath(path)))
     const previewLayout = isBdaLayoutPath(path) && previewItems(base).some((item) => item.editable)
     if (previewLayout && !refreshBdaLayout(path)) return
@@ -5784,9 +6038,9 @@ function selectFile(
       preview.setSelected([])
     }
     const info = currentBdaAppearance()
-    setSourceValue(info ? decodedBdaSource(info.path, info.bytes, path.split("/").pop()) : "{}")
+    setSourceValue(info ? decodedBdaSource(info.path, info.bytes, panelName) : "{}")
     source.disabled = true
-    sourceName.textContent = info ? `${info.path} · ${path.split("/").pop()} · 解码源码` : path
+    sourceName.textContent = info ? `${info.path} · ${panelName} · 解码源码` : panelName
     inspectorTab = "properties"
   } else if (archive?.isImage(path)) {
     inspectorTab = "properties"
@@ -5817,7 +6071,7 @@ function selectFile(
     hideImageWorkspace()
     selectedDocument = undefined
     setSourceValue(decodedBdaSource(path, archive.getBytes(path)!))
-    source.disabled = true
+    source.disabled = false
     sourceName.textContent = `${path} · 解码源码`
     inspectorTab = "properties"
   } else {
@@ -5827,7 +6081,9 @@ function selectFile(
     layoutDocument = selectedDocument
     refreshPreview()
   }
-  if (preferredSidebarView === "source" && (archive?.isText(path) || archive?.isBdaConfig(path))) {
+  if (preferredSidebarView === "source" && (
+    archive?.isText(path) || archive?.isBdaConfig(path) || isBdaAppearancePartPath(path)
+  )) {
     inspectorTab = "source"
   }
   if (preserveCurrentInspectorView) inspectorTab = previousInspectorTab
@@ -5915,14 +6171,36 @@ function renderFiles(): void {
     return body
   }
 
-  type NavEntry = { group: string; label: string; path: string; className: string; icon: string; navMode?: string }
+  type NavEntry = {
+    group: string
+    label: string
+    path: string
+    className: string
+    icon: string
+    navMode?: string
+    meta?: string
+  }
   const entries: NavEntry[] = []
+  const bdaConfigGroups = [
+    ["animation", "动画效果", "动画配置", "sparkles"],
+    ["lightAnimation", "轻量动画", "轻量动画", "sparkles"],
+    ["sound", "按键音效", "声音配置", "speaker.wave.2"],
+    ["switch", "开关配置", "开关配置", "gearshape"],
+    ["sticker", "贴纸配置", "贴纸配置", "photo"],
+    ["scene", "场景配置", "场景配置", "gearshape"],
+  ] as const
   const overviewPath = archive.names().includes(`${theme.value}/skin/Info.txt`)
     ? `${theme.value}/skin/Info.txt`
     : "Info.txt"
-  entries.push({ group: "皮肤", label: "皮肤信息", path: overviewPath, className: "nav-overview", icon: "info.circle" })
+  entries.push({
+    group: archive.format === "bda" ? "皮肤信息" : "皮肤",
+    label: "皮肤信息",
+    path: overviewPath,
+    className: "nav-overview",
+    icon: "info.circle",
+  })
   if (archive.format === "bda") {
-    entries.push({ group: "皮肤", label: "效果预览", path: `${theme.value}/skin/demo.png`, className: "nav-overview", icon: "photo" })
+    entries.push({ group: "皮肤信息", label: "效果预览", path: `${theme.value}/skin/demo.png`, className: "nav-overview", icon: "photo" })
   }
 
   const iniTypes: Record<string, Omit<NavEntry, "path">> = {
@@ -5938,10 +6216,21 @@ function renderFiles(): void {
     "num2.ini": { group: "数字与符号", label: "数字键盘 2", className: "nav-component", icon: "square.grid.2x2" },
     "symbol.ini": { group: "数字与符号", label: "符号面板", className: "nav-component", icon: "asterisk" },
     "sym_26_cn.ini": { group: "数字与符号", label: "中文 26 键符号", className: "nav-component", icon: "asterisk" },
+    "sym_26_en.ini": { group: "数字与符号", label: "英文 26 键符号", className: "nav-component", icon: "asterisk" },
     "hw_grid.ini": { group: "手写与选择", label: "手写面板", className: "nav-component", icon: "pencil" },
     "hw_full.ini": { group: "手写与选择", label: "全屏手写", className: "nav-component", icon: "pencil" },
     "sel_ch.ini": { group: "手写与选择", label: "中文选择栏", className: "nav-component", icon: "list.bullet" },
     "sel_en.ini": { group: "手写与选择", label: "英文选择栏", className: "nav-component", icon: "list.bullet" },
+    "voice.ini": { group: "键盘组件", label: "语音键盘", className: "nav-component", icon: "keyboard" },
+    "dial.ini": { group: "键盘布局", label: "拨号键盘", className: "nav-layout", icon: "keyboard" },
+    "email.ini": { group: "键盘布局", label: "邮箱键盘", className: "nav-layout", icon: "keyboard" },
+    "net.ini": { group: "键盘布局", label: "网络键盘", className: "nav-layout", icon: "keyboard" },
+    "net_shifts.ini": { group: "键盘布局", label: "网络键盘 Shift", className: "nav-layout", icon: "keyboard" },
+    "sel_ch_h.ini": { group: "手写与选择", label: "中文选择栏（加高）", className: "nav-component", icon: "list.bullet" },
+    "sel_en_h.ini": { group: "手写与选择", label: "英文选择栏（加高）", className: "nav-component", icon: "list.bullet" },
+    "sym_26_cn_h.ini": { group: "数字与符号", label: "中文 26 键符号（加高）", className: "nav-component", icon: "asterisk" },
+    "sym_26_en_h.ini": { group: "数字与符号", label: "英文 26 键符号（加高）", className: "nav-component", icon: "asterisk" },
+    "symbol_h.ini": { group: "数字与符号", label: "符号面板（加高）", className: "nav-component", icon: "asterisk" },
     "help.ini": { group: "手写与选择", label: "帮助面板", className: "nav-component", icon: "list.bullet" },
     "logo.ini": { group: "键盘组件", label: "输入法标识", className: "nav-component", icon: "app" },
     "gen.ini": { group: "资源配置", label: "通用配置", className: "nav-style", icon: "gearshape" },
@@ -5949,11 +6238,56 @@ function renderFiles(): void {
   const hiddenLayouts = new Set(["def_9.ini", "def_26.ini"])
   const configPrefix = `${theme.value}/skin/${orientation.value}/`
   const appearancePath = bdaAppearancePath(archive, theme.value, orientation.value)
-  const layoutPaths = archive.format === "bda"
-    ? bdaAvailableLayoutPaths()
-    : archive.names()
+  const appearanceBytes = appearancePath && archive.getBytes(appearancePath)
+  const appearance = appearanceBytes ? decodeBdaAppearance(appearanceBytes) : undefined
+  if (archive.format === "bda" && appearance) {
+    for (const panelName of appearance.panels.keys()) {
+      const name = `${panelName}.ini`
+      if (hiddenLayouts.has(name)) continue
+      const info = iniTypes[name] ?? {
+        group: "面板样式",
+        label: panelName.replaceAll("_", " "),
+        className: "nav-layout",
+        icon: "keyboard",
+      }
+      entries.push({
+        ...info,
+        group: "面板样式",
+        path: `${configPrefix}${name}`,
+        meta: panelName,
+      })
+    }
+    for (const [group, section, label, icon] of bdaAppearanceStyleGroups) {
+      entries.push({
+        group: section,
+        label,
+        path: bdaAppearanceStylePath(group),
+        className: "nav-style",
+        icon,
+        navMode: "style",
+        meta: group,
+      })
+    }
+    entries.push({
+      group: "资源配置",
+      label: "图片资源",
+      path: appearancePath!,
+      className: "nav-resource",
+      icon: "photo",
+      navMode: "resource",
+    })
+    entries.push({
+      group: "资源配置",
+      label: "声音资源",
+      path: appearancePath!,
+      className: "nav-resource",
+      icon: "speaker.wave.2",
+      navMode: "sound",
+    })
+  }
+  const layoutPaths = archive.format === "bda" ? [] : archive.names()
   for (const path of layoutPaths.sort()) {
-    const basePath = archive.format === "bda" ? bdaBasePath(path) : path
+    const basePath = path
     if (!path.startsWith(configPrefix) || path.slice(configPrefix.length).includes("/") || !/\.ini$/i.test(path)) continue
     if (archive.format === "bda" && !bdaBase?.isText(basePath)) continue
     const name = path.split("/").pop() ?? path
@@ -5964,7 +6298,11 @@ function renderFiles(): void {
       className: "nav-layout",
       icon: "keyboard",
     }
-    entries.push({ ...info, path })
+    entries.push({
+      ...info,
+      group: info.group,
+      path,
+    })
   }
 
   const candidatePath = archive.format === "bda" ? undefined : toolbarConfigPath()
@@ -5972,39 +6310,42 @@ function renderFiles(): void {
   const hintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
   if (hintPath) entries.push({ group: "键盘组件", label: "按键气泡", path: hintPath, className: "nav-component", icon: "rectangle.and.hand.point" })
   const stylePath = appearancePath ?? (archive.format === "bda" ? undefined : styleConfigPath())
-  if (stylePath) {
-    entries.push({ group: "资源配置", label: "图片资源", path: stylePath, className: "nav-resource", icon: "photo", navMode: "resource" })
-    if (archive.format !== "bda") {
-      entries.push({ group: "资源配置", label: "样式配置", path: stylePath, className: "nav-style", icon: "paintpalette", navMode: "style" })
-      entries.push({ group: "资源配置", label: "按键音效", path: stylePath, className: "nav-resource", icon: "speaker.wave.2", navMode: "sound" })
-    }
+  if (stylePath && archive.format !== "bda") {
+    entries.push({
+      group: "资源配置",
+      label: "图片资源",
+      path: stylePath,
+      className: "nav-resource",
+      icon: "photo",
+      navMode: "resource",
+    })
+    entries.push({ group: "资源配置", label: "样式配置", path: stylePath, className: "nav-style", icon: "paintpalette", navMode: "style" })
+    entries.push({ group: "资源配置", label: "按键音效", path: stylePath, className: "nav-resource", icon: "speaker.wave.2", navMode: "sound" })
   }
   const legacyAnimationPath = archive.format === "bda" ? undefined : legacyAnimationConfigPath()
   if (legacyAnimationPath) {
     entries.push({ group: "资源配置", label: "粒子动效", path: legacyAnimationPath, className: "nav-style", icon: "sparkles" })
   }
   if (archive.format === "bda") {
-    for (const [kind, label] of [
-      ["animation", "动画配置"],
-      ["lightAnimation", "轻量动画"],
-      ["sound", "声音配置"],
-      ["switch", "开关配置"],
-    ] as const) {
+    for (const [kind, group, label, icon] of bdaConfigGroups) {
       const paths = bdaConfigPaths(archive, theme.value, orientation.value, kind)
       for (const path of paths) entries.push({
-        group: "扩展配置",
+        group,
         label: paths.length > 1 ? `${label} · ${path.split("/").pop()}` : label,
         path,
         className: kind === "sound" ? "nav-resource" : "nav-style",
-        icon: kind === "sound" ? "speaker.wave.2" : "gearshape",
+        icon,
         navMode: kind === "sound" ? "sound" : undefined,
       })
     }
   }
-  for (const group of ["皮肤", "资源配置", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "扩展配置", "扩展布局"]) {
+  const groups = archive.format === "bda"
+    ? ["皮肤信息", "样式配置", "资源配置", "面板样式", "动画效果", "按键音效", "轻量动画", "开关配置", "贴纸配置", "场景配置"]
+    : ["皮肤", "资源配置", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "扩展配置", "扩展布局"]
+  for (const group of groups) {
     const grouped = entries.filter((entry) => entry.group === group && (
       archive?.names().includes(entry.path) ||
-      archive?.format === "bda" && Boolean(bdaBase?.isText(bdaBasePath(entry.path)))
+      archive?.format === "bda" && (isBdaAppearancePartPath(entry.path) || Boolean(bdaBase?.isText(bdaBasePath(entry.path))))
     ))
     if (group === "键盘布局") {
       const layoutRank: Record<string, number> = { "py_9.ini": 0, "py_26.ini": 1, "bh.ini": 3 }
@@ -6014,9 +6355,37 @@ function renderFiles(): void {
         return (layoutRank[aName] ?? 2) - (layoutRank[bName] ?? 2)
       })
     }
+    if (archive.format === "bda" && group === "面板样式") {
+      const bdaLayoutRank: Record<string, number> = {
+        "py_9": 0,
+        "py_26": 1,
+        "en_26": 2,
+        "en_26s": 3,
+        "en_9": 4,
+        "en_9s": 5,
+        "num_9": 6,
+        "num_26": 7,
+        "symbol": 8,
+        "sym_26_cn": 9,
+        "sym_26_en": 10,
+        "hw_grid": 11,
+        "hw_full": 12,
+        "bh": 13,
+        "sel_ch": 14,
+        "sel_en": 15,
+        "voice": 16,
+      }
+      grouped.sort((a, b) => {
+        const aName = a.meta ?? ""
+        const bName = b.meta ?? ""
+        return (bdaLayoutRank[aName] ?? 100) - (bdaLayoutRank[bName] ?? 100) || aName.localeCompare(bName)
+      })
+    }
     if (!grouped.length) continue
     const body = section(group)
-    for (const entry of grouped) addNavButton(body, entry.label, entry.path, entry.className, entry.icon, entry.navMode)
+    for (const entry of grouped) {
+      addNavButton(body, entry.label, entry.path, entry.className, entry.icon, entry.navMode, entry.meta)
+    }
   }
   const availableMobileGroups = Array.from(mobileGroups.querySelectorAll<HTMLButtonElement>("button"))
   if (!availableMobileGroups.some((button) => button.dataset.overviewGroup === mobileOverviewGroup)) {
@@ -6391,7 +6760,8 @@ async function loadSourceWorkspace(path: string): Promise<boolean> {
       ? `${directoryName}/`
       : ""
     const name = decodedPath.split(/[\\/]/).filter(Boolean).pop() || "皮肤源码"
-    await loadArchive(decodeBase64Archive(encoded), "", false, path, name, sourcePrefix)
+    const packed = SkinArchive.open(decodeBase64Archive(encoded))
+    await loadArchive(sourceArchiveFromFiles(packed.sourceFiles()).toBytes(), "", false, path, name, sourcePrefix)
     return true
   }
   const files = await invoke<SourceReadFilePayload[]>("open_source_workspace", { path })
@@ -6412,7 +6782,7 @@ async function loadSourceWorkspace(path: string): Promise<boolean> {
       data: new Uint8Array(file.data),
     }))
   if (!sourceFiles.length) throw new Error("源码文件夹为空")
-  const sourceArchive = SkinArchive.fromSourceFiles(sourceFiles)
+  const sourceArchive = sourceArchiveFromFiles(sourceFiles)
   const name = path.split(/[\\/]/).pop() || "皮肤源码"
   await loadArchive(sourceArchive.toBytes(), "", false, path, name, sourcePrefix)
   return true
@@ -7131,6 +7501,10 @@ imageOpen.addEventListener("change", async () => {
 })
 source.addEventListener("input", () => {
   if (!isEditing() || !archive || !selectedPath) return
+  if (archive.isBdaConfig(selectedPath) || isBdaAppearancePartPath(selectedPath)) {
+    scheduleSourceInputHighlight()
+    return
+  }
   if (resourceConfigActive && selectedResourcePath) {
     const before = tileDocument.toString()
     tileDocument = IniDocument.parse(source.value)
@@ -7140,24 +7514,20 @@ source.addEventListener("input", () => {
     populateTileInspector()
     drawAtlas()
     updateDirty()
-    updateSourceHighlight()
+    scheduleSourceInputHighlight()
     return
   }
   const before = selectedDocument?.toString() ?? archive.getText(selectedPath)
   selectedDocument = IniDocument.parse(source.value)
   commitText(selectedPath, before, source.value)
   if (selectedPath === layoutPath) layoutDocument = selectedDocument
-  refreshPreview()
-  populateKeyInspector()
   updateDirty()
-  updateSourceHighlight()
+  scheduleSourceInputHighlight(true)
 })
-source.addEventListener("scroll", () => {
-  syncSourceScroll()
-})
+source.addEventListener("change", commitBdaSourceEdit)
 sourceSearch.addEventListener("input", () => {
-  sourceSearchIndex = -1
-  findSourceMatch(1)
+  sourceSearchIndex = sourceSearch.value.trim() ? 0 : -1
+  scheduleSourceSearch()
 })
 sourceSearch.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return
@@ -7566,7 +7936,7 @@ async function applyLayoutImage(): Promise<void> {
     }
     const base = nextResourceBase()
     const plan = planLayoutImage(layoutImageTarget, [], IniDocument.parse(""), candidateRect.width, candidateRect.height)
-    const tilesDoc = layoutImageTileDocument(plan)
+    const tilesBytes = layoutImageTileBytes(plan)
     const stylesDoc = IniDocument.parse(styles.toString())
     const candDoc = IniDocument.parse(cand.toString())
     applyCandidateImageStyles(stylesDoc, candDoc, plan, base.split("/").pop()!)
@@ -7575,7 +7945,7 @@ async function applyLayoutImage(): Promise<void> {
     const stylePath = styleConfigPath()
     commitBatch([
       { kind: "bytes", path: pngPath, before: archive.getBytes(pngPath) ?? new Uint8Array(0), after: layoutImageBytes },
-      { kind: "bytes", path: tilPath, before: archive.getBytes(tilPath) ?? new Uint8Array(0), after: new TextEncoder().encode(tilesDoc.toString()) },
+      { kind: "bytes", path: tilPath, before: archive.getBytes(tilPath) ?? new Uint8Array(0), after: tilesBytes },
       { kind: "text", path: candPath, before: cand.toString(), after: candDoc.toString() },
       { kind: "text", path: stylePath, before: styles.toString(), after: stylesDoc.toString() },
     ])
@@ -7647,7 +8017,7 @@ async function applyLayoutImage(): Promise<void> {
     sourceHeight = scan.height
   }
   const base = nextResourceBase()
-  const tilesDoc = layoutImageTileDocument(plan)
+  const tilesBytes = layoutImageTileBytes(plan)
   const stylesDoc = IniDocument.parse(styles.toString())
   if (layoutImageConfig === "layout-follows-image" && layoutImageTarget !== "panel") {
     // 布局跟随图片：把按键矩形与面板尺寸改写为图片网格
@@ -7660,7 +8030,7 @@ async function applyLayoutImage(): Promise<void> {
   const stylePath = styleConfigPath()
   commitBatch([
     { kind: "bytes", path: pngPath, before: archive.getBytes(pngPath) ?? new Uint8Array(0), after: layoutImageBytes },
-    { kind: "bytes", path: tilPath, before: archive.getBytes(tilPath) ?? new Uint8Array(0), after: new TextEncoder().encode(tilesDoc.toString()) },
+    { kind: "bytes", path: tilPath, before: archive.getBytes(tilPath) ?? new Uint8Array(0), after: tilesBytes },
     { kind: "text", path: targetPath, before: layout.toString(), after: layoutDoc.toString() },
     { kind: "text", path: stylePath, before: styles.toString(), after: stylesDoc.toString() },
   ])

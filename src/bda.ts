@@ -163,6 +163,10 @@ export type BdaAppearance = {
   gamePanel?: BdaGamePanel
   dragBar?: BdaBar
 }
+export type BdaAppearanceStyleGroup = "imageStyles" | "textStyles" | "colorStyles"
+export type BdaAppearancePart =
+  | { kind: "panel"; name: string }
+  | { kind: "styles"; group: BdaAppearanceStyleGroup }
 export type BdaAnimationFrame = { resourceID?: string; duration?: number }
 export type BdaAnimationSequence = { name: string; frames: BdaAnimationFrame[] }
 export type BdaAnimationKind = "group" | "alpha" | "scale" | "shift" | "rotate" | "frame" | "image" | "emitter" | "lottie" | "video"
@@ -256,7 +260,14 @@ export type BdaSoundConfig = {
   keySounds: Map<string, BdaResource>
   iosKeySounds: Map<string, BdaResource>
 }
-export type BdaConfigKind = "appearance" | "animation" | "lightAnimation" | "sound" | "switch"
+export type BdaConfigKind =
+  | "appearance"
+  | "animation"
+  | "lightAnimation"
+  | "sound"
+  | "switch"
+  | "sticker"
+  | "scene"
 
 const STYLE_BASE = { image: 1_000_000, color: 2_000_000, text: 3_000_000 } as const
 
@@ -1289,6 +1300,23 @@ function updateMapValue(
   return join([bytes.slice(0, field.start), encodedField(fieldNumber, 2, entry), bytes.slice(field.end)])
 }
 
+function updateStringMapValue(
+  bytes: Uint8Array,
+  fieldNumber: number,
+  key: string,
+  update: (value: Uint8Array) => Uint8Array,
+): Uint8Array {
+  const field = rawFields(bytes).find((item) => {
+    if (item.number !== fieldNumber || !item.bytes) return false
+    return rawString(rawFields(item.bytes).find((entry) => entry.number === 1)) === key
+  })
+  if (!field?.bytes) throw new Error(`BDA 配置项不存在：${key}`)
+  const entryValue = rawFields(field.bytes).find((item) => item.number === 2)?.bytes
+  if (!entryValue) throw new Error(`BDA 配置项缺少值：${key}`)
+  const entry = replaceField(field.bytes, 2, 2, update(entryValue))
+  return join([bytes.slice(0, field.start), encodedField(fieldNumber, 2, entry), bytes.slice(field.end)])
+}
+
 function rawString(field: RawField | undefined): string {
   if (!field?.bytes) return ""
   try {
@@ -1493,16 +1521,39 @@ function decodedAppearanceSource(appearance: BdaAppearance, panelName?: string):
   }
 }
 
-function genericBdaSource(bytes: Uint8Array): unknown[] {
-  return fields(bytes).map((field) => ({
-    field: field.number,
-    wire: field.wire,
-    value: field.varint ?? field.fixed32 ?? (
-      field.bytes
-        ? string(field) || `<${field.bytes.length} bytes>`
-        : undefined
-    ),
-  }))
+function genericBdaSource(bytes: Uint8Array, compact = false): unknown[] {
+  const hex = (value: Uint8Array) => Array.from(value, (byte) => byte.toString(16).padStart(2, "0")).join("")
+  const decode = (value: Uint8Array, depth: number): unknown[] => rawFields(value).map((field) => {
+    const source: Record<string, unknown> = {
+      field: field.number,
+      wire: field.wire,
+    }
+    if (depth === 0) source.encodedHex = hex(value.slice(field.start, field.end))
+    if (field.wire === 0) source.value = field.varint
+    else if (field.wire === 1) source.valueHex = hex(value.slice(field.payloadStart, field.payloadEnd))
+    else if (field.wire === 5) source.value = new DataView(
+      value.buffer,
+      value.byteOffset + field.payloadStart,
+      4,
+    ).getFloat32(0, true)
+    else if (field.bytes) {
+      source.byteLength = field.bytes.length
+      if (compact) return source
+      const text = rawString(field)
+      if (text && !/[\u0000-\u0008\u000e-\u001f]/.test(text)) source.text = text
+      if (depth < 16 && !source.text && field.bytes.length) {
+        try {
+          const children = decode(field.bytes, depth + 1)
+          if (children.length) source.fields = children
+        } catch {
+          // Arbitrary resources can use the same length-delimited wire type as nested messages.
+        }
+      }
+      if (!source.text && !source.fields) source.payloadHex = hex(field.bytes)
+    }
+    return source
+  })
+  return decode(bytes, 0)
 }
 
 export function decodedBdaSource(path: string, bytes: Uint8Array, panelName?: string): string {
@@ -1529,7 +1580,317 @@ export function decodedBdaSource(path: string, bytes: Uint8Array, panelName?: st
   } else {
     value = { fields: genericBdaSource(bytes) }
   }
+  const object = jsonObject(value)
+  if (!panelName && object && !("fields" in object)) object.$protobuf = genericBdaSource(bytes, true)
   return JSON.stringify(value, null, 2)
+}
+
+export function decodedBdaAppearancePart(bytes: Uint8Array, part: BdaAppearancePart): string {
+  if (part.kind === "panel") return JSON.stringify(decodedAppearanceSource(decodeBdaAppearance(bytes), part.name), null, 2)
+  const source = decodedAppearanceSource(decodeBdaAppearance(bytes))
+  return JSON.stringify({ [part.group]: source[part.group] }, null, 2)
+}
+
+type JsonObject = Record<string, unknown>
+
+function jsonObject(value: unknown): JsonObject | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as JsonObject
+    : undefined
+}
+
+function sameJson(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right) && left.length === right.length &&
+      left.every((value, index) => sameJson(value, right[index]))
+  }
+  const leftObject = jsonObject(left)
+  const rightObject = jsonObject(right)
+  if (!leftObject || !rightObject) return false
+  const leftKeys = Object.keys(leftObject).sort()
+  const rightKeys = Object.keys(rightObject).sort()
+  return leftKeys.length === rightKeys.length && leftKeys.every((key, index) =>
+    key === rightKeys[index] && sameJson(leftObject[key], rightObject[key]))
+}
+
+type PanelPatchKind = "style" | "styleList" | "message" | "stringMap" | "boolean" | "number" | "color"
+type PanelPatchField = { field: number; kind: PanelPatchKind; schema?: PanelPatchSchema }
+type PanelPatchSchema = Record<string, PanelPatchField>
+
+const keyPatchSchema: PanelPatchSchema = {
+  backStyle: { field: 1, kind: "style" },
+  foreStyles: { field: 2, kind: "styleList" },
+  backStyleState: { field: 4, kind: "style" },
+}
+const hintPatchSchema: PanelPatchSchema = {
+  backStyle: { field: 2, kind: "style" },
+  barStyle: { field: 3, kind: "style" },
+  foreStyle: { field: 5, kind: "style" },
+  cellStyle: { field: 6, kind: "style" },
+}
+const listPatchSchema: PanelPatchSchema = {
+  backStyle: { field: 1, kind: "style" },
+  cellBackStyle: { field: 2, kind: "style" },
+  cellForeStyle: { field: 3, kind: "style" },
+  foreStyles: { field: 4, kind: "styleList" },
+}
+const inputPatchSchema: PanelPatchSchema = {
+  backStyle: { field: 1, kind: "style" },
+  textStyle: { field: 2, kind: "style" },
+}
+const gridPatchSchema: PanelPatchSchema = {
+  backStyle: { field: 1, kind: "style" },
+  cellForeStyle: { field: 2, kind: "style" },
+  cellBackStyle: { field: 3, kind: "style" },
+}
+const switchPatchSchema: PanelPatchSchema = {
+  normalBack: { field: 1, kind: "style" },
+  selectBack: { field: 2, kind: "style" },
+  normalFore: { field: 3, kind: "style" },
+  selectFore: { field: 4, kind: "style" },
+}
+const candPatchSchema: PanelPatchSchema = {
+  candBarStyle: { field: 1, kind: "style" },
+  candOnBarStyle: { field: 2, kind: "style" },
+  cellBackStyle: { field: 3, kind: "style" },
+  cellForeStyle: { field: 4, kind: "style" },
+  firstCellForeStyle: { field: 5, kind: "style" },
+  firstCellBackStyle: { field: 6, kind: "style" },
+  subCandCellForeStyle: { field: 7, kind: "style" },
+  subCandCellBackStyle: { field: 8, kind: "style" },
+  switch: { field: 9, kind: "message", schema: switchPatchSchema },
+  candKeys: { field: 10, kind: "stringMap", schema: keyPatchSchema },
+  subCandBackStyle: { field: 11, kind: "style" },
+  menuKeys: { field: 12, kind: "stringMap", schema: keyPatchSchema },
+  aiIcon: { field: 13, kind: "message", schema: keyPatchSchema },
+  accessoryBackStyle: { field: 14, kind: "style" },
+  gridLeftForeStyle: { field: 15, kind: "style" },
+  gridRightForeStyle: { field: 16, kind: "style" },
+}
+const panelPatchSchema: PanelPatchSchema = {
+  hints: { field: 1, kind: "stringMap", schema: hintPatchSchema },
+  lists: { field: 2, kind: "stringMap", schema: listPatchSchema },
+  keys: { field: 3, kind: "stringMap", schema: keyPatchSchema },
+  cand: { field: 4, kind: "message", schema: candPatchSchema },
+  input: { field: 5, kind: "message", schema: inputPatchSchema },
+  more: { field: 6, kind: "message", schema: gridPatchSchema },
+  backStyle: { field: 7, kind: "style" },
+  shouldBgBlur: { field: 8, kind: "boolean" },
+  trackColor: { field: 9, kind: "color" },
+  wholeBackStyle: { field: 10, kind: "style" },
+  shouldKeySlotting: { field: 11, kind: "boolean" },
+  inputRegionBackStyle: { field: 12, kind: "style" },
+}
+
+function patchStyleRef(bytes: Uint8Array, value: unknown): Uint8Array {
+  const ref = jsonObject(value)
+  const types = { image: 0, color: 1, text: 2 } as const
+  const type = typeof ref?.type === "string" ? types[ref.type as keyof typeof types] : undefined
+  if (type === undefined || typeof ref?.key !== "number" || !Number.isInteger(ref.key) || ref.key < 0) {
+    throw new Error("BDA 样式引用无效")
+  }
+  return replaceField(replaceField(bytes, 1, 0, encodeVarint(type)), 2, 0, encodeVarint(ref.key))
+}
+
+function replaceRepeatedMessage(bytes: Uint8Array, fieldNumber: number, index: number, payload: Uint8Array): Uint8Array {
+  const field = rawFields(bytes).filter((item) => item.number === fieldNumber)[index]
+  if (!field) throw new Error(`BDA 重复字段不存在：${fieldNumber}[${index}]`)
+  return join([bytes.slice(0, field.start), encodedField(fieldNumber, 2, payload), bytes.slice(field.end)])
+}
+
+function patchPanelMessage(bytes: Uint8Array, desired: JsonObject, current: JsonObject, schema: PanelPatchSchema): Uint8Array {
+  let output = bytes
+  for (const [property, spec] of Object.entries(schema)) {
+    const wanted = desired[property]
+    const old = current[property]
+    if (sameJson(wanted, old)) continue
+    if (wanted === undefined) throw new Error(`暂不支持删除 BDA 面板字段：${property}`)
+    if (spec.kind === "style") {
+      const original = rawFields(output).find((field) => field.number === spec.field)?.bytes ?? new Uint8Array()
+      output = replaceField(output, spec.field, 2, patchStyleRef(original, wanted))
+      continue
+    }
+    if (spec.kind === "styleList") {
+      if (!Array.isArray(wanted) || !Array.isArray(old) || wanted.length !== old.length) {
+        throw new Error(`暂不支持增删 BDA 样式引用：${property}`)
+      }
+      wanted.forEach((value, index) => {
+        if (sameJson(value, old[index])) return
+        const original = rawFields(output).filter((field) => field.number === spec.field)[index]?.bytes ?? new Uint8Array()
+        output = replaceRepeatedMessage(output, spec.field, index, patchStyleRef(original, value))
+      })
+      continue
+    }
+    if (spec.kind === "message") {
+      const wantedObject = jsonObject(wanted)
+      const oldObject = jsonObject(old) ?? {}
+      if (!wantedObject || !spec.schema) throw new Error(`BDA 面板对象无效：${property}`)
+      const original = rawFields(output).find((field) => field.number === spec.field)?.bytes ?? new Uint8Array()
+      output = replaceField(output, spec.field, 2, patchPanelMessage(original, wantedObject, oldObject, spec.schema))
+      continue
+    }
+    if (spec.kind === "stringMap") {
+      const wantedMap = jsonObject(wanted)
+      const oldMap = jsonObject(old)
+      if (!wantedMap || !oldMap || !spec.schema) throw new Error(`BDA 面板映射无效：${property}`)
+      for (const [key, wantedValue] of Object.entries(wantedMap)) {
+        const oldValue = oldMap[key]
+        if (sameJson(wantedValue, oldValue)) continue
+        const wantedObject = jsonObject(wantedValue)
+        const oldObject = jsonObject(oldValue)
+        if (!wantedObject || !oldObject) throw new Error(`暂不支持增删 BDA 面板项：${key}`)
+        output = updateStringMapValue(output, spec.field, key, (value) =>
+          patchPanelMessage(value, wantedObject, oldObject, spec.schema!))
+      }
+      continue
+    }
+    if (spec.kind === "boolean") {
+      if (typeof wanted !== "boolean") throw new Error(`BDA 布尔值无效：${property}`)
+      output = replaceField(output, spec.field, 0, encodeVarint(wanted ? 1 : 0))
+      continue
+    }
+    const numeric = spec.kind === "color"
+      ? typeof wanted === "string" ? colorValue(wanted) : NaN
+      : wanted
+    if (typeof numeric !== "number" || !Number.isInteger(numeric) || numeric < 0) {
+      throw new Error(`BDA 数值无效：${property}`)
+    }
+    output = replaceField(output, spec.field, 0, encodeVarint(numeric))
+  }
+  return output
+}
+
+function updateBdaPanel(bytes: Uint8Array, name: string, desired: JsonObject, current: JsonObject): Uint8Array {
+  return updateStringMapValue(bytes, 4, name, (value) => patchPanelMessage(value, desired, current, panelPatchSchema))
+}
+
+export function applyDecodedBdaSource(path: string, bytes: Uint8Array, text: string): Uint8Array {
+  const desired = jsonObject(JSON.parse(text))
+  if (!desired) throw new Error("BDA 解码源码必须是 JSON 对象")
+  delete desired.$bdiEditorRaw
+  delete desired.$protobuf
+  const current = JSON.parse(decodedBdaSource(path, bytes)) as JsonObject
+  delete current.$protobuf
+  const name = path.split("/").pop() ?? path
+  let output = bytes
+  const changedSequences = new Set<string>()
+
+  if (/^\d*appearanceConfig$/i.test(name)) {
+    if (!sameJson(desired.designWidth, current.designWidth)) {
+      if (typeof desired.designWidth !== "number") throw new Error("BDA 设计宽度必须是数字")
+      output = updateBdaDesignWidth(output, desired.designWidth)
+    }
+    const styles = [
+      ["imageStyles", "image", [["normalImage", "NM_IMG"], ["highlightImage", "HL_IMG"]]],
+      ["colorStyles", "color", [["normalColor", "NM_COLOR"], ["highlightColor", "HL_COLOR"]]],
+      ["textStyles", "text", [["fontName", "FONT_NAME"], ["fontSize", "FONT_SIZE"], ["normalColor", "NM_COLOR"], ["highlightColor", "HL_COLOR"]]],
+    ] as const
+    for (const [group, type, properties] of styles) {
+      const wantedStyles = jsonObject(desired[group]) ?? {}
+      const oldStyles = jsonObject(current[group]) ?? {}
+      for (const [key, wantedValue] of Object.entries(wantedStyles)) {
+        const wantedStyle = jsonObject(wantedValue)
+        const oldStyle = jsonObject(oldStyles[key])
+        if (!wantedStyle) continue
+        for (const [property, editorProperty] of properties) {
+          const wanted = type === "image"
+            ? jsonObject(jsonObject(wantedStyle[property])?.resource)?.resourceID
+            : wantedStyle[property]
+          const old = type === "image"
+            ? jsonObject(jsonObject(oldStyle?.[property])?.resource)?.resourceID
+            : oldStyle?.[property]
+          if (sameJson(wanted, old)) continue
+          if (typeof wanted !== "string" && typeof wanted !== "number") continue
+          output = updateBdaStyle(output, { type, key: Number(key) }, editorProperty, String(wanted))
+        }
+      }
+    }
+    const wantedPanels = jsonObject(desired.panels) ?? {}
+    const oldPanels = jsonObject(current.panels) ?? {}
+    for (const [panelName, wantedValue] of Object.entries(wantedPanels)) {
+      const wantedPanel = jsonObject(wantedValue)
+      const oldPanel = jsonObject(oldPanels[panelName])
+      if (!wantedPanel || !oldPanel || sameJson(wantedPanel, oldPanel)) continue
+      output = updateBdaPanel(output, panelName, wantedPanel, oldPanel)
+    }
+  } else if (/animationConfig$/i.test(name)) {
+    if (!sameJson(desired.designWidth, current.designWidth)) {
+      if (typeof desired.designWidth !== "number" || desired.designWidth <= 0) {
+        throw new Error("BDA 设计宽度必须是正数")
+      }
+      output = replaceField(output, 12, 0, encodeVarint(Math.round(desired.designWidth)))
+    }
+    const wantedSequences = jsonObject(desired.sequences) ?? {}
+    const oldSequences = jsonObject(current.sequences) ?? {}
+    for (const [sequence, wantedValue] of Object.entries(wantedSequences)) {
+      const wantedFrames = jsonObject(wantedValue)?.frames
+      const oldFrames = jsonObject(oldSequences[sequence])?.frames
+      if (!Array.isArray(wantedFrames) || !Array.isArray(oldFrames)) continue
+      wantedFrames.forEach((wantedValue, frame) => {
+        const wantedFrame = jsonObject(wantedValue)
+        const oldFrame = jsonObject(oldFrames[frame])
+        if (!wantedFrame || !oldFrame) return
+        for (const property of ["resourceID", "duration"] as const) {
+          const wanted = wantedFrame[property]
+          if (sameJson(wanted, oldFrame[property])) continue
+          if (property === "resourceID" && typeof wanted !== "string") continue
+          if (property === "duration" && typeof wanted !== "number") continue
+          output = updateBdaAnimationFrame(output, sequence, frame, property, wanted as string | number)
+          changedSequences.add(sequence)
+        }
+      })
+    }
+  } else if (/^\d*soundConfig$/i.test(name)) {
+    for (const [group, ios] of [["keySounds", false], ["iosKeySounds", true]] as const) {
+      const wantedSounds = jsonObject(desired[group]) ?? {}
+      const oldSounds = jsonObject(current[group]) ?? {}
+      for (const [key, wantedValue] of Object.entries(wantedSounds)) {
+        if (sameJson(wantedValue, oldSounds[key])) continue
+        const wanted = jsonObject(wantedValue)
+        if (typeof wanted?.type !== "number" || typeof wanted.resourceID !== "string") continue
+        output = updateBdaKeySound(output, key, { type: wanted.type, resourceID: wanted.resourceID }, ios)
+      }
+    }
+  }
+
+  const actual = JSON.parse(decodedBdaSource(path, output)) as JsonObject
+  delete actual.$protobuf
+  for (const sequence of changedSequences) {
+    const wantedEffect = jsonObject(jsonObject(desired.effects)?.[`image:${sequence}`])
+    const actualEffect = jsonObject(jsonObject(actual.effects)?.[`image:${sequence}`])
+    if (wantedEffect && actualEffect) wantedEffect.sequence = actualEffect.sequence
+  }
+  if (!sameJson(actual, desired)) {
+    throw new Error("该 BDA JSON 改动暂不支持；可修改设计宽度、样式资源/字体/颜色、动画帧和按键音")
+  }
+  return output
+}
+
+export function applyDecodedBdaAppearancePart(
+  path: string,
+  bytes: Uint8Array,
+  text: string,
+  part: BdaAppearancePart,
+): Uint8Array {
+  const desiredPart = jsonObject(JSON.parse(text))
+  if (!desiredPart) throw new Error("BDA appearanceConfig 片段必须是 JSON 对象")
+  const full = JSON.parse(decodedBdaSource(path, bytes)) as JsonObject
+  if (part.kind === "styles") {
+    const styles = jsonObject(desiredPart[part.group])
+    if (!styles || Object.keys(desiredPart).some((key) => key !== part.group)) {
+      throw new Error(`源码必须只包含 ${part.group}`)
+    }
+    full[part.group] = styles
+  } else {
+    if (desiredPart.panel !== part.name) throw new Error(`面板源码标识必须是 ${part.name}`)
+    const panels = jsonObject(full.panels)
+    if (!panels) throw new Error("appearanceConfig 缺少 panels")
+    const panel = { ...desiredPart }
+    delete panel.panel
+    panels[part.name] = panel
+  }
+  return applyDecodedBdaSource(path, bytes, JSON.stringify(full))
 }
 
 export function describeBdaConfig(path: string, bytes: Uint8Array): string {

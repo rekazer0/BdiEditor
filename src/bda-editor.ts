@@ -22,6 +22,14 @@ type LayoutEditorOptions = {
   onStyleChange: BdaStyleChange
 }
 
+type StyleEditorOptions = {
+  appearance: BdaAppearance
+  ref: BdaStyleRef
+  resolver?: VisualResolver
+  editable: boolean
+  onStyleChange: BdaStyleChange
+}
+
 type ConfigEditorOptions = {
   path: string
   bytes: Uint8Array
@@ -266,6 +274,22 @@ function styleCard(
   }
   if (controls.childElementCount) card.append(controls)
   return card
+}
+
+export function renderBdaStyleEditor(
+  container: HTMLElement,
+  options: StyleEditorOptions,
+): void {
+  container.replaceChildren()
+  const card = styleCard(
+    options.ref,
+    `STYLE ${options.ref.key}`,
+    options.appearance,
+    options.resolver,
+    options.editable,
+    options.onStyleChange,
+  )
+  if (card) container.append(card)
 }
 
 export function renderBdaLayoutEditor(container: HTMLElement, options: LayoutEditorOptions): void {

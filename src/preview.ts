@@ -21,6 +21,80 @@ export type PreviewEvent = {
 }
 
 type Rect = { x: number; y: number; width: number; height: number }
+
+type NineSliceCanvas = Pick<HTMLCanvasElement, "width" | "height" | "getContext">
+
+let nineSliceBuffer: HTMLCanvasElement | undefined
+
+function sharedNineSliceBuffer(): HTMLCanvasElement {
+  nineSliceBuffer ??= document.createElement("canvas")
+  return nineSliceBuffer
+}
+
+function nineSliceAxis(size: number, leading: number, trailing: number): [number, number, number, number] {
+  const fixed = leading + trailing
+  const scale = fixed > size && fixed > 0 ? size / fixed : 1
+  const first = Math.round(leading * scale)
+  const second = Math.max(first, Math.round(size - trailing * scale))
+  return [0, first, second, size]
+}
+
+export function drawNineSliceImage(
+  context: Pick<CanvasRenderingContext2D, "drawImage">,
+  visual: Visual,
+  destination: Rect,
+  createCanvas: () => NineSliceCanvas = sharedNineSliceBuffer,
+): void {
+  if (!visual.image || !visual.source || !visual.inner) return
+  const [sx, sy, sw, sh] = visual.source
+  const [ix, iy, iw, ih] = visual.inner
+  const width = Math.max(1, Math.round(destination.width))
+  const height = Math.max(1, Math.round(destination.height))
+  const buffer = createCanvas()
+  buffer.width = width
+  buffer.height = height
+  const bufferContext = buffer.getContext("2d")
+  if (!bufferContext) return
+  bufferContext.imageSmoothingEnabled = true
+  bufferContext.imageSmoothingQuality = "high"
+
+  const xs = [0, ix, ix + iw, sw]
+  const ys = [0, iy, iy + ih, sh]
+  const dx = nineSliceAxis(width, ix, sw - ix - iw)
+  const dy = nineSliceAxis(height, iy, sh - iy - ih)
+  for (let row = 0; row < 3; row++) {
+    for (let column = 0; column < 3; column++) {
+      const sourceWidth = xs[column + 1] - xs[column]
+      const sourceHeight = ys[row + 1] - ys[row]
+      const targetWidth = dx[column + 1] - dx[column]
+      const targetHeight = dy[row + 1] - dy[row]
+      if (sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) continue
+      bufferContext.drawImage(
+        visual.image,
+        sx + xs[column],
+        sy + ys[row],
+        sourceWidth,
+        sourceHeight,
+        dx[column],
+        dy[row],
+        targetWidth,
+        targetHeight,
+      )
+    }
+  }
+  context.drawImage(
+    buffer as CanvasImageSource,
+    0,
+    0,
+    width,
+    height,
+    destination.x,
+    destination.y,
+    destination.width,
+    destination.height,
+  )
+}
+
 export type PreviewItem = {
   section: string
   sections: string[]
@@ -1765,43 +1839,7 @@ export class Preview {
     visual: Visual,
     destination: Rect,
   ): void {
-    if (!visual.image || !visual.source || !visual.inner) return
-    const [sx, sy, sw, sh] = visual.source
-    const [ix, iy, iw, ih] = visual.inner
-    const xs = [0, ix, ix + iw, sw]
-    const ys = [0, iy, iy + ih, sh]
-    const dx = [
-      destination.x,
-      destination.x + ix,
-      destination.x + destination.width - (sw - ix - iw),
-      destination.x + destination.width,
-    ]
-    const dy = [
-      destination.y,
-      destination.y + iy,
-      destination.y + destination.height - (sh - iy - ih),
-      destination.y + destination.height,
-    ]
-    for (let row = 0; row < 3; row++) {
-      for (let column = 0; column < 3; column++) {
-        const sourceWidth = xs[column + 1] - xs[column]
-        const sourceHeight = ys[row + 1] - ys[row]
-        const targetWidth = dx[column + 1] - dx[column]
-        const targetHeight = dy[row + 1] - dy[row]
-        if (sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) continue
-        context.drawImage(
-          visual.image,
-          sx + xs[column],
-          sy + ys[row],
-          sourceWidth,
-          sourceHeight,
-          dx[column],
-          dy[row],
-          targetWidth,
-          targetHeight,
-        )
-      }
-    }
+    drawNineSliceImage(context, visual, destination)
   }
 
   private drawVisual(

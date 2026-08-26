@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { pushChange, type Change } from "../src/history.ts"
-import { layoutImageTileDocument, planLayoutImageSlices } from "../src/layout-image.ts"
+import { layoutImageTileBytes, layoutImageTileDocument, planLayoutImageSlices } from "../src/layout-image.ts"
 import { applyLayoutAction, gestureDirection, snapPointToRects, snapRectDelta, type LayoutRect } from "../src/layout.ts"
 import { IniDocument } from "../src/ini.ts"
 import { previewItems } from "../src/preview.ts"
@@ -97,5 +97,6 @@ console.log("✓ 单个按键素材会复用到所有目标按键")
 const generatedTiles = layoutImageTileDocument(singleKeyPlan).toString()
 assert.match(generatedTiles, /^\[GLOBAL\]\r\nUSE_ALPHA=2\r\nTILE_NUM=1\r\n\r\n\[IMG1\]\r\n/)
 assert.doesNotMatch(generatedTiles, /(^|[^\r])\n/)
+assert.deepEqual([...layoutImageTileBytes(singleKeyPlan).slice(0, 3)], [0xef, 0xbb, 0xbf])
 
-console.log("✓ 一键替换生成 iOS 可解析的 TIL 头部与 CRLF 换行")
+console.log("✓ 一键替换生成带 UTF-8 BOM、iOS 可解析的 TIL 文件")
