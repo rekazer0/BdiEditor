@@ -15,6 +15,7 @@ assert.equal(
 )
 
 const css = fs.readFileSync("src/style.css", "utf8")
+const main = fs.readFileSync("src/main.ts", "utf8")
 assert.match(
   css,
   /#quick-inspector:has\(> #mobile-inspector-groups\[hidden\]\):not\(\[hidden\]\) \{\s*grid-template-columns:\s*minmax\(0, 1fr\);/,
@@ -25,5 +26,8 @@ assert.match(
   /#quick-inspector:has\(> #mobile-inspector-groups\[hidden\]\):not\(\[hidden\]\) \{\s*padding-right:\s*13px;/,
   "桌面端分组栏隐藏后不应保留右侧空白",
 )
+assert.match(css, /#quick-inspector,[\s\S]*?touch-action:\s*pan-y;[\s\S]*?-webkit-overflow-scrolling:\s*touch;/)
+assert.doesNotMatch(main, /mainWorkspace\.setPointerCapture\(/, "移动面板切换不应预先抢占属性区纵向滚动")
+assert.match(main, /Math\.abs\(deltaY\) > 12 && Math\.abs\(deltaY\) > Math\.abs\(deltaX\)/)
 
-console.log("✓ 检查器分组栏拖动正常，隐藏后属性区占满宽度")
+console.log("✓ 检查器分组栏布局正常，属性区纵向滚动不被面板手势抢占")

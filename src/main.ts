@@ -1419,12 +1419,15 @@ mainWorkspace.addEventListener("pointerdown", (event) => {
   if (!mobilePortraitQuery.matches || event.pointerType === "mouse" && event.button !== 0 ||
     !(event.target as Element).closest("aside, .source")) return
   mobileSwipeStart = { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
-  mainWorkspace.setPointerCapture(event.pointerId)
 })
 mainWorkspace.addEventListener("pointermove", (event) => {
   if (!mobileSwipeStart || mobileSwipeStart.pointerId !== event.pointerId) return
   const deltaX = event.clientX - mobileSwipeStart.x
   const deltaY = event.clientY - mobileSwipeStart.y
+  if (Math.abs(deltaY) > 12 && Math.abs(deltaY) > Math.abs(deltaX)) {
+    mobileSwipeStart = undefined
+    return
+  }
   if (Math.abs(deltaX) < 56 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return
   mobileSwipeStart = undefined
   setMobilePane(deltaX < 0 ? "inspector" : "layout")
@@ -1434,7 +1437,6 @@ mainWorkspace.addEventListener("pointerup", (event) => {
   const deltaX = event.clientX - mobileSwipeStart.x
   const deltaY = event.clientY - mobileSwipeStart.y
   mobileSwipeStart = undefined
-  if (mainWorkspace.hasPointerCapture(event.pointerId)) mainWorkspace.releasePointerCapture(event.pointerId)
   if (Math.abs(deltaX) < 56 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return
   setMobilePane(deltaX < 0 ? "inspector" : "layout")
 })

@@ -5784,6 +5784,16 @@ input[type="search"]:focus {
 
   #quick-inspector,
   #resource-inspector,
+  #source-editor,
+  #quick-inspector[data-inspector-group-display="grouped"] > .mobile-inspector-managed,
+  #quick-inspector[data-inspector-group-display="grouped"] > .document-fields:has(.mobile-inspector-managed) {
+    touch-action: pan-y;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #quick-inspector,
+  #resource-inspector,
   #source-editor {
     scroll-padding-bottom: calc(72px + env(safe-area-inset-bottom));
   }
