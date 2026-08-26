@@ -190,8 +190,10 @@ import {
 import { unsavedDecision, type UnsavedDecision } from "./unsaved.ts"
 import { checkForUpdate } from "./update.ts"
 import { clientLog, clientLogZip, flushClientLogs, installClientLogging } from "./client-log.ts"
+import { installSafeAreaLock } from "./safe-area.ts"
 
 installClientLogging(document.querySelector<HTMLElement>("#about-update")?.dataset.currentVersion ?? "unknown")
+installSafeAreaLock()
 
 document.documentElement.classList.toggle("macos", isTauri() && navigator.userAgent.includes("Macintosh"))
 document.documentElement.classList.toggle("windows", isTauri() && navigator.userAgent.includes("Windows"))

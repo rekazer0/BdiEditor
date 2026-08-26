@@ -29,6 +29,7 @@
     "verify:bda-official-parser": "node scripts/verify-bda-official-parser.ts",
     "verify:bda-official-preview": "node scripts/verify-bda-official-preview.ts",
     "verify:logging": "node scripts/verify-client-logging.ts",
+    "verify:safe-area": "node scripts/verify-safe-area.ts",
     "tauri": "tauri"
   },
   "dependencies": {
