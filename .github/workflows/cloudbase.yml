@@ -31,7 +31,7 @@ jobs:
           TCB_ENV_ID: ${{ secrets.TCB_ENV_ID }}
         run: |
           npx tcb login --apiKeyId "$TCB_SECRET_ID" --apiKey "$TCB_SECRET_KEY"
-          npx tcb app deploy bdi-edit -e "$TCB_ENV_ID" --framework vite --build-command "npm run build" --output-dir dist --deploy-path / --force
+          npx tcb app deploy bdi-edit -e "$TCB_ENV_ID" --framework vite --install-command "npm ci" --build-command "npm run build" --output-dir dist --deploy-path / --force
       - name: Verify CloudBase Web App
         env:
           APP_URL: https://bdieditor-bdieditor-d4gdhm3ir22dcc04c.webapps.tcloudbase.com/
