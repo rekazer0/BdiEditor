@@ -2221,6 +2221,10 @@ canvas {
     padding-right: 84px;
   }
 
+  #quick-inspector:has(> #mobile-inspector-groups[hidden]):not([hidden]) {
+    padding-right: 13px;
+  }
+
   #mobile-inspector-groups {
     width: 64px;
     max-height: calc(100% - 16px);
@@ -5800,6 +5804,10 @@ input[type="search"]:focus {
     grid-auto-flow: row dense;
     align-content: start;
     column-gap: 8px;
+  }
+
+  #quick-inspector:has(> #mobile-inspector-groups[hidden]):not([hidden]) {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   #quick-inspector > .keyboard-fields:empty {

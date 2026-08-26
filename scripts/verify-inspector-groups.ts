@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import fs from "node:fs"
 import { inspectorGroupPositionPercent } from "../src/inspector-groups.ts"
 
 assert.equal(
@@ -13,4 +14,16 @@ assert.equal(
   "分组栏不应被拖出检查器顶部",
 )
 
-console.log("✓ 检查器分组栏拖动保持鼠标抓取位置")
+const css = fs.readFileSync("src/style.css", "utf8")
+assert.match(
+  css,
+  /#quick-inspector:has\(> #mobile-inspector-groups\[hidden\]\):not\(\[hidden\]\) \{\s*grid-template-columns:\s*minmax\(0, 1fr\);/,
+  "移动端分组栏隐藏后不应保留右侧空列",
+)
+assert.match(
+  css,
+  /#quick-inspector:has\(> #mobile-inspector-groups\[hidden\]\):not\(\[hidden\]\) \{\s*padding-right:\s*13px;/,
+  "桌面端分组栏隐藏后不应保留右侧空白",
+)
+
+console.log("✓ 检查器分组栏拖动正常，隐藏后属性区占满宽度")
