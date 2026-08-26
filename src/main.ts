@@ -4390,6 +4390,25 @@ function updateBdaRefs(refs: BdaStyleRef[], property: string, value: string): bo
   return true
 }
 
+function updateSelectedBdaPanelProperty(
+  property: "shouldBgBlur" | "shouldKeySlotting" | "trackColor",
+  value: boolean | string,
+): boolean {
+  const info = currentBdaAppearance()
+  const part = bdaAppearancePart(selectedPath)
+  if (!info || part?.kind !== "panel") return false
+  const source = JSON.parse(decodedBdaAppearancePart(info.bytes, part)) as Record<string, unknown>
+  source[property] = value
+  const after = applyDecodedBdaAppearancePart(info.path, info.bytes, JSON.stringify(source), part)
+  commitBytes(info.path, info.bytes, after)
+  refreshBdaLayout(layoutPath)
+  refreshSelectedBdaSource()
+  refreshPreview()
+  populateKeyInspector()
+  updateDirty()
+  return true
+}
+
 baiduActionCodes.replaceChildren(...knownFunctionCodes.map((value) => {
   return new Option(actionDescription(value), value)
 }))
@@ -4793,6 +4812,7 @@ function populateBdaConfigInspector(): void {
       resolver: visualResolver(),
       editable: isEditing(),
       onStyleChange: (ref, property, value) => { updateBdaRefs([ref], property, value) },
+      onPanelPropertyChange: (property, value) => { updateSelectedBdaPanelProperty(property, value) },
     })
     return
   }

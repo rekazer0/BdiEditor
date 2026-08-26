@@ -8,7 +8,7 @@ import {
   decodedBdaAppearancePart,
   decodedBdaSource,
 } from "../src/bda.ts"
-import { bdaAnimationDurations } from "../src/bda-editor.ts"
+import { bdaAnimationDurations, bdaLayoutStyleGroups } from "../src/bda-editor.ts"
 import { highlightJson, jsonPropertyRanges } from "../src/highlight.ts"
 import { SkinArchive } from "../src/skin.ts"
 
@@ -76,16 +76,35 @@ const panelPartSource = JSON.parse(decodedBdaAppearancePart(appearanceBytes, pan
 assert.equal(panelPartSource.panel, "py_9")
 assert.ok(!("panels" in panelPartSource), "面板入口应只显示当前面板源码")
 panelPartSource.keys.KEY_AS.backStyle.key += 1
+panelPartSource.shouldBgBlur = false
+panelPartSource.trackColor = "FF112233"
 const panelPartBytes = applyDecodedBdaAppearancePart(
   appearancePath,
   appearanceBytes,
   JSON.stringify(panelPartSource),
   panelPart,
 )
+const patchedPanel = decodeBdaAppearance(panelPartBytes).panels.get("py_9")
 assert.equal(
-  decodeBdaAppearance(panelPartBytes).panels.get("py_9")?.keys.get("KEY_AS")?.backStyle?.key,
+  patchedPanel?.keys.get("KEY_AS")?.backStyle?.key,
   panelPartSource.keys.KEY_AS.backStyle.key,
   "面板片段中的样式引用应写回 appearanceConfig",
+)
+assert.equal(patchedPanel?.shouldBgBlur, false, "背景模糊选项应写回 appearanceConfig")
+assert.equal(patchedPanel?.trackColor, 0xFF112233, "轨迹颜色应写回 appearanceConfig")
+
+const panel = decodeBdaAppearance(appearanceBytes).panels.get("py_9")!
+const groups = bdaLayoutStyleGroups(panel, [])
+assert.deepEqual(
+  groups.map((group) => group.key),
+  ["panel", "candidate", "input", "more", "hints", "lists", "keys"],
+  "未选择按键时应展示全部已确认的 BDA 面板组件",
+)
+assert.ok(groups.every((group) => group.items.length > 0), "实际存在的组件分组不应为空")
+assert.deepEqual(
+  bdaLayoutStyleGroups(panel, [{ name: "KEY_AS", key: panel.keys.get("KEY_AS")! }]).map((group) => group.key),
+  ["selection"],
+  "选择按键后应聚焦显示所选按键样式",
 )
 
 const main = fs.readFileSync("src/main.ts", "utf8")
@@ -107,6 +126,9 @@ assert.match(editor, /renderBdaLayoutEditor/)
 assert.match(editor, /stylePreview/)
 assert.match(editor, /picker\.type = "color"/)
 assert.match(editor, /range\.type = "range"/)
+assert.match(editor, /高级图片字段（只读）/)
+assert.match(editor, /onPanelPropertyChange/)
+assert.match(editor, /bda-component-section/)
 assert.deepEqual(bdaAnimationDurations([
   {},
   { duration: 0 },

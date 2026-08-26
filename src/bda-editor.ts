@@ -8,6 +8,7 @@ import {
   type BdaAppearance,
   type BdaAnimationFrame,
   type BdaKey,
+  type BdaPanel,
   type BdaStyleRef,
 } from "./bda.ts"
 
@@ -20,6 +21,90 @@ type LayoutEditorOptions = {
   resolver?: VisualResolver
   editable: boolean
   onStyleChange: BdaStyleChange
+  onPanelPropertyChange: (property: "shouldBgBlur" | "shouldKeySlotting" | "trackColor", value: boolean | string) => void
+}
+
+export type BdaLayoutStyleItem = { ref: BdaStyleRef; label: string }
+export type BdaLayoutStyleGroup = { key: string; title: string; items: BdaLayoutStyleItem[] }
+
+function uniqueStyleItems(items: BdaLayoutStyleItem[]): BdaLayoutStyleItem[] {
+  return [...new Map(items.map((item) => [`${item.ref.type}:${item.ref.key}`, item])).values()]
+}
+
+function keyStyleItems(name: string, key: BdaKey): BdaLayoutStyleItem[] {
+  return [
+    ...(key.backStyle ? [{ ref: key.backStyle, label: `${name} · 背景` }] : []),
+    ...key.foreStyles.map((ref, index) => ({ ref, label: `${name} · 前景 ${index + 1}` })),
+    ...(key.backStyleState ? [{ ref: key.backStyleState, label: `${name} · 状态背景` }] : []),
+  ]
+}
+
+export function bdaLayoutStyleGroups(
+  panel: BdaPanel,
+  keys: Array<{ name: string; key: BdaKey }>,
+): BdaLayoutStyleGroup[] {
+  const group = (key: string, title: string, items: BdaLayoutStyleItem[]): BdaLayoutStyleGroup | undefined => {
+    const unique = uniqueStyleItems(items)
+    return unique.length ? { key, title, items: unique } : undefined
+  }
+  if (keys.length) {
+    const selection = group("selection", `已选按键（${keys.length}）`, keys.flatMap(({ name, key }) => keyStyleItems(name, key)))
+    return selection ? [selection] : []
+  }
+
+  const candidate: BdaLayoutStyleItem[] = []
+  const cand = panel.cand
+  if (cand) {
+    for (const [ref, label] of [
+      [cand.candBarStyle, "候选栏背景"], [cand.candOnBarStyle, "候选上屏状态"],
+      [cand.cellBackStyle, "候选单元背景"], [cand.cellForeStyle, "候选文字"],
+      [cand.firstCellBackStyle, "首候选背景"], [cand.firstCellForeStyle, "首候选文字"],
+      [cand.subCandBackStyle, "子候选栏背景"], [cand.subCandCellBackStyle, "子候选单元背景"],
+      [cand.subCandCellForeStyle, "子候选文字"], [cand.accessoryBackStyle, "候选附件背景"],
+      [cand.gridLeftForeStyle, "候选网格左图标"], [cand.gridRightForeStyle, "候选网格右图标"],
+    ] as const) if (ref) candidate.push({ ref, label })
+    if (cand.switch) {
+      for (const [ref, label] of [
+        [cand.switch.normalBack, "候选切换 · 正常背景"], [cand.switch.selectBack, "候选切换 · 选中背景"],
+        [cand.switch.normalFore, "候选切换 · 正常前景"], [cand.switch.selectFore, "候选切换 · 选中前景"],
+      ] as const) if (ref) candidate.push({ ref, label })
+    }
+    for (const [name, value] of cand.candKeys) candidate.push(...keyStyleItems(`候选键 ${name}`, value))
+    for (const [name, value] of cand.menuKeys) candidate.push(...keyStyleItems(`候选菜单 ${name}`, value))
+    if (cand.aiIcon) candidate.push(...keyStyleItems("AI 图标", cand.aiIcon))
+  }
+
+  const groups = [
+    group("panel", "面板", [
+      ...(panel.wholeBackStyle ? [{ ref: panel.wholeBackStyle, label: "面板整体背景" }] : []),
+      ...(panel.backStyle ? [{ ref: panel.backStyle, label: "面板背景" }] : []),
+      ...(panel.inputRegionBackStyle ? [{ ref: panel.inputRegionBackStyle, label: "输入区整体背景" }] : []),
+    ]),
+    group("candidate", "候选栏", candidate),
+    group("input", "输入区", [
+      ...(panel.input?.backStyle ? [{ ref: panel.input.backStyle, label: "输入区背景" }] : []),
+      ...(panel.input?.textStyle ? [{ ref: panel.input.textStyle, label: "输入区文字" }] : []),
+    ]),
+    group("more", "更多面板", [
+      ...(panel.more?.backStyle ? [{ ref: panel.more.backStyle, label: "更多面板背景" }] : []),
+      ...(panel.more?.cellBackStyle ? [{ ref: panel.more.cellBackStyle, label: "更多面板单元背景" }] : []),
+      ...(panel.more?.cellForeStyle ? [{ ref: panel.more.cellForeStyle, label: "更多面板单元前景" }] : []),
+    ]),
+    group("hints", "按键提示", [...panel.hints].flatMap(([name, hint]) => [
+      ...(hint.backStyle ? [{ ref: hint.backStyle, label: `${name} · 背景` }] : []),
+      ...(hint.barStyle ? [{ ref: hint.barStyle, label: `${name} · 提示条` }] : []),
+      ...(hint.foreStyle ? [{ ref: hint.foreStyle, label: `${name} · 前景` }] : []),
+      ...(hint.cellStyle ? [{ ref: hint.cellStyle, label: `${name} · 单元背景` }] : []),
+    ])),
+    group("lists", "列表", [...panel.lists].flatMap(([name, list]) => [
+      ...(list.backStyle ? [{ ref: list.backStyle, label: `${name} · 背景` }] : []),
+      ...(list.cellBackStyle ? [{ ref: list.cellBackStyle, label: `${name} · 单元背景` }] : []),
+      ...(list.cellForeStyle ? [{ ref: list.cellForeStyle, label: `${name} · 单元文字` }] : []),
+      ...list.foreStyles.map((ref, index) => ({ ref, label: `${name} · 前景 ${index + 1}` })),
+    ])),
+    group("keys", "全部按键样式", [...panel.keys].flatMap(([name, value]) => keyStyleItems(name, value))),
+  ]
+  return groups.filter((value): value is BdaLayoutStyleGroup => Boolean(value))
 }
 
 type StyleEditorOptions = {
@@ -239,6 +324,35 @@ function textField(
   return field
 }
 
+function readonlyField(label: string, value: string | number): HTMLElement {
+  const field = element("label", "bda-readonly-field")
+  const caption = element("span")
+  caption.textContent = label
+  const output = element("output")
+  output.value = String(value)
+  field.append(caption, output)
+  return field
+}
+
+function booleanField(
+  label: string,
+  value: boolean,
+  disabled: boolean,
+  onChange: (value: boolean) => void,
+): HTMLElement {
+  const field = element("label", "bda-boolean-field")
+  const caption = element("span")
+  caption.textContent = label
+  const input = element("input")
+  input.type = "checkbox"
+  input.setAttribute("role", "switch")
+  input.checked = value
+  input.disabled = disabled
+  input.addEventListener("change", () => onChange(input.checked))
+  field.append(caption, input)
+  return field
+}
+
 function styleCard(
   ref: BdaStyleRef,
   label: string,
@@ -259,6 +373,30 @@ function styleCard(
     if (style.highlightImage?.resource) {
       controls.append(textField("按下图片", style.highlightImage.resource.resourceID, !editable, (value) => onChange(ref, "HL_IMG", value)))
     }
+    const advanced = element("div", "bda-style-controls bda-advanced-fields")
+    const atomFields = (prefix: string, atom: typeof style.normalImage) => {
+      if (!atom) return
+      if (atom.innerRect) advanced.append(readonlyField(`${prefix}切片区域`, `${atom.innerRect.x}, ${atom.innerRect.y}, ${atom.innerRect.width}, ${atom.innerRect.height}`))
+      if (atom.contentInset) advanced.append(readonlyField(`${prefix}内容边距`, `${atom.contentInset.top}, ${atom.contentInset.left}, ${atom.contentInset.bottom}, ${atom.contentInset.right}`))
+      if (atom.alpha !== undefined) advanced.append(readonlyField(`${prefix}透明度`, atom.alpha))
+      if (atom.filterColor !== undefined) advanced.append(readonlyField(`${prefix}滤色`, bdaColorHex(atom.filterColor)))
+    }
+    atomFields("正常", style.normalImage)
+    atomFields("按下", style.highlightImage)
+    if (style.fontInfo) {
+      const font = style.fontInfo
+      if (font.contentText !== undefined) advanced.append(readonlyField("图片内文字", font.contentText))
+      if (font.fontSize !== undefined) advanced.append(readonlyField("图片内字号", font.fontSize))
+      if (font.normalColor !== undefined) advanced.append(readonlyField("图片内正常文字色", bdaColorHex(font.normalColor)))
+      if (font.highlightColor !== undefined) advanced.append(readonlyField("图片内按下文字色", bdaColorHex(font.highlightColor)))
+      if (font.scaledOffset) advanced.append(readonlyField("图片内文字偏移", `${font.scaledOffset.x}, ${font.scaledOffset.y}`))
+      if (font.drawType !== undefined) advanced.append(readonlyField("图片内文字绘制方式", font.drawType))
+    }
+    if (advanced.childElementCount) {
+      const note = element("p", "bda-advanced-note")
+      note.textContent = "高级图片字段（只读）"
+      card.append(note, advanced)
+    }
   } else if (ref.type === "color") {
     const style = appearance.colorStyles.get(ref.key)
     if (!style) return
@@ -271,6 +409,8 @@ function styleCard(
     if (style.fontSize !== undefined) controls.append(rangeField("字号", style.fontSize, 1, 160, !editable, (value) => onChange(ref, "FONT_SIZE", String(value))))
     if (style.normalColor !== undefined) controls.append(colorField("正常文字", style.normalColor, !editable, (value) => onChange(ref, "NM_COLOR", value)))
     if (style.highlightColor !== undefined) controls.append(colorField("按下文字", style.highlightColor, !editable, (value) => onChange(ref, "HL_COLOR", value)))
+    if (style.resource) controls.append(readonlyField("字体资源", `${style.resource.type}:${style.resource.resourceID}`))
+    if (style.contentText !== undefined) controls.append(readonlyField("固定文字", style.contentText))
   }
   if (controls.childElementCount) card.append(controls)
   return card
@@ -296,27 +436,44 @@ export function renderBdaLayoutEditor(container: HTMLElement, options: LayoutEdi
   container.replaceChildren()
   const panel = options.appearance.panels.get(options.panelName.replace(/\.ini$/i, ""))
   if (!panel) return
-  const refs: Array<{ ref: BdaStyleRef; label: string }> = []
-  if (options.keys.length) {
-    for (const { name, key } of options.keys) {
-      if (key.backStyle) refs.push({ ref: key.backStyle, label: `${name} · 背景` })
-      key.foreStyles.forEach((ref, index) => refs.push({ ref, label: `${name} · 前景 ${index + 1}` }))
-      if (key.backStyleState) refs.push({ ref: key.backStyleState, label: `${name} · 状态背景` })
-    }
-  } else {
-    if (panel.wholeBackStyle) refs.push({ ref: panel.wholeBackStyle, label: "面板整体背景" })
-    if (panel.backStyle) refs.push({ ref: panel.backStyle, label: "面板背景" })
-    if (panel.inputRegionBackStyle) refs.push({ ref: panel.inputRegionBackStyle, label: "输入区背景" })
-  }
-  const unique = [...new Map(refs.map((item) => [`${item.ref.type}:${item.ref.key}`, item])).values()]
+  const groups = bdaLayoutStyleGroups(panel, options.keys)
+  const uniqueCount = new Set(groups.flatMap((group) => group.items.map((item) => `${item.ref.type}:${item.ref.key}`))).size
   const summary = element("div", "bda-editor-summary")
-  summary.append(heading(options.keys.length ? `已选 ${options.keys.length} 个 BDA 按键` : options.panelName.replace(/\.ini$/i, ""), `${unique.length} 个实际样式引用`))
+  summary.append(heading(
+    options.keys.length ? `已选 ${options.keys.length} 个 BDA 按键` : options.panelName.replace(/\.ini$/i, ""),
+    `${groups.length} 个组件分组 · ${uniqueCount} 个实际样式引用`,
+  ))
   container.append(summary)
-  for (const item of unique) {
-    const card = styleCard(item.ref, item.label, options.appearance, options.resolver, options.editable, options.onStyleChange)
-    if (card) container.append(card)
+
+  if (!options.keys.length) {
+    const controls = element("div", "bda-style-controls")
+    if (panel.shouldBgBlur !== undefined) controls.append(booleanField("背景模糊", panel.shouldBgBlur, !options.editable, (value) => options.onPanelPropertyChange("shouldBgBlur", value)))
+    if (panel.shouldKeySlotting !== undefined) controls.append(booleanField("按键开槽", panel.shouldKeySlotting, !options.editable, (value) => options.onPanelPropertyChange("shouldKeySlotting", value)))
+    if (panel.trackColor !== undefined) controls.append(colorField("滑动轨迹颜色", panel.trackColor, !options.editable, (value) => options.onPanelPropertyChange("trackColor", value)))
+    if (controls.childElementCount) {
+      const card = element("article", "bda-style-card bda-panel-options")
+      card.append(heading("面板选项"), controls)
+      container.append(card)
+    }
   }
-  if (!unique.length) {
+
+  groups.forEach((group, index) => {
+    const section = element("details", "bda-component-section")
+    section.open = options.keys.length > 0 || index === 0
+    const title = element("summary")
+    const label = element("strong")
+    const count = element("small")
+    label.textContent = group.title
+    count.textContent = `${group.items.length} 个样式`
+    title.append(label, count)
+    section.append(title)
+    for (const item of group.items) {
+      const card = styleCard(item.ref, item.label, options.appearance, options.resolver, options.editable, options.onStyleChange)
+      if (card) section.append(card)
+    }
+    container.append(section)
+  })
+  if (!groups.length) {
     const empty = element("p", "bda-editor-empty")
     empty.textContent = "当前对象没有可编辑的 BDA 样式字段。"
     container.append(empty)

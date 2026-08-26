@@ -2876,12 +2876,77 @@ canvas {
 
 .bda-text-field,
 .bda-range-field,
-.bda-color-field {
+.bda-color-field,
+.bda-readonly-field,
+.bda-boolean-field {
   min-width: 0;
   display: grid;
   gap: 4px;
   color: var(--secondary);
   font-size: 9px;
+}
+
+.bda-readonly-field output {
+  min-height: 28px;
+  padding: 6px 7px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--content) 72%, transparent);
+  font: 9px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.bda-boolean-field {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.bda-boolean-field input {
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  position: relative;
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--content);
+  transition: background 160ms ease;
+}
+
+.bda-boolean-field input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 24%);
+  transition: transform 160ms ease;
+}
+
+.bda-boolean-field input:checked {
+  background: var(--accent);
+}
+
+.bda-boolean-field input:checked::after {
+  transform: translateX(14px);
+}
+
+.bda-boolean-field input:disabled {
+  opacity: 0.45;
+}
+
+.bda-advanced-note {
+  margin: 9px 0 0;
+  color: var(--tertiary);
+  font-size: 9px;
+}
+
+.bda-advanced-fields {
+  margin-top: 6px;
 }
 
 .bda-text-field input {
@@ -2922,6 +2987,57 @@ canvas {
   color: var(--text);
   font: 9px ui-monospace, SFMono-Regular, Menlo, monospace;
   text-align: right;
+}
+
+.bda-component-section {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--control) 72%, transparent);
+}
+
+.bda-component-section > summary {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+}
+
+.bda-component-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bda-component-section > summary::before {
+  content: "›";
+  color: var(--tertiary);
+  font-size: 17px;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+
+.bda-component-section[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.bda-component-section > summary strong {
+  flex: 1;
+  font-size: 11px;
+}
+
+.bda-component-section > summary small {
+  color: var(--tertiary);
+  font-size: 9px;
+}
+
+.bda-component-section > .bda-style-card {
+  margin: 0 8px 8px;
+  background: var(--content);
 }
 
 .bda-panel-list,
