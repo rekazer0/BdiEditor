@@ -5132,19 +5132,6 @@ input[type="search"]:focus {
     --titlebar-height: calc(50px + var(--safe-area-top));
   }
 
-  html,
-  body {
-    height: var(--app-height, 100dvh);
-    overflow: hidden;
-  }
-
-  body {
-    position: fixed;
-    top: var(--vv-top, 0px);
-    left: var(--vv-left, 0px);
-    width: var(--vv-width, 100%);
-  }
-
   .titlebar {
     height: var(--titlebar-height);
     gap: 4px;
@@ -5299,7 +5286,7 @@ input[type="search"]:focus {
   }
 
   main {
-    height: calc(var(--app-height, 100dvh) - var(--titlebar-height));
+    height: calc(100vh - var(--titlebar-height));
     min-height: 0;
     display: block;
     position: relative;
@@ -5532,15 +5519,6 @@ input[type="search"]:focus {
     pointer-events: none;
   }
 
-  :root[data-keyboard-open="true"] .workspace,
-  :root[data-keyboard-open="true"] .mobile-workspace-tabs {
-    display: none;
-  }
-
-  :root[data-keyboard-open="true"] :is(aside, .source) {
-    top: 0;
-    height: 100%;
-  }
 
   .preview-toolbar {
     display: none;
@@ -5963,19 +5941,6 @@ input[type="search"]:focus {
     --titlebar-height: calc(44px + var(--safe-area-top));
   }
 
-  html,
-  body {
-    height: var(--app-height, 100dvh);
-    overflow: hidden;
-  }
-
-  body {
-    position: fixed;
-    top: var(--vv-top, 0px);
-    left: var(--vv-left, 0px);
-    width: var(--vv-width, 100%);
-  }
-
   .titlebar {
     height: var(--titlebar-height);
     gap: 4px;
@@ -6022,7 +5987,7 @@ input[type="search"]:focus {
   }
 
   main {
-    height: calc(var(--app-height, 100dvh) - var(--titlebar-height));
+    height: calc(100vh - var(--titlebar-height));
     grid-template-columns: clamp(116px, 18vw, 150px) minmax(0, 1fr) 0 clamp(190px, 28vw, 240px);
   }
 

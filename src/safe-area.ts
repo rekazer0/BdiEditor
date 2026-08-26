@@ -6,10 +6,7 @@ export function resolveSafeAreaTop(options: {
 }): { top: number; cached: number } {
   const measured = Math.max(0, options.measured)
   const cached = measured > 1 ? measured : Math.max(0, options.cached)
-  if (options.keyboardOpen && measured <= 1) {
-    if ((options.viewportOffsetTop ?? 0) > 1) return { top: 0, cached }
-    return { top: cached, cached }
-  }
+  if (options.keyboardOpen && measured <= 1) return { top: cached, cached }
   return { top: measured, cached }
 }
 
@@ -44,11 +41,15 @@ function revealFocusedInput(): void {
   if (!(active instanceof HTMLElement) || !isTextInput(active)) return
   const scroller = active.closest("#quick-inspector, #resource-inspector, #source-editor, aside #files, .source")
   if (!(scroller instanceof HTMLElement)) return
+  const viewport = window.visualViewport
+  const viewportTop = viewport?.offsetTop ?? 0
+  const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight)
   const scrollerRect = scroller.getBoundingClientRect()
   const activeRect = active.getBoundingClientRect()
-  if (activeRect.top < scrollerRect.top + 8 || activeRect.bottom > scrollerRect.bottom - 8) {
-    active.scrollIntoView({ block: "center", inline: "nearest" })
-  }
+  const visibleTop = Math.max(scrollerRect.top, viewportTop) + 8
+  const visibleBottom = Math.min(scrollerRect.bottom, viewportBottom) - 8
+  if (activeRect.top < visibleTop) scroller.scrollTop -= visibleTop - activeRect.top
+  else if (activeRect.bottom > visibleBottom) scroller.scrollTop += activeRect.bottom - visibleBottom
 }
 
 export function installSafeAreaLock(root: HTMLElement = document.documentElement): () => void {
@@ -99,7 +100,7 @@ export function installSafeAreaLock(root: HTMLElement = document.documentElement
     [document, "focusout", schedule],
   ]
   const viewport = window.visualViewport
-  if (viewport) listeners.push([viewport, "resize", schedule], [viewport, "scroll", schedule])
+  if (viewport) listeners.push([viewport, "resize", reveal], [viewport, "scroll", reveal])
   for (const [target, type, listener] of listeners) target.addEventListener(type, listener, { passive: true })
   sync(false)
   return () => {
