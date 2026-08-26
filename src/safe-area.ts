@@ -2,12 +2,30 @@ export function resolveSafeAreaTop(options: {
   measured: number
   cached: number
   keyboardOpen: boolean
+  viewportOffsetTop?: number
 }): { top: number; cached: number } {
   const measured = Math.max(0, options.measured)
   const cached = measured > 1 ? measured : Math.max(0, options.cached)
+  if (options.keyboardOpen && measured <= 1) {
+    if ((options.viewportOffsetTop ?? 0) > 1) return { top: 0, cached }
+    return { top: cached, cached }
+  }
+  return { top: measured, cached }
+}
+
+export function resolveViewportFrame(options: {
+  viewportHeight: number
+  viewportOffsetTop: number
+  viewportOffsetLeft: number
+  viewportWidth: number
+  layoutHeight: number
+  layoutWidth: number
+}): { height: number; width: number; offsetTop: number; offsetLeft: number } {
   return {
-    top: options.keyboardOpen ? Math.max(measured, cached) : measured,
-    cached,
+    height: Math.max(1, options.viewportHeight || options.layoutHeight),
+    width: Math.max(1, options.viewportWidth || options.layoutWidth),
+    offsetTop: Math.max(0, options.viewportOffsetTop),
+    offsetLeft: Math.max(0, options.viewportOffsetLeft),
   }
 }
 
@@ -21,6 +39,18 @@ export function isTextInput(target: EventTarget | null): boolean {
   return Boolean(target.closest?.(".cm-content, .cm-editor"))
 }
 
+function revealFocusedInput(): void {
+  const active = document.activeElement
+  if (!(active instanceof HTMLElement) || !isTextInput(active)) return
+  const scroller = active.closest("#quick-inspector, #resource-inspector, #source-editor, aside #files, .source")
+  if (!(scroller instanceof HTMLElement)) return
+  const scrollerRect = scroller.getBoundingClientRect()
+  const activeRect = active.getBoundingClientRect()
+  if (activeRect.top < scrollerRect.top + 8 || activeRect.bottom > scrollerRect.bottom - 8) {
+    active.scrollIntoView({ block: "center", inline: "nearest" })
+  }
+}
+
 export function installSafeAreaLock(root: HTMLElement = document.documentElement): () => void {
   let cached = 0
   const probe = document.createElement("div")
@@ -29,42 +59,55 @@ export function installSafeAreaLock(root: HTMLElement = document.documentElement
   root.append(probe)
 
   const measure = () => Number.parseFloat(getComputedStyle(probe).paddingTop) || 0
-  const pinScroll = () => {
-    const scroller = document.scrollingElement
-    if (scroller && (scroller.scrollTop || scroller.scrollLeft)) {
-      scroller.scrollTop = 0
-      scroller.scrollLeft = 0
-    }
-    if (window.scrollX || window.scrollY) window.scrollTo(0, 0)
-  }
-  const sync = () => {
-    pinScroll()
+  const sync = (reveal = false) => {
+    const viewport = window.visualViewport
+    const frame = resolveViewportFrame({
+      viewportHeight: viewport?.height ?? window.innerHeight,
+      viewportOffsetTop: viewport?.offsetTop ?? 0,
+      viewportOffsetLeft: viewport?.offsetLeft ?? 0,
+      viewportWidth: viewport?.width ?? window.innerWidth,
+      layoutHeight: window.innerHeight,
+      layoutWidth: window.innerWidth,
+    })
+    const keyboardOpen = isTextInput(document.activeElement)
     const resolved = resolveSafeAreaTop({
       measured: measure(),
       cached,
-      keyboardOpen: isTextInput(document.activeElement),
+      keyboardOpen,
+      viewportOffsetTop: frame.offsetTop,
     })
     cached = resolved.cached
     root.style.setProperty("--safe-area-top", `${resolved.top}px`)
+    root.style.setProperty("--app-height", `${frame.height}px`)
+    root.style.setProperty("--vv-top", `${frame.offsetTop}px`)
+    root.style.setProperty("--vv-left", `${frame.offsetLeft}px`)
+    root.style.setProperty("--vv-width", `${frame.width}px`)
+    root.dataset.keyboardOpen = keyboardOpen ? "true" : "false"
+    if (reveal && keyboardOpen) revealFocusedInput()
   }
   const schedule = () => {
-    window.requestAnimationFrame(sync)
+    window.requestAnimationFrame(() => sync(false))
+  }
+  const reveal = () => {
+    window.requestAnimationFrame(() => sync(true))
   }
 
-  const listeners: Array<[EventTarget, string]> = [
-    [window, "resize"],
-    [window, "orientationchange"],
-    [window, "scroll"],
-    [document, "focusin"],
-    [document, "focusout"],
+  const listeners: Array<[EventTarget, string, EventListener]> = [
+    [window, "resize", schedule],
+    [window, "orientationchange", schedule],
+    [document, "focusin", reveal],
+    [document, "focusout", schedule],
   ]
   const viewport = window.visualViewport
-  if (viewport) listeners.push([viewport, "resize"], [viewport, "scroll"])
-  for (const [target, type] of listeners) target.addEventListener(type, schedule, { passive: true })
-  sync()
+  if (viewport) listeners.push([viewport, "resize", schedule], [viewport, "scroll", schedule])
+  for (const [target, type, listener] of listeners) target.addEventListener(type, listener, { passive: true })
+  sync(false)
   return () => {
-    for (const [target, type] of listeners) target.removeEventListener(type, schedule)
+    for (const [target, type, listener] of listeners) target.removeEventListener(type, listener)
     probe.remove()
-    root.style.removeProperty("--safe-area-top")
+    delete root.dataset.keyboardOpen
+    for (const name of ["--safe-area-top", "--app-height", "--vv-top", "--vv-left", "--vv-width"]) {
+      root.style.removeProperty(name)
+    }
   }
 }
