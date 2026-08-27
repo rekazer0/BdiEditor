@@ -309,7 +309,8 @@ assert.match(styles, /\.style-detail-previews\[hidden\]\s*\{\s*display:\s*none/,
 assert.match(styles, /#style-detail-fields\s*>\s*\.bda-style-card\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/, "BDA 样式编辑卡应铺满详情区的两列网格")
 assert.match(styles, /\.app-dialog \.settings-switch,\s*\.inspector-switch/, "BDA 面板开关应复用通用开关样式")
 assert.match(styles, /\.bda-panel-property-section \.document-property-grid\s*\{[^}]*gap:\s*0[^}]*border:\s*1px solid var\(--line-soft\)/s, "BDA 引用应组成连续属性列表而不是重复卡片")
-assert.match(styles, /\.style-reference-field\s*\{[^}]*grid-template-columns:\s*minmax\(112px, 0\.72fr\) minmax\(0, 2\.28fr\)/s, "宽屏 BDA 引用行应明确分配名称与编辑内容")
+assert.match(styles, /\.bda-panel-property-section \.style-reference-field\s*\{[^}]*grid-template-columns:\s*minmax\(112px, 0\.72fr\) minmax\(0, 2\.28fr\)/s, "宽屏 BDA 引用行应明确分配名称与编辑内容")
+assert.doesNotMatch(styles, /\n\.style-reference-field\s*\{[^}]*grid-template-columns/s, "普通 BDS/BDI 样式字段的标题应位于控件上方")
 assert.match(styles, /@container \(max-width: 520px\)[\s\S]*?\.style-reference-field\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s, "窄检查器中的 BDA 引用行应折成单列")
 assert.deepEqual(bdaAnimationDurations([
   {},

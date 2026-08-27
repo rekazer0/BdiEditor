@@ -13,7 +13,6 @@ type ZipEntry = {
   name: string
   central: Uint8Array
   local: Uint8Array
-  flags: number
   method: number
   compressedSize: number
   uncompressedSize: number
@@ -63,7 +62,6 @@ function parseZip(bytes: Uint8Array): { entries: ZipEntry[]; end: Uint8Array } {
       name: decoder.decode(bytes.subarray(offset + 46, offset + 46 + nameLength)),
       central,
       localOffset: data.getUint32(offset + 42, true),
-      flags: data.getUint16(offset + 8, true),
       method: data.getUint16(offset + 10, true),
       compressedSize: data.getUint32(offset + 20, true),
       uncompressedSize: data.getUint32(offset + 24, true),
@@ -120,7 +118,7 @@ function changedLocal(entry: ZipEntry, data: Uint8Array): {
   const { crc, compressed } = compressedPayload(data, entry.method === 0 ? 0 : 6)
   const header = entry.local.slice(0, dataOffset)
   const trailer = entry.local.slice(trailerOffset)
-  if (entry.flags & 8) {
+  if (localView.getUint16(6, true) & 8) {
     const descriptorOffset = view(trailer).getUint32(0, true) === 0x08074b50 ? 4 : 0
     writeUint32(trailer, descriptorOffset, crc)
     writeUint32(trailer, descriptorOffset + 4, compressed.length)

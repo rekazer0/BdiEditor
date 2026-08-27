@@ -3572,6 +3572,9 @@ canvas {
 
 .style-reference-field {
   grid-column: 1 / -1;
+}
+
+.bda-panel-property-section .style-reference-field {
   grid-template-columns: minmax(112px, 0.72fr) minmax(0, 2.28fr);
   align-items: center;
   gap: 12px;
