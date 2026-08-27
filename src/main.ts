@@ -27,6 +27,7 @@ import {
   AtlasResolver,
   canvasFontFamily,
   drawVisualSource,
+  drawVisualText,
   isTransparentColor,
   type TextVisual,
   type Visual,
@@ -71,14 +72,15 @@ import {
   decodeBdaSoundConfig,
   updateBdaAnimationFrame,
   updateBdaDesignWidth,
+  updateBdaImageInnerRect,
   updateBdaStyle,
   type BdaAppearance,
   type BdaAppearancePart,
   type BdaAppearanceStyleGroup,
-  type BdaKey,
   type BdaStyleRef,
 } from "./bda.ts"
 import {
+  refreshBdaStyleReferenceField,
   renderBdaConfigEditor,
   renderBdaLayoutEditor,
   renderBdaMetadataEditor,
@@ -344,6 +346,16 @@ const bdaConfigFields = $("#bda-config-fields")
 const colorPickers = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-picker-for]"))
 const colorAlphas = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-alpha-for]"))
 const keyOnlyGroups = Array.from(document.querySelectorAll<HTMLElement>(".key-only"))
+const keyAppearanceFieldsGroup = $(".key-appearance-fields")
+const bdaKeyFieldLabels: Record<string, string> = {
+  BACK_STYLE: "背景样式（backStyle）",
+  FORE_STYLE: "前景样式（foreStyles）",
+  FORE_OFFSET: "前景样式偏移（foreStyleOffsets）",
+  FONT_NAME: "字体名称（fontName）",
+  FONT_SIZE: "字体大小（fontSize）",
+  NM_COLOR: "正常文字颜色（normalColor）",
+  HL_COLOR: "高亮文字颜色（highlightColor）",
+}
 const gapFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-gap-field]"))
 const layoutActionButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-layout-action]"),
@@ -423,11 +435,15 @@ const layoutImageConfigButtons = Array.from(document.querySelectorAll<HTMLButton
 const inspectorResizeHandle = $("#inspector-resize-handle") as HTMLDivElement
 const tileInspector = $("#tile-inspector")
 const tileTitle = $("#tile-title")
+const bdaTileUsage = $("#bda-tile-usage") as HTMLSelectElement
+const tileInnerTitle = $("#tile-inner-title")
+const tileSourceFieldsGroup = $("#tile-source-fields")
 const tilePreviewWrap = $("#tile-preview-wrap")
 const tilePreview = $("#tile-preview") as HTMLCanvasElement
 const newTileButton = $("#new-tile") as HTMLButtonElement
 const duplicateTileButton = $("#duplicate-tile") as HTMLButtonElement
 const deleteTileButton = $("#delete-tile") as HTMLButtonElement
+const moveTileButton = $("#move-tile") as HTMLButtonElement
 const tileModeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-tile-mode]"))
 const tileSourceFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-tile-source]"))
 const tileInnerFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-tile-inner]"))
@@ -489,6 +505,7 @@ let selectedDocument: IniDocument | undefined
 let layoutPath = ""
 let layoutDocument: IniDocument | undefined
 let selectedKeySections: string[] = []
+let selectedCandidate = false
 let unsavedNew = false
 let assetURL = ""
 let assetReturnPath = ""
@@ -557,15 +574,25 @@ let resourceConfigActive = false
 let resourceInspectorMode: "image" | "style" | "sound" = "image"
 let selectedStyleID = ""
 let selectedSoundID = ""
+let selectedBdaStyleGroup: BdaAppearanceStyleGroup = "imageStyles"
 let styleReturnPath = ""
 let styleReturnSelection: string[] = []
+let styleReturnCandidate = false
 let styleReturnScrollTop = 0
 let styleReturnInspectorGroup = ""
+let bdaSliceReturn: { path: string; styleID: string } | undefined
 let selectedResourcePath = ""
 let resourceURLs: string[] = []
 let tilePath = ""
 let tileDocument = IniDocument.parse("")
 let slices: TileSlice[] = []
+type BdaTileUsage = {
+  index: number
+  ref: BdaStyleRef
+  highlighted: boolean
+  label: string
+}
+let bdaTileUsages: BdaTileUsage[] = []
 let selectedTileIndex: number | undefined
 let drawingTile = false
 let tileDragStart: TilePoint | undefined
@@ -607,6 +634,8 @@ const preview = new Preview(
     handlePreviewEvent(event)
   },
   (sections) => {
+    selectedCandidate = false
+    syncCandidateSelection()
     if (selectedPath !== layoutPath) selectFile(layoutPath, "overview")
     selectedKeySections = sections
     if (sections.length && mobilePortraitQuery.matches) setMobilePane("inspector")
@@ -677,6 +706,7 @@ let pendingPointerCoordinates: {
 let pointerCoordinatesFrame = 0
 
 function schedulePointerCoordinates(event: PointerEvent, target: HTMLElement, canvas: HTMLCanvasElement): void {
+  if (previewPanStart) return
   pendingPointerCoordinates = {
     event: { clientX: event.clientX, clientY: event.clientY, pointerType: event.pointerType },
     target,
@@ -698,6 +728,7 @@ toolbarStrip.addEventListener("pointermove", (event) => {
   schedulePointerCoordinates(event, toolbarStrip, toolbarCanvas)
 })
 document.addEventListener("pointermove", (event) => {
+  if (previewPanStart) return
   const target = event.target as Node
   if (event.pointerType === "mouse" && !previewCanvas.contains(target) && !toolbarStrip.contains(target)) {
     pendingPointerCoordinates = undefined
@@ -1262,6 +1293,8 @@ function syncMobileInspectorHeader(): void {
 }
 
 function mobileInspectorGroupLabel(group: HTMLElement): string {
+  const explicitLabel = group.dataset.inspectorGroupLabel?.trim()
+  if (explicitLabel) return explicitLabel
   if (group.classList.contains("document-property-section")) {
     const label = group.querySelector(":scope > h3")?.textContent?.trim() ?? "配置"
     return label.replace(/\s*[（(][^）)]*[）)]\s*$/, "")
@@ -1282,6 +1315,7 @@ function setMobileInspectorGroup(id: string, scroll = true): void {
   for (const group of Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))) {
     const active = group.dataset.mobileInspectorGroup === id
     group.classList.toggle("mobile-inspector-active", active)
+    if (active && group instanceof HTMLDetailsElement) group.open = true
   }
   for (const button of Array.from(mobileInspectorGroups.querySelectorAll<HTMLButtonElement>("button"))) {
     const active = button.dataset.mobileInspectorGroup === id
@@ -1304,9 +1338,15 @@ function syncMobileInspectorGroups(): void {
   }
   const groups = Array.from(quickInspector.querySelectorAll<HTMLElement>(":scope > .inspector-group"))
     .filter((group) => !group.hidden)
-    .flatMap((group) => group === documentFieldsGroup
-      ? Array.from(documentFields.querySelectorAll<HTMLElement>(":scope > .document-property-section"))
-      : [group])
+    .flatMap((group) => {
+      if (group === documentFieldsGroup) {
+        return Array.from(documentFields.querySelectorAll<HTMLElement>(":scope > .document-property-section"))
+      }
+      if (group === bdaConfigFieldsGroup) {
+        return Array.from(bdaConfigFields.querySelectorAll<HTMLElement>(":scope > .bda-inspector-section"))
+      }
+      return [group]
+    })
   for (const [index, group] of groups.entries()) {
     group.dataset.mobileInspectorGroup = `${index}`
     group.classList.add("mobile-inspector-managed")
@@ -1909,6 +1949,10 @@ function applyBytesSnapshot(path: string, bytes?: Uint8Array): void {
   scheduleSourceAutosave([path])
   refreshBdaLayout()
   if (selectedPath === path && bytes && archive.isBdaConfig(path)) setSourceValue(decodedBdaEditorSource(path, bytes))
+  if (resourceConfigActive && archive.format === "bda" && selectedResourcePath) {
+    loadTiles(selectedResourcePath)
+    renderResourceInspector()
+  }
   refreshPreview()
   populateKeyInspector()
   updateDirty()
@@ -1974,10 +2018,10 @@ function currentBdaAppearance(): { path: string; bytes: Uint8Array; appearance: 
 }
 
 const bdaAppearanceStyleGroups = [
-  ["imageStyles", "样式配置", "图片样式", "photo"],
-  ["textStyles", "样式配置", "文字样式", "textformat"],
-  ["colorStyles", "样式配置", "颜色样式", "paintpalette"],
-] as const satisfies ReadonlyArray<readonly [BdaAppearanceStyleGroup, string, string, string]>
+  ["imageStyles", "图片样式"],
+  ["textStyles", "文字样式"],
+  ["colorStyles", "颜色样式"],
+] as const satisfies ReadonlyArray<readonly [BdaAppearanceStyleGroup, string]>
 
 function bdaAppearanceStylePath(group: BdaAppearanceStyleGroup): string {
   return `${theme.value}/skin/${orientation.value}/.appearance/${group}.json`
@@ -2417,11 +2461,32 @@ let previewPanX = 0
 let previewPanY = 0
 let previewPanStart: { x: number; y: number; panX: number; panY: number } | undefined
 let previewPanCandidate: { pointerId: number; x: number; y: number; panX: number; panY: number } | undefined
+let pendingPreviewPan: { x: number; y: number } | undefined
+let previewPanFrame = 0
 
 function setPreviewPan(x: number, y: number): void {
   previewPanX = x
   previewPanY = y
   deviceShell.style.transform = `translate(${x}px, ${y}px) scale(${device.value === "canvas" ? 1 : previewZoom})`
+}
+
+function schedulePreviewPan(x: number, y: number): void {
+  pendingPreviewPan = { x, y }
+  if (previewPanFrame) return
+  previewPanFrame = requestAnimationFrame(() => {
+    previewPanFrame = 0
+    const pending = pendingPreviewPan
+    pendingPreviewPan = undefined
+    if (pending) setPreviewPan(pending.x, pending.y)
+  })
+}
+
+function flushPreviewPan(): void {
+  if (previewPanFrame) cancelAnimationFrame(previewPanFrame)
+  previewPanFrame = 0
+  const pending = pendingPreviewPan
+  pendingPreviewPan = undefined
+  if (pending) setPreviewPan(pending.x, pending.y)
 }
 
 function applyPreviewZoom(value: number, anchor?: { x: number; y: number }): void {
@@ -2482,6 +2547,7 @@ canvasWrap.addEventListener("wheel", (event) => {
 }, { passive: false })
 
 window.addEventListener("blur", () => {
+  flushPreviewPan()
   previewPanCandidate = undefined
   previewPanStart = undefined
   canvasWrap.classList.remove("preview-pan-ready", "preview-panning")
@@ -2513,18 +2579,23 @@ canvasWrap.addEventListener("pointermove", (event) => {
     if (Math.hypot(dx, dy) < 3) return
     previewPanStart = previewPanCandidate
     preview.cancelPointerInteraction()
+    if (pointerCoordinatesFrame) cancelAnimationFrame(pointerCoordinatesFrame)
+    pointerCoordinatesFrame = 0
+    pendingPointerCoordinates = undefined
+    previewCoordinates.hidden = true
     canvasWrap.classList.add("preview-panning")
     canvasWrap.setPointerCapture(event.pointerId)
   }
   if (!previewPanStart) return
   event.preventDefault()
-  setPreviewPan(
+  schedulePreviewPan(
     previewPanStart.panX + event.clientX - previewPanStart.x,
     previewPanStart.panY + event.clientY - previewPanStart.y,
   )
 })
 
 function finishPreviewPan(): void {
+  flushPreviewPan()
   previewPanCandidate = undefined
   previewPanStart = undefined
   canvasWrap.classList.remove("preview-pan-ready", "preview-panning")
@@ -2962,6 +3033,63 @@ function showImage(path: string): void {
   assetBackButton.disabled = !assetReturnPath
 }
 
+function bdaTileUsageKey(usage: BdaTileUsage | undefined): string {
+  return usage ? `${usage.ref.key}:${usage.highlighted ? "highlight" : "normal"}` : ""
+}
+
+function selectedBdaTileUsage(): BdaTileUsage | undefined {
+  return bdaTileUsages.find((usage) => usage.index === selectedTileIndex)
+}
+
+function bdaImageResourceID(path: string): string {
+  return (path.split("/").pop() ?? path).replace(/\.png$/i, "")
+}
+
+function pngPixelSize(bytes: Uint8Array | undefined): readonly [number, number] | undefined {
+  if (!bytes || bytes.length < 24 || bytes[0] !== 0x89 || bytes[1] !== 0x50 || bytes[2] !== 0x4e || bytes[3] !== 0x47) return
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  return [view.getUint32(16), view.getUint32(20)]
+}
+
+function bdaImageUsageCounts(): Map<string, number> {
+  const counts = new Map<string, number>()
+  const appearance = currentBdaAppearance()?.appearance
+  if (!appearance) return counts
+  for (const style of appearance.imageStyles.values()) {
+    for (const atom of [style.normalImage, style.highlightImage]) {
+      const resourceID = atom?.resource?.resourceID.replace(/\.png$/i, "")
+      if (resourceID) counts.set(resourceID, (counts.get(resourceID) ?? 0) + 1)
+    }
+  }
+  return counts
+}
+
+function bdaImageTiles(path: string): { slices: TileSlice[]; usages: BdaTileUsage[] } {
+  const info = currentBdaAppearance()
+  const size = pngPixelSize(archive?.getBytes(path))
+  if (!info || !size) return { slices: [], usages: [] }
+  const resourceID = bdaImageResourceID(path)
+  const matches = [...info.appearance.imageStyles].flatMap(([key, style]) => [
+    { ref: { type: "image" as const, key }, highlighted: false, atom: style.normalImage },
+    { ref: { type: "image" as const, key }, highlighted: true, atom: style.highlightImage },
+  ]).filter(({ atom }) => atom?.resource?.resourceID.replace(/\.png$/i, "") === resourceID)
+    .sort((left, right) => left.ref.key - right.ref.key || Number(left.highlighted) - Number(right.highlighted))
+  const usages = matches.map(({ ref, highlighted }, index) => ({
+    index: index + 1,
+    ref,
+    highlighted,
+    label: `STYLE ${bdaStyleID(ref)} · ${highlighted ? "按下" : "正常"}`,
+  }))
+  const slices = matches.map(({ atom }, index) => ({
+    index: index + 1,
+    source: [0, 0, size[0], size[1]] as TileRect,
+    ...(atom?.innerRect ? {
+      inner: [atom.innerRect.x, atom.innerRect.y, atom.innerRect.width, atom.innerRect.height] as TileRect,
+    } : {}),
+  }))
+  return { slices, usages }
+}
+
 function drawAtlas(): void {
   if (!workspaceImage.complete || !workspaceImage.naturalWidth) return
   if (atlasCanvas.width !== workspaceImage.naturalWidth) atlasCanvas.width = workspaceImage.naturalWidth
@@ -2973,11 +3101,14 @@ function drawAtlas(): void {
   drawTilePreview()
   if (!resourceConfigActive || !guidesVisible) return
 
-  const visible = tileDraft
+  const allVisible = tileDraft
     ? [...slices, { index: nextTileIndex(tileDocument), source: tileDraft }]
     : movingTile
       ? slices.map((slice) => slice.index === movingTile?.index ? movingTile : slice)
       : slices
+  const visible = archive?.format === "bda"
+    ? allVisible.filter((slice) => slice.index === selectedTileIndex)
+    : allVisible
   const lineWidth = Math.max(1, Math.round(Math.min(atlasCanvas.width, atlasCanvas.height) / 500))
   context.font = `${Math.max(11, lineWidth * 7)}px ui-monospace, monospace`
   context.textBaseline = "top"
@@ -2987,12 +3118,24 @@ function drawAtlas(): void {
     context.lineWidth = selected ? lineWidth * 2 : lineWidth
     context.strokeStyle = selected ? "#ff3b30" : "#0a7ff5"
     context.strokeRect(x + context.lineWidth / 2, y + context.lineWidth / 2, width - context.lineWidth, height - context.lineWidth)
-    const label = `IMG${slice.index}`
+    const usage = bdaTileUsages.find((item) => item.index === slice.index)
+    const label = usage?.label ?? `IMG${slice.index}`
     const labelWidth = context.measureText(label).width + 6
     context.fillStyle = selected ? "#ff3b30" : "#0a7ff5"
     context.fillRect(x, y, labelWidth, Math.max(15, lineWidth * 9))
     context.fillStyle = "#fff"
     context.fillText(label, x + 3, y + 2)
+    if (archive?.format === "bda" && slice.inner) {
+      const [innerX, innerY, innerWidth, innerHeight] = slice.inner
+      if (innerWidth > 0 && innerHeight > 0) {
+        context.save()
+        context.lineWidth = Math.max(2, lineWidth * 2)
+        context.strokeStyle = "#ff9500"
+        context.setLineDash([lineWidth * 4, lineWidth * 3])
+        context.strokeRect(innerX, innerY, innerWidth, innerHeight)
+        context.restore()
+      }
+    }
   }
 }
 
@@ -3016,29 +3159,79 @@ function drawTilePreview(): void {
   context.lineWidth = 2
   context.strokeStyle = "#ff3b30"
   context.strokeRect(destination.x + 1, destination.y + 1, destination.width - 2, destination.height - 2)
+  if (archive?.format === "bda" && slice.inner) {
+    const [innerX, innerY, innerWidth, innerHeight] = slice.inner
+    if (innerWidth > 0 && innerHeight > 0) {
+      context.save()
+      context.strokeStyle = "#ff9500"
+      context.setLineDash([6, 4])
+      context.strokeRect(
+        destination.x + ((innerX - x) / width) * destination.width,
+        destination.y + ((innerY - y) / height) * destination.height,
+        (innerWidth / width) * destination.width,
+        (innerHeight / height) * destination.height,
+      )
+      context.restore()
+    }
+  }
 }
 
 function populateTileInspector(): void {
   const slice = slices.find((item) => item.index === selectedTileIndex)
+  const bdaSelected = archive?.format === "bda"
+  const usage = selectedBdaTileUsage()
   tileInspector.hidden = !selectedResourcePath
-  newTileButton.disabled = !selectedResourcePath || !isEditing()
-  duplicateTileButton.disabled = !slice || !isEditing()
-  deleteTileButton.disabled = !slice || !isEditing()
-  tileTitle.textContent = slice ? `IMG${slice.index}` : "切片"
+  bdaTileUsage.hidden = !bdaSelected || !bdaTileUsages.length
+  tileSourceFieldsGroup.hidden = bdaSelected
+  tileInnerTitle.textContent = bdaSelected ? "切片区域（innerRect）" : "INNER_RECT（可选）"
+  bdaTileUsage.replaceChildren(...bdaTileUsages.map((item) => {
+    const option = new Option(item.label, String(item.index))
+    option.selected = item.index === selectedTileIndex
+    return option
+  }))
+  newTileButton.hidden = Boolean(bdaSelected)
+  duplicateTileButton.hidden = Boolean(bdaSelected)
+  deleteTileButton.hidden = Boolean(bdaSelected)
+  moveTileButton.hidden = Boolean(bdaSelected)
+  newTileButton.disabled = !selectedResourcePath || !isEditing() || bdaSelected
+  duplicateTileButton.disabled = !slice || !isEditing() || bdaSelected
+  deleteTileButton.disabled = !slice || !isEditing() || bdaSelected
+  tileTitle.textContent = usage ? "图片样式切片" : (slice ? `IMG${slice.index}` : bdaSelected ? "未被当前 BDA 外观引用" : "切片")
   for (const field of tileSourceFields) {
     const index = Number(field.dataset.tileSource)
     field.value = slice ? String(slice.source[index]) : ""
-    field.disabled = !slice || !isEditing()
+    field.disabled = !slice || !isEditing() || bdaSelected
   }
   for (const field of tileInnerFields) {
     const index = Number(field.dataset.tileInner)
     field.value = slice?.inner ? String(slice.inner[index]) : ""
+    field.min = bdaSelected ? "0" : index >= 2 ? "1" : ""
     field.disabled = !slice || !isEditing()
   }
   drawTilePreview()
 }
 
 function loadTiles(path: string): void {
+  const previousUsage = bdaTileUsageKey(selectedBdaTileUsage())
+  if (archive?.format === "bda") {
+    const tiles = bdaImageTiles(path)
+    tilePath = ""
+    tileDocument = IniDocument.parse("")
+    setSourceValue("")
+    source.disabled = true
+    slices = tiles.slices
+    bdaTileUsages = tiles.usages
+    selectedTileIndex = bdaTileUsages.find((usage) => bdaTileUsageKey(usage) === previousUsage)?.index
+      ?? bdaTileUsages[0]?.index
+    tileDraft = undefined
+    movingTile = undefined
+    moveStart = undefined
+    moveSource = undefined
+    populateTileInspector()
+    drawAtlas()
+    return
+  }
+  bdaTileUsages = []
   tilePath = path.replace(/\.png$/i, ".til")
   tileDocument = archive?.isText(tilePath) ? IniDocument.parse(archive.getText(tilePath)) : IniDocument.parse("")
   slices = tileSlices(tileDocument)
@@ -3067,6 +3260,41 @@ function openBdaAnimationResourceChooser(onSelect: (resourceID: string) => void)
   resourcePickerSelect = onSelect
   if (isTauri()) openResourcePickerWindow()
   else openStyleImageResourcePicker()
+}
+
+function openBdaStyleImageResourceChooser(ref: BdaStyleRef, highlighted: boolean): void {
+  pickerTarget = undefined
+  resourcePickerSelect = (resourceID) => {
+    const property = highlighted ? "HL_IMG" : "NM_IMG"
+    if (updateBdaRefs([ref], property, resourceID)) void renderStyleResourceDetail()
+  }
+  if (isTauri()) openResourcePickerWindow()
+  else openStyleImageResourcePicker()
+}
+
+function replaceBdaStyleImage(ref: BdaStyleRef, highlighted: boolean): void {
+  if (ref.type !== "image" || !isEditing()) return
+  openBdaStyleImageResourceChooser(ref, highlighted)
+}
+
+function editBdaStyleImageSlice(ref: BdaStyleRef, highlighted: boolean): void {
+  const info = currentBdaAppearance()
+  const style = ref.type === "image" ? info?.appearance.imageStyles.get(ref.key) : undefined
+  const atom = highlighted ? style?.highlightImage : style?.normalImage
+  const resourceID = atom?.resource?.resourceID.replace(/\.png$/i, "")
+  if (!info || !resourceID) return
+  const path = resourceImagePaths(archive?.names() ?? [], theme.value, orientation.value)
+    .find((candidate) => candidate.split("/").pop()?.replace(/\.png$/i, "") === resourceID)
+  if (!path) return
+  const returnState = { path: selectedPath, styleID: selectedStyleID }
+  selectFile(info.path, "overview", "image")
+  bdaSliceReturn = returnState
+  selectResourceImage(path)
+  selectedTileIndex = bdaTileUsages.find((usage) =>
+    usage.ref.type === ref.type && usage.ref.key === ref.key && usage.highlighted === highlighted)?.index
+    ?? selectedTileIndex
+  populateTileInspector()
+  drawAtlas()
 }
 
 function chooseStyleImageSlice(property: "NM_IMG" | "HL_IMG"): void {
@@ -3147,6 +3375,10 @@ async function renderStyleResourceDetail(): Promise<void> {
       resolver: visualResolver(),
       editable: isEditing(),
       onStyleChange: (styleRef, property, value) => { updateBdaRefs([styleRef], property, value) },
+      onImageAction: (ref, highlighted, action) => {
+        if (action === "slice") editBdaStyleImageSlice(ref, highlighted)
+        else replaceBdaStyleImage(ref, highlighted)
+      },
     })
     return
   }
@@ -3296,6 +3528,14 @@ async function renderStyleResourceGallery(): Promise<void> {
     return
   }
   if (!archive?.isText(styleConfigPath())) return
+  if (resourceCategory.dataset.styleCategories !== "bdi") {
+    resourceCategory.replaceChildren(
+      new Option("全部样式", "all"),
+      new Option("声音样式", "sound"),
+      new Option("视觉样式", "visual"),
+    )
+    resourceCategory.dataset.styleCategories = "bdi"
+  }
   const query = resourceSearch.value.trim().toLowerCase()
   const stylesDocument = IniDocument.parse(archive.getText(styleConfigPath()))
   const category = resourceCategory.value
@@ -3376,13 +3616,18 @@ async function renderBdaStyleResourceGallery(): Promise<void> {
     colorStyles: { label: "颜色样式", type: "color", styles: info.appearance.colorStyles },
   } as const
   const definition = definitions[part.group]
+  if (resourceCategory.dataset.styleCategories !== "bda") {
+    resourceCategory.replaceChildren(...bdaAppearanceStyleGroups.map(([value, label]) => new Option(label, value)))
+    resourceCategory.dataset.styleCategories = "bda"
+  }
+  resourceCategory.value = part.group
   const query = resourceSearch.value.trim().toLowerCase()
   const keys = [...definition.styles.keys()].filter((key) => !query || String(key).includes(query))
-  resourceListTitle.textContent = definition.label
+  resourceListTitle.textContent = "样式配置"
   resourceSearch.placeholder = "搜索样式"
   resourceSearch.setAttribute("aria-label", "搜索样式")
   resourceSearchControl.setAttribute("aria-label", "搜索样式")
-  resourceCategory.hidden = true
+  resourceCategory.hidden = false
   resourceCount.textContent = `${keys.length} 个样式`
   resourceUploadButton.hidden = true
   styleAddButton.hidden = true
@@ -3516,6 +3761,7 @@ function renderResourceInspector(): void {
   const query = resourceSearch.value.trim().toLowerCase()
   const paths = resourceImagePaths(archive.names(), theme.value, orientation.value)
     .filter((path) => !query || path.toLowerCase().includes(query))
+  const bdaUsageCounts = archive.format === "bda" ? bdaImageUsageCounts() : new Map<string, number>()
   resourceCount.textContent = `${paths.length} 张图片`
   resourceListView.hidden = Boolean(selectedResourcePath)
   resourceDetail.hidden = !selectedResourcePath
@@ -3536,7 +3782,11 @@ function renderResourceInspector(): void {
     const name = document.createElement("strong")
     name.textContent = path.split("/").pop() ?? path
     const meta = document.createElement("small")
-    meta.textContent = archive.isText(path.replace(/\.png$/i, ".til")) ? "TIL" : "无 TIL"
+    const hasTil = archive.isText(path.replace(/\.png$/i, ".til"))
+    const bdaUsageCount = bdaUsageCounts.get(bdaImageResourceID(path)) ?? 0
+    meta.textContent = archive.format === "bda"
+      ? bdaUsageCount ? `${bdaUsageCount} 个样式引用` : "未被外观引用"
+      : hasTil ? "TIL" : "无 TIL"
     image.addEventListener("load", () => {
       meta.textContent = `${image.naturalWidth} × ${image.naturalHeight} · ${meta.textContent}`
     })
@@ -3616,7 +3866,9 @@ function updateInspectorView(): void {
   for (const button of inspectorTabButtons) {
     const tab = button.dataset.inspectorTab
     const available = resourceConfigActive
-      ? tab === "properties" || tab === "source" && Boolean(selectedPath)
+      ? tab === "properties" || tab === "source" && Boolean(selectedPath) && !(
+        archive?.format === "bda" && resourceInspectorMode === "image"
+      )
       :
       tab === "properties"
         ? imageSelected || propertiesAvailable
@@ -3625,7 +3877,9 @@ function updateInspectorView(): void {
     button.classList.toggle("active", tab === inspectorTab && available)
   }
   if (resourceConfigActive) {
-    sourceName.textContent = inspectorTab === "source" && selectedResourcePath ? tilePath : selectedResourcePath || selectedPath
+    sourceName.textContent = inspectorTab === "source" && selectedResourcePath
+      ? archive?.format === "bda" ? "BDA 切片由 appearanceConfig 管理" : tilePath
+      : selectedResourcePath || selectedPath
     quickInspector.hidden = true
     asset.hidden = true
     resourceInspector.hidden = inspectorTab !== "properties"
@@ -4045,6 +4299,7 @@ function drawVisualPreview(canvas: HTMLCanvasElement, visuals: Array<Visual | un
       context.fillRect(destination.x, destination.y, destination.width, destination.height)
     }
     drawVisualSource(context, visual, destination)
+    drawVisualText(context, visual, destination)
   })
 }
 
@@ -4164,13 +4419,28 @@ async function refreshStyleReferenceThumbnail(
 }
 
 function openStyleReferenceEditor(styleID: string): void {
-  if (!styleID || !availableStyleIDs().includes(styleID)) return
-  const path = styleConfigPath()
-  if (!archive?.isText(path)) return
+  if (!styleID || !availableStyleIDs().includes(styleID) || !archive) return
   const returnPath = selectedPath
   const returnSelection = [...selectedKeySections]
+  const returnCandidate = selectedCandidate
   const returnScrollTop = quickInspector.scrollTop
   const returnInspectorGroup = quickInspector.dataset.mobileInspectorGroup ?? ""
+  if (archive.format === "bda") {
+    const ref = bdaStyleRef(styleID)
+    if (!ref) return
+    const group = `${ref.type}Styles` as BdaAppearanceStyleGroup
+    const path = bdaAppearanceStylePath(group)
+    selectFile(path, "overview", "style")
+    styleReturnPath = returnPath === path ? "" : returnPath
+    styleReturnSelection = returnSelection
+    styleReturnCandidate = returnCandidate
+    styleReturnScrollTop = returnScrollTop
+    styleReturnInspectorGroup = returnInspectorGroup
+    selectStyleResource(String(ref.key))
+    return
+  }
+  const path = styleConfigPath()
+  if (!archive.isText(path)) return
   selectFile(path, "overview", "style")
   styleReturnPath = returnPath === path ? "" : returnPath
   styleReturnSelection = returnSelection
@@ -4179,8 +4449,33 @@ function openStyleReferenceEditor(styleID: string): void {
   selectStyleResource(styleID)
 }
 
+function openBdaStyleReferencePicker(paths: string[][], ref: BdaStyleRef, field: string, owner: HTMLElement): void {
+  const input = document.createElement("input")
+  input.value = bdaStyleID(ref)
+  input.dataset.documentStyleKey = field
+  input.dataset.bdaStyleType = ref.type
+  input.addEventListener("change", () => {
+    const next = bdaStyleRef(input.value)
+    if (next) updateBdaAppearanceStyleRef(paths, next, owner)
+  })
+  openStylePicker(input)
+}
+
+function stylePickerLabel(styleID: string): string {
+  return archive?.format === "bda" ? String(bdaStyleRef(styleID)?.key ?? styleID) : styleID
+}
+
 function availableStyleIDs(): string[] {
-  if (!archive || archive.format === "bda") return []
+  if (!archive) return []
+  if (archive.format === "bda") {
+    const appearance = currentBdaAppearance()?.appearance
+    if (!appearance) return []
+    return [
+      ...[...appearance.imageStyles.keys()].map((key) => bdaStyleID({ type: "image", key })),
+      ...[...appearance.colorStyles.keys()].map((key) => bdaStyleID({ type: "color", key })),
+      ...[...appearance.textStyles.keys()].map((key) => bdaStyleID({ type: "text", key })),
+    ]
+  }
   const path = styleConfigPath()
   if (!archive.isText(path)) return []
   return IniDocument.parse(archive.getText(path)).sections()
@@ -4192,9 +4487,11 @@ async function renderStylePicker(): Promise<void> {
   const renderID = ++stylePickerRenderID
   const query = stylePickerSearch.value.trim().toLowerCase()
   const soundOnly = styleReferenceKey(stylePickerTarget!) === "SOUND_STYLE"
+  const bdaTargetType = archive?.format === "bda" ? stylePickerTarget?.dataset.bdaStyleType : undefined
   const stylesPath = styleConfigPath()
   const styles = archive?.isText(stylesPath) ? IniDocument.parse(archive.getText(stylesPath)) : undefined
   const styleIDs = availableStyleIDs().filter((styleID) => {
+    if (bdaTargetType && bdaStyleRef(styleID)?.type !== bdaTargetType) return false
     const filename = styles?.get(`STYLE${styleID}`, "PRESS_SOUND_PATH")?.trim() ?? ""
     return (!query || styleID.toLowerCase().includes(query) || filename.toLowerCase().includes(query))
       && (!soundOnly || Boolean(filename))
@@ -4259,13 +4556,14 @@ async function renderStylePicker(): Promise<void> {
   })))
   if (renderID !== stylePickerRenderID) return
   for (const { styleID, visuals } of items) {
+    const displayID = stylePickerLabel(styleID)
     const button = document.createElement("button")
     button.type = "button"
     button.className = "style-picker-item"
     button.classList.toggle("selected", stylePickerTarget?.value.split(",")[0]?.trim() === styleID)
-    button.title = `点击使用样式 ${styleID}；Command/Ctrl 点击编辑`
+    button.title = `点击使用样式 ${displayID}；Command/Ctrl 点击编辑`
     const label = document.createElement("strong")
-    label.textContent = styleID
+    label.textContent = displayID
     const previews = document.createElement("span")
     previews.className = "style-picker-previews"
     for (const [index, visual] of visuals.entries()) {
@@ -4357,6 +4655,17 @@ function selectedBdaRefs(
   return refs.length || !fallbackSource ? refs : collect(fallbackSource)
 }
 
+function bdaStyleHasProperty(appearance: BdaAppearance, ref: BdaStyleRef, property: string): boolean {
+  if (ref.type !== "text") return false
+  const style = appearance.textStyles.get(ref.key)
+  if (!style) return false
+  if (property === "FONT_NAME") return style.fontName !== undefined
+  if (property === "FONT_SIZE") return style.fontSize !== undefined
+  if (property === "NM_COLOR") return style.normalColor !== undefined
+  if (property === "HL_COLOR") return style.highlightColor !== undefined
+  return false
+}
+
 function bdaStyleValue(appearance: BdaAppearance, ref: BdaStyleRef, property: string): string {
   if (ref.type === "image") {
     const style = appearance.imageStyles.get(ref.key)
@@ -4388,6 +4697,36 @@ function updateBdaRefs(refs: BdaStyleRef[], property: string, value: string): bo
   refreshSelectedBdaSource()
   refreshPreview()
   populateKeyInspector()
+  updateDirty()
+  return true
+}
+
+// 将样式引用写回 appearanceConfig 的面板片段，path 指向解码 JSON 中的字段位置。
+function updateBdaAppearanceStyleRef(paths: string[][], ref: BdaStyleRef, owner?: HTMLElement): boolean {
+  const info = currentBdaAppearance()
+  const part = bdaAppearancePart(selectedPath)
+  if (!info || part?.kind !== "panel" || !paths.length) return false
+  const source = JSON.parse(decodedBdaAppearancePart(info.bytes, part)) as Record<string, unknown>
+  const value = { type: ref.type, key: ref.key }
+  for (const path of paths) {
+    let target: unknown = source
+    for (const step of path.slice(0, -1)) {
+      if (target === null || typeof target !== "object") return false
+      target = Array.isArray(target)
+        ? target[Number(step)]
+        : (target as Record<string, unknown>)[step]
+    }
+    if (target === null || typeof target !== "object") return false
+    const last = path[path.length - 1]
+    if (Array.isArray(target)) target[Number(last)] = value
+    else (target as Record<string, unknown>)[last] = value
+  }
+  const after = applyDecodedBdaAppearancePart(info.path, info.bytes, JSON.stringify(source), part)
+  commitBytes(info.path, info.bytes, after)
+  refreshBdaLayout(layoutPath)
+  refreshSelectedBdaSource()
+  refreshPreview()
+  if (owner) void refreshBdaStyleReferenceField(owner, ref, visualResolver())
   updateDirty()
   return true
 }
@@ -4767,16 +5106,8 @@ function selectedBdaKeyNames(): string[] {
   }))]
 }
 
-function selectedBdaKeys(appearance: BdaAppearance): Array<{ name: string; key: BdaKey }> {
-  const panel = appearance.panels.get(layoutPath.split("/").pop()?.replace(/\.ini$/i, "") ?? "")
-  if (!panel) return []
-  return selectedBdaKeyNames().flatMap((name) => {
-    const key = panel.keys.get(name)
-    return key ? [{ name, key }] : []
-  })
-}
-
 function selectedBdaSourceKeys(): string[] {
+  if (selectedCandidate && selectedPath === layoutPath) return ["cand"]
   return isBdaLayoutPath(selectedPath) ? selectedBdaKeyNames() : []
 }
 
@@ -4806,15 +5137,27 @@ function populateBdaConfigInspector(): void {
     return
   }
   if (bdaAppearancePart(selectedPath)?.kind === "panel" && info) {
+    const panelName = selectedPath.split("/").pop()?.replace(/\.ini$/i, "") ?? ""
+    const panel = info.appearance.panels.get(panelName)
+    const selectedKeys = selectedBdaKeyNames().flatMap((name) => {
+      const key = panel?.keys.get(name)
+      return key ? [{ name, key }] : []
+    })
     bdaConfigFieldsGroup.hidden = false
     renderBdaLayoutEditor(bdaConfigFields, {
       appearance: info.appearance,
-      panelName: selectedPath.split("/").pop() ?? "",
-      keys: selectedBdaKeys(info.appearance),
+      panelName,
+      keys: selectedKeys,
+      scope: selectedCandidate ? "candidate" : "panel",
       resolver: visualResolver(),
       editable: isEditing(),
       onStyleChange: (ref, property, value) => { updateBdaRefs([ref], property, value) },
       onPanelPropertyChange: (property, value) => { updateSelectedBdaPanelProperty(property, value) },
+      onStyleRefChange: (paths, ref, owner) => { updateBdaAppearanceStyleRef(paths, ref, owner) },
+      onStyleRefAction: (paths, ref, field, action, owner) => {
+        if (action === "edit") openStyleReferenceEditor(bdaStyleID(ref))
+        else openBdaStyleReferencePicker(paths, ref, field, owner)
+      },
     })
     return
   }
@@ -4885,6 +5228,20 @@ function addNavButton(
   parent.append(button)
 }
 
+function syncBdaKeyFieldLabels(bdaSelected: boolean): void {
+  for (const field of [...keyFields, ...styleFields]) {
+    const label = field.closest<HTMLElement>("label")
+    const textNode = label && Array.from(label.childNodes).find(
+      (node): node is Text => node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim()),
+    )
+    if (!textNode || !label) continue
+    const name = field.dataset.keyField ?? field.dataset.styleField ?? ""
+    label.dataset.defaultInspectorCaption ??= textNode.textContent.trim()
+    const caption = bdaSelected ? bdaKeyFieldLabels[name] : label.dataset.defaultInspectorCaption
+    if (caption) textNode.textContent = `${caption} `
+  }
+}
+
 function populateKeyInspector(): void {
   if (selectedPath !== layoutPath && selectedKeySections.length) {
     selectedKeySections = []
@@ -4897,20 +5254,28 @@ function populateKeyInspector(): void {
   const toolbarSelected = isToolbarPath(selectedPath)
   const bdaConfigSelected = Boolean(archive?.isBdaConfig(selectedPath))
   const bdaSelected = archive?.format === "bda"
+  const candidateSelected = Boolean(bdaSelected && selectedCandidate && selectedPath === layoutPath)
+  syncBdaKeyFieldLabels(bdaSelected)
   skinFieldsGroup.hidden = !skinSelected || bdaSelected
   toolbarFieldsGroup.hidden = !toolbarSelected || bdaSelected
-  keyboardFieldsGroup.hidden = bdaSelected || skinSelected || toolbarSelected || bdaConfigSelected || selectedPath !== layoutPath || hasSelection
-  for (const group of keyOnlyGroups) group.hidden = bdaSelected || skinSelected || bdaConfigSelected || !hasSelection
+  keyboardFieldsGroup.hidden = bdaSelected || skinSelected || toolbarSelected || bdaConfigSelected || candidateSelected || selectedPath !== layoutPath || hasSelection
+  for (const group of keyOnlyGroups) {
+    group.hidden = skinSelected || bdaConfigSelected || !hasSelection || bdaSelected && group !== keyAppearanceFieldsGroup
+  }
   selectedKeyName.textContent = skinSelected
     ? "皮肤信息"
     : bdaConfigSelected
       ? selectedPath.split("/").pop() ?? "BDA 专属配置"
+    : candidateSelected
+      ? "候选栏"
     : toolbarSelected
       ? "候选栏与工具栏"
     : selectedPath !== layoutPath && !toolbarSelected
       ? selectedPath.split("/").pop() ?? "文档配置"
     : !hasSelection
       ? `${layout.value === "py_26.ini" ? "26 键" : "九键"} · 整体设置`
+    : bdaSelected
+      ? selectedBdaKeyNames().join("、") || `已选择 ${sections.length} 个 BDA 按键`
     : sections.length === 1
       ? isListCell(sections[0])
         ? "LIST · 候选栏"
@@ -4955,6 +5320,7 @@ function populateKeyInspector(): void {
     : undefined
   for (const field of keyFields) {
     const name = field.dataset.keyField ?? ""
+    // BDA 样式引用由源码结构控件编辑，旧格式按键字段只负责非 BDA 皮肤。
     field.disabled = !hasSelection || archive?.format === "bda"
     field.placeholder = ""
     if (!hasSelection) {
@@ -4995,15 +5361,26 @@ function populateKeyInspector(): void {
     field.value = common
     if (!common && new Set(values).size > 1) field.placeholder = "混合"
   }
+  const bdaKeyProperties = new Set(["FORE_OFFSET"])
+  for (const field of keyFields) {
+    if (!field.closest(".key-appearance-fields")) continue
+    const label = field.closest<HTMLElement>("label")
+    if (label) label.hidden = Boolean(bdaSelected && (
+      !bdaKeyProperties.has(field.dataset.keyField ?? "") || !field.value && field.placeholder !== "混合"
+    ))
+  }
+  const bdaTextPropertyAvailability = new Map<string, boolean>()
   for (const field of styleFields) {
     const property = field.dataset.styleField ?? ""
     if (archive?.format === "bda") {
       const info = currentBdaAppearance()
       const refs = selectedBdaRefs("FORE_STYLE", "text")
       const values = info ? refs.map((ref) => bdaStyleValue(info.appearance, ref, property)) : []
+      const available = Boolean(info && refs.some((ref) => bdaStyleHasProperty(info.appearance, ref, property)))
+      bdaTextPropertyAvailability.set(property, available)
       const common = values.length && values.every((value) => value === values[0]) ? values[0] : ""
-      field.disabled = !refs.length || property === "FONT_WEIGHT"
-      field.placeholder = refs.length && !common && new Set(values).size > 1 ? "混合" : field.disabled ? "未配置" : ""
+      field.disabled = !available
+      field.placeholder = available && !common && new Set(values).size > 1 ? "混合" : available ? "" : "未配置"
       field.value = common
       if (property.endsWith("COLOR")) syncColorControl(field)
       continue
@@ -5025,7 +5402,27 @@ function populateKeyInspector(): void {
   const hasTextStyle = archive?.format === "bda"
     ? selectedBdaRefs("FORE_STYLE", "text").length > 0
     : styleFields.some((field) => Boolean(selectedStylePropertyContext(field.dataset.styleField ?? "")))
-  for (const label of textStyleLabels) label.hidden = !hasSelection || !hasTextStyle
+  for (const label of textStyleLabels) {
+    if (!hasSelection || !hasTextStyle) {
+      label.hidden = true
+      continue
+    }
+    if (archive?.format !== "bda") {
+      label.hidden = false
+      for (const fieldLabel of Array.from(label.querySelectorAll<HTMLLabelElement>("label"))) fieldLabel.hidden = false
+      continue
+    }
+    if (label.classList.contains("color-pair-field")) {
+      for (const field of Array.from(label.querySelectorAll<HTMLInputElement>("[data-style-field]"))) {
+        const fieldLabel = field.closest<HTMLLabelElement>("label")
+        if (fieldLabel) fieldLabel.hidden = !bdaTextPropertyAvailability.get(field.dataset.styleField ?? "")
+      }
+      label.hidden = !Array.from(label.querySelectorAll<HTMLLabelElement>("label")).some((fieldLabel) => !fieldLabel.hidden)
+      continue
+    }
+    const property = label.querySelector<HTMLInputElement>("[data-style-field]")?.dataset.styleField ?? ""
+    label.hidden = !bdaTextPropertyAvailability.get(property)
+  }
   const listSelected = sections.some(isListCell)
   const keyToolsAvailable = hasSelection && isEditing() && archive?.format !== "bda" && !listSelected
   for (const button of keyModeButtons) button.disabled = !keyToolsAvailable
@@ -5212,8 +5609,9 @@ function updateToolbar(field: HTMLInputElement): void {
 }
 
 function updateSelectedKey(field: HTMLInputElement): void {
-  if (!archive || archive.format === "bda" || !layoutDocument || !selectedKeySections.length) return
   const name = field.dataset.keyField ?? ""
+  if (archive?.format === "bda") return
+  if (!archive || !layoutDocument || !selectedKeySections.length) return
   const rectNames = ["x", "y", "width", "height"]
   if (selectedKeySections.length === 1 && isListCell(selectedKeySections[0])) {
     // LIST 候选栏单元：几何字段写回定义处（布局或 gen.ini），其余写回布局的 [LIST]
@@ -5425,7 +5823,7 @@ function selectImageResource(path: string): void {
   const select = resourcePickerSelect
   if (select) {
     const resourceID = path.split("/").pop()?.replace(/\.png$/i, "") ?? path
-    closeStyleImageResourcePicker()
+    clearImageSlicePicker()
     select(resourceID)
     return
   }
@@ -5467,6 +5865,14 @@ function renderStyleImageResources(): void {
 
 function openStyleImageResourcePicker(): void {
   if (isTauri() || !archive || (!pickerTarget && !resourcePickerSelect)) return
+  if (!pickerTarget) {
+    styleImageDialog.hidden = false
+    styleImagePreview.hidden = true
+    styleImagePicker.hidden = true
+    styleImageResourceOpen.hidden = true
+    styleImageTitle.textContent = "选择图片资源"
+    styleImageSubtitle.textContent = ""
+  }
   styleImageResourcePicker.hidden = false
   renderStyleImageResources()
   styleImageResourceSearch.focus()
@@ -5700,6 +6106,22 @@ function atlasPoint(event: Pick<PointerEvent, "clientX" | "clientY">): TilePoint
   }
 }
 
+function commitBdaTileInnerRect(rect: TileRect): void {
+  const info = currentBdaAppearance()
+  const usage = selectedBdaTileUsage()
+  const slice = slices.find((item) => item.index === selectedTileIndex)
+  if (!info || !usage || !slice || !isEditing()) return
+  const [x, y, width, height] = rect
+  if (rect.some((value) => !Number.isInteger(value) || value < 0)) return
+  if (x + width > slice.source[2] || y + height > slice.source[3]) return
+  const after = updateBdaImageInnerRect(info.bytes, usage.ref, usage.highlighted, rect)
+  commitBytes(info.path, info.bytes, after)
+  loadTiles(selectedResourcePath)
+  refreshPreview()
+  populateKeyInspector()
+  updateDirty()
+}
+
 function commitTile(slice: TileSlice, coalesce = false): void {
   if (!archive || !selectedResourcePath || !isEditing()) return
   const [x, y, width, height] = slice.source
@@ -5780,11 +6202,15 @@ function duplicateSelectedTile(): void {
 function updateSelectedTile(): void {
   const existing = slices.find((slice) => slice.index === selectedTileIndex)
   if (!existing) return
-  const source = tileSourceFields.map((field) => Number(field.value)) as TileRect
-  if (source.some((value) => !Number.isFinite(value))) return
   const innerValues = tileInnerFields.map((field) => field.value.trim())
   const innerNumbers = innerValues.map(Number) as TileRect
   const inner = innerValues.every(Boolean) && innerNumbers.every(Number.isFinite) ? innerNumbers : undefined
+  if (archive?.format === "bda") {
+    if (inner) commitBdaTileInnerRect(inner)
+    return
+  }
+  const source = tileSourceFields.map((field) => Number(field.value)) as TileRect
+  if (source.some((value) => !Number.isFinite(value))) return
   commitTile({ index: existing.index, source, ...(inner ? { inner } : {}) })
 }
 
@@ -5995,11 +6421,14 @@ function selectFile(
   resourceMode: "document" | "image" | "style" | "sound" = "document",
   preserveInspectorView = false,
 ): void {
+  if (resourceMode !== "image") bdaSliceReturn = undefined
   if (path !== selectedPath) source.commit()
+  selectedCandidate = false
   const previousInspectorTab = inspectorTab
   const preserveCurrentInspectorView = preserveInspectorView || path === selectedPath
   if (path !== selectedPath) sourceHistoryHighlight = undefined
   styleReturnPath = ""
+  styleReturnCandidate = false
   resourceConfigActive = resourceMode !== "document"
   resourceInspectorMode = resourceMode === "style" ? "style" : resourceMode === "sound" ? "sound" : "image"
   const guideLabel = resourceInspectorMode === "image" && resourceConfigActive ? "切片网格" : "辅助线"
@@ -6140,6 +6569,7 @@ function selectFile(
   }
   updateSourceFileActions()
   updateSourceSearchStatus()
+  syncCandidateSelection()
 }
 
 const overviewGroupState = new Map<string, boolean>()
@@ -6283,17 +6713,15 @@ function renderFiles(): void {
         meta: panelName,
       })
     }
-    for (const [group, section, label, icon] of bdaAppearanceStyleGroups) {
-      entries.push({
-        group: section,
-        label,
-        path: bdaAppearanceStylePath(group),
-        className: "nav-style",
-        icon,
-        navMode: "style",
-        meta: group,
-      })
-    }
+    entries.push({
+      group: "资源配置",
+      label: "样式配置",
+      path: bdaAppearanceStylePath(selectedBdaStyleGroup),
+      className: "nav-style",
+      icon: "paintpalette",
+      navMode: "style",
+      meta: "appearanceConfig",
+    })
     entries.push({
       group: "资源配置",
       label: "图片资源",
@@ -6332,7 +6760,9 @@ function renderFiles(): void {
   }
 
   const candidatePath = archive.format === "bda" ? undefined : toolbarConfigPath()
-  if (candidatePath) entries.push({ group: "键盘组件", label: "候选栏与工具栏", path: candidatePath, className: "nav-component", icon: "text.bubble" })
+  if (candidatePath) {
+    entries.push({ group: "键盘组件", label: "候选栏与工具栏", path: candidatePath, className: "nav-component", icon: "text.bubble" })
+  }
   const hintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
   if (hintPath) entries.push({ group: "键盘组件", label: "按键气泡", path: hintPath, className: "nav-component", icon: "rectangle.and.hand.point" })
   const stylePath = appearancePath ?? (archive.format === "bda" ? undefined : styleConfigPath())
@@ -6366,7 +6796,7 @@ function renderFiles(): void {
     }
   }
   const groups = archive.format === "bda"
-    ? ["皮肤信息", "样式配置", "资源配置", "面板样式", "动画效果", "按键音效", "轻量动画", "开关配置", "贴纸配置", "场景配置"]
+    ? ["皮肤信息", "资源配置", "面板样式", "动画效果", "按键音效", "轻量动画", "开关配置", "贴纸配置", "场景配置"]
     : ["皮肤", "资源配置", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "扩展配置", "扩展布局"]
   for (const group of groups) {
     const grouped = entries.filter((entry) => entry.group === group && (
@@ -7741,15 +8171,26 @@ newTileButton.addEventListener("click", () => {
 duplicateTileButton.addEventListener("click", duplicateSelectedTile)
 deleteTileButton.addEventListener("click", deleteSelectedTile)
 resourceBackButton.addEventListener("click", () => {
+  if (resourceInspectorMode === "image" && bdaSliceReturn) {
+    const { path, styleID } = bdaSliceReturn
+    bdaSliceReturn = undefined
+    selectFile(path, "overview", "style")
+    selectStyleResource(styleID)
+    return
+  }
   if (resourceInspectorMode === "style" && styleReturnPath) {
     const path = styleReturnPath
     const selection = [...styleReturnSelection]
+    const candidate = styleReturnCandidate
     const scrollTop = styleReturnScrollTop
     const inspectorGroup = styleReturnInspectorGroup
     styleReturnPath = ""
+    styleReturnCandidate = false
     selectFile(path, "overview")
     selectedKeySections = selection
+    selectedCandidate = candidate
     preview.setSelected(selection)
+    syncCandidateSelection()
     populateKeyInspector()
     if (inspectorGroup) setMobileInspectorGroup(inspectorGroup, false)
     quickInspector.scrollTop = scrollTop
@@ -7759,7 +8200,23 @@ resourceBackButton.addEventListener("click", () => {
   showResourceList()
 })
 resourceSearch.addEventListener("input", renderResourceInspector)
-resourceCategory.addEventListener("change", renderResourceInspector)
+resourceCategory.addEventListener("change", () => {
+  if (archive?.format !== "bda" || resourceInspectorMode !== "style" || !resourceConfigActive) {
+    renderResourceInspector()
+    return
+  }
+  const group = resourceCategory.value as BdaAppearanceStyleGroup
+  if (!bdaAppearanceStyleGroups.some(([value]) => value === group)) return
+  source.commit()
+  selectedBdaStyleGroup = group
+  renderFiles()
+  selectFile(bdaAppearanceStylePath(group), "overview", "style")
+})
+bdaTileUsage.addEventListener("change", () => {
+  selectedTileIndex = Number(bdaTileUsage.value)
+  populateTileInspector()
+  drawAtlas()
+})
 for (const button of tileModeButtons) {
   button.addEventListener("click", () => {
     tileMode = button.dataset.tileMode === "move" ? "move" : "select"
@@ -7776,7 +8233,9 @@ atlasCanvas.addEventListener("pointerdown", (event) => {
     atlasCanvas.setPointerCapture(event.pointerId)
     return
   }
-  const hit = tileSliceAt(slices, point)
+  const hit = archive?.format === "bda"
+    ? slices.find((slice) => slice.index === selectedTileIndex)
+    : tileSliceAt(slices, point)
   selectedTileIndex = hit?.index
   updateSourceHighlight()
   if (hit) requestAnimationFrame(scrollSelectedSource)
@@ -7892,7 +8351,9 @@ function openLayoutImageDialog(): void {
   const layout = currentLayoutDocument()
   const styles = currentStyleDocument()
   if (!layout || !styles) return
-  layoutImageLayout.textContent = `当前布局：${layoutPath.split("/").pop() ?? "布局"}（${orientation.value}）`
+  const themeLabel = theme.value === "dark" ? "深色" : "浅色"
+  const orientationLabel = orientation.value === "land" ? "横屏" : "竖屏"
+  layoutImageLayout.textContent = `当前布局：${layoutPath.split("/").pop() ?? "布局"}（${themeLabel} · ${orientationLabel}）`
   layoutImageScope.textContent = selectedKeySections.length
     ? `已选中 ${selectedKeySections.length} 个按键，将只替换这些按键。`
     : "未选中按键，将替换当前布局的全部按键。"
@@ -7946,6 +8407,7 @@ async function applyLayoutImage(): Promise<void> {
     return
   }
   const panel = resolvePanelConfig(layout, gen, styles)
+  const alphaMode = archive.format === "bds" ? 1 : 2
   if (layoutImageTarget === "candidate") {
     const candPath = toolbarConfigPath()
     const cand = candPath && archive.isText(candPath) ? IniDocument.parse(archive.getText(candPath)) : undefined
@@ -7962,7 +8424,7 @@ async function applyLayoutImage(): Promise<void> {
     }
     const base = nextResourceBase()
     const plan = planLayoutImage(layoutImageTarget, [], IniDocument.parse(""), candidateRect.width, candidateRect.height)
-    const tilesBytes = layoutImageTileBytes(plan)
+    const tilesBytes = layoutImageTileBytes(plan, alphaMode)
     const stylesDoc = IniDocument.parse(styles.toString())
     const candDoc = IniDocument.parse(cand.toString())
     applyCandidateImageStyles(stylesDoc, candDoc, plan, base.split("/").pop()!)
@@ -8043,7 +8505,7 @@ async function applyLayoutImage(): Promise<void> {
     sourceHeight = scan.height
   }
   const base = nextResourceBase()
-  const tilesBytes = layoutImageTileBytes(plan)
+  const tilesBytes = layoutImageTileBytes(plan, alphaMode)
   const stylesDoc = IniDocument.parse(styles.toString())
   if (layoutImageConfig === "layout-follows-image" && layoutImageTarget !== "panel") {
     // 布局跟随图片：把按键矩形与面板尺寸改写为图片网格
@@ -8146,8 +8608,27 @@ panelScaleForm.addEventListener("submit", (event) => {
   panelScaleDialog.close()
   void runFileOperation("复制面板", copyPanel)
 })
+function syncCandidateSelection(): void {
+  const selected = selectedCandidate && archive?.format === "bda" && selectedPath === layoutPath
+    || archive?.format !== "bda" && isToolbarPath(selectedPath)
+  candidateArea.classList.toggle("candidate-selected", selected)
+  candidateArea.setAttribute("aria-selected", String(selected))
+}
+
 candidateArea.addEventListener("click", () => {
   if (!isEditing()) return
+  if (archive?.format === "bda") {
+    if (selectedPath !== layoutPath) selectFile(layoutPath, "overview")
+    selectedCandidate = true
+    selectedKeySections = []
+    preview.setSelected([])
+    syncCandidateSelection()
+    populateKeyInspector()
+    updateSourceHighlight()
+    scrollSelectedSource()
+    if (mobilePortraitQuery.matches) setMobilePane("inspector")
+    return
+  }
   const path = toolbarStrip.dataset.path
   if (path) selectFile(path)
 })
@@ -8169,7 +8650,10 @@ styleImagePickerCanvas.addEventListener("click", (event) => {
 })
 styleImageClose.addEventListener("click", clearImageSlicePicker)
 styleImageResourceOpen.addEventListener("click", openStyleImageResourcePicker)
-styleImageResourceClose.addEventListener("click", closeStyleImageResourcePicker)
+styleImageResourceClose.addEventListener("click", () => {
+  if (pickerTarget) closeStyleImageResourcePicker()
+  else clearImageSlicePicker()
+})
 styleImageResourceSearch.addEventListener("input", renderStyleImageResources)
 
 if (isTauri()) {

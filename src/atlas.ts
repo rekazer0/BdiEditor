@@ -5,6 +5,7 @@ export type Visual = {
   image?: ImageBitmap
   imagePath?: string
   color?: string
+  text?: StyleTextVisual
   source?: [number, number, number, number]
   inner?: [number, number, number, number]
   scale?: [number, number, number, number, number]
@@ -73,6 +74,21 @@ export function canvasFontFamily(fontName: string | undefined): string {
   const name = fontName?.trim()
   if (!name || /^\.SF(?:UI|NS)/i.test(name)) return "system-ui"
   return `"${name.replaceAll('"', '\\"')}", system-ui`
+}
+
+export function drawVisualText(
+  context: CanvasRenderingContext2D,
+  visual: Pick<Visual, "text">,
+  destination: { x: number; y: number; width: number; height: number },
+): void {
+  if (!visual.text) return
+  context.save()
+  context.fillStyle = visual.text.color ?? "#202124"
+  context.font = `${visual.text.fontWeight ?? 400} ${destination.height * 0.55}px ${canvasFontFamily(visual.text.fontName)}`
+  context.textAlign = "center"
+  context.textBaseline = "middle"
+  context.fillText(visual.text.text, destination.x + destination.width / 2, destination.y + destination.height / 2, destination.width * 0.9)
+  context.restore()
 }
 
 export function drawVisualSource(

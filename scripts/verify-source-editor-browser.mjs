@@ -114,7 +114,8 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 100))
     const finalLines = editor.renderedLineCount
     const visibleText = editor.view.contentDOM.textContent ?? ""
-    const selectedVisible = Boolean(editor.view.contentDOM.querySelector(".cm-source-selected"))
+    const selectedLines = editor.view.contentDOM.querySelectorAll(".cm-line.cm-source-selected").length
+    const selectedMarkInsideText = Boolean(editor.view.contentDOM.querySelector(".cm-line .cm-source-selected"))
     const activeSearchVisible = Boolean(editor.view.contentDOM.querySelector(".cm-source-search-active"))
 
     const blurTarget = document.createElement("button")
@@ -149,7 +150,8 @@ try {
       inputEvents,
       jsonLines,
       readOnly,
-      selectedVisible,
+      selectedLines,
+      selectedMarkInsideText,
       visibleText,
     }
   })
@@ -159,7 +161,8 @@ try {
   assert.ok(result.finalLines < 500, `INI 末尾渲染了过多行：${result.finalLines}`)
   assert.ok(result.jsonLines < 500, `JSON 末尾渲染了过多行：${result.jsonLines}`)
   assert.match(result.visibleText, /KEY29999/, "滚动到末尾后应渲染最后一个 INI section")
-  assert.ok(result.selectedVisible, "末尾选中范围应在当前视口显示")
+  assert.equal(result.selectedLines, 3, "末尾选中范围应高亮完整的 3 行")
+  assert.ok(!result.selectedMarkInsideText, "整行选中装饰不应嵌入文字并遮挡行首")
   assert.ok(result.activeSearchVisible, "末尾搜索结果应在当前视口显示")
   assert.ok(result.edited && result.inputEvents === 1, "CodeMirror 编辑应更新值并发出一次 input")
   assert.equal(result.changeEvents, 1, "CodeMirror 失焦应发出一次 change 供 BDA JSON 提交")

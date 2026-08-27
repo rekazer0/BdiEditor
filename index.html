@@ -287,7 +287,6 @@
             <div id="document-fields"></div>
           </div>
           <div class="inspector-group bda-config-fields" hidden>
-            <h3>BDA 可视化编辑器</h3>
             <div id="bda-config-fields"></div>
           </div>
           <div class="inspector-group key-only primary-key-fields">
@@ -297,7 +296,7 @@
               <label>点击动作（CENTER） <input data-key-field="CENTER" list="baidu-action-codes" /><small data-action-meaning="CENTER"></small></label>
             </div>
           </div>
-          <section class="inspector-group inspector-disclosure key-only">
+          <section class="inspector-group inspector-disclosure key-only key-layout-fields">
             <h3>布局</h3>
             <div class="inspector-grid geometry-fields">
               <label>X（VIEW_RECT） <input data-key-field="x" type="number" /></label>
@@ -323,49 +322,67 @@
               <button data-layout-action="merge" title="合并按键">合并</button>
             </div>
           </section>
-          <section class="inspector-group inspector-disclosure key-only">
+          <section class="inspector-group inspector-disclosure key-only key-appearance-fields">
             <h3>样式引用、文字与图片</h3>
             <div class="inspector-grid appearance-fields">
-              <label class="style-ref-row" title="按键引用的共享背景样式编号">背景样式引用（BACK_STYLE）
-                <span class="style-field">
-                  <input data-key-field="BACK_STYLE" />
-                </span>
-              </label>
-              <label class="style-ref-row" title="按键引用的共享前景样式编号">前景样式引用（FORE_STYLE）
-                <span class="style-field">
-                  <input data-key-field="FORE_STYLE" />
-                </span>
-              </label>
-              <label class="style-ref-row" title="状态样式（S状态_样式，多组用 | 分隔；S0 表示无状态样式）">状态样式（STAT_STYLE）
-                <span class="style-field">
-                  <input data-key-field="STAT_STYLE" />
-                </span>
-              </label>
-              <label class="style-ref-row" title="每层前景偏移（x,y；多组用 ; 分隔）">前景偏移（FORE_OFFSET）
-                <span class="style-field">
-                  <input data-key-field="FORE_OFFSET" />
-                </span>
-              </label>
-              <label class="style-ref-row" title="每层前景位置类型（逗号分隔）">前景位置类型（POS_TYPE）
-                <span class="style-field">
-                  <input data-key-field="POS_TYPE" />
-                </span>
-              </label>
-              <label class="style-ref-row" title="按键引用的按键音效样式编号">按键音效样式（SOUND_STYLE）
-                <span class="style-field">
-                  <input data-key-field="SOUND_STYLE" />
-                </span>
-              </label>
-              <label data-text-style>字体（FONT_NAME） <input data-style-field="FONT_NAME" /></label>
-              <label data-text-style>字重（FONT_WEIGHT） <input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
-              <label data-text-style>字号（FONT_SIZE） <input data-style-field="FONT_SIZE" type="number" /></label>
-              <div class="color-pair-field" data-text-style>
-                <label>文字正常颜色（NM_COLOR） <span class="color-control"><input data-style-field="NM_COLOR" /><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色（NM_COLOR）"><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度（NM_COLOR）"></span></label>
-                <label>文字按下颜色（HL_COLOR） <span class="color-control"><input data-style-field="HL_COLOR" /><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色（HL_COLOR）"><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度（HL_COLOR）"></span></label>
+              <div class="appearance-section appearance-visual-styles">
+                <div class="appearance-section-heading"><strong>视觉样式</strong><span>正常 / 按下</span></div>
+                <div class="appearance-reference-grid">
+                  <label class="style-ref-row" title="按键引用的共享背景样式编号">背景（BACK_STYLE）
+                    <span class="style-field">
+                      <input data-key-field="BACK_STYLE" />
+                    </span>
+                  </label>
+                  <label class="style-ref-row" title="按键引用的共享前景样式编号">前景（FORE_STYLE）
+                    <span class="style-field">
+                      <input data-key-field="FORE_STYLE" />
+                    </span>
+                  </label>
+                </div>
+              </div>
+              <div class="appearance-section appearance-layout-fields">
+                <div class="appearance-section-heading"><strong>状态与排布</strong></div>
+                <div class="appearance-property-grid">
+                  <label title="状态样式（S状态_样式，多组用 | 分隔；S0 表示无状态样式）">状态样式（STAT_STYLE）
+                    <span class="style-field">
+                      <input data-key-field="STAT_STYLE" />
+                    </span>
+                  </label>
+                  <label title="每层前景偏移（x,y；多组用 ; 分隔）">前景偏移（FORE_OFFSET）
+                    <span class="style-field">
+                      <input data-key-field="FORE_OFFSET" />
+                    </span>
+                  </label>
+                  <label title="每层前景位置类型（逗号分隔）">位置类型（POS_TYPE）
+                    <span class="style-field">
+                      <input data-key-field="POS_TYPE" />
+                    </span>
+                  </label>
+                </div>
+              </div>
+              <div class="appearance-section appearance-typography-fields">
+                <div class="appearance-section-heading"><strong>文字</strong></div>
+                <div class="appearance-property-grid typography-property-grid">
+                  <label data-text-style>字体（FONT_NAME） <input data-style-field="FONT_NAME" /></label>
+                  <label data-text-style>字重（FONT_WEIGHT） <input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
+                  <label data-text-style>字号（FONT_SIZE） <input data-style-field="FONT_SIZE" type="number" /></label>
+                  <div class="color-pair-field" data-text-style>
+                    <label>正常颜色（NM_COLOR） <span class="color-control"><input data-style-field="NM_COLOR" /><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色（NM_COLOR）"><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度（NM_COLOR）"></span></label>
+                    <label>按下颜色（HL_COLOR） <span class="color-control"><input data-style-field="HL_COLOR" /><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色（HL_COLOR）"><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度（HL_COLOR）"></span></label>
+                  </div>
+                </div>
+              </div>
+              <div class="appearance-section appearance-sound-field">
+                <div class="appearance-section-heading"><strong>音效</strong></div>
+                <label title="按键引用的按键音效样式编号">按键音效（SOUND_STYLE）
+                  <span class="style-field">
+                    <input data-key-field="SOUND_STYLE" />
+                  </span>
+                </label>
               </div>
             </div>
           </section>
-          <section class="inspector-group inspector-disclosure key-only">
+          <section class="inspector-group inspector-disclosure key-only key-gesture-fields">
             <h3>滑动与长按</h3>
             <div class="direction-editor" aria-label="滑动与长按动作">
               <label class="direction-up"><span>↑ 上滑（UP）</span><input data-key-field="UP" list="baidu-action-codes" /><small data-action-meaning="UP"></small></label>
@@ -417,15 +434,16 @@
           <div id="tile-inspector" class="inspector-group">
             <div class="tile-heading">
               <h3 id="tile-title">切片</h3>
+              <select id="bda-tile-usage" aria-label="BDA 图片样式引用" hidden></select>
             </div>
             <div id="tile-preview-wrap" hidden><canvas id="tile-preview" width="240" height="240" aria-label="选中切片放大预览"></canvas></div>
-            <div class="inspector-grid geometry-fields">
+            <div id="tile-source-fields" class="inspector-grid geometry-fields">
               <label>X（SOURCE） <input data-tile-source="0" type="number" min="0" /></label>
               <label>Y（SOURCE） <input data-tile-source="1" type="number" min="0" /></label>
               <label>宽（SOURCE） <input data-tile-source="2" type="number" min="1" /></label>
               <label>高（SOURCE） <input data-tile-source="3" type="number" min="1" /></label>
             </div>
-            <h3>INNER_RECT（可选）</h3>
+            <h3 id="tile-inner-title">INNER_RECT（可选）</h3>
             <div class="inspector-grid geometry-fields">
               <label>X（INNER_RECT） <input data-tile-inner="0" type="number" /></label>
               <label>Y（INNER_RECT） <input data-tile-inner="1" type="number" /></label>

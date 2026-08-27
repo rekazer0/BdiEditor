@@ -15,6 +15,7 @@ assert.match(editor, /class SourceCodeEditor/, "应通过独立适配器封装 C
 assert.match(editor, /StreamLanguage\.define\(properties\)/, "BDS 和 BDI 源码应使用 INI 模式")
 assert.match(editor, /language === "json" \? json\(\) : iniLanguage/, "BDA 解码源码应切换为 JSON 模式")
 assert.match(editor, /EditorView\.decorations/, "源码选区和搜索应使用视口化装饰")
+assert.match(editor, /Decoration\.line\(\{ class: "cm-source-selected" \}\)/, "源码业务选区应使用整行装饰")
 assert.match(editor, /scrollIntoView/, "源码定位应交给 CodeMirror")
 assert.match(editor, /commit\(\): void \{[\s\S]*?dispatchEvent\(new Event\("change"\)\)/, "源码编辑器应能在导航前显式提交待处理修改")
 assert.match(main, /new SourceCodeEditor/, "主界面应初始化 CodeMirror 适配器")

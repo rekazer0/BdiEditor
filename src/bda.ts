@@ -1103,10 +1103,13 @@ export class BdaResolver implements VisualResolver {
     if (!ref) return
     if (ref.type === "color") {
       const style = this.appearance.colorStyles.get(ref.key)
-      const normalColor = style?.normalColor ?? 0
+      const normalColor = style?.normalColor ?? style?.highlightColor ?? 0
       return style ? { color: bdaCssColor(highlighted ? style.highlightColor ?? normalColor : normalColor) } : undefined
     }
-    if (ref.type === "text") return
+    if (ref.type === "text") {
+      const style = this.appearance.textStyles.get(ref.key)
+      return style ? { text: { text: style.contentText || "Aa", ...this.resolveText(styleID, highlighted) } } : undefined
+    }
     const style = this.appearance.imageStyles.get(ref.key)
     const atom = highlighted ? style?.highlightImage ?? style?.normalImage : style?.normalImage
     const found = atom?.resource?.resourceID ? this.resource(atom.resource.resourceID) : undefined
@@ -1141,7 +1144,7 @@ export class BdaResolver implements VisualResolver {
     }).find(Boolean)
     if (!ref) return
     const style = this.appearance.textStyles.get(ref.key)
-    const normalColor = style?.normalColor ?? 0
+    const normalColor = style?.normalColor ?? style?.highlightColor ?? 0
     return style ? {
       fontName: style.fontName || undefined,
       fontSize: style.fontSize || undefined,
@@ -1401,6 +1404,40 @@ export function updateBdaStyle(
     const numeric = property === "FONT_SIZE" ? Number(value) : colorValue(value)
     if (!Number.isFinite(numeric) || numeric < 0) throw new Error("BDA 数值无效")
     return replaceField(style, field, 0, encodeVarint(numeric))
+  })
+}
+
+export function updateBdaImageInnerRect(
+  bytes: Uint8Array,
+  ref: BdaStyleRef,
+  highlighted: boolean,
+  rect: readonly [number, number, number, number],
+): Uint8Array {
+  if (ref.type !== "image") throw new Error("BDA 切片区域只能写入图片样式")
+  if (rect.some((value) => !Number.isInteger(value) || value < 0)) {
+    throw new Error("BDA 切片区域必须是非负整数")
+  }
+  return updateMapValue(bytes, 1, ref.key, (style) => {
+    const state = highlighted ? 2 : 1
+    const atom = rawFields(style).find((item) => item.number === state)?.bytes
+    if (!atom) throw new Error(`BDA 图片样式缺少${highlighted ? "按下" : "正常"}状态：${ref.key}`)
+    const originalRect = rawFields(atom).find((item) => item.number === 2)?.bytes ?? new Uint8Array()
+    const originalPoint = rawFields(originalRect).find((item) => item.number === 1)?.bytes ?? new Uint8Array()
+    const originalSize = rawFields(originalRect).find((item) => item.number === 2)?.bytes ?? new Uint8Array()
+    const point = replaceField(
+      replaceField(originalPoint, 1, 0, encodeVarint(rect[0])),
+      2,
+      0,
+      encodeVarint(rect[1]),
+    )
+    const size = replaceField(
+      replaceField(originalSize, 1, 0, encodeVarint(rect[2])),
+      2,
+      0,
+      encodeVarint(rect[3]),
+    )
+    const nextRect = replaceField(replaceField(originalRect, 1, 2, point), 2, 2, size)
+    return replaceField(style, state, 2, replaceField(atom, 2, 2, nextRect))
   })
 }
 

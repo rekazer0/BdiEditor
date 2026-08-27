@@ -72,11 +72,11 @@
 
 ## 开发与构建
 
-需要 Node.js 20.19+ 或 22.12+、Rust stable，以及对应平台的 Tauri 2 系统依赖。
+需要 Node.js 22.18+ 或 23.6+（`verify:*` 脚本直接以 `node` 运行 `.ts`，依赖默认启用的 type-stripping）、Rust stable，以及对应平台的 Tauri 2 系统依赖。
 
 ```bash
 npm install
-npm test
+npm run typecheck
 npm run build
 npm run tauri dev
 ```

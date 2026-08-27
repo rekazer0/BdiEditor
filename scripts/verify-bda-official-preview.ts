@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { existsSync, readFileSync } from "node:fs"
-import { bdaAppearancePath, bdaConfigPaths, bdaLayoutDocument, bdaStyleRef, decodeBdaAnimation, decodeBdaAppearance, decodedBdaSource } from "../src/bda.ts"
+import { BdaResolver, bdaAppearancePath, bdaConfigPaths, bdaLayoutDocument, bdaStyleID, bdaStyleRef, decodeBdaAnimation, decodeBdaAppearance, decodedBdaSource } from "../src/bda.ts"
 import { IniDocument } from "../src/ini.ts"
 import { previewItems } from "../src/preview.ts"
 import { SkinArchive } from "../src/skin.ts"
@@ -15,6 +15,11 @@ for (const orientation of ["port", "land"]) {
   const appearancePath = bdaAppearancePath(skin, "light", orientation)
   assert.ok(appearancePath)
   const appearance = decodeBdaAppearance(skin.getBytes(appearancePath)!)
+  const resolver = new BdaResolver(skin, skin.getBytes(appearancePath)!, base, "light", orientation)
+  const textStyle = appearance.textStyles.entries().next().value
+  const colorStyle = appearance.colorStyles.entries().next().value
+  assert.ok(textStyle && (await resolver.resolve(bdaStyleID({ type: "text", key: textStyle[0] }), false))?.text, `${orientation} 文字样式应生成文字预览`)
+  assert.ok(colorStyle && (await resolver.resolve(bdaStyleID({ type: "color", key: colorStyle[0] }), false))?.color, `${orientation} 颜色样式应生成颜色预览`)
   const source = JSON.parse(decodedBdaSource(appearancePath, skin.getBytes(appearancePath)!))
   assert.ok(source.panels?.py_26?.cand, `${orientation} 官方候选字段应出现在源码视图`)
   assert.ok(source.panels?.py_26?.hints?.short, `${orientation} 官方提示字段应出现在源码视图`)

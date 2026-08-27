@@ -45,14 +45,26 @@ const replaceDecorations = StateEffect.define<SourceEditorDecorations>()
 function decorationSet(state: EditorState, value: SourceEditorDecorations): DecorationSet {
   const length = state.doc.length
   const ranges: Range<Decoration>[] = []
-  const add = (range: readonly [number, number], className: string): void => {
+  const addMark = (range: readonly [number, number], className: string): void => {
     const from = Math.max(0, Math.min(length, range[0]))
     const to = Math.max(from, Math.min(length, range[1]))
     if (from < to) ranges.push(Decoration.mark({ class: className }).range(from, to))
   }
-  for (const range of value.selectedRanges ?? []) add(range, "cm-source-selected")
-  for (const range of value.searchRanges ?? []) add(range, "cm-source-search-match")
-  if (value.activeSearchRange) add(value.activeSearchRange, "cm-source-search-active")
+  const selectedLines = new Set<number>()
+  for (const range of value.selectedRanges ?? []) {
+    const from = Math.max(0, Math.min(length, range[0]))
+    const to = Math.max(from, Math.min(length, range[1]))
+    if (from === to) continue
+    const lastLine = state.doc.lineAt(to - 1).number
+    for (let lineNumber = state.doc.lineAt(from).number; lineNumber <= lastLine; lineNumber += 1) {
+      selectedLines.add(state.doc.line(lineNumber).from)
+    }
+  }
+  for (const from of selectedLines) {
+    ranges.push(Decoration.line({ class: "cm-source-selected" }).range(from))
+  }
+  for (const range of value.searchRanges ?? []) addMark(range, "cm-source-search-match")
+  if (value.activeSearchRange) addMark(value.activeSearchRange, "cm-source-search-active")
   return Decoration.set(ranges, true)
 }
 

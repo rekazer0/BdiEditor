@@ -9,6 +9,7 @@ import {
   decodedBdaAppearancePart,
   decodedBdaEditorSource,
   decodedBdaSource,
+  updateBdaImageInnerRect,
 } from "../src/bda.ts"
 import { bdaAnimationDurations, bdaLayoutStyleGroups } from "../src/bda-editor.ts"
 import { highlightJson, jsonPropertyRanges } from "../src/highlight.ts"
@@ -44,6 +45,32 @@ assert.ok(source.panels.py_9.keys.KEY_AS, "解码源码应包含包内真实按�
 assert.equal(source.colorStyles[93].normalColor, "FFFFFFFF")
 assert.ok(!("highlightColor" in source.colorStyles[93]), "包内缺失的高亮颜色不应出现在解码源码")
 assert.ok(!("alpha" in source.imageStyles[294].normalImage), "包内缺失的图片透明度不应被默认值伪造")
+
+const slicedRef = { type: "image", key: 14 } as const
+const slicedStyle = decodeBdaAppearance(appearanceBytes).imageStyles.get(slicedRef.key)
+assert.ok(slicedStyle?.normalImage?.innerRect, "测试样式应包含 BDA innerRect")
+const slicedBytes = updateBdaImageInnerRect(appearanceBytes, slicedRef, false, [1, 2, 3, 4])
+const slicedAppearance = decodeBdaAppearance(slicedBytes)
+assert.deepEqual(
+  slicedAppearance.imageStyles.get(slicedRef.key)?.normalImage?.innerRect,
+  { x: 1, y: 2, width: 3, height: 4 },
+  "图片切片工具应把 innerRect 写回 BDA 正常状态图片原子",
+)
+assert.deepEqual(
+  slicedAppearance.imageStyles.get(slicedRef.key)?.highlightImage,
+  slicedStyle.highlightImage,
+  "修改正常状态切片不应影响按下状态图片原子",
+)
+assert.equal(
+  slicedAppearance.imageStyles.get(slicedRef.key)?.normalImage?.resource?.resourceID,
+  slicedStyle.normalImage?.resource?.resourceID,
+  "修改 BDA 切片不应改变图片资源引用",
+)
+assert.throws(
+  () => updateBdaImageInnerRect(appearanceBytes, slicedRef, false, [-1, 0, 10, 10]),
+  /非负整数/,
+  "BDA 切片区域不应接受负数",
+)
 
 const externalSource = structuredClone(source)
 externalSource.designWidth = 1079
@@ -108,8 +135,54 @@ const panel = decodeBdaAppearance(appearanceBytes).panels.get("py_9")!
 const groups = bdaLayoutStyleGroups(panel, [])
 assert.deepEqual(
   groups.map((group) => group.key),
-  ["panel", "candidate", "input", "more", "hints", "lists", "keys"],
-  "未选择按键时应展示全部已确认的 BDA 面板组件",
+  ["panel", "input", "more", "hints", "lists"],
+  "面板整体设置只展示面板自身组件，不应混入候选栏或全部按键样式",
+)
+assert.deepEqual(
+  bdaLayoutStyleGroups(panel, [], "candidate").map((group) => group.key),
+  ["candidate", "candidateSwitch", "candidateKeys"],
+  "候选栏样式应属于候选栏作用域，且空分组不占位",
+)
+assert.ok(
+  bdaLayoutStyleGroups(panel, [], "candidate").every((group) =>
+    group.items.every((item) => item.path[0] === "cand")),
+  "候选栏样式写回路径应指向 appearanceConfig 的 cand 字段",
+)
+assert.deepEqual(
+  bdaLayoutStyleGroups(panel, [{ name: "KEY_AS", key: panel.keys.get("KEY_AS")! }])[0].items[0].path,
+  ["keys", "KEY_AS", "backStyle"],
+  "按键样式应携带指向 appearanceConfig 的写回路径",
+)
+const selectedKeyStyleItems = bdaLayoutStyleGroups(
+  panel,
+  [{ name: "KEY_AS", key: panel.keys.get("KEY_AS")! }],
+)[0].items
+assert.ok(
+  selectedKeyStyleItems.every((item) => item.owner === "KEY_AS"),
+  "同一按键的背景和前景样式应归入同一个按键块",
+)
+assert.deepEqual(
+  selectedKeyStyleItems.map((item) => item.label),
+  ["背景样式", ...selectedKeyStyleItems.slice(1).map((_, index) => `前景样式 ${index + 1}`)],
+  "按键块内应使用背景样式和前景样式作为字段名",
+)
+const mergedKeyStyleItems = bdaLayoutStyleGroups(panel, [
+  { name: "KEY_AS", key: panel.keys.get("KEY_AS")! },
+  { name: "KEY_Q", key: panel.keys.get("KEY_Q")! },
+])[0].items
+assert.equal(
+  mergedKeyStyleItems.filter((item) => item.field === "backStyle").length,
+  1,
+  "多选 BDA 按键后应重叠为一组样式字段",
+)
+assert.deepEqual(
+  mergedKeyStyleItems.find((item) => item.field === "backStyle")?.paths,
+  [["keys", "KEY_AS", "backStyle"], ["keys", "KEY_Q", "backStyle"]],
+  "合并字段应保留全部按键的写回路径",
+)
+assert.ok(
+  mergedKeyStyleItems.every((item) => !item.owner),
+  "多选合并字段不应再按单个按键分块",
 )
 assert.ok(groups.every((group) => group.items.length > 0), "实际存在的组件分组不应为空")
 assert.deepEqual(
@@ -118,6 +191,7 @@ assert.deepEqual(
   "选择按键后应聚焦显示所选按键样式",
 )
 
+const html = fs.readFileSync("index.html", "utf8")
 const main = fs.readFileSync("src/main.ts", "utf8")
 const editor = fs.readFileSync("src/bda-editor.ts", "utf8")
 const styles = fs.readFileSync("src/style.css", "utf8")
@@ -131,17 +205,112 @@ assert.match(main, /function commitBdaSourceEdit\([\s\S]*?applyDecodedBdaSource[
 assert.match(main, /applyDecodedBdaAppearancePart/, "虚拟 appearance 片段应合并写回真实配置")
 assert.match(main, /jsonPropertyRanges\(source\.value, selectedBdaSourceKeys\(\)\)/, "BDA 按键选中范围应传给 CodeMirror 装饰")
 assert.doesNotMatch(main, /BDA 官方基础布局（只读几何）/)
-assert.match(main, /group\.hidden = bdaSelected \|\|/)
+assert.doesNotMatch(main, /group\.hidden = bdaSelected \|\|/, "BDA 选中具体按键时应复用标准按键检查器")
+assert.match(html, /key-only key-appearance-fields/, "BDA 按键样式应使用 BDS\/BDI 的标准样式分组")
+assert.match(main, /bdaSelected && group !== keyAppearanceFieldsGroup/, "BDA 按键只应显示实际存在的样式分组")
+assert.match(main, /const bdaKeyProperties = new Set\(\["FORE_OFFSET"\]\)/, "BDA 按键的旧检查器不应再展示合成样式编号")
+for (const [field, caption] of [
+  ["BACK_STYLE", "背景样式（backStyle）"],
+  ["FORE_STYLE", "前景样式（foreStyles）"],
+  ["FORE_OFFSET", "前景样式偏移（foreStyleOffsets）"],
+  ["FONT_NAME", "字体名称（fontName）"],
+  ["FONT_SIZE", "字体大小（fontSize）"],
+  ["NM_COLOR", "正常文字颜色（normalColor）"],
+  ["HL_COLOR", "高亮文字颜色（highlightColor）"],
+] as const) {
+  assert.match(main, new RegExp(`${field}: "${caption}"`), `${field} 应显示 appearanceConfig 的真实字段说明`)
+}
+assert.match(main, /function bdaImageTiles/, "BDA 图片资源应从 appearanceConfig 图片样式构建切片引用")
+assert.match(main, /updateBdaImageInnerRect\(info\.bytes, usage\.ref, usage\.highlighted, rect\)/, "BDA 切片检查器应写回选中样式状态的 innerRect")
+assert.match(html, /id="tile-source-fields"[\s\S]{0,200}data-tile-source="0"/, "TIL SOURCE_RECT 字段组应可与 BDA innerRect 字段分开控制")
+assert.match(main, /tileSourceFieldsGroup\.hidden = bdaSelected/, "BDA 不应展示并不存在于 appearanceConfig 中的 SOURCE_RECT 字段")
+assert.match(styles, /\.geometry-fields\[hidden\]/, "隐藏的 SOURCE_RECT 字段组不应被 grid 布局重新显示")
+assert.match(main, /archive\?\.format === "bda"[\s\S]*?newTileButton\.hidden/, "BDA 不适用的 TIL 新建操作应隐藏")
+assert.match(html, /id="bda-tile-usage"/, "BDA 图片被多个样式引用时应可选择具体样式状态")
+assert.match(main, /BDA 切片由 appearanceConfig 管理/, "BDA 图片资源不应暴露不存在的 TIL 源码")
+assert.match(main, /bdaUsageCounts/, "BDA 资源列表应批量统计样式引用，避免逐图片重复解码")
+assert.match(main, /syncBdaKeyFieldLabels\(bdaSelected\)/, "BDA 与 BDS\/BDI 应切换各自的按键字段说明")
+assert.match(main, /bdaSelected[\s\S]*?selectedBdaKeyNames\(\)\.join/, "BDA 按键标题应使用 appearanceConfig 中的实际键名")
+assert.match(main, /bdaStyleHasProperty/, "BDA 文字属性应按源码字段是否真实存在决定显隐")
+assert.match(main, /function updateBdaAppearanceStyleRef/, "BDA 样式引用应可写回 appearanceConfig")
+assert.match(main, /applyDecodedBdaAppearancePart\(info\.path, info\.bytes, JSON\.stringify\(source\), part\)/, "BDA 样式引用写回应编译回 protobuf")
+const updateBdaStyleRef = main.match(/function updateBdaAppearanceStyleRef\([\s\S]*?\n\}/)?.[0] ?? ""
+assert.match(updateBdaStyleRef, /for \(const path of paths\)/, "修改合并字段应在一次提交中同步全部选中按键")
+assert.match(updateBdaStyleRef, /refreshBdaStyleReferenceField\(owner, ref, visualResolver\(\)\)/, "修改样式引用后应只重绘当前预览字段")
+assert.doesNotMatch(updateBdaStyleRef, /populateKeyInspector\(\)/, "修改一个样式引用不应重建全部 BDA 预览")
+assert.doesNotMatch(main, /bdaEditableKeyFields/, "BDA 按键样式引用不应继续走旧格式输入框")
+assert.match(main, /if \(selectedCandidate && selectedPath === layoutPath\) return \["cand"\]/, "BDA 候选栏应定位当前面板源码中的 cand 字段")
+assert.match(main, /scope: selectedCandidate \? "candidate" : "panel"/, "选中候选栏时应渲染候选栏作用域的样式")
+const candidateSelection = main.match(/candidateArea\.addEventListener\("click"[\s\S]*?\n\}\)/)?.[0] ?? ""
+const bdaCandidateSelection = candidateSelection.match(/if \(archive\?\.format === "bda"\) \{[\s\S]*?\n  \}/)?.[0] ?? ""
+assert.match(candidateSelection, /if \(!isEditing\(\)\) return/, "候选栏应与画布按键一样只在编辑模式下选中")
+assert.match(bdaCandidateSelection, /selectedPath !== layoutPath[\s\S]*?selectFile\(layoutPath, "overview"\)/, "候选栏选中时应保持在当前面板")
+assert.match(bdaCandidateSelection, /selectedCandidate = true[\s\S]*?selectedKeySections = \[\]/, "候选栏与按键选择应互斥")
+assert.doesNotMatch(bdaCandidateSelection, /toolbarStrip\.dataset\.path|selectFile\(path\)/, "BDA 候选栏不应选择基础包中的虚拟 cand1.cnd")
+assert.match(styles, /#candidate-area\.candidate-selected::after/, "候选栏选中时应显示与按键一致的强调框")
+assert.match(editor, /caption\.title = `\$\{item\.label\}（\$\{item\.field\}）`/, "按键说明应标注 BDA 源码字段名")
+assert.doesNotMatch(editor, /typeSelect\.value = item\.ref\.type/, "BDA 样式引用默认不应显示 type")
+assert.match(editor, /keyInput\.value = String\(item\.ref\.key\)/, "BDA 样式引用应直接显示源码中的 key")
+assert.doesNotMatch(editor, /keyInput\.type = "number"/, "BDA 样式引用不是数值输入框，不应响应鼠标滚轮")
+assert.match(editor, /querySelector<HTMLInputElement>\("\.document-property-input"\)/, "局部刷新应按样式输入框类名更新 key")
+assert.doesNotMatch(editor, /input\.value = bdaStyleID\(item\.ref\)/, "BDA 属性值不应显示人为合成的样式编号")
+assert.match(editor, /style-reference-input bda-style-reference-input/, "BDA 样式引用应复用 BDS 的 key 与预览容器")
+assert.match(editor, /style-picker-trigger[\s\S]*?style-picker-states/, "BDA 样式引用应复用 BDS 的双状态预览样式")
+assert.match(editor, /const bounds = canvas\.getBoundingClientRect\(\)/, "BDA 预览应使用实际渲染尺寸设置画布")
+assert.match(editor, /context\.fillRect\(0, 0, width, height\)/, "BDA 颜色预览应铺满整个预览框")
+assert.doesNotMatch(editor, /fillRect\(8, 8, 112, 60\)/, "BDA 预览不应继续保留固定内边距")
+assert.match(editor, /fore-styles-reference-field[\s\S]*?bda-fore-styles-grid/, "foreStyles 应按集合渲染为一组对应预览")
+assert.doesNotMatch(editor, /const forePreview/, "foreStyles 应复用背景样式的正常、按下双状态预览")
+assert.doesNotMatch(editor, /isForeStyle\s*\?\s*control\.append/, "foreStyles 应与背景样式一样横向排列 key 和预览")
+assert.match(editor, /onStyleRefAction\?\.\([\s\n]*item\.paths \?\? \[item\.path\],[\s\n]*currentRef\(\),/, "局部更新后再次点击应使用当前 key 和全部合并路径")
+assert.match(styles, /\.bda-fore-styles-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s, "foreStyles 应逐行使用横向样式引用")
+assert.doesNotMatch(styles, /\.bda-fore-styles-grid \.bda-style-reference-input\s*\{/, "foreStyles 不应覆盖共用的横向样式布局")
+assert.doesNotMatch(styles, /\.bda-style-reference-input > \.style-picker-trigger\s*\{/, "BDA 预览应复用 BDI、BDS 的高度和内边距")
+assert.doesNotMatch(styles, /\.style-reference-input\.bda-style-reference-input > input\s*\{/, "BDA key 输入框应复用 BDI、BDS 的高度")
+assert.doesNotMatch(styles, /\.bda-style-reference-input \.style-picker-state canvas\s*\{/, "BDA 缩略图应复用 BDI、BDS 的画布样式")
+assert.match(editor, /event\.metaKey \|\| event\.ctrlKey \? "edit" : "replace"/, "BDA 样式预览应按修饰键区分更换和编辑")
+assert.match(main, /function openBdaStyleReferencePicker[\s\S]*?openStylePicker\(input\)/, "普通点击 BDA 样式预览应复用标准样式选择器")
+assert.match(main, /onStyleRefAction:[\s\S]*?openStyleReferenceEditor\(bdaStyleID\(ref\)\)/, "修饰键点击 BDA 样式预览应复用标准样式编辑入口")
+assert.match(main, /function stylePickerLabel[\s\S]*?bdaStyleRef\(styleID\)\?\.key/, "BDA 样式选择器应隐藏内部合成编号并显示原始 key")
+assert.match(main, /input\.dataset\.bdaStyleType = ref\.type[\s\S]*?bdaStyleRef\(styleID\)\?\.type !== bdaTargetType/, "隐藏 type 时选择器应只展示当前引用同类型的样式，避免重复 key 歧义")
+assert.match(editor, /booleanField\("背景模糊"[\s\S]*?"shouldBgBlur"\)/, "面板开关应通过技术字段名标注 BDA 源码字段")
+assert.match(main, /const selectedKeys = selectedBdaKeyNames\(\)[\s\S]*?keys: selectedKeys/, "选中 BDA 按键后应使用统一的源码样式引用组件")
 assert.match(main, /const states = bdaSkin \? \[\] : availableSkinStates/)
 assert.match(main, /if \(stylePath && archive\.format !== "bda"\)[\s\S]*label: "按键音效"/)
 assert.match(editor, /renderBdaLayoutEditor/)
 assert.match(editor, /stylePreview/)
+assert.match(editor, /event\.metaKey \|\| event\.ctrlKey \? "slice" : "replace"/, "BDA 图片样式预览应按修饰键区分换图和切片")
+assert.match(editor, /state\.title = "点击更换图片；Command\/Ctrl 点击进入切片工具"/, "BDA 图片样式预览应说明两种交互")
+assert.match(main, /function replaceBdaStyleImage\([\s\S]*?openBdaStyleImageResourceChooser/, "普通点击 BDA 状态图片应打开资源选择器")
+assert.match(main, /if \(!pickerTarget\) \{[\s\S]*?styleImageDialog\.hidden = false/, "直接更换 BDA 图片时应显示资源选择对话框")
+assert.match(main, /function editBdaStyleImageSlice\([\s\S]*?selectResourceImage\(path\)/, "修饰键点击 BDA 状态图片应进入图片切片工具")
+assert.match(main, /onImageAction: \(ref, highlighted, action\)/, "BDA 样式编辑器应把图片状态操作接入主工作流")
 assert.match(editor, /picker\.type = "color"/)
 assert.match(editor, /range\.type = "range"/)
 assert.match(editor, /高级图片字段（只读）/)
 assert.match(editor, /onPanelPropertyChange/)
-assert.match(editor, /bda-component-section/)
-assert.match(editor, /section\.addEventListener\("toggle", renderItems\)/, "折叠组件应延迟创建样式预览，避免移动端一次加载全部资源")
+assert.match(editor, /document-property-section bda-panel-property-section/, "BDA 面板应复用 BDS\/BDI 的标准属性分区")
+assert.match(editor, /bda-key-style-block/, "同一 BDA 按键的背景和前景引用应渲染在一个按键块中")
+assert.match(editor, /document-property-field wide style-reference-field/, "BDA 样式引用应复用标准属性字段与预览逻辑")
+assert.match(editor, /bda-style-reference-label/, "BDA 样式引用名称应有独立语义，便于与控件和预览对齐")
+assert.match(editor, /bda-style-reference-state-label/, "正常与按下状态应使用专用的紧凑标签")
+assert.match(editor, /imageResourceNames\?\.\[index\]/, "BDA 图片资源名应显示在对应状态预览中")
+assert.match(editor, /state\.append\(name\)[\s\S]*?state\.append\(canvas, caption\)/, "BDA 图片资源名应位于预览图上方")
+assert.doesNotMatch(editor, /textField\("(?:正常|按下)图片"/, "BDA 图片资源名不应作为可编辑输入框显示")
+assert.match(styles, /\.bda-style-resource-name\s*\{[^}]*text-overflow:\s*ellipsis/s, "长图片资源名应在预览上方安全截断")
+assert.match(styles, /\.bda-style-resource-name\s*\{[^}]*text-align:\s*center/s, "图片资源名应在预览上方居中显示")
+assert.doesNotMatch(editor, /group\("keys", "全部按键样式"/, "整体设置不应列出具体按键样式")
+assert.match(editor, /dataset\.inspectorGroupLabel = label/, "BDA 属性块应提供统一检查器分组标签")
+assert.match(main, /group === bdaConfigFieldsGroup[\s\S]*?bda-inspector-section/, "BDA 属性块应接入与 BDS\/BDI 相同的检查器分组栏")
+assert.match(main, /availableStyleIDs\(\)[\s\S]*?archive\.format === "bda"[\s\S]*?bdaStyleID/, "BDA 样式引用应复用标准样式预览和编辑入口")
+assert.match(main, /archive\?\.format === "bda"[\s\S]*?styleDetailPreviews\.hidden = true/, "BDA 样式详情应隐藏 BDI\/BDS 的 NM_IMG、HL_IMG 状态预览")
+assert.match(styles, /:is\(\.document-fields, \.bda-config-fields\):has\(\.mobile-inspector-managed\)/, "BDA 分组应复用检查器的 grouped 布局")
+assert.match(styles, /\.style-detail-previews\[hidden\]\s*\{\s*display:\s*none/, "隐藏的 BDI\/BDS 状态预览不应被 grid 样式强制显示")
+assert.match(styles, /#style-detail-fields\s*>\s*\.bda-style-card\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/, "BDA 样式编辑卡应铺满详情区的两列网格")
+assert.match(styles, /\.app-dialog \.settings-switch,\s*\.inspector-switch/, "BDA 面板开关应复用通用开关样式")
+assert.match(styles, /\.bda-panel-property-section \.document-property-grid\s*\{[^}]*gap:\s*0[^}]*border:\s*1px solid var\(--line-soft\)/s, "BDA 引用应组成连续属性列表而不是重复卡片")
+assert.match(styles, /\.style-reference-field\s*\{[^}]*grid-template-columns:\s*minmax\(112px, 0\.72fr\) minmax\(0, 2\.28fr\)/s, "宽屏 BDA 引用行应明确分配名称与编辑内容")
+assert.match(styles, /@container \(max-width: 520px\)[\s\S]*?\.style-reference-field\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s, "窄检查器中的 BDA 引用行应折成单列")
 assert.deepEqual(bdaAnimationDurations([
   {},
   { duration: 0 },

@@ -10,6 +10,7 @@ export type LayoutImagePlan = {
   indices: Map<string, number>
   panelIndex?: number
 }
+export type LayoutImageAlphaMode = 1 | 2
 
 export function layoutKeyRects(layout: IniDocument, selected: readonly string[] = [], panelSize?: readonly [number, number]): LayoutKeyGeometry[] {
   const filter = selected.length ? new Set(selected) : undefined
@@ -67,14 +68,14 @@ export function planLayoutImage(target: LayoutImageTarget, keys: readonly Layout
   return { target, keys: [...keys], slices, indices }
 }
 
-export function layoutImageTileDocument(plan: LayoutImagePlan): IniDocument {
-  const tiles = IniDocument.parse(`[GLOBAL]\r\nUSE_ALPHA=2\r\nTILE_NUM=${plan.slices.length}\r\n\r\n`)
+export function layoutImageTileDocument(plan: LayoutImagePlan, alphaMode: LayoutImageAlphaMode): IniDocument {
+  const tiles = IniDocument.parse(`[GLOBAL]\r\nUSE_ALPHA=${alphaMode}\r\nTILE_NUM=${plan.slices.length}\r\n\r\n`)
   for (const slice of plan.slices) updateTileSlice(tiles, slice)
   return tiles
 }
 
-export function layoutImageTileBytes(plan: LayoutImagePlan): Uint8Array {
-  return new TextEncoder().encode(`\uFEFF${layoutImageTileDocument(plan).toString()}`)
+export function layoutImageTileBytes(plan: LayoutImagePlan, alphaMode: LayoutImageAlphaMode): Uint8Array {
+  return new TextEncoder().encode(`\uFEFF${layoutImageTileDocument(plan, alphaMode).toString()}`)
 }
 
 // 图片跟随布局 / 布局跟随图片：切片源改为图像里检测到的网格单元，按键按索引取对应切片

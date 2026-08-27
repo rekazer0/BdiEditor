@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import fs from "node:fs"
 import { pushChange, type Change } from "../src/history.ts"
 import { layoutImageTileBytes, layoutImageTileDocument, planLayoutImageSlices } from "../src/layout-image.ts"
 import { applyLayoutAction, gestureDirection, snapPointToRects, snapRectDelta, type LayoutRect } from "../src/layout.ts"
@@ -39,6 +40,31 @@ pushChange(history, { kind: "text", path: "layout.ini", before: "x=2", after: "x
 assert.equal(history.length, 2)
 
 console.log("✓ 方向键自动重复移动合并为一次撤销记录")
+
+const mainSource = fs.readFileSync("src/main.ts", "utf8")
+const styleSource = fs.readFileSync("src/style.css", "utf8")
+assert.match(
+  mainSource,
+  /function schedulePreviewPan\([\s\S]+requestAnimationFrame[\s\S]+setPreviewPan/,
+  "画布拖动应按渲染帧合并 transform 更新",
+)
+assert.match(
+  styleSource,
+  /\.canvas-wrap\.preview-pan-ready \.device-shell\s*\{[^}]*will-change:\s*transform/,
+  "开始拖动时应提前把预览键盘提升到合成层",
+)
+assert.match(
+  mainSource,
+  /preview\.cancelPointerInteraction\(\)[\s\S]+cancelAnimationFrame\(pointerCoordinatesFrame\)[\s\S]+previewCoordinates\.hidden = true/,
+  "画布拖动期间应暂停编辑模式十字线计算",
+)
+assert.match(
+  mainSource,
+  /function finishPreviewPan\(\)[\s\S]+flushPreviewPan\(\)/,
+  "拖动结束时应同步最后一个平移位置",
+)
+
+console.log("✓ 预览画布拖动逐帧合并更新，并暂停编辑十字线计算")
 
 assert.deepEqual(
   snapPointToRects({ x: 118, y: 148 }, [second], { x: 4, y: 4 }),
@@ -94,9 +120,13 @@ assert.deepEqual([...singleKeyPlan.indices.values()], [1, 1])
 
 console.log("✓ 单个按键素材会复用到所有目标按键")
 
-const generatedTiles = layoutImageTileDocument(singleKeyPlan).toString()
-assert.match(generatedTiles, /^\[GLOBAL\]\r\nUSE_ALPHA=2\r\nTILE_NUM=1\r\n\r\n\[IMG1\]\r\n/)
-assert.doesNotMatch(generatedTiles, /(^|[^\r])\n/)
-assert.deepEqual([...layoutImageTileBytes(singleKeyPlan).slice(0, 3)], [0xef, 0xbb, 0xbf])
+const generatedAndroidTiles = layoutImageTileDocument(singleKeyPlan, 1).toString()
+assert.match(generatedAndroidTiles, /^\[GLOBAL\]\r\nUSE_ALPHA=1\r\nTILE_NUM=1\r\n\r\n\[IMG1\]\r\n/)
+assert.doesNotMatch(generatedAndroidTiles, /(^|[^\r])\n/)
 
-console.log("✓ 一键替换生成带 UTF-8 BOM、iOS 可解析的 TIL 文件")
+const generatedIosTiles = layoutImageTileDocument(singleKeyPlan, 2).toString()
+assert.match(generatedIosTiles, /^\[GLOBAL\]\r\nUSE_ALPHA=2\r\nTILE_NUM=1\r\n\r\n\[IMG1\]\r\n/)
+assert.doesNotMatch(generatedIosTiles, /(^|[^\r])\n/)
+assert.deepEqual([...layoutImageTileBytes(singleKeyPlan, 1).slice(0, 3)], [0xef, 0xbb, 0xbf])
+
+console.log("✓ 一键替换按 Android/iOS 平台生成正确 alpha 模式的 TIL 文件")

@@ -19,6 +19,7 @@ src-tauri/gen/
 /design-qa-*.png
 /implementation-*.png
 /island-skin-*.png
+/tmp-*.mjs
 /public/iphone-notes-keyboard-blank.png
 /public/iphone-notes-reference.png
 /public/iphone-notes-reference-dark.png
