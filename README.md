@@ -21,10 +21,10 @@
   <img src="readme-assets/mobile-editor.png" width="390" alt="移动端编辑界面">
 </p>
 
-## v1.4.54 更新
+## v1.6.59 更新
 
-- 支持识别不同目录结构的 BDA 单主题与明暗双主题皮肤，并完善静态列表内容预览。
-- 新增客户端诊断日志导出，完善 Android 分享校验及源码工作区的二进制传输兼容性。
+- 引入 CodeMirror 6 代码编辑器，完善源码高亮、搜索、定位与编辑体验。
+- 重构 BDA 解析器，完善解析、导入导出、预览、属性编辑、资源替换、图片切片及 protobuf 写回。
 
 完整记录见 [CHANGELOG.md](CHANGELOG.md)。
 
