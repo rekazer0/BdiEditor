@@ -4,6 +4,7 @@ import {
   applyDecodedBdaAppearancePart,
   applyDecodedBdaSource,
   bdaAppearancePath,
+  bdaDecodedSourceEditable,
   decodeBdaAppearance,
   decodedBdaAppearancePart,
   decodedBdaEditorSource,
@@ -23,6 +24,12 @@ assert.ok(Array.isArray(source.$protobuf) && source.$protobuf.length > 0, "工�
 const editorSource = JSON.parse(decodedBdaEditorSource(appearancePath, appearanceBytes))
 assert.ok(!("$protobuf" in editorSource), "应用内普通源码不应显示内部 protobuf 备份")
 assert.ok(editorSource.panels.py_9.keys.KEY_AS, "应用内普通源码仍应包含完整语义配置")
+assert.equal(bdaDecodedSourceEditable(appearancePath), true, "已确认 schema 的 appearanceConfig 应允许源码编辑")
+assert.equal(bdaDecodedSourceEditable("light/skin/port/animationConfig"), true, "已确认 schema 的 animationConfig 应允许源码编辑")
+assert.equal(bdaDecodedSourceEditable("light/skin/soundConfig"), true, "已确认 schema 的 soundConfig 应允许源码编辑")
+assert.equal(bdaDecodedSourceEditable("light/skin/switchConfig"), false, "未知 schema 配置必须保持只读")
+assert.equal(bdaDecodedSourceEditable("light/skin/stickerConfig"), false, "贴纸配置没有官方字段证据前必须保持只读")
+assert.equal(bdaDecodedSourceEditable("light/skin/sceneConfig"), false, "场景配置没有官方字段证据前必须保持只读")
 assert.equal(
   source.$protobuf.map((field: { encodedHex: string }) => field.encodedHex).join(""),
   Buffer.from(appearanceBytes).toString("hex"),
@@ -119,7 +126,7 @@ assert.match(main, /source\.\$bdiEditorRaw = encodeBase64\(bytes\)/, "BDA 源码
 assert.match(main, /setSourceValue\(decodedBdaEditorSource\(/, "应用内源码视图应隐藏 protobuf 备份")
 assert.match(main, /applyDecodedBdaSource\(canonical, before/, "外部 BDA JSON 改动应编译回 protobuf")
 const bdaSourceSelection = main.match(/else if \(archive\?\.isBdaConfig\(path\)\) \{[\s\S]*?\n  \} else \{/)?.[0] ?? ""
-assert.match(bdaSourceSelection, /source\.disabled = false/, "编辑模式应允许编辑 BDA 解码 JSON")
+assert.match(bdaSourceSelection, /source\.disabled = !bdaDecodedSourceEditable\(path\)/, "未知 schema 的 BDA 解码 JSON 应保持只读")
 assert.match(main, /function commitBdaSourceEdit\([\s\S]*?applyDecodedBdaSource[\s\S]*?commitBytes/, "应用内 BDA JSON 应编译回 protobuf 后再提交")
 assert.match(main, /applyDecodedBdaAppearancePart/, "虚拟 appearance 片段应合并写回真实配置")
 assert.match(main, /jsonPropertyRanges\(source\.value, selectedBdaSourceKeys\(\)\)/, "BDA 按键选中范围应传给 CodeMirror 装饰")
@@ -134,6 +141,7 @@ assert.match(editor, /range\.type = "range"/)
 assert.match(editor, /高级图片字段（只读）/)
 assert.match(editor, /onPanelPropertyChange/)
 assert.match(editor, /bda-component-section/)
+assert.match(editor, /section\.addEventListener\("toggle", renderItems\)/, "折叠组件应延迟创建样式预览，避免移动端一次加载全部资源")
 assert.deepEqual(bdaAnimationDurations([
   {},
   { duration: 0 },

@@ -467,11 +467,18 @@ export function renderBdaLayoutEditor(container: HTMLElement, options: LayoutEdi
     count.textContent = `${group.items.length} 个样式`
     title.append(label, count)
     section.append(title)
-    for (const item of group.items) {
-      const card = styleCard(item.ref, item.label, options.appearance, options.resolver, options.editable, options.onStyleChange)
-      if (card) section.append(card)
+    let rendered = false
+    const renderItems = () => {
+      if (!section.open || rendered) return
+      rendered = true
+      for (const item of group.items) {
+        const card = styleCard(item.ref, item.label, options.appearance, options.resolver, options.editable, options.onStyleChange)
+        if (card) section.append(card)
+      }
     }
+    section.addEventListener("toggle", renderItems)
     container.append(section)
+    renderItems()
   })
   if (!groups.length) {
     const empty = element("p", "bda-editor-empty")

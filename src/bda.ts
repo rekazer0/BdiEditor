@@ -1556,6 +1556,13 @@ function genericBdaSource(bytes: Uint8Array, compact = false): unknown[] {
   return decode(bytes, 0)
 }
 
+export function bdaDecodedSourceEditable(path: string): boolean {
+  const name = path.split("/").pop() ?? path
+  return /^\d*appearanceConfig$/i.test(name) ||
+    /animationConfig$/i.test(name) ||
+    /^\d*soundConfig$/i.test(name)
+}
+
 function decodedBdaValue(path: string, bytes: Uint8Array, panelName?: string): unknown {
   const name = path.split("/").pop() ?? path
   if (/^\d*appearanceConfig$/i.test(name)) {

@@ -56,6 +56,7 @@ import {
   bdaAppearancePath,
   bdaColorHex,
   bdaConfigPath,
+  bdaDecodedSourceEditable,
   bdaConfigPaths,
   bdaLayoutDocument,
   bdaLayoutNames,
@@ -2036,7 +2037,7 @@ function commitBdaSourceEdit(): void {
     }
     return
   }
-  if (!archive.isBdaConfig(selectedPath)) return
+  if (!archive.isBdaConfig(selectedPath) || !bdaDecodedSourceEditable(selectedPath)) return
   const before = archive.getBytes(selectedPath)
   if (!before) return
   try {
@@ -6096,8 +6097,8 @@ function selectFile(
     hideImageWorkspace()
     selectedDocument = undefined
     setSourceValue(decodedBdaEditorSource(path, archive.getBytes(path)!))
-    source.disabled = false
-    sourceName.textContent = `${path} · 解码源码`
+    source.disabled = !bdaDecodedSourceEditable(path)
+    sourceName.textContent = `${path} · 解码源码${source.disabled ? "（原始字段，只读）" : ""}`
     inspectorTab = "properties"
   } else {
     return
