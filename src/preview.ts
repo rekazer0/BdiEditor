@@ -1264,6 +1264,13 @@ export class Preview {
   private defaults?: IniDocument
   private offsets?: IniDocument
   private resolver?: VisualResolver
+  // Resolver lookups are asynchronous and can involve stylesheet/tile parsing
+  // and image decoding. Keep the resolved values for the lifetime of a
+  // resolver; drag frames then only redraw geometry instead of repeating the
+  // expensive lookups for every key.
+  private readonly visualCache = new Map<string, Promise<Visual | undefined>>()
+  private readonly resourceCache = new Map<string, Promise<Visual | undefined>>()
+  private toolbarImagesCache?: Promise<Visual[]>
   private panelStyle = ""
   private panelWidth = DEFAULT_PANEL_WIDTH
   private panelHeight = DEFAULT_PANEL_HEIGHT
@@ -1407,7 +1414,41 @@ export class Preview {
 
   setResolver(resolver?: VisualResolver): void {
     this.resolver = resolver
+    this.visualCache.clear()
+    this.resourceCache.clear()
+    this.toolbarImagesCache = undefined
     void this.draw()
+  }
+
+  private resolveVisual(styleID: string, highlighted: boolean): Promise<Visual | undefined> {
+    const key = `${highlighted ? "1" : "0"}:${styleID}`
+    let result = this.visualCache.get(key)
+    if (!result) {
+      result = this.resolver?.resolve(styleID, highlighted) ?? Promise.resolve(undefined)
+      this.visualCache.set(key, result)
+    }
+    return result
+  }
+
+  private resolveResource(resourceID: string): Promise<Visual | undefined> {
+    let result = this.resourceCache.get(resourceID)
+    if (!result) {
+      const resource = this.resolver?.resolveResource?.(resourceID)
+      result = resource
+        ? resource.then((value) => value ?? this.resolveVisual(resourceID, false))
+        : this.resolveVisual(resourceID, false)
+      this.resourceCache.set(resourceID, result)
+    }
+    return result
+  }
+
+  private resolveToolbar(): Promise<Visual[]> {
+    if (!this.toolbarImagesCache) {
+      this.toolbarImagesCache = this.toolbarSlots && !this.persistentOnly
+        ? this.resolver?.resolveToolbarImages() ?? Promise.resolve([])
+        : Promise.resolve([])
+    }
+    return this.toolbarImagesCache
   }
 
   setOffsets(offsets?: IniDocument): void {
@@ -1417,6 +1458,7 @@ export class Preview {
 
   setDefaults(defaults?: IniDocument): void {
     this.defaults = defaults
+    this.visualCache.clear()
     this.keys = this.document
       ? previewItems(
           this.document,
@@ -1454,6 +1496,8 @@ export class Preview {
   setPersistentOnly(persistentOnly: boolean): void {
     if (this.persistentOnly === persistentOnly) return
     this.persistentOnly = persistentOnly
+    this.visualCache.clear()
+    this.toolbarImagesCache = undefined
     this.keys = this.document
       ? previewItems(
           this.document,
@@ -1506,6 +1550,7 @@ export class Preview {
   setPanel(styleID: string, width: number, height: number, animationStyle = ""): void {
     const animationChanged = this.panelAnimationStyle !== animationStyle
     this.panelStyle = styleID
+    this.visualCache.clear()
     this.panelAnimationStyle = animationStyle
     this.panelWidth = width
     this.panelHeight = height
@@ -1519,6 +1564,7 @@ export class Preview {
 
   setDocument(document?: IniDocument): void {
     this.document = document
+    this.visualCache.clear()
     this.keys = document
       ? previewItems(
           document,
@@ -2193,12 +2239,12 @@ export class Preview {
         const highlighted = this.active?.key.section === key.section ||
           this.legacyAnimationState?.key.section === key.section
         return {
-          back: await this.resolver?.resolve(
+          back: await this.resolveVisual(
             highlighted ? key.highlightBackStyle ?? key.backStyle : key.backStyle,
             highlighted,
           ),
           fore: await Promise.all(
-            key.foreStyles.map((style) => this.resolver?.resolve(style, highlighted)),
+            key.foreStyles.map((style) => this.resolveVisual(style, highlighted)),
           ),
           text: this.resolver?.resolveText(key.foreStyles.join(","), highlighted),
           styleTexts: key.foreStyles.map((style) =>
@@ -2206,24 +2252,22 @@ export class Preview {
           ),
         }
       })),
-      this.toolbarSlots && !this.persistentOnly
-        ? this.resolver?.resolveToolbarImages() ?? Promise.resolve([])
-        : Promise.resolve([]),
+      this.resolveToolbar(),
       Promise.all(particleStyleIDs.map(async (styleID) =>
-        await this.resolver?.resolveResource?.(styleID) ?? this.resolver?.resolve(styleID, false)
+        await this.resolveResource(styleID)
       )),
       hintIcon
         ? Promise.all([
-            this.resolver?.resolve(hintIcon.backStyle, false),
-            this.resolver?.resolve(hintIcon.foreStyle, false),
+            this.resolveVisual(hintIcon.backStyle, false),
+            this.resolveVisual(hintIcon.foreStyle, false),
           ])
         : Promise.resolve([undefined, undefined]),
       hintIcon ? this.resolver?.resolveText(hintIcon.foreStyle, false) : undefined,
       hintIcon ? this.resolver?.resolveText(hintIcon.foreStyle, true) : undefined,
       hintBar && hintConfig?.cellStyle
         ? Promise.all([
-            this.resolver?.resolve(hintConfig.cellStyle, false),
-            this.resolver?.resolve(hintConfig.cellStyle, true),
+            this.resolveVisual(hintConfig.cellStyle, false),
+            this.resolveVisual(hintConfig.cellStyle, true),
           ])
         : Promise.resolve([undefined, undefined]),
     ])
