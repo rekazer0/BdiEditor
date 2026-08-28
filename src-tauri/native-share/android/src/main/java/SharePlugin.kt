@@ -1,8 +1,10 @@
 package io.github.rekazer0.bdiedit.share
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.net.Uri
 import android.os.Handler
@@ -115,15 +117,42 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
         "${activity.packageName}.fileprovider",
         file,
       )
-      val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(uri, args.mimeType)
-        setPackage("com.baidu.input")
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      val targets = listOf(
+        "百度输入法（com.baidu.input）" to Intent(Intent.ACTION_VIEW).apply {
+          setDataAndType(uri, args.mimeType)
+          setPackage("com.baidu.input")
+          addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        },
+        "百度输入法小米版（com.baidu.input_mi）" to Intent(Intent.ACTION_VIEW).apply {
+          setDataAndType(uri, args.mimeType)
+          setPackage("com.baidu.input_mi")
+          addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        },
+      ).filter { (_, intent) ->
+        activity.packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY) != null
       }
+      when (targets.size) {
+        0 -> invoke.reject("未安装支持导入皮肤的百度输入法")
+        1 -> openSkin(invoke, targets[0].second)
+        else -> AlertDialog.Builder(activity)
+          .setTitle("选择百度输入法")
+          .setItems(targets.map { it.first }.toTypedArray()) { _, index ->
+            openSkin(invoke, targets[index].second)
+          }
+          .setOnCancelListener { invoke.reject("已取消导入皮肤") }
+          .show()
+      }
+    } catch (error: Exception) {
+      invoke.reject(error.message ?: "Unable to share skin", error)
+    }
+  }
+
+  private fun openSkin(invoke: Invoke, viewIntent: Intent) {
+    try {
       activity.startActivity(viewIntent)
       invoke.resolve()
     } catch (error: ActivityNotFoundException) {
-      invoke.reject("未安装百度输入法或当前版本不支持导入皮肤", error)
+      invoke.reject("当前百度输入法版本不支持导入皮肤", error)
     } catch (error: Exception) {
       invoke.reject(error.message ?: "Unable to share skin", error)
     }
