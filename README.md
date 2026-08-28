@@ -13,7 +13,9 @@
 
 ### PC 端
 
-![PC 端编辑界面](readme-assets/desktop-editor.png)
+<img width="1440" height="882" alt="image" src="https://github.com/user-attachments/assets/30050874-c96f-4051-a131-f22fd39e75dc" />
+<img width="1440" height="882" alt="image" src="https://github.com/user-attachments/assets/f3bba23e-240c-4df3-a885-e7ff9fb2476f" />
+<img width="1440" height="882" alt="image" src="https://github.com/user-attachments/assets/23b334ca-d19e-474f-993c-1566f940fa12" />
 
 ### 移动端
 
