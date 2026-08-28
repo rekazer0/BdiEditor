@@ -540,25 +540,20 @@
 
     <dialog id="panel-scale-dialog" class="project-dialog" aria-labelledby="panel-scale-title">
       <form id="panel-scale-form" method="dialog">
-        <header><h2 id="panel-scale-title">面板复制</h2><p>复制一个面板及其样式与图片资源，可跨主题和屏幕方向。</p></header>
+        <header><h2 id="panel-scale-title">面板复制</h2><p>复制目录下的全部内容，或复制单个文件。</p></header>
         <div class="panel-copy-fields">
-          <label>源面板 <select id="panel-copy-source" required></select></label>
-          <div class="panel-scale-grid">
-            <label>目标主题 <select id="panel-target-theme"><option value="light">浅色</option><option value="dark">深色</option></select></label>
-            <label>目标方向 <select id="panel-target-orientation"><option value="port">竖屏</option><option value="land">横屏</option></select></label>
-          </div>
-          <label>目标面板 <select id="panel-target-existing" aria-label="选择目标路径下的 INI"></select></label>
-          <label>目标文件名 <input id="panel-target-file" required autocomplete="off"></label>
+          <label>源目录 <input id="panel-copy-source" list="panel-copy-source-options" required autocomplete="off" spellcheck="false" placeholder="输入目录或具体文件"><datalist id="panel-copy-source-options"></datalist></label>
+          <label>目标目录 <input id="panel-copy-target" list="panel-copy-target-options" required autocomplete="off" spellcheck="false" placeholder="输入目录或具体文件"><datalist id="panel-copy-target-options"></datalist></label>
         </div>
         <label class="project-template-option"><input id="panel-scale-enabled" type="checkbox"><span><strong>缩放分辨率</strong><small>按配置的目标宽高缩放面板、切片和图片</small></span></label>
         <div id="panel-scale-options" class="panel-scale-grid" hidden>
-          <label>源宽度 <input id="panel-source-width" type="number" min="1" readonly></label>
-          <label>源高度 <input id="panel-source-height" type="number" min="1" readonly></label>
+          <label>源宽度 <input id="panel-source-width" type="number" min="1" readonly disabled></label>
+          <label>源高度 <input id="panel-source-height" type="number" min="1" readonly disabled></label>
           <label>目标宽度 <input id="panel-target-width" type="number" min="1" required></label>
           <label>目标高度 <input id="panel-target-height" type="number" min="1" required></label>
         </div>
         <p id="panel-scale-summary"></p>
-        <footer><button value="cancel">取消</button><button class="primary" value="copy">复制</button></footer>
+        <footer><button value="cancel" formnovalidate>取消</button><button class="primary" value="copy">复制</button></footer>
       </form>
     </dialog>
 

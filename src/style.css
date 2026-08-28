@@ -5262,6 +5262,22 @@ canvas {
   font-size: 12px;
 }
 
+.panel-copy-fields input,
+.panel-scale-grid input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  background: var(--control);
+  color: var(--text);
+}
+
+.panel-scale-grid input:disabled {
+  color: var(--secondary);
+  opacity: 1;
+}
+
 #panel-scale-options[hidden] { display: none; }
 
 .workspace-status {

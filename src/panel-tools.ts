@@ -121,6 +121,58 @@ export function variantCopyPaths(
   }).sort((a, b) => a.source.localeCompare(b.source))
 }
 
+function archivePath(value: string): { path: string; directory: boolean } {
+  const input = value.trim().replace(/\\/g, "/")
+  const directory = input.endsWith("/")
+  const path = input.replace(/\/+$/, "")
+  if (!path || path.startsWith("/") || /^[A-Za-z]:/.test(path) || path.split("/").some((part) => !part || part === "." || part === ".." || part.includes("\0"))) {
+    throw new Error(`无效归档路径：${value}`)
+  }
+  return { path, directory }
+}
+
+export function archivePathOptions(names: readonly string[]): string[] {
+  const paths = new Set<string>()
+  for (const name of names) {
+    const path = name.replace(/\/+$/, "")
+    if (!path) continue
+    if (!name.endsWith("/")) paths.add(path)
+    const parts = path.split("/")
+    for (let index = 1; index < parts.length; index++) paths.add(`${parts.slice(0, index).join("/")}/`)
+  }
+  return [...paths].sort((a, b) => a.localeCompare(b))
+}
+
+export function archiveCopyPaths(
+  names: readonly string[],
+  sourceValue: string,
+  targetValue: string,
+): Array<{ source: string; target: string }> {
+  const sourceInput = archivePath(sourceValue)
+  const targetInput = archivePath(targetValue)
+  const files = names.filter((name) => !name.endsWith("/"))
+  const sourceIsFile = files.includes(sourceInput.path)
+  const sources = sourceIsFile
+    ? [sourceInput.path]
+    : files.filter((name) => name.startsWith(`${sourceInput.path}/`))
+  if (!sources.length) throw new Error(`源目录或文件不存在：${sourceInput.path}`)
+  if (!sourceIsFile && files.includes(targetInput.path)) throw new Error(`目标路径是文件：${targetInput.path}`)
+
+  const directories = new Set(archivePathOptions(names).filter((path) => path.endsWith("/")).map((path) => path.slice(0, -1)))
+  const targetLeaf = targetInput.path.split("/").pop() ?? ""
+  const sourceLeaf = sourceInput.path.split("/").pop() ?? ""
+  const targetIsDirectory = !sourceIsFile || targetInput.directory || directories.has(targetInput.path) ||
+    !files.includes(targetInput.path) && sourceLeaf.includes(".") && !targetLeaf.includes(".")
+  const copies = sources.map((source) => ({
+    source,
+    target: targetIsDirectory
+      ? `${targetInput.path}/${sourceIsFile ? source.split("/").pop() : source.slice(sourceInput.path.length + 1)}`
+      : targetInput.path,
+  }))
+  if (copies.some(({ source, target }) => source === target)) throw new Error("源目录或文件和目标不能相同")
+  return copies
+}
+
 export function copyablePanelPaths(names: readonly string[]): string[] {
   return names.filter((path) =>
     /^(?:light|dark)\/skin\/(?:port|land)\/[^/]+\.ini$/i.test(path) &&

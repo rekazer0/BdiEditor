@@ -127,18 +127,13 @@ import { mixedCoordinateDelta, shouldClearMixedInput } from "./mixed-input.ts"
 import { installNumberInputWheel } from "./number-input-wheel.ts"
 import { loadBuiltInProjectTemplate, operationError } from "./operations.ts"
 import {
+  archiveCopyPaths,
+  archivePathOptions,
   availableSkinStates,
   canvasFitWidth,
-  copiedResourceBase,
-  copyablePanelPaths,
   effectivePanelSection,
-  mergePanelStyles,
-  panelStyleIDs,
   previewScalePercent,
-  rewriteStyleImageBases,
   scaleIniDocument,
-  scalePanelDocument,
-  validPanelFilename,
   variantCopyPaths,
 } from "./panel-tools.ts"
 import {
@@ -313,11 +308,10 @@ const ios26Dialog = $("#ios26-dialog") as HTMLDialogElement
 const ios26Form = $("#ios26-form") as HTMLFormElement
 const panelScaleDialog = $("#panel-scale-dialog") as HTMLDialogElement
 const panelScaleForm = $("#panel-scale-form") as HTMLFormElement
-const panelCopySource = $("#panel-copy-source") as HTMLSelectElement
-const panelTargetTheme = $("#panel-target-theme") as HTMLSelectElement
-const panelTargetOrientation = $("#panel-target-orientation") as HTMLSelectElement
-const panelTargetExisting = $("#panel-target-existing") as HTMLSelectElement
-const panelTargetFile = $("#panel-target-file") as HTMLInputElement
+const panelCopySource = $("#panel-copy-source") as HTMLInputElement
+const panelCopySourceOptions = $("#panel-copy-source-options") as HTMLDataListElement
+const panelCopyTarget = $("#panel-copy-target") as HTMLInputElement
+const panelCopyTargetOptions = $("#panel-copy-target-options") as HTMLDataListElement
 const panelScaleEnabled = $("#panel-scale-enabled") as HTMLInputElement
 const panelScaleOptions = $("#panel-scale-options")
 const panelSourceWidth = $("#panel-source-width") as HTMLInputElement
@@ -2720,31 +2714,40 @@ function panelSizeForPath(path: string): [number, number] | undefined {
     (archive.isText(`${directory}/gen.ini`) ? panelSizeFrom(IniDocument.parse(archive.getText(`${directory}/gen.ini`))) : undefined)
 }
 
-function panelCopyTargetPath(): string {
-  return `${panelTargetTheme.value}/skin/${panelTargetOrientation.value}/${panelTargetFile.value.trim()}`
+function panelCopySourceSize(): [number, number] | undefined {
+  if (!archive) return
+  const source = panelCopySource.value.trim().replace(/\\/g, "/").replace(/\/+$/, "")
+  if (archive.isText(source)) return panelSizeForPath(source)
+  for (const path of archive.names()) {
+    if (path.startsWith(`${source}/`) && /\.ini$/i.test(path)) {
+      const size = panelSizeForPath(path)
+      if (size) return size
+    }
+  }
 }
 
 function updatePanelCopyForm(): void {
   if (!archive) return
-  const sourceSize = panelSizeForPath(panelCopySource.value)
+  const sourceSize = panelCopySourceSize()
   panelSourceWidth.value = sourceSize ? String(sourceSize[0]) : ""
   panelSourceHeight.value = sourceSize ? String(sourceSize[1]) : ""
   if (!panelTargetWidth.value && sourceSize) panelTargetWidth.value = String(sourceSize[0])
   if (!panelTargetHeight.value && sourceSize) panelTargetHeight.value = String(sourceSize[1])
+  if (!sourceSize) panelScaleEnabled.checked = false
+  panelScaleEnabled.disabled = !sourceSize
   panelScaleOptions.hidden = !panelScaleEnabled.checked
-  for (const field of [panelSourceWidth, panelSourceHeight, panelTargetWidth, panelTargetHeight]) {
-    field.disabled = !panelScaleEnabled.checked
+  panelSourceWidth.disabled = true
+  panelSourceHeight.disabled = true
+  panelTargetWidth.disabled = !panelScaleEnabled.checked
+  panelTargetHeight.disabled = !panelScaleEnabled.checked
+  try {
+    const copies = archiveCopyPaths(archive.names(), panelCopySource.value, panelCopyTarget.value)
+    panelScaleSummary.textContent = copies.length === 1
+      ? `目标：${copies[0].target}`
+      : `目标：${panelCopyTarget.value.trim()}（${copies.length} 个文件）`
+  } catch {
+    panelScaleSummary.textContent = ""
   }
-  const prefix = `${panelTargetTheme.value}/skin/${panelTargetOrientation.value}/`
-  const targetFiles = copyablePanelPaths(archive.names())
-    .filter((path) => path.startsWith(prefix))
-    .map((path) => path.slice(prefix.length))
-  panelTargetExisting.replaceChildren(
-    Object.assign(document.createElement("option"), { value: "", textContent: "新建 / 自定义文件名" }),
-    ...targetFiles.map((value) => Object.assign(document.createElement("option"), { value, textContent: value })),
-  )
-  panelTargetExisting.value = targetFiles.includes(panelTargetFile.value.trim()) ? panelTargetFile.value.trim() : ""
-  panelScaleSummary.textContent = `目标：${panelCopyTargetPath()}`
 }
 
 async function resizePng(bytes: Uint8Array, xRatio: number, yRatio: number): Promise<Uint8Array> {
@@ -2787,28 +2790,28 @@ async function decodePngMask(bytes: Uint8Array): Promise<{ width: number; height
   return { width: canvas.width, height: canvas.height, mask: alphaMask(context.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height) }
 }
 
-function panelResourceRoots(path: string): string[] {
-  const match = path.match(/^(light|dark)\/skin\/(port|land)\//)
-  if (!match) throw new Error(`无效面板路径：${path}`)
-  return [`${match[1]}/skin/${match[2]}/res`, `${match[1]}/skin/res`]
+function defaultPanelCopyTarget(source: string): string {
+  if (source.endsWith("/")) return `${source.slice(0, -1)}_copy/`
+  const slash = source.lastIndexOf("/") + 1
+  const dot = source.lastIndexOf(".")
+  return dot >= slash
+    ? `${source.slice(0, dot)}_copy${source.slice(dot)}`
+    : `${source}_copy`
 }
 
 function openPanelCopyDialog(): void {
   if (!archive) return
-  const paths = copyablePanelPaths(archive.names())
+  const paths = archivePathOptions(archive.names())
   if (!paths.length) {
-    showError(new Error("皮肤中没有可复制的面板文件"), "打开面板复制")
+    showError(new Error("皮肤中没有可复制的目录或文件"), "打开面板复制")
     return
   }
-  panelCopySource.replaceChildren(...paths.map((path) => Object.assign(document.createElement("option"), {
-    value: path,
-    textContent: path,
-  })))
+  const options = paths.map((value) => Object.assign(document.createElement("option"), { value }))
+  panelCopySourceOptions.replaceChildren(...options.map((option) => option.cloneNode(true)))
+  panelCopyTargetOptions.replaceChildren(...options)
   panelCopySource.value = paths.includes(selectedPath) ? selectedPath :
     paths.find((path) => path === `${theme.value}/skin/${orientation.value}/${layout.value}`) ?? paths[0]
-  panelTargetTheme.value = theme.value
-  panelTargetOrientation.value = orientation.value
-  panelTargetFile.value = panelCopySource.value.split("/").pop() ?? "panel.ini"
+  panelCopyTarget.value = defaultPanelCopyTarget(panelCopySource.value)
   panelScaleEnabled.checked = false
   panelTargetWidth.value = ""
   panelTargetHeight.value = ""
@@ -2819,93 +2822,45 @@ function openPanelCopyDialog(): void {
 async function copyPanel(): Promise<boolean> {
   if (!archive) return false
   const currentArchive = archive
-  const sourcePath = panelCopySource.value
-  if (!copyablePanelPaths(currentArchive.names()).includes(sourcePath)) throw new Error("请选择有效的源面板")
-  if (!validPanelFilename(panelTargetFile.value.trim())) throw new Error("目标文件名必须是安全的 .ini 文件名")
-  const targetPath = panelCopyTargetPath()
-  if (sourcePath === targetPath) throw new Error("源面板和目标面板不能相同")
-  if (currentArchive.getBytes(targetPath) && !window.confirm(`目标面板 ${targetPath} 已存在，是否覆盖？`)) return false
+  const copies = archiveCopyPaths(currentArchive.names(), panelCopySource.value, panelCopyTarget.value)
+  const existingTargets = copies.filter(({ target }) => currentArchive.getBytes(target))
+  if (existingTargets.length && !window.confirm(`目标中已有 ${existingTargets.length} 个文件，是否覆盖？`)) return false
 
   let xRatio = 1
   let yRatio = 1
   if (panelScaleEnabled.checked) {
-    const sourceWidth = Number(panelSourceWidth.value)
-    const sourceHeight = Number(panelSourceHeight.value)
+    const sourceSize = panelCopySourceSize()
     const targetWidth = Number(panelTargetWidth.value)
     const targetHeight = Number(panelTargetHeight.value)
-    if (![sourceWidth, sourceHeight, targetWidth, targetHeight].every((value) => Number.isFinite(value) && value > 0)) {
+    if (!sourceSize || ![targetWidth, targetHeight].every((value) => Number.isFinite(value) && value > 0)) {
       throw new Error("面板分辨率必须是正数")
     }
-    xRatio = targetWidth / sourceWidth
-    yRatio = targetHeight / sourceHeight
+    xRatio = targetWidth / sourceSize[0]
+    yRatio = targetHeight / sourceSize[1]
   }
 
-  const sourcePanel = IniDocument.parse(currentArchive.getText(sourcePath))
-  const sourceRoots = panelResourceRoots(sourcePath)
-  const targetRoots = panelResourceRoots(targetPath)
-  const sourceStylePath = sourceRoots.map((root) => `${root}/default.css`).find((path) => currentArchive.isText(path))
-  if (!sourceStylePath) throw new Error("源面板缺少 default.css")
-  const targetStylePath = targetRoots.map((root) => `${root}/default.css`).find((path) => currentArchive.isText(path)) ?? `${targetRoots[0]}/default.css`
-  const sourceStyles = IniDocument.parse(currentArchive.getText(sourceStylePath))
-  const targetStyles = currentArchive.isText(targetStylePath) ? IniDocument.parse(currentArchive.getText(targetStylePath)) : IniDocument.parse("")
-  const styleIDs = panelStyleIDs(sourcePanel)
-  const imageBases = new Set<string>()
-  for (const styleID of styleIDs) {
-    for (const property of ["NM_IMG", "HL_IMG"]) {
-      const base = sourceStyles.get(`STYLE${styleID}`, property)?.split(",")[0].trim()
-      if (base) imageBases.add(base)
-    }
-  }
-
-  const targetPairs = new Map<string, { png?: Uint8Array; til?: Uint8Array }>()
-  for (const root of targetRoots) {
-    const prefix = `${root}/`
-    const bases = currentArchive.names().flatMap((path) => {
-      if (!path.startsWith(prefix)) return []
-      const match = path.slice(prefix.length).match(/^(.*)\.(?:png|til)$/i)
-      return match ? [match[1]] : []
-    })
-    for (const base of new Set(bases)) {
-      if (targetPairs.has(base)) continue
-      const png = currentArchive.getBytes(`${root}/${base}.png`)
-      const til = currentArchive.getBytes(`${root}/${base}.til`)
-      if (png && til) targetPairs.set(base, { png, til })
-    }
-  }
-  const targetRoot = targetStylePath.slice(0, targetStylePath.lastIndexOf("/"))
   const staged = new Map<string, Uint8Array>()
-  const resourceNames = new Map<string, string>()
   const encoder = new TextEncoder()
-  for (const base of imageBases) {
-    const sourceRoot = sourceRoots.find((root) => currentArchive.getBytes(`${root}/${base}.png`) && currentArchive.getBytes(`${root}/${base}.til`))
-    if (!sourceRoot) throw new Error(`源样式引用的资源不完整：${base}.png / ${base}.til`)
-    const sourcePng = currentArchive.getBytes(`${sourceRoot}/${base}.png`)!
-    const sourceTil = currentArchive.getBytes(`${sourceRoot}/${base}.til`)!
-    const scaled = xRatio !== 1 || yRatio !== 1
-    const png = scaled ? await resizePng(sourcePng, xRatio, yRatio) : sourcePng.slice()
-    const til = scaled
-      ? encoder.encode(scaleIniDocument(IniDocument.parse(currentArchive.getText(`${sourceRoot}/${base}.til`)), xRatio, yRatio).toString())
-      : sourceTil.slice()
-    const targetBase = copiedResourceBase(base, png, til, targetPairs)
-    resourceNames.set(base, targetBase)
-    targetPairs.set(targetBase, { png, til })
-    staged.set(`${targetRoot}/${targetBase}.png`, png)
-    staged.set(`${targetRoot}/${targetBase}.til`, til)
+  for (const { source, target } of copies) {
+    const bytes = currentArchive.getBytes(source)!
+    const scaled = panelScaleEnabled.checked && (xRatio !== 1 || yRatio !== 1)
+    const output = scaled && source.toLowerCase().endsWith(".png")
+      ? await resizePng(bytes, xRatio, yRatio)
+      : scaled && /\.(?:ini|til)$/i.test(source) && currentArchive.isText(source)
+        ? encoder.encode(scaleIniDocument(IniDocument.parse(currentArchive.getText(source)), xRatio, yRatio).toString())
+        : bytes.slice()
+    staged.set(target, output)
   }
-
-  const copiedStyles = rewriteStyleImageBases(sourceStyles, styleIDs, resourceNames)
-  const merged = mergePanelStyles(sourcePanel, copiedStyles, targetStyles)
-  const panel = panelScaleEnabled.checked
-    ? scalePanelDocument(merged.panel, xRatio, yRatio, Number(panelTargetWidth.value), Number(panelTargetHeight.value))
-    : merged.panel
-  staged.set(targetStylePath, encoder.encode(merged.styles.toString()))
-  staged.set(targetPath, encoder.encode(panel.toString()))
   for (const [path, bytes] of staged) currentArchive.setBytes(path, bytes)
   scheduleSourceAutosave([...staged.keys()])
 
-  theme.value = panelTargetTheme.value
-  orientation.value = panelTargetOrientation.value as "port" | "land"
-  syncSegmentedControls()
+  const targetPath = copies[0].target
+  const variant = targetPath.match(/^(light|dark)\/skin\/(port|land)\//)
+  if (variant) {
+    theme.value = variant[1]
+    orientation.value = variant[2] as "port" | "land"
+    syncSegmentedControls()
+  }
   renderFiles()
   selectFile(targetPath)
   updateDirty()
@@ -8564,20 +8519,13 @@ layoutImageForm.addEventListener("submit", (event) => {
   event.preventDefault()
   void applyLayoutImage()
 })
-panelCopySource.addEventListener("change", () => {
-  panelTargetFile.value = panelCopySource.value.split("/").pop() ?? "panel.ini"
+panelCopySource.addEventListener("input", () => {
   panelTargetWidth.value = ""
   panelTargetHeight.value = ""
   updatePanelCopyForm()
 })
-for (const field of [panelTargetTheme, panelTargetOrientation, panelScaleEnabled]) {
-  field.addEventListener("change", updatePanelCopyForm)
-}
-panelTargetExisting.addEventListener("change", () => {
-  if (panelTargetExisting.value) panelTargetFile.value = panelTargetExisting.value
-  updatePanelCopyForm()
-})
-panelTargetFile.addEventListener("input", updatePanelCopyForm)
+panelCopyTarget.addEventListener("input", updatePanelCopyForm)
+panelScaleEnabled.addEventListener("change", updatePanelCopyForm)
 panelScaleForm.addEventListener("submit", (event) => {
   if ((event.submitter as HTMLButtonElement | null)?.value !== "copy") return
   event.preventDefault()
