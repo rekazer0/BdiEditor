@@ -662,7 +662,7 @@ function updatePointerCoordinates(
   event: Pick<PointerEvent, "clientX" | "clientY" | "pointerType">,
   target: HTMLElement,
   canvas: HTMLCanvasElement,
-  geometry?: { target: DOMRect; wrap: DOMRect },
+  geometry?: { target: DOMRect; wrap: DOMRect; wrapWidth: number; wrapHeight: number },
 ): void {
   if (event.pointerType !== "mouse" || editorCrosshair.checked && !isEditing()) {
     if (editorCrosshair.checked) previewCoordinates.hidden = true
@@ -675,6 +675,8 @@ function updatePointerCoordinates(
   const bounds = geometry?.target ?? target.getBoundingClientRect()
   if (!bounds.width || !bounds.height) return
   const wrapBounds = geometry?.wrap ?? canvasWrap.getBoundingClientRect()
+  const wrapWidth = geometry?.wrapWidth ?? canvasWrap.clientWidth
+  const wrapHeight = geometry?.wrapHeight ?? canvasWrap.clientHeight
   let x = Math.min(bounds.width - 1, Math.max(0, event.clientX - bounds.left))
   let y = Math.min(bounds.height - 1, Math.max(0, event.clientY - bounds.top))
   const snapPreview = canvas === previewCanvas ? preview : canvas === toolbarCanvas ? toolbarPreview : undefined
@@ -698,18 +700,18 @@ function updatePointerCoordinates(
   const crosshairY = Math.round(bounds.top - wrapBounds.top + y)
   previewCoordinates.style.left = `${canvasWrap.scrollLeft}px`
   previewCoordinates.style.top = `${canvasWrap.scrollTop}px`
-  previewCoordinates.style.width = `${canvasWrap.clientWidth}px`
-  previewCoordinates.style.height = `${canvasWrap.clientHeight}px`
+  previewCoordinates.style.width = `${wrapWidth}px`
+  previewCoordinates.style.height = `${wrapHeight}px`
   previewCoordinates.style.setProperty("--crosshair-x", `${crosshairX}px`)
   previewCoordinates.style.setProperty("--crosshair-y", `${crosshairY}px`)
   const labelWidth = 130
   previewCoordinates.style.setProperty(
     "--coordinate-label-x",
-    `${crosshairX + labelWidth + 8 <= canvasWrap.clientWidth ? crosshairX + 8 : Math.max(0, crosshairX - labelWidth - 8)}px`,
+    `${crosshairX + labelWidth + 8 <= wrapWidth ? crosshairX + 8 : Math.max(0, crosshairX - labelWidth - 8)}px`,
   )
   previewCoordinates.style.setProperty(
     "--coordinate-label-y",
-    `${Math.min(canvasWrap.clientHeight - 14, Math.max(14, crosshairY))}px`,
+    `${Math.min(wrapHeight - 14, Math.max(14, crosshairY))}px`,
   )
   previewCoordinates.hidden = false
 }
@@ -718,7 +720,7 @@ let pendingPointerCoordinates: {
   event: Pick<PointerEvent, "clientX" | "clientY" | "pointerType">
   target: HTMLElement
   canvas: HTMLCanvasElement
-  geometry?: { target: DOMRect; wrap: DOMRect }
+  geometry?: { target: DOMRect; wrap: DOMRect; wrapWidth: number; wrapHeight: number }
 } | undefined
 let pointerCoordinatesFrame = 0
 
@@ -726,7 +728,7 @@ function schedulePointerCoordinates(
   event: PointerEvent,
   target: HTMLElement,
   canvas: HTMLCanvasElement,
-  geometry?: { target: DOMRect; wrap: DOMRect },
+  geometry?: { target: DOMRect; wrap: DOMRect; wrapWidth: number; wrapHeight: number },
 ): void {
   pendingPointerCoordinates = {
     event: { clientX: event.clientX, clientY: event.clientY, pointerType: event.pointerType },
@@ -2530,7 +2532,7 @@ let previewPanStart: { x: number; y: number; panX: number; panY: number } | unde
 let previewPanCandidate: { pointerId: number; x: number; y: number; panX: number; panY: number } | undefined
 let pendingPreviewPan: { x: number; y: number } | undefined
 let previewPanFrame = 0
-let previewPanGeometry: { target: DOMRect; wrap: DOMRect } | undefined
+let previewPanGeometry: { target: DOMRect; wrap: DOMRect; wrapWidth: number; wrapHeight: number } | undefined
 
 function setPreviewPan(x: number, y: number): void {
   previewPanX = x
@@ -2651,9 +2653,11 @@ canvasWrap.addEventListener("pointermove", (event) => {
     // Cache layout before the first transform write. Every subsequent frame
     // can derive the transformed canvas bounds from this snapshot and the pan
     // delta, avoiding forced reflow in the crosshair update path.
-    previewPanGeometry = {
+  previewPanGeometry = {
       target: previewCanvas.getBoundingClientRect(),
       wrap: canvasWrap.getBoundingClientRect(),
+      wrapWidth: canvasWrap.clientWidth,
+      wrapHeight: canvasWrap.clientHeight,
     }
     if (pointerCoordinatesFrame) cancelAnimationFrame(pointerCoordinatesFrame)
     pointerCoordinatesFrame = 0
@@ -2675,6 +2679,8 @@ canvasWrap.addEventListener("pointermove", (event) => {
     schedulePointerCoordinates(event, previewCanvas, previewCanvas, {
       target: new DOMRect(target.left + offsetX, target.top + offsetY, target.width, target.height),
       wrap: geometry.wrap,
+      wrapWidth: geometry.wrapWidth,
+      wrapHeight: geometry.wrapHeight,
     })
   } else {
     schedulePointerCoordinates(event, previewCanvas, previewCanvas)
