@@ -153,7 +153,7 @@ export function rewritePanelStyleIDs(
   const output = IniDocument.parse(source.toString())
   for (const { section, key, value } of output.entries()) {
     if (key === "STAT_STYLE") {
-      output.set(section, key, value.replace(/(S\d+_)(\d+)/g, (match, prefix, id) =>
+      output.set(section, key, value.replace(/(S\d+_)(\d+)/g, (_, prefix, id) =>
         `${prefix}${replacements.get(Number(id)) ?? id}`,
       ))
     } else if (key.endsWith("_STYLE")) {

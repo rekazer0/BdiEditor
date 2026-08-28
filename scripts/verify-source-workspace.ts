@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import { findTextMatches, highlightIni, highlightJson, insertedTextRange, replaceTextMatches } from "../src/highlight.ts"
 import { SkinArchive } from "../src/skin.ts"
-import { consumeSourceWriteSnapshot, resolveSourceArchivePath } from "../src/source-tree.ts"
+import { consumeSourceWriteSnapshot, resolveSourceArchivePath, writePendingSourcePaths } from "../src/source-tree.ts"
 
 for (const path of ["public/default-template.bds", "public/default-template.bda"]) {
   const archive = SkinArchive.open(fs.readFileSync(path))
@@ -45,6 +45,17 @@ assert.equal(
   consumeSourceWriteSnapshot(writes, "skin/port/layout.ini", new Uint8Array([3])),
   false,
   "源码监听不应吞掉真正的外部修改",
+)
+
+const pendingWrites = new Set(["skin/port/layout.ini"])
+await assert.rejects(
+  writePendingSourcePaths(pendingWrites, async () => { throw new Error("disk full") }),
+  /disk full/,
+)
+assert.deepEqual(
+  [...pendingWrites],
+  ["skin/port/layout.ini"],
+  "源码写入失败后应恢复待保存路径供下次重试",
 )
 
 const html = fs.readFileSync("index.html", "utf8")

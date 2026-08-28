@@ -9,7 +9,6 @@ import "./style.css"
 import {
   DEFAULT_BDA_PANEL_HEIGHT,
   DEFAULT_BDA_PANEL_WIDTH,
-  DEFAULT_PANEL_HEIGHT,
   DEFAULT_PANEL_WIDTH,
 } from "./keyboard.ts"
 import {
@@ -107,7 +106,6 @@ import {
 } from "./layout-image.ts"
 import { alphaMask, detectGridCells } from "./layout-scan.ts"
 import {
-  backgroundStyleSections,
   keyboardConfig,
   resolvePanelConfig,
   setKeyboardHeight,
@@ -116,7 +114,6 @@ import {
 import {
   applyLayoutAction as transformLayout,
   isListCell,
-  listCellIndex,
   listCellRect,
   listCellValue,
   mergeLayoutRects,
@@ -164,8 +161,13 @@ import {
   moveCaretVertical,
 } from "./simulation.ts"
 import { SkinArchive } from "./skin.ts"
-import { consumeSourceWriteSnapshot, resolveSourceArchivePath, type SourceWriteSnapshot } from "./source-tree.ts"
-import { SourceCodeEditor } from "./source-editor.ts"
+import {
+  consumeSourceWriteSnapshot,
+  resolveSourceArchivePath,
+  writePendingSourcePaths,
+  type SourceWriteSnapshot,
+} from "./source-tree.ts"
+import { LazySourceCodeEditor } from "./lazy-source-editor.ts"
 import {
   SOUND_ACCEPT,
   decodeAiffPcm,
@@ -258,7 +260,7 @@ const mobilePortraitQuery = matchMedia("(max-width: 760px) and (orientation: por
 const exportButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-export-format]"),
 )
-const source = new SourceCodeEditor($("#source"))
+const source = new LazySourceCodeEditor($("#source"))
 const sourceEditor = $("#source-editor")
 const sourceSearch = $("#source-search") as HTMLInputElement
 const sourceSearchCount = $("#source-search-count")
@@ -1656,32 +1658,30 @@ async function flushSourceAutosave(): Promise<void> {
   if (archive && sourceWorkspacePath && pendingSourcePaths.size) {
     const workspace = sourceWorkspacePath
     const value = archive
-    const paths = [...pendingSourcePaths]
-    pendingSourcePaths.clear()
-    const changes: SourceChangePayload[] = paths.map((path) => {
-      const archivePath = sourcePathForArchive(path)
-      const canonical = value.canonicalSourcePath(archivePath)
-      const bytes = value.getSourceBytes(archivePath)
-      const data = bytes && value.isBdaConfig(canonical) ? bdaWorkspaceData(canonical, bytes) : bytes
-      return { path, data: data ? Array.from(data) : null, directory: false }
-    })
-    sourceAutosaveQueue = sourceAutosaveQueue.catch(() => {}).then(() => {
-      for (const change of changes) rememberSourceWrite(change.path, change.data ? new Uint8Array(change.data) : null)
-      return invoke("apply_source_changes", { path: workspace, changes })
-    })
+    sourceAutosaveQueue = sourceAutosaveQueue.catch(() => {}).then(() =>
+      writePendingSourcePaths(pendingSourcePaths, async (paths) => {
+        const changes: SourceChangePayload[] = paths.map((path) => {
+          const archivePath = sourcePathForArchive(path)
+          const canonical = value.canonicalSourcePath(archivePath)
+          const bytes = value.getSourceBytes(archivePath)
+          const data = bytes && value.isBdaConfig(canonical) ? bdaWorkspaceData(canonical, bytes) : bytes
+          return { path, data: data ? Array.from(data) : null, directory: false }
+        })
+        for (const change of changes) rememberSourceWrite(change.path, change.data ? new Uint8Array(change.data) : null)
+        await invoke("apply_source_changes", { path: workspace, changes })
+      }),
+    )
   }
-  try {
-    await sourceAutosaveQueue
-  } catch (error) {
-    showError(error, "自动保存源码")
-  }
+  await sourceAutosaveQueue
 }
 
 function scheduleSourceAutosave(paths: string[]): void {
   if (!archive || (!sourceWorkspacePath && sourceWorkspacePendingArchive !== archive)) return
   for (const path of paths) pendingSourcePaths.add(sourcePathForWorkspace(archive.sourcePath(path)))
   if (!sourceWorkspacePath || sourceAutosaveTimer !== undefined) return
-  sourceAutosaveTimer = window.setTimeout(() => void flushSourceAutosave(), 3 * 60_000)
+  sourceAutosaveTimer = window.setTimeout(() => {
+    void flushSourceAutosave().catch((error) => showError(error, "自动保存源码"))
+  }, 3 * 60_000)
 }
 
 async function refreshExternalSourceFiles(workspace: string, paths: string[]): Promise<void> {
@@ -1822,7 +1822,12 @@ function chooseUnsavedDecision(): Promise<UnsavedDecision> {
 }
 
 async function prepareDocumentReplacement(): Promise<boolean> {
-  await flushSourceAutosave()
+  try {
+    await flushSourceAutosave()
+  } catch (error) {
+    showError(error, "自动保存源码")
+    return false
+  }
   if (!hasUnsavedChanges()) return true
   let decision: "save" | "discard" | "cancel"
   if (isTauri()) {
@@ -3849,6 +3854,15 @@ function hideImageWorkspace(): void {
   deviceShell.hidden = false
 }
 
+function loadVisibleSourceEditor(): void {
+  if (sourceEditor.hidden) return
+  void source.load().then(() => requestAnimationFrame(() => {
+    source.requestMeasure()
+    scrollSelectedSource()
+    updateSourceHighlight()
+  })).catch((error) => showError(error, "加载源码编辑器"))
+}
+
 workspaceImage.addEventListener("load", clearImagePreviewError)
 workspaceImage.addEventListener("error", showImagePreviewError)
 
@@ -3884,6 +3898,7 @@ function updateInspectorView(): void {
     asset.hidden = true
     resourceInspector.hidden = inspectorTab !== "properties"
     sourceEditor.hidden = inspectorTab !== "source"
+    loadVisibleSourceEditor()
     return
   }
   resourceInspector.hidden = true
@@ -3896,11 +3911,7 @@ function updateInspectorView(): void {
   asset.hidden = true
   quickInspector.hidden = inspectorTab !== "properties" || !propertiesAvailable
   sourceEditor.hidden = inspectorTab !== "source"
-  if (!sourceEditor.hidden) requestAnimationFrame(() => {
-    source.requestMeasure()
-    scrollSelectedSource()
-    updateSourceHighlight()
-  })
+  loadVisibleSourceEditor()
 }
 
 const SOURCE_SEARCH_HIGHLIGHT_LIMIT = 20_000
@@ -4236,16 +4247,6 @@ function refreshToolbarPreview(
   toolbarPreview.setDocument(toolbarDocument)
   toolbarPreview.setMode("preview")
   return { width, height, inputHeight }
-}
-
-function commonSelectedStyle(name: "BACK_STYLE" | "FORE_STYLE"): string | undefined {
-  if (!layoutDocument || !selectedKeySections.length) return
-  const values = selectedKeySections.map((section) =>
-    isListCell(section)
-      ? (layoutDocument?.get("LIST", name) ?? "").trim()
-      : effectiveKeyValue(section, name)?.trim() ?? "",
-  )
-  return values.every((value) => value === values[0]) ? values[0] : undefined
 }
 
 function previewDestination(
@@ -5031,7 +5032,7 @@ function populateDocumentInspector(): void {
     }
     return label
   }
-  for (const [sectionIndex, section] of sections.entries()) {
+  for (const section of sections) {
     const sectionPanel = document.createElement("section")
     sectionPanel.className = "document-property-section"
     const sectionEntries = entries.filter((item) => item.section === section)
@@ -5705,31 +5706,6 @@ function selectedStyleImageSections(source: "BACK_STYLE" | "FORE_STYLE"): { docu
         }).filter((section) => section && document.sections().includes(section))
       }))]
   return sections.length ? { document, path, sections } : undefined
-}
-
-function styleWriteTarget(
-  source: "BACK_STYLE" | "FORE_STYLE",
-  property: "NM_IMG" | "HL_IMG",
-  styleIDs: string[],
-): StyleImagePickerTarget {
-  if (archive?.format === "bda") return { source, property }
-  const path = styleConfigPath()
-  if (!archive?.isText(path)) return { source, property }
-  const document = IniDocument.parse(archive.getText(path))
-  const sections = [
-    ...new Set(
-      styleIDs.flatMap((token) => {
-        const value = Number(token)
-        return [
-          `STYLE${token}`,
-          source === "FORE_STYLE" && Number.isFinite(value)
-            ? `STYLE${Math.floor(value / 100)}`
-            : "",
-        ].filter(Boolean)
-      }).filter((section) => document.sections().includes(section)),
-    ),
-  ]
-  return sections.length ? { source, property, document, path, sections } : { source, property }
 }
 
 function updateSelectedImageReference(target: StyleImagePickerTarget | undefined, value: string): boolean {

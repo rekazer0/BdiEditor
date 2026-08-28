@@ -39,3 +39,18 @@ export function consumeSourceWriteSnapshot(
   if (!candidates.length) snapshots.delete(path)
   return true
 }
+
+export async function writePendingSourcePaths(
+  pending: Set<string>,
+  write: (paths: string[]) => Promise<void>,
+): Promise<void> {
+  const paths = [...pending]
+  if (!paths.length) return
+  pending.clear()
+  try {
+    await write(paths)
+  } catch (error) {
+    for (const path of paths) pending.add(path)
+    throw error
+  }
+}

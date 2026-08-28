@@ -4,7 +4,7 @@ import { IniDocument } from "../src/ini.ts"
 import { Preview, previewFallbackText, previewItems } from "../src/preview.ts"
 
 assert.equal(
-  previewFallbackText({ show: "9" } as Parameters<typeof previewFallbackText>[0], "preview", false),
+  previewFallbackText({ show: "9" } as Parameters<typeof previewFallbackText>[0], false),
   "",
   "键级 SHOW 是按键数组名，前景缺失时也不能作为键帽文字绘制",
 )
@@ -48,7 +48,7 @@ assert.deepEqual(
   "TYPE=0 的静态列表仍应显示候选单元",
 )
 assert.equal(
-  previewFallbackText(previewItems(staticList, 1080, 532)[1], "edit", false),
+  previewFallbackText(previewItems(staticList, 1080, 532)[1], false),
   "+",
   "NAMES 应作为静态列表单元的预览文字",
 )

@@ -48,10 +48,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     let builder = tauri::plugin::Builder::new("native-share");
     #[cfg(target_os = "android")]
     let builder = builder.setup(|app, api| {
-        let handle = api.register_android_plugin(
-            "io.github.rekazer0.bdiedit.share",
-            "SharePlugin",
-        )?;
+        let handle =
+            api.register_android_plugin("io.github.rekazer0.bdiedit.share", "SharePlugin")?;
         app.manage(NativeShare(handle));
         Ok(())
     });
@@ -115,7 +113,10 @@ pub async fn create_source_workspace<R: Runtime>(
 ) -> Result<String, String> {
     app.state::<NativeShare<R>>()
         .0
-        .run_mobile_plugin_async("createSourceWorkspace", CreateWorkspacePayload { uri, name, files })
+        .run_mobile_plugin_async(
+            "createSourceWorkspace",
+            CreateWorkspacePayload { uri, name, files },
+        )
         .await
         .map_err(|error| error.to_string())
 }

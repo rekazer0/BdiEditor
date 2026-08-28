@@ -824,7 +824,6 @@ export function previewSelectionVisible(mode: "edit" | "preview", selected: bool
 
 export function previewFallbackText(
   item: PreviewItem,
-  mode: "edit" | "preview",
   hasForeground: boolean,
 ): string {
   return !hasForeground && item.section?.startsWith("LIST:") ? item.show : ""
@@ -2038,7 +2037,6 @@ export class Preview {
     )
 
     for (const [index, key] of keys.entries()) {
-      const active = this.active?.key.section === key.section
       const selected = previewSelectionVisible(this.mode, this.itemSelected(key))
       const animationElapsed = this.legacyAnimationState?.key.section === key.section
         ? Date.now() - this.legacyAnimationState.startedAt
@@ -2129,7 +2127,7 @@ export class Preview {
       context.font = `${fontWeight}${fontSize}px ${canvasFontFamily(textVisual?.fontName)}`
       context.textAlign = "center"
       context.textBaseline = "middle"
-      const fallbackText = previewFallbackText(key, this.mode, hasForeground)
+      const fallbackText = previewFallbackText(key, hasForeground)
       if (fallbackText) {
         const animationStyle = key.foreAnimStyle || key.animStyle
         const foreScale = animationElapsed >= 0

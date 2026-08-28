@@ -7,6 +7,7 @@ const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8")) as {
 const html = fs.readFileSync("index.html", "utf8")
 const main = fs.readFileSync("src/main.ts", "utf8")
 const editor = fs.readFileSync("src/source-editor.ts", "utf8")
+const lazyEditor = fs.readFileSync("src/lazy-source-editor.ts", "utf8")
 
 assert.ok(packageJson.dependencies?.["@codemirror/view"], "源码编辑器应引入 CodeMirror 6")
 assert.match(html, /<div id="source"[^>]*><\/div>/, "源码区应提供 CodeMirror 挂载节点")
@@ -18,7 +19,10 @@ assert.match(editor, /EditorView\.decorations/, "源码选区和搜索应使用�
 assert.match(editor, /Decoration\.line\(\{ class: "cm-source-selected" \}\)/, "源码业务选区应使用整行装饰")
 assert.match(editor, /scrollIntoView/, "源码定位应交给 CodeMirror")
 assert.match(editor, /commit\(\): void \{[\s\S]*?dispatchEvent\(new Event\("change"\)\)/, "源码编辑器应能在导航前显式提交待处理修改")
-assert.match(main, /new SourceCodeEditor/, "主界面应初始化 CodeMirror 适配器")
+assert.match(lazyEditor, /import\("\.\/source-editor\.ts"\)/, "CodeMirror 应通过动态导入延迟加载")
+assert.match(main, /new LazySourceCodeEditor/, "主界面应初始化轻量源码编辑器代理")
+assert.match(main, /source\.load\(\)/, "源码面板显示时应加载 CodeMirror")
+assert.doesNotMatch(main, /from "\.\/source-editor\.ts"/, "主入口不应静态导入 CodeMirror")
 assert.doesNotMatch(main, /sourceHighlight\.innerHTML|sourceLineNumbers\.textContent/, "主界面不应重建全文源码 DOM")
 
 console.log("✓ CodeMirror 源码编辑器集成契约验证通过")

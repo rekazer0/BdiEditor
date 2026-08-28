@@ -106,6 +106,28 @@ fn safe_source_path(path: &str) -> bool {
             .all(|part| matches!(part, Component::Normal(_)))
 }
 
+fn source_target(root: &Path, path: &str) -> Result<PathBuf, String> {
+    if !safe_source_path(path) {
+        return Err(format!("皮肤源码包含不安全路径：{path}"));
+    }
+    let mut target = root.to_path_buf();
+    for part in Path::new(path).components() {
+        let Component::Normal(name) = part else {
+            unreachable!()
+        };
+        target.push(name);
+        match fs::symlink_metadata(&target) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(format!("皮肤源码路径包含符号链接：{path}"));
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    Ok(target)
+}
+
 fn canonical_event_path(path: PathBuf) -> PathBuf {
     fs::canonicalize(&path).unwrap_or_else(|_| {
         let Some(parent) = path.parent() else {
@@ -198,7 +220,7 @@ fn remove_empty_parents(mut path: PathBuf, root: &Path) -> Result<(), String> {
 fn write_source_files(directory: &Path, files: &[SourceFile]) -> Result<(), String> {
     let paths = source_paths(files)?;
     fs::create_dir_all(directory).map_err(|error| error.to_string())?;
-    let manifest = directory.join(SOURCE_MANIFEST);
+    let manifest = source_target(directory, SOURCE_MANIFEST)?;
     let previous: Vec<String> = fs::read(&manifest)
         .ok()
         .and_then(|data| serde_json::from_slice(&data).ok())
@@ -207,7 +229,7 @@ fn write_source_files(directory: &Path, files: &[SourceFile]) -> Result<(), Stri
         if !safe_source_path(path) {
             continue;
         }
-        let target = directory.join(path);
+        let target = source_target(directory, path)?;
         if target.is_file() {
             fs::remove_file(&target).map_err(|error| error.to_string())?;
             if let Some(parent) = target.parent() {
@@ -216,7 +238,7 @@ fn write_source_files(directory: &Path, files: &[SourceFile]) -> Result<(), Stri
         }
     }
     for file in files {
-        let target = directory.join(&file.path);
+        let target = source_target(directory, &file.path)?;
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         }
@@ -230,7 +252,12 @@ fn write_source_files(directory: &Path, files: &[SourceFile]) -> Result<(), Stri
 }
 
 fn read_source_files(directory: &Path) -> Result<Vec<SourceFile>, String> {
-    fn visit(root: &Path, directory: &Path, output: &mut Vec<SourceFile>, total: &mut usize) -> Result<(), String> {
+    fn visit(
+        root: &Path,
+        directory: &Path,
+        output: &mut Vec<SourceFile>,
+        total: &mut usize,
+    ) -> Result<(), String> {
         for entry in fs::read_dir(directory).map_err(|error| error.to_string())? {
             let entry = entry.map_err(|error| error.to_string())?;
             let path = entry.path();
@@ -266,7 +293,10 @@ fn read_source_files(directory: &Path) -> Result<Vec<SourceFile>, String> {
                 .map_err(|error| error.to_string())?
                 .to_string_lossy()
                 .replace('\\', "/");
-            output.push(SourceFile { path: relative, data });
+            output.push(SourceFile {
+                path: relative,
+                data,
+            });
         }
         Ok(())
     }
@@ -288,10 +318,20 @@ fn workspace_name(name: &str) -> String {
         .unwrap_or("skin");
     let cleaned: String = stem
         .chars()
-        .map(|value| if value.is_alphanumeric() || value == '-' || value == '_' { value } else { '-' })
+        .map(|value| {
+            if value.is_alphanumeric() || value == '-' || value == '_' {
+                value
+            } else {
+                '-'
+            }
+        })
         .collect();
     let cleaned = cleaned.trim_matches('-');
-    if cleaned.is_empty() { "skin".into() } else { cleaned.chars().take(48).collect() }
+    if cleaned.is_empty() {
+        "skin".into()
+    } else {
+        cleaned.chars().take(48).collect()
+    }
 }
 
 fn prune_source_workspaces(root: &Path) -> Result<(), String> {
@@ -316,7 +356,10 @@ fn prune_source_workspaces(root: &Path) -> Result<(), String> {
 #[tauri::command]
 fn prepare_source_directory(app: tauri::AppHandle, path: Option<String>) -> Result<String, String> {
     #[cfg(target_os = "android")]
-    if let Some(uri) = path.as_deref().filter(|value| value.starts_with("content://")) {
+    if let Some(uri) = path
+        .as_deref()
+        .filter(|value| value.starts_with("content://"))
+    {
         return Ok(uri.to_string());
     }
     let directory = source_root(&app, path)?;
@@ -334,16 +377,22 @@ async fn create_source_workspace(
     files: Vec<EncodedSourceFile>,
 ) -> Result<String, String> {
     #[cfg(target_os = "android")]
-    if let Some(uri) = directory.as_deref().filter(|value| value.starts_with("content://")) {
+    if let Some(uri) = directory
+        .as_deref()
+        .filter(|value| value.starts_with("content://"))
+    {
         return tauri_plugin_native_share::create_source_workspace(
             &app,
             uri.to_string(),
             name,
             serde_json::to_value(files).map_err(|error| error.to_string())?,
-        ).await;
+        )
+        .await;
     }
     let files = decode_source_files(files)?;
-    let uses_builtin_directory = directory.as_ref().map_or(true, |value| value.trim().is_empty());
+    let uses_builtin_directory = directory
+        .as_ref()
+        .is_none_or(|value| value.trim().is_empty());
     let root = source_root(&app, directory)?;
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -358,8 +407,11 @@ async fn create_source_workspace(
     }
     fs::create_dir(&workspace).map_err(|error| error.to_string())?;
     let result = (|| {
-        fs::write(workspace.join(SOURCE_MARKER), b"BdiEditor source workspace\n")
-            .map_err(|error| error.to_string())?;
+        fs::write(
+            workspace.join(SOURCE_MARKER),
+            b"BdiEditor source workspace\n",
+        )
+        .map_err(|error| error.to_string())?;
         write_source_files(&workspace, &files)?;
         if uses_builtin_directory {
             prune_source_workspaces(&root)?;
@@ -376,11 +428,15 @@ async fn create_source_workspace(
 }
 
 #[tauri::command]
-async fn open_source_workspace(app: tauri::AppHandle, path: String) -> Result<Vec<SourceFile>, String> {
+async fn open_source_workspace(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<Vec<SourceFile>, String> {
     #[cfg(target_os = "android")]
     if path.starts_with("content://") {
         let value = tauri_plugin_native_share::read_source_workspace(&app, path).await?;
-        let files: Vec<SourceFile> = serde_json::from_value(value).map_err(|error| error.to_string())?;
+        let files: Vec<SourceFile> =
+            serde_json::from_value(value).map_err(|error| error.to_string())?;
         source_paths(&files)?;
         return Ok(files);
     }
@@ -397,7 +453,10 @@ async fn open_source_workspace(app: tauri::AppHandle, path: String) -> Result<Ve
 }
 
 #[tauri::command]
-async fn open_source_workspace_archive(app: tauri::AppHandle, path: String) -> Result<String, String> {
+async fn open_source_workspace_archive(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<String, String> {
     #[cfg(target_os = "android")]
     if path.starts_with("content://") {
         return tauri_plugin_native_share::read_source_workspace_archive(&app, path).await;
@@ -407,14 +466,19 @@ async fn open_source_workspace_archive(app: tauri::AppHandle, path: String) -> R
 }
 
 #[tauri::command]
-async fn apply_source_changes(app: tauri::AppHandle, path: String, changes: Vec<SourceChange>) -> Result<(), String> {
+async fn apply_source_changes(
+    app: tauri::AppHandle,
+    path: String,
+    changes: Vec<SourceChange>,
+) -> Result<(), String> {
     #[cfg(target_os = "android")]
     if path.starts_with("content://") {
         return tauri_plugin_native_share::apply_source_changes(
             &app,
             path,
             serde_json::to_value(changes).map_err(|error| error.to_string())?,
-        ).await;
+        )
+        .await;
     }
     let _ = app;
     apply_source_changes_path(path, changes)
@@ -423,10 +487,7 @@ async fn apply_source_changes(app: tauri::AppHandle, path: String, changes: Vec<
 fn apply_source_changes_path(path: String, changes: Vec<SourceChange>) -> Result<(), String> {
     let directory = fs::canonicalize(path).map_err(|error| error.to_string())?;
     for change in changes {
-        if !safe_source_path(&change.path) {
-            return Err(format!("皮肤源码包含不安全路径：{}", change.path));
-        }
-        let target = directory.join(&change.path);
+        let target = source_target(&directory, &change.path)?;
         match change.data {
             Some(data) => {
                 if data.len() > MAX_SOURCE_BYTES {
@@ -451,13 +512,22 @@ fn apply_source_changes_path(path: String, changes: Vec<SourceChange>) -> Result
 }
 
 #[tauri::command]
-async fn read_source_changes(app: tauri::AppHandle, path: String, changed_paths: Vec<String>) -> Result<Vec<SourceChange>, String> {
+async fn read_source_changes(
+    app: tauri::AppHandle,
+    path: String,
+    changed_paths: Vec<String>,
+) -> Result<Vec<SourceChange>, String> {
     #[cfg(target_os = "android")]
     if path.starts_with("content://") {
         let value = tauri_plugin_native_share::read_source_workspace(&app, path).await?;
-        let files: Vec<SourceFile> = serde_json::from_value(value).map_err(|error| error.to_string())?;
+        let files: Vec<SourceFile> =
+            serde_json::from_value(value).map_err(|error| error.to_string())?;
         source_paths(&files)?;
-        let mut output = vec![SourceChange { path: String::new(), data: None, directory: true }];
+        let mut output = vec![SourceChange {
+            path: String::new(),
+            data: None,
+            directory: true,
+        }];
         output.extend(files.into_iter().map(|file| SourceChange {
             path: file.path,
             data: Some(file.data),
@@ -469,7 +539,10 @@ async fn read_source_changes(app: tauri::AppHandle, path: String, changed_paths:
     read_source_changes_path(path, changed_paths)
 }
 
-fn read_source_changes_path(path: String, changed_paths: Vec<String>) -> Result<Vec<SourceChange>, String> {
+fn read_source_changes_path(
+    path: String,
+    changed_paths: Vec<String>,
+) -> Result<Vec<SourceChange>, String> {
     let directory = fs::canonicalize(path).map_err(|error| error.to_string())?;
     let mut output = Vec::new();
     for changed_path in changed_paths {
@@ -493,9 +566,20 @@ fn read_source_changes_path(path: String, changed_paths: Vec<String>) -> Result<
                 } else {
                     format!("{}/{}", relative.trim_end_matches('/'), file.path)
                 };
-                output.push(SourceChange { path: nested, data: Some(file.data), directory: false });
+                output.push(SourceChange {
+                    path: nested,
+                    data: Some(file.data),
+                    directory: false,
+                });
             }
-            output.insert(0, SourceChange { path: relative, data: None, directory: true });
+            output.insert(
+                0,
+                SourceChange {
+                    path: relative,
+                    data: None,
+                    directory: true,
+                },
+            );
         } else {
             let missing = !target.exists();
             let data = if target.is_file() {
@@ -503,7 +587,11 @@ fn read_source_changes_path(path: String, changed_paths: Vec<String>) -> Result<
             } else {
                 None
             };
-            output.push(SourceChange { path: relative, data, directory: missing });
+            output.push(SourceChange {
+                path: relative,
+                data,
+                directory: missing,
+            });
         }
     }
     Ok(output)
@@ -699,6 +787,7 @@ async fn fetch_release_page() -> Result<String, String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use super::{
         append_client_log_path, apply_source_changes_path, prune_source_workspaces,
@@ -772,15 +861,54 @@ mod tests {
         fs::write(root.join("keep.txt"), b"external").expect("write external file");
         write_source_files(
             &root,
-            &[super::SourceFile { path: "skin/a.txt".into(), data: b"a".to_vec() }],
-        ).expect("write managed file");
+            &[super::SourceFile {
+                path: "skin/a.txt".into(),
+                data: b"a".to_vec(),
+            }],
+        )
+        .expect("write managed file");
         apply_source_changes_path(
             root.to_string_lossy().into_owned(),
-            vec![super::SourceChange { path: "skin/a.txt".into(), data: None, directory: false }],
-        ).expect("delete managed file");
+            vec![super::SourceChange {
+                path: "skin/a.txt".into(),
+                data: None,
+                directory: false,
+            }],
+        )
+        .expect("delete managed file");
         assert!(root.join("keep.txt").is_file());
         assert!(!root.join("skin/a.txt").exists());
         fs::remove_dir_all(root).expect("cleanup source root");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn source_workspace_sync_rejects_symlinked_parent_paths() {
+        use std::os::unix::fs::symlink;
+
+        let root =
+            std::env::temp_dir().join(format!("bdi-edit-source-link-{}", std::process::id()));
+        let outside =
+            std::env::temp_dir().join(format!("bdi-edit-source-outside-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let _ = fs::remove_dir_all(&outside);
+        fs::create_dir_all(&root).expect("create source root");
+        fs::create_dir_all(&outside).expect("create outside root");
+        symlink(&outside, root.join("skin")).expect("create source symlink");
+
+        let result = apply_source_changes_path(
+            root.to_string_lossy().into_owned(),
+            vec![super::SourceChange {
+                path: "skin/a.txt".into(),
+                data: Some(b"escaped".to_vec()),
+                directory: false,
+            }],
+        );
+        assert!(result.is_err());
+        assert!(!outside.join("a.txt").exists());
+
+        fs::remove_dir_all(root).expect("cleanup source root");
+        fs::remove_dir_all(outside).expect("cleanup outside root");
     }
 
     #[test]
@@ -809,10 +937,13 @@ mod tests {
 
     #[test]
     fn source_reader_accepts_empty_change_snapshots_and_limits_paths() {
-        let root = std::env::temp_dir().join(format!("bdi-edit-empty-source-{}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("bdi-edit-empty-source-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).expect("create source root");
-        assert!(read_source_files(&root).expect("read empty snapshot").is_empty());
+        assert!(read_source_files(&root)
+            .expect("read empty snapshot")
+            .is_empty());
         assert!(safe_source_path("skin/port/layout.ini"));
         assert!(!safe_source_path("../outside"));
         assert!(!safe_source_path("/absolute"));

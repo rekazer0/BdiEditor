@@ -7,6 +7,6 @@ fn main() {
         "startSourceObserver",
         "stopSourceObserver",
     ])
-        .android_path("android")
-        .build();
+    .android_path("android")
+    .build();
 }

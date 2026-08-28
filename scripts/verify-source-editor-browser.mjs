@@ -46,6 +46,7 @@ try {
   const page = await browser.newPage()
   await page.setViewport({ width: 1280, height: 800 })
   await page.goto(origin, { waitUntil: "networkidle0" })
+  assert.equal(await page.$("#source .cm-editor"), null, "源码面板显示前不应加载 CodeMirror")
 
   await (await page.$("#browser-open")).uploadFile(path.resolve("public/default-template.bds"))
   await page.waitForFunction(() => !document.querySelector('[data-inspector-tab="source"]')?.disabled)
@@ -74,6 +75,7 @@ try {
   await (await bdiPage.$("#browser-open")).uploadFile(bdiFixture)
   await bdiPage.waitForFunction(() => !document.querySelector('[data-inspector-tab="source"]')?.disabled)
   await bdiPage.click('[data-inspector-tab="source"]')
+  await bdiPage.waitForSelector("#source .cm-content")
   const bdiSource = await bdiPage.$eval("#source .cm-content", (element) => element.textContent ?? "")
   assert.match(bdiSource, /^\[HINT]/, "BDI 扩展名应进入共用的 INI CodeMirror 源码区")
   await bdiPage.close()
