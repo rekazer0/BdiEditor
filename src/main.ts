@@ -2530,6 +2530,7 @@ let previewPanStart: { x: number; y: number; panX: number; panY: number } | unde
 let previewPanCandidate: { pointerId: number; x: number; y: number; panX: number; panY: number } | undefined
 let pendingPreviewPan: { x: number; y: number } | undefined
 let previewPanFrame = 0
+let previewPanGeometry: { target: DOMRect; wrap: DOMRect } | undefined
 
 function setPreviewPan(x: number, y: number): void {
   previewPanX = x
@@ -2647,6 +2648,13 @@ canvasWrap.addEventListener("pointermove", (event) => {
     if (Math.hypot(dx, dy) < 3) return
     previewPanStart = previewPanCandidate
     preview.setPointerInteractionLocked(true)
+    // Cache layout before the first transform write. Every subsequent frame
+    // can derive the transformed canvas bounds from this snapshot and the pan
+    // delta, avoiding forced reflow in the crosshair update path.
+    previewPanGeometry = {
+      target: previewCanvas.getBoundingClientRect(),
+      wrap: canvasWrap.getBoundingClientRect(),
+    }
     if (pointerCoordinatesFrame) cancelAnimationFrame(pointerCoordinatesFrame)
     pointerCoordinatesFrame = 0
     pendingPointerCoordinates = undefined
@@ -2659,13 +2667,25 @@ canvasWrap.addEventListener("pointermove", (event) => {
     previewPanStart.panX + event.clientX - previewPanStart.x,
     previewPanStart.panY + event.clientY - previewPanStart.y,
   )
-  schedulePointerCoordinates(event, previewCanvas, previewCanvas)
+  const geometry = previewPanGeometry
+  if (geometry) {
+    const offsetX = event.clientX - previewPanStart.x
+    const offsetY = event.clientY - previewPanStart.y
+    const target = geometry.target
+    schedulePointerCoordinates(event, previewCanvas, previewCanvas, {
+      target: new DOMRect(target.left + offsetX, target.top + offsetY, target.width, target.height),
+      wrap: geometry.wrap,
+    })
+  } else {
+    schedulePointerCoordinates(event, previewCanvas, previewCanvas)
+  }
 })
 
 function finishPreviewPan(): void {
   flushPreviewPan()
   previewPanCandidate = undefined
   previewPanStart = undefined
+  previewPanGeometry = undefined
   preview.setPointerInteractionLocked(false)
   canvasWrap.classList.remove("preview-pan-ready", "preview-panning")
 }
