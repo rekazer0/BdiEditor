@@ -21,7 +21,7 @@ jobs:
         with:
           components: clippy, rustfmt
       - name: Install Linux build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
       - run: npm ci
       - run: npm run verify
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
