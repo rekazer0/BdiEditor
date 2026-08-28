@@ -1383,13 +1383,14 @@ export class Preview {
   }
 
   cancelPointerInteraction(): void {
+    const hadInteraction = Boolean(this.active || this.editTouch || this.editDrag)
     this.cancelDragDraw()
     if (this.active?.holdTimer !== undefined) window.clearTimeout(this.active.holdTimer)
     this.active = undefined
     this.cancelEditTouch()
     this.cancelEditDrag()
     this.updateCursor()
-    void this.draw()
+    if (hadInteraction) void this.draw()
   }
 
   setPointerInteractionLocked(locked: boolean): void {
@@ -1588,8 +1589,7 @@ export class Preview {
     }
   }
 
-  private snapThreshold(): { x: number; y: number } {
-    const bounds = this.canvas.getBoundingClientRect()
+  private snapThreshold(bounds: Pick<DOMRect, "width" | "height"> = this.canvas.getBoundingClientRect()): { x: number; y: number } {
     return {
       x: bounds.width ? 8 * this.panelWidth / bounds.width : 0,
       y: bounds.height ? 8 * this.panelHeight / bounds.height : 0,
@@ -1600,13 +1600,13 @@ export class Preview {
     return { width: this.panelWidth, height: this.panelHeight }
   }
 
-  snapPoint(point: { x: number; y: number }): { x: number; y: number } {
+  snapPoint(point: { x: number; y: number }, bounds?: Pick<DOMRect, "width" | "height">): { x: number; y: number } {
     return snapPointToRects(
       point,
       visiblePreviewItems(this.keys, this.skinState)
         .filter((key) => key.editable || this.toolbarSlots)
         .map((key) => key.rect),
-      this.snapThreshold(),
+      this.snapThreshold(bounds),
     )
   }
 

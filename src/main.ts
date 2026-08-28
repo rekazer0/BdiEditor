@@ -682,7 +682,10 @@ function updatePointerCoordinates(
   const snapPreview = canvas === previewCanvas ? preview : canvas === toolbarCanvas ? toolbarPreview : undefined
   const logicalSize = snapPreview?.logicalSize() ?? { width: canvas.width, height: canvas.height }
   const point = editorCrosshair.checked && snapPreview
-    ? snapPreview.snapPoint({ x: x / bounds.width * logicalSize.width, y: y / bounds.height * logicalSize.height })
+    ? snapPreview.snapPoint(
+      { x: x / bounds.width * logicalSize.width, y: y / bounds.height * logicalSize.height },
+      bounds,
+    )
     : { x: x / bounds.width * logicalSize.width, y: y / bounds.height * logicalSize.height }
   const snappedX = Math.min(logicalSize.width - 1, Math.max(0, point.x))
   const snappedY = Math.min(logicalSize.height - 1, Math.max(0, point.y))
@@ -698,10 +701,20 @@ function updatePointerCoordinates(
   }
   const crosshairX = Math.round(bounds.left - wrapBounds.left + x)
   const crosshairY = Math.round(bounds.top - wrapBounds.top + y)
-  previewCoordinates.style.left = `${canvasWrap.scrollLeft}px`
-  previewCoordinates.style.top = `${canvasWrap.scrollTop}px`
-  previewCoordinates.style.width = `${wrapWidth}px`
-  previewCoordinates.style.height = `${wrapHeight}px`
+  const overlayGeometry = { left: canvasWrap.scrollLeft, top: canvasWrap.scrollTop, width: wrapWidth, height: wrapHeight }
+  if (
+    !pointerOverlayGeometry ||
+    pointerOverlayGeometry.left !== overlayGeometry.left ||
+    pointerOverlayGeometry.top !== overlayGeometry.top ||
+    pointerOverlayGeometry.width !== overlayGeometry.width ||
+    pointerOverlayGeometry.height !== overlayGeometry.height
+  ) {
+    pointerOverlayGeometry = overlayGeometry
+    previewCoordinates.style.left = `${pointerOverlayGeometry.left}px`
+    previewCoordinates.style.top = `${pointerOverlayGeometry.top}px`
+    previewCoordinates.style.width = `${pointerOverlayGeometry.width}px`
+    previewCoordinates.style.height = `${pointerOverlayGeometry.height}px`
+  }
   previewCoordinates.style.setProperty("--crosshair-x", `${crosshairX}px`)
   previewCoordinates.style.setProperty("--crosshair-y", `${crosshairY}px`)
   const labelWidth = 130
@@ -723,6 +736,7 @@ let pendingPointerCoordinates: {
   geometry?: { target: DOMRect; wrap: DOMRect; wrapWidth: number; wrapHeight: number }
 } | undefined
 let pointerCoordinatesFrame = 0
+let pointerOverlayGeometry: { left: number; top: number; width: number; height: number } | undefined
 
 function schedulePointerCoordinates(
   event: PointerEvent,
