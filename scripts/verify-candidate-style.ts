@@ -120,19 +120,31 @@ const geometry = keyboardPreviewGeometry(
 )
 const scale = 1206 / 1125
 assert.equal(geometry.topInsetHeight, 38)
-assert.equal(Math.round((geometry.candidateHeight - geometry.topInsetHeight) / scale), 194)
 assert.equal(Math.round(geometry.candidateInsetHeight / scale), 61)
 assert.equal(Math.round(geometry.candidateContentHeight / scale), 194)
 assert.equal(
-  geometry.totalHeight,
+  Math.round((geometry.candidateHeight - geometry.topInsetHeight - geometry.candidateInsetHeight) / scale),
+  194,
+)
+const geometryWithoutInput = keyboardPreviewGeometry(
+  { width: 1206, height: 2622, family: "iphone" },
+  "port",
+  1125,
+  595,
+  194,
+  0,
+)
+assert.ok(geometry.totalHeight > geometryWithoutInput.totalHeight)
+assert.equal(
   keyboardPreviewGeometry(
     { width: 1206, height: 2622, family: "iphone" },
     "port",
     1125,
     595,
     194,
-    0,
+    61,
   ).totalHeight,
+  geometry.totalHeight,
 )
 assert.equal(
   geometry.totalHeight,
@@ -140,7 +152,7 @@ assert.equal(
     { width: 1206, height: 2622, family: "iphone" },
     "port",
     1125,
-    595 + 194,
+    595 + 194 + 61,
     0,
     0,
   ).totalHeight,
@@ -167,6 +179,7 @@ assert.deepEqual(resolveCandidateTextVisuals(undefined, general, textResolver), 
 
 const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8")
 const main = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8")
+assert.doesNotMatch(main, /candidateInputHeight\s*=\s*[^\n]*!composing/)
 assert.doesNotMatch(main, /devicePanelHeight|effectivePanelHeight|symbolInputHeight/)
 assert.match(main, /updatePanelTools\(config\.width, config\.height, candidateHeight\)/)
 assert.match(main, /updatePanelTools\(panelWidth, panelHeight, candidateHeight\)/)
@@ -186,11 +199,17 @@ const candidateWordsCss = [...css.matchAll(/#candidate-words \{([^}]*)}/g)]
   .find((rule) => rule.includes("display: flex")) ?? ""
 assert.match(candidateWordsCss, /align-items:\s*center/)
 assert.match(candidateWordsCss, /gap:\s*var\(--candidate-cell-width,\s*0\)/)
+assert.doesNotMatch(main, /--candidate-padding/)
+assert.doesNotMatch(candidateWordsCss, /padding:\s*var\(--candidate-padding/)
 assert.match(css, /\.device-shell\.canvas-only #candidate-input \{[^}]*grid-row:\s*1;/s)
 assert.match(css, /\.device-shell\.canvas-only #candidate-words \{[^}]*grid-row:\s*3;/s)
 assert.match(css, /#candidate-input \{[^}]*position:\s*absolute;[^}]*bottom:\s*100%;[^}]*height:\s*var\(--candidate-input-height/s)
+assert.match(
+  css,
+  /\.device-shell:not\(\.canvas-only\) #candidate-input \{[^}]*position:\s*relative;[^}]*inset:\s*auto;[^}]*height:\s*100%;/s,
+)
 assert.match(css, /\.device-shell\.canvas-only #candidate-area \{[^}]*overflow:\s*visible;/s)
-assert.match(main, /deviceShell\.style\.setProperty\("--candidate-input-height", `\$\{geometry\.candidateInsetHeight\}px`\)/)
+assert.match(main, /deviceShell\.style\.setProperty\("--candidate-inset-row", `\$\{geometry\.candidateInsetHeight\}fr`\)/)
 assert.match(css, /margin-inline-start:\s*calc\(var\(--candidate-first-gap,[^)]*\) \+ var\(--candidate-cell-inset,/)
 assert.doesNotMatch(css, /#candidate-words > span \{[^}]*flex:/s)
 assert.match(

@@ -4,7 +4,7 @@ import { pushChange, type Change } from "../src/history.ts"
 import { layoutImageTileBytes, layoutImageTileDocument, planLayoutImageSlices } from "../src/layout-image.ts"
 import { applyLayoutAction, gestureDirection, snapPointToRects, snapRectDelta, type LayoutRect } from "../src/layout.ts"
 import { IniDocument } from "../src/ini.ts"
-import { previewItems } from "../src/preview.ts"
+import { legacyHintCandidates, legacyHintIconID, legacyHintText, parseLegacyHint, previewItems, setCanvasSize } from "../src/preview.ts"
 
 const first: LayoutRect = { section: "KEY1", x: 10, y: 20, width: 80, height: 40 }
 const second: LayoutRect = { section: "KEY2", x: 120, y: 100, width: 140, height: 100 }
@@ -55,8 +55,13 @@ assert.match(
 )
 assert.match(
   mainSource,
-  /preview\.cancelPointerInteraction\(\)[\s\S]+cancelAnimationFrame\(pointerCoordinatesFrame\)[\s\S]+previewCoordinates\.hidden = true/,
-  "画布拖动期间应暂停编辑模式十字线计算",
+  /function schedulePointerCoordinates\([\s\S]+canvasWrap\.addEventListener\("pointermove"[\s\S]+schedulePointerCoordinates\(event, previewCanvas, previewCanvas\)/,
+  "画布拖动期间应按帧更新跟手十字线",
+)
+assert.match(
+  mainSource,
+  /preview\.setPointerInteractionLocked\(true\)[\s\S]+preview\.setPointerInteractionLocked\(false\)/,
+  "画布拖动期间应锁定按键交互，结束后恢复",
 )
 assert.match(
   mainSource,
@@ -64,7 +69,7 @@ assert.match(
   "拖动结束时应同步最后一个平移位置",
 )
 
-console.log("✓ 预览画布拖动逐帧合并更新，并暂停编辑十字线计算")
+console.log("✓ 预览画布拖动逐帧合并更新，十字轴保持跟手")
 
 assert.deepEqual(
   snapPointToRects({ x: 118, y: 148 }, [second], { x: 4, y: 4 }),
@@ -104,6 +109,89 @@ assert.deepEqual(
 )
 
 console.log("✓ 自定义按键的上下左右动作均被解析并用于拖动预览")
+
+const shortHint = parseLegacyHint(IniDocument.parse(`
+[DRAW]
+ICON_UP=2
+ICON_DN=3
+ICON_LT=4
+ICON_RT=5
+[BAR]
+BACK_ICON=1
+CELL_STYLE=24
+[ICON1]
+BACK_STYLE=23
+FORE_STYLE=21
+SIZE=170,175
+POS=0,-15
+PADDING=45,42,42,40
+[ICON2]
+BACK_STYLE=25
+FORE_STYLE=22
+SIZE=190,205
+`))
+assert.ok(shortHint)
+assert.equal(shortHint.barIcon, "1")
+assert.equal(shortHint.cellStyle, "24")
+assert.equal(legacyHintIconID(shortHint, "center"), undefined)
+assert.equal(legacyHintIconID(shortHint, "up"), "2")
+assert.equal(legacyHintIconID(shortHint, "down"), undefined)
+assert.equal(legacyHintIconID(shortHint, "left"), undefined)
+assert.equal(legacyHintIconID(shortHint, "right"), undefined)
+assert.equal(legacyHintIconID(shortHint, "hold"), undefined)
+assert.deepEqual(shortHint.icons.get("1")?.padding, [45, 42, 42, 40])
+
+const noSwipeHint = parseLegacyHint(IniDocument.parse(`
+[BAR]
+BACK_ICON=1
+[ICON1]
+BACK_STYLE=23
+SIZE=175,180
+`))
+assert.equal(legacyHintIconID(noSwipeHint, "up"), undefined)
+assert.equal(legacyHintIconID(noSwipeHint, "left"), undefined)
+assert.equal(noSwipeHint?.upIcon, undefined)
+assert.equal(noSwipeHint?.barIcon, "1")
+
+const longHint = parseLegacyHint(IniDocument.parse(`
+[HINT]
+BACK_ICON=2
+[BAR]
+BACK_ICON=1
+[ICON1]
+BACK_STYLE=23
+SIZE=170,175
+[ICON2]
+BACK_STYLE=25
+SIZE=190,205
+`))
+assert.equal(legacyHintIconID(longHint, "center"), undefined)
+assert.equal(legacyHintIconID(longHint, "hold"), "2")
+
+const nineKey = { up: "9", left: "w", center: "x", right: "y", down: "z", hold: "", holdSymbols: "" }
+assert.equal(legacyHintText(nineKey, "up"), "9")
+assert.deepEqual(legacyHintCandidates(nineKey, "up"), ["9", "w", "x", "y", "z"])
+assert.deepEqual(legacyHintCandidates({ ...nineKey, holdSymbols: "a,ā,á" }, "hold"), ["a", "ā", "á"])
+assert.deepEqual(
+  legacyHintCandidates({ up: "6", left: "m", center: "n", right: "o", down: "n", hold: "", holdSymbols: "" }, "hold", true),
+  ["m", "n", "o", "6", "M", "N", "O"],
+)
+assert.deepEqual(
+  legacyHintCandidates({ up: "*", left: "", center: "j", right: "", down: "j", hold: "", holdSymbols: "" }, "hold", true),
+  ["J", "*", "j"],
+)
+
+let canvasResets = 0
+const stableCanvas = {
+  get width() { return 100 },
+  set width(_value: number) { canvasResets++ },
+  get height() { return 50 },
+  set height(_value: number) { canvasResets++ },
+}
+assert.equal(setCanvasSize(stableCanvas, 100, 50), false)
+assert.equal(canvasResets, 0)
+
+console.log("✓ 仅上滑气泡和长按气泡图标映射被正确解析")
 
 const singleKeySlice = [2, 3, 40, 20] as [number, number, number, number]
 const singleKeyPlan = planLayoutImageSlices(

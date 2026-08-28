@@ -86,6 +86,7 @@ import {
   renderBdaStyleEditor,
 } from "./bda-editor.ts"
 import { convertBdaArchive } from "./bda-convert.ts"
+import { bdaCompatibilityWarnings, bdaPlatform, convertBdaPlatform, type BdaPlatform } from "./bda-platform.ts"
 import { IniDocument } from "./ini.ts"
 import { adaptIos26KeyboardLayout, adaptIos26Variant } from "./ios26.ts"
 import { findTextMatches, iniSectionRanges, insertedTextRange, jsonPropertyRanges, replaceTextMatches } from "./highlight.ts"
@@ -139,6 +140,7 @@ import {
 import {
   Preview,
   parseLegacyAnimation,
+  parseLegacyHint,
   parseLegacyParticleEmitter,
   previewContentVerticalBounds,
   previewItems,
@@ -237,6 +239,10 @@ const canvasBackground = $("#canvas-background") as HTMLSelectElement
 const appTheme = $("#app-theme") as HTMLSelectElement
 const sourceFontSize = $("#source-font-size") as HTMLInputElement
 const windowMaterial = $("#window-material") as HTMLInputElement
+const windowMaterialOpacitySetting = $("#window-material-opacity-setting")
+const windowMaterialOpacityLabel = $("#window-material-opacity-label")
+const windowMaterialOpacity = $("#window-material-opacity") as HTMLInputElement
+const windowMaterialOpacityValue = $("#window-material-opacity-value") as HTMLOutputElement
 const sidebarViewVisible = $("#sidebar-view-visible") as HTMLInputElement
 const inspectorTabsVisible = $("#inspector-tabs-visible") as HTMLInputElement
 const inspectorGroupedDisplay = $("#inspector-grouped-display") as HTMLInputElement
@@ -295,6 +301,14 @@ const documentName = $("#document-name")
 const sourceName = $("#source-name")
 const dirty = $("#dirty")
 const eventLog = $("#event-log")
+const fileOperationDialog = $("#file-operation-dialog") as HTMLDialogElement
+const fileOperationTitle = $("#file-operation-title")
+const fileOperationDetail = $("#file-operation-detail")
+const fileOperationProgress = $("#file-operation-progress") as HTMLProgressElement
+const fileOperationResult = $("#file-operation-result")
+const fileOperationClose = $("#file-operation-close") as HTMLButtonElement
+const LARGE_SKIN_BYTES = 5 * 1024 * 1024
+let fileOperationProgressVisible = false
 const panelStatus = $("#panel-status")
 const previewCoordinates = $("#preview-coordinates")
 const previewCoordinateX = $("#preview-coordinate-x")
@@ -641,20 +655,26 @@ const preview = new Preview(
   },
   false,
   (sections, deltaX, deltaY) => moveSelectedKeys(deltaX, deltaY, sections),
+  $("#hint-preview") as HTMLCanvasElement,
 )
 
 function updatePointerCoordinates(
   event: Pick<PointerEvent, "clientX" | "clientY" | "pointerType">,
   target: HTMLElement,
   canvas: HTMLCanvasElement,
+  geometry?: { target: DOMRect; wrap: DOMRect },
 ): void {
   if (event.pointerType !== "mouse" || editorCrosshair.checked && !isEditing()) {
     if (editorCrosshair.checked) previewCoordinates.hidden = true
     return
   }
-  const bounds = target.getBoundingClientRect()
+  // During canvas panning the shell is transformed every frame. Reading its
+  // bounds immediately after that write forces a synchronous layout. The pan
+  // handler supplies the already-known geometry instead, keeping this path
+  // compositor-only while preserving exact coordinates.
+  const bounds = geometry?.target ?? target.getBoundingClientRect()
   if (!bounds.width || !bounds.height) return
-  const wrapBounds = canvasWrap.getBoundingClientRect()
+  const wrapBounds = geometry?.wrap ?? canvasWrap.getBoundingClientRect()
   let x = Math.min(bounds.width - 1, Math.max(0, event.clientX - bounds.left))
   let y = Math.min(bounds.height - 1, Math.max(0, event.clientY - bounds.top))
   const snapPreview = canvas === previewCanvas ? preview : canvas === toolbarCanvas ? toolbarPreview : undefined
@@ -698,22 +718,28 @@ let pendingPointerCoordinates: {
   event: Pick<PointerEvent, "clientX" | "clientY" | "pointerType">
   target: HTMLElement
   canvas: HTMLCanvasElement
+  geometry?: { target: DOMRect; wrap: DOMRect }
 } | undefined
 let pointerCoordinatesFrame = 0
 
-function schedulePointerCoordinates(event: PointerEvent, target: HTMLElement, canvas: HTMLCanvasElement): void {
-  if (previewPanStart) return
+function schedulePointerCoordinates(
+  event: PointerEvent,
+  target: HTMLElement,
+  canvas: HTMLCanvasElement,
+  geometry?: { target: DOMRect; wrap: DOMRect },
+): void {
   pendingPointerCoordinates = {
     event: { clientX: event.clientX, clientY: event.clientY, pointerType: event.pointerType },
     target,
     canvas,
+    geometry,
   }
   if (pointerCoordinatesFrame) return
   pointerCoordinatesFrame = requestAnimationFrame(() => {
     pointerCoordinatesFrame = 0
     const pending = pendingPointerCoordinates
     pendingPointerCoordinates = undefined
-    if (pending) updatePointerCoordinates(pending.event, pending.target, pending.canvas)
+    if (pending) updatePointerCoordinates(pending.event, pending.target, pending.canvas, pending.geometry)
   })
 }
 
@@ -726,7 +752,11 @@ toolbarStrip.addEventListener("pointermove", (event) => {
 document.addEventListener("pointermove", (event) => {
   if (previewPanStart) return
   const target = event.target as Node
-  if (event.pointerType === "mouse" && !previewCanvas.contains(target) && !toolbarStrip.contains(target)) {
+  if (
+    event.pointerType === "mouse" &&
+    !canvasWrap.contains(target) &&
+    !toolbarStrip.contains(target)
+  ) {
     pendingPointerCoordinates = undefined
     if (editorCrosshair.checked) previewCoordinates.hidden = true
     else {
@@ -871,7 +901,8 @@ function keySoundForEvent(event: PreviewEvent): string | undefined {
     const path = bdaConfigPath(archive, theme.value, orientation.value, "sound")
     const bytes = path ? archive.getBytes(path) : undefined
     if (!bytes) return
-    const sounds = decodeBdaSoundConfig(bytes).keySounds
+    const sound = decodeBdaSoundConfig(bytes)
+    const sounds = bdaPlatform(archive) === "ios" ? sound.iosKeySounds : sound.keySounds
     const resource = sounds.get(bdaPanelKeyName(event.code))
       ?? sounds.get(event.section)
       ?? [...sounds.values()][0]
@@ -1212,8 +1243,11 @@ function mobileCommandTarget(button: HTMLButtonElement): HTMLButtonElement | und
   const command = button.dataset.mobileCommand
   if (command) return document.getElementById(command) as HTMLButtonElement | null ?? undefined
   const format = button.dataset.mobileExportFormat
+  const platform = button.dataset.bdaPlatform
   return format
-    ? document.querySelector<HTMLButtonElement>(`[data-export-format="${format}"]`) ?? undefined
+    ? document.querySelector<HTMLButtonElement>(
+      `[data-export-format="${format}"]${platform ? `[data-bda-platform="${platform}"]` : ""}`,
+    ) ?? undefined
     : undefined
 }
 
@@ -2119,8 +2153,12 @@ function isBdaLayoutPath(path: string): boolean {
 function textDocument(path: string): IniDocument | undefined {
   if (archive?.isText(path)) return IniDocument.parse(archive.getText(path))
   if (isBdaVirtualTextPath(path)) {
-    const base = IniDocument.parse(bdaBase!.getText(bdaBasePath(path)))
+    let base = IniDocument.parse(bdaBase!.getText(bdaBasePath(path)))
     const info = currentBdaAppearance()
+    const width = Number(base.get("PANEL", "SIZE")?.split(",")[0])
+    if (info?.appearance.designWidth && width) {
+      base = scaleIniDocument(base, info.appearance.designWidth / width, info.appearance.designWidth / width)
+    }
     return info ? bdaLayoutDocument(base, info.appearance, layout.value) : base
   }
 }
@@ -2130,8 +2168,13 @@ function refreshBdaLayout(path = preferredPath()): boolean {
   const basePath = bdaBasePath(path)
   if (!info || !bdaBase?.isText(basePath)) return false
   layoutPath = path
+  let base = IniDocument.parse(bdaBase.getText(basePath))
+  const width = Number(base.get("PANEL", "SIZE")?.split(",")[0])
+  if (info.appearance.designWidth && width) {
+    base = scaleIniDocument(base, info.appearance.designWidth / width, info.appearance.designWidth / width)
+  }
   layoutDocument = bdaLayoutDocument(
-    IniDocument.parse(bdaBase.getText(basePath)),
+    base,
     info.appearance,
     path.split("/").pop() ?? layout.value,
   )
@@ -2229,7 +2272,7 @@ function applyDeviceKeyboardGeometry(
   )
   deviceShell.style.setProperty("--candidate-row", `${geometry.candidateHeight}fr`)
   deviceShell.style.setProperty("--candidate-top-inset-row", `${geometry.topInsetHeight}fr`)
-  deviceShell.style.setProperty("--candidate-inset-row", "0fr")
+  deviceShell.style.setProperty("--candidate-inset-row", `${geometry.candidateInsetHeight}fr`)
   deviceShell.style.setProperty("--candidate-content-row", `${geometry.candidateContentHeight}fr`)
   deviceShell.style.setProperty("--candidate-input-height", `${geometry.candidateInsetHeight}px`)
   deviceShell.style.setProperty("--panel-row", `${geometry.panelHeight}fr`)
@@ -2242,6 +2285,7 @@ function devicePreviewTransparent(): boolean {
 
 function refreshPreview(): void {
   if (!archive) return
+  const currentArchive = archive
   const composing = refreshSimulationState()
   const resolver = visualResolver()
   const context = keyboardContext()
@@ -2260,6 +2304,26 @@ function refreshPreview(): void {
           IniDocument.parse(archive.getText(legacyAnimationPath)),
         )
       : undefined,
+  )
+  const hintBase = `${theme.value}/skin/${orientation.value}/`
+  const hintPath = (name: string) => `${hintBase}${name}`
+  const bdaInfo = currentBdaAppearance()
+  const bdaHintPanel = bdaInfo?.appearance.panels.get(layout.value.replace(/\.ini$/i, ""))
+  const hasBdaHints = Boolean(bdaHintPanel?.hints.size)
+  const hintSource = currentArchive.format === "bda" ? bdaBase : currentArchive
+  const hintDocument = (name: string) => {
+    if (currentArchive.format === "bda" && !hasBdaHints) return
+    const path = currentArchive.format === "bda" ? bdaBasePath(hintPath(name)) : hintPath(name)
+    if (!hintSource?.isText(path)) return
+    const document = IniDocument.parse(hintSource.getText(path))
+    return bdaInfo ? bdaLayoutDocument(document, bdaInfo.appearance, layout.value) : document
+  }
+  const shortHint = hintDocument("hint1.pop") ?? hintDocument("hint.pop")
+  const longHint = hintDocument("hint2.pop") ?? shortHint
+  preview.setLegacyHints(
+    parseLegacyHint(shortHint),
+    parseLegacyHint(longHint),
+    currentArchive.format === "bda" && hasBdaHints,
   )
   const bdaGenPath = bdaBasePath(genConfigPath())
   const bdaGen = archive.format === "bda" && bdaBase?.isText(bdaGenPath)
@@ -2328,7 +2392,9 @@ function refreshPreview(): void {
     const candidateDocument = toolbarConfigPath() ? textDocument(toolbarConfigPath()!) : undefined
     const panel = currentBdaAppearance()?.appearance.panels.get(layout.value.replace(/\.ini$/i, ""))
     const inputVisual = resolver?.resolveText(
-      candidateInputForegroundStyle(bdaGen, candidateDocument),
+      panel?.input?.textStyle
+        ? bdaStyleID(panel.input.textStyle)
+        : candidateInputForegroundStyle(bdaGen, candidateDocument),
       false,
     )
     const { normal: candidateVisual, first: firstVisual } = resolver
@@ -2387,7 +2453,9 @@ function refreshSimulationPreview(): void {
   const toolbarSize = refreshToolbarPreview(composing, resolver)
   const symbolPanel = candidateArea.hidden
   const candidateHeight = symbolPanel ? 0 : (toolbarSize?.height ?? activeKeyboardGeometry.candidateHeight)
-  const candidateInputHeight = symbolPanel ? 0 : (toolbarSize?.inputHeight ?? activeKeyboardGeometry.candidateInputHeight)
+  const candidateInputHeight = symbolPanel
+    ? 0
+    : (toolbarSize?.inputHeight ?? activeKeyboardGeometry.candidateInputHeight)
   if (
     candidateHeight !== activeKeyboardGeometry.candidateHeight ||
     candidateInputHeight !== activeKeyboardGeometry.candidateInputHeight
@@ -2549,6 +2617,7 @@ window.addEventListener("blur", () => {
   flushPreviewPan()
   previewPanCandidate = undefined
   previewPanStart = undefined
+  preview.setPointerInteractionLocked(false)
   canvasWrap.classList.remove("preview-pan-ready", "preview-panning")
 })
 
@@ -2577,11 +2646,10 @@ canvasWrap.addEventListener("pointermove", (event) => {
     const dy = event.clientY - previewPanCandidate.y
     if (Math.hypot(dx, dy) < 3) return
     previewPanStart = previewPanCandidate
-    preview.cancelPointerInteraction()
+    preview.setPointerInteractionLocked(true)
     if (pointerCoordinatesFrame) cancelAnimationFrame(pointerCoordinatesFrame)
     pointerCoordinatesFrame = 0
     pendingPointerCoordinates = undefined
-    previewCoordinates.hidden = true
     canvasWrap.classList.add("preview-panning")
     canvasWrap.setPointerCapture(event.pointerId)
   }
@@ -2591,12 +2659,14 @@ canvasWrap.addEventListener("pointermove", (event) => {
     previewPanStart.panX + event.clientX - previewPanStart.x,
     previewPanStart.panY + event.clientY - previewPanStart.y,
   )
+  schedulePointerCoordinates(event, previewCanvas, previewCanvas)
 })
 
 function finishPreviewPan(): void {
   flushPreviewPan()
   previewPanCandidate = undefined
   previewPanStart = undefined
+  preview.setPointerInteractionLocked(false)
   canvasWrap.classList.remove("preview-pan-ready", "preview-panning")
 }
 
@@ -2893,9 +2963,57 @@ function showError(error: unknown, action = "操作"): void {
   void flushClientLogs()
   eventLog.dataset.kind = "error"
   eventLog.textContent = text
-  if (isTauri()) {
+  if (isTauri() && !fileOperationDialog.open) {
     void message(text, { title: `${action}失败`, kind: "error" }).catch(() => {})
   }
+}
+
+function updateFileOperationProgress(value: number, detail: string): void {
+  fileOperationProgress.value = Math.max(0, Math.min(100, value))
+  fileOperationProgress.textContent = `${Math.round(fileOperationProgress.value)}%`
+  fileOperationDetail.textContent = detail
+}
+
+function showSkinLoadProgress(size: number): boolean {
+  if (size <= LARGE_SKIN_BYTES) return false
+  if (!fileOperationProgressVisible) {
+    fileOperationProgressVisible = true
+    if (!fileOperationDialog.open) fileOperationDialog.showModal()
+  }
+  return true
+}
+
+async function readBrowserSkinFile(file: File): Promise<Uint8Array> {
+  if (!showSkinLoadProgress(file.size)) return new Uint8Array(await file.arrayBuffer())
+  const output = new Uint8Array(file.size)
+  const reader = file.stream().getReader()
+  let offset = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    output.set(value, offset)
+    offset += value.length
+    updateFileOperationProgress(2 + offset / file.size * 16, `正在读取皮肤文件… ${Math.round(offset / file.size * 100)}%`)
+  }
+  return output
+}
+
+async function readNativeSkinFile(path: string): Promise<Uint8Array> {
+  const size = await invoke<number>("skin_file_size", { path })
+  if (showSkinLoadProgress(size)) {
+    updateFileOperationProgress(2, "正在读取皮肤文件… 0%")
+    await waitForInterfacePaint()
+  }
+  const progress = new Channel<[number, number]>()
+  progress.onmessage = ([loaded, total]) => {
+    if (!fileOperationProgressVisible) return
+    updateFileOperationProgress(2 + loaded / total * 16, `正在读取皮肤文件… ${Math.round(loaded / total * 100)}%`)
+  }
+  return new Uint8Array(await invoke<number[]>("read_skin_file", { path, progress }))
+}
+
+function waitForInterfacePaint(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
 }
 
 function ios26StylePath(genPath: string): string | undefined {
@@ -2954,7 +3072,14 @@ async function runFileOperation(
 ): Promise<void> {
   if (fileOperationRunning) return
   setFileOperationBusy(true)
+  fileOperationProgressVisible = false
   showStatus(`正在${action}…`, "progress")
+  fileOperationDialog.dataset.outcome = "progress"
+  fileOperationTitle.textContent = `正在${action}`
+  fileOperationResult.hidden = true
+  fileOperationResult.textContent = ""
+  fileOperationClose.disabled = true
+  updateFileOperationProgress(2, "正在准备…")
   const started = performance.now()
   clientLog.info("operation.start", { action })
   try {
@@ -2964,8 +3089,15 @@ async function runFileOperation(
       outcome: completed ? "completed" : "cancelled",
       durationMs: Math.round(performance.now() - started),
     })
-    if (completed) showStatus(`${action}完成。`)
-    else showStatus(`${action}已取消。`)
+    const result = completed ? `${action}完成。` : `${action}已取消。`
+    showStatus(result)
+    if (fileOperationProgressVisible) {
+      fileOperationDialog.dataset.outcome = completed ? "success" : "cancelled"
+      fileOperationTitle.textContent = completed ? `${action}完成` : `${action}已取消`
+      updateFileOperationProgress(completed ? 100 : fileOperationProgress.value, completed ? "处理完成" : "未进行更改")
+      fileOperationResult.textContent = result
+      fileOperationResult.hidden = false
+    }
   } catch (error) {
     clientLog.info("operation.finish", {
       action,
@@ -2973,8 +3105,15 @@ async function runFileOperation(
       durationMs: Math.round(performance.now() - started),
     })
     showError(error, action)
+    if (fileOperationProgressVisible) {
+      fileOperationDialog.dataset.outcome = "error"
+      fileOperationTitle.textContent = `${action}失败`
+      fileOperationResult.textContent = operationError(action, error)
+      fileOperationResult.hidden = false
+    }
   } finally {
     setFileOperationBusy(false)
+    if (fileOperationProgressVisible) fileOperationClose.disabled = false
   }
 }
 
@@ -4120,16 +4259,6 @@ function applyCandidateGeometry(
   width: number,
 ): void {
   const padding = document.get("CAND", "PADDING")?.split(",").map((value) => candidateCssLength(value, width))
-  if (padding?.every(Boolean)) {
-    const css = padding.length === 4
-      ? [padding[1], padding[2], padding[3], padding[0]]
-      : padding.length === 2
-        ? [padding[1], padding[0]]
-        : padding
-    candidateArea.style.setProperty("--candidate-padding", css.join(" "))
-  } else {
-    candidateArea.style.removeProperty("--candidate-padding")
-  }
   if (padding?.[0]) candidateArea.style.setProperty("--candidate-left-padding", padding[0])
   else candidateArea.style.removeProperty("--candidate-left-padding")
   const firstGap = candidateCssLength(document.get("CAND", "FIRST_GAP"), width)
@@ -4169,6 +4298,9 @@ function refreshToolbarPreview(
     return
   }
   const gen = textDocument(genConfigPath())
+  const bdaPanel = archive.format === "bda"
+    ? currentBdaAppearance()?.appearance.panels.get(layoutPath.split("/").pop()?.replace(/\.ini$/i, "") ?? "")
+    : undefined
   toolbarStrip.hidden = false
   toolbarStrip.dataset.path = path
   toolbarPreview.setResolver(resolver)
@@ -4178,10 +4310,15 @@ function refreshToolbarPreview(
   toolbarPreview.setTheme(theme.value === "dark" ? "dark" : "light")
   toolbarPreview.setTransparent(true)
   const { width, height } = resolveCandidateRect(document, gen)
-  const inputStyle = resolveCandidateInputStyle(gen, resolver, width, document)
+  const inputGeneral = bdaPanel?.input?.textStyle
+    ? IniDocument.parse(`[INPUT]\nFORE_STYLE=${bdaStyleID(bdaPanel.input.textStyle)}\n`)
+    : gen
+  const inputStyle = resolveCandidateInputStyle(inputGeneral, resolver, width, document)
   const inputHeight = inputStyle.height
-  const backgroundStyle = document.get("CAND", "BACK_STYLE")?.split(",")[0] ??
-    gen?.get("SCAND", "BACK_STYLE")?.split(",")[0] ?? ""
+  const backgroundStyle = archive?.format === "bda"
+    ? bdaStyleID(bdaPanel?.backStyle)
+    : document.get("CAND", "BACK_STYLE")?.split(",")[0] ??
+      gen?.get("SCAND", "BACK_STYLE")?.split(",")[0] ?? ""
   candidateBackgroundCanvas.hidden = false
   candidateBackgroundPreview.setResolver(resolver)
   candidateBackgroundPreview.setTheme(theme.value === "dark" ? "dark" : "light")
@@ -6418,6 +6555,7 @@ function selectFile(
     const base = IniDocument.parse(bdaBase!.getText(bdaBasePath(path)))
     const previewLayout = isBdaLayoutPath(path) && previewItems(base).some((item) => item.editable)
     if (previewLayout && !refreshBdaLayout(path)) return
+    if (previewLayout) layoutPath = path
     selectedDocument = previewLayout ? layoutDocument : base
     if (previewLayout) {
       selectedKeySections = []
@@ -6696,6 +6834,8 @@ function renderFiles(): void {
   }
   const hintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
   if (hintPath) entries.push({ group: "键盘组件", label: "按键气泡", path: hintPath, className: "nav-component", icon: "rectangle.and.hand.point" })
+  const longHintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint2.pop"])
+  if (longHintPath) entries.push({ group: "键盘组件", label: "长按气泡", path: longHintPath, className: "nav-component", icon: "rectangle.and.hand.point" })
   const stylePath = appearancePath ?? (archive.format === "bda" ? undefined : styleConfigPath())
   if (stylePath && archive.format !== "bda") {
     entries.push({
@@ -7010,6 +7150,7 @@ async function loadArchive(
     sizeBytes: bytes.byteLength,
     sourceWorkspace: Boolean(existingSourceWorkspace),
   })
+  if (showSkinLoadProgress(bytes.byteLength)) await waitForInterfacePaint()
   await flushSourceAutosave()
   await activateSourceWorkspace("", "")
   sourceWorkspacePendingArchive = undefined
@@ -7017,7 +7158,14 @@ async function loadArchive(
   keySoundBuffers.clear()
   let nextArchive: SkinArchive
   try {
-    nextArchive = SkinArchive.open(bytes, exportFormatFromPath(displayName || path))
+    updateFileOperationProgress(18, "正在解析皮肤包…")
+    nextArchive = await SkinArchive.openAsync(
+      bytes,
+      exportFormatFromPath(displayName || path),
+      fileOperationProgressVisible
+        ? (progress) => updateFileOperationProgress(18 + progress * 32, `正在解析皮肤包… ${Math.round(progress * 100)}%`)
+        : undefined,
+    )
   } catch (error) {
     clientLog.error("archive.parse.error", {
       name: (displayName || path).split(/[\\/]/).pop() || "unnamed",
@@ -7028,10 +7176,14 @@ async function loadArchive(
     throw error
   }
   if (nextArchive.format === "bda" && !bdaBase) {
+    updateFileOperationProgress(52, "正在加载 BDA 基础布局…")
     const response = await fetch(new URL("bda-base.bds", document.baseURI))
     if (!response.ok) throw new Error("无法加载 BDA 官方基础布局")
-    bdaBase = SkinArchive.open(new Uint8Array(await response.arrayBuffer()))
+    bdaBase = await SkinArchive.openAsync(new Uint8Array(await response.arrayBuffer()))
   }
+  const bdaWarnings = bdaCompatibilityWarnings(nextArchive)
+  if (bdaWarnings.length) clientLog.info("bda.compatibility.warning", { warnings: bdaWarnings.join("；") })
+  updateFileOperationProgress(55, "正在建立编辑工作区…")
   let nextSourceWorkspace = existingSourceWorkspace
   let pendingSourceDirectory: string | null | undefined
   const sourceDirectoryActive = !isAndroidTauri() || localStorage.getItem("source-directory-enabled") === "true"
@@ -7067,6 +7219,8 @@ async function loadArchive(
     const format = button.dataset.exportFormat as ExportFormat
     button.disabled = archive.format !== "bda" && format === "bda"
   }
+  updateFileOperationProgress(68, "正在生成文件列表…")
+  await waitForInterfacePaint()
   renderFiles()
   const bdaLayouts = bdaAvailableLayoutPaths()
   layoutPath = archive.format === "bda" && !bdaLayouts.includes(preferredPath())
@@ -7080,8 +7234,10 @@ async function loadArchive(
       : archive.names().find((name) => archive?.isText(name))
   if (initial) {
     layoutPath = initial
+    updateFileOperationProgress(82, "正在生成皮肤预览…")
     selectFile(initial)
   }
+  updateFileOperationProgress(92, "正在连接源码工作区…")
   await activateSourceWorkspace(nextSourceWorkspace, sourcePrefix)
   if (pendingSourceDirectory !== undefined) {
     const pendingArchive = nextArchive
@@ -7196,7 +7352,7 @@ async function loadNativePath(path: string): Promise<boolean> {
   if (!isSupportedSkinPath(path)) throw new Error("仅支持 .bda、.bdi 或 .bds 皮肤文件")
   const bytes = path.startsWith("content://")
     ? await readFile(path)
-    : new Uint8Array(await invoke<number[]>("read_file", { path }))
+    : await readNativeSkinFile(path)
   await loadArchive(bytes, path)
   return true
 }
@@ -7208,7 +7364,7 @@ function isSupportedSkinPath(path: string): boolean {
 async function loadDroppedFile(file: File): Promise<boolean> {
   if (!isSupportedSkinPath(file.name)) return false
   if (!(await prepareDocumentReplacement())) return false
-  await loadArchive(new Uint8Array(await file.arrayBuffer()), file.name)
+  await loadArchive(await readBrowserSkinFile(file), file.name)
   return true
 }
 
@@ -7228,31 +7384,40 @@ function currentExportFormat(): ExportFormat {
 }
 
 function mobileShareFormat(): ExportFormat {
+  if (archive?.format === "bda") return "bda"
   if (isIOSWeb()) return "bdi"
-  if (isAndroidTauri() || isAndroidWeb()) return archive?.format === "bda" ? "bda" : "bds"
+  if (isAndroidTauri() || isAndroidWeb()) return "bds"
   return currentExportFormat()
 }
 
-function exportArchive(format: ExportFormat): {
+async function exportArchive(format: ExportFormat, targetBdaPlatform?: Exclude<BdaPlatform, "unknown">): Promise<{
   bytes: Uint8Array
   converted: boolean
   warnings: string[]
-} | undefined {
+} | undefined> {
   if (!archive) throw new Error("当前没有可保存的皮肤")
+  updateFileOperationProgress(22, `正在生成 ${format.toUpperCase()} 皮肤包…`)
+  if (archive.format === "bda" && format === "bda" && targetBdaPlatform) {
+    const result = convertBdaPlatform(archive, targetBdaPlatform)
+    return { bytes: await result.toBytesAsync(), converted: true, warnings: bdaCompatibilityWarnings(archive) }
+  }
   if (archive.format !== "bda" || format === "bda") {
-    return { bytes: archive.toBytes(format), converted: false, warnings: [] }
+    return { bytes: await archive.toBytesAsync(format), converted: false, warnings: [] }
   }
   if (!bdaBase) throw new Error("无法加载 BDA 官方基础布局")
+  await waitForInterfacePaint()
+  updateFileOperationProgress(34, "正在转换 BDA 配置…")
   const result = convertBdaArchive(archive, bdaBase)
   if (result.warnings.length && !window.confirm(
     `BDA 转换为 ${format.toUpperCase()} 时将降级以下内容：\n\n${result.warnings.join("\n")}\n\n继续导出吗？`,
   )) return
-  return { bytes: result.archive.toBytes(format), converted: true, warnings: result.warnings }
+  updateFileOperationProgress(48, `正在压缩 ${format.toUpperCase()} 皮肤包…`)
+  return { bytes: await result.archive.toBytesAsync(format), converted: true, warnings: result.warnings }
 }
 
 async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: string): Promise<boolean> {
   if (!archive) throw new Error("当前没有可保存的皮肤")
-  const exported = exportArchive(format)
+  const exported = await exportArchive(format)
   if (!exported) return false
   let path = currentPath
   if (saveAs || !path || (!path.startsWith("content://") && exportFormatFromPath(path) !== format)) {
@@ -7265,7 +7430,7 @@ async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: 
   if (!exported.converted) {
     currentPath = path
     unsavedNew = false
-    archive.markSaved(exported.bytes)
+    archive.markSaved(exported.bytes, format)
     documentName.textContent = path.split(/[\\/]/).pop() || "未命名皮肤"
     updateDirty()
   }
@@ -7278,11 +7443,12 @@ type BrowserSaveFileHandle = {
 }
 
 async function writeNativePath(path: string, bytes: Uint8Array): Promise<void> {
+  updateFileOperationProgress(72, "正在写入文件…")
   if (path.startsWith("content://")) {
     await writeFile(path, bytes)
     return
   }
-  await invoke("write_file", { path, data: Array.from(bytes) })
+  await invoke("write_file", { path, data: bytes })
 }
 
 async function writeToChosenFile(
@@ -7336,23 +7502,36 @@ async function writeToChosenFile(
 
 async function downloadArchive(format: ExportFormat, suggestedName: string): Promise<boolean> {
   if (!archive) throw new Error("当前没有可保存的皮肤")
-  const exported = exportArchive(format)
+  const exported = await exportArchive(format)
   if (!exported) return false
   const path = await writeToChosenFile(suggestedName, exported.bytes, `${format.toUpperCase()} 皮肤`)
   if (!path) return false
   if (!exported.converted) {
     currentPath = path
     documentName.textContent = suggestedName
-    archive.markSaved(exported.bytes)
+    archive.markSaved(exported.bytes, format)
     unsavedNew = false
     updateDirty()
   }
   return true
 }
 
-async function saveArchive(saveAs: boolean, format: ExportFormat): Promise<boolean> {
+async function saveArchive(
+  saveAs: boolean,
+  format: ExportFormat,
+  targetBdaPlatform?: Exclude<BdaPlatform, "unknown">,
+): Promise<boolean> {
   const currentName = documentName.textContent?.trim() ?? ""
   const suggestedName = exportName(currentName, format)
+  if (targetBdaPlatform) {
+    const exported = await exportArchive(format, targetBdaPlatform)
+    if (!exported) return false
+    return Boolean(await writeToChosenFile(
+      suggestedName,
+      exported.bytes,
+      `${targetBdaPlatform === "ios" ? "iOS" : "Android"} BDA 皮肤`,
+    ))
+  }
   return isTauri()
     ? saveNative(saveAs, format, suggestedName)
     : downloadArchive(format, suggestedName)
@@ -7361,12 +7540,13 @@ async function saveArchive(saveAs: boolean, format: ExportFormat): Promise<boole
 async function shareArchiveToMobile(): Promise<boolean> {
   if (!archive) return false
   const format = mobileShareFormat()
-  const exported = exportArchive(format)
+  const exported = await exportArchive(format, format === "bda" ? (isIOSWeb() ? "ios" : "android") : undefined)
   if (!exported) return false
   const currentName = documentName.textContent?.trim() || "皮肤"
   const name = exportName(currentName, format)
   if (isAndroidTauri()) {
-    await invoke("share_file", { name, data: Array.from(exported.bytes) })
+    updateFileOperationProgress(72, "正在交给系统分享…")
+    await invoke("share_file", { name, data: exported.bytes })
     return true
   }
   const file = new File([new Uint8Array(exported.bytes).buffer], name, { type: "application/octet-stream" })
@@ -7430,8 +7610,9 @@ mobileShareButton.addEventListener("click", () => {
 for (const button of exportButtons) {
   button.addEventListener("click", () => {
     const format = button.dataset.exportFormat as ExportFormat
+    const platform = button.dataset.bdaPlatform as Exclude<BdaPlatform, "unknown"> | undefined
     toolbarMore.open = false
-    void runFileOperation("导出", () => saveArchive(true, format))
+    void runFileOperation("导出", () => saveArchive(true, format, platform))
   })
 }
 async function refreshUpdateStatus(): Promise<void> {
@@ -7698,12 +7879,27 @@ function saveSourceFontSize(): void {
 sourceFontSize.addEventListener("input", applySourceFontSize)
 sourceFontSize.addEventListener("change", saveSourceFontSize)
 sourceFontSize.addEventListener("blur", saveSourceFontSize)
+type WindowMaterialKind = "glass" | "acrylic" | "none"
+let windowMaterialKind: WindowMaterialKind = "glass"
+function currentWindowMaterialOpacity(): number {
+  return Math.max(20, Math.min(100, Number(windowMaterialOpacity.value) || 100))
+}
+function applyWindowMaterialOpacity(): void {
+  const opacity = currentWindowMaterialOpacity()
+  windowMaterialOpacity.value = String(opacity)
+  windowMaterialOpacityValue.value = `${opacity}%`
+  windowMaterialOpacity.disabled = !windowMaterial.checked
+  document.documentElement.dataset.windowMaterialKind = windowMaterialKind
+  document.documentElement.dataset.windowMaterialOpaque = opacity >= 100 ? "true" : "false"
+  document.documentElement.style.setProperty("--window-material-opacity", `${opacity}%`)
+}
 async function applyWindowMaterial(): Promise<void> {
   const enabled = windowMaterial.checked
   document.documentElement.dataset.windowMaterial = enabled ? "on" : "off"
+  applyWindowMaterialOpacity()
   if (!isTauri()) return
   try {
-    await invoke("set_window_material", { enabled })
+    await invoke("set_window_material", { enabled, opacity: currentWindowMaterialOpacity() })
   } catch (error) {
     windowMaterial.checked = false
     document.documentElement.dataset.windowMaterial = "off"
@@ -7712,11 +7908,24 @@ async function applyWindowMaterial(): Promise<void> {
   }
 }
 windowMaterial.checked = localStorage.getItem("window-material") !== "off"
-void applyWindowMaterial()
+void (async () => {
+  if (isTauri()) windowMaterialKind = await invoke<WindowMaterialKind>("window_material_kind")
+  windowMaterialOpacitySetting.hidden = windowMaterialKind === "none"
+  windowMaterialOpacityLabel.textContent = windowMaterialKind === "acrylic" ? "亚克力不透明度" : "玻璃不透明度"
+  const storageKey = windowMaterialKind === "acrylic" ? "window-acrylic-opacity" : "window-glass-opacity"
+  windowMaterialOpacity.value = localStorage.getItem(storageKey) ?? (windowMaterialKind === "acrylic" ? "92" : "100")
+  await applyWindowMaterial()
+})().catch((error) => showError(error, "读取窗口材质"))
 windowMaterial.addEventListener("change", () => {
   localStorage.setItem("window-material", windowMaterial.checked ? "on" : "off")
   void applyWindowMaterial()
 })
+windowMaterialOpacity.addEventListener("input", () => {
+  const storageKey = windowMaterialKind === "acrylic" ? "window-acrylic-opacity" : "window-glass-opacity"
+  localStorage.setItem(storageKey, String(currentWindowMaterialOpacity()))
+  applyWindowMaterialOpacity()
+})
+windowMaterialOpacity.addEventListener("change", () => void applyWindowMaterial())
 
 let windowDragPointerDown = false
 let windowDragMaterialDisabled = false
@@ -7743,7 +7952,7 @@ async function startWindowsWindowDrag(): Promise<void> {
   windowDragPointerDown = true
   document.documentElement.dataset.windowMaterial = "off"
   try {
-    windowDragMaterialTransition = invoke("set_window_material", { enabled: false })
+    windowDragMaterialTransition = invoke("set_window_material", { enabled: false, opacity: currentWindowMaterialOpacity() })
     await windowDragMaterialTransition
     windowDragMaterialDisabled = true
     if (!windowDragPointerDown) {
@@ -7815,11 +8024,14 @@ browserOpen.addEventListener("change", async () => {
   if (file) {
     await runFileOperation("打开", async () => {
       if (!isSupportedSkinPath(file.name)) throw new Error("仅支持 .bda、.bdi 或 .bds 皮肤文件")
-      await loadArchive(new Uint8Array(await file.arrayBuffer()), file.name)
+      await loadArchive(await readBrowserSkinFile(file), file.name)
       return true
     })
   }
   browserOpen.value = ""
+})
+fileOperationDialog.addEventListener("cancel", (event) => {
+  if (fileOperationRunning) event.preventDefault()
 })
 let canvasDragDepth = 0
 function setCanvasDropState(active: boolean): void {
@@ -8907,6 +9119,10 @@ if (isTauri()) {
       }
       setSourceDropTarget()
       void (async () => {
+        if (payload.paths.length === 1 && isSupportedSkinPath(payload.paths[0])) {
+          await runFileOperation("打开", () => loadDroppedPath(payload.paths[0]))
+          return
+        }
         for (const path of payload.paths) {
           if (await invoke<boolean>("path_is_directory", { path })) {
             await runFileOperation("打开源码文件夹", () => loadDroppedSourceWorkspace(path))

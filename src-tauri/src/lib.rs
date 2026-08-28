@@ -1,6 +1,6 @@
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -663,6 +663,42 @@ fn read_file(path: String) -> Result<Vec<u8>, String> {
 }
 
 #[tauri::command]
+fn skin_file_size(path: String) -> Result<u64, String> {
+    let size = fs::metadata(path).map_err(|error| error.to_string())?.len();
+    if size > MAX_ARCHIVE_BYTES {
+        return Err("skin file exceeds 64 MB".into());
+    }
+    Ok(size)
+}
+
+#[tauri::command]
+fn read_skin_file(
+    path: String,
+    progress: tauri::ipc::Channel<[u64; 2]>,
+) -> Result<Vec<u8>, String> {
+    let size = fs::metadata(&path)
+        .map_err(|error| error.to_string())?
+        .len();
+    if size > MAX_ARCHIVE_BYTES {
+        return Err("skin file exceeds 64 MB".into());
+    }
+    let mut file = fs::File::open(path).map_err(|error| error.to_string())?;
+    let mut output = Vec::with_capacity(size as usize);
+    let mut chunk = [0; 256 * 1024];
+    loop {
+        let read = file.read(&mut chunk).map_err(|error| error.to_string())?;
+        if read == 0 {
+            break;
+        }
+        output.extend_from_slice(&chunk[..read]);
+        progress
+            .send([output.len() as u64, size])
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(output)
+}
+
+#[tauri::command]
 fn write_file(path: String, data: Vec<u8>) -> Result<(), String> {
     fs::write(path, data).map_err(|error| error.to_string())
 }
@@ -738,7 +774,37 @@ fn quit_app(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-fn set_window_material(window: tauri::WebviewWindow, enabled: bool) -> Result<(), String> {
+fn window_material_kind() -> &'static str {
+    #[cfg(target_os = "macos")]
+    return "glass";
+    #[cfg(target_os = "windows")]
+    return windows_material_kind(windows_version::OsVersion::current().build);
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    return "none";
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn windows_material_kind(build: u32) -> &'static str {
+    if build >= 22_000 {
+        "glass"
+    } else {
+        "acrylic"
+    }
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn acrylic_alpha(opacity: u8) -> u8 {
+    ((u16::from(opacity.min(100)) * 255 + 50) / 100) as u8
+}
+
+#[tauri::command]
+fn set_window_material(
+    window: tauri::WebviewWindow,
+    enabled: bool,
+    opacity: u8,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    let _ = opacity;
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
         if !enabled {
@@ -750,12 +816,12 @@ fn set_window_material(window: tauri::WebviewWindow, enabled: bool) -> Result<()
             .map_err(|error| error.to_string());
         #[cfg(target_os = "windows")]
         {
-            let effect = if windows_version::OsVersion::current().build >= 22_000 {
+            let effect = if window_material_kind() == "glass" {
                 EffectsBuilder::new().effect(Effect::Mica)
             } else {
                 EffectsBuilder::new()
                     .effect(Effect::Acrylic)
-                    .color(tauri::window::Color(32, 34, 38, 235))
+                    .color(tauri::window::Color(32, 34, 38, acrylic_alpha(opacity)))
             };
             return window
                 .set_effects(effect.build())
@@ -764,7 +830,7 @@ fn set_window_material(window: tauri::WebviewWindow, enabled: bool) -> Result<()
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        let _ = (window, enabled);
+        let _ = (window, enabled, opacity);
         Ok(())
     }
 }
@@ -790,14 +856,22 @@ async fn fetch_release_page() -> Result<String, String> {
 #[allow(clippy::items_after_test_module)]
 mod tests {
     use super::{
-        append_client_log_path, apply_source_changes_path, prune_source_workspaces,
+        acrylic_alpha, append_client_log_path, apply_source_changes_path, prune_source_workspaces,
         read_client_log_path, read_file, read_source_changes_path, read_source_files,
-        safe_source_path, valid_share_filename, write_file, write_source_files, MAX_ARCHIVE_BYTES,
-        SOURCE_MARKER,
+        safe_source_path, valid_share_filename, windows_material_kind, write_file,
+        write_source_files, MAX_ARCHIVE_BYTES, SOURCE_MARKER,
     };
     use std::fs;
     use std::thread;
     use std::time::Duration;
+
+    #[test]
+    fn window_material_distinguishes_windows_10_acrylic_from_windows_11_glass() {
+        assert_eq!(windows_material_kind(21_999), "acrylic");
+        assert_eq!(windows_material_kind(22_000), "glass");
+        assert_eq!(acrylic_alpha(0), 0);
+        assert_eq!(acrylic_alpha(100), 255);
+    }
 
     #[test]
     fn file_commands_report_success_and_missing_file_errors() {
@@ -990,12 +1064,15 @@ pub fn run() {
     #[cfg(target_os = "macos")]
     let builder = builder.invoke_handler(tauri::generate_handler![
         read_file,
+        skin_file_size,
+        read_skin_file,
         write_file,
         append_client_log,
         read_client_logs,
         share_file,
         take_opened_files,
         quit_app,
+        window_material_kind,
         set_window_material,
         fetch_release_page,
         prepare_source_directory,
@@ -1012,12 +1089,15 @@ pub fn run() {
     #[cfg(not(target_os = "macos"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         read_file,
+        skin_file_size,
+        read_skin_file,
         write_file,
         append_client_log,
         read_client_logs,
         share_file,
         take_opened_files,
         quit_app,
+        window_material_kind,
         set_window_material,
         fetch_release_page,
         prepare_source_directory,

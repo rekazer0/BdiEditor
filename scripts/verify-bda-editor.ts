@@ -42,6 +42,11 @@ assert.deepEqual(
   "未修改的解码源码回写后必须逐字节不变",
 )
 assert.ok(source.panels.py_9.keys.KEY_AS, "解码源码应包含包内真实按键")
+assert.equal(
+  decodeBdaAppearance(appearanceBytes).panels.get("py_9")?.input?.textStyle?.type,
+  "text",
+  "BDA 面板应提供输入区文字样式",
+)
 assert.equal(source.colorStyles[93].normalColor, "FFFFFFFF")
 assert.ok(!("highlightColor" in source.colorStyles[93]), "包内缺失的高亮颜色不应出现在解码源码")
 assert.ok(!("alpha" in source.imageStyles[294].normalImage), "包内缺失的图片透明度不应被默认值伪造")
@@ -203,6 +208,7 @@ const bdaSourceSelection = main.match(/else if \(archive\?\.isBdaConfig\(path\)\
 assert.match(bdaSourceSelection, /source\.disabled = !bdaDecodedSourceEditable\(path\)/, "未知 schema 的 BDA 解码 JSON 应保持只读")
 assert.match(main, /function commitBdaSourceEdit\([\s\S]*?applyDecodedBdaSource[\s\S]*?commitBytes/, "应用内 BDA JSON 应编译回 protobuf 后再提交")
 assert.match(main, /applyDecodedBdaAppearancePart/, "虚拟 appearance 片段应合并写回真实配置")
+assert.match(main, /if \(previewLayout\) layoutPath = path/, "切换 BDA 虚拟布局后应同步 layoutPath，保证交互预览使用当前布局")
 assert.match(main, /jsonPropertyRanges\(source\.value, selectedBdaSourceKeys\(\)\)/, "BDA 按键选中范围应传给 CodeMirror 装饰")
 assert.doesNotMatch(main, /BDA 官方基础布局（只读几何）/)
 assert.doesNotMatch(main, /group\.hidden = bdaSelected \|\|/, "BDA 选中具体按键时应复用标准按键检查器")

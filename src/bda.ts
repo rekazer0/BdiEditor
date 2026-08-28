@@ -373,6 +373,7 @@ export function bdaLayoutDocument(base: IniDocument, appearance: BdaAppearance, 
   setBdaStyle(document, "PANEL", "BACK_STYLE", panel.backStyle)
   setBdaStyle(document, "INPUT", "BACK_STYLE", panel.input?.backStyle)
   setBdaStyle(document, "INPUT", "FORE_STYLE", panel.input?.textStyle)
+  setBdaStyle(document, "SCAND", "INPUT_STYLE", panel.input?.textStyle)
   setBdaStyle(document, "MORE", "BACK_STYLE", panel.more?.backStyle)
   setBdaStyle(document, "MORE", "FORE_STYLE", panel.more?.cellForeStyle)
   setBdaStyle(document, "MORE", "CELL_STYLE", panel.more?.cellBackStyle)
@@ -1239,6 +1240,65 @@ function replaceField(bytes: Uint8Array, number: number, wire: 0 | 2, payload: U
   return field
     ? join([bytes.slice(0, field.start), replacement, bytes.slice(field.end)])
     : join([bytes, replacement])
+}
+
+function removeFields(bytes: Uint8Array, numbers: Set<number>): Uint8Array {
+  const fields = rawFields(bytes)
+  return join(fields.filter((field) => !numbers.has(field.number)).map((field) => bytes.slice(field.start, field.end)))
+}
+
+function convertBdaPanelPlatform(bytes: Uint8Array, platform: "ios" | "android"): Uint8Array {
+  const source = rawFields(bytes)
+  const from = platform === "ios" ? 10 : 7
+  const to = platform === "ios" ? 7 : 10
+  const style = source.find((field) => field.number === to && field.bytes?.length) ??
+    source.find((field) => field.number === from && field.bytes?.length)
+  return join([
+    ...source.filter((field) => field.number !== 7 && field.number !== 10)
+      .map((field) => bytes.slice(field.start, field.end)),
+    ...(style?.bytes ? [encodedField(to, 2, style.bytes)] : []),
+  ])
+}
+
+export const IOS_BDA_PANELS = new Set([
+  "bh", "def_9", "def_26", "email", "en_26", "en_26s", "hw_grid", "num_9", "num_26",
+  "py_9", "py_26", "sel_ch", "sel_en", "sym_26_cn", "sym_26_en", "symbol", "url",
+])
+
+export function convertBdaAppearancePlatform(bytes: Uint8Array, platform: "ios" | "android"): Uint8Array {
+  let output = updateBdaDesignWidth(bytes, platform === "ios" ? 1242 : 1080)
+  const fields = rawFields(output)
+  return join(fields.flatMap((field) => {
+    if (field.number !== 4 || !field.bytes) return [output.slice(field.start, field.end)]
+    const entry = rawFields(field.bytes)
+    const keyField = entry.find((item) => item.number === 1)
+    const key = rawString(keyField)
+    if (platform === "ios" && !IOS_BDA_PANELS.has(key) && key !== "net") return []
+    const value = entry.find((item) => item.number === 2)
+    if (!value?.bytes) return [output.slice(field.start, field.end)]
+    const renamed = platform === "ios" && key === "net" && keyField?.bytes
+      ? encodedField(1, 2, new TextEncoder().encode("url"))
+      : keyField ? field.bytes!.slice(keyField.start, keyField.end) : undefined
+    return [encodedField(4, 2, join([
+      ...entry.filter((item) => item.number !== 1 && item.number !== 2).map((item) => field.bytes!.slice(item.start, item.end)),
+      ...(renamed ? [renamed] : []),
+      encodedField(2, 2, convertBdaPanelPlatform(value.bytes, platform)),
+    ]))]
+  }))
+}
+
+export function convertBdaSoundPlatform(bytes: Uint8Array, platform: "ios" | "android"): Uint8Array {
+  const target = platform === "ios" ? 3 : 1
+  const maps = rawFields(bytes).filter((field) => (field.number === 1 || field.number === 3) && field.bytes)
+  const entries = new Map<string, Uint8Array>()
+  for (const field of maps) {
+    const key = rawString(rawFields(field.bytes!).find((entry) => entry.number === 1))
+    if (key && (!entries.has(key) || field.number === target)) entries.set(key, field.bytes!)
+  }
+  return join([
+    removeFields(bytes, new Set([1, 3])),
+    ...[...entries.values()].map((entry) => encodedField(target, 2, entry)),
+  ])
 }
 
 export function updateBdaDesignWidth(bytes: Uint8Array, width: number): Uint8Array {

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { existsSync, readFileSync } from "node:fs"
 import { BdaResolver, bdaAppearancePath, bdaConfigPaths, bdaLayoutDocument, bdaStyleID, bdaStyleRef, decodeBdaAnimation, decodeBdaAppearance, decodedBdaSource } from "../src/bda.ts"
+import { candidateInputForegroundStyle, resolveCandidateInputStyle } from "../src/candidate-style.ts"
 import { IniDocument } from "../src/ini.ts"
 import { previewItems } from "../src/preview.ts"
 import { SkinArchive } from "../src/skin.ts"
@@ -23,6 +24,27 @@ for (const orientation of ["port", "land"]) {
   const source = JSON.parse(decodedBdaSource(appearancePath, skin.getBytes(appearancePath)!))
   assert.ok(source.panels?.py_26?.cand, `${orientation} 官方候选字段应出现在源码视图`)
   assert.ok(source.panels?.py_26?.hints?.short, `${orientation} 官方提示字段应出现在源码视图`)
+  const gen = bdaLayoutDocument(
+    IniDocument.parse(base.getText(`light/skin/${orientation}/gen.ini`)),
+    appearance,
+    "py_26",
+  )
+  const candidate = bdaLayoutDocument(
+    IniDocument.parse(base.getText(`light/skin/${orientation}/cand1.cnd`)),
+    appearance,
+    "py_26",
+  )
+  const candidateBar = previewItems(candidate, 1080, 133).find((item) => item.section === "CAND")
+  assert.deepEqual(
+    candidateBar?.foreStyles,
+    [],
+    `${orientation} 候选文字样式不应作为整条候选栏的固定前景绘制`,
+  )
+  const inputStyle = resolveCandidateInputStyle(gen, resolver, 1080, candidate)
+  assert.ok(
+    candidateInputForegroundStyle(gen, candidate).startsWith("3") && inputStyle.height > 0,
+    `${orientation} BDA 拼音输入区应使用可解析的文字样式并保留工具栏高度`,
+  )
   const documents = ["gen.ini", "cand1.cnd", "hint1.pop"]
   for (const [panelName, panel] of appearance.panels) {
     const layoutPath = `light/skin/${orientation}/${panelName}.ini`

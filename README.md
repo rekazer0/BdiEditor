@@ -23,7 +23,7 @@
   <img src="readme-assets/mobile-editor.png" width="390" alt="移动端编辑界面">
 </p>
 
-## v1.6.59 更新
+## v1.7.69 更新
 
 - 引入 CodeMirror 6 代码编辑器，完善源码高亮、搜索、定位与编辑体验。
 - 重构 BDA 解析器，完善解析、导入导出、预览、属性编辑、资源替换、图片切片及 protobuf 写回。
@@ -46,7 +46,7 @@
 
 ## 主要特性
 
-- 打开、创建、保存 `.bdi/.bds` 皮肤，并打开、保存 `.bda` 皮肤；旧格式导出时会转换平台目录和 `SupportPlatform`，而非仅改扩展名；
+- 打开、创建、保存 `.bdi/.bds/.bda` 皮肤；BDA 会按 `appearanceConfig`、面板集合和声音字段识别 iOS/Android 家族，可双向转换导出，而非仅修改 `SupportPlatform`；
 - 按百度官方 protobuf 描述符解析 BDA 样式、面板、按键引用和资源 ID；结合安装包内的 1080 横竖屏基础几何显示各类布局，可编辑并保存按键图片 ID、字体、字号、文字颜色及包内 PNG，写回时保留未知 protobuf 字段；
 - 自动识别九键、魔改九键和 26 键布局；
 - 浅色/深色、竖屏/横屏实时预览；内置 iPhone 17 Pro、iPhone 17 Pro Max、Xiaomi 17、Pixel 10 Pro 与 Galaxy S25 Ultra 的厂商公布分辨率模板；

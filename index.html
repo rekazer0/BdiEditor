@@ -7,7 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'"
     />
-    <title>键设-bdiEditor v1.6.59</title>
+    <title>键设-bdiEditor v1.7.69</title>
   </head>
   <body>
     <header class="titlebar" data-tauri-drag-region>
@@ -29,7 +29,8 @@
           <div class="toolbar-menu export-actions" aria-label="导出皮肤">
             <button class="export-action" data-export-format="bdi" disabled>导出 iOS 皮肤 (.bdi)…</button>
             <button class="export-action" data-export-format="bds" disabled>导出 Android 皮肤 (.bds)…</button>
-            <button class="export-action" data-export-format="bda" disabled>导出新版 Android 皮肤 (.bda)…</button>
+            <button class="export-action" data-export-format="bda" data-bda-platform="ios" disabled>导出新版 iOS 皮肤 (.bda)…</button>
+            <button class="export-action" data-export-format="bda" data-bda-platform="android" disabled>导出新版 Android 皮肤 (.bda)…</button>
           </div>
         </details>
         <span class="toolbar-divider"></span>
@@ -50,7 +51,8 @@
           <span class="mobile-menu-separator" role="separator"></span>
           <button type="button" data-mobile-export-format="bdi"><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出 iOS 皮肤</span></button>
           <button type="button" data-mobile-export-format="bds"><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出 Android 皮肤</span></button>
-          <button type="button" data-mobile-export-format="bda"><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出新版 Android 皮肤</span></button>
+          <button type="button" data-mobile-export-format="bda" data-bda-platform="ios"><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出新版 iOS 皮肤</span></button>
+          <button type="button" data-mobile-export-format="bda" data-bda-platform="android"><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出新版 Android 皮肤</span></button>
           <span class="mobile-menu-separator" role="separator"></span>
           <button type="button" data-mobile-command="panel-scale"><span class="system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"></span><span>面板复制</span></button>
           <button type="button" data-mobile-command="replace-layout-image"><span class="system-symbol" data-system-symbol="photo.badge.arrow.down" aria-hidden="true"></span><span>替换键盘样式</span></button>
@@ -208,6 +210,7 @@
                   <img class="keyboard-accessory-icon" src="/icons/phone-microphone.png" alt="" />
                 </div>
               </div>
+              <canvas id="hint-preview" aria-hidden="true"></canvas>
             </div>
           </div>
           <figure id="workspace-image-figure" hidden>
@@ -538,6 +541,18 @@
       </form>
     </dialog>
 
+    <dialog id="file-operation-dialog" class="project-dialog file-operation-dialog" aria-labelledby="file-operation-title">
+      <form method="dialog">
+        <header>
+          <h2 id="file-operation-title">正在处理</h2>
+          <p id="file-operation-detail" aria-live="polite">正在准备…</p>
+        </header>
+        <progress id="file-operation-progress" max="100" value="0">0%</progress>
+        <p id="file-operation-result" aria-live="assertive" hidden></p>
+        <footer><button id="file-operation-close" value="close" disabled>关闭</button></footer>
+      </form>
+    </dialog>
+
     <dialog id="panel-scale-dialog" class="project-dialog" aria-labelledby="panel-scale-title">
       <form id="panel-scale-form" method="dialog">
         <header><h2 id="panel-scale-title">面板复制</h2><p>复制目录下的全部内容，或复制单个文件。</p></header>
@@ -671,6 +686,7 @@
             <div class="settings-list">
               <label class="settings-row"><span>软件外观</span><select id="app-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
               <label class="settings-row settings-switch"><span>窗口玻璃与亚克力材质</span><input id="window-material" type="checkbox" role="switch" checked></label>
+              <label id="window-material-opacity-setting" class="settings-row settings-range"><span id="window-material-opacity-label">玻璃不透明度</span><span class="settings-range-control"><input id="window-material-opacity" type="range" min="20" max="100" step="1" value="100" aria-labelledby="window-material-opacity-label window-material-opacity-value"><output id="window-material-opacity-value" for="window-material-opacity">100%</output></span></label>
             </div>
           </section>
 
@@ -721,12 +737,12 @@
 
     <dialog id="about-dialog" class="app-dialog" aria-labelledby="about-title">
       <form method="dialog">
-        <header><h2 id="about-title">关于 键设-bdiEditor v1.6.59</h2><button aria-label="关闭">关闭</button></header>
+        <header><h2 id="about-title">关于 键设-bdiEditor v1.7.69</h2><button aria-label="关闭">关闭</button></header>
         <p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
-        <p>版本 1.6.59</p>
+        <p>版本 1.7.69</p>
         <p>支持读取、编辑和导出 BDI、BDS、BDA 皮肤包。</p>
         <p class="about-alpha">阿尔法版本：包含未完成的功能与实验性改动，仅用于测试。</p>
-        <section id="about-update" class="about-update" data-current-version="1.6.59">
+        <section id="about-update" class="about-update" data-current-version="1.7.69">
           <div><strong>版本更新</strong><button id="check-update" type="button">检查更新</button></div>
           <p id="update-status" aria-live="polite">正在检查更新…</p>
           <a id="download-update" href="https://github.com/rekazer0/BdiEditor/releases" target="_blank" rel="noreferrer" hidden>查看最新版本</a>

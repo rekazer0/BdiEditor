@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
+import { zipSync } from "fflate"
 import { IniDocument } from "../src/ini.ts"
 import { SkinArchive } from "../src/skin.ts"
 
@@ -31,6 +32,40 @@ additive.setBytes("light/skin/res/added.png", new Uint8Array([2]))
 const additiveBytes = additive.toBytes()
 assert.equal(zipMethod(additiveBytes, "Info.txt"), 0, "新增资源不应重压缩原 ZIP 条目")
 assert.deepEqual(SkinArchive.open(additiveBytes).getBytes("light/skin/res/added.png"), new Uint8Array([2]))
+const progress: number[] = []
+const progressive = await SkinArchive.openAsync(additiveBytes, undefined, (value) => progress.push(value))
+assert.deepEqual(progressive.names(), SkinArchive.open(additiveBytes).names())
+assert.equal(progress.at(-1), 1, "流式解压应报告完成")
+assert(progress.every((value, index) => index === 0 || value >= progress[index - 1]), "解压进度不应倒退")
+const failedProgress: number[] = []
+await assert.rejects(SkinArchive.openAsync(additiveBytes, "bda", (value) => failedProgress.push(value)))
+assert.notEqual(failedProgress.at(-1), 1, "归档校验完成前不应报告 100%")
+let random = 1
+const largeCompressedFile = new Uint8Array(1024 * 1024)
+for (let index = 0; index < largeCompressedFile.length; index++) {
+  random ^= random << 13
+  random ^= random >>> 17
+  random ^= random << 5
+  largeCompressedFile[index] = random
+}
+const largeCompressedArchive = zipSync({
+  "light/skin/port/gen.ini": new TextEncoder().encode("[PANEL]\nSIZE=1,1"),
+  "light/skin/res/large.png": largeCompressedFile,
+}, { level: 6 })
+assert.deepEqual(
+  (await SkinArchive.openAsync(largeCompressedArchive, undefined, () => {})).getBytes("light/skin/res/large.png"),
+  largeCompressedFile,
+  "大体积 Deflate 条目应能通过进度解压路径打开",
+)
+const largeConvertedArchive = SkinArchive.fromSourceFiles([
+  { path: "port/gen.ini", data: new TextEncoder().encode("[PANEL]\nSIZE=1,1") },
+  { path: "res/large.png", data: largeCompressedFile },
+])
+assert.deepEqual(
+  SkinArchive.open(await largeConvertedArchive.toBytesAsync("bdi"), "bdi").getBytes("light/skin/res/large.png"),
+  largeCompressedFile,
+  "含大文件的 BDS 应能异步导出为 BDI",
+)
 
 const paths = process.argv.slice(2)
 if (!paths.length) throw new Error("用法：npm run verify:samples -- <皮肤.bdi> [皮肤.bds]")

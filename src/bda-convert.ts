@@ -67,6 +67,10 @@ export function convertBdaArchive(source: SkinArchive, base: SkinArchive): BdaCo
   }
 
   for (const theme of ["light", "dark"] as const) {
+    for (const name of ["Info.txt", "demo.png"] as const) {
+      const bytes = source.getBytes(`${theme}/skin/${name}`) ?? source.getBytes(name)
+      if (bytes) output.set(`${theme}/skin/${name}`, bytes)
+    }
     for (const orientation of ["port", "land"] as const) {
       const appearancePath = bdaAppearancePath(source, theme, orientation)
       const appearanceBytes = appearancePath && source.getBytes(appearancePath)

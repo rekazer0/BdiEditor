@@ -26,6 +26,17 @@ type NineSliceCanvas = Pick<HTMLCanvasElement, "width" | "height" | "getContext"
 
 let nineSliceBuffer: HTMLCanvasElement | undefined
 
+export function setCanvasSize(
+  canvas: Pick<HTMLCanvasElement, "width" | "height">,
+  width: number,
+  height: number,
+): boolean {
+  if (canvas.width === width && canvas.height === height) return false
+  canvas.width = width
+  canvas.height = height
+  return true
+}
+
 function sharedNineSliceBuffer(): HTMLCanvasElement {
   nineSliceBuffer ??= document.createElement("canvas")
   return nineSliceBuffer
@@ -170,6 +181,95 @@ type LegacyAnimationEffect = {
 }
 
 export type LegacyAnimation = Map<string, LegacyAnimationEffect>
+
+export type LegacyHintIcon = {
+  backStyle: string
+  foreStyle: string
+  size: readonly [number, number]
+  position: readonly [number, number]
+  padding: readonly [number, number, number, number]
+}
+
+export type LegacyHint = {
+  icons: Map<string, LegacyHintIcon>
+  upIcon?: string
+  holdIcon?: string
+  barIcon?: string
+  cellStyle?: string
+}
+
+function fixedNumberTuple(value: string | undefined, length: number): number[] | undefined {
+  const parts = value?.split(",").map((part) => Number(part.trim()))
+  return parts?.length === length && parts.every(Number.isFinite) ? parts : undefined
+}
+
+export function parseLegacyHint(document: IniDocument | undefined): LegacyHint | undefined {
+  if (!document) return
+  const icons = new Map<string, LegacyHintIcon>()
+  for (const section of document.sections()) {
+    const id = section.match(/^ICON(.+)$/i)?.[1]
+    if (!id) continue
+    const size = fixedNumberTuple(document.get(section, "SIZE"), 2)
+    if (!size || size[0] <= 0 || size[1] <= 0) continue
+    const position = fixedNumberTuple(document.get(section, "POS"), 2) ?? [0, 0]
+    const padding = fixedNumberTuple(document.get(section, "PADDING"), 4) ?? [0, 0, 0, 0]
+    icons.set(id, {
+      backStyle: document.get(section, "BACK_STYLE") ?? "",
+      foreStyle: document.get(section, "FORE_STYLE") ?? "",
+      size: size as [number, number],
+      position: position as [number, number],
+      padding: padding as [number, number, number, number],
+    })
+  }
+  if (!icons.size) return
+  return {
+    icons,
+    upIcon: document.get("DRAW", "ICON_UP"),
+    holdIcon: document.get("HINT", "BACK_ICON"),
+    barIcon: document.get("BAR", "BACK_ICON"),
+    cellStyle: document.get("BAR", "CELL_STYLE"),
+  }
+}
+
+export function legacyHintIconID(
+  hint: LegacyHint | undefined,
+  direction: "center" | "up" | "down" | "left" | "right" | "hold",
+): string | undefined {
+  if (!hint) return
+  if (direction === "hold") return hint.holdIcon
+  return direction === "up" ? hint.upIcon : undefined
+}
+
+export function legacyHintText(
+  key: Pick<PreviewItem, "up" | "down" | "left" | "right" | "center" | "hold" | "holdSymbols">,
+  direction: "center" | "up" | "down" | "left" | "right" | "hold",
+): string {
+  if (direction === "hold") {
+    return key.holdSymbols.split(/[,|]/).map((value) => value.trim()).join("") ||
+      (/^F\d+$/i.test(key.hold) ? "" : key.hold)
+  }
+  return direction === "up" && !/^F\d+$/i.test(key.up) ? key.up : ""
+}
+
+export function legacyHintCandidates(
+  key: Pick<PreviewItem, "up" | "down" | "left" | "right" | "center" | "hold" | "holdSymbols">,
+  direction: "up" | "hold",
+  bda = false,
+): string[] {
+  if (bda && direction === "hold" && !key.holdSymbols && !key.hold) {
+    const letters = [key.left, key.center, key.right]
+      .filter((value) => /^[a-z]$/i.test(value))
+    return letters.length > 1 && /^\d$/.test(key.up)
+      ? [...new Set([...letters.map((value) => value.toLowerCase()), key.up, ...letters.map((value) => value.toUpperCase())])]
+      : [...new Set([key.center.toUpperCase(), key.up, key.center].filter((value) => value && !/^F\d+$/i.test(value)))]
+  }
+  const values = direction === "up"
+    ? [key.up, key.left, key.center, key.right, key.down]
+    : key.holdSymbols.includes(",") || key.holdSymbols.includes("|")
+      ? key.holdSymbols.split(/[,|]/).map((value) => value.trim())
+      : [...key.holdSymbols || key.hold]
+  return [...new Set(values.filter((value) => value && !/^F\d+$/i.test(value)))]
+}
 
 function animationEasing(type: number, progress: number): number {
   if (type === 1) return progress * progress
@@ -907,7 +1007,11 @@ function itemFromSection(document: IniDocument, section: string): PreviewItem | 
   const rect = parseRect(document.get(section, "VIEW_RECT"))
   if (!rect) return
   const value = (name: string) => document.get(section, name) ?? ""
-  const foreStyles = value("FORE_STYLE").split(",").map((token) => token.trim()).filter(Boolean)
+  // CAND.FORE_STYLE styles runtime candidate words; it is not a static
+  // foreground for the whole candidate bar.
+  const foreStyles = section === "CAND"
+    ? []
+    : value("FORE_STYLE").split(",").map((token) => token.trim()).filter(Boolean)
   const center = value("CENTER")
   const down = value("DOWN") || center
   return {
@@ -1047,7 +1151,9 @@ export function previewItems(
   defaults?: IniDocument,
   persistentOnly = false,
 ): PreviewItem[] {
-  const list = persistentOnly ? [] : listItems(document, defaults)
+  const list = persistentOnly || !document.sections().includes("LIST")
+    ? []
+    : listItems(document, defaults)
   const real = document.sections().flatMap((section) => {
     if (/^TIP\d+$/i.test(section)) return []
     if (persistentOnly !== (document.get(section, "PERSIST") === "2")) return []
@@ -1066,7 +1172,11 @@ export function previewItems(
       persistentOnly !== (document.get(section, "PERSIST") === "2")
     ) return []
     const backStyle = document.get(section, "BACK_STYLE")?.split(",")[0] ?? ""
-    const foreStyles = document.get(section, "FORE_STYLE")?.split(",").map((token) => token.trim()).filter(Boolean) ?? []
+    // CAND.FORE_STYLE styles runtime candidate words; it is not a static
+    // foreground for the whole candidate bar.
+    const foreStyles = section === "CAND"
+      ? []
+      : document.get(section, "FORE_STYLE")?.split(",").map((token) => token.trim()).filter(Boolean) ?? []
     const foreStyle = foreStyles[0] ?? ""
     if (section !== "CAND" && (!document.get(section, "SIZE") || (!backStyle && !foreStyle))) return []
     const size = document.get(section, "SIZE")?.split(",").map(Number)
@@ -1149,6 +1259,7 @@ export class Preview {
   private readonly onSelect: (sections: string[]) => void
   private readonly onMove: (sections: string[], deltaX: number, deltaY: number) => void
   private readonly toolbarSlots: boolean
+  private readonly hintCanvas?: HTMLCanvasElement
   private document?: IniDocument
   private defaults?: IniDocument
   private offsets?: IniDocument
@@ -1161,6 +1272,7 @@ export class Preview {
   private keys: PreviewItem[] = []
   private mode: "edit" | "preview" = "edit"
   private editTool: "select" | "move" = "select"
+  private pointerInteractionLocked = false
   private editDrag?: {
     pointerId: number
     startX: number
@@ -1187,6 +1299,7 @@ export class Preview {
     startedAt: number
     clearOnHold: boolean
     holdTriggered: boolean
+    direction: "center" | "up" | "down" | "left" | "right" | "hold"
     holdTimer?: number
   }
   private selected = new Set<string>()
@@ -1202,6 +1315,9 @@ export class Preview {
   private bdaAnimationState?: { key: PreviewItem; startedAt: number }
   private bdaAnimationTimer?: number
   private legacyAnimation?: LegacyAnimation
+  private shortHint?: LegacyHint
+  private longHint?: LegacyHint
+  private bdaHints = false
   private legacyAnimationState?: { key: PreviewItem; startedAt: number }
   private legacyAnimationTimer?: number
   private particlePreview?: LegacyParticleEmitter
@@ -1210,6 +1326,10 @@ export class Preview {
   private legacyPanelAnimationTimer?: number
   private drawID = 0
   private drawQueued = false
+  private renderPending = false
+  private renderAgain = false
+  private hintVisible = false
+  private dragDrawFrame = 0
   private readonly resizeObserver: ResizeObserver
 
   constructor(
@@ -1218,17 +1338,20 @@ export class Preview {
     onSelect: (sections: string[]) => void,
     toolbarSlots = false,
     onMove: (sections: string[], deltaX: number, deltaY: number) => void = () => {},
+    hintCanvas?: HTMLCanvasElement,
   ) {
     this.canvas = canvas
     this.onEvent = onEvent
     this.onSelect = onSelect
     this.onMove = onMove
     this.toolbarSlots = toolbarSlots
+    this.hintCanvas = hintCanvas
     canvas.addEventListener("pointerdown", (event) => this.pointerDown(event))
     canvas.addEventListener("pointermove", (event) => this.pointerMove(event))
     canvas.addEventListener("pointerup", (event) => this.pointerUp(event))
     canvas.addEventListener("contextmenu", (event) => event.preventDefault())
     canvas.addEventListener("pointercancel", () => {
+      this.cancelDragDraw()
       if (this.active?.holdTimer !== undefined) window.clearTimeout(this.active.holdTimer)
       this.active = undefined
       this.cancelEditTouch()
@@ -1241,6 +1364,7 @@ export class Preview {
   }
 
   setMode(mode: "edit" | "preview"): void {
+    this.cancelDragDraw()
     this.mode = mode
     this.mobileMultiSelect = false
     if (this.active?.holdTimer !== undefined) window.clearTimeout(this.active.holdTimer)
@@ -1252,6 +1376,7 @@ export class Preview {
   }
 
   cancelPointerInteraction(): void {
+    this.cancelDragDraw()
     if (this.active?.holdTimer !== undefined) window.clearTimeout(this.active.holdTimer)
     this.active = undefined
     this.cancelEditTouch()
@@ -1260,7 +1385,13 @@ export class Preview {
     void this.draw()
   }
 
+  setPointerInteractionLocked(locked: boolean): void {
+    this.pointerInteractionLocked = locked
+    if (locked) this.cancelPointerInteraction()
+  }
+
   setEditTool(tool: "select" | "move"): void {
+    this.cancelDragDraw()
     this.editTool = tool
     this.cancelEditTouch()
     this.cancelEditDrag()
@@ -1356,6 +1487,13 @@ export class Preview {
     this.legacyAnimationState = undefined
     if (this.legacyAnimationTimer) window.cancelAnimationFrame(this.legacyAnimationTimer)
     this.restartLegacyPanelAnimation()
+    void this.draw()
+  }
+
+  setLegacyHints(shortHint?: LegacyHint, longHint?: LegacyHint, bda = false): void {
+    this.shortHint = shortHint
+    this.longHint = longHint
+    this.bdaHints = bda
     void this.draw()
   }
 
@@ -1467,6 +1605,7 @@ export class Preview {
   }
 
   private pointerDown(event: PointerEvent): void {
+    if (this.pointerInteractionLocked) return
     const point = this.point(event)
     const key = this.hit(point)
     if (!key) {
@@ -1534,13 +1673,18 @@ export class Preview {
       startedAt: Date.now(),
       clearOnHold: key.center.trim() === "F36",
       holdTriggered: false,
+      direction: "center",
     }
-    if (this.active.clearOnHold) {
+    if (this.active.clearOnHold || key.hold || key.holdSymbols || this.bdaHints) {
       const active = this.active
       active.holdTimer = window.setTimeout(() => {
         if (this.active !== active) return
-        active.holdTriggered = true
-        this.onEvent({ section: key.section, direction: "hold", code: "F48" })
+        active.direction = "hold"
+        if (active.clearOnHold) {
+          active.holdTriggered = true
+          this.onEvent({ section: key.section, direction: "hold", code: "F48" })
+        }
+        void this.draw()
       }, 450)
     }
     void this.playAnimation(key)
@@ -1575,6 +1719,16 @@ export class Preview {
   private pointerMove(event: PointerEvent): void {
     if (this.active && event.pointerId === this.active.pointerId) {
       const point = this.point(event)
+      const direction = gestureDirection(
+        point.x - this.active.startX,
+        point.y - this.active.startY,
+        Date.now() - this.active.startedAt,
+        Boolean(this.active.key.hold || this.active.key.holdSymbols) || this.active.clearOnHold || this.bdaHints,
+      )
+      if (direction !== this.active.direction) {
+        this.active.direction = direction
+        void this.draw()
+      }
       if (Math.max(
         Math.abs(point.x - this.active.startX),
         Math.abs(point.y - this.active.startY),
@@ -1597,7 +1751,7 @@ export class Preview {
       const original = this.editDrag.original.get(key.section)
       if (original) key.rect = { ...original, x: original.x + dx, y: original.y + dy }
     }
-    void this.draw()
+    this.scheduleDragDraw()
   }
 
   private async playAnimation(key: PreviewItem): Promise<void> {
@@ -1713,6 +1867,7 @@ export class Preview {
       const drag = this.editDrag
       const point = this.point(event)
       const { x: dx, y: dy } = this.dragDelta(point)
+      this.cancelDragDraw()
       this.editDrag = undefined
       this.updateCursor()
       if (dx || dy) {
@@ -1738,7 +1893,7 @@ export class Preview {
       dx,
       dy,
       Date.now() - startedAt,
-      Boolean(key.hold || key.holdSymbols) || clearOnHold,
+      Boolean(key.hold || key.holdSymbols) || clearOnHold || this.bdaHints,
     )
     const code = direction === "hold" && clearOnHold ? "F48" : key[direction]
     this.onEvent({
@@ -1757,6 +1912,7 @@ export class Preview {
   }
 
   private cancelEditDrag(): void {
+    this.cancelDragDraw()
     if (!this.editDrag) return
     for (const key of this.keys) {
       const original = this.editDrag.original.get(key.section)
@@ -1772,6 +1928,20 @@ export class Preview {
 
   private updateCursor(): void {
     this.canvas.style.cursor = this.mode === "preview" ? "pointer" : this.editTool === "move" ? "grab" : "default"
+  }
+
+  private scheduleDragDraw(): void {
+    if (this.dragDrawFrame) return
+    this.dragDrawFrame = window.requestAnimationFrame(() => {
+      this.dragDrawFrame = 0
+      if (this.editDrag) void this.draw()
+    })
+  }
+
+  private cancelDragDraw(): void {
+    if (!this.dragDrawFrame) return
+    window.cancelAnimationFrame(this.dragDrawFrame)
+    this.dragDrawFrame = 0
   }
 
   private fitCanvas(): void {
@@ -1795,9 +1965,7 @@ export class Preview {
     const ratio = devicePixelRatio || 1
     const width = Math.max(1, Math.round(bounds.width * ratio))
     const height = Math.max(1, Math.round(bounds.height * ratio))
-    if (this.canvas.width === width && this.canvas.height === height) return
-    this.canvas.width = width
-    this.canvas.height = height
+    if (!setCanvasSize(this.canvas, width, height)) return
     void this.draw()
   }
 
@@ -1947,11 +2115,30 @@ export class Preview {
   }
 
   private draw(): void {
+    if (this.renderPending) {
+      this.renderAgain = true
+      return
+    }
     if (this.drawQueued) return
     this.drawQueued = true
     queueMicrotask(() => {
       this.drawQueued = false
-      void this.render()
+      if (this.renderPending) {
+        this.renderAgain = true
+        return
+      }
+      this.startRender()
+    })
+  }
+
+  private startRender(): void {
+    this.renderPending = true
+    void this.render().finally(() => {
+      this.renderPending = false
+      if (this.renderAgain) {
+        this.renderAgain = false
+        this.startRender()
+      }
     })
   }
 
@@ -1986,11 +2173,21 @@ export class Preview {
       : []
     const allParticleFrames = [...particleFrames, ...bdaParticleFrames]
     const particleStyleIDs = [...new Set(allParticleFrames.map((frame) => frame.styleID))]
+    const hintDirection = this.active?.direction ?? "center"
+    const hintConfig = hintDirection === "hold" ? this.longHint ?? this.shortHint : this.shortHint
+    const hintCandidates = this.active && (
+      hintDirection === "hold" || hintDirection === "up" && hintConfig?.upIcon
+    )
+      ? legacyHintCandidates(this.active.key, hintDirection, this.bdaHints)
+      : []
+    const hintBar = hintCandidates.length > 1 && Boolean(hintConfig?.barIcon)
+    const hintIconID = hintBar ? hintConfig?.barIcon : legacyHintIconID(hintConfig, hintDirection)
+    const hintIcon = hintIconID ? hintConfig?.icons.get(hintIconID) : undefined
     const keys = previewDrawOrder(visiblePreviewItems(this.keys, this.skinState)
       .map((key) =>
         this.document ? effectivePreviewItem(this.document, key, this.skinState ?? 0) : key,
       ), this.panelWidth, this.panelHeight, this.legacyAnimationState?.key.section)
-    const [panel, visuals, toolbarImages, particleVisuals] = await Promise.all([
+    const [panel, visuals, toolbarImages, particleVisuals, hintVisuals, hintTextVisual, hintSelectedTextVisual, hintCellVisuals] = await Promise.all([
       this.resolver?.resolve(this.panelStyle, false),
       Promise.all(keys.map(async (key) => {
         const highlighted = this.active?.key.section === key.section ||
@@ -2015,6 +2212,20 @@ export class Preview {
       Promise.all(particleStyleIDs.map(async (styleID) =>
         await this.resolver?.resolveResource?.(styleID) ?? this.resolver?.resolve(styleID, false)
       )),
+      hintIcon
+        ? Promise.all([
+            this.resolver?.resolve(hintIcon.backStyle, false),
+            this.resolver?.resolve(hintIcon.foreStyle, false),
+          ])
+        : Promise.resolve([undefined, undefined]),
+      hintIcon ? this.resolver?.resolveText(hintIcon.foreStyle, false) : undefined,
+      hintIcon ? this.resolver?.resolveText(hintIcon.foreStyle, true) : undefined,
+      hintBar && hintConfig?.cellStyle
+        ? Promise.all([
+            this.resolver?.resolve(hintConfig.cellStyle, false),
+            this.resolver?.resolve(hintConfig.cellStyle, true),
+          ])
+        : Promise.resolve([undefined, undefined]),
     ])
     if (drawID !== this.drawID) return
     const context = this.canvas.getContext("2d")
@@ -2151,6 +2362,73 @@ export class Preview {
         })
       }
 
+    }
+
+    const shouldDrawHint = Boolean(this.active && hintIcon)
+    let hintContext = context
+    if (this.hintCanvas && (shouldDrawHint || this.hintVisible)) {
+      const overlayBounds = this.hintCanvas.getBoundingClientRect()
+      const previewBounds = this.canvas.getBoundingClientRect()
+      const scale = globalThis.devicePixelRatio || 1
+      setCanvasSize(
+        this.hintCanvas,
+        Math.max(1, Math.round(overlayBounds.width * scale)),
+        Math.max(1, Math.round(overlayBounds.height * scale)),
+      )
+      const overlayContext = this.hintCanvas.getContext("2d")
+      if (overlayContext) {
+        overlayContext.setTransform(scale, 0, 0, scale, 0, 0)
+        overlayContext.clearRect(0, 0, overlayBounds.width, overlayBounds.height)
+        overlayContext.translate(previewBounds.left - overlayBounds.left, previewBounds.top - overlayBounds.top)
+        overlayContext.scale(previewBounds.width / this.panelWidth, previewBounds.height / this.panelHeight)
+        overlayContext.imageSmoothingEnabled = true
+        overlayContext.imageSmoothingQuality = "high"
+        hintContext = overlayContext
+      }
+    }
+
+    if (shouldDrawHint && this.active && hintIcon) {
+      this.hintVisible = true
+      const [baseWidth, height] = hintIcon.size
+      const [offsetX, offsetY] = hintIcon.position
+      const key = this.active.key
+      const [left, top, right, bottom] = hintIcon.padding
+      const cellWidth = this.bdaHints ? this.panelWidth / 14 : this.panelWidth / 24
+      const width = hintBar ? Math.max(baseWidth, left + right + hintCandidates.length * cellWidth) : baseWidth
+      const x = Math.max(0, Math.min(this.panelWidth - width, key.rect.x + (key.rect.width - width) / 2 + offsetX))
+      const bdaNineKeyBar = this.bdaHints && hintDirection === "hold" && /^\d$/.test(key.up) && hintCandidates.length > 3
+      const rect = { x, y: bdaNineKeyBar ? -height + offsetY : key.rect.y - height + offsetY, width, height }
+      this.drawVisual(hintContext, hintVisuals[0], rect, true)
+      this.drawVisual(hintContext, phoneForegroundVisual(hintVisuals[1]), rect, false)
+      if (hintBar) {
+        const selected = hintDirection === "up"
+          ? 0
+          : this.bdaHints && /^\d$/.test(key.up) && hintCandidates.includes(key.up)
+            ? hintCandidates.indexOf(key.up)
+            : Math.max(0, hintCandidates.lastIndexOf(key.center))
+        const cellHeight = height - top - bottom
+        hintCandidates.forEach((action, index) => {
+          const cell = { x: rect.x + left + index * cellWidth, y: rect.y + top, width: cellWidth, height: cellHeight }
+          this.drawVisual(hintContext, hintCellVisuals[index === selected ? 1 : 0], cell, true)
+          const text = index === selected ? hintSelectedTextVisual ?? hintTextVisual : hintTextVisual
+          hintContext.fillStyle = text?.color ?? (this.theme === "dark" ? "#f5f5f7" : "#17191c")
+          hintContext.font = `${text?.fontWeight ? `${text.fontWeight} ` : ""}${text?.fontSize ?? Math.max(18, Math.min(42, height * 0.25))}px ${canvasFontFamily(text?.fontName)}`
+          hintContext.textAlign = "center"
+          hintContext.textBaseline = "middle"
+          hintContext.fillText(action, cell.x + cell.width / 2, cell.y + cell.height / 2)
+        })
+      } else {
+        const action = legacyHintText(key, hintDirection)
+        if (action) {
+          hintContext.fillStyle = hintTextVisual?.color ?? (this.theme === "dark" ? "#f5f5f7" : "#17191c")
+          hintContext.font = `${hintTextVisual?.fontWeight ? `${hintTextVisual.fontWeight} ` : ""}${hintTextVisual?.fontSize ?? Math.max(18, Math.min(42, height * 0.25))}px ${canvasFontFamily(hintTextVisual?.fontName)}`
+          hintContext.textAlign = "center"
+          hintContext.textBaseline = "middle"
+          hintContext.fillText(action, rect.x + left + (width - left - right) / 2, rect.y + top + (height - top - bottom) / 2)
+        }
+      }
+    } else {
+      this.hintVisible = false
     }
 
     const particleVisualByStyle = new Map(

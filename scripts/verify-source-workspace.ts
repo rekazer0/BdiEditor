@@ -172,6 +172,12 @@ assert.match(androidShare, /archivePaths\.add\(archivePath\)/, "Android 源码�
 assert.match(androidShare, /readSourceWorkspaceArchive[\s\S]+sourceArchive\(directory\(args\.uri\)\)/, "Android 打开源码应返回原生构建的 ZIP")
 assert.match(nativeShare, /read_source_workspace_archive[\s\S]+Result<String, String>/, "原生插件应把紧凑源码包作为字符串转发")
 assert.match(tauri, /open_source_workspace_archive[\s\S]+read_source_workspace_archive/, "Android 打开源码应直接转发紧凑源码包")
+assert.match(
+  main,
+  /async function readNativeSkinFile[\s\S]+skin_file_size[\s\S]+showSkinLoadProgress[\s\S]+waitForInterfacePaint[\s\S]+read_skin_file/,
+  "原生皮肤读取前应先按文件大小显示并绘制进度弹窗",
+)
+assert.match(tauri, /fn skin_file_size[\s\S]+fs::metadata/, "原生端应能在读取皮肤前返回文件大小")
 assert.match(main, /decodeBase64Archive/, "前端应直接解码原生源码包")
 assert.match(main, /open_source_workspace_archive/, "Android 前端应调用紧凑源码包命令")
 assert.doesNotMatch(main, /Array\.from\(file\.data\)/, "完整源码工作区不应把每个字节展开成 JSON 数字")

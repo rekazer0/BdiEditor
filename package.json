@@ -1,13 +1,13 @@
 {
   "name": "bdi-edit",
   "private": true,
-  "version": "1.6.59",
+  "version": "1.7.69",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/verify-bundle-size.mjs",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && npm run verify:samples -- public/default-template.bds && npm run verify:layers && npm run verify:states && npm run verify:layout && npm run verify:actions && npm run verify:preview-lists && npm run verify:candidate-style && npm run verify:inspector-groups && npm run verify:particle-inspector && npm run verify:mobile-share && npm run verify:sources && npm run verify:source-editor && npm run verify:bda-import && npm run verify:bda-editor && npm run verify:bda-overview && npm run verify:bda-official-parser && npm run verify:bda-official-preview && npm run verify:logging && npm run verify:safe-area && npm run verify:mixed-coordinate && npm run verify:preview-slicing && npm run verify:panel-copy && npm run verify:unsaved",
+    "verify": "npm run typecheck && npm run verify:samples -- public/default-template.bds && npm run verify:bda-platform && npm run verify:layers && npm run verify:states && npm run verify:layout && npm run verify:actions && npm run verify:preview-lists && npm run verify:candidate-style && npm run verify:inspector-groups && npm run verify:particle-inspector && npm run verify:mobile-share && npm run verify:sources && npm run verify:source-editor && npm run verify:bda-import && npm run verify:bda-editor && npm run verify:bda-overview && npm run verify:bda-official-parser && npm run verify:bda-official-preview && npm run verify:logging && npm run verify:safe-area && npm run verify:mixed-coordinate && npm run verify:preview-slicing && npm run verify:panel-copy && npm run verify:unsaved",
     "deploy:cloudbase": "tcb app deploy",
     "version:feature": "node scripts/bump-version.mjs feature",
     "version:bugfix": "node scripts/bump-version.mjs bugfix",
@@ -25,6 +25,7 @@
     "verify:source-editor": "node scripts/verify-source-editor.ts",
     "verify:source-editor:browser": "node scripts/verify-source-editor-browser.mjs",
     "verify:bda-import": "node scripts/verify-bda-import.ts",
+    "verify:bda-platform": "node scripts/verify-bda-platform.ts",
     "verify:bda-editor": "node scripts/verify-bda-editor.ts",
     "verify:bda-overview": "node scripts/verify-bda-overview-groups.ts",
     "verify:bda-official-parser": "node scripts/verify-bda-official-parser.ts",

@@ -1,4 +1,4 @@
-import { strFromU8, strToU8, unzipSync, zipSync } from "fflate"
+import { strFromU8, strToU8, Unzip, UnzipInflate, unzip, unzipSync, zipSync } from "fflate"
 import type { ExportFormat } from "./export.ts"
 
 const TEXT_EXTENSIONS = new Set(["ini", "css", "til", "cnd", "pop", "txt", "plist"])
@@ -57,7 +57,7 @@ function parseZip(bytes: Uint8Array): { entries: ZipEntry[]; end: Uint8Array } {
     const extraLength = data.getUint16(offset + 30, true)
     const commentLength = data.getUint16(offset + 32, true)
     const length = 46 + nameLength + extraLength + commentLength
-    const central = bytes.slice(offset, offset + length)
+    const central = bytes.subarray(offset, offset + length)
     partial.push({
       name: decoder.decode(bytes.subarray(offset + 46, offset + 46 + nameLength)),
       central,
@@ -78,9 +78,9 @@ function parseZip(bytes: Uint8Array): { entries: ZipEntry[]; end: Uint8Array } {
       if (data.getUint32(localOffset, true) !== LOCAL_SIGNATURE) {
         throw new Error(`无效的 ZIP 本地条目：${entry.name}`)
       }
-      return { ...entry, local: bytes.slice(localOffset, localEnds.get(entry.name)) }
+      return { ...entry, local: bytes.subarray(localOffset, localEnds.get(entry.name)) }
     }),
-    end: bytes.slice(endOffset),
+    end: bytes.subarray(endOffset),
   }
 }
 
@@ -169,6 +169,72 @@ function validateArchiveLimits(bytes: Uint8Array): void {
     if (total > MAX_UNPACKED_BYTES) throw new Error("皮肤解压后超过 256 MB")
     offset += length
   }
+}
+
+async function unzipWithProgress(
+  bytes: Uint8Array,
+  onProgress: (value: number) => void,
+): Promise<Record<string, Uint8Array>> {
+  const expected = view(bytes).getUint16(findEnd(bytes) + 10, true)
+  const files: Record<string, Uint8Array> = {}
+  let completed = 0
+  let inputProgress = 0
+  let inputDone = false
+  let settled = false
+  let resolveResult!: (files: Record<string, Uint8Array>) => void
+  let rejectResult!: (error: unknown) => void
+  const result = new Promise<Record<string, Uint8Array>>((resolve, reject) => {
+    resolveResult = resolve
+    rejectResult = reject
+  })
+  const finish = () => {
+    onProgress(inputProgress * 0.7 + (expected ? completed / expected : 1) * 0.3)
+    if (inputDone && completed === expected && !settled) {
+      settled = true
+      resolveResult(files)
+    }
+  }
+  const unzipper = new Unzip((file) => {
+    const chunks: Uint8Array[] = []
+    let length = 0
+    file.ondata = (error, chunk, final) => {
+      if (settled) return
+      if (error) {
+        settled = true
+        rejectResult(error)
+        return
+      }
+      chunks.push(chunk)
+      length += chunk.length
+      if (!final) return
+      const data = new Uint8Array(length)
+      let offset = 0
+      for (const part of chunks) {
+        data.set(part, offset)
+        offset += part.length
+      }
+      files[file.name] = data
+      completed++
+      finish()
+    }
+    file.start()
+  })
+  unzipper.register(UnzipInflate)
+  const chunkSize = 256 * 1024
+  try {
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+      const end = Math.min(bytes.length, offset + chunkSize)
+      unzipper.push(bytes.subarray(offset, end), end === bytes.length)
+      inputProgress = end / bytes.length
+      inputDone = end === bytes.length
+      finish()
+      if (!inputDone) await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    }
+  } catch (error) {
+    settled = true
+    rejectResult(error)
+  }
+  return result
 }
 
 function bdaThemeRoots(files: Map<string, Uint8Array>): Map<BdaTheme, string> | undefined {
@@ -316,6 +382,7 @@ export class SkinArchive {
   private layout: PackageLayout
   private bdaRoots?: Map<BdaTheme, string>
   private canonicalToRaw = new Map<string, string>()
+  private cachedNames?: string[]
   private changedRaw = new Set<string>()
   readonly changed = new Set<string>()
 
@@ -364,18 +431,58 @@ export class SkinArchive {
     return new SkinArchive(files, bytes, formatHint)
   }
 
+  static async openAsync(
+    bytes: Uint8Array,
+    formatHint?: ExportFormat,
+    onProgress?: (value: number) => void,
+  ): Promise<SkinArchive> {
+    validateArchiveLimits(bytes)
+    const unpacked = onProgress
+      ? await unzipWithProgress(bytes, (value) => onProgress(value * 0.85))
+      : await new Promise<Record<string, Uint8Array>>((resolve, reject) => {
+        unzip(bytes, (error, files) => error ? reject(error) : resolve(files))
+      })
+    const names = Object.keys(unpacked)
+    if (names.length > MAX_FILES) throw new Error(`皮肤包含过多文件（${names.length}）`)
+
+    let total = 0
+    const files = new Map<string, Uint8Array>()
+    for (const [index, name] of names.entries()) {
+      if (!safePath(name)) throw new Error(`皮肤包含不安全路径：${name}`)
+      total += unpacked[name].byteLength
+      if (total > MAX_UNPACKED_BYTES) throw new Error("皮肤解压后超过 256 MB")
+      files.set(name, unpacked[name])
+      if (onProgress && ((index + 1) % 50 === 0 || index + 1 === names.length)) {
+        onProgress(0.85 + (index + 1) / names.length * 0.1)
+        await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      }
+    }
+    const archive = new SkinArchive(files, bytes, formatHint)
+    onProgress?.(1)
+    return archive
+  }
+
   static fromSourceFiles(files: Array<{ path: string; data: Uint8Array }>): SkinArchive {
     return SkinArchive.open(zipSync(Object.fromEntries(files.map((file) => [file.path, file.data])), { level: 0 }))
   }
 
   names(): string[] {
-    return [...this.canonicalToRaw.keys()].sort()
+    this.cachedNames ??= [...this.canonicalToRaw.keys()].sort()
+    return this.cachedNames.slice()
   }
 
   sourceFiles(): Array<{ path: string; data: Uint8Array }> {
     return [...this.files.entries()]
       .filter(([path]) => !path.endsWith("/"))
       .map(([path, data]) => ({ path, data: data.slice() }))
+  }
+
+  zipEncryptedPaths(): string[] {
+    return this.sourceZip?.entries.filter((entry) => view(entry.central).getUint16(8, true) & 1).map((entry) => entry.name) ?? []
+  }
+
+  normalizedBytes(): Uint8Array {
+    return zipSync(Object.fromEntries(this.files), { level: 6 })
   }
 
   sourcePath(path: string): string {
@@ -423,8 +530,10 @@ export class SkinArchive {
     if (current && current.length === bytes.length && current.every((byte, index) => byte === bytes[index])) {
       return
     }
+    const isNewPath = !this.canonicalToRaw.has(path)
     this.files.set(raw, bytes)
     this.canonicalToRaw.set(path, raw)
+    if (isNewPath) this.cachedNames = undefined
     const original = this.originals.get(raw)
     if (original && original.length === bytes.length && original.every((byte, index) => byte === bytes[index])) {
       this.changed.delete(path)
@@ -440,6 +549,7 @@ export class SkinArchive {
     if (!raw) return
     this.files.delete(raw)
     this.canonicalToRaw.delete(path)
+    this.cachedNames = undefined
     if (this.originals.has(raw)) {
       this.changed.add(path)
     } else {
@@ -448,16 +558,24 @@ export class SkinArchive {
     this.changedRaw.delete(raw)
   }
 
-  markSaved(bytes?: Uint8Array): void {
+  markSaved(bytes?: Uint8Array, format = this.format): void {
     if (bytes) {
-      const reopened = SkinArchive.open(bytes, this.format)
-      this.files = reopened.files
-      this.originals = reopened.originals
-      this.sourceBytes = reopened.sourceBytes
-      this.sourceZip = reopened.sourceZip
-      this.layout = reopened.layout
-      this.bdaRoots = reopened.bdaRoots
-      this.canonicalToRaw = reopened.canonicalToRaw
+      if (format !== this.format || this.layout === "legacy-ios") {
+        const reopened = SkinArchive.open(bytes, format)
+        this.files = reopened.files
+        this.originals = reopened.originals
+        this.sourceBytes = reopened.sourceBytes
+        this.sourceZip = reopened.sourceZip
+        this.layout = reopened.layout
+        this.bdaRoots = reopened.bdaRoots
+        this.canonicalToRaw = reopened.canonicalToRaw
+        this.cachedNames = undefined
+      } else {
+        // The decoded files and paths do not change when saving in place.
+        this.originals = new Map(this.files)
+        this.sourceBytes = bytes.slice()
+        this.sourceZip = parseZip(bytes)
+      }
       this.changedRaw.clear()
       this.changed.clear()
       return
@@ -467,7 +585,7 @@ export class SkinArchive {
     this.changed.clear()
   }
 
-  private packagedBytes(format: ExportFormat): Uint8Array {
+  private packagedFiles(format: ExportFormat): Record<string, Uint8Array> {
     const output = new Map<string, Uint8Array>()
     const single = this.layout.endsWith("single")
     const add = (name: string, data: Uint8Array) => {
@@ -493,7 +611,23 @@ export class SkinArchive {
       add(destination, data)
     }
 
-    return zipSync(Object.fromEntries(output), { level: 6 })
+    return Object.fromEntries(output)
+  }
+
+  private packagedBytes(format: ExportFormat): Uint8Array {
+    return zipSync(this.packagedFiles(format), { level: 6 })
+  }
+
+  async toBytesAsync(format?: ExportFormat): Promise<Uint8Array> {
+    if (format && (format === "bda" || this.format === "bda") && format !== this.format) {
+      throw new Error("BDA 与 BDI/BDS 使用不同配置格式，不能转换")
+    }
+    if (this.changed.size === 0 && (!format || (format === this.format && this.layout !== "legacy-ios"))) {
+      return this.sourceBytes.slice()
+    }
+    // Avoid fflate's one-worker-per-large-file async ZIP path, which can exhaust WebView workers.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    return this.toBytes(format)
   }
 
   toBytes(format?: ExportFormat): Uint8Array {

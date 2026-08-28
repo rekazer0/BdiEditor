@@ -12,20 +12,29 @@
   --tertiary: #95959c;
   --accent: #0a7ff5;
   --search-font-size: 12px;
-  --window: rgb(255 255 255 / 64%);
-  --toolbar: rgb(255 255 255 / 44%);
-  --sidebar: rgb(238 244 250 / 36%);
-  --inspector: rgb(255 255 255 / 42%);
-  --panel: rgb(255 255 255 / 72%);
-  --menu: rgb(255 255 255 / 92%);
-  --content: rgb(245 247 249 / 32%);
+  --material-window: rgb(255 255 255 / 64%);
+  --material-toolbar: rgb(255 255 255 / 44%);
+  --material-sidebar: rgb(238 244 250 / 36%);
+  --material-inspector: rgb(255 255 255 / 42%);
+  --material-panel: rgb(255 255 255 / 72%);
+  --material-menu: rgb(255 255 255 / 92%);
+  --material-content: rgb(245 247 249 / 32%);
   --canvas: #eef1f3;
-  --control: rgb(255 255 255 / 66%);
+  --material-control: rgb(255 255 255 / 66%);
   --hover: rgb(0 0 0 / 5%);
-  --glass-surface: rgb(255 255 255 / 30%);
+  --material-glass-surface: rgb(255 255 255 / 30%);
   --glass-border: rgb(255 255 255 / 62%);
   --glass-highlight: rgb(255 255 255 / 64%);
   --glass-shadow: 0 8px 28px rgb(30 45 52 / 10%), inset 0 1px rgb(255 255 255 / 78%);
+  --window: var(--material-window);
+  --toolbar: var(--material-toolbar);
+  --sidebar: var(--material-sidebar);
+  --inspector: var(--material-inspector);
+  --panel: var(--material-panel);
+  --menu: var(--material-menu);
+  --content: var(--material-content);
+  --control: var(--material-control);
+  --glass-surface: var(--material-glass-surface);
 }
 
 :root.macos {
@@ -42,44 +51,83 @@
   --secondary: #a6a9ae;
   --tertiary: #858991;
   --accent: #3395ff;
-  --window: rgb(23 25 27 / 66%);
-  --toolbar: rgb(28 31 34 / 46%);
-  --sidebar: rgb(27 32 34 / 38%);
-  --inspector: rgb(25 28 31 / 46%);
-  --panel: rgb(36 39 42 / 76%);
-  --menu: rgb(36 39 42 / 92%);
-  --content: rgb(25 28 31 / 34%);
+  --material-window: rgb(23 25 27 / 66%);
+  --material-toolbar: rgb(28 31 34 / 46%);
+  --material-sidebar: rgb(27 32 34 / 38%);
+  --material-inspector: rgb(25 28 31 / 46%);
+  --material-panel: rgb(36 39 42 / 76%);
+  --material-menu: rgb(36 39 42 / 92%);
+  --material-content: rgb(25 28 31 / 34%);
   --canvas: #202225;
-  --control: rgb(255 255 255 / 8%);
+  --material-control: rgb(255 255 255 / 8%);
   --hover: rgb(255 255 255 / 9%);
-  --glass-surface: rgb(255 255 255 / 7%);
+  --material-glass-surface: rgb(255 255 255 / 7%);
   --glass-border: rgb(255 255 255 / 14%);
   --glass-highlight: rgb(255 255 255 / 13%);
   --glass-shadow: 0 10px 32px rgb(0 0 0 / 28%), inset 0 1px rgb(255 255 255 / 12%);
 }
 
 :root.windows[data-window-material="on"] {
-  --window: rgb(255 255 255 / 96%);
-  --toolbar: rgb(255 255 255 / 94%);
-  --sidebar: rgb(238 244 250 / 94%);
-  --inspector: rgb(255 255 255 / 95%);
-  --panel: rgb(255 255 255 / 97%);
-  --menu: rgb(255 255 255 / 98%);
-  --content: rgb(245 247 249 / 90%);
-  --control: rgb(255 255 255 / 95%);
-  --glass-surface: rgb(255 255 255 / 94%);
+  --material-window: rgb(255 255 255 / 96%);
+  --material-toolbar: rgb(255 255 255 / 94%);
+  --material-sidebar: rgb(238 244 250 / 94%);
+  --material-inspector: rgb(255 255 255 / 95%);
+  --material-panel: rgb(255 255 255 / 97%);
+  --material-menu: rgb(255 255 255 / 98%);
+  --material-content: rgb(245 247 249 / 90%);
+  --material-control: rgb(255 255 255 / 95%);
+  --material-glass-surface: rgb(255 255 255 / 94%);
 }
 
 :root.windows[data-app-theme="dark"][data-window-material="on"] {
-  --window: rgb(23 25 27 / 96%);
-  --toolbar: rgb(28 31 34 / 94%);
-  --sidebar: rgb(27 32 34 / 94%);
-  --inspector: rgb(25 28 31 / 95%);
-  --panel: rgb(36 39 42 / 97%);
-  --menu: rgb(36 39 42 / 98%);
-  --content: rgb(25 28 31 / 91%);
-  --control: rgb(52 55 59 / 95%);
-  --glass-surface: rgb(48 51 55 / 94%);
+  --material-window: rgb(23 25 27 / 96%);
+  --material-toolbar: rgb(28 31 34 / 94%);
+  --material-sidebar: rgb(27 32 34 / 94%);
+  --material-inspector: rgb(25 28 31 / 95%);
+  --material-panel: rgb(36 39 42 / 97%);
+  --material-menu: rgb(36 39 42 / 98%);
+  --material-content: rgb(25 28 31 / 91%);
+  --material-control: rgb(52 55 59 / 95%);
+  --material-glass-surface: rgb(48 51 55 / 94%);
+}
+
+:root[data-window-material-kind="glass"][data-window-material="on"] {
+  --window: rgb(255 255 255 / var(--window-material-opacity));
+  --toolbar: rgb(255 255 255 / var(--window-material-opacity));
+  --sidebar: rgb(238 244 250 / var(--window-material-opacity));
+  --inspector: rgb(255 255 255 / var(--window-material-opacity));
+  --panel: rgb(255 255 255 / var(--window-material-opacity));
+  --menu: rgb(255 255 255 / var(--window-material-opacity));
+  --content: rgb(245 247 249 / var(--window-material-opacity));
+  --control: rgb(255 255 255 / var(--window-material-opacity));
+  --glass-surface: rgb(255 255 255 / var(--window-material-opacity));
+}
+
+:root[data-app-theme="dark"][data-window-material-kind="glass"][data-window-material="on"] {
+  --window: rgb(23 25 27 / var(--window-material-opacity));
+  --toolbar: rgb(28 31 34 / var(--window-material-opacity));
+  --sidebar: rgb(27 32 34 / var(--window-material-opacity));
+  --inspector: rgb(25 28 31 / var(--window-material-opacity));
+  --panel: rgb(36 39 42 / var(--window-material-opacity));
+  --menu: rgb(36 39 42 / var(--window-material-opacity));
+  --content: rgb(25 28 31 / var(--window-material-opacity));
+  --control: rgb(52 55 59 / var(--window-material-opacity));
+  --glass-surface: rgb(48 51 55 / var(--window-material-opacity));
+}
+
+:root[data-window-material-kind="glass"][data-window-material="on"][data-window-material-opaque="true"] :is(
+  .titlebar,
+  aside,
+  .source,
+  .preview-toolbar,
+  .workspace-status,
+  .toolbar-menu,
+  .glass-module,
+  .app-dialog,
+  .project-dialog
+) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 :root[data-window-material="off"] {
@@ -1337,6 +1385,13 @@ h2 {
     #f5f5f7;
 }
 
+#hint-preview {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
 .device-shell[data-family="android"] .device-screen {
   border-radius: 28px;
 }
@@ -1751,6 +1806,12 @@ h2 {
   white-space: nowrap;
 }
 
+.device-shell:not(.canvas-only) #candidate-input {
+  position: relative;
+  inset: auto;
+  height: 100%;
+}
+
 #candidate-words {
   min-height: 0;
   grid-column: 1;
@@ -1758,7 +1819,6 @@ h2 {
   display: flex;
   align-items: center;
   gap: var(--candidate-cell-width, 0);
-  padding: var(--candidate-padding, 0);
   padding-inline-start: var(--candidate-left-padding, 0cqw);
   padding-inline-end: var(--candidate-more-width, 3.2cqw);
   overflow: hidden;
@@ -4751,6 +4811,28 @@ canvas {
   font-size: 10px;
 }
 
+.settings-range-control {
+  display: grid;
+  grid-template-columns: 112px 34px;
+  align-items: center;
+  gap: 7px;
+}
+
+.settings-range-control input {
+  width: 112px;
+  accent-color: var(--accent);
+}
+
+.settings-range-control output {
+  color: var(--secondary);
+  font-size: 10px;
+  text-align: right;
+}
+
+.settings-range-control input:disabled {
+  opacity: 0.45;
+}
+
 .settings-path-control {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 30px 30px;
@@ -5242,6 +5324,34 @@ canvas {
   gap: 18px;
   padding: 22px;
 }
+
+.file-operation-dialog {
+  width: min(400px, calc(100% - 32px));
+  border-radius: 8px;
+}
+
+.file-operation-dialog progress {
+  width: 100%;
+  height: 8px;
+  border: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  accent-color: var(--accent);
+}
+
+.file-operation-dialog progress::-webkit-progress-bar { background: var(--control); }
+.file-operation-dialog progress::-webkit-progress-value { background: var(--accent); }
+.file-operation-dialog[data-outcome="success"] progress::-webkit-progress-value { background: #2f9e55; }
+.file-operation-dialog[data-outcome="error"] progress::-webkit-progress-value { background: #c62828; }
+
+#file-operation-result {
+  margin: 0;
+  color: var(--secondary);
+  font-size: 13px;
+}
+
+.file-operation-dialog[data-outcome="success"] #file-operation-result { color: color-mix(in srgb, #2f9e55 75%, var(--text)); }
+.file-operation-dialog[data-outcome="error"] #file-operation-result { color: #c62828; }
 
 .panel-scale-grid {
   display: grid;

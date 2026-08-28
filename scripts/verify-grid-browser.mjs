@@ -143,6 +143,16 @@ await sleep(400)
 const editM = await page.$eval('input[data-key-field="CENTER"]', (el) => el.value)
 console.log("edit m CENTER", JSON.stringify(editM))
 
+await page.mouse.move(canvasBox.x + canvasBox.width * qx, canvasBox.y + canvasBox.height * qy)
+await page.mouse.down()
+await page.mouse.move(canvasBox.x + canvasBox.width * qx + 40, canvasBox.y + canvasBox.height * qy + 20)
+await page.mouse.up()
+await sleep(100)
+if (await page.$eval("#preview-coordinates", (el) => el.hidden)) {
+  throw new Error("crosshair disappeared while panning the preview")
+}
+await page.click("#preview-zoom-fit")
+
 await page.click('[data-mode-choice="preview"]')
 await sleep(200)
 await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2)
