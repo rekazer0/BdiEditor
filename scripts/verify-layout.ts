@@ -68,6 +68,12 @@ assert.match(
   /function finishPreviewPan\(\)[\s\S]+flushPreviewPan\(\)/,
   "拖动结束时应同步最后一个平移位置",
 )
+assert.doesNotMatch(styleSource, /app-region:\s*drag/, "窗口拖动应只由 Tauri 自定义链路启动")
+assert.match(
+  mainSource,
+  /const mouseReleased = invoke\("wait_for_left_mouse_release"\)[\s\S]+startDragging\(\)[\s\S]+await mouseReleased[\s\S]+restoreWindowMaterialAfterDrag\(\)/,
+  "Windows 窗口拖动应等待物理左键松开后恢复材质",
+)
 
 console.log("✓ 预览画布拖动逐帧合并更新，十字轴保持跟手")
 

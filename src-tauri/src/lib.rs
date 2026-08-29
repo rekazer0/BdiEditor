@@ -836,6 +836,21 @@ fn set_window_material(
 }
 
 #[tauri::command]
+async fn wait_for_left_mouse_release() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    tauri::async_runtime::spawn_blocking(|| {
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
+
+        while unsafe { GetAsyncKeyState(VK_LBUTTON.into()) } < 0 {
+            std::thread::sleep(std::time::Duration::from_millis(16));
+        }
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 async fn fetch_release_page() -> Result<String, String> {
     reqwest::Client::builder()
         .user_agent("BdiEditor update checker")
@@ -1074,6 +1089,7 @@ pub fn run() {
         quit_app,
         window_material_kind,
         set_window_material,
+        wait_for_left_mouse_release,
         fetch_release_page,
         prepare_source_directory,
         create_source_workspace,
@@ -1099,6 +1115,7 @@ pub fn run() {
         quit_app,
         window_material_kind,
         set_window_material,
+        wait_for_left_mouse_release,
         fetch_release_page,
         prepare_source_directory,
         create_source_workspace,

@@ -164,7 +164,8 @@ import {
   writePendingSourcePaths,
   type SourceWriteSnapshot,
 } from "./source-tree.ts"
-import { LazySourceCodeEditor } from "./lazy-source-editor.ts"
+import { SourceCodeEditor } from "./source-editor.ts"
+import type { SourceEditorValueRange } from "./source-editor.ts"
 import {
   SOUND_ACCEPT,
   decodeAiffPcm,
@@ -201,6 +202,41 @@ installSafeAreaLock()
 document.documentElement.classList.toggle("macos", isTauri() && navigator.userAgent.includes("Macintosh"))
 document.documentElement.classList.toggle("windows", isTauri() && navigator.userAgent.includes("Windows"))
 installNumberInputWheel()
+
+window.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0 || event.pointerType !== "mouse") return
+  for (const target of event.composedPath()) {
+    if (!(target instanceof HTMLElement)) continue
+    const style = getComputedStyle(target)
+    if (style.getPropertyValue("scrollbar-width") === "none") continue
+    const size = Number.parseFloat(style.getPropertyValue("--scrollbar-size"))
+    const rect = target.getBoundingClientRect()
+    const vertical = target.scrollHeight > target.clientHeight
+      && /auto|scroll|overlay/.test(style.overflowY)
+      && event.clientX >= rect.right - size
+      && event.clientY < rect.top + target.clientTop + target.clientHeight
+    const horizontal = target.scrollWidth > target.clientWidth
+      && /auto|scroll|overlay/.test(style.overflowX)
+      && event.clientY >= rect.bottom - size
+      && event.clientX < rect.left + target.clientLeft + target.clientWidth
+    if (!vertical && !horizontal) continue
+
+    const clientSize = vertical ? target.clientHeight : target.clientWidth
+    const scrollSize = vertical ? target.scrollHeight : target.scrollWidth
+    const scrollPosition = vertical ? target.scrollTop : target.scrollLeft
+    const pointer = vertical ? event.clientY - rect.top - target.clientTop : event.clientX - rect.left - target.clientLeft
+    const thumbSize = Math.max(24, clientSize * clientSize / scrollSize)
+    const thumbStart = scrollPosition / (scrollSize - clientSize) * (clientSize - thumbSize)
+    if (pointer >= thumbStart && pointer <= thumbStart + thumbSize) return
+
+    const position = (pointer - thumbSize / 2) / (clientSize - thumbSize) * (scrollSize - clientSize)
+    if (vertical) target.scrollTop = position
+    else target.scrollLeft = position
+    event.preventDefault()
+    event.stopPropagation()
+    return
+  }
+}, true)
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 const newButton = $("#new") as HTMLButtonElement
@@ -246,8 +282,13 @@ const windowMaterialOpacityValue = $("#window-material-opacity-value") as HTMLOu
 const sidebarViewVisible = $("#sidebar-view-visible") as HTMLInputElement
 const inspectorTabsVisible = $("#inspector-tabs-visible") as HTMLInputElement
 const inspectorGroupedDisplay = $("#inspector-grouped-display") as HTMLInputElement
+const sourceCompletionEnabled = $("#source-completion-enabled") as HTMLInputElement
+const sourceValueHintsEnabled = $("#source-value-hints-enabled") as HTMLInputElement
+const sourceLineExplanationEnabled = $("#source-line-explanation-enabled") as HTMLInputElement
 const mobilePreviewPosition = $("#mobile-preview-position") as HTMLSelectElement
 const editorCrosshair = $("#editor-crosshair") as HTMLInputElement
+const editorCoordinateSnapSetting = $("#editor-coordinate-snap-setting")
+const editorCoordinateSnap = $("#editor-coordinate-snap") as HTMLInputElement
 const settingsStorageSection = $("#settings-storage-section")
 const sourceDirectoryEnabledSetting = $("#source-directory-enabled-setting")
 const sourceDirectoryEnabled = $("#source-directory-enabled") as HTMLInputElement
@@ -261,7 +302,8 @@ const mobilePortraitQuery = matchMedia("(max-width: 760px) and (orientation: por
 const exportButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-export-format]"),
 )
-const source = new LazySourceCodeEditor($("#source"))
+const source = new SourceCodeEditor($("#source"))
+source.setValuePreviewRenderer(renderSourceValueThumbnail)
 const sourceEditor = $("#source-editor")
 const sourceSearch = $("#source-search") as HTMLInputElement
 const sourceSearchCount = $("#source-search-count")
@@ -648,6 +690,7 @@ const preview = new Preview(
     syncCandidateSelection()
     if (selectedPath !== layoutPath) selectFile(layoutPath, "overview")
     selectedKeySections = sections
+    if (!sections.length) source.collapseSelection()
     if (sections.length && mobilePortraitQuery.matches) setMobilePane("inspector")
     populateKeyInspector()
     updateSourceHighlight()
@@ -681,7 +724,7 @@ function updatePointerCoordinates(
   let y = Math.min(bounds.height - 1, Math.max(0, event.clientY - bounds.top))
   const snapPreview = canvas === previewCanvas ? preview : canvas === toolbarCanvas ? toolbarPreview : undefined
   const logicalSize = snapPreview?.logicalSize() ?? { width: canvas.width, height: canvas.height }
-  const point = editorCrosshair.checked && snapPreview
+  const point = editorCrosshair.checked && editorCoordinateSnap.checked && snapPreview
     ? snapPreview.snapPoint(
       { x: x / bounds.width * logicalSize.width, y: y / bounds.height * logicalSize.height },
       bounds,
@@ -2624,6 +2667,7 @@ previewZoomIn.addEventListener("click", () => applyPreviewZoom(previewZoom + 0.1
 canvasWrap.addEventListener("wheel", (event) => {
   if (deviceShell.hidden) return
   event.preventDefault()
+  if (previewPanLocked) return
   applyPreviewZoom(
     previewZoom + (event.deltaY < 0 ? 0.1 : -0.1),
     { x: event.clientX, y: event.clientY },
@@ -3990,11 +4034,11 @@ function hideImageWorkspace(): void {
 
 function loadVisibleSourceEditor(): void {
   if (sourceEditor.hidden) return
-  void source.load().then(() => requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
     source.requestMeasure()
     scrollSelectedSource()
     updateSourceHighlight()
-  })).catch((error) => showError(error, "加载源码编辑器"))
+  })
 }
 
 workspaceImage.addEventListener("load", clearImagePreviewError)
@@ -4049,6 +4093,8 @@ function updateInspectorView(): void {
 }
 
 const SOURCE_SEARCH_HIGHLIGHT_LIMIT = 20_000
+// ponytail: cap value decorations to keep large files responsive; raise after viewport-only ranges exist.
+const SOURCE_VALUE_HINT_LIMIT = 5_000
 
 function scheduleSourceInputHighlight(refreshInspector = false): void {
   sourceInputRefreshPending ||= refreshInspector
@@ -4065,6 +4111,52 @@ function scheduleSourceSearch(): void {
     sourceSearchTimer = undefined
     updateSourceHighlight()
   }, 80)
+}
+
+function sourceValueRanges(text: string, language: "ini" | "json"): SourceEditorValueRange[] {
+  const ranges: SourceEditorValueRange[] = []
+  const sourceColor = (value: string): string => {
+    const clean = value.replace(/^#/, "")
+    if (clean.length === 6) return `#${clean}`
+    const alpha = Number.parseInt(clean.slice(0, 2), 16) / 255
+    const red = Number.parseInt(clean.slice(2, 4), 16)
+    const green = Number.parseInt(clean.slice(4, 6), 16)
+    const blue = Number.parseInt(clean.slice(6, 8), 16)
+    return `rgba(${red}, ${green}, ${blue}, ${Number(alpha.toFixed(3))})`
+  }
+  const add = (value: string, from: number, to: number): void => {
+    if (ranges.length >= SOURCE_VALUE_HINT_LIMIT) return
+    const normalized = value.trim()
+    if (!normalized) return
+    const action = normalized.match(/^(F\d+|S\d+(?:_\d+)?)$/i)
+    const color = normalized.match(/^#?(?:[0-9a-f]{6}|[0-9a-f]{8})$/i)
+    const style = /^(?:STYLE\d+|[123]\d{6})$/i.test(normalized)
+    if (!action && !color && !style) return
+    const kind = action ? "action" : color ? "color" : "style"
+    ranges.push({
+      from, to, value: normalized, kind,
+      label: action ? actionDescription(action[1].toUpperCase()) : kind === "color" ? `颜色 ${normalized}` : `样式 ${normalized}`,
+      color: color ? sourceColor(normalized) : undefined,
+    })
+  }
+  if (language === "ini") {
+    for (const match of text.matchAll(/^[ \t]*[^=\r\n]+\s*=\s*([^;#\r\n]*)/gm)) {
+      if (ranges.length >= SOURCE_VALUE_HINT_LIMIT) break
+      const raw = match[1]
+      const value = raw.trim()
+      const offset = match.index! + match[0].lastIndexOf(raw) + (raw.length - raw.trimStart().length)
+      add(value, offset, offset + value.length)
+    }
+  } else {
+    for (const match of text.matchAll(/"(?:action|value|code|style|color|normalColor|highlightColor)"\s*:\s*(?:"([^"\\]*(?:\\.[^"\\]*)*)"|(-?\d+(?:\.\d+)?))/gi)) {
+      if (ranges.length >= SOURCE_VALUE_HINT_LIMIT) break
+      const value = match[1] ?? match[2] ?? ""
+      const full = match[0]
+      const start = match.index! + full.lastIndexOf(value)
+      add(value, start, start + value.length)
+    }
+  }
+  return ranges
 }
 
 function updateSourceHighlight(): void {
@@ -4095,6 +4187,12 @@ function updateSourceHighlight(): void {
     selectedRanges,
     searchRanges,
     activeSearchRange: activeStart === undefined ? undefined : [activeStart, activeStart + query.length],
+    valueRanges: sourceValueHintsEnabled.checked ? sourceValueRanges(source.value, bdaSource ? "json" : "ini") : [],
+  })
+  source.setFeatures({
+    completion: sourceCompletionEnabled.checked,
+    valueHints: sourceValueHintsEnabled.checked,
+    explanations: sourceLineExplanationEnabled.checked,
   })
 }
 
@@ -4434,6 +4532,60 @@ function drawVisualPreview(canvas: HTMLCanvasElement, visuals: Array<Visual | un
     drawVisualSource(context, visual, destination)
     drawVisualText(context, visual, destination)
   })
+}
+
+function renderSourceValueThumbnail(canvas: HTMLCanvasElement, range: SourceEditorValueRange): void {
+  retinaThumbnail(canvas, 48, 30)
+  const context = canvas.getContext("2d")
+  if (!context) return
+  context.clearRect(0, 0, canvas.width, canvas.height)
+  if (range.kind === "color") {
+    context.fillStyle = range.color ?? "transparent"
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    return
+  }
+  const resolver = visualResolver()
+  if (!resolver) return
+  const styleID = range.value.replace(/^STYLE/i, "")
+  void resolver.resolve(styleID, false).then((visual) => {
+    if (canvas.isConnected) drawVisualPreview(canvas, [visual], false)
+  }).catch(() => {})
+}
+
+let sourceValuePreviewRenderID = 0
+
+function openSourceValuePreview(range: SourceEditorValueRange): void {
+  clearImageSlicePicker()
+  styleImageDialog.hidden = false
+  styleImagePreview.hidden = false
+  styleImagePicker.hidden = true
+  styleImageResourceOpen.hidden = true
+  styleImageTitle.textContent = range.kind === "style"
+    ? `样式 ${range.value.replace(/^STYLE/i, "")}`
+    : `颜色 ${range.value}`
+  styleImageSubtitle.textContent = range.kind === "style" ? "正常 / 按下" : "颜色预览"
+  const renderID = ++sourceValuePreviewRenderID
+  const canvas = retinaThumbnail(styleImagePreview, 960, 260)
+  const context = canvas.getContext("2d")
+  if (!context) return
+  context.clearRect(0, 0, canvas.width, canvas.height)
+  if (range.kind === "color") {
+    context.fillStyle = range.color ?? "transparent"
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    return
+  }
+  const resolver = visualResolver()
+  if (!resolver) return
+  const styleID = range.value.replace(/^STYLE/i, "")
+  void Promise.all([false, true].map((highlighted) => resolver.resolve(styleID, highlighted).catch(() => undefined)))
+    .then((visuals) => {
+      if (renderID !== sourceValuePreviewRenderID) return
+      visuals.forEach((visual, index) => {
+        const preview = retinaThumbnail(document.createElement("canvas"), 480, 260)
+        drawVisualPreview(preview, [visual], false)
+        context.drawImage(preview, index * canvas.width / 2, 0, canvas.width / 2, canvas.height)
+      })
+    })
 }
 
 let stylePickerTarget: HTMLInputElement | undefined
@@ -7866,10 +8018,12 @@ mobilePreviewPosition.addEventListener("change", () => {
   document.documentElement.dataset.mobilePreviewPosition = mobilePreviewPosition.value
 })
 editorCrosshair.checked = localStorage.getItem("editor-crosshair") !== "off"
+editorCoordinateSnap.checked = localStorage.getItem("editor-coordinate-snap") !== "off"
 function applyEditorCrosshairSetting(): void {
   const state = editorCrosshair.checked ? "on" : "off"
   deviceShell.dataset.crosshair = state
   previewCoordinates.dataset.crosshair = state
+  editorCoordinateSnapSetting.hidden = !editorCrosshair.checked
   previewCoordinates.hidden = editorCrosshair.checked
   if (!editorCrosshair.checked) {
     for (const property of ["left", "top", "width", "height"]) previewCoordinates.style.removeProperty(property)
@@ -7879,6 +8033,9 @@ applyEditorCrosshairSetting()
 editorCrosshair.addEventListener("change", () => {
   localStorage.setItem("editor-crosshair", editorCrosshair.checked ? "on" : "off")
   applyEditorCrosshairSetting()
+})
+editorCoordinateSnap.addEventListener("change", () => {
+  localStorage.setItem("editor-coordinate-snap", editorCoordinateSnap.checked ? "on" : "off")
 })
 const systemTheme = matchMedia("(prefers-color-scheme: dark)")
 function applyAppTheme(): void {
@@ -7999,7 +8156,10 @@ async function startWindowsWindowDrag(): Promise<void> {
       await restoreWindowMaterialAfterDrag()
       return
     }
+    const mouseReleased = invoke("wait_for_left_mouse_release")
     await getCurrentWindow().startDragging()
+    await mouseReleased
+    await restoreWindowMaterialAfterDrag()
   } catch (error) {
     windowDragMaterialTransition = undefined
     await restoreWindowMaterialAfterDrag()
@@ -8024,9 +8184,6 @@ document.addEventListener("mousedown", (event) => {
   void startWindowsWindowDrag()
 }, true)
 window.addEventListener("mouseup", () => {
-  if (windowDragPointerDown) void restoreWindowMaterialAfterDrag()
-}, true)
-window.addEventListener("blur", () => {
   if (windowDragPointerDown) void restoreWindowMaterialAfterDrag()
 }, true)
 sidebarViewVisible.checked = localStorage.getItem("sidebar-view-visible") !== "off"
@@ -8056,6 +8213,25 @@ applyInspectorGroupedDisplay()
 inspectorGroupedDisplay.addEventListener("change", () => {
   localStorage.setItem("inspector-grouped-display", inspectorGroupedDisplay.checked ? "on" : "off")
   applyInspectorGroupedDisplay()
+})
+sourceCompletionEnabled.checked = false
+sourceValueHintsEnabled.checked = false
+sourceLineExplanationEnabled.checked = false
+function applySourceEditorFeatures(): void {
+  source.setFeatures({
+    completion: sourceCompletionEnabled.checked,
+    valueHints: sourceValueHintsEnabled.checked,
+    explanations: sourceLineExplanationEnabled.checked,
+  })
+  updateSourceHighlight()
+}
+for (const [input, key] of [
+  [sourceCompletionEnabled, "source-completion-enabled"],
+  [sourceValueHintsEnabled, "source-value-hints-enabled"],
+  [sourceLineExplanationEnabled, "source-line-explanation-enabled"],
+] as const) input.addEventListener("change", () => {
+  localStorage.setItem(key, input.checked ? "on" : "off")
+  applySourceEditorFeatures()
 })
 undoButton.addEventListener("click", undo)
 redoButton.addEventListener("click", redo)
@@ -8164,6 +8340,11 @@ source.addEventListener("input", () => {
   scheduleSourceInputHighlight(true)
 })
 source.addEventListener("change", commitBdaSourceEdit)
+source.addEventListener("valueclick", (event) => {
+  const detail = (event as CustomEvent<SourceEditorValueRange>).detail
+  if (!detail || detail.kind === "action") return
+  openSourceValuePreview(detail)
+})
 sourceSearch.addEventListener("input", () => {
   sourceSearchIndex = sourceSearch.value.trim() ? 0 : -1
   scheduleSourceSearch()

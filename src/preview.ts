@@ -929,6 +929,38 @@ export function previewFallbackText(
   return !hasForeground && item.section?.startsWith("LIST:") ? item.show : ""
 }
 
+function drawListText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+): void {
+  context.save()
+  context.textAlign = "center"
+  context.textBaseline = "alphabetic"
+  const metrics = context.measureText(text)
+  const values = [
+    metrics.actualBoundingBoxAscent,
+    metrics.actualBoundingBoxDescent,
+    metrics.actualBoundingBoxLeft,
+    metrics.actualBoundingBoxRight,
+  ]
+  if (
+    values.every(Number.isFinite) &&
+    metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent > 0
+  ) {
+    context.fillText(
+      text,
+      x + (metrics.actualBoundingBoxLeft - metrics.actualBoundingBoxRight) / 2,
+      y + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2,
+    )
+  } else {
+    context.textBaseline = "middle"
+    context.fillText(text, x, y)
+  }
+  context.restore()
+}
+
 export function foregroundLayerRect(
   key: Rect,
   source: [number, number, number, number] | undefined,
@@ -2398,11 +2430,10 @@ export class Preview {
           ? legacyAnimationOpacity(this.legacyAnimation, animationStyle, animationElapsed)
           : bdaFore.opacity
         this.withTransform(context, key.rect, foreScale, foreTranslation, foreRotation, foreOpacity, () => {
-          context.fillText(
-            fallbackText,
-            key.rect.x + key.rect.width / 2,
-            key.rect.y + key.rect.height / 2,
-          )
+          const centerX = key.rect.x + key.rect.width / 2
+          const centerY = key.rect.y + key.rect.height / 2
+          if (key.section.startsWith("LIST:")) drawListText(context, fallbackText, centerX, centerY)
+          else context.fillText(fallbackText, centerX, centerY)
         })
       }
 

@@ -46,7 +46,26 @@ try {
   const page = await browser.newPage()
   await page.setViewport({ width: 1280, height: 800 })
   await page.goto(origin, { waitUntil: "networkidle0" })
-  assert.equal(await page.$("#source .cm-editor"), null, "源码面板显示前不应加载 CodeMirror")
+  await page.waitForSelector("#source .cm-editor")
+
+  const scrollbar = await page.evaluate(() => {
+    const scroller = document.createElement("div")
+    scroller.id = "scrollbar-track-test"
+    scroller.style.cssText = "position:fixed;z-index:9999;top:20px;left:20px;width:120px;height:120px;overflow:scroll"
+    const content = document.createElement("div")
+    content.style.cssText = "width:1200px;height:1200px"
+    scroller.append(content)
+    document.body.append(scroller)
+    const rect = scroller.getBoundingClientRect()
+    return { bottom: rect.bottom, left: rect.left, right: rect.right, top: rect.top }
+  })
+  await page.mouse.click(scrollbar.right - 3, scrollbar.top + 90)
+  const verticalJump = await page.$eval("#scrollbar-track-test", (element) => element.scrollTop)
+  await page.mouse.click(scrollbar.left + 90, scrollbar.bottom - 3)
+  const horizontalJump = await page.$eval("#scrollbar-track-test", (element) => element.scrollLeft)
+  assert.ok(verticalJump > 500, `纵向滚动条轨道点击应直接跳转：${verticalJump}`)
+  assert.ok(horizontalJump > 500, `横向滚动条轨道点击应直接跳转：${horizontalJump}`)
+  await page.$eval("#scrollbar-track-test", (element) => element.remove())
 
   await (await page.$("#browser-open")).uploadFile(path.resolve("public/default-template.bds"))
   await page.waitForFunction(() => !document.querySelector('[data-inspector-tab="source"]')?.disabled)
@@ -112,6 +131,9 @@ try {
       searchRanges: [[last, last + 10]],
       activeSearchRange: [last, last + 10],
     })
+    editor.setSelectionRange(last, ini.length, false)
+    editor.collapseSelection()
+    const collapsedSelection = editor.view.state.selection.main.empty
     editor.revealRange(last, ini.length)
     await new Promise((resolve) => setTimeout(resolve, 100))
     const finalLines = editor.renderedLineCount
@@ -145,6 +167,7 @@ try {
     return {
       activeSearchVisible,
       changeEvents,
+      collapsedSelection,
       edited,
       finalLines,
       initialLines,
@@ -168,8 +191,9 @@ try {
   assert.ok(result.activeSearchVisible, "末尾搜索结果应在当前视口显示")
   assert.ok(result.edited && result.inputEvents === 1, "CodeMirror 编辑应更新值并发出一次 input")
   assert.equal(result.changeEvents, 1, "CodeMirror 失焦应发出一次 change 供 BDA JSON 提交")
+  assert.ok(result.collapsedSelection, "取消按键选择应折叠源码文字选区")
   assert.ok(result.readOnly, "只读模式应关闭 contenteditable")
-  console.log(`✓ CodeMirror BDS/BDI 集成与 3 万行视口验证通过（首屏 ${result.initialLines} 行，末尾 ${result.finalLines} 行，JSON ${result.jsonLines} 行，初始化 ${result.initialRenderMs.toFixed(0)}ms）`)
+  console.log(`✓ 滚动条轨道跳转及 CodeMirror BDS/BDI 集成验证通过（首屏 ${result.initialLines} 行，末尾 ${result.finalLines} 行，JSON ${result.jsonLines} 行，初始化 ${result.initialRenderMs.toFixed(0)}ms）`)
 } finally {
   await browser?.close()
   server.kill("SIGTERM")

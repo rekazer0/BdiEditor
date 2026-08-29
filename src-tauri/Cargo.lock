@@ -133,6 +133,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
  "tauri-plugin-native-share",
+ "windows-sys 0.61.2",
  "windows-version",
 ]
 

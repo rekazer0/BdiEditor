@@ -681,47 +681,51 @@
           <section class="settings-section" aria-labelledby="settings-appearance-title">
             <div class="settings-section-heading">
               <h3 id="settings-appearance-title">外观</h3>
-              <p>调整应用窗口的显示效果</p>
+              <p>应用窗口与界面显示</p>
             </div>
             <div class="settings-list">
-              <label class="settings-row"><span>软件外观</span><select id="app-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
-              <label class="settings-row settings-switch"><span>窗口玻璃与亚克力材质</span><input id="window-material" type="checkbox" role="switch" checked></label>
+              <label class="settings-row"><span>外观模式</span><select id="app-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
+              <label class="settings-row settings-switch"><span>窗口材质</span><input id="window-material" type="checkbox" role="switch" checked></label>
               <label id="window-material-opacity-setting" class="settings-row settings-range"><span id="window-material-opacity-label">玻璃不透明度</span><span class="settings-range-control"><input id="window-material-opacity" type="range" min="20" max="100" step="1" value="100" aria-labelledby="window-material-opacity-label window-material-opacity-value"><output id="window-material-opacity-value" for="window-material-opacity">100%</output></span></label>
+              <label class="settings-row settings-switch"><span>检查器分组显示</span><input id="inspector-grouped-display" type="checkbox" role="switch" checked></label>
             </div>
           </section>
 
           <section class="settings-section" aria-labelledby="settings-workspace-title">
             <div class="settings-section-heading">
               <h3 id="settings-workspace-title">工作区</h3>
-              <p>控制编辑器侧栏与源码显示</p>
+              <p>编辑器界面与源代码功能</p>
             </div>
             <div class="settings-list">
-              <label class="settings-row"><span>源代码编辑器字号</span><span class="settings-inline-control"><input id="source-font-size" type="number" min="8" max="32" step="1" value="11" inputmode="numeric" aria-describedby="source-font-size-hint"><small id="source-font-size-hint">px</small></span></label>
-              <label class="settings-row settings-switch"><span>显示概览/源文件切换</span><input id="sidebar-view-visible" type="checkbox" role="switch" checked></label>
-              <label class="settings-row settings-switch"><span>显示属性/源代码切换</span><input id="inspector-tabs-visible" type="checkbox" role="switch" checked></label>
-              <label class="settings-row settings-switch"><span>检查器侧边栏分组展示</span><input id="inspector-grouped-display" type="checkbox" role="switch" checked></label>
+              <label class="settings-row"><span>源代码字号</span><span class="settings-inline-control"><input id="source-font-size" type="number" min="8" max="32" step="1" value="11" inputmode="numeric" aria-describedby="source-font-size-hint"><small id="source-font-size-hint">px</small></span></label>
+              <label class="settings-row settings-switch" hidden><span>源代码补全</span><input id="source-completion-enabled" type="checkbox" role="switch"></label>
+              <label class="settings-row settings-switch" hidden><span>值解析与快捷编辑</span><input id="source-value-hints-enabled" type="checkbox" role="switch"></label>
+              <label class="settings-row settings-switch" hidden><span>当前行释义</span><input id="source-line-explanation-enabled" type="checkbox" role="switch"></label>
+              <label class="settings-row settings-switch"><span>概览与源文件切换</span><input id="sidebar-view-visible" type="checkbox" role="switch" checked></label>
+              <label class="settings-row settings-switch"><span>属性与源代码切换</span><input id="inspector-tabs-visible" type="checkbox" role="switch" checked></label>
             </div>
           </section>
 
           <section class="settings-section" aria-labelledby="settings-preview-title">
             <div class="settings-section-heading">
               <h3 id="settings-preview-title">预览</h3>
-              <p>设置新打开皮肤的画布状态</p>
+              <p>皮肤打开时的画布状态</p>
             </div>
             <div class="settings-list">
-              <label class="settings-row"><span>默认预览设备</span><select id="default-device"><option value="canvas">画布</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
+              <label class="settings-row"><span>默认设备</span><select id="default-device"><option value="canvas">画布</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
               <label class="settings-row"><span>画布背景</span><select id="canvas-background"><option value="glass">玻璃</option><option value="checkerboard">马赛克</option><option value="white" selected>白色</option><option value="dark">深色</option></select></label>
-              <label class="settings-row"><span>手机竖屏预览位置</span><select id="mobile-preview-position"><option value="bottom" selected>下半区</option><option value="top">上半区</option></select></label>
-              <label class="settings-row settings-switch"><span>编辑模式鼠标十字轴</span><input id="editor-crosshair" type="checkbox" role="switch" checked></label>
+              <label class="settings-row"><span>移动端预览面板</span><select id="mobile-preview-position"><option value="bottom" selected>底部</option><option value="top">顶部</option></select></label>
+              <label class="settings-row settings-switch"><span>编辑十字光标</span><input id="editor-crosshair" type="checkbox" role="switch" checked></label>
+              <label id="editor-coordinate-snap-setting" class="settings-row settings-switch"><span>坐标轴吸附</span><input id="editor-coordinate-snap" type="checkbox" role="switch" checked></label>
             </div>
           </section>
 
           <section id="settings-storage-section" class="settings-section settings-storage" aria-labelledby="settings-storage-title">
             <div class="settings-section-heading">
               <h3 id="settings-storage-title">源码存储</h3>
-              <p>选择皮肤源码的本地保存位置</p>
+              <p>皮肤源代码的本地存储位置</p>
             </div>
-            <label id="source-directory-enabled-setting" class="settings-row settings-switch"><span>保存用户可访问的皮肤源码</span><input id="source-directory-enabled" type="checkbox" role="switch"></label>
+            <label id="source-directory-enabled-setting" class="settings-row settings-switch"><span>保存可访问的源代码</span><input id="source-directory-enabled" type="checkbox" role="switch"></label>
             <label class="source-directory-setting">
               <span class="settings-path-control">
                 <input id="source-directory" type="text" autocomplete="off" spellcheck="false" aria-label="皮肤源码保存目录">
