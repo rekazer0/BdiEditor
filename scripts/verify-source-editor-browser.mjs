@@ -10,6 +10,11 @@ const chrome = [
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
 ].find(fs.existsSync)
 if (!chrome) throw new Error("找不到 Chrome 或 Chromium，无法运行源码编辑器浏览器验证")
+assert.match(
+  fs.readFileSync(path.resolve("src/style.css"), "utf8"),
+  /::-webkit-scrollbar-thumb:hover\s*\{[^}]*background:\s*var\(--scrollbar-thumb-hover\)/,
+  "滑块悬停应使用高亮颜色",
+)
 
 const port = 1421
 const origin = `http://127.0.0.1:${port}`
@@ -59,12 +64,28 @@ try {
     const rect = scroller.getBoundingClientRect()
     return { bottom: rect.bottom, left: rect.left, right: rect.right, top: rect.top }
   })
+  const hiddenThumb = await page.$eval("#scrollbar-track-test", (element) =>
+    getComputedStyle(element, "::-webkit-scrollbar-thumb").backgroundColor)
+  await page.mouse.move(scrollbar.left + 30, scrollbar.top + 30)
+  const hoveredThumb = await page.$eval("#scrollbar-track-test", (element) =>
+    getComputedStyle(element, "::-webkit-scrollbar-thumb").backgroundColor)
+  assert.notEqual(hoveredThumb, hiddenThumb, "鼠标进入可滚动区域时应显示滚动条")
+  await page.select("#app-theme", "light")
+  const lightThumb = await page.$eval("html", (element) => getComputedStyle(element).getPropertyValue("--scrollbar-thumb"))
+  await page.select("#app-theme", "dark")
+  const darkThumb = await page.$eval("html", (element) => getComputedStyle(element).getPropertyValue("--scrollbar-thumb"))
+  assert.notEqual(darkThumb, lightThumb, "深色与浅色模式应使用不同的滚动条颜色")
   await page.mouse.click(scrollbar.right - 3, scrollbar.top + 90)
   const verticalJump = await page.$eval("#scrollbar-track-test", (element) => element.scrollTop)
   await page.mouse.click(scrollbar.left + 90, scrollbar.bottom - 3)
   const horizontalJump = await page.$eval("#scrollbar-track-test", (element) => element.scrollLeft)
   assert.ok(verticalJump > 500, `纵向滚动条轨道点击应直接跳转：${verticalJump}`)
   assert.ok(horizontalJump > 500, `横向滚动条轨道点击应直接跳转：${horizontalJump}`)
+  await page.$eval("#scrollbar-track-test", (element) => { element.scrollTop += 1 })
+  await page.waitForFunction(() => document.querySelector("#scrollbar-track-test")?.classList.contains("scrollbar-active"))
+  assert.equal(await page.$eval("#scrollbar-track-test", (element) => element.classList.contains("scrollbar-active")), true, "滚动时应显示滚动条")
+  await new Promise((resolve) => setTimeout(resolve, 1100))
+  assert.equal(await page.$eval("#scrollbar-track-test", (element) => element.classList.contains("scrollbar-active")), false, "停止滚动后应隐藏滚动条")
   await page.$eval("#scrollbar-track-test", (element) => element.remove())
 
   await (await page.$("#browser-open")).uploadFile(path.resolve("public/default-template.bds"))

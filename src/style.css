@@ -10,6 +10,10 @@
   --text: #202124;
   --secondary: #74747b;
   --tertiary: #95959c;
+  --scrollbar-thumb: rgb(32 33 36 / 42%);
+  --scrollbar-thumb-hover: rgb(32 33 36 / 68%);
+  --scrollbar-thumb-border: rgb(0 0 0 / 14%);
+  --scrollbar-thumb-highlight: rgb(255 255 255 / 45%);
   --accent: #0a7ff5;
   --search-font-size: 12px;
   --material-window: rgb(255 255 255 / 64%);
@@ -50,6 +54,10 @@
   --text: #f2f3f4;
   --secondary: #a6a9ae;
   --tertiary: #858991;
+  --scrollbar-thumb: rgb(242 243 244 / 42%);
+  --scrollbar-thumb-hover: rgb(242 243 244 / 68%);
+  --scrollbar-thumb-border: rgb(255 255 255 / 16%);
+  --scrollbar-thumb-highlight: rgb(255 255 255 / 20%);
   --accent: #3395ff;
   --material-window: rgb(23 25 27 / 66%);
   --material-toolbar: rgb(28 31 34 / 46%);
@@ -160,7 +168,7 @@
   --scrollbar-size: 6px;
   box-sizing: border-box;
   scrollbar-width: thin;
-  scrollbar-color: rgb(255 255 255 / 48%) transparent;
+  scrollbar-color: transparent transparent;
 }
 
 ::-webkit-scrollbar {
@@ -173,12 +181,37 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  border: 1px solid rgb(0 0 0 / 12%);
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: rgb(255 255 255 / 48%);
-  box-shadow: inset 0 1px rgb(255 255 255 / 72%);
+  background: transparent;
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
+}
+
+.scrollbar-active {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.scrollbar-active::-webkit-scrollbar-thumb {
+  border-color: var(--scrollbar-thumb-border);
+  background: var(--scrollbar-thumb);
+  box-shadow: inset 0 1px var(--scrollbar-thumb-highlight);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  *:hover {
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+
+  *:hover::-webkit-scrollbar-thumb {
+    border-color: var(--scrollbar-thumb-border);
+    background: var(--scrollbar-thumb);
+    box-shadow: inset 0 1px var(--scrollbar-thumb-highlight);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
 }
 
 html,
@@ -2177,6 +2210,16 @@ canvas {
 }
 
 .inspector-tabs[hidden] {
+  display: none;
+}
+
+.inspector-view-controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+#source-find-toggle {
   display: none;
 }
 
@@ -5078,6 +5121,10 @@ canvas {
   background: var(--toolbar);
 }
 
+.source-toolbar[hidden] {
+  display: none;
+}
+
 .source-find-row,
 .source-replace-row {
   min-width: 0;
@@ -5180,15 +5227,11 @@ canvas {
 
 #source .cm-scroller {
   --scrollbar-size: 9px;
+  --scrollbar-thumb: var(--tertiary);
   overflow: auto;
   font: inherit;
   line-height: inherit;
-  scrollbar-color: var(--tertiary) transparent;
   tab-size: 2;
-}
-
-#source .cm-scroller::-webkit-scrollbar-thumb {
-  background: var(--tertiary);
 }
 
 #source .cm-content {
@@ -5824,6 +5867,15 @@ input[type="search"]:focus {
   :root,
   :root.macos {
     --titlebar-height: calc(50px + var(--safe-area-top));
+    background: #f4f5f6;
+  }
+
+  :root[data-app-theme="dark"] {
+    background: #1c1f22;
+  }
+
+  body {
+    background: var(--toolbar);
   }
 
   .titlebar {
@@ -5831,6 +5883,8 @@ input[type="search"]:focus {
     gap: 4px;
     padding-top: calc(6px + var(--safe-area-top));
     padding-inline: max(6px, env(safe-area-inset-left)) max(6px, env(safe-area-inset-right));
+    border-bottom: 0;
+    box-shadow: 0 1px 18px rgb(35 65 70 / 7%);
   }
 
   .titlebar > .toolbar-group {
@@ -6323,7 +6377,7 @@ input[type="search"]:focus {
     order: 1;
   }
 
-  .source-heading > .inspector-tabs {
+  .source-heading > .inspector-view-controls {
     order: 2;
   }
 
@@ -6382,6 +6436,29 @@ input[type="search"]:focus {
     min-height: 28px;
     padding-inline: 6px;
     font-size: 11px;
+  }
+
+  #source-find-toggle:not([hidden]) {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    background: var(--glass-surface);
+    box-shadow: var(--glass-shadow);
+  }
+
+  #source-find-toggle[aria-pressed="true"] {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--glass-surface));
+  }
+
+  #source-find-toggle .system-symbol {
+    width: 15px;
+    height: 15px;
   }
 
   #files button,

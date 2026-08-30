@@ -1,16 +1,10 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
-import { isKeyboardViewportOpen, resolveSafeAreaTop, resolveViewportFrame } from "../src/safe-area.ts"
+import { isKeyboardViewportOpen, resolveViewportFrame } from "../src/safe-area.ts"
 
 const css = fs.readFileSync("src/style.css", "utf8")
 const main = fs.readFileSync("src/main.ts", "utf8")
 const moduleSource = fs.readFileSync("src/safe-area.ts", "utf8")
-
-assert.equal(resolveSafeAreaTop({ measured: 47, cached: 0 }).top, 47)
-assert.equal(resolveSafeAreaTop({ measured: 47, cached: 0 }).cached, 47)
-assert.equal(resolveSafeAreaTop({ measured: 0, cached: 47 }).top, 47)
-assert.equal(resolveSafeAreaTop({ measured: 34, cached: 47 }).top, 34)
-assert.equal(resolveSafeAreaTop({ measured: 0, cached: 0 }).top, 0)
 
 assert.equal(isKeyboardViewportOpen({ viewportHeight: 430, baselineHeight: 844 }), true)
 assert.equal(isKeyboardViewportOpen({ viewportHeight: 780, baselineHeight: 844 }), false)
@@ -29,6 +23,13 @@ assert.deepEqual(
 )
 
 assert.match(css, /--safe-area-top:\s*env\(safe-area-inset-top, 0px\)/)
+assert.match(css, /@media \(max-width: 760px\) and \(orientation: portrait\)[\s\S]*--titlebar-height:\s*calc\(50px \+ var\(--safe-area-top\)\)/)
+assert.doesNotMatch(
+  css.slice(css.indexOf("@media (max-width: 760px) and (orientation: portrait)")),
+  /--safe-area-top:\s*24px|--titlebar-height:\s*96px/,
+  "移动端标题栏不应硬编码顶部安全区或总高度",
+)
+assert.match(css, /:root\[data-app-theme="dark"\]\s*\{\s*background:\s*#1c1f22/)
 assert.match(css, /--titlebar-height:\s*calc\(52px \+ var\(--safe-area-top\)\)/)
 assert.match(css, /padding:\s*calc\(6px \+ var\(--safe-area-top\)\)/)
 assert.match(css, /height:\s*calc\(100vh - var\(--titlebar-height\)\)/)
@@ -43,6 +44,7 @@ assert.doesNotMatch(css, /\.titlebar \{[^}]*position:\s*sticky/)
 assert.match(main, /import \{ installSafeAreaLock \} from "\.\/safe-area\.ts"/)
 assert.match(main, /installSafeAreaLock\(\)/)
 assert.match(moduleSource, /visualViewport/)
+assert.doesNotMatch(moduleSource, /setProperty\("--safe-area-top"/)
 assert.match(moduleSource, /dataset\.keyboardOpen/)
 assert.match(moduleSource, /scroller\.scrollTop/)
 assert.match(moduleSource, /keyboardWasOpen && !keyboardOpen/)

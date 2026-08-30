@@ -237,9 +237,12 @@
             <span id="source-name">配置文本</span>
             <strong id="mobile-inspector-selection"></strong>
           </div>
-          <div class="inspector-tabs" aria-label="检查器视图">
-            <button class="active" data-inspector-tab="properties">属性</button>
-            <button data-inspector-tab="source">源代码</button>
+          <div class="inspector-view-controls">
+            <button id="source-find-toggle" class="toolbar-button" type="button" title="显示查找" aria-label="显示查找" aria-pressed="false" hidden><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m12.5 12.5 4 4"/></svg></span></button>
+            <div class="inspector-tabs" aria-label="检查器视图">
+              <button class="active" data-inspector-tab="properties">属性</button>
+              <button data-inspector-tab="source">源代码</button>
+            </div>
           </div>
         </div>
         <div id="quick-inspector" hidden>
@@ -471,7 +474,7 @@
               <div class="source-search-actions">
                 <button id="source-search-previous" type="button" title="上一个（Shift + Enter）" aria-label="上一个搜索结果"><span class="system-symbol" data-system-symbol="chevron.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m5 12 5-5 5 5"/></svg></span></button>
                 <button id="source-search-next" type="button" title="下一个（Enter）" aria-label="下一个搜索结果"><span class="system-symbol" data-system-symbol="chevron.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m5 8 5 5 5-5"/></svg></span></button>
-                <button id="source-replace-toggle" type="button" title="展开替换" aria-label="展开替换" aria-expanded="false"><span class="system-symbol" data-system-symbol="arrow.triangle.2.circlepath" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 7a6 6 0 0 1 10-2l2 2M16 13a6 6 0 0 1-10 2l-2-2M16 3v4h-4M4 17v-4h4"/></svg></span></button>
+                <button id="source-replace-toggle" type="button" title="展开替换" aria-label="展开替换" aria-expanded="false"><span class="system-symbol" data-system-symbol="arrow.left.arrow.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 7h12m-3-3 3 3-3 3M17 13H5m3-3-3 3 3 3"/></svg></span></button>
               </div>
             </div>
             <div class="source-replace-row" hidden>

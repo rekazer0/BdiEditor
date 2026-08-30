@@ -88,6 +88,11 @@ assert.match(
   /const preserveCurrentInspectorView = preserveInspectorView \|\| path === selectedPath/,
   "重新选择当前文件时应保留源代码选项卡",
 )
+assert.match(
+  main,
+  /preserveCurrentInspectorView \|\| \(previousInspectorTab === "source" && path === layoutPath\)/,
+  "从任意入口切换布局文件时应保留源代码选项卡",
+)
 const sourceBefore = "[KEY1]\nCENTER=F1\n"
 const sourceAfter = "[KEY1]\nCENTER=F1\nVIEW_RECT=0,0,10,10\n"
 const insertedRange = insertedTextRange(sourceBefore, sourceAfter)
@@ -139,7 +144,10 @@ assert.equal(
 )
 assert.match(html, /id="source-search-previous"/, "源码搜索应提供上一个按钮")
 assert.match(html, /id="source-search-next"/, "源码搜索应提供下一个按钮")
+assert.match(html, /id="source-find-toggle"[^>]+hidden/, "移动端源码查找入口应默认收起")
+assert.match(main, /sourceToolbar\.hidden = mobileSourceVisible && !sourceFindVisible/, "移动端源码查找栏应由独立入口切换")
 assert.match(html, /id="source-replace-toggle"[^>]+aria-expanded="false"/, "替换栏应通过默认收起的图标按钮展开")
+assert.match(html, /data-system-symbol="arrow\.left\.arrow\.right"/, "替换入口应使用双向替换图标")
 assert.match(html, /class="source-replace-row" hidden/, "替换栏应默认隐藏")
 assert.match(html, /id="source-replace-all"/, "源码搜索应提供全部替换")
 assert.match(styles, /\.search-control > input:focus\s*\{[^}]*box-shadow: none/, "搜索框聚焦时只应显示外层焦点环")

@@ -203,6 +203,17 @@ document.documentElement.classList.toggle("macos", isTauri() && navigator.userAg
 document.documentElement.classList.toggle("windows", isTauri() && navigator.userAgent.includes("Windows"))
 installNumberInputWheel()
 
+const scrollbarIdleTimers = new WeakMap<HTMLElement, number>()
+document.addEventListener("scroll", (event) => {
+  if (!(event.target instanceof HTMLElement)) return
+  const target = event.target
+  target.classList.add("scrollbar-active")
+  window.clearTimeout(scrollbarIdleTimers.get(target))
+  scrollbarIdleTimers.set(target, window.setTimeout(() => {
+    target.classList.remove("scrollbar-active")
+  }, 1000))
+}, true)
+
 window.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 || event.pointerType !== "mouse") return
   for (const target of event.composedPath()) {
@@ -305,6 +316,8 @@ const exportButtons = Array.from(
 const source = new SourceCodeEditor($("#source"))
 source.setValuePreviewRenderer(renderSourceValueThumbnail)
 const sourceEditor = $("#source-editor")
+const sourceToolbar = $(".source-toolbar")
+const sourceFindToggle = $("#source-find-toggle") as HTMLButtonElement
 const sourceSearch = $("#source-search") as HTMLInputElement
 const sourceSearchCount = $("#source-search-count")
 const sourceSearchPrevious = $("#source-search-previous") as HTMLButtonElement
@@ -562,6 +575,7 @@ let unsavedNew = false
 let assetURL = ""
 let assetReturnPath = ""
 let inspectorTab: "properties" | "source" = "properties"
+let sourceFindVisible = false
 let sourceSearchIndex = -1
 let sourceInputHighlightTimer: number | undefined
 let sourceInputRefreshPending = false
@@ -1544,6 +1558,7 @@ mobilePortraitQuery.addEventListener("change", () => {
   if (!mobilePortraitQuery.matches) setMobilePreviewCollapsed(false)
   setMobilePane(document.documentElement.dataset.mobilePane === "inspector" ? "inspector" : "layout")
   syncMobileInspectorHeader()
+  updateSourceFindVisibility()
 })
 let mobileSwipeStart: { pointerId: number; x: number; y: number } | undefined
 mainWorkspace.addEventListener("pointerdown", (event) => {
@@ -4076,6 +4091,7 @@ function updateInspectorView(): void {
     asset.hidden = true
     resourceInspector.hidden = inspectorTab !== "properties"
     sourceEditor.hidden = inspectorTab !== "source"
+    updateSourceFindVisibility()
     loadVisibleSourceEditor()
     return
   }
@@ -4084,12 +4100,22 @@ function updateInspectorView(): void {
     quickInspector.hidden = true
     sourceEditor.hidden = true
     asset.hidden = false
+    updateSourceFindVisibility()
     return
   }
   asset.hidden = true
   quickInspector.hidden = inspectorTab !== "properties" || !propertiesAvailable
   sourceEditor.hidden = inspectorTab !== "source"
+  updateSourceFindVisibility()
   loadVisibleSourceEditor()
+}
+
+function updateSourceFindVisibility(): void {
+  const mobileSourceVisible = mobilePortraitQuery.matches && !sourceEditor.hidden
+  sourceFindToggle.hidden = !mobileSourceVisible
+  sourceFindToggle.setAttribute("aria-pressed", String(mobileSourceVisible && sourceFindVisible))
+  sourceFindToggle.title = sourceFindToggle.ariaLabel = sourceFindVisible ? "隐藏查找" : "显示查找"
+  sourceToolbar.hidden = mobileSourceVisible && !sourceFindVisible
 }
 
 const SOURCE_SEARCH_HIGHLIGHT_LIMIT = 20_000
@@ -6802,7 +6828,9 @@ function selectFile(
   )) {
     inspectorTab = "source"
   }
-  if (preserveCurrentInspectorView) inspectorTab = previousInspectorTab
+  if (preserveCurrentInspectorView || (previousInspectorTab === "source" && path === layoutPath)) {
+    inspectorTab = previousInspectorTab
+  }
   updateInspectorView()
   if (resourceConfigActive) renderResourceInspector()
   if (!quickInspector.hidden) populateKeyInspector()
@@ -8356,6 +8384,11 @@ sourceSearch.addEventListener("keydown", (event) => {
 })
 sourceSearchPrevious.addEventListener("click", () => findSourceMatch(-1))
 sourceSearchNext.addEventListener("click", () => findSourceMatch(1))
+sourceFindToggle.addEventListener("click", () => {
+  sourceFindVisible = !sourceFindVisible
+  updateSourceFindVisibility()
+  if (sourceFindVisible) sourceSearch.focus()
+})
 sourceReplaceToggle.addEventListener("click", () => {
   const expanded = sourceReplaceRow.hidden
   sourceReplaceRow.hidden = !expanded
