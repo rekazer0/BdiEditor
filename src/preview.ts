@@ -929,14 +929,14 @@ export function previewFallbackText(
   return !hasForeground && item.section?.startsWith("LIST:") ? item.show : ""
 }
 
-function drawListText(
+export function drawListText(
   context: CanvasRenderingContext2D,
   text: string,
   x: number,
   y: number,
 ): void {
   context.save()
-  context.textAlign = "center"
+  context.textAlign = "left"
   context.textBaseline = "alphabetic"
   const metrics = context.measureText(text)
   const values = [
@@ -949,9 +949,13 @@ function drawListText(
     values.every(Number.isFinite) &&
     metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent > 0
   ) {
+    const cjkOffset = /^[，。？！]$/.test(text) &&
+        metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight >= metrics.width * 0.8
+      ? -metrics.width / 4
+      : (metrics.actualBoundingBoxLeft - metrics.actualBoundingBoxRight) / 2
     context.fillText(
       text,
-      x + (metrics.actualBoundingBoxLeft - metrics.actualBoundingBoxRight) / 2,
+      x + cjkOffset,
       y + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2,
     )
   } else {

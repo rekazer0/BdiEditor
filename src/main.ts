@@ -301,7 +301,6 @@ const editorCrosshair = $("#editor-crosshair") as HTMLInputElement
 const editorCoordinateSnapSetting = $("#editor-coordinate-snap-setting")
 const editorCoordinateSnap = $("#editor-coordinate-snap") as HTMLInputElement
 const settingsStorageSection = $("#settings-storage-section")
-const sourceDirectoryEnabledSetting = $("#source-directory-enabled-setting")
 const sourceDirectoryEnabled = $("#source-directory-enabled") as HTMLInputElement
 const sourceDirectory = $("#source-directory") as HTMLInputElement
 const chooseSourceDirectory = $("#choose-source-directory") as HTMLButtonElement
@@ -557,6 +556,11 @@ let sourceWorkspacePath = ""
 let sourceWorkspacePrefix = ""
 let sourceWorkspacePendingArchive: SkinArchive | undefined
 const LAST_SOURCE_WORKSPACE_KEY = "last-source-workspace"
+
+function sourceDirectoryEnabledBySettings(): boolean {
+  const stored = localStorage.getItem("source-directory-enabled")
+  return isAndroidTauri() ? stored === "true" : stored !== "false"
+}
 let stopSourceWatch: UnwatchFn | undefined
 let sourceAutosaveTimer: number | undefined
 let sourceAutosaveQueue = Promise.resolve()
@@ -7406,9 +7410,9 @@ async function loadArchive(
   updateFileOperationProgress(55, "正在建立编辑工作区…")
   let nextSourceWorkspace = existingSourceWorkspace
   let pendingSourceDirectory: string | null | undefined
-  const sourceDirectoryActive = !isAndroidTauri() || localStorage.getItem("source-directory-enabled") === "true"
+  const sourceDirectoryActive = sourceDirectoryEnabledBySettings()
   const configuredDirectory = sourceDirectoryActive ? localStorage.getItem("source-directory") || null : null
-  if (isTauri() && !nextSourceWorkspace && (!isAndroidTauri() || configuredDirectory)) {
+  if (isTauri() && sourceDirectoryActive && !nextSourceWorkspace && (!isAndroidTauri() || configuredDirectory)) {
     pendingSourceDirectory = configuredDirectory
   }
   assetURL = releaseImagePreviewURL(assetURL)
@@ -7555,17 +7559,14 @@ async function restoreLastSourceWorkspace(): Promise<void> {
   if (!isAndroidTauri() || localStorage.getItem("source-directory-enabled") !== "true") return
   const lastSourceWorkspace = localStorage.getItem(LAST_SOURCE_WORKSPACE_KEY)
   if (!lastSourceWorkspace) return
-  setFileOperationBusy(true)
-  showStatus("正在恢复上次皮肤源码…", "progress")
-  try {
-    await loadSourceWorkspace(lastSourceWorkspace)
-    showStatus("已恢复上次编辑的皮肤源码")
-  } catch {
-    localStorage.removeItem(LAST_SOURCE_WORKSPACE_KEY)
-    showStatus("上次皮肤源码已不可用，请重新打开")
-  } finally {
-    setFileOperationBusy(false)
-  }
+  await runFileOperation("恢复上次皮肤源码", async () => {
+    try {
+      return await loadSourceWorkspace(lastSourceWorkspace)
+    } catch (error) {
+      localStorage.removeItem(LAST_SOURCE_WORKSPACE_KEY)
+      throw error
+    }
+  })
 }
 
 async function loadNativePath(path: string): Promise<boolean> {
@@ -7943,26 +7944,26 @@ async function initializeSourceDirectory(): Promise<void> {
     return
   }
   const configured = localStorage.getItem("source-directory")
+  const enabled = sourceDirectoryEnabledBySettings() && (!isAndroidTauri() || Boolean(configured))
+  sourceDirectoryEnabled.checked = enabled
+  sourceDirectory.disabled = !enabled
+  chooseSourceDirectory.disabled = !enabled
+  resetSourceDirectory.disabled = !enabled
   if (isAndroidTauri()) {
     sourceDirectory.readOnly = true
     sourceDirectory.placeholder = "/storage/emulated/0/BdiEditor"
     resetSourceDirectory.hidden = true
-    const enabled = localStorage.getItem("source-directory-enabled") === "true" && Boolean(configured)
-    sourceDirectoryEnabled.checked = enabled
-    sourceDirectory.disabled = !enabled
-    chooseSourceDirectory.disabled = !enabled
     if (!enabled) {
       localStorage.removeItem("source-directory-enabled")
       localStorage.removeItem("source-directory")
       localStorage.removeItem(LAST_SOURCE_WORKSPACE_KEY)
       sourceDirectory.value = ""
-      sourceDirectoryStatus.textContent = "已关闭 · 不会写入源码文件"
-      return
     }
-    await applySourceDirectory(configured)
+  }
+  if (!enabled) {
+    sourceDirectoryStatus.textContent = "已关闭 · 不会写入源码文件"
     return
   }
-  sourceDirectoryEnabledSetting.hidden = true
   await applySourceDirectory(configured)
 }
 
@@ -7981,24 +7982,36 @@ async function chooseAndroidSourceDirectory(): Promise<boolean> {
 }
 
 sourceDirectoryEnabled.addEventListener("change", () => void (async () => {
-  if (!isAndroidTauri()) return
   if (!sourceDirectoryEnabled.checked) {
-    localStorage.removeItem("source-directory-enabled")
-    localStorage.removeItem("source-directory")
+    if (isAndroidTauri()) localStorage.removeItem("source-directory-enabled")
+    else localStorage.setItem("source-directory-enabled", "false")
     localStorage.removeItem(LAST_SOURCE_WORKSPACE_KEY)
+    sourceWorkspacePendingArchive = undefined
     await activateSourceWorkspace("", "")
     sourceDirectory.disabled = true
     chooseSourceDirectory.disabled = true
-    sourceDirectory.value = ""
+    resetSourceDirectory.disabled = true
+    if (isAndroidTauri()) {
+      localStorage.removeItem("source-directory")
+      sourceDirectory.value = ""
+    }
     sourceDirectoryStatus.textContent = "已关闭 · 不会写入源码文件"
     return
   }
-  const granted = await chooseAndroidSourceDirectory()
-  sourceDirectoryEnabled.checked = granted
-  sourceDirectory.disabled = !granted
-  chooseSourceDirectory.disabled = !granted
-  if (granted) localStorage.setItem("source-directory-enabled", "true")
-  else sourceDirectoryStatus.textContent = "未授权 · 不会写入源码文件"
+  if (isAndroidTauri()) {
+    const granted = await chooseAndroidSourceDirectory()
+    sourceDirectoryEnabled.checked = granted
+    sourceDirectory.disabled = !granted
+    chooseSourceDirectory.disabled = !granted
+    if (granted) localStorage.setItem("source-directory-enabled", "true")
+    else sourceDirectoryStatus.textContent = "未授权 · 不会写入源码文件"
+    return
+  }
+  localStorage.setItem("source-directory-enabled", "true")
+  sourceDirectory.disabled = false
+  chooseSourceDirectory.disabled = false
+  resetSourceDirectory.disabled = false
+  await applySourceDirectory(localStorage.getItem("source-directory"))
 })())
 
 sourceDirectory.addEventListener("change", () => void applySourceDirectory(sourceDirectory.value))

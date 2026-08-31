@@ -201,5 +201,16 @@ assert.match(main, /function ensureSourcePathRendered[\s\S]+dispatchEvent\(new E
 assert.match(main, /const LAST_SOURCE_WORKSPACE_KEY = "last-source-workspace"/, "应记录上次编辑的源码工作区")
 assert.match(main, /localStorage\.setItem\(LAST_SOURCE_WORKSPACE_KEY, path\)/, "成功打开源码工作区后应保存其 URI")
 assert.match(main, /await loadSourceWorkspace\(lastSourceWorkspace\)/, "启动时应恢复上次源码工作区")
+assert.match(
+  main,
+  /async function restoreLastSourceWorkspace[\s\S]+await runFileOperation\("恢复上次皮肤源码"/,
+  "启动恢复源码应复用文件操作进度收尾",
+)
 assert.match(main, /localStorage\.removeItem\(LAST_SOURCE_WORKSPACE_KEY\)/, "关闭源码功能时应清除恢复入口")
+assert.doesNotMatch(main, /sourceDirectoryEnabledSetting\.hidden = true/, "桌面端不应隐藏源码存储开关")
+assert.doesNotMatch(
+  main,
+  /sourceDirectoryEnabled\.addEventListener\("change"[\s\S]{0,120}if \(!isAndroidTauri\(\)\) return/,
+  "桌面端源码存储开关应可用",
+)
 console.log("✓ 源码工作区格式、路径映射与 UI 入口验证通过")

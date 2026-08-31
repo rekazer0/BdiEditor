@@ -1,7 +1,24 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import { IniDocument } from "../src/ini.ts"
-import { Preview, previewFallbackText, previewItems } from "../src/preview.ts"
+import { drawListText, Preview, previewFallbackText, previewItems } from "../src/preview.ts"
+
+let drawnText: [string, number, number] | undefined
+drawListText({
+  save() {},
+  restore() {},
+  textAlign: "start",
+  textBaseline: "alphabetic",
+  measureText: () => ({
+    width: 42,
+    actualBoundingBoxAscent: 5,
+    actualBoundingBoxDescent: 7,
+    actualBoundingBoxLeft: 0,
+    actualBoundingBoxRight: 42,
+  }),
+  fillText: (text, x, y) => { drawnText = [text, x, y] },
+} as unknown as CanvasRenderingContext2D, "，", 100, 100)
+assert.deepEqual(drawnText, ["，", 89.5, 99], "LIST 中文标点应补偿全角字面内的左侧字形")
 
 assert.equal(
   previewFallbackText({ show: "9" } as Parameters<typeof previewFallbackText>[0], false),
