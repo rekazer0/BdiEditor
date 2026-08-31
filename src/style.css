@@ -639,8 +639,7 @@ select option {
 }
 
 main {
-  /* Android 15 edge-to-edge：同时减去顶部和底部安全区域 */
-  height: calc(100vh - var(--titlebar-height) - env(safe-area-inset-bottom));
+  height: calc(100vh - var(--titlebar-height));
   display: grid;
   grid-template-columns: 220px minmax(500px, 1fr) 4px var(--inspector-width, 340px);
   background: transparent;
@@ -6035,7 +6034,7 @@ input[type="search"]:focus {
   }
 
   main {
-    height: calc(100vh - var(--titlebar-height));
+    height: calc(100dvh - var(--titlebar-height));
     min-height: 0;
     display: block;
     position: relative;
@@ -6774,7 +6773,7 @@ input[type="search"]:focus {
   }
 
   main {
-    height: calc(100vh - var(--titlebar-height));
+    height: calc(100dvh - var(--titlebar-height));
     grid-template-columns: clamp(116px, 18vw, 150px) minmax(0, 1fr) 0 clamp(190px, 28vw, 240px);
   }
 
