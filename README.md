@@ -23,7 +23,7 @@
   <img src="readme-assets/mobile-editor.png" width="390" alt="移动端编辑界面">
 </p>
 
-## v1.7.82 更新
+## v1.8.88 更新
 
 - 引入 CodeMirror 6 代码编辑器，完善源码高亮、搜索、定位与编辑体验。
 - 重构 BDA 解析器，完善解析、导入导出、预览、属性编辑、资源替换、图片切片及 protobuf 写回。
