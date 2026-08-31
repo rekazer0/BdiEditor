@@ -8183,7 +8183,16 @@ async function restoreWindowMaterialAfterDrag(): Promise<void> {
     return
   }
   windowDragMaterialDisabled = false
-  await applyWindowMaterial()
+  // 添加短暂延迟确保拖动完全结束后再恢复材质，避免状态不同步
+  await new Promise(resolve => setTimeout(resolve, 50))
+  try {
+    await applyWindowMaterial()
+  } catch (error) {
+    // 恢复材质失败时重试一次
+    console.warn("恢复窗口材质失败，尝试重试:", error)
+    await new Promise(resolve => setTimeout(resolve, 100))
+    await applyWindowMaterial().catch(err => console.error("恢复窗口材质重试失败:", err))
+  }
 }
 
 async function startWindowsWindowDrag(): Promise<void> {
@@ -9357,6 +9366,12 @@ if (isTauri()) {
     clearTimeout(movingDebounce)
     clearTimeout(fitCanvasDebounce)
     movingDebounce = setTimeout(() => { fitCanvasPreview() }, 300)
+  })
+  // 窗口获得焦点时重新同步材质状态，修复 Windows 10 亚克力材质导致的窗口移动卡顿问题
+  void getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+    if (focused && windowMaterial.checked && !windowDragPointerDown && !windowDragMaterialDisabled) {
+      void applyWindowMaterial()
+    }
   })
   let destroyingWindow = false
   void getCurrentWindow().onCloseRequested(async (event) => {
