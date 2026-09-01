@@ -1417,6 +1417,7 @@ h2 {
 #hint-preview {
   position: absolute;
   inset: 0;
+  height: 100%;
   z-index: 4;
   pointer-events: none;
 }
@@ -2118,7 +2119,7 @@ canvas {
 #toolbar-preview {
   width: 100%;
   height: 100%;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .device-shell.canvas-only #toolbar-preview {
@@ -4404,15 +4405,19 @@ canvas {
 }
 
 #style-image-picker {
+  min-height: 0;
   display: grid;
+  align-content: center;
   justify-items: center;
+  overflow: auto;
+  padding: 18px;
 }
 
 #style-image-picker-canvas {
   width: auto;
   height: auto;
-  max-width: 80%;
-  max-height: 62vh;
+  max-width: 100%;
+  max-height: calc(100dvh - 154px);
   display: block;
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -4434,50 +4439,64 @@ canvas {
 
 .style-image-dialog {
   position: fixed;
-  z-index: 200;
-  top: calc(var(--titlebar-height) + 12px);
-  right: 12px;
-  width: min(80vw, 1200px);
-  min-height: min(72vh, 760px);
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
-  padding: 12px 14px 14px;
+  inset: 0;
+  width: min(960px, calc(100vw - 24px));
+  max-width: none;
+  max-height: calc(100dvh - 24px);
+  margin: auto;
+  padding: 0;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: var(--panel);
-  box-shadow: 0 18px 48px rgb(0 0 0 / 22%);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
+  background: var(--menu);
+  color: var(--text);
+  box-shadow: 0 28px 90px rgb(0 0 0 / 28%), inset 0 1px rgb(255 255 255 / 48%);
+  -webkit-backdrop-filter: saturate(180%) blur(28px);
+  backdrop-filter: saturate(180%) blur(28px);
 }
 
-.style-image-dialog[hidden] {
-  display: none;
+.style-image-dialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.style-image-dialog:has(#style-image-picker:not([hidden])),
+.style-image-dialog:has(#style-image-resource-picker:not([hidden])),
+.style-image-dialog:has(#style-image-gallery:not([hidden])) {
+  height: min(720px, calc(100dvh - 24px));
+}
+
+.style-image-dialog::backdrop {
+  background: rgb(20 24 30 / 26%);
+  -webkit-backdrop-filter: saturate(120%) blur(8px);
+  backdrop-filter: saturate(120%) blur(8px);
 }
 
 .style-image-header {
+  min-height: 76px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  cursor: move;
-  user-select: none;
+  gap: 20px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--toolbar);
 }
 
 .style-image-title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: grid;
+  gap: 3px;
   min-width: 0;
 }
 
 .style-image-name {
-  max-width: 320px;
+  max-width: min(520px, 55vw);
+  margin: 0;
   overflow: hidden;
   color: var(--text);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -4490,14 +4509,27 @@ canvas {
 
 .style-image-header button {
   flex: none;
-  height: 30px;
-  padding: 0 10px;
+  height: 34px;
+  padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: 7px;
   background: var(--control);
   color: var(--text);
   font-size: 11px;
   cursor: pointer;
+}
+
+.style-image-header :is(#style-image-more, #style-image-close) {
+  width: 34px;
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.style-image-header :is(#style-image-more, #style-image-close) .system-symbol {
+  width: 15px;
+  height: 15px;
 }
 
 .style-image-header button:hover {
@@ -4506,8 +4538,57 @@ canvas {
 
 .style-image-subtitle {
   color: var(--secondary);
-  font-size: 12px;
+  font-size: 10px;
   white-space: nowrap;
+}
+
+.style-image-gallery {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.style-image-gallery[hidden] {
+  display: none;
+}
+
+.style-image-gallery-toolbar {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.style-image-gallery-toolbar .search-control {
+  width: min(360px, 100%);
+  height: 34px;
+}
+
+.style-image-gallery-toolbar output {
+  margin-left: auto;
+  color: var(--secondary);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.style-image-gallery .style-picker-grid {
+  padding-top: 14px;
+}
+
+.style-image-gallery .style-picker-empty {
+  position: absolute;
+  inset: 54px 0 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.style-image-gallery .style-picker-empty[hidden] {
+  display: none;
 }
 
 .style-image-resource-picker {
@@ -4984,24 +5065,14 @@ canvas {
   text-decoration: underline;
 }
 
-.style-image-dialog header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.style-image-dialog header button {
-  height: 28px;
-  padding: 0 9px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--control);
-  font-size: 10px;
-}
-
 #style-image-preview {
-  width: 100%;
+  width: calc(100% - 36px);
   height: auto;
+  display: block;
+  margin: 18px;
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
   background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 50% / 16px 16px;
 }
 
@@ -5283,6 +5354,17 @@ canvas {
 #source .cm-source-value-action { color: #c04a13; }
 #source .cm-source-value-style { color: #2459a9; }
 #source .cm-source-value-color { color: #087f8c; }
+
+.source-color-picker {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
 
 .cm-source-value-swatch {
   display: inline-block;

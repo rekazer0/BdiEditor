@@ -284,9 +284,6 @@
               <label>内边距（PADDING） <input data-toolbar-field="PADDING" /></label>
               <label>首个候选前景（FIRST_FORE） <span class="style-field"><input data-toolbar-field="FIRST_FORE" /></span></label>
               <label>首个候选背景（FIRST_BACK） <span class="style-field"><input data-toolbar-field="FIRST_BACK" /></span></label>
-              <label>工具按钮 1（ICON1.FORE_STYLE） <span class="style-field"><input data-toolbar-field="ICON1.FORE_STYLE" /></span></label>
-              <label>工具按钮 2（ICON2.FORE_STYLE） <span class="style-field"><input data-toolbar-field="ICON2.FORE_STYLE" /></span></label>
-              <label>工具按钮 3（ICON3.FORE_STYLE） <span class="style-field"><input data-toolbar-field="ICON3.FORE_STYLE" /></span></label>
             </div>
           </div>
           <div class="inspector-group document-fields" hidden>
@@ -588,18 +585,29 @@
       </form>
     </dialog>
 
-    <div id="style-image-dialog" class="style-image-dialog" hidden role="dialog" aria-labelledby="style-image-title">
-      <header class="style-image-header" id="style-image-drag-handle">
+    <input id="source-color-picker" class="source-color-picker" type="color" tabindex="-1" aria-label="源码颜色调节器" aria-hidden="true">
+
+    <dialog id="style-image-dialog" class="style-image-dialog glass-module" aria-labelledby="style-image-title">
+      <header class="style-image-header">
         <div class="style-image-title-wrap">
-          <strong id="style-image-title" class="style-image-name">图片预览</strong>
-          <span class="style-image-subtitle" id="style-image-subtitle"></span>
+          <h2 id="style-image-title" class="style-image-name">图片预览</h2>
+          <small class="style-image-subtitle" id="style-image-subtitle"></small>
         </div>
         <div class="style-image-actions">
           <button id="style-image-resource-open" type="button">选择图片资源</button>
-          <button id="style-image-close" type="button" aria-label="关闭">关闭</button>
+          <button id="style-image-more" class="toolbar-button" type="button" title="更多样式" aria-label="展示全部样式" aria-expanded="false" hidden><span class="icon system-symbol" data-system-symbol="square.grid.2x2" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></span></button>
+          <button id="style-image-close" class="toolbar-button" type="button" title="关闭" aria-label="关闭图片预览"><span class="icon system-symbol" data-system-symbol="xmark" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></span></button>
         </div>
       </header>
       <canvas id="style-image-preview" width="480" height="260"></canvas>
+      <section id="style-image-gallery" class="style-image-gallery" aria-label="全部样式" hidden>
+        <div class="style-image-gallery-toolbar">
+          <label class="search-control" aria-label="搜索全部样式"><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"></span><input id="style-image-gallery-search" type="search" results="0" placeholder="搜索样式编号"></label>
+          <output id="style-image-gallery-count"></output>
+        </div>
+        <div id="style-image-gallery-grid" class="style-picker-grid"></div>
+        <p id="style-image-gallery-empty" class="style-picker-empty" hidden>没有匹配的样式</p>
+      </section>
       <div id="style-image-picker" hidden>
         <canvas id="style-image-picker-canvas" width="720" height="420" aria-label="原始图片切片选择器"></canvas>
         <small id="style-image-picker-meta">点击图片中的切片以修改引用</small>
@@ -618,7 +626,7 @@
         <div id="style-image-img-list" class="style-image-img-list"></div>
         <p id="style-image-resource-empty" class="style-image-resource-empty" hidden>没有匹配的图片资源</p>
       </section>
-    </div>
+    </dialog>
 
     <dialog id="layout-image-dialog" class="app-dialog layout-image-dialog" aria-labelledby="layout-image-title">
       <form id="layout-image-form" method="dialog">
@@ -701,9 +709,9 @@
             </div>
             <div class="settings-list">
               <label class="settings-row"><span>源代码字号</span><span class="settings-inline-control"><input id="source-font-size" type="number" min="8" max="32" step="1" value="11" inputmode="numeric" aria-describedby="source-font-size-hint"><small id="source-font-size-hint">px</small></span></label>
-              <label class="settings-row settings-switch" hidden><span>源代码补全</span><input id="source-completion-enabled" type="checkbox" role="switch"></label>
-              <label class="settings-row settings-switch" hidden><span>值解析与快捷编辑</span><input id="source-value-hints-enabled" type="checkbox" role="switch"></label>
-              <label class="settings-row settings-switch" hidden><span>当前行释义</span><input id="source-line-explanation-enabled" type="checkbox" role="switch"></label>
+              <label class="settings-row settings-switch"><span>源代码补全</span><input id="source-completion-enabled" type="checkbox" role="switch"></label>
+              <label class="settings-row settings-switch"><span>值解析与快捷编辑</span><input id="source-value-hints-enabled" type="checkbox" role="switch"></label>
+              <label class="settings-row settings-switch"><span>当前行释义</span><input id="source-line-explanation-enabled" type="checkbox" role="switch"></label>
               <label class="settings-row settings-switch"><span>概览与源文件切换</span><input id="sidebar-view-visible" type="checkbox" role="switch" checked></label>
               <label class="settings-row settings-switch"><span>属性与源代码切换</span><input id="inspector-tabs-visible" type="checkbox" role="switch" checked></label>
             </div>
@@ -718,6 +726,7 @@
               <label class="settings-row"><span>默认设备</span><select id="default-device"><option value="canvas">画布</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
               <label class="settings-row"><span>画布背景</span><select id="canvas-background"><option value="glass">玻璃</option><option value="checkerboard">马赛克</option><option value="white" selected>白色</option><option value="dark">深色</option></select></label>
               <label class="settings-row"><span>移动端预览面板</span><select id="mobile-preview-position"><option value="bottom" selected>底部</option><option value="top">顶部</option></select></label>
+              <label class="settings-row settings-switch"><span>气泡预览（实验功能）</span><input id="hint-preview-enabled" type="checkbox" role="switch" checked></label>
               <label class="settings-row settings-switch"><span>编辑十字光标</span><input id="editor-crosshair" type="checkbox" role="switch" checked></label>
               <label id="editor-coordinate-snap-setting" class="settings-row settings-switch"><span>坐标轴吸附</span><input id="editor-coordinate-snap" type="checkbox" role="switch" checked></label>
             </div>

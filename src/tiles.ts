@@ -17,6 +17,26 @@ export function tilePreviewDestination(sourceWidth: number, sourceHeight: number
   return { x: (canvasSize - width) / 2, y: (canvasSize - height) / 2, width, height }
 }
 
+export function tilePreviewInnerRect(
+  source: readonly [number, number, number, number],
+  inner: readonly [number, number, number, number],
+  destination: { x: number; y: number; width: number; height: number },
+) {
+  const [sourceX, sourceY, sourceWidth, sourceHeight] = source
+  const [innerX, innerY, innerWidth, innerHeight] = inner
+  if (
+    sourceWidth <= 0 || sourceHeight <= 0 || innerWidth <= 0 || innerHeight <= 0 ||
+    innerX + innerWidth <= sourceX || innerY + innerHeight <= sourceY ||
+    innerX >= sourceX + sourceWidth || innerY >= sourceY + sourceHeight
+  ) return
+  return {
+    x: destination.x + ((innerX - sourceX) / sourceWidth) * destination.width,
+    y: destination.y + ((innerY - sourceY) / sourceHeight) * destination.height,
+    width: (innerWidth / sourceWidth) * destination.width,
+    height: (innerHeight / sourceHeight) * destination.height,
+  }
+}
+
 function rect(value: string | undefined): TileRect | undefined {
   const values = value?.split(",").map(Number)
   if (!values || values.length !== 4 || values.some((item) => !Number.isFinite(item))) return
@@ -51,6 +71,7 @@ export function updateTileSlice(document: IniDocument, slice: TileSlice): void {
   }
   document.set(section, "SOURCE_RECT", slice.source.join(","))
   if (slice.inner) document.set(section, "INNER_RECT", slice.inner.join(","))
+  else document.remove(section, "INNER_RECT")
 }
 
 export function boundedTileRect(

@@ -148,6 +148,7 @@ import {
   type PreviewEvent,
 } from "./preview.ts"
 import { firstExistingPath, resourceImagePaths } from "./resources.ts"
+import { retryAsync } from "./retry.ts"
 import {
   candidatePreview,
   compositionSkinState,
@@ -164,8 +165,9 @@ import {
   writePendingSourcePaths,
   type SourceWriteSnapshot,
 } from "./source-tree.ts"
-import { SourceCodeEditor } from "./source-editor.ts"
-import type { SourceEditorValueRange } from "./source-editor.ts"
+import { LazySourceCodeEditor } from "./lazy-source-editor.ts"
+import type { SourceEditorValueClick, SourceEditorValueRange } from "./lazy-source-editor.ts"
+import { replacedSourceColor, sourceValueRanges } from "./source-value-ranges.ts"
 import {
   SOUND_ACCEPT,
   decodeAiffPcm,
@@ -184,6 +186,7 @@ import {
   nextTileIndex,
   removeTileSlice,
   tileSliceAt,
+  tilePreviewInnerRect,
   tilePreviewDestination,
   tileSlices,
   updateTileSlice,
@@ -297,6 +300,7 @@ const sourceCompletionEnabled = $("#source-completion-enabled") as HTMLInputElem
 const sourceValueHintsEnabled = $("#source-value-hints-enabled") as HTMLInputElement
 const sourceLineExplanationEnabled = $("#source-line-explanation-enabled") as HTMLInputElement
 const mobilePreviewPosition = $("#mobile-preview-position") as HTMLSelectElement
+const hintPreviewEnabled = $("#hint-preview-enabled") as HTMLInputElement
 const editorCrosshair = $("#editor-crosshair") as HTMLInputElement
 const editorCoordinateSnapSetting = $("#editor-coordinate-snap-setting")
 const editorCoordinateSnap = $("#editor-coordinate-snap") as HTMLInputElement
@@ -312,8 +316,9 @@ const mobilePortraitQuery = matchMedia("(max-width: 760px) and (orientation: por
 const exportButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-export-format]"),
 )
-const source = new SourceCodeEditor($("#source"))
+const source = new LazySourceCodeEditor($("#source"))
 source.setValuePreviewRenderer(renderSourceValueThumbnail)
+const sourceColorPicker = $("#source-color-picker") as HTMLInputElement
 const sourceEditor = $("#source-editor")
 const sourceToolbar = $(".source-toolbar")
 const sourceFindToggle = $("#source-find-toggle") as HTMLButtonElement
@@ -527,10 +532,11 @@ const modeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement
 const themeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-theme-choice]"))
 const orientationChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-orientation-choice]"))
 const mobileChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mobile-choice]"))
-const styleImageDialog = $("#style-image-dialog") as HTMLDivElement
+const styleImageDialog = $("#style-image-dialog") as HTMLDialogElement
 const styleImageClose = $("#style-image-close") as HTMLButtonElement
+const styleImageMore = $("#style-image-more") as HTMLButtonElement
 const styleImageTitle = $("#style-image-title") as HTMLElement
-const styleImageSubtitle = $("#style-image-subtitle") as HTMLSpanElement
+const styleImageSubtitle = $("#style-image-subtitle") as HTMLElement
 const styleImageResourceOpen = $("#style-image-resource-open") as HTMLButtonElement
 const styleImageResourcePicker = $("#style-image-resource-picker") as HTMLElement
 const styleImageResourceClose = $("#style-image-resource-close") as HTMLButtonElement
@@ -539,6 +545,11 @@ const styleImageResourceCount = $("#style-image-resource-count") as HTMLElement
 const styleImageResourceEmpty = $("#style-image-resource-empty") as HTMLElement
 const styleImageImgList = $("#style-image-img-list") as HTMLDivElement
 const styleImagePreview = $("#style-image-preview") as HTMLCanvasElement
+const styleImageGallery = $("#style-image-gallery")
+const styleImageGallerySearch = $("#style-image-gallery-search") as HTMLInputElement
+const styleImageGalleryCount = $("#style-image-gallery-count")
+const styleImageGalleryGrid = $("#style-image-gallery-grid")
+const styleImageGalleryEmpty = $("#style-image-gallery-empty")
 const styleImagePicker = $("#style-image-picker")
 const styleImagePickerCanvas = $("#style-image-picker-canvas") as HTMLCanvasElement
 const styleImagePickerMeta = $("#style-image-picker-meta")
@@ -574,6 +585,7 @@ let selectedDocument: IniDocument | undefined
 let layoutPath = ""
 let layoutDocument: IniDocument | undefined
 let selectedKeySections: string[] = []
+let selectedToolbarSections: string[] = []
 let selectedCandidate = false
 let unsavedNew = false
 let assetURL = ""
@@ -843,7 +855,17 @@ document.addEventListener("pointermove", (event) => {
   }
 })
 
-const toolbarPreview = new Preview(toolbarCanvas, () => {}, () => {}, true)
+const toolbarPreview = new Preview(toolbarCanvas, handlePreviewEvent, (sections) => {
+  const path = toolbarStrip.dataset.path
+  if (!path) return
+  if (selectedPath !== path) selectFile(path, "overview")
+  selectedToolbarSections = sections
+  toolbarPreview.setSelected(sections)
+  syncCandidateSelection()
+  populateKeyInspector()
+  updateSourceHighlight()
+  scrollSelectedSource()
+}, true)
 const candidateBackgroundPreview = new Preview(candidateBackgroundCanvas, () => {}, () => {})
 
 function resizeKeyboardPreviews(): void {
@@ -1658,6 +1680,7 @@ function applyModeState(): void {
   if (!editing && editorCrosshair.checked) previewCoordinates.hidden = true
   deviceShell.dataset.mode = editing ? "edit" : "preview"
   preview.setMode(editing ? "edit" : "preview")
+  toolbarPreview.setMode(editing ? "edit" : "preview")
   preview.setEditTool(keyMode)
   source.readOnly = !editing
   replaceAssetButton.disabled = !editing
@@ -2375,14 +2398,15 @@ function refreshPreview(): void {
   const animationBytes = animationPath && archive.getBytes(animationPath)
   preview.setAnimation(animationBytes ? decodeBdaAnimation(animationBytes) : undefined)
   const legacyAnimationPath = legacyAnimationConfigPath()
-  preview.setLegacyAnimation(
+  const legacyAnimation =
     archive.format !== "bda" && archive.isText(styleConfigPath()) && legacyAnimationPath
       ? parseLegacyAnimation(
           IniDocument.parse(archive.getText(styleConfigPath())),
           IniDocument.parse(archive.getText(legacyAnimationPath)),
         )
-      : undefined,
-  )
+      : undefined
+  preview.setLegacyAnimation(legacyAnimation)
+  toolbarPreview.setLegacyAnimation(legacyAnimation)
   const hintBase = `${theme.value}/skin/${orientation.value}/`
   const hintPath = (name: string) => `${hintBase}${name}`
   const bdaInfo = currentBdaAppearance()
@@ -2399,9 +2423,9 @@ function refreshPreview(): void {
   const shortHint = hintDocument("hint1.pop") ?? hintDocument("hint.pop")
   const longHint = hintDocument("hint2.pop") ?? shortHint
   preview.setLegacyHints(
-    parseLegacyHint(shortHint),
-    parseLegacyHint(longHint),
-    currentArchive.format === "bda" && hasBdaHints,
+    hintPreviewEnabled.checked ? parseLegacyHint(shortHint) : undefined,
+    hintPreviewEnabled.checked ? parseLegacyHint(longHint) : undefined,
+    hintPreviewEnabled.checked && currentArchive.format === "bda" && hasBdaHints,
   )
   const bdaGenPath = bdaBasePath(genConfigPath())
   const bdaGen = archive.format === "bda" && bdaBase?.isText(bdaGenPath)
@@ -3327,7 +3351,7 @@ function drawAtlas(): void {
     context.fillRect(x, y, labelWidth, Math.max(15, lineWidth * 9))
     context.fillStyle = "#fff"
     context.fillText(label, x + 3, y + 2)
-    if (archive?.format === "bda" && slice.inner) {
+    if (slice.inner && (archive?.format === "bda" || selected)) {
       const [innerX, innerY, innerWidth, innerHeight] = slice.inner
       if (innerWidth > 0 && innerHeight > 0) {
         context.save()
@@ -3361,18 +3385,16 @@ function drawTilePreview(): void {
   context.lineWidth = 2
   context.strokeStyle = "#ff3b30"
   context.strokeRect(destination.x + 1, destination.y + 1, destination.width - 2, destination.height - 2)
-  if (archive?.format === "bda" && slice.inner) {
-    const [innerX, innerY, innerWidth, innerHeight] = slice.inner
-    if (innerWidth > 0 && innerHeight > 0) {
+  if (slice.inner) {
+    const inner = tilePreviewInnerRect(slice.source, slice.inner, destination)
+    if (inner) {
       context.save()
+      context.beginPath()
+      context.rect(destination.x, destination.y, destination.width, destination.height)
+      context.clip()
       context.strokeStyle = "#ff9500"
       context.setLineDash([6, 4])
-      context.strokeRect(
-        destination.x + ((innerX - x) / width) * destination.width,
-        destination.y + ((innerY - y) / height) * destination.height,
-        (innerWidth / width) * destination.width,
-        (innerHeight / height) * destination.height,
-      )
+      context.strokeRect(inner.x, inner.y, inner.width, inner.height)
       context.restore()
     }
   }
@@ -4053,11 +4075,13 @@ function hideImageWorkspace(): void {
 
 function loadVisibleSourceEditor(): void {
   if (sourceEditor.hidden) return
-  requestAnimationFrame(() => {
-    source.requestMeasure()
-    scrollSelectedSource()
-    updateSourceHighlight()
-  })
+  void source.load()
+    .then(() => requestAnimationFrame(() => {
+      source.requestMeasure()
+      scrollSelectedSource()
+      updateSourceHighlight()
+    }))
+    .catch((error) => showError(error, "加载源码编辑器"))
 }
 
 workspaceImage.addEventListener("load", clearImagePreviewError)
@@ -4123,8 +4147,6 @@ function updateSourceFindVisibility(): void {
 }
 
 const SOURCE_SEARCH_HIGHLIGHT_LIMIT = 20_000
-// ponytail: cap value decorations to keep large files responsive; raise after viewport-only ranges exist.
-const SOURCE_VALUE_HINT_LIMIT = 5_000
 
 function scheduleSourceInputHighlight(refreshInspector = false): void {
   sourceInputRefreshPending ||= refreshInspector
@@ -4141,52 +4163,6 @@ function scheduleSourceSearch(): void {
     sourceSearchTimer = undefined
     updateSourceHighlight()
   }, 80)
-}
-
-function sourceValueRanges(text: string, language: "ini" | "json"): SourceEditorValueRange[] {
-  const ranges: SourceEditorValueRange[] = []
-  const sourceColor = (value: string): string => {
-    const clean = value.replace(/^#/, "")
-    if (clean.length === 6) return `#${clean}`
-    const alpha = Number.parseInt(clean.slice(0, 2), 16) / 255
-    const red = Number.parseInt(clean.slice(2, 4), 16)
-    const green = Number.parseInt(clean.slice(4, 6), 16)
-    const blue = Number.parseInt(clean.slice(6, 8), 16)
-    return `rgba(${red}, ${green}, ${blue}, ${Number(alpha.toFixed(3))})`
-  }
-  const add = (value: string, from: number, to: number): void => {
-    if (ranges.length >= SOURCE_VALUE_HINT_LIMIT) return
-    const normalized = value.trim()
-    if (!normalized) return
-    const action = normalized.match(/^(F\d+|S\d+(?:_\d+)?)$/i)
-    const color = normalized.match(/^#?(?:[0-9a-f]{6}|[0-9a-f]{8})$/i)
-    const style = /^(?:STYLE\d+|[123]\d{6})$/i.test(normalized)
-    if (!action && !color && !style) return
-    const kind = action ? "action" : color ? "color" : "style"
-    ranges.push({
-      from, to, value: normalized, kind,
-      label: action ? actionDescription(action[1].toUpperCase()) : kind === "color" ? `颜色 ${normalized}` : `样式 ${normalized}`,
-      color: color ? sourceColor(normalized) : undefined,
-    })
-  }
-  if (language === "ini") {
-    for (const match of text.matchAll(/^[ \t]*[^=\r\n]+\s*=\s*([^;#\r\n]*)/gm)) {
-      if (ranges.length >= SOURCE_VALUE_HINT_LIMIT) break
-      const raw = match[1]
-      const value = raw.trim()
-      const offset = match.index! + match[0].lastIndexOf(raw) + (raw.length - raw.trimStart().length)
-      add(value, offset, offset + value.length)
-    }
-  } else {
-    for (const match of text.matchAll(/"(?:action|value|code|style|color|normalColor|highlightColor)"\s*:\s*(?:"([^"\\]*(?:\\.[^"\\]*)*)"|(-?\d+(?:\.\d+)?))/gi)) {
-      if (ranges.length >= SOURCE_VALUE_HINT_LIMIT) break
-      const value = match[1] ?? match[2] ?? ""
-      const full = match[0]
-      const start = match.index! + full.lastIndexOf(value)
-      add(value, start, start + value.length)
-    }
-  }
-  return ranges
 }
 
 function updateSourceHighlight(): void {
@@ -4271,6 +4247,8 @@ function selectedSourceSections(): string[] {
   if (resourceConfigActive && selectedResourcePath) {
     return selectedTileIndex === undefined ? [] : [`IMG${selectedTileIndex}`]
   }
+  const toolbarSections = isToolbarPath(selectedPath) ? effectiveToolbarSections() : []
+  if (toolbarSections.length) return toolbarSections
   return selectedPath === layoutPath ? effectiveSelectedSections() : []
 }
 
@@ -4285,6 +4263,14 @@ function effectiveKeySection(section: string): string {
 
 function effectiveSelectedSections(): string[] {
   return selectedKeySections.map(effectiveKeySection)
+}
+
+function effectiveToolbarSections(): string[] {
+  if (!selectedDocument) return selectedToolbarSections
+  return [...new Set(selectedToolbarSections.flatMap((section) => {
+    const effective = effectivePanelSection(selectedDocument!, section, currentSkinState())
+    return effective === section ? [section] : [section, effective]
+  }))]
 }
 
 function effectiveKeyValue(section: string, key: string): string | undefined {
@@ -4505,7 +4491,7 @@ function refreshToolbarPreview(
   toolbarDocument.set("CAND", "BACK_STYLE", "")
   toolbarPreview.setPanel("", width, height)
   toolbarPreview.setDocument(toolbarDocument)
-  toolbarPreview.setMode("preview")
+  toolbarPreview.setMode(isEditing() ? "edit" : "preview")
   return { width, height, inputHeight }
 }
 
@@ -4583,30 +4569,58 @@ function renderSourceValueThumbnail(canvas: HTMLCanvasElement, range: SourceEdit
 }
 
 let sourceValuePreviewRenderID = 0
+let sourceColorPickerTarget: SourceEditorValueRange | undefined
+let sourceStylePreviewID = ""
+let styleImageGalleryRenderID = 0
 
-function openSourceValuePreview(range: SourceEditorValueRange): void {
-  clearImageSlicePicker()
-  styleImageDialog.hidden = false
+function openSourceColorPicker(range: SourceEditorValueClick): void {
+  const clean = range.value.trim().replace(/^#/, "")
+  if (range.kind !== "color" || !/^[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(clean)) return
+  sourceColorPickerTarget = range
+  sourceColorPicker.value = `#${(clean.length === 8 ? clean.slice(2) : clean).toLowerCase()}`
+  sourceColorPicker.title = range.label ?? `颜色 ${range.value}`
+  sourceColorPicker.style.left = `${Math.max(0, Math.min(window.innerWidth - 1, range.anchor.left))}px`
+  sourceColorPicker.style.top = `${Math.max(0, Math.min(window.innerHeight - 1, range.anchor.bottom))}px`
+  try {
+    sourceColorPicker.showPicker()
+  } catch {
+    sourceColorPicker.click()
+  }
+}
+
+function applySourceColorPicker(): void {
+  const target = sourceColorPickerTarget
+  sourceColorPickerTarget = undefined
+  if (!target || source.disabled || source.readOnly) return
+  if (source.value.slice(target.from, target.to) !== target.value) return
+  const next = replacedSourceColor(target.value, sourceColorPicker.value)
+  if (!next) return
+  source.replaceRange(target.from, target.to, next)
+  source.commit()
+}
+
+function showStyleImageDialog(): void {
+  if (!styleImageDialog.open) styleImageDialog.showModal()
+}
+
+function showSourceStylePreview(styleID: string): void {
+  ++styleImageGalleryRenderID
+  sourceStylePreviewID = styleID
+  styleImageGallerySearch.value = ""
+  styleImageGallery.hidden = true
   styleImagePreview.hidden = false
-  styleImagePicker.hidden = true
-  styleImageResourceOpen.hidden = true
-  styleImageTitle.textContent = range.kind === "style"
-    ? `样式 ${range.value.replace(/^STYLE/i, "")}`
-    : `颜色 ${range.value}`
-  styleImageSubtitle.textContent = range.kind === "style" ? "正常 / 按下" : "颜色预览"
+  styleImageMore.setAttribute("aria-expanded", "false")
+  styleImageMore.title = "更多样式"
+  styleImageMore.setAttribute("aria-label", "展示全部样式")
+  styleImageTitle.textContent = `样式 ${stylePickerLabel(styleID)}`
+  styleImageSubtitle.textContent = "正常 / 按下"
   const renderID = ++sourceValuePreviewRenderID
   const canvas = retinaThumbnail(styleImagePreview, 960, 260)
   const context = canvas.getContext("2d")
   if (!context) return
   context.clearRect(0, 0, canvas.width, canvas.height)
-  if (range.kind === "color") {
-    context.fillStyle = range.color ?? "transparent"
-    context.fillRect(0, 0, canvas.width, canvas.height)
-    return
-  }
   const resolver = visualResolver()
   if (!resolver) return
-  const styleID = range.value.replace(/^STYLE/i, "")
   void Promise.all([false, true].map((highlighted) => resolver.resolve(styleID, highlighted).catch(() => undefined)))
     .then((visuals) => {
       if (renderID !== sourceValuePreviewRenderID) return
@@ -4616,6 +4630,75 @@ function openSourceValuePreview(range: SourceEditorValueRange): void {
         context.drawImage(preview, index * canvas.width / 2, 0, canvas.width / 2, canvas.height)
       })
     })
+}
+
+async function renderStyleImageGallery(): Promise<void> {
+  const renderID = ++styleImageGalleryRenderID
+  const query = styleImageGallerySearch.value.trim().toLowerCase()
+  const styleIDs = availableStyleIDs().filter((styleID) => {
+    const displayID = stylePickerLabel(styleID).toLowerCase()
+    return !query || styleID.toLowerCase().includes(query) || displayID.includes(query)
+  })
+  styleImageGalleryGrid.replaceChildren()
+  styleImageGalleryCount.textContent = `${styleIDs.length} 个样式`
+  styleImageSubtitle.textContent = styleImageGalleryCount.textContent
+  styleImageGalleryEmpty.hidden = styleIDs.length > 0
+  const resolver = visualResolver()
+  if (!resolver) return
+  const items = await Promise.all(styleIDs.map(async (styleID) => ({
+    styleID,
+    visuals: await Promise.all([
+      resolver.resolve(styleID, false).catch(() => undefined),
+      resolver.resolve(styleID, true).catch(() => undefined),
+    ]),
+  })))
+  if (renderID !== styleImageGalleryRenderID || styleImageGallery.hidden) return
+  for (const { styleID, visuals } of items) {
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = "style-picker-item"
+    button.classList.toggle("selected", styleID === sourceStylePreviewID)
+    button.title = `预览样式 ${stylePickerLabel(styleID)}`
+    const label = document.createElement("strong")
+    label.textContent = stylePickerLabel(styleID)
+    const previews = document.createElement("span")
+    previews.className = "style-picker-previews"
+    for (const [index, visual] of visuals.entries()) {
+      const canvas = retinaThumbnail(document.createElement("canvas"), 128, 88)
+      canvas.setAttribute("aria-label", index === 0 ? "正常状态" : "按下状态")
+      drawVisualPreview(canvas, [visual], false)
+      previews.append(canvas)
+    }
+    button.append(label, previews)
+    button.addEventListener("click", () => showSourceStylePreview(styleID))
+    styleImageGalleryGrid.append(button)
+  }
+}
+
+function toggleStyleImageGallery(): void {
+  if (!styleImageGallery.hidden) {
+    showSourceStylePreview(sourceStylePreviewID)
+    return
+  }
+  styleImagePreview.hidden = true
+  styleImageGallery.hidden = false
+  styleImageMore.setAttribute("aria-expanded", "true")
+  styleImageMore.title = "收起全部样式"
+  styleImageMore.setAttribute("aria-label", "收起全部样式")
+  styleImageTitle.textContent = "全部样式"
+  void renderStyleImageGallery()
+  styleImageGallerySearch.focus()
+}
+
+function openSourceStylePreview(range: SourceEditorValueRange): void {
+  if (range.kind !== "style") return
+  clearImageSlicePicker()
+  showStyleImageDialog()
+  styleImagePicker.hidden = true
+  styleImageResourceOpen.hidden = true
+  styleImageMore.hidden = availableStyleIDs().length === 0
+  styleImageGallerySearch.value = ""
+  showSourceStylePreview(range.value.replace(/^STYLE/i, ""))
 }
 
 let stylePickerTarget: HTMLInputElement | undefined
@@ -5085,18 +5168,18 @@ const documentFieldLabels: Record<string, string> = {
   TYPE: "类型",
   LAYOUT_NAME: "布局名称",
   KEY_NUM: "按键数量",
-  TIP_NUM: "气泡数量",
+  TIP_NUM: "补丁数量",
   LIST_NUM: "列表数量",
   LIST_ORDER: "列表顺序",
   CELL_SIZE: "单元格尺寸",
   GRID: "网格",
   POS: "位置",
-  NO_BLUR: "禁用模糊",
+  NO_BLUR: "精确输入模式",
   OFFSET_NUM: "偏移数量",
   OFFSET: "偏移",
   FORE_STYLE_NUM: "前景样式数量",
-  INPUT_STYLE: "输入区样式",
-  SCAND_STYLE: "次选区样式",
+  INPUT_STYLE: "输入码样式",
+  SCAND_STYLE: "云输入样式",
   MORE_STYLE: "更多按钮样式",
   BG_COLOR: "背景颜色",
   FONT_NAME: "字体",
@@ -5163,16 +5246,23 @@ function translatedConfigLabel(key: string): string {
 function translatedSectionLabel(section: string): string {
   const offset = section.match(/^OFFSET(\d+)$/)
   const animation = section.match(/^ANIM(\d+)$/)
+  const icon = section.match(/^ICON(\d+)$/i)
+  const tip = section.match(/^TIP(\d+)$/i)
   const label = offset
     ? `偏移 ${offset[1]}`
     : animation
       ? `动画 ${animation[1]}`
-      : documentSectionLabels[section] ?? "扩展区域"
+      : icon
+        ? `工具按钮 ${icon[1]}`
+        : tip
+          ? `状态提示 ${tip[1]}`
+          : documentSectionLabels[section] ?? "扩展区域"
   return `${label}（${section}）`
 }
 
-function isHiddenConfigEntry(section: string, key: string): boolean {
-  return /^(?:OFFSET|TIP)\d*$/i.test(section) || /^(?:OFFSET|TIP)(?:_|\d|$)/i.test(key)
+function isHiddenConfigEntry(section: string, key: string, showTips = false): boolean {
+  if (/^OFFSET\d*$/i.test(section) || /^OFFSET(?:_|\d|$)/i.test(key)) return true
+  return !showTips && (/^TIP\d*$/i.test(section) || /^TIP(?:_|\d|$)/i.test(key))
 }
 
 const particleFieldGroups = [
@@ -5222,6 +5312,7 @@ function populateDocumentInspector(): void {
     return
   }
   const specialized = new Set<string>()
+  const toolbarSections = new Set(isToolbarPath(selectedPath) ? effectiveToolbarSections() : [])
   if (isSkinInfoPath(selectedPath)) {
     for (const field of skinFields) specialized.add(`\u0000${field.dataset.skinField ?? ""}`)
   }
@@ -5233,7 +5324,8 @@ function populateDocumentInspector(): void {
   }
   const entries = selectedDocument.entries().filter((entry) =>
     !/^KEY\d+$/.test(entry.section) &&
-    !isHiddenConfigEntry(entry.section, entry.key) &&
+    !isHiddenConfigEntry(entry.section, entry.key, isToolbarPath(selectedPath)) &&
+    (!toolbarSections.size || toolbarSections.has(entry.section)) &&
     !specialized.has(`${entry.section}\u0000${entry.key}`),
   )
   documentFieldsGroup.hidden = entries.length === 0
@@ -5567,12 +5659,18 @@ function populateKeyInspector(): void {
   const hasSelection = Boolean(document && sections.length && selectedPath === layoutPath)
   const skinSelected = isSkinInfoPath(selectedPath)
   const toolbarSelected = isToolbarPath(selectedPath)
+  const toolbarSections = toolbarSelected ? effectiveToolbarSections() : []
+  const toolbarHasSelection = toolbarSections.length > 0
+  const toolbarSection = selectedToolbarSections[0] ?? ""
+  const effectiveToolbarSection = toolbarSection && selectedDocument
+    ? effectivePanelSection(selectedDocument, toolbarSection, currentSkinState())
+    : toolbarSection
   const bdaConfigSelected = Boolean(archive?.isBdaConfig(selectedPath))
   const bdaSelected = archive?.format === "bda"
   const candidateSelected = Boolean(bdaSelected && selectedCandidate && selectedPath === layoutPath)
   syncBdaKeyFieldLabels(bdaSelected)
   skinFieldsGroup.hidden = !skinSelected || bdaSelected
-  toolbarFieldsGroup.hidden = !toolbarSelected || bdaSelected
+  toolbarFieldsGroup.hidden = !toolbarSelected || bdaSelected || toolbarHasSelection
   keyboardFieldsGroup.hidden = bdaSelected || skinSelected || toolbarSelected || bdaConfigSelected || candidateSelected || selectedPath !== layoutPath || hasSelection
   for (const group of keyOnlyGroups) {
     group.hidden = skinSelected || bdaConfigSelected || !hasSelection || bdaSelected && group !== keyAppearanceFieldsGroup
@@ -5583,6 +5681,8 @@ function populateKeyInspector(): void {
       ? selectedPath.split("/").pop() ?? "BDA 专属配置"
     : candidateSelected
       ? "候选栏"
+    : toolbarHasSelection
+      ? `${toolbarSection} · ${selectedDocument?.get(effectiveToolbarSection, "KEY") || selectedDocument?.get(toolbarSection, "KEY") || "未配置点击动作"}`
     : toolbarSelected
       ? "候选栏与工具栏"
     : selectedPath !== layoutPath && !toolbarSelected
@@ -6155,8 +6255,12 @@ function renderStyleImageResources(): void {
 
 function openStyleImageResourcePicker(): void {
   if (isTauri() || !archive || (!pickerTarget && !resourcePickerSelect)) return
+  ++styleImageGalleryRenderID
+  styleImageMore.hidden = true
+  styleImageMore.setAttribute("aria-expanded", "false")
+  styleImageGallery.hidden = true
   if (!pickerTarget) {
-    styleImageDialog.hidden = false
+    showStyleImageDialog()
     styleImagePreview.hidden = true
     styleImagePicker.hidden = true
     styleImageResourceOpen.hidden = true
@@ -6169,6 +6273,8 @@ function openStyleImageResourcePicker(): void {
 }
 
 function clearImageSlicePicker(): void {
+  ++styleImageGalleryRenderID
+  sourceStylePreviewID = ""
   if (pickerURL) URL.revokeObjectURL(pickerURL)
   pickerURL = ""
   pickerImage = undefined
@@ -6180,11 +6286,20 @@ function clearImageSlicePicker(): void {
   styleImagePicker.hidden = true
   styleImagePreview.hidden = false
   styleImageResourceOpen.hidden = true
+  styleImageMore.hidden = true
+  styleImageMore.setAttribute("aria-expanded", "false")
+  styleImageMore.title = "更多样式"
+  styleImageMore.setAttribute("aria-label", "展示全部样式")
+  styleImageGallery.hidden = true
+  styleImageGallerySearch.value = ""
+  styleImageGalleryGrid.replaceChildren()
+  styleImageGalleryCount.textContent = ""
+  styleImageGalleryEmpty.hidden = true
   closeStyleImageResourcePicker()
   styleImageImgList.replaceChildren()
   styleImageResourceCount.textContent = ""
   styleImageResourceEmpty.hidden = true
-  styleImageDialog.hidden = true
+  if (styleImageDialog.open) styleImageDialog.close()
   nativeImagePickerPayload = undefined
   nativeResourcePickerPayload = []
   if (isTauri()) {
@@ -6245,7 +6360,7 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
     editable: isEditing(),
   }
   if ("__TAURI_INTERNALS__" in window) {
-    styleImageDialog.hidden = true
+    if (styleImageDialog.open) styleImageDialog.close()
     void showPickerWindow("image-picker", "image", "图片切片", 1100, 760)
     return
   }
@@ -6259,13 +6374,17 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
     drawImageSlicePicker()
   }
   pickerImage.src = pickerURL
+  ++styleImageGalleryRenderID
+  styleImageMore.hidden = true
+  styleImageMore.setAttribute("aria-expanded", "false")
+  styleImageGallery.hidden = true
   styleImagePreview.hidden = true
   styleImagePicker.hidden = false
   styleImageResourceOpen.hidden = false
   styleImageTitle.textContent = path.split("/").pop() ?? path
   styleImageSubtitle.textContent = " · 选择切片"
   styleImagePickerMeta.textContent = pickerSlices.length ? "点击图片中的切片以修改引用" : "此图片没有可用的 TIL 切片"
-  styleImageDialog.hidden = false
+  showStyleImageDialog()
 }
 
 function selectedRects(): LayoutRect[] {
@@ -6712,7 +6831,11 @@ function selectFile(
   preserveInspectorView = false,
 ): void {
   if (resourceMode !== "image") bdaSliceReturn = undefined
-  if (path !== selectedPath) source.commit()
+  if (path !== selectedPath) {
+    source.commit()
+    selectedToolbarSections = []
+    toolbarPreview.setSelected([])
+  }
   selectedCandidate = false
   const previousInspectorTab = inspectorTab
   const preserveCurrentInspectorView = preserveInspectorView || path === selectedPath
@@ -8058,6 +8181,11 @@ mobilePreviewPosition.addEventListener("change", () => {
   localStorage.setItem("mobile-preview-position", mobilePreviewPosition.value)
   document.documentElement.dataset.mobilePreviewPosition = mobilePreviewPosition.value
 })
+hintPreviewEnabled.checked = localStorage.getItem("hint-preview-enabled") !== "off"
+hintPreviewEnabled.addEventListener("change", () => {
+  localStorage.setItem("hint-preview-enabled", hintPreviewEnabled.checked ? "on" : "off")
+  refreshPreview()
+})
 editorCrosshair.checked = localStorage.getItem("editor-crosshair") !== "off"
 editorCoordinateSnap.checked = localStorage.getItem("editor-coordinate-snap") !== "off"
 function applyEditorCrosshairSetting(): void {
@@ -8136,49 +8264,54 @@ async function applyWindowMaterial(): Promise<void> {
   document.documentElement.dataset.windowMaterial = enabled ? "on" : "off"
   applyWindowMaterialOpacity()
   if (!isTauri()) return
-  try {
-    await invoke("set_window_material", { enabled, opacity: currentWindowMaterialOpacity() })
-  } catch (error) {
-    windowMaterial.checked = false
-    document.documentElement.dataset.windowMaterial = "off"
-    localStorage.setItem("window-material", "off")
-    showError(error, "切换窗口材质")
-  }
+  await invoke("set_window_material", { enabled, opacity: currentWindowMaterialOpacity() })
 }
-windowMaterial.checked = localStorage.getItem("window-material") !== "off"
-async function initializeWindowMaterial(retryCount = 0): Promise<void> {
-  if (isTauri()) windowMaterialKind = await invoke<WindowMaterialKind>("window_material_kind")
+function applyWindowMaterialWithRetry(): Promise<void> {
+  return retryAsync(applyWindowMaterial, { attempts: 4, delayMs: 100 })
+}
+function handleWindowMaterialError(error: unknown, action: string): void {
+  windowMaterial.checked = false
+  document.documentElement.dataset.windowMaterial = "off"
+  localStorage.setItem("window-material", "off")
+  applyWindowMaterialOpacity()
+  showError(error, action)
+}
+async function initializeWindowMaterial(): Promise<void> {
+  if (isTauri()) {
+    windowMaterialKind = await retryAsync(
+      () => invoke<WindowMaterialKind>("window_material_kind"),
+      { attempts: 4, delayMs: 100 },
+    )
+  }
+  const savedWindowMaterial = localStorage.getItem("window-material")
+  windowMaterial.checked = savedWindowMaterial === null
+    ? windowMaterialKind !== "acrylic"
+    : savedWindowMaterial !== "off"
   windowMaterialOpacitySetting.hidden = windowMaterialKind === "none"
   windowMaterialOpacityLabel.textContent = windowMaterialKind === "acrylic" ? "亚克力不透明度" : "玻璃不透明度"
   const storageKey = windowMaterialKind === "acrylic" ? "window-acrylic-opacity" : "window-glass-opacity"
   windowMaterialOpacity.value = localStorage.getItem(storageKey) ?? (windowMaterialKind === "acrylic" ? "92" : "100")
-  try {
-    await applyWindowMaterial()
-  } catch (error) {
-    if (retryCount < 3) {
-      await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 100))
-      return initializeWindowMaterial(retryCount + 1)
-    }
-    throw error
-  }
+  await applyWindowMaterialWithRetry()
 }
-void initializeWindowMaterial().catch((error) => showError(error, "读取窗口材质"))
+void initializeWindowMaterial().catch((error) => handleWindowMaterialError(error, "读取窗口材质"))
 windowMaterial.addEventListener("change", () => {
   localStorage.setItem("window-material", windowMaterial.checked ? "on" : "off")
-  void applyWindowMaterial()
+  void applyWindowMaterialWithRetry().catch((error) => handleWindowMaterialError(error, "切换窗口材质"))
 })
 windowMaterialOpacity.addEventListener("input", () => {
   const storageKey = windowMaterialKind === "acrylic" ? "window-acrylic-opacity" : "window-glass-opacity"
   localStorage.setItem(storageKey, String(currentWindowMaterialOpacity()))
   applyWindowMaterialOpacity()
 })
-windowMaterialOpacity.addEventListener("change", () => void applyWindowMaterial())
+windowMaterialOpacity.addEventListener("change", () => {
+  void applyWindowMaterialWithRetry().catch((error) => handleWindowMaterialError(error, "切换窗口材质"))
+})
 
 let windowDragPointerDown = false
 let windowDragMaterialDisabled = false
 let windowDragMaterialTransition: Promise<unknown> | undefined
 
-async function restoreWindowMaterialAfterDrag(retryCount = 0): Promise<void> {
+async function restoreWindowMaterialAfterDrag(): Promise<void> {
   windowDragPointerDown = false
   try {
     await windowDragMaterialTransition
@@ -8194,14 +8327,9 @@ async function restoreWindowMaterialAfterDrag(retryCount = 0): Promise<void> {
   windowDragMaterialDisabled = false
   await new Promise(resolve => setTimeout(resolve, 50))
   try {
-    await applyWindowMaterial()
+    await applyWindowMaterialWithRetry()
   } catch (error) {
-    if (retryCount < 3) {
-      await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 100))
-      return restoreWindowMaterialAfterDrag(retryCount + 1)
-    }
-    document.documentElement.dataset.windowMaterial = windowMaterial.checked ? "on" : "off"
-    await applyWindowMaterial().catch(() => {})
+    handleWindowMaterialError(error, "恢复窗口材质")
   }
 }
 
@@ -8274,9 +8402,9 @@ inspectorGroupedDisplay.addEventListener("change", () => {
   localStorage.setItem("inspector-grouped-display", inspectorGroupedDisplay.checked ? "on" : "off")
   applyInspectorGroupedDisplay()
 })
-sourceCompletionEnabled.checked = false
-sourceValueHintsEnabled.checked = false
-sourceLineExplanationEnabled.checked = false
+sourceCompletionEnabled.checked = localStorage.getItem("source-completion-enabled") === "on"
+sourceValueHintsEnabled.checked = localStorage.getItem("source-value-hints-enabled") === "on"
+sourceLineExplanationEnabled.checked = localStorage.getItem("source-line-explanation-enabled") === "on"
 function applySourceEditorFeatures(): void {
   source.setFeatures({
     completion: sourceCompletionEnabled.checked,
@@ -8400,10 +8528,12 @@ source.addEventListener("input", () => {
   scheduleSourceInputHighlight(true)
 })
 source.addEventListener("change", commitBdaSourceEdit)
+sourceColorPicker.addEventListener("change", applySourceColorPicker)
 source.addEventListener("valueclick", (event) => {
-  const detail = (event as CustomEvent<SourceEditorValueRange>).detail
+  const detail = (event as CustomEvent<SourceEditorValueClick>).detail
   if (!detail || detail.kind === "action") return
-  openSourceValuePreview(detail)
+  if (detail.kind === "color") openSourceColorPicker(detail)
+  else if (detail.kind === "style") openSourceStylePreview(detail)
 })
 sourceSearch.addEventListener("input", () => {
   sourceSearchIndex = sourceSearch.value.trim() ? 0 : -1
@@ -9032,13 +9162,14 @@ panelScaleForm.addEventListener("submit", (event) => {
 })
 function syncCandidateSelection(): void {
   const selected = selectedCandidate && archive?.format === "bda" && selectedPath === layoutPath
-    || archive?.format !== "bda" && isToolbarPath(selectedPath)
+    || archive?.format !== "bda" && isToolbarPath(selectedPath) && !selectedToolbarSections.length
   candidateArea.classList.toggle("candidate-selected", selected)
   candidateArea.setAttribute("aria-selected", String(selected))
 }
 
-candidateArea.addEventListener("click", () => {
+candidateArea.addEventListener("click", (event) => {
   if (!isEditing()) return
+  if (event.target === toolbarCanvas && selectedToolbarSections.length) return
   if (archive?.format === "bda") {
     if (selectedPath !== layoutPath) selectFile(layoutPath, "overview")
     selectedCandidate = true
@@ -9071,6 +9202,15 @@ styleImagePickerCanvas.addEventListener("click", (event) => {
   drawImageSlicePicker()
 })
 styleImageClose.addEventListener("click", clearImageSlicePicker)
+styleImageMore.addEventListener("click", toggleStyleImageGallery)
+styleImageGallerySearch.addEventListener("input", () => void renderStyleImageGallery())
+styleImageDialog.addEventListener("cancel", (event) => {
+  event.preventDefault()
+  clearImageSlicePicker()
+})
+styleImageDialog.addEventListener("click", (event) => {
+  if (event.target === styleImageDialog) clearImageSlicePicker()
+})
 styleImageResourceOpen.addEventListener("click", openStyleImageResourcePicker)
 styleImageResourceClose.addEventListener("click", () => {
   if (pickerTarget) closeStyleImageResourcePicker()
@@ -9380,7 +9520,7 @@ if (isTauri()) {
   // 窗口获得焦点时重新同步材质状态，修复 Windows 10 亚克力材质导致的窗口移动卡顿问题
   void getCurrentWindow().onFocusChanged(({ payload: focused }) => {
     if (focused && windowMaterial.checked && !windowDragPointerDown && !windowDragMaterialDisabled) {
-      void applyWindowMaterial()
+      void applyWindowMaterialWithRetry().catch((error) => handleWindowMaterialError(error, "恢复窗口材质"))
     }
   })
   let destroyingWindow = false

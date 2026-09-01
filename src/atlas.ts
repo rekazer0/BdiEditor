@@ -24,6 +24,7 @@ export type TextVisual = {
 export type StyleTextVisual = TextVisual & { text: string }
 
 export type VisualResolver = {
+  ready?(): Promise<void>
   resolve(styleID: string, highlighted: boolean): Promise<Visual | undefined>
   sourceSize?(styleID: string, highlighted: boolean): { width: number; height: number } | undefined
   resolveResource?(resourceID: string): Promise<Visual | undefined>
@@ -115,6 +116,7 @@ export function resolveTextVisual(
   styles: IniDocument,
   foreground: string,
   highlighted: boolean,
+  defaultFontName?: string,
 ): TextVisual | undefined {
   const sections = styles.sections()
   const result: TextVisual = {}
@@ -146,6 +148,7 @@ export function resolveTextVisual(
       if (result.color === undefined && color) result.color = color
     }
   }
+  if (result.fontName === undefined && defaultFontName) result.fontName = defaultFontName
   return Object.keys(result).length ? result : undefined
 }
 
@@ -153,10 +156,11 @@ export function resolveStyleTextVisual(
   styles: IniDocument,
   styleID: string,
   highlighted: boolean,
+  defaultFontName?: string,
 ): StyleTextVisual | undefined {
   const text = styles.get(`STYLE${styleID.trim()}`, "SHOW")
   if (!text) return
-  return { text, ...resolveTextVisual(styles, styleID, highlighted) }
+  return { text, ...resolveTextVisual(styles, styleID, highlighted, defaultFontName) }
 }
 
 export function resolveVisualSpec(
@@ -206,14 +210,89 @@ function topLevelDicts(plist: string): string[] {
   return dictionaries
 }
 
-export function toolbarImagePaths(plist: string, limit = 3): string[] {
-  return topLevelDicts(plist)
+function dictAfterKey(source: string, key: string): string | undefined {
+  const marker = `<key>${key}</key>`
+  const index = source.indexOf(marker)
+  return index < 0 ? undefined : topLevelDicts(source.slice(index + marker.length))[0]
+}
+
+function stringAfterKey(source: string | undefined, key: string): string | undefined {
+  if (!source) return
+  const marker = `<key>${key}</key>`
+  const index = source.indexOf(marker)
+  return index < 0
+    ? undefined
+    : source.slice(index + marker.length).match(/^\s*<string>\s*([^<]+?)\s*<\/string>/)?.[1]
+}
+
+function normalizedToolbarImagePath(path: string | undefined): string | undefined {
+  return path?.trim().replace(/^\/+/, "").replace(/\.png$/i, "") || undefined
+}
+
+export function toolbarImagePaths(plist: string, limit = Number.POSITIVE_INFINITY): string[] {
+  const paths = topLevelDicts(plist)
     .filter((entry) => /<key>Position<\/key>\s*<string>toolbar<\/string>/.test(entry))
     .flatMap((entry) => {
-      const path = entry.match(/<string>(1\.0\/toolbarMenuItem_[^<]+)<\/string>/)?.[1]
+      const images = dictAfterKey(entry, "Images")
+      const normalImages = dictAfterKey(images ?? "", "Normal")
+      const path = normalizedToolbarImagePath(stringAfterKey(normalImages, "Normal"))
       return path ? [path] : []
     })
-    .slice(0, limit)
+  return paths.slice(0, Math.max(0, limit))
+}
+
+type EmbeddedFont = { family: string; ready: Promise<void> }
+
+let embeddedFontID = 0
+const embeddedFonts = new WeakMap<SkinArchive, Map<string, EmbeddedFont>>()
+
+function embeddedFontPath(
+  names: readonly string[],
+  stylePath: string,
+  configuredPath: string | undefined,
+): string | undefined {
+  const clean = configuredPath
+    ?.split(",")[0]
+    ?.trim()
+    .replace(/^['"]|['"]$/g, "")
+    .replaceAll("\\", "/")
+    .replace(/^\/+/, "")
+  if (!clean || clean.split("/").includes("..")) return
+  const styleDirectory = stylePath.slice(0, stylePath.lastIndexOf("/"))
+  const skinRoot = stylePath.match(/^(.*\/skin)\//)?.[1]
+  const candidates = [
+    `${styleDirectory}/${clean}`,
+    skinRoot ? `${skinRoot}/${clean}` : "",
+  ]
+  const byLowercase = new Map(names.map((name) => [name.toLowerCase(), name]))
+  return candidates.flatMap((candidate) => {
+    const found = byLowercase.get(candidate.toLowerCase())
+    return found ? [found] : []
+  })[0]
+}
+
+function loadEmbeddedFont(archive: SkinArchive, path: string): EmbeddedFont | undefined {
+  const bytes = archive.getBytes(path)
+  if (!bytes) return
+  let cache = embeddedFonts.get(archive)
+  if (!cache) {
+    cache = new Map()
+    embeddedFonts.set(archive, cache)
+  }
+  const cached = cache.get(path)
+  if (cached) return cached
+
+  const family = `BdiEmbeddedFont${++embeddedFontID}`
+  const data = new Uint8Array(bytes.byteLength)
+  data.set(bytes)
+  const ready = (async () => {
+    if (typeof FontFace === "undefined" || typeof document === "undefined") return
+    const face = await new FontFace(family, data.buffer).load()
+    document.fonts.add(face)
+  })().catch(() => {})
+  const result = { family, ready }
+  cache.set(path, result)
+  return result
 }
 
 export class AtlasResolver {
@@ -223,6 +302,8 @@ export class AtlasResolver {
   private readonly styles?: IniDocument
   private readonly images = new Map<string, Promise<ImageBitmap>>()
   private readonly tiles = new Map<string, IniDocument>()
+  private readonly embeddedFontFamily?: string
+  private readonly embeddedFontReady: Promise<void>
 
   constructor(archive: SkinArchive, theme: string, orientation: string) {
     this.archive = archive
@@ -235,6 +316,16 @@ export class AtlasResolver {
       ...this.resourceRoots.map((root) => `${root}/default.css`),
     ].find((candidate) => archive.names().includes(candidate))
     if (path) this.styles = IniDocument.parse(archive.getText(path))
+    const fontPath = path && this.styles
+      ? embeddedFontPath(archive.names(), path, this.styles.get("GLOBAL", "FONT_PATH"))
+      : undefined
+    const embeddedFont = fontPath ? loadEmbeddedFont(archive, fontPath) : undefined
+    this.embeddedFontFamily = embeddedFont?.family
+    this.embeddedFontReady = embeddedFont?.ready ?? Promise.resolve()
+  }
+
+  ready(): Promise<void> {
+    return this.embeddedFontReady
   }
 
   private bitmap(path: string): Promise<ImageBitmap> | undefined {
@@ -307,7 +398,7 @@ export class AtlasResolver {
     return { image: await image, imagePath, source, inner, scale, color: spec.color, borderColor: spec.borderColor }
   }
 
-  async resolveToolbarImages(limit = 3): Promise<Visual[]> {
+  async resolveToolbarImages(limit?: number): Promise<Visual[]> {
     const plistPath = `${this.theme}/skin/res/logo/com.baidu.inputmethod.toolbarMenuItems.plist`
     if (!this.archive.isText(plistPath)) return []
     const names = this.archive.names()
@@ -330,11 +421,11 @@ export class AtlasResolver {
 
   resolveText(foreground: string, highlighted: boolean): TextVisual | undefined {
     if (!this.styles) return
-    return resolveTextVisual(this.styles, foreground, highlighted)
+    return resolveTextVisual(this.styles, foreground, highlighted, this.embeddedFontFamily)
   }
 
   resolveStyleText(styleID: string, highlighted: boolean): StyleTextVisual | undefined {
     if (!this.styles) return
-    return resolveStyleTextVisual(this.styles, styleID, highlighted)
+    return resolveStyleTextVisual(this.styles, styleID, highlighted, this.embeddedFontFamily)
   }
 }

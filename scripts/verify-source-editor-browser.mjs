@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import { spawn } from "node:child_process"
+import net from "node:net"
 import os from "node:os"
 import path from "node:path"
 import puppeteer from "puppeteer-core"
@@ -16,7 +17,18 @@ assert.match(
   "滑块悬停应使用高亮颜色",
 )
 
-const port = 1421
+async function availablePort() {
+  return await new Promise((resolve, reject) => {
+    const probe = net.createServer()
+    probe.once("error", reject)
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address()
+      probe.close((error) => error ? reject(error) : resolve(address.port))
+    })
+  })
+}
+
+const port = await availablePort()
 const origin = `http://127.0.0.1:${port}`
 const bdiFixture = path.join(os.tmpdir(), `bdi-editor-codemirror-${process.pid}.bdi`)
 fs.copyFileSync(path.resolve("public/default-template.bds"), bdiFixture)
@@ -26,11 +38,13 @@ const server = spawn(process.execPath, [
   "--port", String(port),
   "--strictPort",
 ], { stdio: ["ignore", "pipe", "pipe"] })
+let serverError = ""
+server.stderr.on("data", (chunk) => { serverError += String(chunk) })
 
 async function waitForServer() {
   const deadline = Date.now() + 15_000
   while (Date.now() < deadline) {
-    if (server.exitCode !== null) throw new Error(`Vite 提前退出：${server.exitCode}`)
+    if (server.exitCode !== null) throw new Error(`Vite 提前退出：${server.exitCode}\n${serverError.trim()}`)
     try {
       const response = await fetch(origin)
       if (response.ok) return
@@ -51,7 +65,7 @@ try {
   const page = await browser.newPage()
   await page.setViewport({ width: 1280, height: 800 })
   await page.goto(origin, { waitUntil: "networkidle0" })
-  await page.waitForSelector("#source .cm-editor")
+  assert.equal(await page.$("#source .cm-editor"), null, "未打开源码面板前不应加载 CodeMirror")
 
   const scrollbar = await page.evaluate(() => {
     const scroller = document.createElement("div")
@@ -133,8 +147,42 @@ try {
 
     let inputEvents = 0
     let changeEvents = 0
+    let valueClick
     editor.addEventListener("input", () => inputEvents += 1)
     editor.addEventListener("change", () => changeEvents += 1)
+    editor.addEventListener("valueclick", (event) => { valueClick = event.detail })
+    editor.value = "NM_COLOR=9D6262"
+    editor.setFeatures({ valueHints: true })
+    editor.setDecorations({
+      valueRanges: [{ from: 9, to: 15, value: "9D6262", kind: "color", color: "#9d6262" }],
+    })
+    const colorValue = parent.querySelector(".cm-source-value-color")
+    const colorBounds = colorValue?.getBoundingClientRect()
+    colorValue?.dispatchEvent(new MouseEvent("mousedown", {
+      bubbles: true,
+      button: 0,
+      clientX: colorBounds ? colorBounds.left + colorBounds.width / 2 : 0,
+      clientY: colorBounds ? colorBounds.top + colorBounds.height / 2 : 0,
+    }))
+    const valueClickAnchored = Boolean(
+      colorBounds && valueClick &&
+      Math.abs(valueClick.anchor.left - colorBounds.left) < 0.5 &&
+      Math.abs(valueClick.anchor.bottom - colorBounds.bottom) < 0.5
+    )
+    editor.value = "CENT"
+    editor.setFeatures({ completion: true })
+    editor.setSelectionRange(editor.value.length)
+    editor.focus()
+    editor.view.contentDOM.dispatchEvent(new KeyboardEvent("keydown", {
+      key: " ", code: "Space", ctrlKey: true, bubbles: true, cancelable: true,
+    }))
+    const completion = parent.querySelector(".cm-source-completion button")
+    const completionDetail = completion?.getAttribute("title") ?? ""
+    if (completion instanceof HTMLButtonElement) completion.click()
+    const semanticCompletion = editor.value === "CENTER=" && /点击动作/.test(completionDetail)
+    inputEvents = 0
+    changeEvents = 0
+
     const ini = Array.from(
       { length: 30_000 },
       (_, index) => `[KEY${index}]\nCENTER=F${index}\nVIEW_RECT=${index},0,10,10`,
@@ -196,8 +244,10 @@ try {
       inputEvents,
       jsonLines,
       readOnly,
+      semanticCompletion,
       selectedLines,
       selectedMarkInsideText,
+      valueClickAnchored,
       visibleText,
     }
   })
@@ -214,6 +264,8 @@ try {
   assert.equal(result.changeEvents, 1, "CodeMirror 失焦应发出一次 change 供 BDA JSON 提交")
   assert.ok(result.collapsedSelection, "取消按键选择应折叠源码文字选区")
   assert.ok(result.readOnly, "只读模式应关闭 contenteditable")
+  assert.ok(result.semanticCompletion, "Ctrl+Space 应把带中文说明的键名候选应用为 CENTER=")
+  assert.ok(result.valueClickAnchored, "源码颜色点击事件应锚定到被点击的颜色值")
   console.log(`✓ 滚动条轨道跳转及 CodeMirror BDS/BDI 集成验证通过（首屏 ${result.initialLines} 行，末尾 ${result.finalLines} 行，JSON ${result.jsonLines} 行，初始化 ${result.initialRenderMs.toFixed(0)}ms）`)
 } finally {
   await browser?.close()

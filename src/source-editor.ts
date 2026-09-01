@@ -32,7 +32,8 @@ import {
   type DecorationSet,
 } from "@codemirror/view"
 import { tags } from "@lezer/highlight"
-import { actionDescription, knownFunctionCodes, knownSkinStates } from "./actions.ts"
+import { actionDescription } from "./actions.ts"
+import { sourceCompletions, type SourceCompletionItem } from "./source-completion.ts"
 
 export type SourceEditorLanguage = "ini" | "json"
 
@@ -53,7 +54,12 @@ export type SourceEditorValueRange = {
   color?: string
 }
 
-export type SourceEditorValueClick = SourceEditorValueRange
+export type SourceEditorValueClick = SourceEditorValueRange & {
+  anchor: {
+    left: number
+    bottom: number
+  }
+}
 
 export type SourceEditorValuePreviewRenderer = (
   canvas: HTMLCanvasElement,
@@ -213,7 +219,7 @@ export class SourceCodeEditor extends EventTarget {
   private valueRanges: SourceEditorValueRange[] = []
   private valuePreviewRenderer?: SourceEditorValuePreviewRenderer
   private completionPopup?: HTMLElement
-  private completionItems: string[] = []
+  private completionItems: SourceCompletionItem[] = []
   private completionIndex = 0
   private completionFrom = 0
 
@@ -247,7 +253,10 @@ export class SourceCodeEditor extends EventTarget {
               if (position === null) return false
               const range = this.valueRanges.find((item) => item.kind !== "action" && position >= item.from && position < item.to)
               if (!range) return false
-              this.dispatchEvent(new CustomEvent<SourceEditorValueClick>("valueclick", { detail: range }))
+              const bounds = target.getBoundingClientRect()
+              this.dispatchEvent(new CustomEvent<SourceEditorValueClick>("valueclick", {
+                detail: { ...range, anchor: { left: bounds.left, bottom: bounds.bottom } },
+              }))
               return true
             },
           }),
@@ -393,29 +402,31 @@ export class SourceCodeEditor extends EventTarget {
     if (event.key === "Enter" || event.key === "Tab") {
       event.preventDefault()
       const item = this.completionItems[this.completionIndex]
-      if (item) this.replaceRange(this.completionFrom, this.view.state.selection.main.head, item)
+      if (item) this.applyCompletion(item)
       this.closeCompletion()
       return true
     }
     return false
   }
 
-  private refreshCompletion(): void {
+  private refreshCompletion(explicit = false): void {
     if (!this.features.completion) return
     const head = this.view.state.selection.main.head
     const line = this.view.state.doc.lineAt(head)
-    const prefix = line.text.slice(0, head - line.from).match(/(?:^|[=:\s"'])\s*([FS]\d*)$/i)
-    if (!prefix) { this.closeCompletion(); return }
-    this.completionFrom = head - prefix[1].length
-    const query = prefix[1].toUpperCase()
-    this.completionItems = (query.startsWith("F") ? knownFunctionCodes : knownSkinStates.map((state) => `S${state}`))
-      .filter((item) => item.startsWith(query)).slice(0, 24)
+    const result = sourceCompletions(line.text.slice(0, head - line.from), this.language, explicit)
+    if (!result) { this.closeCompletion(); return }
+    this.completionFrom = head - result.replaceLength
+    this.completionItems = result.items
     if (!this.completionItems.length) { this.closeCompletion(); return }
     this.completionIndex = 0
     this.renderCompletion()
   }
 
-  private openCompletion(): void { this.refreshCompletion() }
+  private openCompletion(): void { this.refreshCompletion(true) }
+
+  private applyCompletion(item: SourceCompletionItem): void {
+    this.replaceRange(this.completionFrom, this.view.state.selection.main.head, item.apply ?? item.label)
+  }
 
   private renderCompletion(): void {
     if (!this.completionItems.length) return
@@ -429,10 +440,10 @@ export class SourceCodeEditor extends EventTarget {
       const button = document.createElement("button")
       button.type = "button"
       button.className = index === this.completionIndex ? "active" : ""
-      button.textContent = item
-      button.title = actionDescription(item) || `百度状态码 ${item}`
+      button.textContent = item.label
+      button.title = item.detail
       button.addEventListener("click", () => {
-        this.replaceRange(this.completionFrom, this.view.state.selection.main.head, item)
+        this.applyCompletion(item)
         this.closeCompletion()
       })
       return button

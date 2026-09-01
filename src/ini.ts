@@ -96,6 +96,13 @@ export class IniDocument {
     return true
   }
 
+  remove(section: string, key: string): boolean {
+    const index = this.lines.findIndex((line) => line.section === section && line.key === key)
+    if (index < 0) return false
+    this.lines.splice(index, 1)
+    return true
+  }
+
   entries(section?: string): IniEntry[] {
     return this.lines.flatMap((line) => {
       if (!line.key || line.section === undefined || line.value === undefined) return []

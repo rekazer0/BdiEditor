@@ -42,6 +42,7 @@ assert.equal(history.length, 2)
 console.log("✓ 方向键自动重复移动合并为一次撤销记录")
 
 const mainSource = fs.readFileSync("src/main.ts", "utf8")
+const htmlSource = fs.readFileSync("index.html", "utf8")
 const styleSource = fs.readFileSync("src/style.css", "utf8")
 assert.match(
   mainSource,
@@ -69,6 +70,8 @@ assert.match(
   "拖动结束时应同步最后一个平移位置",
 )
 assert.doesNotMatch(styleSource, /app-region:\s*drag/, "窗口拖动应只由 Tauri 自定义链路启动")
+assert.match(htmlSource, /id="hint-preview-enabled"[^>]*checked/, "设置中应提供默认开启的实验气泡预览开关")
+assert.match(mainSource, /hintPreviewEnabled\.addEventListener\("change"[\s\S]+refreshPreview\(\)/, "气泡预览设置应立即刷新画布")
 assert.match(
   mainSource,
   /const mouseReleased = invoke\("wait_for_left_mouse_release"\)[\s\S]+startDragging\(\)[\s\S]+await mouseReleased[\s\S]+restoreWindowMaterialAfterDrag\(\)/,
@@ -139,11 +142,11 @@ SIZE=190,205
 assert.ok(shortHint)
 assert.equal(shortHint.barIcon, "1")
 assert.equal(shortHint.cellStyle, "24")
-assert.equal(legacyHintIconID(shortHint, "center"), undefined)
+assert.equal(legacyHintIconID(shortHint, "center"), "2")
 assert.equal(legacyHintIconID(shortHint, "up"), "2")
-assert.equal(legacyHintIconID(shortHint, "down"), undefined)
-assert.equal(legacyHintIconID(shortHint, "left"), undefined)
-assert.equal(legacyHintIconID(shortHint, "right"), undefined)
+assert.equal(legacyHintIconID(shortHint, "down"), "3")
+assert.equal(legacyHintIconID(shortHint, "left"), "4")
+assert.equal(legacyHintIconID(shortHint, "right"), "5")
 assert.equal(legacyHintIconID(shortHint, "hold"), undefined)
 assert.deepEqual(shortHint.icons.get("1")?.padding, [45, 42, 42, 40])
 
@@ -171,7 +174,7 @@ SIZE=170,175
 BACK_STYLE=25
 SIZE=190,205
 `))
-assert.equal(legacyHintIconID(longHint, "center"), undefined)
+assert.equal(legacyHintIconID(longHint, "center"), "2")
 assert.equal(legacyHintIconID(longHint, "hold"), "2")
 
 const nineKey = { up: "9", left: "w", center: "x", right: "y", down: "z", hold: "", holdSymbols: "" }

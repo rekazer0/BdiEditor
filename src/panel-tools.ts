@@ -21,7 +21,7 @@ export function availableSkinStates(...documents: IniDocument[]): number[] {
     const actionState = value.trim().match(/^S(\d+)(?:_\d+)?$/)
     return [...styleStates, ...(actionState ? [Number(actionState[1])] : [])]
   })
-  return [...new Set([...knownSkinStates, ...states].filter((state) => state >= 1 && state <= 122))]
+  return [...new Set([...knownSkinStates, ...states].filter((state) => state >= 0 && state <= 122))]
     .sort((a, b) => a - b)
 }
 
@@ -34,8 +34,9 @@ export function stateTipSection(
   value: string | undefined,
   state: number | undefined,
 ): number | undefined {
-  if (state === undefined || state <= 0 || state > 122) return
-  return stateStyleValue(value, state)
+  const effectiveState = state ?? 0
+  if (effectiveState < 0 || effectiveState > 122) return
+  return stateStyleValue(value, effectiveState)
 }
 
 export function effectivePanelSection(

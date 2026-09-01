@@ -232,7 +232,48 @@ assert.equal(
   "KEY83",
   "TOUCH_RECT=0,0,0,0 不能扩张成全屏热区",
 )
-console.log("✓ TOUCH_RECT=0,0,0,0 忽略，不吞点击")
+console.log("✓ TOUCH_RECT=0,0,0,0 不会扩张成全屏热区")
+assert.equal(
+  previewHitItem(touchItems, { x: 800, y: 500 }, "preview", 1242, 631),
+  undefined,
+  "TOUCH_RECT=0,0,0,0 应使按键不可点击",
+)
+
+const narrowTouch = previewItems(IniDocument.parse(`
+[KEY1]
+VIEW_RECT=0,0,100,100
+TOUCH_RECT=25,25,50,50
+CENTER=a
+`), 100, 100)
+assert.equal(previewHitItem(narrowTouch, { x: 10, y: 10 }, "preview", 100, 100), undefined)
+assert.equal(previewHitItem(narrowTouch, { x: 50, y: 50 }, "preview", 100, 100)?.section, "KEY1")
+console.log("✓ TOUCH_RECT 精确控制预览点击范围，零尺寸禁用点击")
+
+const candidateIcon = IniDocument.parse(`
+[ICON1]
+FORE_STYLE=115
+SIZE=100,100
+ANCHOR_TYPE=1
+POS=0,0
+KEY=F8
+PERSIST=1
+ANIM_STYLE=301
+BACK_ANIM_STYLE=302
+FORE_ANIM_STYLE=303,304
+`)
+const icon = previewHitItem(previewItems(candidateIcon, 1080, 119), { x: 50, y: 50 }, "preview", 1080, 119)
+assert.deepEqual(
+  icon && {
+    section: icon.section,
+    center: icon.center,
+    animStyle: icon.animStyle,
+    backAnimStyle: icon.backAnimStyle,
+    foreAnimStyles: icon.foreAnimStyles,
+  },
+  { section: "ICON1", center: "F8", animStyle: "301", backAnimStyle: "302", foreAnimStyles: ["303", "304"] },
+  "cand1.cnd 的 ICON 应像 KEY 一样可点击并解析点击动画",
+)
+console.log("✓ cand1.cnd ICON 可点击并解析点击动画")
 
 const tipGeometry = IniDocument.parse(`
 [KEY1]
@@ -261,9 +302,9 @@ assert.equal(previewStateFromAction("S123"), undefined)
 assert.equal(stateTipSection("S122_7", 122), 7)
 assert.ok(availableSkinStates(extendedStates).includes(95), "应包含 APK 已知状态")
 assert.ok(availableSkinStates(extendedStates).includes(122), "应保留皮肤自定义状态")
-assert.equal(skinStateLabel(2), "S2（大写锁定）")
-assert.equal(actionDescription("S27"), "百度状态码 S27（回车键：发送）")
-console.log("✓ S 状态：覆盖 S1-S122、补齐 APK 状态并显示中文说明")
+assert.equal(skinStateLabel(2), "S2（英文锁定大写）")
+assert.equal(actionDescription("S27"), "百度状态码 S27（输入框已满足发送条件）")
+console.log("✓ S 状态：覆盖 S0-S122、补齐 APK 状态并显示中文说明")
 
 const particleAnimations = parseLegacyAnimation(
   IniDocument.parse(`

@@ -110,7 +110,7 @@ export type PreviewItem = {
   section: string
   sections: string[]
   rect: Rect
-  touchRect?: Rect
+  touchRect?: Rect | null
   foreRect?: Rect
   editable: boolean
   show: string
@@ -193,8 +193,12 @@ export type LegacyHintIcon = {
 export type LegacyHint = {
   icons: Map<string, LegacyHintIcon>
   upIcon?: string
+  downIcon?: string
+  leftIcon?: string
+  rightIcon?: string
   holdIcon?: string
   barIcon?: string
+  arrowIcon?: string
   cellStyle?: string
 }
 
@@ -225,8 +229,12 @@ export function parseLegacyHint(document: IniDocument | undefined): LegacyHint |
   return {
     icons,
     upIcon: document.get("DRAW", "ICON_UP"),
+    downIcon: document.get("DRAW", "ICON_DN"),
+    leftIcon: document.get("DRAW", "ICON_LT"),
+    rightIcon: document.get("DRAW", "ICON_RT"),
     holdIcon: document.get("HINT", "BACK_ICON"),
     barIcon: document.get("BAR", "BACK_ICON"),
+    arrowIcon: document.get("BAR", "ARROW_ICON"),
     cellStyle: document.get("BAR", "CELL_STYLE"),
   }
 }
@@ -236,8 +244,14 @@ export function legacyHintIconID(
   direction: "center" | "up" | "down" | "left" | "right" | "hold",
 ): string | undefined {
   if (!hint) return
+  if (direction === "center") return hint.holdIcon ?? hint.upIcon
   if (direction === "hold") return hint.holdIcon
-  return direction === "up" ? hint.upIcon : undefined
+  return {
+    up: hint.upIcon,
+    down: hint.downIcon,
+    left: hint.leftIcon,
+    right: hint.rightIcon,
+  }[direction]
 }
 
 export function legacyHintText(
@@ -248,7 +262,11 @@ export function legacyHintText(
     return key.holdSymbols.split(/[,|]/).map((value) => value.trim()).join("") ||
       (/^F\d+$/i.test(key.hold) ? "" : key.hold)
   }
-  return direction === "up" && !/^F\d+$/i.test(key.up) ? key.up : ""
+  return !/^F\d+$/i.test(key[direction]) ? key[direction] : ""
+}
+
+export function isLegacyHintInputKey(key: Pick<PreviewItem, "section" | "center">): boolean {
+  return /^KEY\d+$/i.test(key.section) && Boolean(key.center.trim()) && !/^F\d+$/i.test(key.center.trim())
 }
 
 export function legacyHintCandidates(
@@ -632,65 +650,48 @@ export function effectivePreviewItem(
       foreAnimStyles: [],
     }
   }
-  if (!/^ICON\d+$/i.test(item.section)) {
-    const value = (name: string): string | undefined => document.get(section, name)
-    const backStyle = value("BACK_STYLE")
-    const foreStyle = value("FORE_STYLE")
-    const positionType = value("POS_TYPE")
-    const foreOffset = value("FORE_OFFSET")
-    const foreAnimStyle = value("FORE_ANIM_STYLE")
-    const backAnimStyle = value("BACK_ANIM_STYLE")
-    const animStyle = value("ANIM_STYLE")
-    const center = value("CENTER") ?? item.center
-    const down = value("DOWN") ?? (value("CENTER") === undefined ? item.down : center)
-    const foreStyles = foreStyle === undefined
-      ? item.foreStyles
-      : foreStyle.split(",").map((token) => token.trim()).filter(Boolean)
-    return {
-      ...item,
-      show: value("SHOW") ?? item.show,
-      center,
-      up: value("UP") ?? item.up,
-      down,
-      left: value("LEFT") ?? item.left,
-      right: value("RIGHT") ?? item.right,
-      hold: value("HOLD") ?? item.hold,
-      holdSymbols: value("HOLDSYM") ?? item.holdSymbols,
-      backStyle: backStyle === undefined ? item.backStyle : backStyle.split(",")[0],
-      highlightBackStyle: value("HL_BACK_STYLE")?.split(",")[0] ?? item.highlightBackStyle,
-      foreStyle: foreStyles[0] ?? "",
-      foreStyles,
-      foreOffsets: foreOffset === undefined
-        ? item.foreOffsets
-        : foreOffset.split(";").map(parseOffset),
-      positionTypes: positionType === undefined
-        ? item.positionTypes
-        : positionType.split(",").map((token) => token.trim()).filter(Boolean),
-      animStyle: animStyle ?? item.animStyle,
-      backAnimStyle: backAnimStyle ?? item.backAnimStyle,
-      foreAnimStyle: foreAnimStyle === undefined
-        ? item.foreAnimStyle
-        : foreAnimStyle.split(",")[0],
-      foreAnimStyles: foreAnimStyle === undefined
-        ? item.foreAnimStyles
-        : foreAnimStyle.split(",").map((token) => token.trim()).filter(Boolean),
-    }
-  }
-  const backStyle = document.get(section, "BACK_STYLE")
-  const foreStyle = document.get(section, "FORE_STYLE")
-  const positionType = document.get(section, "POS_TYPE")
+  const value = (name: string): string | undefined => document.get(section, name)
+  const backStyle = value("BACK_STYLE")
+  const foreStyle = value("FORE_STYLE")
+  const positionType = value("POS_TYPE")
+  const foreOffset = value("FORE_OFFSET")
+  const foreAnimStyle = value("FORE_ANIM_STYLE")
+  const backAnimStyle = value("BACK_ANIM_STYLE")
+  const animStyle = value("ANIM_STYLE")
+  const centerValue = (/^ICON\d+$/i.test(item.section) ? value("KEY") : undefined) ?? value("CENTER")
+  const center = centerValue ?? item.center
+  const down = value("DOWN") ?? (centerValue === undefined ? item.down : center)
   const foreStyles = foreStyle === undefined
     ? item.foreStyles
     : foreStyle.split(",").map((token) => token.trim()).filter(Boolean)
   return {
     ...item,
+    show: value("SHOW") ?? item.show,
+    center,
+    up: value("UP") ?? item.up,
+    down,
+    left: value("LEFT") ?? item.left,
+    right: value("RIGHT") ?? item.right,
+    hold: value("HOLD") ?? item.hold,
+    holdSymbols: value("HOLDSYM") ?? item.holdSymbols,
     backStyle: backStyle === undefined ? item.backStyle : backStyle.split(",")[0],
-    highlightBackStyle: document.get(section, "HL_BACK_STYLE")?.split(",")[0] ?? item.highlightBackStyle,
+    highlightBackStyle: value("HL_BACK_STYLE")?.split(",")[0] ?? item.highlightBackStyle,
     foreStyle: foreStyles[0] ?? "",
     foreStyles,
+    foreOffsets: foreOffset === undefined
+      ? item.foreOffsets
+      : foreOffset.split(";").map(parseOffset),
     positionTypes: positionType === undefined
       ? item.positionTypes
       : positionType.split(",").map((token) => token.trim()).filter(Boolean),
+    animStyle: animStyle ?? item.animStyle,
+    backAnimStyle: backAnimStyle ?? item.backAnimStyle,
+    foreAnimStyle: foreAnimStyle === undefined
+      ? item.foreAnimStyle
+      : foreAnimStyle.split(",")[0],
+    foreAnimStyles: foreAnimStyle === undefined
+      ? item.foreAnimStyles
+      : foreAnimStyle.split(",").map((token) => token.trim()).filter(Boolean),
   }
 }
 
@@ -887,6 +888,7 @@ export function previewHitItem(
   for (const item of [...visiblePreviewItems(items, state)].reverse()) {
     if (!item.editable) continue
     const target = previewHitRect(item, mode)
+    if (!target) continue
     if (
       point.x < target.x ||
       point.x > target.x + target.width ||
@@ -1007,13 +1009,9 @@ export function isTouchLongPress(pointerType: string, duration: number, distance
   return pointerType === "touch" && duration >= 450 && distance <= 12
 }
 
-export function previewHitRect(item: PreviewItem, mode: "edit" | "preview"): Rect {
-  if (mode === "edit" || !item.touchRect) return item.rect
-  const x = Math.min(item.rect.x, item.touchRect.x)
-  const y = Math.min(item.rect.y, item.touchRect.y)
-  const right = Math.max(item.rect.x + item.rect.width, item.touchRect.x + item.touchRect.width)
-  const bottom = Math.max(item.rect.y + item.rect.height, item.touchRect.y + item.touchRect.height)
-  return { x, y, width: right - x, height: bottom - y }
+export function previewHitRect(item: PreviewItem, mode: "edit" | "preview"): Rect | undefined {
+  if (mode === "edit") return item.rect
+  return item.touchRect === null ? undefined : item.touchRect ?? item.rect
 }
 
 function parseRect(value: string | undefined): Rect | undefined {
@@ -1024,10 +1022,26 @@ function parseRect(value: string | undefined): Rect | undefined {
   return { x, y, width, height }
 }
 
+function parseTouchRect(value: string | undefined): Rect | null | undefined {
+  if (value === undefined) return
+  const parts = value.split(",").map(Number)
+  if (parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) return
+  const [x, y, width, height] = parts
+  return width <= 0 || height <= 0 ? null : { x, y, width, height }
+}
+
 function parseOffset(value: string | undefined): [number, number] | undefined {
   const parts = value?.split(",").map(Number)
   if (!parts || parts.length !== 2 || parts.some((part) => !Number.isFinite(part))) return
   return parts as [number, number]
+}
+
+function previewItemSections(document: IniDocument, section: string): string[] {
+  if (!/^ICON\d+$/i.test(section)) return [section]
+  const tips = [...(document.get(section, "STAT_STYLE") ?? "").matchAll(/(?:^|\|)S\d+_(\d+)(?=\||$)/g)]
+    .map((match) => `TIP${match[1]}`)
+    .filter((tip, index, values) => document.sections().includes(tip) && values.indexOf(tip) === index)
+  return [section, ...tips]
 }
 
 // gen.ini 的 OFFSET 段既有 POS=x,y 也有 R_POS=x,y（部分 Android 皮肤）。
@@ -1052,9 +1066,9 @@ function itemFromSection(document: IniDocument, section: string): PreviewItem | 
   const down = value("DOWN") || center
   return {
     section,
-    sections: [section],
+    sections: previewItemSections(document, section),
     rect,
-    touchRect: parseRect(document.get(section, "TOUCH_RECT")),
+    touchRect: parseTouchRect(document.get(section, "TOUCH_RECT")),
     editable: true,
     show: value("SHOW"),
     center,
@@ -1214,7 +1228,10 @@ export function previewItems(
       ? []
       : document.get(section, "FORE_STYLE")?.split(",").map((token) => token.trim()).filter(Boolean) ?? []
     const foreStyle = foreStyles[0] ?? ""
-    if (section !== "CAND" && (!document.get(section, "SIZE") || (!backStyle && !foreStyle))) return []
+    if (
+      section !== "CAND" &&
+      (!document.get(section, "SIZE") || (!/^ICON\d+$/i.test(section) && !backStyle && !foreStyle))
+    ) return []
     const size = document.get(section, "SIZE")?.split(",").map(Number)
     const width = section === "CAND" ? panelWidth : size?.[0] ?? 0
     const height = section === "CAND" ? panelHeight : size?.[1] ?? 0
@@ -1249,10 +1266,10 @@ export function previewItems(
     const value = (name: string) => document.get(section, name) ?? ""
     return [{
       section,
-      sections: [section],
+      sections: previewItemSections(document, section),
       rect: { x, y, width, height },
       foreRect,
-      editable: false,
+      editable: /^ICON\d+$/i.test(section),
       show: document.get(section, "SHOW") ?? "",
       center: value("KEY") || value("CENTER"),
       up: value("UP"),
@@ -1269,7 +1286,9 @@ export function previewItems(
       positionTypes: document.get(section, "POS_TYPE")?.split(",").map((token) => token.trim()).filter(Boolean) ?? [],
       statStyle: value("STAT_STYLE"),
       animStyle: value("ANIM_STYLE"),
-      foreAnimStyles: [],
+      backAnimStyle: value("BACK_ANIM_STYLE"),
+      foreAnimStyle: value("FORE_ANIM_STYLE").split(",")[0],
+      foreAnimStyles: value("FORE_ANIM_STYLE").split(",").map((token) => token.trim()).filter(Boolean),
     }]
   }), ...list]
 }
@@ -1989,8 +2008,7 @@ export class Preview {
       this.active = undefined
       void this.draw()
     }
-    if (event.pointerType === "touch") globalThis.setTimeout(release, 80)
-    else release()
+    globalThis.setTimeout(release, 160)
   }
 
   private cancelEditDrag(): void {
@@ -2226,6 +2244,7 @@ export class Preview {
 
   private async render(): Promise<void> {
     const drawID = ++this.drawID
+    await this.resolver?.ready?.()
     const panelAnimationElapsed = this.legacyPanelAnimationStartedAt
       ? Date.now() - this.legacyPanelAnimationStartedAt
       : -1
@@ -2443,7 +2462,7 @@ export class Preview {
 
     }
 
-    const shouldDrawHint = Boolean(this.active && hintIcon)
+    const shouldDrawHint = Boolean(this.active && isLegacyHintInputKey(this.active.key) && hintIcon)
     let hintContext = context
     if (this.hintCanvas && (shouldDrawHint || this.hintVisible)) {
       const overlayBounds = this.hintCanvas.getBoundingClientRect()

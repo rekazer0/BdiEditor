@@ -1,7 +1,47 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
+import { AtlasResolver, toolbarImagePaths } from "../src/atlas.ts"
 import { IniDocument } from "../src/ini.ts"
-import { drawListText, Preview, previewFallbackText, previewItems } from "../src/preview.ts"
+import { SkinArchive } from "../src/skin.ts"
+import {
+  drawListText,
+  effectivePreviewItem,
+  Preview,
+  previewFallbackText,
+  previewItems,
+} from "../src/preview.ts"
+
+const loadedFonts: Array<{ family: string; source: ArrayBuffer }> = []
+Object.defineProperty(globalThis, "FontFace", {
+  value: class {
+    readonly family: string
+    readonly source: ArrayBuffer
+    constructor(family: string, source: ArrayBuffer) {
+      this.family = family
+      this.source = source
+    }
+    async load(): Promise<this> {
+      loadedFonts.push({ family: this.family, source: this.source })
+      return this
+    }
+  },
+})
+Object.defineProperty(globalThis, "document", {
+  value: { fonts: { add() {} } },
+})
+const embeddedFontSkin = SkinArchive.fromSourceFiles([
+  {
+    path: "res/default.css",
+    data: new TextEncoder().encode("[GLOBAL]\nFONT_PATH=Rubik.ttf\n[STYLE1]\nSHOW=󰀋\nNM_COLOR=444444\n[STYLE2]\nSHOW=A\nFONT_NAME=Custom\n"),
+  },
+  { path: "res/Rubik.ttf", data: new Uint8Array([0, 1, 2, 3]) },
+])
+const embeddedFontResolver = new AtlasResolver(embeddedFontSkin, "light", "port")
+await embeddedFontResolver.ready?.()
+const embeddedFontVisual = embeddedFontResolver.resolveStyleText("1", false)
+assert.ok(embeddedFontVisual?.fontName, "GLOBAL.FONT_PATH 应为样式文字提供内嵌字体")
+assert.equal(embeddedFontResolver.resolveStyleText("2", false)?.fontName, "Custom", "样式字体应覆盖全局内嵌字体")
+assert.equal(loadedFonts.length, 1, "同一个内嵌字体应只加载一次")
 
 let drawnText: [string, number, number] | undefined
 drawListText({
@@ -160,20 +200,76 @@ KEY=你
 PERSIST=1
 
 [ICON2]
-FORE_STYLE=287
 SIZE=100,100
 ANCHOR_TYPE=6
 POS=-122,-50
 KEY=F9
 PERSIST=2
+STAT_STYLE=S9_1|S10_2
+
+[TIP1]
+FORE_STYLE=288
+KEY=F8
+
+[TIP2]
+FORE_STYLE=289
+KEY=F7
 `)
 const candidateItems = previewItems(candidateSkin, 1080, 119)
 assert.equal(candidateItems.find((item) => item.section === "ICON1")?.center, "你")
-assert.equal(candidateItems.some((item) => item.section === "ICON2"), false)
+assert.equal(candidateItems.some((item) => item.section === "ICON2"), false, "默认候选栏不能叠加输入态 ICON")
+const persistentItems = previewItems(candidateSkin, 1080, 119, undefined, true)
+const statefulCandidateIcon = persistentItems.find((item) => item.section === "ICON2")
+assert.ok(statefulCandidateIcon, "没有自身样式的 ICON 容器也应可选中")
+assert.deepEqual(statefulCandidateIcon.sections, ["ICON2", "TIP1", "TIP2"], "ICON 应收集全部 STAT_STYLE 引用的 TIP")
 assert.deepEqual(
-  previewItems(candidateSkin, 1080, 119, undefined, true).map((item) => item.section),
+  {
+    center: effectivePreviewItem(candidateSkin, statefulCandidateIcon, 9).center,
+    foreStyles: effectivePreviewItem(candidateSkin, statefulCandidateIcon, 9).foreStyles,
+  },
+  { center: "F8", foreStyles: ["288"] },
+  "候选栏 TIP 应覆盖 ICON 的 KEY 和样式，同时继承 ICON 的几何区域",
+)
+assert.deepEqual(
+  persistentItems.map((item) => item.section),
   ["ICON2"],
   "输入时只应保留 PERSIST=2 的最右侧工具图标",
+)
+
+const toolbarPlist = `
+<plist><array>
+<dict><key>Position</key><string>toolbar</string><key>Images</key><dict><key>Normal</key><dict><key>Normal</key><string>1.0/toolbarMenuItem_Voice_Normal</string></dict></dict></dict>
+<dict><key>Position</key><string>toolbar</string><key>Images</key><dict><key>Normal</key><dict><key>Normal</key><string>1.0/linly_Normal</string></dict></dict></dict>
+<dict><key>Position</key><string>toolbar</string><key>Images</key><dict><key>Normal</key><dict><key>Normal</key><string>/custom/icon_a</string></dict></dict></dict>
+<dict><key>Position</key><string>toolbar</string><key>Images</key><dict><key>Normal</key><dict><key>Highlight</key><string>custom/selection.png</string><key>Normal</key><string>custom/icon_b.png</string></dict></dict></dict>
+</array></plist>`
+assert.deepEqual(
+  toolbarImagePaths(toolbarPlist),
+  ["1.0/toolbarMenuItem_Voice_Normal", "1.0/linly_Normal", "custom/icon_a", "custom/icon_b"],
+  "工具栏应解析全部定制图片路径，不能限制固定命名或只取前三项",
+)
+
+const editorHtml = fs.readFileSync("index.html", "utf8")
+const editorMain = fs.readFileSync("src/main.ts", "utf8")
+const editorCss = fs.readFileSync("src/style.css", "utf8")
+assert.doesNotMatch(editorHtml, /data-toolbar-field="ICON\d+\./, "候选检查器不能把 ICON 数量硬编码在页面中")
+assert.match(editorMain, /工具按钮 \$\{icon\[1\]\}/, "动态 ICON 段应显示明确的检查器分组名称")
+assert.match(editorMain, /状态提示 \$\{tip\[1\]\}/, "动态 TIP 段应显示明确的检查器分组名称")
+assert.match(
+  editorMain,
+  /isHiddenConfigEntry\(entry\.section, entry\.key, isToolbarPath\(selectedPath\)\)/,
+  "cand1.cnd 检查器应放开全部 TIP 段和 TIP_NUM 字段",
+)
+assert.match(editorMain, /new Preview\(toolbarCanvas, handlePreviewEvent,/, "候选栏 ICON 点击应走 KEY 的事件处理")
+assert.match(editorMain, /toolbarPreview\.setLegacyAnimation\(legacyAnimation\)/, "候选栏 ICON 应使用已解析的点击动画")
+assert.match(editorMain, /selectedToolbarSections = sections/, "编辑模式点击 ICON 应保存候选栏选区")
+assert.match(editorMain, /return \[\.\.\.new Set\(selectedToolbarSections\.flatMap/, "TIP 状态应保留 ICON 基础段并追加覆盖段")
+assert.match(editorMain, /isToolbarPath\(selectedPath\) \? effectiveToolbarSections\(\) : \[\]/, "源码应高亮选中的 ICON/TIP 段")
+assert.match(editorMain, /toolbarSections\.has\(entry\.section\)/, "属性检查器应只显示选中的 ICON/TIP 段")
+assert.match(
+  editorCss,
+  /#toolbar-preview\s*\{[^}]*pointer-events:\s*auto/,
+  "编辑和交互预览模式都应把指针事件交给候选栏 ICON 画布",
 )
 
 Object.defineProperty(globalThis, "ResizeObserver", {

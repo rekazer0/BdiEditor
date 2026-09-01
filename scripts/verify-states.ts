@@ -18,7 +18,7 @@ import {
   moveCaretVertical,
 } from "../src/simulation.ts"
 
-assert.equal(knownSkinStates.length, 122)
+assert.equal(knownSkinStates.length, 123)
 assert.equal(knownSkinStates[0], MIN_SKIN_STATE)
 assert.equal(knownSkinStates.at(-1), MAX_SKIN_STATE)
 for (let state = MIN_SKIN_STATE; state <= MAX_SKIN_STATE; state += 1) {
@@ -26,10 +26,10 @@ for (let state = MIN_SKIN_STATE; state <= MAX_SKIN_STATE; state += 1) {
   assert.equal(previewStateFromAction(`S${state}_999`), state, `S${state}_TIP 应可解析`)
   assert.ok(skinStateLabel(state).startsWith(`S${state}`), `S${state} 应有稳定标签`)
 }
-assert.equal(previewStateFromAction("S0"), undefined)
+assert.equal(previewStateFromAction("S0"), 0)
 assert.equal(previewStateFromAction("S123"), undefined)
 assert.deepEqual(availableSkinStates(IniDocument.parse("[KEY1]\nSTAT_STYLE=S122_1")), knownSkinStates)
-console.log("✓ S1-S122 全量解析、标签和发现契约")
+console.log("✓ S0-S122 全量解析、标签和发现契约")
 
 const inspectorTarget = IniDocument.parse(`
 [KEY17]
@@ -43,6 +43,20 @@ assert.equal(effectivePanelSection(inspectorTarget, "KEY17", 38), "TIP17")
 assert.equal(effectivePanelSection(inspectorTarget, "KEY17", 37), "KEY17")
 assert.equal(effectivePanelSection(IniDocument.parse("[KEY17]\nSTAT_STYLE=S38_17"), "KEY17", 38), "KEY17")
 console.log("✓ 状态编辑目标解析到已存在的 TIP，未命中或缺失 TIP 时保留原 KEY")
+
+const zeroState = IniDocument.parse(`
+[KEY1]
+VIEW_RECT=0,0,100,100
+FORE_STYLE=default
+STAT_STYLE=S0_1
+
+[TIP1]
+FORE_STYLE=zero
+`)
+const zeroStateItem = previewItems(zeroState, 100, 100)[0]
+assert.equal(effectivePanelSection(zeroState, "KEY1", undefined), "TIP1")
+assert.deepEqual(effectivePreviewItem(zeroState, zeroStateItem, undefined).foreStyles, ["zero"])
+console.log("✓ 未选择显式状态时按 S0 应用零状态补丁")
 
 const generated = IniDocument.parse([
   "[KEY1]",
@@ -63,7 +77,7 @@ for (const state of knownSkinStates) {
   assert.deepEqual(effectivePreviewItem(generated, generatedKey, state).foreStyles, [`state-${state}`])
   assert.deepEqual(previewStateImpact(generated, state), { mapped: true, resolved: true })
 }
-console.log("✓ S1-S122 每个状态仅命中自己的 STAT_STYLE/TIP")
+console.log("✓ S0-S122 每个状态仅命中自己的 STAT_STYLE/TIP")
 
 const returnKey = IniDocument.parse(`
 [KEY5]
@@ -99,13 +113,17 @@ CENTER=F39
 STAT_STYLE=S11_4|S17_1|S23_2|S27_3|S21_5
 `)
 const missingReturnItem = previewItems(missingReturnTips, 240, 100)[0]
-for (const state of [11, 17, 21, 23, 27]) {
+const exactInputItem = effectivePreviewItem(missingReturnTips, missingReturnItem, 11)
+assert.equal(exactInputItem.show, "")
+assert.deepEqual(exactInputItem.foreStyles, ["return"])
+assert.deepEqual(previewStateImpact(missingReturnTips, 11), { mapped: true, resolved: false })
+for (const state of [17, 21, 23, 27]) {
   const item = effectivePreviewItem(missingReturnTips, missingReturnItem, state)
   assert.equal(item.show, skinStateFallbackText(state))
   assert.deepEqual(item.foreStyles, [])
   assert.deepEqual(previewStateImpact(missingReturnTips, state), { mapped: true, resolved: true })
 }
-console.log("✓ 缺失 TIP 的旧皮肤回车状态使用语义文字兜底")
+console.log("✓ 缺失 TIP 的表单状态使用语义文字兜底，S11 保持精确输入语义")
 
 assert.deepEqual(candidatePreview("hello", 5, "en"), {
   composing: true,
