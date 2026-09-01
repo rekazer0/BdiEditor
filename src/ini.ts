@@ -17,6 +17,34 @@ function splitLines(source: string): string[] {
   return source.match(/[^\r\n]*(?:\r\n|\n|\r|$)/g)?.filter(Boolean) ?? []
 }
 
+function parseLines(source: string): Line[] {
+  let section = ""
+  return splitLines(source).map((raw): Line => {
+    const ending = raw.match(/(\r\n|\n|\r)$/)?.[1] ?? ""
+    const content = ending ? raw.slice(0, -ending.length) : raw
+    const sectionMatch = content.match(/^\s*\[([^\]]+)]\s*$/)
+    if (sectionMatch) {
+      section = sectionMatch[1]
+      return { raw, ending, section }
+    }
+
+    if (!/^\s*[;#]/.test(content)) {
+      const entry = content.match(/^(\s*([^=]+?)\s*=\s*)(.*)$/)
+      if (entry) {
+        return {
+          raw,
+          ending,
+          section,
+          key: entry[2].trim(),
+          prefix: entry[1],
+          value: entry[3],
+        }
+      }
+    }
+    return { raw, ending }
+  })
+}
+
 export class IniDocument {
   private lines: Line[]
 
@@ -25,32 +53,7 @@ export class IniDocument {
   }
 
   static parse(source: string): IniDocument {
-    let section = ""
-    const lines = splitLines(source).map((raw): Line => {
-      const ending = raw.match(/(\r\n|\n|\r)$/)?.[1] ?? ""
-      const content = ending ? raw.slice(0, -ending.length) : raw
-      const sectionMatch = content.match(/^\s*\[([^\]]+)]\s*$/)
-      if (sectionMatch) {
-        section = sectionMatch[1]
-        return { raw, ending, section }
-      }
-
-      if (!/^\s*[;#]/.test(content)) {
-        const entry = content.match(/^(\s*([^=]+?)\s*=\s*)(.*)$/)
-        if (entry) {
-          return {
-            raw,
-            ending,
-            section,
-            key: entry[2].trim(),
-            prefix: entry[1],
-            value: entry[3],
-          }
-        }
-      }
-      return { raw, ending }
-    })
-    return new IniDocument(lines)
+    return new IniDocument(parseLines(source))
   }
 
   get(section: string, key: string): string | undefined {
@@ -150,6 +153,55 @@ export class IniDocument {
       return !selected.has(section)
     })
     return this.lines.length !== before
+  }
+
+  // 返回 section 的原始文本（含段头行，不含下一个段头），未找到返回 undefined
+  getSectionText(section: string): string | undefined {
+    const start = this.lines.findIndex(
+      (line) => line.section === section && line.key === undefined,
+    )
+    if (start < 0) return undefined
+    const next = this.lines
+      .slice(start + 1)
+      .findIndex((line) => line.section !== undefined && line.key === undefined)
+    const end = next < 0 ? this.lines.length : start + 1 + next
+    return this.lines
+      .slice(start, end)
+      .map((line) => line.raw)
+      .join("")
+  }
+
+  // 用新文本整体替换 section 的原始行（含段头）。
+  // 段头必须保留且只能有一个段头（例如编辑 [STYLE43] 块时不能删掉或改成别的段头）。
+  // 返回 false 表示未找到该 section 或新文本无效；内容无变化也返回 false。
+  setSectionText(section: string, text: string): boolean {
+    const start = this.lines.findIndex(
+      (line) => line.section === section && line.key === undefined,
+    )
+    if (start < 0) return false
+    const next = this.lines
+      .slice(start + 1)
+      .findIndex((line) => line.section !== undefined && line.key === undefined)
+    const end = next < 0 ? this.lines.length : start + 1 + next
+    const current = this.lines
+      .slice(start, end)
+      .map((line) => line.raw)
+      .join("")
+    if (current === text) return false
+    const parsed = parseLines(text)
+    const headers = parsed.filter(
+      (line) => line.key === undefined && line.section !== undefined,
+    )
+    if (headers.length !== 1 || headers[0].section !== section) return false
+    const ending = this.lines.find((line) => line.ending)?.ending ?? "\n"
+    for (const line of parsed) {
+      if (!line.ending) {
+        line.ending = ending
+        line.raw = `${line.raw}${ending}`
+      }
+    }
+    this.lines.splice(start, end - start, ...parsed)
+    return true
   }
 
   toString(): string {

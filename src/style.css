@@ -4404,6 +4404,63 @@ canvas {
   min-width: 0;
 }
 
+.style-inline-blocks {
+  display: grid;
+  gap: 6px;
+}
+
+.style-inline-blocks[hidden] {
+  display: none;
+}
+
+.style-inline-block {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.style-inline-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 8px;
+  font-size: 10px;
+  color: var(--tertiary);
+  background: var(--hover);
+}
+
+.style-inline-block textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  padding: 6px 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 72px;
+  white-space: pre;
+  tab-size: 4;
+  color: var(--text);
+  background: var(--canvas);
+}
+
+.style-inline-block textarea.invalid {
+  outline: 2px solid #e5534b;
+  outline-offset: -2px;
+}
+
+.style-inline-missing {
+  padding: 3px 8px;
+  font-size: 10px;
+  color: var(--tertiary);
+  opacity: 0.7;
+}
+
 #style-image-picker {
   min-height: 0;
   display: grid;

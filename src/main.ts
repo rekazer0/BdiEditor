@@ -400,6 +400,7 @@ const keyToolbar = $(".key-toolbar")
 const selectedKeyName = $("#selected-key")
 const keyFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-key-field]"))
 const styleFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-style-field]"))
+const foreStyleBlocks = $("[data-fore-style-blocks]")
 const keyboardFields = Array.from(
   document.querySelectorAll<HTMLInputElement>("[data-keyboard-field]"),
 )
@@ -5894,6 +5895,7 @@ function populateKeyInspector(): void {
   populateBdaConfigInspector()
   syncMobileInspectorGroups()
   applyModeState()
+  renderForeStyleBlocks()
 }
 
 function updateSkinInfo(field: HTMLInputElement): void {
@@ -6094,6 +6096,97 @@ function updateSelectedStyle(field: HTMLInputElement): void {
   if (selectedPath === context.path) setSourceValue(text)
   refreshPreview()
   populateKeyInspector()
+  updateDirty()
+}
+
+// FORE_STYLE 内联样式块：在输入框下方直接显示/编辑引用的 default.css 样式段（仅 BDS）
+function renderForeStyleBlocks(): void {
+  if (!foreStyleBlocks) return
+  const clear = () => {
+    foreStyleBlocks.replaceChildren()
+    foreStyleBlocks.hidden = true
+  }
+  if (
+    !archive ||
+    archive.format === "bda" ||
+    !layoutDocument ||
+    !selectedKeySections.length ||
+    selectedPath !== layoutPath
+  ) {
+    clear()
+    return
+  }
+  const path = styleConfigPath()
+  if (!archive.isText(path)) {
+    clear()
+    return
+  }
+  const values = selectedKeySections.map((section) =>
+    isListCell(section)
+      ? (layoutDocument?.get("LIST", "FORE_STYLE") ?? "").trim()
+      : effectiveKeyValue(section, "FORE_STYLE") ?? "",
+  )
+  if (new Set(values).size > 1) {
+    clear()
+    return
+  }
+  const tokens = (values[0] ?? "")
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean)
+  if (!tokens.length) {
+    clear()
+    return
+  }
+  const stylesDocument = IniDocument.parse(archive.getText(path))
+  foreStyleBlocks.replaceChildren()
+  for (const token of tokens) {
+    const section = `STYLE${token}`
+    const text = stylesDocument.getSectionText(section)
+    if (text === undefined) {
+      const missing = document.createElement("div")
+      missing.className = "style-inline-missing"
+      missing.textContent = `未找到 ${section}`
+      foreStyleBlocks.append(missing)
+      continue
+    }
+    const block = document.createElement("div")
+    block.className = "style-inline-block"
+    const header = document.createElement("div")
+    header.className = "style-inline-block-header"
+    const title = document.createElement("span")
+    title.textContent = `${section} · ${path.split("/").slice(-3).join("/")}`
+    header.append(title)
+    const textarea = document.createElement("textarea")
+    textarea.value = text
+    textarea.spellcheck = false
+    textarea.dataset.styleSection = section
+    block.append(header, textarea)
+    foreStyleBlocks.append(block)
+  }
+  foreStyleBlocks.hidden = false
+}
+
+function commitForeStyleBlock(textarea: HTMLTextAreaElement): void {
+  const section = textarea.dataset.styleSection ?? ""
+  const path = styleConfigPath()
+  if (!archive || !archive.isText(path)) return
+  const stylesDocument = IniDocument.parse(archive.getText(path))
+  const current = stylesDocument.getSectionText(section)
+  if (textarea.value === current) {
+    textarea.classList.remove("invalid")
+    return
+  }
+  if (!stylesDocument.setSectionText(section, textarea.value)) {
+    textarea.classList.add("invalid")
+    return
+  }
+  textarea.classList.remove("invalid")
+  const before = archive.getText(path)
+  const after = stylesDocument.toString()
+  commitText(path, before, after)
+  if (selectedPath === path) setSourceValue(after)
+  refreshPreview()
   updateDirty()
 }
 
@@ -8574,6 +8667,12 @@ for (const field of keyFields) {
 for (const field of styleFields) {
   field.addEventListener("input", () => updateSelectedStyle(field))
 }
+foreStyleBlocks?.addEventListener("input", (event) => {
+  const textarea = (event.target as HTMLElement).closest<HTMLTextAreaElement>(
+    "textarea[data-style-section]",
+  )
+  if (textarea) commitForeStyleBlock(textarea)
+})
 for (const field of [...keyboardFields, ...styleFields]) {
   if (!field.dataset.keyboardField?.endsWith("COLOR") && !field.dataset.styleField?.endsWith("COLOR")) continue
   field.addEventListener("input", () => syncColorControl(field))
