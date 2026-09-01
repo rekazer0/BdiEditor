@@ -8146,14 +8146,23 @@ async function applyWindowMaterial(): Promise<void> {
   }
 }
 windowMaterial.checked = localStorage.getItem("window-material") !== "off"
-void (async () => {
+async function initializeWindowMaterial(retryCount = 0): Promise<void> {
   if (isTauri()) windowMaterialKind = await invoke<WindowMaterialKind>("window_material_kind")
   windowMaterialOpacitySetting.hidden = windowMaterialKind === "none"
   windowMaterialOpacityLabel.textContent = windowMaterialKind === "acrylic" ? "亚克力不透明度" : "玻璃不透明度"
   const storageKey = windowMaterialKind === "acrylic" ? "window-acrylic-opacity" : "window-glass-opacity"
   windowMaterialOpacity.value = localStorage.getItem(storageKey) ?? (windowMaterialKind === "acrylic" ? "92" : "100")
-  await applyWindowMaterial()
-})().catch((error) => showError(error, "读取窗口材质"))
+  try {
+    await applyWindowMaterial()
+  } catch (error) {
+    if (retryCount < 3) {
+      await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 100))
+      return initializeWindowMaterial(retryCount + 1)
+    }
+    throw error
+  }
+}
+void initializeWindowMaterial().catch((error) => showError(error, "读取窗口材质"))
 windowMaterial.addEventListener("change", () => {
   localStorage.setItem("window-material", windowMaterial.checked ? "on" : "off")
   void applyWindowMaterial()
@@ -8169,7 +8178,7 @@ let windowDragPointerDown = false
 let windowDragMaterialDisabled = false
 let windowDragMaterialTransition: Promise<unknown> | undefined
 
-async function restoreWindowMaterialAfterDrag(): Promise<void> {
+async function restoreWindowMaterialAfterDrag(retryCount = 0): Promise<void> {
   windowDragPointerDown = false
   try {
     await windowDragMaterialTransition
@@ -8183,15 +8192,16 @@ async function restoreWindowMaterialAfterDrag(): Promise<void> {
     return
   }
   windowDragMaterialDisabled = false
-  // 添加短暂延迟确保拖动完全结束后再恢复材质，避免状态不同步
   await new Promise(resolve => setTimeout(resolve, 50))
   try {
     await applyWindowMaterial()
   } catch (error) {
-    // 恢复材质失败时重试一次
-    console.warn("恢复窗口材质失败，尝试重试:", error)
-    await new Promise(resolve => setTimeout(resolve, 100))
-    await applyWindowMaterial().catch(err => console.error("恢复窗口材质重试失败:", err))
+    if (retryCount < 3) {
+      await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 100))
+      return restoreWindowMaterialAfterDrag(retryCount + 1)
+    }
+    document.documentElement.dataset.windowMaterial = windowMaterial.checked ? "on" : "off"
+    await applyWindowMaterial().catch(() => {})
   }
 }
 
