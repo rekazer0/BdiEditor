@@ -49,7 +49,7 @@ assert.match(
   "源码颜色与样式点击应分别进入颜色调节器和样式预览",
 )
 assert.match(main, /styleImageMore\.addEventListener\("click", toggleStyleImageGallery\)/, "更多样式图标应切换扩展视图")
-assert.match(main, /button\.addEventListener\("click", \(\) => showSourceStylePreview\(styleID\)\)/, "点击全部样式卡片应回到对应样式预览")
+assert.match(main, /applySourceStylePicker\(styleID\)[\s\S]*showSourceStylePreview\(styleID\)/, "点击全部样式卡片应写回源码并预览所选样式")
 assert.match(style, /\.style-image-dialog::backdrop/, "样式预览弹窗应提供新版遮罩层")
 assert.doesNotMatch(
   style,

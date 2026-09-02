@@ -146,7 +146,11 @@
               <option value="xiaomi-17">Xiaomi 17 · 1220×2656</option>
               <option value="pixel-10-pro">Pixel 10 Pro · 1280×2856</option>
               <option value="galaxy-s25-ultra">Galaxy S25 Ultra · 1440×3120</option>
-              <option value="canvas" selected>画布</option>
+              <option value="canvas-glass">画布 · 玻璃</option>
+              <option value="canvas-checkerboard">画布 · 马赛克</option>
+              <option value="canvas-white" selected>画布 · 浅色</option>
+              <option value="canvas-gray">画布 · 灰色</option>
+              <option value="canvas-dark">画布 · 深色</option>
             </select>
           </label>
           <div class="preview-choice glass-module" aria-label="方向">
@@ -724,7 +728,7 @@
             </div>
             <div class="settings-list">
               <label class="settings-row"><span>默认设备</span><select id="default-device"><option value="canvas">画布</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label>
-              <label class="settings-row"><span>画布背景</span><select id="canvas-background"><option value="glass">玻璃</option><option value="checkerboard">马赛克</option><option value="white" selected>白色</option><option value="dark">深色</option></select></label>
+              <label class="settings-row"><span>画布背景</span><select id="canvas-background"><option value="glass">玻璃</option><option value="checkerboard">马赛克</option><option value="white" selected>浅色</option><option value="gray">灰色</option><option value="dark">深色</option></select></label>
               <label class="settings-row"><span>移动端预览面板</span><select id="mobile-preview-position"><option value="bottom" selected>底部</option><option value="top">顶部</option></select></label>
               <label class="settings-row settings-switch"><span>气泡预览（实验功能）</span><input id="hint-preview-enabled" type="checkbox" role="switch" checked></label>
               <label class="settings-row settings-switch"><span>编辑十字光标</span><input id="editor-crosshair" type="checkbox" role="switch" checked></label>
@@ -754,10 +758,10 @@
     <dialog id="about-dialog" class="app-dialog" aria-labelledby="about-title">
       <form method="dialog">
         <header><h2 id="about-title">关于 键设-bdiEditor v1.9.104</h2><button aria-label="关闭">关闭</button></header>
-        <p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
-        <p>版本 1.9.104</p>
-        <p>支持读取、编辑和导出 BDI、BDS、BDA 皮肤包。</p>
-        <p class="about-alpha">阿尔法版本：包含未完成的功能与实验性改动，仅用于测试。</p>
+<p>百度输入法 iOS 与 Android 皮肤可视化编辑器。</p>
+<p>版本 1.9.104</p>
+<p>支持读取、编辑和导出 BDI、BDS、BDA 皮肤包。</p>
+<p class="about-alpha">阿尔法版本：包含未完成的功能与实验性改动，仅用于测试。</p>
         <section id="about-update" class="about-update" data-current-version="1.9.104">
           <div><strong>版本更新</strong><button id="check-update" type="button">检查更新</button></div>
           <p id="update-status" aria-live="polite">正在检查更新…</p>

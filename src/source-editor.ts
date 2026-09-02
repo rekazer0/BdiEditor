@@ -12,6 +12,7 @@ import {
   Compartment,
   EditorSelection,
   EditorState,
+  Prec,
   StateEffect,
   StateField,
   Transaction,
@@ -239,7 +240,7 @@ export class SourceCodeEditor extends EventTarget {
             this.dispatchEvent(new Event("input"))
             if (this.features.completion) this.refreshCompletion()
           }),
-          EditorView.domEventHandlers({
+          Prec.highest(EditorView.domEventHandlers({
             keydown: (event) => this.handleKeydown(event),
             mouseup: () => {
               this.refreshExplanation()
@@ -259,7 +260,7 @@ export class SourceCodeEditor extends EventTarget {
               }))
               return true
             },
-          }),
+          })),
           EditorView.domEventHandlers({
             blur: () => {
               this.commit()

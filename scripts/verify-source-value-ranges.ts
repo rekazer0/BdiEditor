@@ -1,9 +1,12 @@
 import assert from "node:assert/strict"
-import { replacedSourceColor, sourceValueRanges } from "../src/source-value-ranges.ts"
+import { replacedSourceColor, replacedSourceStyle, sourceValueRanges } from "../src/source-value-ranges.ts"
 
 assert.equal(replacedSourceColor("FF000000", "#1a2b3c"), "FF1A2B3C", "8 位颜色调节后应保留 alpha")
 assert.equal(replacedSourceColor("#FFFF00", "#123456"), "#123456", "6 位颜色调节后应保留井号前缀")
 assert.equal(replacedSourceColor("invalid", "#123456"), undefined, "无效颜色不应写回源码")
+assert.equal(replacedSourceStyle("119", "263"), "263", "数字样式应替换为所选样式")
+assert.equal(replacedSourceStyle("STYLE119", "263"), "STYLE263", "样式替换应保留 STYLE 前缀")
+assert.equal(replacedSourceStyle("invalid", "263"), undefined, "无效样式不应写回源码")
 
 const ini = [
   "[KEY1]",

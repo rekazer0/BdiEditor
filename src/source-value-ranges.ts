@@ -12,6 +12,12 @@ export function replacedSourceColor(value: string, rgb: string): string | undefi
   return `${value.trim().startsWith("#") ? "#" : ""}${clean.length === 8 ? clean.slice(0, 2).toUpperCase() : ""}${nextRgb.toUpperCase()}`
 }
 
+export function replacedSourceStyle(value: string, styleID: string): string | undefined {
+  return /^(?:STYLE)?\d+$/i.test(value) && /^\d+$/.test(styleID)
+    ? value.replace(/\d+$/, styleID)
+    : undefined
+}
+
 function sourceColor(value: string): string | undefined {
   const clean = value.replace(/^#/, "")
   if (!/^[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(clean)) return

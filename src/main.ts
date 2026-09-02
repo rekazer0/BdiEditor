@@ -38,6 +38,13 @@ import {
   showsKeyboardAccessories,
 } from "./devices.ts"
 import {
+  canvasBackgroundFromDevice,
+  canvasBackgroundValues,
+  canvasDeviceValue,
+  effectiveDeviceValue,
+  type CanvasBackground,
+} from "./canvas-background.ts"
+import {
   candidateInputForegroundStyle,
   resolveCandidateRect,
   resolveCandidateInputStyle,
@@ -167,7 +174,7 @@ import {
 } from "./source-tree.ts"
 import { LazySourceCodeEditor } from "./lazy-source-editor.ts"
 import type { SourceEditorValueClick, SourceEditorValueRange } from "./lazy-source-editor.ts"
-import { replacedSourceColor, sourceValueRanges } from "./source-value-ranges.ts"
+import { replacedSourceColor, replacedSourceStyle, sourceValueRanges } from "./source-value-ranges.ts"
 import {
   SOUND_ACCEPT,
   decodeAiffPcm,
@@ -447,6 +454,9 @@ const orientation = $("#orientation") as HTMLSelectElement & { value: "port" | "
 const layout = $("#layout") as HTMLSelectElement
 const mode = $("#mode") as HTMLSelectElement
 const device = $("#device") as HTMLSelectElement
+function currentDeviceValue(): string {
+  return effectiveDeviceValue(device.value)
+}
 const toggleGuides = $("#toggle-guides") as HTMLButtonElement
 const mobileToggleGuides = $("#mobile-toggle-guides") as HTMLButtonElement
 const skinStateControl = $("#skin-state-control")
@@ -2353,7 +2363,7 @@ function applyDeviceKeyboardGeometry(
   candidateHeight: number,
   candidateInputHeight: number,
 ): void {
-  const spec = deviceSpec(device.value)
+  const spec = deviceSpec(currentDeviceValue())
   if (!spec) {
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
     return
@@ -2613,7 +2623,7 @@ function fitCanvasPreview(): void {
       `${Math.round(toolbarHeight * scale)}px`,
     )
   }
-  if (device.value === "canvas") updateCanvasPanelStatus(renderedWidth)
+  if (currentDeviceValue() === "canvas") updateCanvasPanelStatus(renderedWidth)
   requestAnimationFrame(resizeKeyboardPreviews)
 }
 
@@ -2637,7 +2647,7 @@ let previewPanGeometry: { target: DOMRect; wrap: DOMRect; wrapWidth: number; wra
 function setPreviewPan(x: number, y: number): void {
   previewPanX = x
   previewPanY = y
-  deviceShell.style.transform = `translate(${x}px, ${y}px) scale(${device.value === "canvas" ? 1 : previewZoom})`
+  deviceShell.style.transform = `translate(${x}px, ${y}px) scale(${currentDeviceValue() === "canvas" ? 1 : previewZoom})`
 }
 
 function schedulePreviewPan(x: number, y: number): void {
@@ -2666,7 +2676,7 @@ function applyPreviewZoom(value: number, anchor?: { x: number; y: number }): voi
   previewZoom = Math.min(3, Math.max(0.4, Math.round(value * 10) / 10))
   previewZoomOut.disabled = previewZoom <= 0.4
   previewZoomIn.disabled = previewZoom >= 3
-  if (device.value === "canvas") fitCanvasPreview()
+  if (currentDeviceValue() === "canvas") fitCanvasPreview()
   else setPreviewPan(previewPanX, previewPanY)
   if (anchor && before) {
     const after = deviceShell.getBoundingClientRect()
@@ -2675,7 +2685,7 @@ function applyPreviewZoom(value: number, anchor?: { x: number; y: number }): voi
       previewPanY + anchor.y - (after.top + anchorY * after.height),
     )
   }
-  if (device.value !== "canvas" && canvasLogicalSize) {
+  if (currentDeviceValue() !== "canvas" && canvasLogicalSize) {
     requestAnimationFrame(() => {
       const bounds = ($("#preview") as HTMLCanvasElement).getBoundingClientRect()
       panelStatus.textContent = `面板：${Math.round(canvasLogicalSize!.width)} × ${Math.round(canvasLogicalSize!.panelHeight)} · 预览缩放：${previewScalePercent(bounds.width, bounds.height, canvasLogicalSize!.width, canvasLogicalSize!.panelHeight)}%`
@@ -2688,7 +2698,7 @@ function scheduleFitCanvasPreview(): void {
   if (canvasFitFrozen) return
   clearTimeout(fitCanvasDebounce)
   fitCanvasDebounce = setTimeout(() => {
-    if (device.value === "canvas") fitCanvasPreview()
+    if (currentDeviceValue() === "canvas") fitCanvasPreview()
   }, 50)
 }
 
@@ -2844,7 +2854,7 @@ function updatePanelTools(
   skinStateControl.hidden = states.length === 0
   applySkinState(skinState.value ? Number(skinState.value) : undefined)
   requestAnimationFrame(() => {
-    if (device.value === "canvas") return
+    if (currentDeviceValue() === "canvas") return
     const bounds = ($("#preview") as HTMLCanvasElement).getBoundingClientRect()
     panelStatus.textContent = `面板：${Math.round(width)} × ${Math.round(height)} · 预览缩放：${previewScalePercent(bounds.width, bounds.height, width, height)}%`
   })
@@ -2852,11 +2862,12 @@ function updatePanelTools(
 
 function updateDevicePreview(): void {
   setPreviewPan(0, 0)
-  deviceShell.dataset.device = device.value
+  const deviceValue = currentDeviceValue()
+  deviceShell.dataset.device = deviceValue
   deviceShell.dataset.orientation = orientation.value
   deviceShell.dataset.theme = theme.value
-  deviceShell.classList.toggle("canvas-only", device.value === "canvas")
-  const spec = deviceSpec(device.value)
+  deviceShell.classList.toggle("canvas-only", deviceValue === "canvas")
+  const spec = deviceSpec(deviceValue)
   const referenceFrame = spec?.family === "iphone" && orientation.value === "port"
   deviceShell.dataset.referenceFrame = String(referenceFrame)
   deviceShell.dataset.accessories = showsKeyboardAccessories(spec, orientation.value)
@@ -4570,6 +4581,7 @@ function renderSourceValueThumbnail(canvas: HTMLCanvasElement, range: SourceEdit
 
 let sourceValuePreviewRenderID = 0
 let sourceColorPickerTarget: SourceEditorValueRange | undefined
+let sourceStylePickerTarget: SourceEditorValueRange | undefined
 let sourceStylePreviewID = ""
 let styleImageGalleryRenderID = 0
 
@@ -4670,7 +4682,10 @@ async function renderStyleImageGallery(): Promise<void> {
       previews.append(canvas)
     }
     button.append(label, previews)
-    button.addEventListener("click", () => showSourceStylePreview(styleID))
+    button.addEventListener("click", () => {
+      applySourceStylePicker(styleID)
+      showSourceStylePreview(styleID)
+    })
     styleImageGalleryGrid.append(button)
   }
 }
@@ -4692,6 +4707,7 @@ function toggleStyleImageGallery(): void {
 
 function openSourceStylePreview(range: SourceEditorValueRange): void {
   if (range.kind !== "style") return
+  sourceStylePickerTarget = range
   clearImageSlicePicker()
   showStyleImageDialog()
   styleImagePicker.hidden = true
@@ -4699,6 +4715,17 @@ function openSourceStylePreview(range: SourceEditorValueRange): void {
   styleImageMore.hidden = availableStyleIDs().length === 0
   styleImageGallerySearch.value = ""
   showSourceStylePreview(range.value.replace(/^STYLE/i, ""))
+}
+
+function applySourceStylePicker(styleID: string): void {
+  const target = sourceStylePickerTarget
+  if (!target || source.disabled || source.readOnly) return
+  if (source.value.slice(target.from, target.to) !== target.value) return
+  const next = replacedSourceStyle(target.value, styleID)
+  if (!next) return
+  source.replaceRange(target.from, target.to, next)
+  sourceStylePickerTarget = { ...target, to: target.from + next.length, value: next }
+  source.commit()
 }
 
 let stylePickerTarget: HTMLInputElement | undefined
@@ -7549,7 +7576,9 @@ async function loadArchive(
   if (!availableThemes.includes(theme.value)) theme.value = availableThemes[0] ?? "light"
   syncSegmentedControls()
   const preferredDevice = localStorage.getItem("default-device")
-  if (preferredDevice && Array.from(device.options).some((option) => option.value === preferredDevice)) {
+  if (preferredDevice === "canvas") {
+    device.value = canvasDeviceValue(canvasBackground.value as CanvasBackground)
+  } else if (preferredDevice && Array.from(device.options).some((option) => option.value === preferredDevice)) {
     device.value = preferredDevice
   }
   canvasWrap.classList.remove("empty")
@@ -8164,16 +8193,32 @@ for (const button of sidebarViewButtons) {
 const savedDefaultDevice = localStorage.getItem("default-device")
 defaultDevice.value = Array.from(defaultDevice.options).some((option) => option.value === savedDefaultDevice)
   ? savedDefaultDevice!
-  : device.value
+  : currentDeviceValue()
 defaultDevice.addEventListener("change", () => {
   localStorage.setItem("default-device", defaultDevice.value)
 })
+function applyCanvasBackground(background: CanvasBackground): void {
+  canvasBackground.value = background
+  localStorage.setItem("canvas-background", background)
+  canvasWrap.dataset.background = background
+}
+
 const savedCanvasBackground = localStorage.getItem("canvas-background")
-canvasBackground.value = savedCanvasBackground === "default" ? "glass" : savedCanvasBackground ?? "white"
-canvasWrap.dataset.background = canvasBackground.value
+const initialCanvasBackground = savedCanvasBackground === "default"
+  ? "glass"
+  : canvasBackgroundValues.includes(savedCanvasBackground as CanvasBackground)
+    ? savedCanvasBackground as CanvasBackground
+    : "white"
+applyCanvasBackground(initialCanvasBackground)
+if (currentDeviceValue() === "canvas") device.value = canvasDeviceValue(initialCanvasBackground)
 canvasBackground.addEventListener("change", () => {
-  localStorage.setItem("canvas-background", canvasBackground.value)
-  canvasWrap.dataset.background = canvasBackground.value
+  const background = canvasBackground.value as CanvasBackground
+  applyCanvasBackground(background)
+  if (currentDeviceValue() === "canvas") {
+    device.value = canvasDeviceValue(background)
+    updateDevicePreview()
+    refreshPreview()
+  }
 })
 mobilePreviewPosition.value = localStorage.getItem("mobile-preview-position") === "top" ? "top" : "bottom"
 document.documentElement.dataset.mobilePreviewPosition = mobilePreviewPosition.value
@@ -8413,6 +8458,7 @@ function applySourceEditorFeatures(): void {
   })
   updateSourceHighlight()
 }
+applySourceEditorFeatures()
 for (const [input, key] of [
   [sourceCompletionEnabled, "source-completion-enabled"],
   [sourceValueHintsEnabled, "source-value-hints-enabled"],
@@ -9432,6 +9478,8 @@ resourceDeleteButton.addEventListener("click", () => {
 })
 
 device.addEventListener("change", () => {
+  const background = canvasBackgroundFromDevice(device.value)
+  if (background) applyCanvasBackground(background)
   updateDevicePreview()
   refreshPreview()
 })

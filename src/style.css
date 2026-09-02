@@ -1132,6 +1132,13 @@ h2 {
   --canvas-tertiary: #74747b;
 }
 
+.canvas-wrap[data-background="gray"] {
+  background: #808080;
+  --canvas-text: #202124;
+  --canvas-secondary: #303236;
+  --canvas-tertiary: #45484d;
+}
+
 .canvas-wrap[data-background="dark"] {
   background: #242529;
   --canvas-text: #f2f3f4;
@@ -1318,7 +1325,9 @@ h2 {
 }
 
 .canvas-wrap[data-background="white"] .preview-coordinate-label,
+.canvas-wrap[data-background="gray"] .preview-coordinate-label,
 .canvas-wrap[data-background="checkerboard"] .preview-coordinate-label,
+.canvas-wrap[data-background="gray"] ~ .preview-zoom-control,
 .canvas-wrap[data-background="checkerboard"] ~ .preview-zoom-control {
   border-color: rgb(32 33 36 / 22%);
   background: rgb(255 255 255 / 88%);
@@ -1328,6 +1337,7 @@ h2 {
   backdrop-filter: none;
 }
 
+.canvas-wrap[data-background="gray"] ~ .preview-zoom-control button,
 .canvas-wrap[data-background="checkerboard"] ~ .preview-zoom-control button {
   color: #202124;
 }
@@ -4841,6 +4851,10 @@ canvas {
 .app-dialog label > small {
   color: var(--secondary);
   font-size: 10px;
+}
+
+#about-dialog {
+  width: min(560px, calc(100vw - 32px));
 }
 
 #settings-dialog {
