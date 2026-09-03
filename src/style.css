@@ -3331,15 +3331,44 @@ canvas {
 
 #style-detail-fields {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 8px;
+  align-items: start;
+  gap: 12px;
 }
 
 #style-detail-fields > .bda-style-card {
   grid-column: 1 / -1;
 }
 
-#style-detail-fields .style-detail-field:last-child:nth-child(odd) {
-  grid-column: 1 / -1;
+.style-detail-group {
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--control) 72%, transparent);
+}
+
+.style-detail-group legend {
+  padding: 0 4px;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.style-detail-group-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px 8px;
+}
+
+#style-resource-detail {
+  container-type: inline-size;
+}
+
+@container (max-width: 520px) {
+  #style-detail-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .app-dialog.layout-image-dialog {
@@ -3998,6 +4027,10 @@ canvas {
   grid-template-columns: 1fr 1fr;
 }
 
+.primary-css-fields {
+  display: contents;
+}
+
 .direction-editor {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4176,6 +4209,21 @@ canvas {
   height: 100%;
   display: grid;
   place-items: center;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.style-picker-state + .style-picker-state {
+  border-left: 1px solid var(--line-soft);
+}
+
+.style-picker-state:hover,
+.style-picker-state:focus-visible {
+  background: var(--hover);
 }
 
 .style-picker-state canvas {
@@ -4194,7 +4242,7 @@ canvas {
   background-size: 10px 10px;
 }
 
-.style-picker-trigger:hover {
+.style-picker-trigger:is(button):hover {
   background: var(--hover);
 }
 
@@ -4529,7 +4577,7 @@ canvas {
   cursor: pointer;
 }
 
-.style-image-header :is(#style-image-more, #style-image-close) {
+.style-image-header :is(#style-image-source, #style-image-more, #style-image-close) {
   width: 34px;
   min-height: 34px;
   display: grid;
@@ -4537,7 +4585,7 @@ canvas {
   padding: 0;
 }
 
-.style-image-header :is(#style-image-more, #style-image-close) .system-symbol {
+.style-image-header :is(#style-image-source, #style-image-more, #style-image-close) .system-symbol {
   width: 15px;
   height: 15px;
 }
@@ -4673,6 +4721,7 @@ canvas {
 .style-image-img-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-auto-rows: max-content;
   align-content: start;
   gap: 12px;
   min-height: 0;
@@ -5146,6 +5195,12 @@ canvas {
   font-family: inherit;
   font-size: 11px;
   user-select: text;
+}
+
+.inspector-grid.primary-actions input {
+  height: 44px;
+  padding: 8px 12px;
+  font-size: 15px;
 }
 
 .inspector-grid small {

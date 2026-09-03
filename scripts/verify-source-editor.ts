@@ -41,6 +41,7 @@ assert.match(editor, /anchor: \{ left: bounds\.left, bottom: bounds\.bottom \}/,
 assert.match(main, /sourceColorPicker\.style\.left[\s\S]*sourceColorPicker\.style\.top[\s\S]*sourceColorPicker\.showPicker\(\)/, "源码颜色调节器应先锚定到被点击值再打开")
 assert.doesNotMatch(style, /\.source-color-picker\s*\{[^}]*\b(?:right|bottom):/, "源码颜色调节器不应固定在窗口右下角")
 assert.match(html, /id="style-image-more"[\s\S]{0,300}data-system-symbol="square\.grid\.2x2"/, "样式预览应提供更多样式图标")
+assert.match(html, /id="style-image-source"[\s\S]{0,300}data-system-symbol="doc\.text"/, "样式预览应提供跳转至源码图标")
 assert.match(html, /id="style-image-gallery"[^>]*aria-label="全部样式"/, "样式预览应包含可扩展的全部样式区域")
 assert.match(main, /styleImageDialog\.showModal\(\)/, "样式预览应通过模态 API 打开")
 assert.match(
@@ -49,6 +50,13 @@ assert.match(
   "源码颜色与样式点击应分别进入颜色调节器和样式预览",
 )
 assert.match(main, /styleImageMore\.addEventListener\("click", toggleStyleImageGallery\)/, "更多样式图标应切换扩展视图")
+assert.match(main, /styleImageSource\.addEventListener\("click", openSourceStyleDefinition\)/, "源码图标应跳转至样式定义")
+assert.match(
+  main,
+  /function openSourceStyleDefinition\(\)[\s\S]*const target = pickerTarget[\s\S]*target\?\.path[\s\S]*target\?\.sections[\s\S]*selectFile\(path, "source"\)/,
+  "图片切片弹窗的源码图标应跳转至当前引用定义",
+)
+assert.match(main, /openImageSlicePicker[\s\S]*styleImageSource\.hidden = !\(target\.path && target\.sections\?\.length\)/, "图片切片存在源码目标时应显示跳转图标")
 assert.match(main, /applySourceStylePicker\(styleID\)[\s\S]*showSourceStylePreview\(styleID\)/, "点击全部样式卡片应写回源码并预览所选样式")
 assert.match(style, /\.style-image-dialog::backdrop/, "样式预览弹窗应提供新版遮罩层")
 assert.doesNotMatch(

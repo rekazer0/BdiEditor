@@ -26,6 +26,16 @@ function stylePropertySource(
   }
 }
 
+export function resolveStylePropertyLayers(
+  document: IniDocument,
+  foreground: string,
+  property: string,
+): StylePropertySource[] {
+  return foreground.split(",").map((token) => token.trim()).filter(Boolean).flatMap((token) =>
+    stylePropertySource(document, token, property) ?? []
+  )
+}
+
 export function resolveStylePropertySources(
   document: IniDocument,
   foregrounds: string[],
