@@ -246,6 +246,7 @@
             <div class="inspector-tabs" aria-label="检查器视图">
               <button class="active" data-inspector-tab="properties">属性</button>
               <button data-inspector-tab="source">源代码</button>
+              <button data-inspector-tab="ai" type="button">AI 设计</button>
             </div>
           </div>
         </div>
@@ -254,8 +255,13 @@
             <button id="inspector-groups-drag" type="button" aria-label="拖动属性分组栏" title="拖动属性分组栏">⋮⋮</button>
           </nav>
           <div class="inspector-title key-inspector-title">
-            <strong id="selected-key">选择画布中的按键</strong>
-            <span>更改会自动写回配置</span>
+            <span id="selected-key-preview" class="key-inspector-preview" aria-hidden="true" hidden>ABC</span>
+            <div class="key-inspector-copy">
+              <strong id="selected-key">选择画布中的按键</strong>
+              <span id="selected-key-context">更改会自动写回配置</span>
+            </div>
+            <span id="selected-key-save-state" class="key-inspector-save-state" hidden>自动保存</span>
+            <button id="selected-key-reset" class="key-inspector-reset" type="button" title="撤销最近修改" aria-label="撤销最近修改" hidden><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"></span></button>
             <div class="tile-toolbar key-toolbar key-only">
               <div class="tile-mode-control key-mode-control" aria-label="按键操作模式">
                 <button class="toolbar-button active" type="button" data-key-mode="select" title="点击选择" aria-label="点击选择"><span class="icon system-symbol" data-system-symbol="cursorarrow" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 2.5 15.5 11l-5 .8 2.8 5-2.5 1.4-2.7-5L4 16z"/></svg></span></button>
@@ -294,17 +300,19 @@
             <div id="document-fields"></div>
           </div>
           <div class="inspector-group bda-config-fields" hidden>
+            <div id="bda-selected-style-heading" class="bda-selected-style-heading" hidden>
+              <div>
+                <h3>样式</h3>
+                <p>正常与按下状态</p>
+              </div>
+              <div class="inspector-state-switch" role="group" aria-label="按键状态">
+                <button class="active" type="button" data-bda-inspector-state="normal" aria-pressed="true">正常</button>
+                <button type="button" data-bda-inspector-state="pressed" aria-pressed="false">按下</button>
+              </div>
+            </div>
             <div id="bda-config-fields"></div>
           </div>
-          <div class="inspector-group key-only primary-key-fields">
-            <h3>常用</h3>
-            <div class="inspector-grid primary-actions">
-              <label>显示内容（SHOW） <input data-key-field="SHOW" /></label>
-              <label>点击动作（CENTER） <input data-key-field="CENTER" list="baidu-action-codes" /><small data-action-meaning="CENTER"></small></label>
-              <div id="primary-css-fields" class="primary-css-fields"></div>
-            </div>
-          </div>
-          <section class="inspector-group inspector-disclosure key-only key-layout-fields">
+          <section class="inspector-group inspector-disclosure key-only key-layout-fields" data-inspector-group-label="布局">
             <h3>布局</h3>
             <div class="inspector-grid geometry-fields">
               <label>X（VIEW_RECT） <input data-key-field="x" type="number" /></label>
@@ -318,20 +326,40 @@
               <label>垂直间距（VIEW_RECT） <input data-gap-field="vertical" type="number" /></label>
             </div>
             <div class="layout-actions" aria-label="对齐与分布">
-              <button data-layout-action="left" title="左对齐">左齐</button>
-              <button data-layout-action="right" title="右对齐">右齐</button>
-              <button data-layout-action="top" title="顶对齐">顶齐</button>
-              <button data-layout-action="bottom" title="底对齐">底齐</button>
-              <button data-layout-action="same-width" title="等宽">等宽</button>
-              <button data-layout-action="same-height" title="等高">等高</button>
-              <button data-layout-action="horizontal-gap" title="水平等间距">水平分布</button>
-              <button data-layout-action="vertical-gap" title="垂直等间距">垂直分布</button>
-              <button data-layout-action="swap" title="交换位置">交换</button>
-              <button data-layout-action="merge" title="合并按键">合并</button>
+              <div class="layout-action-group" aria-label="对齐">
+                <span class="layout-action-label">对齐</span>
+                <div class="layout-action-buttons">
+                  <button data-layout-action="left" title="左对齐"><span class="system-symbol" data-system-symbol="align.horizontal.left" aria-hidden="true"></span><span>左对齐</span></button>
+                  <button data-layout-action="right" title="右对齐"><span class="system-symbol" data-system-symbol="align.horizontal.right" aria-hidden="true"></span><span>右对齐</span></button>
+                  <button data-layout-action="top" title="顶对齐"><span class="system-symbol" data-system-symbol="align.vertical.top" aria-hidden="true"></span><span>顶对齐</span></button>
+                  <button data-layout-action="bottom" title="底对齐"><span class="system-symbol" data-system-symbol="align.vertical.bottom" aria-hidden="true"></span><span>底对齐</span></button>
+                </div>
+              </div>
+              <div class="layout-action-group" aria-label="尺寸">
+                <span class="layout-action-label">尺寸</span>
+                <div class="layout-action-buttons">
+                  <button data-layout-action="same-width" title="统一宽度"><span class="system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"></span><span>统一宽度</span></button>
+                  <button data-layout-action="same-height" title="统一高度"><span class="system-symbol" data-system-symbol="arrow.up.and.down" aria-hidden="true"></span><span>统一高度</span></button>
+                </div>
+              </div>
+              <div class="layout-action-group" aria-label="分布">
+                <span class="layout-action-label">分布</span>
+                <div class="layout-action-buttons">
+                  <button data-layout-action="horizontal-gap" title="水平等间距"><span class="system-symbol" data-system-symbol="arrow.left.and.right.righttriangle.left.righttriangle.right" aria-hidden="true"></span><span>水平等间距</span></button>
+                  <button data-layout-action="vertical-gap" title="垂直等间距"><span class="system-symbol" data-system-symbol="arrow.up.and.down.righttriangle.up.righttriangle.down" aria-hidden="true"></span><span>垂直等间距</span></button>
+                </div>
+              </div>
+              <div class="layout-action-group" aria-label="操作">
+                <span class="layout-action-label">操作</span>
+                <div class="layout-action-buttons">
+                  <button data-layout-action="swap" title="交换位置"><span class="system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"></span><span>交换位置</span></button>
+                  <button data-layout-action="merge" title="合并按键"><span class="system-symbol" data-system-symbol="square.2.layers.3d" aria-hidden="true"></span><span>合并按键</span></button>
+                </div>
+              </div>
             </div>
           </section>
-          <section class="inspector-group inspector-disclosure key-only key-appearance-fields">
-            <h3>样式引用、文字与图片</h3>
+          <section class="inspector-group inspector-disclosure key-only key-appearance-fields" data-inspector-group-label="样式">
+            <h3>样式</h3>
             <div class="inspector-grid appearance-fields">
               <div class="appearance-section appearance-visual-styles">
                 <div class="appearance-section-heading"><strong>视觉样式</strong><span>正常 / 按下</span></div>
@@ -368,18 +396,6 @@
                   </label>
                 </div>
               </div>
-              <div class="appearance-section appearance-typography-fields">
-                <div class="appearance-section-heading"><strong>文字</strong></div>
-                <div class="appearance-property-grid typography-property-grid">
-                  <label data-text-style>字体（FONT_NAME） <input data-style-field="FONT_NAME" /></label>
-                  <label data-text-style>字重（FONT_WEIGHT） <input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
-                  <label data-text-style>字号（FONT_SIZE） <input data-style-field="FONT_SIZE" type="number" /></label>
-                  <div class="color-pair-field" data-text-style>
-                    <label>正常颜色（NM_COLOR） <span class="color-control"><input data-style-field="NM_COLOR" /><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色（NM_COLOR）"><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度（NM_COLOR）"></span></label>
-                    <label>按下颜色（HL_COLOR） <span class="color-control"><input data-style-field="HL_COLOR" /><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色（HL_COLOR）"><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度（HL_COLOR）"></span></label>
-                  </div>
-                </div>
-              </div>
               <div class="appearance-section appearance-sound-field">
                 <div class="appearance-section-heading"><strong>音效</strong></div>
                 <label title="按键引用的按键音效样式编号">按键音效（SOUND_STYLE）
@@ -390,8 +406,31 @@
               </div>
             </div>
           </section>
-          <section class="inspector-group inspector-disclosure key-only key-gesture-fields">
-            <h3>滑动与长按</h3>
+          <section class="inspector-group inspector-disclosure key-only key-typography-fields" data-inspector-group-label="文字">
+            <h3><span class="typography-heading-default">文字</span><span class="typography-heading-override">文字覆盖</span></h3>
+            <p class="inspector-group-subtitle"><span class="typography-subtitle-default">显示内容与字体颜色</span><span class="typography-subtitle-override">仅当前状态</span></p>
+            <div class="inspector-grid typography-content-fields">
+              <label>显示内容（SHOW） <input data-key-field="SHOW" /></label>
+              <div id="primary-css-fields" class="primary-css-fields"></div>
+            </div>
+            <div class="appearance-section appearance-typography-fields">
+              <div class="appearance-property-grid typography-property-grid">
+                <label data-text-style>字体（FONT_NAME） <input data-style-field="FONT_NAME" /></label>
+                <label data-text-style>字重（FONT_WEIGHT） <input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
+                <label data-text-style>字号（FONT_SIZE） <input data-style-field="FONT_SIZE" type="number" /></label>
+                <div class="color-pair-field" data-text-style>
+                  <label>正常颜色（NM_COLOR） <span class="color-control"><input data-style-field="NM_COLOR" /><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色（NM_COLOR）"><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度（NM_COLOR）"></span></label>
+                  <label>按下颜色（HL_COLOR） <span class="color-control"><input data-style-field="HL_COLOR" /><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色（HL_COLOR）"><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度（HL_COLOR）"></span></label>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="inspector-group inspector-disclosure key-only key-gesture-fields" data-inspector-group-label="动作">
+            <h3>手势与动作</h3>
+            <p class="inspector-group-subtitle">点击、滑动与长按</p>
+            <div class="inspector-grid primary-actions">
+              <label>点击动作（CENTER） <input data-key-field="CENTER" list="baidu-action-codes" /><small data-action-meaning="CENTER"></small></label>
+            </div>
             <div class="direction-editor" aria-label="滑动与长按动作">
               <label class="direction-up"><span>↑ 上滑（UP）</span><input data-key-field="UP" list="baidu-action-codes" /><small data-action-meaning="UP"></small></label>
               <label class="direction-left"><span>← 左滑（LEFT）</span><input data-key-field="LEFT" list="baidu-action-codes" /><small data-action-meaning="LEFT"></small></label>
@@ -488,6 +527,30 @@
           <div class="source-code">
             <div id="source"></div>
           </div>
+        </div>
+        <div id="ai-design-panel" hidden>
+          <form id="ai-design-form">
+            <div class="ai-design-conversation" aria-live="polite" aria-label="AI 设计对话">
+              <div id="ai-design-user-message" class="ai-design-user-message" hidden></div>
+              <article class="ai-design-assistant-message">
+                <div class="ai-design-assistant-heading"><span class="ai-design-avatar" aria-hidden="true">✦</span><span class="ai-design-thought-label">设计助手</span><span class="ai-design-connection-dot" aria-hidden="true"></span></div>
+                <h2>告诉我你想怎样调整当前皮肤</h2>
+                <p id="ai-design-answer">我会结合画布中选中的按键或当前布局，分析现有配置并生成可撤销的修改。</p>
+                <p id="ai-design-status" class="ai-design-status" aria-live="polite"></p>
+              </article>
+            </div>
+            <div class="ai-design-composer">
+              <div class="ai-design-target"><span class="system-symbol" data-system-symbol="scope" aria-hidden="true">◎</span><span>作用于</span><strong id="ai-design-target">当前布局</strong></div>
+              <textarea id="ai-design-prompt" rows="3" required aria-label="设计要求" placeholder="描述要如何设计选中的按键或布局"></textarea>
+              <footer>
+                <div class="ai-design-options">
+                  <label title="选择视觉风格"><span>风格</span><select name="ai-design-style" aria-label="视觉风格"><option value="follow">延续当前</option><option value="minimal">简约清晰</option><option value="expressive">鲜明个性</option></select></label>
+                  <label class="ai-design-switch" title="保持按键位置和数量不变"><input id="ai-design-keep-layout" type="checkbox" checked><span>保持布局</span></label>
+                </div>
+                <div class="ai-design-actions"><button id="ai-design-cancel" type="button" hidden>取消</button><button class="primary" type="submit" aria-label="发送设计要求" title="发送设计要求"><span class="system-symbol" data-system-symbol="arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="m6 11 6-6 6 6M12 5v14"/></svg></span><span class="ai-design-submit-label">发送</span></button></div>
+              </footer>
+            </div>
+          </form>
         </div>
         <div id="asset" hidden>
           <div class="asset-toolbar">
@@ -694,8 +757,16 @@
     <dialog id="settings-dialog" class="app-dialog" aria-labelledby="settings-title">
       <form method="dialog">
         <header><h2 id="settings-title">设置</h2><button aria-label="关闭">关闭</button></header>
-        <div class="settings-grid">
-          <section class="settings-section" aria-labelledby="settings-appearance-title">
+        <div class="settings-layout">
+          <nav class="settings-sidebar" aria-label="设置分类">
+            <button class="settings-nav-item" type="button" data-settings-page="appearance" aria-selected="true"><span class="system-symbol" data-system-symbol="paintbrush" aria-hidden="true"></span><span>外观</span></button>
+            <button class="settings-nav-item" type="button" data-settings-page="workspace" aria-selected="false"><span class="system-symbol" data-system-symbol="rectangle.3.group" aria-hidden="true"></span><span>工作区</span></button>
+            <button class="settings-nav-item" type="button" data-settings-page="preview" aria-selected="false"><span class="system-symbol" data-system-symbol="eye" aria-hidden="true"></span><span>预览</span></button>
+            <button id="settings-storage-nav" class="settings-nav-item" type="button" data-settings-page="storage" aria-selected="false" hidden><span class="system-symbol" data-system-symbol="internaldrive" aria-hidden="true"></span><span>源码存储</span></button>
+            <button id="settings-model-nav" class="settings-nav-item" type="button" data-settings-page="model" aria-selected="false" hidden><span class="system-symbol" data-system-symbol="sparkles" aria-hidden="true"></span><span>大模型</span></button>
+          </nav>
+          <div class="settings-content">
+          <section class="settings-section settings-page" data-settings-panel="appearance" aria-labelledby="settings-appearance-title">
             <div class="settings-section-heading">
               <h3 id="settings-appearance-title">外观</h3>
               <p>应用窗口与界面显示</p>
@@ -704,11 +775,11 @@
               <label class="settings-row"><span>外观模式</span><select id="app-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
               <label class="settings-row settings-switch"><span>窗口材质</span><input id="window-material" type="checkbox" role="switch" checked></label>
               <label id="window-material-opacity-setting" class="settings-row settings-range"><span id="window-material-opacity-label">玻璃不透明度</span><span class="settings-range-control"><input id="window-material-opacity" type="range" min="20" max="100" step="1" value="100" aria-labelledby="window-material-opacity-label window-material-opacity-value"><output id="window-material-opacity-value" for="window-material-opacity">100%</output></span></label>
-              <label class="settings-row settings-switch"><span>检查器分组显示</span><input id="inspector-grouped-display" type="checkbox" role="switch" checked></label>
+              <label class="settings-row settings-switch"><span>检查器分组显示</span><input id="inspector-grouped-display" type="checkbox" role="switch"></label>
             </div>
           </section>
 
-          <section class="settings-section" aria-labelledby="settings-workspace-title">
+          <section class="settings-section settings-page" data-settings-panel="workspace" aria-labelledby="settings-workspace-title" hidden>
             <div class="settings-section-heading">
               <h3 id="settings-workspace-title">工作区</h3>
               <p>编辑器界面与源代码功能</p>
@@ -723,7 +794,7 @@
             </div>
           </section>
 
-          <section class="settings-section" aria-labelledby="settings-preview-title">
+          <section class="settings-section settings-page" data-settings-panel="preview" aria-labelledby="settings-preview-title" hidden>
             <div class="settings-section-heading">
               <h3 id="settings-preview-title">预览</h3>
               <p>皮肤打开时的画布状态</p>
@@ -738,7 +809,7 @@
             </div>
           </section>
 
-          <section id="settings-storage-section" class="settings-section settings-storage" aria-labelledby="settings-storage-title">
+          <section id="settings-storage-section" class="settings-section settings-page settings-storage" data-settings-panel="storage" aria-labelledby="settings-storage-title" hidden>
             <div class="settings-section-heading">
               <h3 id="settings-storage-title">源码存储</h3>
               <p>皮肤源代码的本地存储位置</p>
@@ -753,6 +824,23 @@
               <small id="source-directory-status"></small>
             </label>
           </section>
+          <section id="settings-model-section" class="settings-section settings-page settings-model" data-settings-panel="model" aria-labelledby="settings-model-title" hidden>
+            <div class="settings-section-heading">
+              <h3 id="settings-model-title">大模型</h3>
+              <p>配置桌面应用使用的模型服务</p>
+            </div>
+            <div class="settings-list">
+              <label class="settings-row"><span>服务商</span><select id="model-provider"></select></label>
+              <label class="settings-row settings-text-row"><span>API 地址</span><input id="model-api-url" type="url" autocomplete="url" spellcheck="false" placeholder="https://api.openai.com/v1"></label>
+              <label class="settings-row settings-text-row"><span>模型名称</span><span class="settings-model-control"><input id="model-name" type="text" list="model-list" autocomplete="off" spellcheck="false" placeholder="gpt-5"><button id="refresh-model-list" type="button" title="从 API 获取模型" aria-label="从 API 获取模型"><span class="system-symbol" data-system-symbol="arrow.clockwise" aria-hidden="true"></span></button></span><datalist id="model-list"></datalist></label>
+              <label class="settings-row settings-text-row"><span>API 密钥</span><span class="settings-secret-control"><input id="model-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…"><button id="toggle-model-api-key" type="button" title="显示 API 密钥" aria-label="显示 API 密钥"><span class="system-symbol" data-system-symbol="eye" aria-hidden="true"></span></button></span></label>
+            </div>
+            <div class="settings-model-footer">
+              <div><p id="model-configuration-status" aria-live="polite">配置保存在本机应用配置目录</p><small id="model-configuration-path"></small></div>
+              <div class="settings-model-actions"><button id="test-model-connection" type="button">测试连接</button><button id="save-model-configuration" class="primary" type="button">保存配置</button></div>
+            </div>
+          </section>
+          </div>
         </div>
       </form>
     </dialog>

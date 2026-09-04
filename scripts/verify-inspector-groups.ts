@@ -29,7 +29,18 @@ assert.deepEqual(styleLayers, [
   { section: "STYLE16", value: "H" },
   { section: "STYLE32", value: "&" },
 ], "属性检查器应分别解析 FORE_STYLE 每一层的 CSS 显示内容")
-assert.match(html, /id="primary-css-fields"/, "常用分组应包含 CSS 属性容器")
+assert.match(html, /key-typography-fields[\s\S]*id="primary-css-fields"/, "文字分组应包含 CSS 显示内容")
+assert.doesNotMatch(
+  html,
+  /id="inspector-grouped-display"[^>]*checked/,
+  "检查器应默认使用方案 B，分组导航由用户主动开启",
+)
+assert.match(
+  main,
+  /inspectorGroupedDisplay\.checked = localStorage\.getItem\("inspector-grouped-display"\) === "on"/,
+  "仅在设置明确开启时使用方案 C",
+)
+assert.match(main, /button\.append\(createSystemSymbol\(mobileInspectorGroupSymbol\(label\)\), text\)/, "分组入口应包含图标与文本")
 assert.match(main, /来自 CSS · \$\{source\.section\}/, "CSS 属性应注明来源样式")
 assert.match(
   css,
@@ -51,6 +62,16 @@ assert.match(
   /@media \(min-width: 761px\)[\s\S]*?#mobile-inspector-groups \{[\s\S]*?grid-row:\s*1;[\s\S]*?align-self:\s*start;/,
   "桌面端分组栏应固定在分组网格的可见行内，避免高度塌缩",
 )
+assert.match(
+  css,
+  /#quick-inspector\[data-inspector-group-display="all"\]:has\(#selected-key-preview:not\(\[hidden\]\)\) #mobile-inspector-groups \{\s*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\);/,
+  "方案 B 的按键属性应使用四列顶部分类工作台",
+)
+assert.match(
+  css,
+  /#quick-inspector\[data-inspector-group-display="grouped"\]:not\(\[hidden\]\) \{\s*grid-template-columns:\s*80px minmax\(0, 1fr\);/,
+  "方案 C 应使用左侧分组导航",
+)
 assert.doesNotMatch(
   css,
   /@media \(max-width: 1060px\)[\s\S]*?\.source\s*\{\s*display:\s*none;/,
@@ -64,15 +85,13 @@ assert.match(
 assert.match(css, /#quick-inspector,[\s\S]*?touch-action:\s*pan-y;[\s\S]*?-webkit-overflow-scrolling:\s*touch;/)
 assert.doesNotMatch(main, /mainWorkspace\.setPointerCapture\(/, "移动面板切换不应预先抢占属性区纵向滚动")
 assert.match(main, /Math\.abs\(deltaY\) > 12 && Math\.abs\(deltaY\) > Math\.abs\(deltaX\)/)
-assert.match(html, /appearance-visual-styles[\s\S]*appearance-layout-fields[\s\S]*appearance-typography-fields[\s\S]*appearance-sound-field/, "样式检查器应按视觉、排布、文字和音效分组")
+assert.match(html, /key-layout-fields[\s\S]*key-appearance-fields[\s\S]*key-typography-fields[\s\S]*key-gesture-fields/, "按键检查器应按布局、样式、文字和动作分组")
+assert.match(main, /groups = \[keyLayoutFieldsGroup, bdaConfigFieldsGroup, keyTypographyFieldsGroup, keyGestureFieldsGroup\]/, "BDA 按键也应使用相同的四分组顺序")
 assert.match(main, /\["colors", "状态颜色"[\s\S]*\["typography", "字体"[\s\S]*\["content", "内容与说明"[\s\S]*\["advanced", "边框与扩展"/, "样式资源属性应按用途分组")
 assert.match(css, /\.style-detail-group-fields \{[\s\S]*?grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/, "样式属性分组内部应保留紧凑双列")
 assert.match(css, /@container \(max-width: 520px\)[\s\S]*?#style-detail-fields \{\s*grid-template-columns:\s*minmax\(0, 1fr\);/, "窄检查器中的样式属性分组应折成单列")
 assert.match(css, /\.appearance-reference-grid \{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\);/, "背景和前景样式引用应各占一行")
-assert.doesNotMatch(css, /\.key-appearance-fields \.style-reference-input > input,[\s\S]*?height:\s*62px;/, "BDI、BDS 按键样式预览应复用 BDA 的通用高度")
-assert.match(css, /\.style-picker-trigger \{[\s\S]*?height:\s*92px;/, "BDA、BDI、BDS 样式预览应统一使用通用高度")
 assert.match(main, /item\.dataset\.styleState = highlighted \? "highlighted" : "normal"/, "正常与按下缩略图应为独立点击目标")
 assert.match(main, /openStyleReferenceStateImage\(input, key, highlighted\)/, "两个状态应分别编辑 NM_IMG 与 HL_IMG")
-assert.match(css, /\.key-appearance-fields \.style-reference-input\.sound-style-reference > input,[\s\S]*?height:\s*36px;/, "按键音效引用不应占用视觉预览高度")
 
 console.log("✓ 检查器分组栏布局正常，属性区纵向滚动不被面板手势抢占")

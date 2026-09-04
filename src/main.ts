@@ -98,6 +98,7 @@ import { IniDocument } from "./ini.ts"
 import { adaptIos26KeyboardLayout, adaptIos26Variant } from "./ios26.ts"
 import { findTextMatches, iniSectionRanges, insertedTextRange, jsonPropertyRanges, replaceTextMatches } from "./highlight.ts"
 import { pushChange, type Change } from "./history.ts"
+import type { AiSkinDraftChange, AiSkinEditableFile } from "./ai-skin-workspace.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
 import {
   applyCandidateImageStyles,
@@ -132,6 +133,7 @@ import {
   type LayoutRect,
 } from "./layout.ts"
 import { mixedCoordinateDelta, shouldClearMixedInput } from "./mixed-input.ts"
+import { MODEL_PROVIDER_PRESETS, modelProviderPreset, type ModelProtocol } from "./model-providers.ts"
 import { installNumberInputWheel } from "./number-input-wheel.ts"
 import { loadBuiltInProjectTemplate, operationError } from "./operations.ts"
 import {
@@ -286,6 +288,11 @@ const mobileShareMenuLabel = mobileCommandMenu.querySelector<HTMLElement>(
 )!
 const appDialogButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-app-dialog]"))
 const settingsDialog = $("#settings-dialog") as HTMLDialogElement
+const settingsNavItems = Array.from(settingsDialog.querySelectorAll<HTMLButtonElement>("[data-settings-page]"))
+const settingsPages = Array.from(settingsDialog.querySelectorAll<HTMLElement>("[data-settings-panel]"))
+const settingsStorageNav = $("#settings-storage-nav") as HTMLButtonElement
+const settingsModelNav = $("#settings-model-nav") as HTMLButtonElement
+const settingsModelSection = $("#settings-model-section")
 const aboutDialog = $("#about-dialog") as HTMLDialogElement
 const copyQqGroupButton = $("#copy-qq-group") as HTMLButtonElement
 const aboutUpdate = $("#about-update")
@@ -321,6 +328,17 @@ const sourceDirectory = $("#source-directory") as HTMLInputElement
 const chooseSourceDirectory = $("#choose-source-directory") as HTMLButtonElement
 const resetSourceDirectory = $("#reset-source-directory") as HTMLButtonElement
 const sourceDirectoryStatus = $("#source-directory-status")
+const modelProvider = $("#model-provider") as HTMLSelectElement
+const modelApiUrl = $("#model-api-url") as HTMLInputElement
+const modelName = $("#model-name") as HTMLInputElement
+const modelList = $("#model-list") as HTMLDataListElement
+const modelApiKey = $("#model-api-key") as HTMLInputElement
+const toggleModelApiKey = $("#toggle-model-api-key") as HTMLButtonElement
+const refreshModelList = $("#refresh-model-list") as HTMLButtonElement
+const testModelConnection = $("#test-model-connection") as HTMLButtonElement
+const saveModelConfiguration = $("#save-model-configuration") as HTMLButtonElement
+const modelConfigurationStatus = $("#model-configuration-status")
+const modelConfigurationPath = $("#model-configuration-path")
 const mobilePaneButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mobile-pane]"))
 const mobileSplitHandle = $("#mobile-split-handle") as HTMLButtonElement
 const mobilePortraitQuery = matchMedia("(max-width: 760px) and (orientation: portrait)")
@@ -406,9 +424,13 @@ const panelScaleSummary = $("#panel-scale-summary")
 const quickInspector = $("#quick-inspector")
 const mobileInspectorGroups = $("#mobile-inspector-groups")
 const inspectorGroupsDrag = $("#inspector-groups-drag") as HTMLButtonElement
-const keyInspectorTitle = $(".key-inspector-title")
 const keyToolbar = $(".key-toolbar")
+const keyInspectorTitle = $(".key-inspector-title")
 const selectedKeyName = $("#selected-key")
+const selectedKeyPreview = $("#selected-key-preview")
+const selectedKeyContext = $("#selected-key-context")
+const selectedKeySaveState = $("#selected-key-save-state")
+const selectedKeyReset = $("#selected-key-reset") as HTMLButtonElement
 const keyFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-key-field]"))
 const styleFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-style-field]"))
 const primaryCssFields = $("#primary-css-fields")
@@ -424,10 +446,14 @@ const documentFieldsGroup = $(".document-fields")
 const documentFields = $("#document-fields")
 const bdaConfigFieldsGroup = $(".bda-config-fields")
 const bdaConfigFields = $("#bda-config-fields")
+const bdaSelectedStyleHeading = $("#bda-selected-style-heading")
+const bdaInspectorStateButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-bda-inspector-state]"))
 const colorPickers = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-picker-for]"))
 const colorAlphas = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-alpha-for]"))
 const keyOnlyGroups = Array.from(document.querySelectorAll<HTMLElement>(".key-only"))
-const keyAppearanceFieldsGroup = $(".key-appearance-fields")
+const keyLayoutFieldsGroup = $(".key-layout-fields")
+const keyTypographyFieldsGroup = $(".key-typography-fields")
+const keyGestureFieldsGroup = $(".key-gesture-fields")
 const bdaKeyFieldLabels: Record<string, string> = {
   BACK_STYLE: "背景样式（backStyle）",
   FORE_STYLE: "前景样式（foreStyles）",
@@ -452,6 +478,16 @@ const inspectorTabButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-inspector-tab]"),
 )
 const inspectorTabs = $(".inspector-tabs")
+const aiDesignPanel = $("#ai-design-panel")
+const aiDesignForm = $("#ai-design-form") as HTMLFormElement
+const aiDesignPrompt = $("#ai-design-prompt") as HTMLTextAreaElement
+const aiDesignStatus = $("#ai-design-status")
+const aiDesignAnswer = $("#ai-design-answer")
+const aiDesignUserMessage = $("#ai-design-user-message")
+const aiDesignTarget = $("#ai-design-target")
+const aiDesignSubmit = aiDesignForm.querySelector<HTMLButtonElement>('button[type="submit"]')!
+const aiDesignCancel = $("#ai-design-cancel") as HTMLButtonElement
+const aiDesignKeepLayout = $("#ai-design-keep-layout") as HTMLInputElement
 const browserOpen = $("#browser-open") as HTMLInputElement
 const imageOpen = $("#image-open") as HTMLInputElement
 const theme = $("#theme") as HTMLSelectElement
@@ -606,7 +642,7 @@ let selectedCandidate = false
 let unsavedNew = false
 let assetURL = ""
 let assetReturnPath = ""
-let inspectorTab: "properties" | "source" = "properties"
+let inspectorTab: "properties" | "source" | "ai" = "properties"
 let sourceFindVisible = false
 let sourceSearchIndex = -1
 let sourceInputHighlightTimer: number | undefined
@@ -616,6 +652,7 @@ let sourceHistoryHighlight: readonly [number, number] | undefined
 type LayoutImageConfig = "none" | "image-follows-layout" | "layout-follows-image"
 let undoStack: Change[] = []
 let redoStack: Change[] = []
+let aiDesignController: AbortController | undefined
 let layoutImageBytes: Uint8Array | undefined
 let layoutImageWidth = 0
 let layoutImageHeight = 0
@@ -1315,6 +1352,22 @@ const fallbackSymbolPaths: Record<string, string[]> = {
   "doc.on.doc": ["M8 7V3h10l3 3v12h-4", "M5 7h10v14H5z", "M9 12h2m-2 4h2"],
   "arrow.uturn.backward": ["m7 5-4 3.5L7 12", "M4 8.5h7.2a5 5 0 0 1 5 5"],
   "arrow.uturn.forward": ["m13 5 4 3.5-4 3.5", "M16 8.5H8.8a5 5 0 0 0-5 5"],
+  "arrow.left.and.right": ["M3 7h18M3 7l4-4M3 7l4 4M21 17H3m18 0-4-4m4 4-4 4"],
+  "arrow.up.and.down": ["M7 3v18M7 3 3 7m4-4 4 4M17 21V3m0 18 4-4m-4 4-4-4"],
+  "align.horizontal.left": ["M4 4v16M8 7h12M8 12h8M8 17h10"],
+  "align.horizontal.right": ["M20 4v16M4 7h12M8 12h8M6 17h10"],
+  "align.vertical.top": ["M4 4h16M7 8v12M12 8v8M17 8v10"],
+  "align.vertical.bottom": ["M4 20h16M7 4v12M12 4v12M17 4v12"],
+  "arrow.left.and.right.righttriangle.left.righttriangle.right": ["M3 12h18M3 12l4-4v8zm18 0-4-4v8z"],
+  "arrow.up.and.down.righttriangle.up.righttriangle.down": ["M12 3v18M12 3 8 7h8zm0 18-4-4h8z"],
+  "square.2.layers.3d": ["M4 7h12v12H4zM8 3h12v12M8 7h8"],
+  "arrow.clockwise": ["M19 8a8 8 0 1 0 1 6", "M19 3v5h-5"],
+  paintbrush: ["m4 17 10-10 3 3-10 10H4z", "m14 7 2-2 3 3-2 2", "M4 20h5"],
+  "rectangle.3.group": ["M3 5h18v4H3zM3 11h8v8H3zM13 11h8v8h-8z"],
+  eye: ["M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6", "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6"],
+  "eye.slash": ["M3 3l18 18", "M2.5 12s3.5-6 9.5-6c6 0 9.5 6 9.5 6a16 16 0 0 1-3.2 3.8M6.2 17.8A15 15 0 0 1 2.5 12", "M10 9.7A3 3 0 0 1 14.3 14"],
+  internaldrive: ["M4 5h16l2 11H2z", "M2 16v3h20v-3M17 12h1"],
+  sparkles: ["m12 2 1.4 4.6L18 8l-4.6 1.4L12 14l-1.4-4.6L6 8l4.6-1.4z", "m19 14 .8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8z", "m5 14 .8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8z"],
   "rectangle.portrait": ["M6 2.5h12v19H6z", "M9 5h6M9 19h6"],
   "rectangle.landscape": ["M2.5 6h19v12h-19z", "M5 9v6M19 9v6"],
   "sun.max": ["M12 4V2m0 20v-2M4 12H2m20 0h-2M5.6 5.6 4.2 4.2m15.6 15.6-1.4-1.4m0-12.8 1.4-1.4M5.6 18.4l-1.4 1.4", "M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10"],
@@ -1433,8 +1486,10 @@ function syncSegmentedControls(): void {
 function syncMobileInspectorHeader(): void {
   mobileInspectorSelection.textContent = selectedKeyName.textContent
   sourceHeading.dataset.mobileKeyTools = selectedKeySections.length ? "on" : "off"
-  const target = mobilePortraitQuery.matches ? sourceHeading : keyInspectorTitle
-  if (keyToolbar.parentElement !== target) target.append(keyToolbar)
+  // Keep the key operation selector attached to the selected-key card. Moving
+  // it into the gesture fields (or the pane heading on mobile) makes the
+  // controls appear detached at the bottom of the inspector.
+  if (keyToolbar.parentElement !== keyInspectorTitle) keyInspectorTitle.append(keyToolbar)
 }
 
 function mobileInspectorGroupLabel(group: HTMLElement): string {
@@ -1453,6 +1508,18 @@ function mobileInspectorGroupLabel(group: HTMLElement): string {
   if (label.includes("样式")) return "样式"
   if (label.includes("滑动")) return "手势"
   return label.split(/[、与（(]/)[0]
+}
+
+function mobileInspectorGroupSymbol(label: string): string {
+  if (/布局|面板|输入区/.test(label)) return "rectangle.3.group"
+  if (/样式|外观|颜色/.test(label)) return "paintbrush"
+  if (/文字|字体|内容/.test(label)) return "doc.text"
+  if (/手势|动作|按键/.test(label)) return "rectangle.and.hand.point"
+  if (/列表/.test(label)) return "list.bullet"
+  if (/声音|音效/.test(label)) return "speaker.wave.2"
+  if (/动画/.test(label)) return "play"
+  if (/皮肤/.test(label)) return "paintpalette"
+  return "app"
 }
 
 function setMobileInspectorGroup(id: string, scroll = true): void {
@@ -1481,7 +1548,7 @@ function syncMobileInspectorGroups(): void {
     group.classList.remove("mobile-inspector-managed", "mobile-inspector-active")
     delete group.dataset.mobileInspectorGroup
   }
-  const groups = Array.from(quickInspector.querySelectorAll<HTMLElement>(":scope > .inspector-group"))
+  let groups = Array.from(quickInspector.querySelectorAll<HTMLElement>(":scope > .inspector-group"))
     .filter((group) => !group.hidden)
     .flatMap((group) => {
       if (group === documentFieldsGroup) {
@@ -1492,6 +1559,15 @@ function syncMobileInspectorGroups(): void {
       }
       return [group]
     })
+  const selectedBdaKey = archive?.format === "bda" && selectedKeySections.length > 0 && !selectedCandidate
+  bdaSelectedStyleHeading.hidden = !selectedBdaKey
+  if (selectedBdaKey) {
+    bdaConfigFieldsGroup.dataset.inspectorGroupLabel = "样式"
+    groups = [keyLayoutFieldsGroup, bdaConfigFieldsGroup, keyTypographyFieldsGroup, keyGestureFieldsGroup]
+      .filter((group) => !group.hidden)
+  } else {
+    delete bdaConfigFieldsGroup.dataset.inspectorGroupLabel
+  }
   for (const [index, group] of groups.entries()) {
     group.dataset.mobileInspectorGroup = `${index}`
     group.classList.add("mobile-inspector-managed")
@@ -1499,15 +1575,35 @@ function syncMobileInspectorGroups(): void {
   const active = groups.find((group) => group.dataset.mobileInspectorGroup === quickInspector.dataset.mobileInspectorGroup)
     ?? groups[0]
   mobileInspectorGroups.hidden = groups.length < 2
+  // Keep the horizontal inspector navigation evenly distributed when the
+  // available groups change (for example: 面板 / 提示栏 / 扩展区域).
+  mobileInspectorGroups.style.setProperty("--inspector-group-count", String(Math.max(groups.length, 1)))
   mobileInspectorGroups.replaceChildren(inspectorGroupsDrag, ...groups.map((group) => {
     const button = document.createElement("button")
     button.type = "button"
-    button.textContent = mobileInspectorGroupLabel(group)
+    const label = mobileInspectorGroupLabel(group)
+    const text = document.createElement("span")
+    text.className = "inspector-group-label"
+    text.textContent = label
+    button.append(createSystemSymbol(mobileInspectorGroupSymbol(label)), text)
+    button.title = label
     button.dataset.mobileInspectorGroup = group.dataset.mobileInspectorGroup
     button.addEventListener("click", () => setMobileInspectorGroup(group.dataset.mobileInspectorGroup ?? "0"))
     return button
   }))
   setMobileInspectorGroup(active?.dataset.mobileInspectorGroup ?? "", false)
+}
+
+for (const button of bdaInspectorStateButtons) {
+  button.addEventListener("click", () => {
+    const state = button.dataset.bdaInspectorState === "pressed" ? "pressed" : "normal"
+    bdaConfigFieldsGroup.dataset.previewState = state
+    for (const item of bdaInspectorStateButtons) {
+      const active = item === button
+      item.classList.toggle("active", active)
+      item.setAttribute("aria-pressed", String(active))
+    }
+  })
 }
 
 {
@@ -1997,6 +2093,7 @@ function updateDirty(): void {
 function updateHistoryButtons(): void {
   undoButton.disabled = undoStack.length === 0
   redoButton.disabled = redoStack.length === 0
+  selectedKeyReset.disabled = undoStack.length === 0
 }
 
 function commitText(path: string, before: string, after: string, coalesce = false): void {
@@ -4138,11 +4235,13 @@ function updateInspectorView(): void {
   for (const button of inspectorTabButtons) {
     const tab = button.dataset.inspectorTab
     const available = resourceConfigActive
-      ? tab === "properties" || tab === "source" && Boolean(selectedPath) && !(
+      ? tab === "ai" || tab === "properties" || tab === "source" && Boolean(selectedPath) && !(
         archive?.format === "bda" && resourceInspectorMode === "image"
       )
       :
-      tab === "properties"
+      tab === "ai"
+        ? true
+        : tab === "properties"
         ? imageSelected || propertiesAvailable
         : !imageSelected && Boolean(selectedPath)
     button.disabled = !available
@@ -4156,6 +4255,7 @@ function updateInspectorView(): void {
     asset.hidden = true
     resourceInspector.hidden = inspectorTab !== "properties"
     sourceEditor.hidden = inspectorTab !== "source"
+    aiDesignPanel.hidden = inspectorTab !== "ai"
     updateSourceFindVisibility()
     loadVisibleSourceEditor()
     return
@@ -4164,13 +4264,15 @@ function updateInspectorView(): void {
   if (imageSelected) {
     quickInspector.hidden = true
     sourceEditor.hidden = true
-    asset.hidden = false
+    aiDesignPanel.hidden = inspectorTab !== "ai"
+    asset.hidden = inspectorTab === "ai"
     updateSourceFindVisibility()
     return
   }
   asset.hidden = true
   quickInspector.hidden = inspectorTab !== "properties" || !propertiesAvailable
   sourceEditor.hidden = inspectorTab !== "source"
+  aiDesignPanel.hidden = inspectorTab !== "ai"
   updateSourceFindVisibility()
   loadVisibleSourceEditor()
 }
@@ -4805,7 +4907,37 @@ function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferen
   wrapper.className = "style-reference-input"
   wrapper.classList.toggle("sound-style-reference", soundStyle)
   parent.insertBefore(wrapper, input)
-  wrapper.append(input)
+  if (soundStyle) {
+    const soundMain = document.createElement("span")
+    soundMain.className = "sound-style-main"
+    soundMain.setAttribute("role", "button")
+    soundMain.tabIndex = 0
+    soundMain.setAttribute("aria-label", "播放按键音效")
+    const musicIcon = createSystemSymbol("music.note")
+    musicIcon.classList.add("sound-style-main-icon")
+    const soundMeta = document.createElement("span")
+    soundMeta.className = "sound-style-main-meta"
+    const soundTitle = document.createElement("strong")
+    soundTitle.className = "sound-style-name"
+    const soundSubtitle = document.createElement("small")
+    soundSubtitle.className = "sound-style-file"
+    soundMeta.append(soundTitle, soundSubtitle)
+    input.classList.add("sound-style-value")
+    input.tabIndex = -1
+    input.setAttribute("aria-hidden", "true")
+    soundMain.append(musicIcon, soundMeta, input)
+    const playCurrent = () => {
+      const path = soundPathForStyle(input.value.split(",")[0]?.trim() ?? "")
+      if (path) playSoundPath(path)
+    }
+    soundMain.addEventListener("click", playCurrent)
+    soundMain.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); playCurrent() }
+    })
+    wrapper.append(soundMain)
+  } else {
+    wrapper.append(input)
+  }
   const button = document.createElement(soundStyle ? "button" : "span")
   if (button instanceof HTMLButtonElement) button.type = "button"
   button.className = "style-picker-trigger"
@@ -4844,19 +4976,7 @@ function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferen
   input.addEventListener("change", () => void refreshStyleReferenceThumbnail(button, input, key))
   void refreshStyleReferenceThumbnail(button, input, key)
   wrapper.append(button)
-  if (soundStyle) {
-    const playButton = document.createElement("button")
-    playButton.type = "button"
-    playButton.className = "sound-style-play"
-    playButton.setAttribute("aria-label", "播放按键音效")
-    playButton.append(createSystemSymbol("play.fill"))
-    playButton.addEventListener("click", () => {
-      const path = soundPathForStyle(input.value.split(",")[0]?.trim() ?? "")
-      if (path) playSoundPath(path)
-    })
-    wrapper.append(playButton)
-    void refreshStyleReferenceThumbnail(button, input, key)
-  }
+  if (soundStyle) void refreshStyleReferenceThumbnail(button, input, key)
 }
 
 function styleReferenceForeground(key: string): boolean {
@@ -4873,10 +4993,14 @@ async function refreshStyleReferenceThumbnail(
   if (key === "SOUND_STYLE") {
     const styleID = input.value.split(",")[0]?.trim() ?? ""
     const path = soundPathForStyle(styleID)
-    const playButton = button.parentElement?.querySelector<HTMLButtonElement>(".sound-style-play")
-    if (playButton) {
-      playButton.disabled = !path
-      playButton.title = path ? `播放 ${path.split("/").pop() ?? path}` : "当前声音样式没有可播放的音效文件"
+    const main = button.parentElement?.querySelector<HTMLElement>(".sound-style-main")
+    const title = main?.querySelector<HTMLElement>(".sound-style-name")
+    const file = main?.querySelector<HTMLElement>(".sound-style-file")
+    if (title) title.textContent = styleID ? `STYLE${styleID}` : "未选择音效样式"
+    if (file) file.textContent = path ? (path.split("/").pop() ?? path) : "未找到音乐文件"
+    if (main) {
+      main.classList.toggle("has-sound", Boolean(path))
+      main.setAttribute("aria-disabled", String(!path))
     }
     button.classList.toggle("has-sound", Boolean(path))
     return
@@ -5847,7 +5971,8 @@ function populateKeyInspector(): void {
   toolbarFieldsGroup.hidden = !toolbarSelected || bdaSelected || toolbarHasSelection
   keyboardFieldsGroup.hidden = bdaSelected || skinSelected || toolbarSelected || bdaConfigSelected || candidateSelected || selectedPath !== layoutPath || hasSelection
   for (const group of keyOnlyGroups) {
-    group.hidden = skinSelected || bdaConfigSelected || !hasSelection || bdaSelected && group !== keyAppearanceFieldsGroup
+    const availableForBda = group === keyLayoutFieldsGroup || group === keyTypographyFieldsGroup || group === keyGestureFieldsGroup
+    group.hidden = skinSelected || bdaConfigSelected || !hasSelection || bdaSelected && !availableForBda
   }
   selectedKeyName.textContent = skinSelected
     ? "皮肤信息"
@@ -5870,6 +5995,20 @@ function populateKeyInspector(): void {
         ? "LIST · 候选栏"
         : `${effectiveKeySection(sections[0])} · ${effectiveKeyValue(sections[0], "CENTER") || "未配置点击动作"}`
       : `已选择 ${sections.length} 个按键`
+  const previewValue = hasSelection && !bdaSelected
+    ? effectiveKeyValue(sections[0], "SHOW") || effectiveKeyValue(sections[0], "CENTER") || "ABC"
+    : hasSelection && bdaSelected
+      ? "ABC"
+      : ""
+  selectedKeyPreview.textContent = previewValue.length > 8 ? previewValue.slice(0, 8) : previewValue
+  selectedKeyPreview.hidden = !hasSelection
+  selectedKeyContext.textContent = hasSelection
+    ? `${layout.value === "py_26.ini" ? "中文 26 键" : "中文 9 键"} · ${layout.value.replace(/\.ini$/i, "")} · 已选 ${sections.length} 个按键`
+    : "更改会自动写回配置"
+  selectedKeySaveState.hidden = !hasSelection
+  selectedKeyReset.hidden = !hasSelection
+  selectedKeyReset.disabled = undoStack.length === 0
+  syncAiDesignTarget()
   syncMobileInspectorHeader()
   for (const field of skinFields) {
     field.value = skinSelected ? selectedDocument?.get("", field.dataset.skinField ?? "") ?? "" : ""
@@ -8206,11 +8345,199 @@ for (const button of appDialogButtons) {
     for (const menu of toolbarMenus) menu.open = false
   })
 }
+
+function showSettingsPage(page: string): void {
+  const target = settingsPages.find(panel => panel.dataset.settingsPanel === page && !panel.hasAttribute("data-platform-hidden"))
+    ?? settingsPages.find(panel => !panel.hasAttribute("data-platform-hidden"))
+  if (!target) return
+  for (const panel of settingsPages) panel.hidden = panel !== target
+  for (const button of settingsNavItems) {
+    const selected = button.dataset.settingsPage === target.dataset.settingsPanel
+    button.setAttribute("aria-selected", String(selected))
+    button.tabIndex = selected ? 0 : -1
+  }
+  settingsDialog.querySelector<HTMLElement>(".settings-content")?.scrollTo({ top: 0 })
+}
+
+for (const button of settingsNavItems) {
+  button.addEventListener("click", () => showSettingsPage(button.dataset.settingsPage ?? "appearance"))
+  button.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return
+    event.preventDefault()
+    const visibleItems = settingsNavItems.filter(item => !item.hidden)
+    const offset = event.key === "ArrowDown" ? 1 : -1
+    const index = visibleItems.indexOf(button)
+    const next = visibleItems[(index + offset + visibleItems.length) % visibleItems.length]
+    next?.focus()
+    next?.click()
+  })
+}
+
+const nativeSettings = isTauri() || location.hostname === "127.0.0.1" && ["1420", "4173"].includes(location.port)
+settingsStorageNav.hidden = !nativeSettings
+settingsModelNav.hidden = !nativeSettings
+settingsStorageSection.toggleAttribute("data-platform-hidden", !nativeSettings)
+settingsModelSection.toggleAttribute("data-platform-hidden", !nativeSettings)
+showSettingsPage("appearance")
+
 for (const dialog of [settingsDialog, aboutDialog]) {
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) dialog.close()
   })
 }
+
+function aiEditableProjectFiles(target: SkinArchive): AiSkinEditableFile[] {
+  return target.names().flatMap((path) => {
+    if (target.format === "bda") {
+      if (!target.isBdaConfig(path) || !bdaDecodedSourceEditable(path)) return []
+      const bytes = target.getBytes(path)
+      if (!bytes) return []
+      try {
+        return [{ path, syntax: "json" as const, text: decodedBdaEditorSource(path, bytes) }]
+      } catch {
+        return []
+      }
+    }
+    if (!target.isText(path) || !/\.(?:ini|css|json)$/i.test(path)) return []
+    return [{ path, syntax: /\.json$/i.test(path) ? "json" as const : "ini" as const, text: target.getText(path) }]
+  })
+}
+
+function validatedAiChanges(target: SkinArchive, drafts: readonly AiSkinDraftChange[]): Change[] {
+  const allowed = new Map(aiEditableProjectFiles(target).map((file) => [file.path, file]))
+  const seen = new Set<string>()
+  return drafts.flatMap<Change>((draft): Change[] => {
+    if (seen.has(draft.path)) throw new Error(`AI 返回了重复修改：${draft.path}`)
+    seen.add(draft.path)
+    const editable = allowed.get(draft.path)
+    if (!editable || editable.syntax !== draft.syntax) throw new Error(`AI 修改了未授权文件：${draft.path}`)
+    if (editable.text !== draft.before) throw new Error(`AI 运行期间文件已变化：${draft.path}`)
+    if (draft.before === draft.after) return []
+    if (target.format !== "bda") {
+      return [{ kind: "text" as const, path: draft.path, before: draft.before, after: draft.after }]
+    }
+    const before = target.getBytes(draft.path)
+    if (!before) throw new Error(`文件已不存在：${draft.path}`)
+    const after = applyDecodedBdaSource(draft.path, before, draft.after)
+    return [{ kind: "bytes" as const, path: draft.path, before: before.slice(), after }]
+  })
+}
+
+function setAiDesignBusy(busy: boolean): void {
+  for (const control of aiDesignForm.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLButtonElement>("input, textarea, button")) {
+    control.disabled = busy && control !== aiDesignCancel
+  }
+  aiDesignCancel.hidden = !busy
+  aiDesignSubmit.querySelector<HTMLElement>(".ai-design-submit-label")!.textContent = busy ? "设计中…" : "发送"
+}
+
+function syncAiDesignTarget(): void {
+  const selected = selectedKeyName.textContent?.trim()
+  aiDesignTarget.textContent = selected || (layout.value ? `${layout.selectedOptions[0]?.textContent ?? layout.value} · 整体布局` : "当前布局")
+}
+
+function aiDesignErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  const normalized = raw.toLowerCase()
+  if (normalized.includes("connection error") || normalized.includes("failed to fetch") || normalized.includes("networkerror")) {
+    return "无法连接模型服务。请在设置 > AI 模型中检查 API 地址、模型名称和密钥。"
+  }
+  if (normalized.includes("401") || normalized.includes("unauthorized") || normalized.includes("api key")) {
+    return "模型服务拒绝了请求，请检查 API 密钥是否正确或已过期。"
+  }
+  if (normalized.includes("404") || normalized.includes("not found")) {
+    return "找不到模型接口，请检查 API 地址和协议类型是否匹配。"
+  }
+  return `AI 设计失败：${raw}`
+}
+
+aiDesignPrompt.addEventListener("keydown", (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    event.preventDefault()
+    if (!aiDesignSubmit.disabled) aiDesignForm.requestSubmit()
+  }
+})
+
+aiDesignCancel.addEventListener("click", () => {
+  aiDesignController?.abort()
+  aiDesignStatus.textContent = "正在取消…"
+})
+
+aiDesignForm.addEventListener("submit", (event) => void (async () => {
+  event.preventDefault()
+  if (!aiDesignForm.reportValidity() || aiDesignController) return
+  if (!isTauri()) {
+    aiDesignStatus.textContent = "AI 设计当前仅在桌面应用中可用。"
+    return
+  }
+  if (!archive) {
+    aiDesignStatus.textContent = "请先打开一个皮肤项目。"
+    return
+  }
+  if (!isEditing()) {
+    aiDesignStatus.textContent = "请先切换到编辑模式。"
+    return
+  }
+
+  source.commit()
+  syncAiDesignTarget()
+  aiDesignUserMessage.textContent = aiDesignPrompt.value.trim()
+  aiDesignUserMessage.hidden = false
+  aiDesignAnswer.textContent = "我正在读取当前选择和相关配置。"
+  const target = archive
+  const controller = new AbortController()
+  aiDesignController = controller
+  setAiDesignBusy(true)
+  aiDesignStatus.textContent = "正在加载受限 AI 编辑器…"
+  try {
+    const { runAiSkinDesign } = await import("./ai-design.ts")
+    const style = new FormData(aiDesignForm).get("ai-design-style") ?? "follow"
+    const styleInstruction = style === "minimal"
+      ? "视觉风格：简约清晰，减少装饰并强化信息层级。"
+      : style === "expressive"
+        ? "视觉风格：鲜明个性，加强配色对比并保持文字易读。"
+        : "视觉风格：延续当前设计，保留现有配色关系。"
+    const keepLayout = aiDesignKeepLayout.checked
+      ? "必须保持当前按键布局，不得修改几何、按键数量或动作。"
+      : "可在现有修复接口允许的范围内调整；仍不得创建或删除文件、配置节及二进制资源。"
+    const result = await runAiSkinDesign(currentModelConfiguration(), {
+      format: target.format,
+      theme: theme.value,
+      orientation: orientation.value,
+      layout: layout.value,
+      selectedPath,
+      selectedTarget: aiDesignTarget.textContent ?? "当前布局",
+      selectedSections: selectedSourceSections(),
+      files: aiEditableProjectFiles(target),
+    }, `${aiDesignPrompt.value.trim()}\n\n${styleInstruction}\n${keepLayout}`, {
+      signal: controller.signal,
+      onStatus: (_kind, text) => { aiDesignStatus.textContent = text },
+    })
+    if (archive !== target) throw new Error("AI 运行期间已切换皮肤项目，本轮草稿未应用")
+    const changes = validatedAiChanges(target, result.changes)
+    if (!changes.length) {
+      aiDesignAnswer.textContent = result.response || "AI 分析完成，没有需要应用的修改。"
+      aiDesignStatus.textContent = ""
+      return
+    }
+    commitBatch(changes)
+    if (target.format === "bda") refreshBdaLayout(layoutPath)
+    renderFiles()
+    if (selectedPath && target.getBytes(selectedPath)) selectFile(selectedPath, sidebarView, "document", true)
+    refreshPreview()
+    populateKeyInspector()
+    updateDirty()
+    aiDesignAnswer.textContent = result.response || `AI 已修改 ${changes.length} 个配置文件，可使用撤销恢复。`
+    aiDesignStatus.textContent = ""
+  } catch (error) {
+    aiDesignStatus.textContent = controller.signal.aborted
+      ? "AI 设计已取消，没有应用任何修改。"
+      : aiDesignErrorMessage(error)
+  } finally {
+    if (aiDesignController === controller) aiDesignController = undefined
+    setAiDesignBusy(false)
+  }
+})())
 
 function setSourceDirectoryState(path: string, custom: boolean, error = ""): void {
   sourceDirectory.value = path
@@ -8269,6 +8596,191 @@ async function initializeSourceDirectory(): Promise<void> {
   }
   await applySourceDirectory(configured)
 }
+
+interface ModelConfiguration {
+  provider: string
+  protocol: ModelProtocol
+  apiUrl: string
+  model: string
+  apiKey: string
+}
+
+interface ModelConfigurationState {
+  configuration?: ModelConfiguration
+  path: string
+}
+
+interface ModelConnectionResult {
+  message: string
+  modelCount: number
+}
+
+for (const preset of MODEL_PROVIDER_PRESETS) {
+  const option = document.createElement("option")
+  option.value = preset.id
+  option.textContent = preset.label
+  modelProvider.append(option)
+}
+
+function currentModelConfiguration(): ModelConfiguration {
+  const preset = modelProviderPreset(modelProvider.value)
+  return {
+    provider: preset.id,
+    protocol: preset.protocol,
+    apiUrl: modelApiUrl.value.trim(),
+    model: modelName.value.trim(),
+    apiKey: modelApiKey.value.trim(),
+  }
+}
+
+function applyModelConfiguration(configuration: ModelConfiguration): void {
+  const preset = modelProviderPreset(configuration.provider)
+  modelProvider.value = preset.id
+  previousModelProvider = preset.id
+  modelApiUrl.value = configuration.apiUrl || preset.apiUrl
+  modelName.value = configuration.model || preset.model
+  modelApiKey.value = configuration.apiKey
+}
+
+function setModelConfigurationStatus(message: string, state: "idle" | "busy" | "success" | "error" = "idle"): void {
+  modelConfigurationStatus.textContent = message
+  modelConfigurationStatus.dataset.state = state
+}
+
+function setModelConfigurationBusy(busy: boolean): void {
+  refreshModelList.disabled = busy
+  testModelConnection.disabled = busy
+  saveModelConfiguration.disabled = busy
+}
+
+function populateModelList(models: string[]): void {
+  modelList.replaceChildren(...models.map((model) => {
+    const option = document.createElement("option")
+    option.value = model
+    return option
+  }))
+  if (!modelName.value && models[0]) modelName.value = models[0]
+}
+
+async function persistModelConfiguration(showFeedback = true): Promise<void> {
+  if (!isTauri()) {
+    setModelConfigurationStatus("请在桌面应用中保存配置", "idle")
+    return
+  }
+  setModelConfigurationBusy(true)
+  if (showFeedback) setModelConfigurationStatus("正在保存配置…", "busy")
+  try {
+    const state = await invoke<ModelConfigurationState>("save_model_configuration", {
+      configuration: currentModelConfiguration(),
+    })
+    modelConfigurationPath.textContent = state.path
+    if (showFeedback) setModelConfigurationStatus("配置已保存到本机", "success")
+  } catch (error) {
+    setModelConfigurationStatus(`保存失败：${String(error)}`, "error")
+    throw error
+  } finally {
+    setModelConfigurationBusy(false)
+  }
+}
+
+async function initializeModelConfiguration(): Promise<void> {
+  const defaultPreset = modelProviderPreset("openai")
+  applyModelConfiguration({
+    provider: defaultPreset.id,
+    protocol: defaultPreset.protocol,
+    apiUrl: defaultPreset.apiUrl,
+    model: defaultPreset.model,
+    apiKey: "",
+  })
+  if (!isTauri()) return
+  try {
+    const state = await invoke<ModelConfigurationState>("load_model_configuration")
+    modelConfigurationPath.textContent = state.path
+    if (state.configuration) {
+      applyModelConfiguration(state.configuration)
+      setModelConfigurationStatus("已载入本机配置")
+      return
+    }
+    const legacyProvider = localStorage.getItem("model-provider")
+    const legacyApiUrl = localStorage.getItem("model-api-url")
+    const legacyModel = localStorage.getItem("model-name")
+    const legacyApiKey = localStorage.getItem("model-api-key")
+    if (legacyProvider || legacyApiUrl || legacyModel || legacyApiKey) {
+      const legacyPreset = modelProviderPreset(legacyProvider ?? "openai")
+      applyModelConfiguration({
+        provider: legacyPreset.id,
+        protocol: legacyPreset.protocol,
+        apiUrl: legacyApiUrl || legacyPreset.apiUrl,
+        model: legacyModel || legacyPreset.model,
+        apiKey: legacyApiKey ?? "",
+      })
+      await persistModelConfiguration(false)
+      setModelConfigurationStatus("旧配置已迁移到本机配置文件", "success")
+    }
+  } catch (error) {
+    setModelConfigurationStatus(`读取配置失败：${String(error)}`, "error")
+  } finally {
+    for (const key of ["model-provider", "model-api-url", "model-name", "model-api-key"]) localStorage.removeItem(key)
+  }
+}
+
+let previousModelProvider = "openai"
+modelProvider.addEventListener("change", () => {
+  const previous = modelProviderPreset(previousModelProvider)
+  const next = modelProviderPreset(modelProvider.value)
+  if (!modelApiUrl.value || modelApiUrl.value === previous.apiUrl) modelApiUrl.value = next.apiUrl
+  if (!modelName.value || modelName.value === previous.model) modelName.value = next.model
+  previousModelProvider = next.id
+  populateModelList([])
+  setModelConfigurationStatus("配置已更改，保存后生效")
+})
+
+refreshModelList.addEventListener("click", () => void (async () => {
+  if (!isTauri()) {
+    setModelConfigurationStatus("请在桌面应用中从 API 获取模型", "idle")
+    return
+  }
+  setModelConfigurationBusy(true)
+  setModelConfigurationStatus("正在从 API 获取模型…", "busy")
+  try {
+    const models = await invoke<string[]>("fetch_model_list", { configuration: currentModelConfiguration() })
+    populateModelList(models)
+    setModelConfigurationStatus(`已获取 ${models.length} 个模型`, "success")
+  } catch (error) {
+    setModelConfigurationStatus(`获取模型失败：${String(error)}`, "error")
+  } finally {
+    setModelConfigurationBusy(false)
+  }
+})())
+
+testModelConnection.addEventListener("click", () => void (async () => {
+  if (!isTauri()) {
+    setModelConfigurationStatus("请在桌面应用中测试连接", "idle")
+    return
+  }
+  setModelConfigurationBusy(true)
+  setModelConfigurationStatus("正在测试连接…", "busy")
+  try {
+    const result = await invoke<ModelConnectionResult>("test_model_connection", {
+      configuration: currentModelConfiguration(),
+    })
+    setModelConfigurationStatus(result.message, "success")
+  } catch (error) {
+    setModelConfigurationStatus(`连接失败：${String(error)}`, "error")
+  } finally {
+    setModelConfigurationBusy(false)
+  }
+})())
+
+saveModelConfiguration.addEventListener("click", () => void persistModelConfiguration())
+void initializeModelConfiguration()
+toggleModelApiKey.addEventListener("click", () => {
+  const revealing = modelApiKey.type === "password"
+  modelApiKey.type = revealing ? "text" : "password"
+  toggleModelApiKey.title = revealing ? "隐藏 API 密钥" : "显示 API 密钥"
+  toggleModelApiKey.setAttribute("aria-label", toggleModelApiKey.title)
+  toggleModelApiKey.querySelector<HTMLElement>(".system-symbol")?.replaceWith(createSystemSymbol(revealing ? "eye.slash" : "eye"))
+})
 
 async function chooseAndroidSourceDirectory(): Promise<boolean> {
   try {
@@ -8588,7 +9100,7 @@ inspectorTabsVisible.addEventListener("change", () => {
   localStorage.setItem("inspector-tabs-visible", inspectorTabsVisible.checked ? "on" : "off")
   applyInspectorTabsVisibility()
 })
-inspectorGroupedDisplay.checked = localStorage.getItem("inspector-grouped-display") !== "off"
+inspectorGroupedDisplay.checked = localStorage.getItem("inspector-grouped-display") === "on"
 function applyInspectorGroupedDisplay(): void {
   quickInspector.dataset.inspectorGroupDisplay = inspectorGroupedDisplay.checked ? "grouped" : "all"
   if (inspectorGroupedDisplay.checked) quickInspector.scrollTop = 0
@@ -8620,6 +9132,7 @@ for (const [input, key] of [
 })
 undoButton.addEventListener("click", undo)
 redoButton.addEventListener("click", redo)
+selectedKeyReset.addEventListener("click", undo)
 browserOpen.addEventListener("change", async () => {
   const file = browserOpen.files?.[0]
   if (file) {
@@ -8847,10 +9360,12 @@ for (const button of keyActionButtons) {
 }
 for (const button of inspectorTabButtons) {
   button.addEventListener("click", () => {
-    inspectorTab = button.dataset.inspectorTab === "source" ? "source" : "properties"
+    const tab = button.dataset.inspectorTab
+    inspectorTab = tab === "source" ? "source" : tab === "ai" ? "ai" : "properties"
     if (mobilePortraitQuery.matches) setMobilePane("inspector")
     updateInspectorView()
     if (!quickInspector.hidden) populateKeyInspector()
+    if (!aiDesignPanel.hidden) requestAnimationFrame(() => aiDesignPrompt.focus())
   })
 }
 for (const control of [theme, orientation, layout]) {
@@ -9440,8 +9955,8 @@ if (isTauri()) {
 {
   const MIN_W = 220
   const MAX_W = Math.max(700, window.innerWidth - 720)
-  const DEFAULT_W = Math.max(420, Math.round(window.innerWidth * 0.28))
-  const storageKey = "inspectorWidthV3"
+  const DEFAULT_W = Math.max(520, Math.round(window.innerWidth * 0.34))
+  const storageKey = "inspectorWidthV4"
   const stored = Number(localStorage.getItem(storageKey) || DEFAULT_W)
   const initialW = Math.max(MIN_W, Math.min(MAX_W, stored))
   document.documentElement.style.setProperty("--inspector-width", `${initialW}px`)

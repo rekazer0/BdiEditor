@@ -553,7 +553,6 @@ export function renderBdaLayoutEditor(container: HTMLElement, options: LayoutEdi
       }, field)
     }
     keyInput.addEventListener("change", commit)
-    caption.hidden = isForeStyle
     const preview = element("button", "style-picker-trigger bda-style-reference-preview")
     preview.type = "button"
     preview.disabled = !options.editable
@@ -603,12 +602,19 @@ export function renderBdaLayoutEditor(container: HTMLElement, options: LayoutEdi
           index += 1
         }
         const field = element("div", "document-property-field wide style-reference-field fore-styles-reference-field")
-        const caption = element("span", "bda-style-reference-label")
-        caption.textContent = "前景样式"
-        caption.title = "前景样式（foreStyles）"
         const strip = element("div", "bda-fore-styles-grid")
-        strip.append(...collection.map(styleReferenceField))
-        field.append(caption, strip)
+        strip.append(...collection.map((entry, itemIndex) => {
+          const row = styleReferenceField(entry)
+          const rowCaption = row.querySelector<HTMLElement>(".bda-style-reference-label")
+          if (rowCaption) {
+            rowCaption.replaceChildren()
+            rowCaption.append(document.createTextNode(
+              itemIndex === 0 ? "前景样式 · 主" : itemIndex === 1 ? "前景样式 · 辅" : `前景样式 · 辅 ${itemIndex}`,
+            ))
+          }
+          return row
+        }))
+        field.append(strip)
         container.append(field)
       }
     }

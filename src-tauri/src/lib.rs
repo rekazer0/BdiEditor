@@ -23,6 +23,32 @@ const CLIENT_LOG_FILE: &str = "client.jsonl";
 const CLIENT_LOG_PREVIOUS_FILE: &str = "client.previous.jsonl";
 const MAX_CLIENT_LOG_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_CLIENT_LOG_BATCH_BYTES: usize = 256 * 1024;
+const MODEL_CONFIG_FILE: &str = "model-config.json";
+const MAX_MODEL_RESPONSE_BYTES: usize = 2 * 1024 * 1024;
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ModelConfiguration {
+    provider: String,
+    protocol: String,
+    api_url: String,
+    model: String,
+    api_key: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ModelConfigurationState {
+    configuration: Option<ModelConfiguration>,
+    path: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ModelConnectionResult {
+    message: String,
+    model_count: usize,
+}
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -867,18 +893,281 @@ async fn fetch_release_page() -> Result<String, String> {
         .map_err(|error| error.to_string())
 }
 
+fn validate_model_configuration(configuration: &ModelConfiguration) -> Result<(), String> {
+    if configuration.provider.is_empty() || configuration.provider.len() > 64 {
+        return Err("模型服务商无效".into());
+    }
+    if !matches!(
+        configuration.protocol.as_str(),
+        "anthropic" | "openai-chat" | "openai-responses" | "google"
+    ) {
+        return Err("不支持的模型服务协议".into());
+    }
+    if configuration.api_url.len() > 2048 {
+        return Err("API 地址过长".into());
+    }
+    let url = reqwest::Url::parse(configuration.api_url.trim())
+        .map_err(|_| "API 地址无效".to_string())?;
+    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
+        return Err("API 地址必须是 HTTP 或 HTTPS 地址".into());
+    }
+    if configuration.model.len() > 256 {
+        return Err("模型名称过长".into());
+    }
+    if configuration.api_key.len() > 16 * 1024 {
+        return Err("API 密钥过长".into());
+    }
+    Ok(())
+}
+
+fn model_configuration_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?
+        .join(MODEL_CONFIG_FILE))
+}
+
+fn read_model_configuration_path(path: &Path) -> Result<Option<ModelConfiguration>, String> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let bytes = fs::read(path).map_err(|error| error.to_string())?;
+    let configuration: ModelConfiguration =
+        serde_json::from_slice(&bytes).map_err(|error| format!("模型配置文件无效：{error}"))?;
+    validate_model_configuration(&configuration)?;
+    Ok(Some(configuration))
+}
+
+fn write_model_configuration_path(
+    path: &Path,
+    configuration: &ModelConfiguration,
+) -> Result<(), String> {
+    validate_model_configuration(configuration)?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| "模型配置目录无效".to_string())?;
+    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let temporary = path.with_extension("json.tmp");
+    let data = serde_json::to_vec_pretty(configuration).map_err(|error| error.to_string())?;
+    fs::write(&temporary, data).map_err(|error| error.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&temporary, fs::Permissions::from_mode(0o600))
+            .map_err(|error| error.to_string())?;
+    }
+    if let Err(error) = fs::rename(&temporary, path) {
+        if path.exists() {
+            fs::remove_file(path).map_err(|remove_error| remove_error.to_string())?;
+            fs::rename(&temporary, path).map_err(|rename_error| rename_error.to_string())?;
+        } else {
+            return Err(error.to_string());
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn load_model_configuration(app: tauri::AppHandle) -> Result<ModelConfigurationState, String> {
+    let path = model_configuration_path(&app)?;
+    Ok(ModelConfigurationState {
+        configuration: read_model_configuration_path(&path)?,
+        path: path.to_string_lossy().into_owned(),
+    })
+}
+
+#[tauri::command]
+fn save_model_configuration(
+    app: tauri::AppHandle,
+    configuration: ModelConfiguration,
+) -> Result<ModelConfigurationState, String> {
+    let path = model_configuration_path(&app)?;
+    write_model_configuration_path(&path, &configuration)?;
+    Ok(ModelConfigurationState {
+        configuration: Some(configuration),
+        path: path.to_string_lossy().into_owned(),
+    })
+}
+
+fn model_list_url(configuration: &ModelConfiguration) -> Result<reqwest::Url, String> {
+    let mut url = reqwest::Url::parse(&format!(
+        "{}/models",
+        configuration.api_url.trim().trim_end_matches('/')
+    ))
+    .map_err(|_| "API 地址无效".to_string())?;
+    if configuration.protocol == "google" {
+        url.query_pairs_mut()
+            .append_pair("key", configuration.api_key.trim());
+    }
+    Ok(url)
+}
+
+fn parse_model_list(protocol: &str, bytes: &[u8]) -> Result<Vec<String>, String> {
+    let value: serde_json::Value =
+        serde_json::from_slice(bytes).map_err(|_| "模型列表响应不是有效 JSON".to_string())?;
+    let entries = if protocol == "google" {
+        value.get("models")
+    } else {
+        value.get("data")
+    }
+    .and_then(serde_json::Value::as_array)
+    .ok_or_else(|| "响应中没有模型列表".to_string())?;
+    let mut models: Vec<String> = entries
+        .iter()
+        .filter_map(|entry| {
+            let field = if protocol == "google" { "name" } else { "id" };
+            entry.get(field).and_then(serde_json::Value::as_str)
+        })
+        .map(|name| name.strip_prefix("models/").unwrap_or(name).to_string())
+        .filter(|name| !name.is_empty() && name.len() <= 256)
+        .collect();
+    models.sort_unstable();
+    models.dedup();
+    Ok(models)
+}
+
+async fn request_model_list(configuration: &ModelConfiguration) -> Result<Vec<String>, String> {
+    validate_model_configuration(configuration)?;
+    if configuration.api_key.trim().is_empty() {
+        return Err("请先填写 API 密钥".into());
+    }
+    let client = reqwest::Client::builder()
+        .user_agent("BdiEditor model connection test")
+        .timeout(std::time::Duration::from_secs(15))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|error| error.to_string())?;
+    let url = model_list_url(configuration)?;
+    let mut request = client.get(url);
+    request = match configuration.protocol.as_str() {
+        "anthropic" => request
+            .header("x-api-key", configuration.api_key.trim())
+            .header("anthropic-version", "2023-06-01"),
+        "google" => request,
+        _ => request.bearer_auth(configuration.api_key.trim()),
+    };
+    let response = request
+        .send()
+        .await
+        .map_err(|error| format!("连接模型服务失败：{}", error.without_url()))?;
+    let status = response.status();
+    let bytes = response.bytes().await.map_err(|error| error.to_string())?;
+    if bytes.len() > MAX_MODEL_RESPONSE_BYTES {
+        return Err("模型列表响应过大".into());
+    }
+    if !status.is_success() {
+        let detail = String::from_utf8_lossy(&bytes);
+        let detail = detail.chars().take(400).collect::<String>();
+        return Err(if detail.trim().is_empty() {
+            format!("模型服务返回 HTTP {status}")
+        } else {
+            format!("模型服务返回 HTTP {status}：{detail}")
+        });
+    }
+    parse_model_list(&configuration.protocol, &bytes)
+}
+
+#[tauri::command]
+async fn fetch_model_list(configuration: ModelConfiguration) -> Result<Vec<String>, String> {
+    request_model_list(&configuration).await
+}
+
+#[tauri::command]
+async fn test_model_connection(
+    configuration: ModelConfiguration,
+) -> Result<ModelConnectionResult, String> {
+    let models = request_model_list(&configuration).await?;
+    let model_count = models.len();
+    Ok(ModelConnectionResult {
+        message: if model_count == 0 {
+            "连接成功，服务未返回可用模型".into()
+        } else {
+            format!("连接成功，获取到 {model_count} 个模型")
+        },
+        model_count,
+    })
+}
+
 #[cfg(test)]
 #[allow(clippy::items_after_test_module)]
 mod tests {
     use super::{
-        acrylic_alpha, append_client_log_path, apply_source_changes_path, prune_source_workspaces,
-        read_client_log_path, read_file, read_source_changes_path, read_source_files,
+        acrylic_alpha, append_client_log_path, apply_source_changes_path, model_list_url,
+        parse_model_list, prune_source_workspaces, read_client_log_path, read_file,
+        read_model_configuration_path, read_source_changes_path, read_source_files,
         safe_source_path, valid_share_filename, windows_material_kind, write_file,
-        write_source_files, MAX_ARCHIVE_BYTES, SOURCE_MARKER,
+        write_model_configuration_path, write_source_files, ModelConfiguration, MAX_ARCHIVE_BYTES,
+        SOURCE_MARKER,
     };
     use std::fs;
     use std::thread;
     use std::time::Duration;
+
+    fn test_model_configuration(protocol: &str) -> ModelConfiguration {
+        ModelConfiguration {
+            provider: "test".into(),
+            protocol: protocol.into(),
+            api_url: "https://example.com/v1/".into(),
+            model: "model-a".into(),
+            api_key: "secret".into(),
+        }
+    }
+
+    #[test]
+    fn model_configuration_round_trips_as_private_json() {
+        let root =
+            std::env::temp_dir().join(format!("bdi-edit-model-config-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let path = root.join("model-config.json");
+        let configuration = test_model_configuration("openai-chat");
+        write_model_configuration_path(&path, &configuration).expect("write model config");
+        assert_eq!(
+            read_model_configuration_path(&path).expect("read model config"),
+            Some(configuration)
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+        }
+        fs::remove_dir_all(root).expect("cleanup model config");
+    }
+
+    #[test]
+    fn model_list_url_normalizes_base_and_protects_google_key() {
+        let openai = test_model_configuration("openai-chat");
+        assert_eq!(
+            model_list_url(&openai).unwrap().as_str(),
+            "https://example.com/v1/models"
+        );
+        let google = test_model_configuration("google");
+        assert_eq!(
+            model_list_url(&google).unwrap().as_str(),
+            "https://example.com/v1/models?key=secret"
+        );
+    }
+
+    #[test]
+    fn model_list_parser_supports_openai_anthropic_and_google_shapes() {
+        let data = br#"{"data":[{"id":"z-model"},{"id":"a-model"},{"id":"a-model"}]}"#;
+        assert_eq!(
+            parse_model_list("openai-chat", data).unwrap(),
+            vec!["a-model", "z-model"]
+        );
+        assert_eq!(
+            parse_model_list("anthropic", data).unwrap(),
+            vec!["a-model", "z-model"]
+        );
+        let google = br#"{"models":[{"name":"models/gemini-pro"}]}"#;
+        assert_eq!(
+            parse_model_list("google", google).unwrap(),
+            vec!["gemini-pro"]
+        );
+    }
 
     #[test]
     fn window_material_distinguishes_windows_10_acrylic_from_windows_11_glass() {
@@ -1091,6 +1380,10 @@ pub fn run() {
         set_window_material,
         wait_for_left_mouse_release,
         fetch_release_page,
+        load_model_configuration,
+        save_model_configuration,
+        fetch_model_list,
+        test_model_connection,
         prepare_source_directory,
         create_source_workspace,
         open_source_workspace,
@@ -1117,6 +1410,10 @@ pub fn run() {
         set_window_material,
         wait_for_left_mouse_release,
         fetch_release_page,
+        load_model_configuration,
+        save_model_configuration,
+        fetch_model_list,
+        test_model_connection,
         prepare_source_directory,
         create_source_workspace,
         open_source_workspace,
