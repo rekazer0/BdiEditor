@@ -430,6 +430,7 @@ const selectedKeyName = $("#selected-key")
 const selectedKeyPreview = $("#selected-key-preview")
 const selectedKeyContext = $("#selected-key-context")
 const selectedKeySaveState = $("#selected-key-save-state")
+const inspectorLayoutBack = $("#inspector-layout-back") as HTMLButtonElement
 const selectedKeyReset = $("#selected-key-reset") as HTMLButtonElement
 const keyFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-key-field]"))
 const styleFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-style-field]"))
@@ -1544,6 +1545,8 @@ function setMobileInspectorGroup(id: string, scroll = true): void {
 }
 
 function syncMobileInspectorGroups(): void {
+  const previousGroup = quickInspector.querySelector<HTMLElement>(".mobile-inspector-active")
+  const previousLabel = previousGroup ? mobileInspectorGroupLabel(previousGroup) : ""
   for (const group of Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))) {
     group.classList.remove("mobile-inspector-managed", "mobile-inspector-active")
     delete group.dataset.mobileInspectorGroup
@@ -1572,7 +1575,7 @@ function syncMobileInspectorGroups(): void {
     group.dataset.mobileInspectorGroup = `${index}`
     group.classList.add("mobile-inspector-managed")
   }
-  const active = groups.find((group) => group.dataset.mobileInspectorGroup === quickInspector.dataset.mobileInspectorGroup)
+  const active = groups.find((group) => mobileInspectorGroupLabel(group) === previousLabel)
     ?? groups[0]
   mobileInspectorGroups.hidden = groups.length < 2
   // Keep the horizontal inspector navigation evenly distributed when the
@@ -5987,7 +5990,7 @@ function populateKeyInspector(): void {
     : selectedPath !== layoutPath && !toolbarSelected
       ? selectedPath.split("/").pop() ?? "文档配置"
     : !hasSelection
-      ? `${layout.value === "py_26.ini" ? "26 键" : "九键"} · 整体设置`
+      ? `${selectedPath.split("/").pop() ?? "键盘"} · 整体布局`
     : bdaSelected
       ? selectedBdaKeyNames().join("、") || `已选择 ${sections.length} 个 BDA 按键`
     : sections.length === 1
@@ -6003,8 +6006,9 @@ function populateKeyInspector(): void {
   selectedKeyPreview.textContent = previewValue.length > 8 ? previewValue.slice(0, 8) : previewValue
   selectedKeyPreview.hidden = !hasSelection
   selectedKeyContext.textContent = hasSelection
-    ? `${layout.value === "py_26.ini" ? "中文 26 键" : "中文 9 键"} · ${layout.value.replace(/\.ini$/i, "")} · 已选 ${sections.length} 个按键`
-    : "更改会自动写回配置"
+    ? `${selectedPath.split("/").pop()} · 已选 ${sections.length} 个按键`
+    : selectedPath === layoutPath ? "编辑整体属性，或点击画布中的按键单独编辑" : "更改会自动写回配置"
+  inspectorLayoutBack.hidden = selectedPath !== layoutPath || !(hasSelection || candidateSelected)
   selectedKeySaveState.hidden = !hasSelection
   selectedKeyReset.hidden = !hasSelection
   selectedKeyReset.disabled = undoStack.length === 0
@@ -9133,6 +9137,15 @@ for (const [input, key] of [
 undoButton.addEventListener("click", undo)
 redoButton.addEventListener("click", redo)
 selectedKeyReset.addEventListener("click", undo)
+inspectorLayoutBack.addEventListener("click", () => {
+  selectedKeySections = []
+  selectedCandidate = false
+  preview.setSelected([])
+  syncCandidateSelection()
+  populateKeyInspector()
+  updateSourceHighlight()
+  mobileInspectorGroups.querySelector<HTMLButtonElement>("button:not(#inspector-groups-drag)")?.focus()
+})
 browserOpen.addEventListener("change", async () => {
   const file = browserOpen.files?.[0]
   if (file) {

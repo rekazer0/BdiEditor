@@ -255,6 +255,7 @@
             <button id="inspector-groups-drag" type="button" aria-label="拖动属性分组栏" title="拖动属性分组栏">⋮⋮</button>
           </nav>
           <div class="inspector-title key-inspector-title">
+            <button id="inspector-layout-back" type="button" hidden>← 整体布局</button>
             <span id="selected-key-preview" class="key-inspector-preview" aria-hidden="true" hidden>ABC</span>
             <div class="key-inspector-copy">
               <strong id="selected-key">选择画布中的按键</strong>
@@ -427,7 +428,7 @@
           </section>
           <section class="inspector-group inspector-disclosure key-only key-gesture-fields" data-inspector-group-label="动作">
             <h3>手势与动作</h3>
-            <p class="inspector-group-subtitle">点击、滑动与长按</p>
+            <p class="inspector-group-subtitle">设置点击输出；下方按方向设置滑动动作，留空表示未配置。</p>
             <div class="inspector-grid primary-actions">
               <label>点击动作（CENTER） <input data-key-field="CENTER" list="baidu-action-codes" /><small data-action-meaning="CENTER"></small></label>
             </div>
