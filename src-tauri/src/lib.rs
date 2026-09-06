@@ -25,6 +25,7 @@ const MAX_CLIENT_LOG_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_CLIENT_LOG_BATCH_BYTES: usize = 256 * 1024;
 const MODEL_CONFIG_FILE: &str = "model-config.json";
 const MAX_MODEL_RESPONSE_BYTES: usize = 2 * 1024 * 1024;
+const MAX_MODEL_CHAT_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,7 +41,34 @@ struct ModelConfiguration {
 #[serde(rename_all = "camelCase")]
 struct ModelConfigurationState {
     configuration: Option<ModelConfiguration>,
+    configurations: Vec<ModelConfiguration>,
     path: String,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct ModelConfigurationStore {
+    #[serde(flatten)]
+    configuration: ModelConfiguration,
+    #[serde(default)]
+    configurations: Vec<ModelConfiguration>,
+}
+
+fn read_model_profiles(path: &Path) -> Result<Vec<ModelConfiguration>, String> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let store: ModelConfigurationStore =
+        serde_json::from_slice(&fs::read(path).map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+    let profiles = if store.configurations.is_empty() {
+        vec![store.configuration]
+    } else {
+        store.configurations
+    };
+    for profile in &profiles {
+        validate_model_configuration(profile)?;
+    }
+    Ok(profiles)
 }
 
 #[derive(serde::Serialize)]
@@ -48,6 +76,22 @@ struct ModelConfigurationState {
 struct ModelConnectionResult {
     message: String,
     model_count: usize,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ModelHttpRequest {
+    url: String,
+    method: String,
+    headers: Vec<(String, String)>,
+    body: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+struct ModelHttpResponse {
+    status: u16,
+    headers: Vec<(String, String)>,
+    body: Vec<u8>,
 }
 
 #[derive(serde::Serialize)]
@@ -939,11 +983,19 @@ fn read_model_configuration_path(path: &Path) -> Result<Option<ModelConfiguratio
     Ok(Some(configuration))
 }
 
+#[cfg(test)]
 fn write_model_configuration_path(
     path: &Path,
     configuration: &ModelConfiguration,
 ) -> Result<(), String> {
     validate_model_configuration(configuration)?;
+    write_model_store_path(path, configuration)
+}
+
+fn write_model_store_path(
+    path: &Path,
+    configuration: &impl serde::Serialize,
+) -> Result<(), String> {
     let parent = path
         .parent()
         .ok_or_else(|| "模型配置目录无效".to_string())?;
@@ -973,6 +1025,7 @@ fn load_model_configuration(app: tauri::AppHandle) -> Result<ModelConfigurationS
     let path = model_configuration_path(&app)?;
     Ok(ModelConfigurationState {
         configuration: read_model_configuration_path(&path)?,
+        configurations: read_model_profiles(&path)?,
         path: path.to_string_lossy().into_owned(),
     })
 }
@@ -981,11 +1034,27 @@ fn load_model_configuration(app: tauri::AppHandle) -> Result<ModelConfigurationS
 fn save_model_configuration(
     app: tauri::AppHandle,
     configuration: ModelConfiguration,
+    configurations: Option<Vec<ModelConfiguration>>,
 ) -> Result<ModelConfigurationState, String> {
     let path = model_configuration_path(&app)?;
-    write_model_configuration_path(&path, &configuration)?;
+    let configurations = configurations.unwrap_or_else(|| vec![configuration.clone()]);
+    if configurations.is_empty() || configurations.len() > 100 {
+        return Err("模型配置数量必须在 1 到 100 之间".into());
+    }
+    validate_model_configuration(&configuration)?;
+    for profile in &configurations {
+        validate_model_configuration(profile)?;
+    }
+    write_model_store_path(
+        &path,
+        &ModelConfigurationStore {
+            configuration: configuration.clone(),
+            configurations: configurations.clone(),
+        },
+    )?;
     Ok(ModelConfigurationState {
         configuration: Some(configuration),
+        configurations,
         path: path.to_string_lossy().into_owned(),
     })
 }
@@ -1089,6 +1158,77 @@ async fn test_model_connection(
     })
 }
 
+#[tauri::command]
+async fn model_http_request(
+    app: tauri::AppHandle,
+    request: ModelHttpRequest,
+) -> Result<ModelHttpResponse, String> {
+    if !request.method.eq_ignore_ascii_case("POST") {
+        return Err("模型对话只允许 POST 请求".into());
+    }
+    if request.body.as_ref().map_or(0, String::len) > MAX_MODEL_CHAT_BYTES {
+        return Err("模型请求体过大".into());
+    }
+    let url = reqwest::Url::parse(&request.url).map_err(|_| "模型请求地址无效".to_string())?;
+    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
+        return Err("模型请求地址必须是 HTTP 或 HTTPS 地址".into());
+    }
+    let profiles = read_model_profiles(&model_configuration_path(&app)?)?;
+    if !profiles.iter().any(|profile| {
+        let Ok(base) = reqwest::Url::parse(profile.api_url.trim()) else {
+            return false;
+        };
+        let base_path = base.path().trim_end_matches('/');
+        url.scheme() == base.scheme()
+            && url.host_str() == base.host_str()
+            && url.port_or_known_default() == base.port_or_known_default()
+            && (url.path() == base_path || url.path().starts_with(&format!("{base_path}/")))
+    }) {
+        return Err("模型请求地址与已保存的 API 地址不一致".into());
+    }
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(180))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|error| error.to_string())?;
+    let mut outgoing = client.post(url);
+    for (name, value) in request.headers {
+        if name.eq_ignore_ascii_case("host") || name.eq_ignore_ascii_case("content-length") {
+            continue;
+        }
+        outgoing = outgoing.header(&name, &value);
+    }
+    let response = outgoing
+        .body(request.body.unwrap_or_default())
+        .send()
+        .await
+        .map_err(|error| format!("连接模型服务失败：{}", error.without_url()))?;
+    let status = response.status().as_u16();
+    let headers = response
+        .headers()
+        .iter()
+        .filter_map(|(name, value)| {
+            value
+                .to_str()
+                .ok()
+                .map(|value| (name.to_string(), value.to_string()))
+        })
+        .collect();
+    let body = response
+        .bytes()
+        .await
+        .map_err(|error| error.to_string())?
+        .to_vec();
+    if body.len() > MAX_MODEL_CHAT_BYTES {
+        return Err("模型响应过大".into());
+    }
+    Ok(ModelHttpResponse {
+        status,
+        headers,
+        body,
+    })
+}
+
 #[cfg(test)]
 #[allow(clippy::items_after_test_module)]
 mod tests {
@@ -1122,6 +1262,22 @@ mod tests {
         let path = root.join("model-config.json");
         let configuration = test_model_configuration("openai-chat");
         write_model_configuration_path(&path, &configuration).expect("write model config");
+        assert_eq!(
+            super::read_model_profiles(&path).unwrap(),
+            vec![configuration.clone()]
+        );
+        let mut second = configuration.clone();
+        second.model = "model-b".into();
+        let profiles = vec![configuration.clone(), second];
+        super::write_model_store_path(
+            &path,
+            &super::ModelConfigurationStore {
+                configuration: configuration.clone(),
+                configurations: profiles.clone(),
+            },
+        )
+        .unwrap();
+        assert_eq!(super::read_model_profiles(&path).unwrap(), profiles);
         assert_eq!(
             read_model_configuration_path(&path).expect("read model config"),
             Some(configuration)
@@ -1384,6 +1540,7 @@ pub fn run() {
         save_model_configuration,
         fetch_model_list,
         test_model_connection,
+        model_http_request,
         prepare_source_directory,
         create_source_workspace,
         open_source_workspace,
@@ -1414,6 +1571,7 @@ pub fn run() {
         save_model_configuration,
         fetch_model_list,
         test_model_connection,
+        model_http_request,
         prepare_source_directory,
         create_source_workspace,
         open_source_workspace,

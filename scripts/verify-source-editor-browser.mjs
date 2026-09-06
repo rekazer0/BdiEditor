@@ -104,6 +104,46 @@ try {
 
   await (await page.$("#browser-open")).uploadFile(path.resolve("public/default-template.bds"))
   await page.waitForFunction(() => !document.querySelector('[data-inspector-tab="source"]')?.disabled)
+  for (const width of [1280, 390, 320]) {
+    await page.setViewport({ width, height: 844 })
+    for (const theme of ["light", "dark"]) {
+      await page.select("#app-theme", theme)
+      const headings = []
+      for (const tab of ["properties", "source", "ai"]) {
+        await page.click(`[data-inspector-tab="${tab}"]`)
+        await page.evaluate(() => Promise.all(document.querySelector(".source").getAnimations().map(animation => animation.finished)))
+        const state = await page.evaluate(() => {
+          const heading = document.querySelector(".source-heading")
+          const active = document.querySelector(".inspector-tabs .active")
+          const panel = document.querySelector(".source")
+          return {
+            heading: getComputedStyle(heading).backgroundColor,
+            selected: active.getAttribute("aria-pressed"),
+            overflow: panel.scrollWidth - panel.clientWidth,
+          }
+        })
+        headings.push(state.heading)
+        assert.equal(state.selected, "true", "标签应向辅助技术报告当前视图")
+        assert.ok(state.overflow <= 1, `${width}px ${theme} ${tab} 检查器不应横向溢出`)
+      }
+      assert.equal(new Set(headings).size, 1, "三个视图应使用同一页头配色")
+      const composer = await page.$eval(".ai-design-composer", element => {
+        const rect = element.getBoundingClientRect()
+        return { bottom: rect.bottom, right: rect.right, left: rect.left }
+      })
+      await page.screenshot({ path: path.join(os.tmpdir(), `bdi-inspector-${width}-${theme}.png`) })
+      assert.ok(composer.bottom <= 844 && composer.right <= width && composer.left >= 0,
+        `${width}px ${theme} AI 输入和发送区应完整可见 ${JSON.stringify(composer)}`)
+    }
+  }
+  await page.setViewport({ width: 1280, height: 800 })
+  await page.focus("#ai-design-prompt")
+  await page.type("#ai-design-prompt", "调整按键配色")
+  await page.click('#ai-design-form button[type="submit"]')
+  await page.waitForFunction(() => document.querySelector("#ai-design-status").textContent.length > 0)
+  assert.match(await page.$eval("#ai-design-status", element => element.textContent), /桌面应用/,
+    "浏览器应清楚说明 AI 的平台限制")
+  await page.setViewport({ width: 1280, height: 800 })
   await page.click('[data-inspector-tab="source"]')
   await page.click('[data-mode-choice="edit"]')
   await page.waitForSelector("#source .cm-content[contenteditable=true]")

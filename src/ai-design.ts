@@ -12,6 +12,7 @@ import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messag
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy"
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy"
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy"
+import { invoke } from "@tauri-apps/api/core"
 import { AiSkinWorkspace, type AiSkinDraftChange, type AiSkinEditableFile } from "./ai-skin-workspace.ts"
 import type { ModelProtocol } from "./model-providers.ts"
 
@@ -41,6 +42,8 @@ export type AiDesignResult = {
 }
 
 type StatusKind = "thinking" | "reading" | "editing" | "done"
+type AiDesignMessage = { role: "user" | "assistant"; text: string }
+type ModelHttpResponse = { status: number; headers: Array<[string, string]>; body: number[] }
 
 const MAX_TOOL_CALLS = 80
 const MAX_TURNS = 12
@@ -95,7 +98,7 @@ function systemPrompt(project: AiDesignProject): string {
 选择范围要求：如果存在选中的按键或配置节，用户的设计要求默认只作用于这些对象；不得顺带重做未选按键或整个布局。只有当前没有局部选择，或用户明确要求全局调整时，才把任务理解为当前布局整体修改。
 
 可用修复接口：
-1. inspect_project：查看项目上下文、权限和硬限制。每次任务先调用它。
+1. inspect_project：查看项目上下文、权限和硬限制。编辑或分析项目时先调用它；普通问候和聊天直接回答。
 2. list_project_files：列出允许读取或修改的配置文件，可按相对路径前缀筛选。
 3. read_project_file：分页读取一个明确列出的文件。修改前必须先读取目标片段。
 4. set_ini_value：在已有 INI 配置节中新增配置键，或修改已有键。适用于 BDI/BDS 的 .ini/.css 配置。
@@ -255,11 +258,29 @@ function finalResponse(agent: Agent): string {
   return message.content.flatMap((content) => content.type === "text" ? [content.text] : []).join("\n").trim()
 }
 
+function conversationContext(history: readonly AiDesignMessage[]): string {
+  const messages = history.slice(-6).map(({ role, text }) => `${role === "user" ? "用户" : "助手"}：${text.trim()}`)
+  if (!messages.length) return ""
+  return `此前同一皮肤的对话（仅作上下文，仍以当前项目内容为准）：\n${messages.join("\n").slice(-8_000)}\n\n当前要求：\n`
+}
+
+async function nativeModelFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const url = input instanceof Request ? input.url : String(input)
+  const headers = new Headers(input instanceof Request ? input.headers : undefined)
+  new Headers(init.headers).forEach((value, name) => headers.set(name, value))
+  if (init.body != null && typeof init.body !== "string") throw new Error("模型请求体格式不受支持")
+  const response = await invoke<ModelHttpResponse>("model_http_request", {
+    request: { url, method: init.method ?? (input instanceof Request ? input.method : "POST"), headers: [...headers], body: init.body ?? null },
+  })
+  return new Response(new Uint8Array(response.body), { status: response.status, headers: response.headers })
+}
+
 export async function runAiSkinDesign(
   config: AiDesignConfiguration,
   project: AiDesignProject,
   prompt: string,
   options: {
+    history?: readonly AiDesignMessage[]
     signal?: AbortSignal
     onStatus?: (kind: StatusKind, text: string) => void
   } = {},
@@ -321,12 +342,16 @@ export async function runAiSkinDesign(
   const abort = () => agent.abort()
   if (options.signal?.aborted) abort()
   else options.signal?.addEventListener("abort", abort, { once: true })
+  const webviewFetch = globalThis.fetch
+  // ponytail: one AI run is allowed at a time; replace fetch only for that run so every provider avoids WebView CORS.
+  globalThis.fetch = nativeModelFetch
   try {
-    await agent.prompt(prompt.trim())
+    await agent.prompt(`${conversationContext(options.history ?? [])}${prompt.trim()}`)
     if (options.signal?.aborted) throw new DOMException("AI 设计已取消", "AbortError")
     if (agent.state.errorMessage) throw new Error(agent.state.errorMessage)
     return { changes: workspace.changes(), response: finalResponse(agent), toolCalls }
   } finally {
+    globalThis.fetch = webviewFetch
     options.signal?.removeEventListener("abort", abort)
     unsubscribe()
   }

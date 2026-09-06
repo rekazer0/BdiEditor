@@ -275,7 +275,7 @@ const saveButton = $("#save") as HTMLButtonElement
 const mobileShareButton = $("#mobile-share") as HTMLButtonElement
 const undoButton = $("#undo") as HTMLButtonElement
 const redoButton = $("#redo") as HTMLButtonElement
-const toolbarMore = $(".toolbar-more") as HTMLDetailsElement
+const fileMenu = $(".file-menu") as HTMLDetailsElement
 const toolbarMenus = Array.from(document.querySelectorAll<HTMLDetailsElement>(".toolbar-more"))
 const mobileCommandMenu = $(".mobile-command-menu") as HTMLDetailsElement
 const mobileUndoButton = $("#mobile-undo") as HTMLButtonElement
@@ -331,7 +331,7 @@ const sourceDirectoryStatus = $("#source-directory-status")
 const modelProvider = $("#model-provider") as HTMLSelectElement
 const modelApiUrl = $("#model-api-url") as HTMLInputElement
 const modelName = $("#model-name") as HTMLInputElement
-const modelList = $("#model-list") as HTMLDataListElement
+const modelList = $("#model-list") as HTMLSelectElement
 const modelApiKey = $("#model-api-key") as HTMLInputElement
 const toggleModelApiKey = $("#toggle-model-api-key") as HTMLButtonElement
 const refreshModelList = $("#refresh-model-list") as HTMLButtonElement
@@ -483,12 +483,12 @@ const aiDesignPanel = $("#ai-design-panel")
 const aiDesignForm = $("#ai-design-form") as HTMLFormElement
 const aiDesignPrompt = $("#ai-design-prompt") as HTMLTextAreaElement
 const aiDesignStatus = $("#ai-design-status")
-const aiDesignAnswer = $("#ai-design-answer")
-const aiDesignUserMessage = $("#ai-design-user-message")
+const aiDesignMessages = $("#ai-design-messages")
+const aiDesignModel = $("#ai-design-model") as HTMLSelectElement
+const modelProfile = $("#model-profile") as HTMLSelectElement
 const aiDesignTarget = $("#ai-design-target")
 const aiDesignSubmit = aiDesignForm.querySelector<HTMLButtonElement>('button[type="submit"]')!
 const aiDesignCancel = $("#ai-design-cancel") as HTMLButtonElement
-const aiDesignKeepLayout = $("#ai-design-keep-layout") as HTMLInputElement
 const browserOpen = $("#browser-open") as HTMLInputElement
 const imageOpen = $("#image-open") as HTMLInputElement
 const theme = $("#theme") as HTMLSelectElement
@@ -654,6 +654,9 @@ type LayoutImageConfig = "none" | "image-follows-layout" | "layout-follows-image
 let undoStack: Change[] = []
 let redoStack: Change[] = []
 let aiDesignController: AbortController | undefined
+let aiDesignConversationTarget: SkinArchive | undefined
+// ponytail: keep three exchanges in memory; persist sessions only if cross-restart chat is needed.
+let aiDesignConversation: Array<{ role: "user" | "assistant"; text: string }> = []
 let layoutImageBytes: Uint8Array | undefined
 let layoutImageWidth = 0
 let layoutImageHeight = 0
@@ -4249,6 +4252,7 @@ function updateInspectorView(): void {
         : !imageSelected && Boolean(selectedPath)
     button.disabled = !available
     button.classList.toggle("active", tab === inspectorTab && available)
+    button.setAttribute("aria-pressed", String(tab === inspectorTab && available))
   }
   if (resourceConfigActive) {
     sourceName.textContent = inspectorTab === "source" && selectedResourcePath
@@ -8256,7 +8260,10 @@ async function newDocument(): Promise<boolean> {
   return true
 }
 
-newButton.addEventListener("click", () => void runFileOperation("新建项目", newDocument))
+fileMenu.addEventListener("click", (event) => {
+  if ((event.target as Element).closest("button")) fileMenu.open = false
+})
+newButton.addEventListener("click", () => void runFileOperation("新建皮肤", newDocument))
 openButton.addEventListener("click", () => {
   if (isTauri()) void runFileOperation("打开", openNative)
   else {
@@ -8278,7 +8285,6 @@ for (const button of exportButtons) {
   button.addEventListener("click", () => {
     const format = button.dataset.exportFormat as ExportFormat
     const platform = button.dataset.bdaPlatform as Exclude<BdaPlatform, "unknown"> | undefined
-    toolbarMore.open = false
     void runFileOperation("导出", () => saveArchive(true, format, platform))
   })
 }
@@ -8345,6 +8351,7 @@ for (const button of appDialogButtons) {
   button.addEventListener("click", () => {
     const dialog = button.dataset.appDialog === "settings" ? settingsDialog : aboutDialog
     dialog.showModal()
+    if (button.classList.contains("ai-design-settings")) showSettingsPage("model")
     if (dialog === aboutDialog) void refreshUpdateStatus()
     for (const menu of toolbarMenus) menu.open = false
   })
@@ -8379,6 +8386,7 @@ for (const button of settingsNavItems) {
 
 const nativeSettings = isTauri() || location.hostname === "127.0.0.1" && ["1420", "4173"].includes(location.port)
 settingsStorageNav.hidden = !nativeSettings
+aiDesignForm.querySelector<HTMLButtonElement>(".ai-design-settings")!.hidden = !nativeSettings
 settingsModelNav.hidden = !nativeSettings
 settingsStorageSection.toggleAttribute("data-platform-hidden", !nativeSettings)
 settingsModelSection.toggleAttribute("data-platform-hidden", !nativeSettings)
@@ -8428,7 +8436,7 @@ function validatedAiChanges(target: SkinArchive, drafts: readonly AiSkinDraftCha
 }
 
 function setAiDesignBusy(busy: boolean): void {
-  for (const control of aiDesignForm.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLButtonElement>("input, textarea, button")) {
+  for (const control of aiDesignForm.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLButtonElement | HTMLSelectElement>("input, textarea, button, select")) {
     control.disabled = busy && control !== aiDesignCancel
   }
   aiDesignCancel.hidden = !busy
@@ -8436,6 +8444,7 @@ function setAiDesignBusy(busy: boolean): void {
 }
 
 function syncAiDesignTarget(): void {
+  if (aiDesignController) return
   const selected = selectedKeyName.textContent?.trim()
   aiDesignTarget.textContent = selected || (layout.value ? `${layout.selectedOptions[0]?.textContent ?? layout.value} · 整体布局` : "当前布局")
 }
@@ -8456,7 +8465,7 @@ function aiDesignErrorMessage(error: unknown): string {
 }
 
 aiDesignPrompt.addEventListener("keydown", (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
     event.preventDefault()
     if (!aiDesignSubmit.disabled) aiDesignForm.requestSubmit()
   }
@@ -8483,28 +8492,39 @@ aiDesignForm.addEventListener("submit", (event) => void (async () => {
     return
   }
 
+  const prompt = aiDesignPrompt.value.trim()
+  if (!prompt) {
+    aiDesignStatus.textContent = "请填写设计要求。"
+    aiDesignPrompt.focus()
+    return
+  }
   source.commit()
   syncAiDesignTarget()
-  aiDesignUserMessage.textContent = aiDesignPrompt.value.trim()
-  aiDesignUserMessage.hidden = false
-  aiDesignAnswer.textContent = "我正在读取当前选择和相关配置。"
   const target = archive
+  const configuration = savedModels[Number(aiDesignModel.value)]
+  if (!configuration) {
+    aiDesignStatus.textContent = "请先配置 AI 模型。"
+    return
+  }
+  if (aiDesignConversationTarget !== target) {
+    aiDesignConversationTarget = target
+    aiDesignConversation = []
+    aiDesignMessages.replaceChildren()
+  }
+  const userMessage = document.createElement("div")
+  userMessage.className = "ai-design-user-message"
+  userMessage.textContent = prompt
+  const aiDesignAnswer = document.createElement("div")
+  aiDesignAnswer.className = "ai-design-assistant-message"
+  aiDesignAnswer.textContent = "正在思考…"
+  aiDesignMessages.append(userMessage, aiDesignAnswer)
+  aiDesignPrompt.value = ""
+  aiDesignAnswer.scrollIntoView({ block: "nearest" })
   const controller = new AbortController()
   aiDesignController = controller
-  setAiDesignBusy(true)
   aiDesignStatus.textContent = "正在加载受限 AI 编辑器…"
   try {
-    const { runAiSkinDesign } = await import("./ai-design.ts")
-    const style = new FormData(aiDesignForm).get("ai-design-style") ?? "follow"
-    const styleInstruction = style === "minimal"
-      ? "视觉风格：简约清晰，减少装饰并强化信息层级。"
-      : style === "expressive"
-        ? "视觉风格：鲜明个性，加强配色对比并保持文字易读。"
-        : "视觉风格：延续当前设计，保留现有配色关系。"
-    const keepLayout = aiDesignKeepLayout.checked
-      ? "必须保持当前按键布局，不得修改几何、按键数量或动作。"
-      : "可在现有修复接口允许的范围内调整；仍不得创建或删除文件、配置节及二进制资源。"
-    const result = await runAiSkinDesign(currentModelConfiguration(), {
+    const project = {
       format: target.format,
       theme: theme.value,
       orientation: orientation.value,
@@ -8513,7 +8533,11 @@ aiDesignForm.addEventListener("submit", (event) => void (async () => {
       selectedTarget: aiDesignTarget.textContent ?? "当前布局",
       selectedSections: selectedSourceSections(),
       files: aiEditableProjectFiles(target),
-    }, `${aiDesignPrompt.value.trim()}\n\n${styleInstruction}\n${keepLayout}`, {
+    }
+    setAiDesignBusy(true)
+    const { runAiSkinDesign } = await import("./ai-design.ts")
+    const result = await runAiSkinDesign(configuration, project, prompt, {
+      history: aiDesignConversation,
       signal: controller.signal,
       onStatus: (_kind, text) => { aiDesignStatus.textContent = text },
     })
@@ -8521,6 +8545,8 @@ aiDesignForm.addEventListener("submit", (event) => void (async () => {
     const changes = validatedAiChanges(target, result.changes)
     if (!changes.length) {
       aiDesignAnswer.textContent = result.response || "AI 分析完成，没有需要应用的修改。"
+      aiDesignConversation.push({ role: "user", text: prompt }, { role: "assistant", text: aiDesignAnswer.textContent })
+      aiDesignConversation = aiDesignConversation.slice(-6)
       aiDesignStatus.textContent = ""
       return
     }
@@ -8532,14 +8558,21 @@ aiDesignForm.addEventListener("submit", (event) => void (async () => {
     populateKeyInspector()
     updateDirty()
     aiDesignAnswer.textContent = result.response || `AI 已修改 ${changes.length} 个配置文件，可使用撤销恢复。`
+    aiDesignConversation.push({ role: "user", text: prompt }, { role: "assistant", text: aiDesignAnswer.textContent })
+    aiDesignConversation = aiDesignConversation.slice(-6)
     aiDesignStatus.textContent = ""
   } catch (error) {
     aiDesignStatus.textContent = controller.signal.aborted
       ? "AI 设计已取消，没有应用任何修改。"
       : aiDesignErrorMessage(error)
+    aiDesignAnswer.textContent = aiDesignStatus.textContent
+    aiDesignPrompt.value = prompt
   } finally {
     if (aiDesignController === controller) aiDesignController = undefined
     setAiDesignBusy(false)
+    syncAiDesignTarget()
+    aiDesignAnswer.scrollIntoView({ block: "nearest" })
+    aiDesignPrompt.focus()
   }
 })())
 
@@ -8611,8 +8644,37 @@ interface ModelConfiguration {
 
 interface ModelConfigurationState {
   configuration?: ModelConfiguration
+  configurations?: ModelConfiguration[]
   path: string
 }
+
+let savedModels: ModelConfiguration[] = []
+let editingModelIndex = -1
+
+function syncModelProfiles(): void {
+  const selected = aiDesignModel.value
+  for (const select of [modelProfile, aiDesignModel]) {
+    select.replaceChildren(...savedModels.map((configuration, index) =>
+      new Option(`${configuration.model} · ${modelProviderPreset(configuration.provider).label}`, String(index))))
+  }
+  modelProfile.value = String(editingModelIndex)
+  aiDesignModel.value = savedModels[Number(selected)] ? selected : "0"
+  aiDesignForm.querySelector<HTMLButtonElement>(".ai-design-settings")!.hidden = savedModels.length > 0 || !nativeSettings
+}
+
+modelProfile.addEventListener("change", () => {
+  editingModelIndex = Number(modelProfile.value)
+  applyModelConfiguration(savedModels[editingModelIndex])
+  populateModelList([])
+})
+$("#model-profile-add").addEventListener("click", () => {
+  editingModelIndex = -1
+  modelProfile.selectedIndex = -1
+  applyModelConfiguration({ ...currentModelConfiguration(), model: "", apiKey: "" })
+  modelName.value = ""
+  populateModelList([])
+  setModelConfigurationStatus("填写新模型后保存")
+})
 
 interface ModelConnectionResult {
   message: string
@@ -8658,12 +8720,23 @@ function setModelConfigurationBusy(busy: boolean): void {
 }
 
 function populateModelList(models: string[]): void {
-  modelList.replaceChildren(...models.map((model) => {
+  const placeholder = document.createElement("option")
+  placeholder.value = ""
+  placeholder.textContent = "选择模型…"
+  const custom = document.createElement("option")
+  custom.value = "__custom__"
+  custom.textContent = "手动输入…"
+  const available = modelName.value && !models.includes(modelName.value) ? [modelName.value, ...models] : models
+  modelList.replaceChildren(placeholder, ...available.map((model) => {
     const option = document.createElement("option")
     option.value = model
+    option.textContent = model
     return option
-  }))
+  }), custom)
+  modelName.hidden = models.length > 0
+  modelList.hidden = models.length === 0
   if (!modelName.value && models[0]) modelName.value = models[0]
+  modelList.value = modelName.value || ""
 }
 
 async function persistModelConfiguration(showFeedback = true): Promise<void> {
@@ -8674,9 +8747,18 @@ async function persistModelConfiguration(showFeedback = true): Promise<void> {
   setModelConfigurationBusy(true)
   if (showFeedback) setModelConfigurationStatus("正在保存配置…", "busy")
   try {
+    const configuration = currentModelConfiguration()
+    if (!configuration.model || !configuration.apiKey || !configuration.apiUrl) throw new Error("请填写 API 地址、模型名称和密钥")
+    const configurations = [...savedModels]
+    const index = editingModelIndex < 0 ? configurations.length : editingModelIndex
+    configurations[index] = configuration
     const state = await invoke<ModelConfigurationState>("save_model_configuration", {
-      configuration: currentModelConfiguration(),
+      configuration,
+      configurations,
     })
+    savedModels = configurations
+    editingModelIndex = index
+    syncModelProfiles()
     modelConfigurationPath.textContent = state.path
     if (showFeedback) setModelConfigurationStatus("配置已保存到本机", "success")
   } catch (error) {
@@ -8701,7 +8783,10 @@ async function initializeModelConfiguration(): Promise<void> {
     const state = await invoke<ModelConfigurationState>("load_model_configuration")
     modelConfigurationPath.textContent = state.path
     if (state.configuration) {
-      applyModelConfiguration(state.configuration)
+      savedModels = (state.configurations ?? [state.configuration]).filter(item => item.apiKey && item.model && item.apiUrl)
+      editingModelIndex = savedModels.length ? 0 : -1
+      applyModelConfiguration(savedModels[0] ?? state.configuration)
+      syncModelProfiles()
       setModelConfigurationStatus("已载入本机配置")
       return
     }
@@ -8737,6 +8822,19 @@ modelProvider.addEventListener("change", () => {
   previousModelProvider = next.id
   populateModelList([])
   setModelConfigurationStatus("配置已更改，保存后生效")
+})
+
+modelList.addEventListener("change", () => {
+  if (modelList.value === "__custom__") {
+    modelList.hidden = true
+    modelName.hidden = false
+    modelName.focus()
+    modelName.select()
+    return
+  }
+  if (!modelList.value) return
+  modelName.value = modelList.value
+  setModelConfigurationStatus("已选择模型，请保存配置")
 })
 
 refreshModelList.addEventListener("click", () => void (async () => {
@@ -9378,7 +9476,10 @@ for (const button of inspectorTabButtons) {
     if (mobilePortraitQuery.matches) setMobilePane("inspector")
     updateInspectorView()
     if (!quickInspector.hidden) populateKeyInspector()
-    if (!aiDesignPanel.hidden) requestAnimationFrame(() => aiDesignPrompt.focus())
+    if (!aiDesignPanel.hidden) {
+      syncAiDesignTarget()
+      requestAnimationFrame(() => aiDesignPrompt.focus())
+    }
   })
 }
 for (const control of [theme, orientation, layout]) {

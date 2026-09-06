@@ -591,11 +591,11 @@ select option {
   animation: glass-menu-in 140ms ease-out;
 }
 
-.export-menu {
+.file-menu {
   z-index: 101;
 }
 
-.export-menu .toolbar-menu {
+.file-menu .toolbar-menu {
   right: auto;
   left: 0;
 }
@@ -615,27 +615,33 @@ select option {
   gap: 2px;
 }
 
-.export-actions {
+.file-actions {
   display: grid;
   gap: 2px;
 }
 
-.toolbar-menu .export-action {
+.toolbar-menu-separator {
+  height: 1px;
+  margin: 4px 7px;
+  background: var(--line);
+}
+
+.file-actions button {
   color: var(--text);
   cursor: default;
   pointer-events: auto;
 }
 
-.toolbar-menu .export-action:hover:not(:disabled) {
+.file-actions button:hover:not(:disabled) {
   background: var(--hover);
 }
 
-.toolbar-menu .export-action:active:not(:disabled),
-.toolbar-menu .export-action:focus-visible {
+.file-actions button:active:not(:disabled),
+.file-actions button:focus-visible {
   background: rgb(0 0 0 / 9%);
 }
 
-.toolbar-menu .export-action:disabled {
+.file-actions button:disabled {
   color: var(--secondary);
   opacity: 0.3;
 }
@@ -4917,26 +4923,33 @@ canvas {
 #ai-design-panel {
   min-height: 0;
   padding: 0;
-  overflow: auto;
-  background: var(--panel);
+  overflow: hidden;
+  background: var(--card-canvas, var(--panel));
 }
+
+#ai-design-messages { display: flex; flex-direction: column; gap: 16px; }
+#ai-design-messages > div { white-space: pre-wrap; overflow-wrap: anywhere; flex-shrink: 0; }
+#ai-design-messages .ai-design-assistant-message { align-self: flex-start; max-width: 92%; font-size: 13px; line-height: 1.7; }
+.ai-design-settings[hidden] { display: none; }
+#ai-design-model { max-width: 240px; min-width: 0; }
 
 #ai-design-panel[hidden] {
   display: none;
 }
 
 #ai-design-panel form {
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0;
 }
-.ai-design-conversation { flex: 1; min-height: 220px; padding: 28px 24px 22px; display: flex; flex-direction: column; align-items: stretch; gap: 18px; overflow: auto; }
+.ai-design-conversation { flex: 1; min-height: 0; padding: 18px 14px; display: flex; flex-direction: column; align-items: stretch; gap: 18px; overflow: auto; }
 .ai-design-user-message { align-self: flex-end; max-width: min(82%, 520px); padding: 11px 15px; border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line)); border-radius: 14px 14px 4px 14px; color: var(--text); background: color-mix(in srgb, var(--accent) 10%, var(--control)); font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
 .ai-design-assistant-message { max-width: 680px; display: grid; gap: 9px; padding: 18px 20px; border: 1px solid var(--line-soft); border-radius: 12px; background: color-mix(in srgb, var(--control) 55%, transparent); }
 .ai-design-assistant-heading { display: flex; align-items: center; gap: 8px; }
 .ai-design-avatar { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 7px; color: #fff; background: var(--accent); font-size: 14px; }
-.ai-design-connection-dot { width: 7px; height: 7px; margin-left: auto; border-radius: 50%; background: #31a46c; box-shadow: 0 0 0 3px color-mix(in srgb, #31a46c 14%, transparent); }
+
 .ai-design-assistant-message h2 { margin: 2px 0 0; color: var(--text); font-size: 18px; font-weight: 650; letter-spacing: 0; }
 .ai-design-assistant-message p,
 .ai-design-status {
@@ -4947,7 +4960,7 @@ canvas {
 }
 .ai-design-thought-label { color: var(--secondary); font-size: 11px; }
 
-.ai-design-composer { margin: 0 18px 18px; padding: 10px 12px 9px; border: 1px solid var(--line); border-radius: 12px; background: var(--control); box-shadow: 0 6px 20px rgb(0 0 0 / 7%); }
+.ai-design-composer { flex: none; margin: 0 14px 14px; padding: 10px 12px 9px; border: 1px solid var(--line); border-radius: 12px; background: var(--control); box-shadow: 0 6px 20px rgb(0 0 0 / 7%); }
 .ai-design-target { display: flex; align-items: center; gap: 6px; min-height: 23px; margin-bottom: 4px; color: var(--muted); font-size: 11px; }
 .ai-design-target .system-symbol { color: var(--accent); font-size: 14px; }
 .ai-design-target strong { color: var(--accent); font-weight: 600; }
@@ -5041,6 +5054,7 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
 }
 .ai-design-options, .ai-design-actions { display: flex; align-items: center; gap: 10px; }
@@ -5294,7 +5308,9 @@ canvas {
 
 .settings-text-row > input,
 .settings-secret-control input,
-.settings-model-control input {
+.settings-model-control input,
+.settings-model-control select {
+  width: 100%;
   min-width: 0;
   height: 30px;
   padding: 0 8px;
@@ -6070,6 +6086,23 @@ canvas {
   padding: 22px;
 }
 
+.new-project-dialog {
+  max-height: min(680px, calc(100dvh - 32px));
+  background: var(--menu);
+}
+
+.new-project-dialog form {
+  max-height: inherit;
+  overflow: hidden;
+}
+
+.new-project-dialog fieldset {
+  display: grid;
+  gap: 7px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .file-operation-dialog {
   width: min(400px, calc(100% - 32px));
   border-radius: 8px;
@@ -6453,7 +6486,7 @@ input[type="search"]:focus {
     display: none;
   }
 
-  .export-menu .toolbar-menu {
+  .file-menu .toolbar-menu {
     position: fixed;
     top: var(--titlebar-height);
     left: max(8px, env(safe-area-inset-left));
@@ -8833,6 +8866,31 @@ input[type="search"]:focus {
     min-height: 54px;
   }
 }
+}
+
+/* Shared inspector surfaces and keyboard focus in both themes. */
+.source :is(#source-editor, .source-toolbar) { background: var(--card-panel); }
+.source .ai-design-assistant-message,
+.source .ai-design-composer { background: var(--card-surface); border-color: var(--card-border); }
+.source .ai-design-assistant-message { flex-shrink: 0; }
+.source :is(.ai-design-user-message, #ai-design-answer, .ai-design-target) { overflow-wrap: anywhere; }
+.source #ai-design-answer { white-space: pre-wrap; }
+.source .ai-design-options { flex-wrap: wrap; }
+.source .ai-design-actions { margin-left: auto; }
+.source .ai-design-composer:focus-within { border-color: var(--accent); }
+.source :is(button, select, input):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.source .inspector-tabs button:disabled { opacity: .4; cursor: not-allowed; }
+.source .source-toolbar :is(button, .search-control) { height: 32px; }
+.ai-design-help { margin: 0 0 8px; color: var(--secondary); font-size: 12px; line-height: 1.5; }
+.ai-design-settings { justify-self: start; color: var(--accent); background: transparent; padding: 6px 0; }
+
+.source .ai-design-switch input { min-height: 20px; flex: 0 0 34px; }
+@media (max-width: 760px) {
+  #ai-design-panel textarea { height: 54px; min-height: 54px; }
+  .ai-design-conversation { padding: 10px; }
+  .ai-design-assistant-message { padding: 12px; }
+  .ai-design-composer { margin: 0 10px 10px; }
+  .ai-design-help { font-size: 11px; }
 }
 
 /* One object summary and category navigation for both layout and key editing. */

@@ -29,3 +29,20 @@ assert.match(design, /必须先调用 inspect_project/, "模型必须先检查�
 assert.doesNotMatch(design, /from\s+"(?:node:)?(?:fs|child_process|process|os)"/, "AI 适配器不得访问文件系统或进程")
 
 console.log("✓ AI 设计接入模型配置并限制在可撤销的皮肤草稿工作区")
+
+assert.ok(submitHandler.indexOf("const project =") < submitHandler.indexOf('await import'),
+  "AI 设计必须在异步加载前快照选择范围")
+assert.doesNotMatch(html, /ai-design-style|ai-design-keep-layout/, "聊天不应保留风格和布局开关")
+assert.match(main, /querySelectorAll<[^>]+>\("input, textarea, button, select"\)/,
+  "运行期间也必须锁定风格选择")
+assert.match(html, /<select id="model-list"/, "API 模型列表必须使用可操作的原生下拉框")
+assert.match(main, /modelList\.addEventListener\("change"[\s\S]*modelName\.value = modelList\.value/,
+  "下拉选择必须写回模型名称")
+assert.match(main, /modelName\.hidden = models\.length > 0[\s\S]*modelList\.hidden = models\.length === 0/,
+  "模型输入框和下拉框不能同时显示")
+assert.match(design, /conversationContext\(options\.history \?\? \[\]\)/,
+  "同一皮肤的后续请求必须携带最近对话上下文")
+assert.match(design, /globalThis\.fetch = nativeModelFetch[\s\S]*globalThis\.fetch = webviewFetch/,
+  "AI 对话必须通过原生网络请求并在结束后恢复 WebView fetch")
+assert.match(fs.readFileSync("src-tauri/src/lib.rs", "utf8"), /async fn model_http_request[\s\S]*generate_handler![\s\S]*model_http_request/,
+  "原生端必须注册模型对话网络命令")

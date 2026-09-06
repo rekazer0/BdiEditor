@@ -12,21 +12,16 @@
   <body>
     <header class="titlebar" data-tauri-drag-region>
       <nav class="toolbar-group" aria-label="文件操作">
-        <button id="new" class="toolbar-button" title="新建项目" aria-label="新建项目">
-          <span class="icon system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" /></svg></span><span>新建项目</span>
-        </button>
-        <button id="open" class="toolbar-button" type="button" title="打开皮肤文件" aria-label="打开皮肤文件">
-          <span class="icon system-symbol" data-system-symbol="folder" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M2.8 6.5h5l1.7 2h7.7l-1.4 7H4.2z"/><path d="M4 6.5V4.3h5l1.5 2.2" /></svg></span>
-        </button>
-        <button id="save" class="toolbar-button" disabled title="保存" aria-label="保存">
-          <span class="icon system-symbol" data-system-symbol="externaldrive" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M6 3v6h8V3M7 14h6" /></svg></span><span>保存</span>
-        </button>
         <button id="mobile-share" class="toolbar-button mobile-only-action" disabled title="分享皮肤" aria-label="分享皮肤">
           <span class="icon system-symbol" data-system-symbol="square.and.arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 13V3m-4 4 4-4 4 4M4 10v6h12v-6" /></svg></span><span>分享</span>
         </button>
-        <details class="toolbar-more export-menu">
-          <summary title="导出" aria-label="导出"><span class="system-symbol" data-system-symbol="square.and.arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 13V3m-4 4 4-4 4 4M4 10v6h12v-6" /></svg></span></summary>
-          <div class="toolbar-menu export-actions" aria-label="导出皮肤">
+        <details class="toolbar-more file-menu">
+          <summary title="文件" aria-label="文件菜单"><span class="system-symbol" data-system-symbol="line.3.horizontal" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h14" /></svg></span></summary>
+          <div class="toolbar-menu file-actions" aria-label="文件操作">
+            <button id="new" type="button">新建皮肤…</button>
+            <button id="open" type="button">打开皮肤…</button>
+            <button id="save" type="button" disabled>保存皮肤</button>
+            <span class="toolbar-menu-separator" role="separator"></span>
             <button class="export-action" data-export-format="bdi" disabled>导出 iOS 皮肤 (.bdi)…</button>
             <button class="export-action" data-export-format="bds" disabled>导出 Android 皮肤 (.bds)…</button>
             <button class="export-action" data-export-format="bda" data-bda-platform="ios" disabled>导出新版 iOS 皮肤 (.bda)…</button>
@@ -44,7 +39,7 @@
       <details class="toolbar-more mobile-command-menu">
         <summary title="操作" aria-label="操作"><span class="system-symbol" data-system-symbol="list.bullet" aria-hidden="true"></span><span>操作</span></summary>
         <div class="toolbar-menu mobile-command-actions" aria-label="手机操作">
-          <button type="button" data-mobile-command="new"><span class="system-symbol" data-system-symbol="plus" aria-hidden="true"></span><span>新建项目</span></button>
+          <button type="button" data-mobile-command="new"><span class="system-symbol" data-system-symbol="plus" aria-hidden="true"></span><span>新建皮肤</span></button>
           <button type="button" data-mobile-command="open"><span class="system-symbol" data-system-symbol="folder" aria-hidden="true"></span><span>打开皮肤</span></button>
           <button type="button" data-mobile-command="save"><span class="system-symbol" data-system-symbol="externaldrive" aria-hidden="true"></span><span>保存皮肤</span></button>
           <button type="button" data-mobile-command="mobile-share"><span class="system-symbol" data-system-symbol="square.and.arrow.up" aria-hidden="true"></span><span>分享皮肤</span></button>
@@ -532,21 +527,17 @@
         <div id="ai-design-panel" hidden>
           <form id="ai-design-form">
             <div class="ai-design-conversation" aria-live="polite" aria-label="AI 设计对话">
-              <div id="ai-design-user-message" class="ai-design-user-message" hidden></div>
-              <article class="ai-design-assistant-message">
-                <div class="ai-design-assistant-heading"><span class="ai-design-avatar" aria-hidden="true">✦</span><span class="ai-design-thought-label">设计助手</span><span class="ai-design-connection-dot" aria-hidden="true"></span></div>
-                <h2>告诉我你想怎样调整当前皮肤</h2>
-                <p id="ai-design-answer">我会结合画布中选中的按键或当前布局，分析现有配置并生成可撤销的修改。</p>
+              <div id="ai-design-messages" role="log" aria-label="聊天记录"></div>
+                <button class="ai-design-settings" type="button" data-app-dialog="settings">配置 AI 模型</button>
                 <p id="ai-design-status" class="ai-design-status" aria-live="polite"></p>
-              </article>
             </div>
             <div class="ai-design-composer">
               <div class="ai-design-target"><span class="system-symbol" data-system-symbol="scope" aria-hidden="true">◎</span><span>作用于</span><strong id="ai-design-target">当前布局</strong></div>
               <textarea id="ai-design-prompt" rows="3" required aria-label="设计要求" placeholder="描述要如何设计选中的按键或布局"></textarea>
+              <p class="ai-design-help">Enter 发送 · Shift + Enter 换行 · 修改后可撤销</p>
               <footer>
                 <div class="ai-design-options">
-                  <label title="选择视觉风格"><span>风格</span><select name="ai-design-style" aria-label="视觉风格"><option value="follow">延续当前</option><option value="minimal">简约清晰</option><option value="expressive">鲜明个性</option></select></label>
-                  <label class="ai-design-switch" title="保持按键位置和数量不变"><input id="ai-design-keep-layout" type="checkbox" checked><span>保持布局</span></label>
+                  <label><span>模型</span><select id="ai-design-model" aria-label="对话模型"></select></label>
                 </div>
                 <div class="ai-design-actions"><button id="ai-design-cancel" type="button" hidden>取消</button><button class="primary" type="submit" aria-label="发送设计要求" title="发送设计要求"><span class="system-symbol" data-system-symbol="arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="m6 11 6-6 6 6M12 5v14"/></svg></span><span class="ai-design-submit-label">发送</span></button></div>
               </footer>
@@ -566,11 +557,11 @@
 
     <datalist id="baidu-action-codes"></datalist>
 
-    <dialog id="new-project-dialog" class="project-dialog" aria-labelledby="new-project-title">
+    <dialog id="new-project-dialog" class="project-dialog new-project-dialog" aria-labelledby="new-project-title">
       <form id="new-project-form" method="dialog">
         <header>
-          <h2 id="new-project-title">新建项目</h2>
-          <p>选择一个内置模板作为项目起点。</p>
+          <h2 id="new-project-title">新建皮肤</h2>
+          <p>选择一个内置模板作为皮肤起点。</p>
           <p>内置皮肤为互联网搜集整理，仅限技术交流请勿用于商业用途。如有侵权请联系作者下架。</p>
         </header>
         <fieldset>
@@ -591,7 +582,7 @@
         </fieldset>
         <footer>
           <button value="cancel">取消</button>
-          <button class="primary" value="create">创建项目</button>
+          <button class="primary" value="create">创建皮肤</button>
         </footer>
       </form>
     </dialog>
@@ -831,9 +822,11 @@
               <p>配置桌面应用使用的模型服务</p>
             </div>
             <div class="settings-list">
+              <label class="settings-row"><span>已保存模型</span><select id="model-profile" aria-label="已保存模型"></select></label>
+              <button id="model-profile-add" type="button">新增模型</button>
               <label class="settings-row"><span>服务商</span><select id="model-provider"></select></label>
               <label class="settings-row settings-text-row"><span>API 地址</span><input id="model-api-url" type="url" autocomplete="url" spellcheck="false" placeholder="https://api.openai.com/v1"></label>
-              <label class="settings-row settings-text-row"><span>模型名称</span><span class="settings-model-control"><input id="model-name" type="text" list="model-list" autocomplete="off" spellcheck="false" placeholder="gpt-5"><button id="refresh-model-list" type="button" title="从 API 获取模型" aria-label="从 API 获取模型"><span class="system-symbol" data-system-symbol="arrow.clockwise" aria-hidden="true"></span></button></span><datalist id="model-list"></datalist></label>
+              <label class="settings-row settings-text-row"><span>模型名称</span><span class="settings-model-control"><input id="model-name" type="text" autocomplete="off" spellcheck="false" placeholder="gpt-5"><select id="model-list" aria-label="选择已获取的模型" title="选择已获取的模型" hidden></select><button id="refresh-model-list" type="button" title="从 API 获取模型" aria-label="从 API 获取模型"><span class="system-symbol" data-system-symbol="arrow.clockwise" aria-hidden="true"></span></button></span></label>
               <label class="settings-row settings-text-row"><span>API 密钥</span><span class="settings-secret-control"><input id="model-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…"><button id="toggle-model-api-key" type="button" title="显示 API 密钥" aria-label="显示 API 密钥"><span class="system-symbol" data-system-symbol="eye" aria-hidden="true"></span></button></span></label>
             </div>
             <div class="settings-model-footer">

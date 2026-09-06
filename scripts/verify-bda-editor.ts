@@ -213,7 +213,7 @@ assert.match(main, /jsonPropertyRanges\(source\.value, selectedBdaSourceKeys\(\)
 assert.doesNotMatch(main, /BDA 官方基础布局（只读几何）/)
 assert.doesNotMatch(main, /group\.hidden = bdaSelected \|\|/, "BDA 选中具体按键时应复用标准按键检查器")
 assert.match(html, /key-only key-appearance-fields/, "BDA 按键样式应使用 BDS\/BDI 的标准样式分组")
-assert.match(main, /bdaSelected && group !== keyAppearanceFieldsGroup/, "BDA 按键只应显示实际存在的样式分组")
+assert.match(main, /bdaSelected && !availableForBda/, "BDA 按键只应显示实际存在的属性分组")
 assert.match(main, /const bdaKeyProperties = new Set\(\["FORE_OFFSET"\]\)/, "BDA 按键的旧检查器不应再展示合成样式编号")
 for (const [field, caption] of [
   ["BACK_STYLE", "背景样式（backStyle）"],
