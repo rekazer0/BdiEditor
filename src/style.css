@@ -4921,12 +4921,12 @@ canvas {
 }
 
 #ai-design-panel {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   padding: 0;
   overflow: hidden;
   background: var(--card-canvas, var(--panel));
-  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 #ai-design-panel[hidden] {
@@ -4962,7 +4962,7 @@ canvas {
   padding: 6px 0;
 }
 .ai-design-settings[hidden] { display: none; }
-#ai-design-chat { width: 100%; height: 100%; min-height: 0; border: 0; background: transparent; }
+#ai-design-chat { width: 100%; min-height: 0; flex: 1; border: 0; background: transparent; }
 .ai-design-status { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .ai-design-status:empty { display: none; }
 #ai-design-status:not(:empty) { margin: 8px 12px 0; padding: 8px 10px; border-radius: 7px; color: var(--secondary); background: color-mix(in srgb, var(--accent) 7%, var(--control)); }
