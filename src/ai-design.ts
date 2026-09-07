@@ -1,4 +1,4 @@
-import { Agent, type AgentEvent, type AgentTool } from "@earendil-works/pi-agent-core"
+import { Agent, type AgentEvent, type AgentMessage, type AgentTool } from "@earendil-works/pi-agent-core"
 import {
   Type,
   createModels,
@@ -29,9 +29,6 @@ export type AiDesignProject = {
   theme: string
   orientation: string
   layout: string
-  selectedPath?: string
-  selectedTarget: string
-  selectedSections: readonly string[]
   files: readonly AiSkinEditableFile[]
 }
 
@@ -39,10 +36,12 @@ export type AiDesignResult = {
   changes: AiSkinDraftChange[]
   response: string
   toolCalls: number
+  conversation: AiDesignConversation
 }
 
+export type AiDesignConversation = AgentMessage[]
+
 type StatusKind = "thinking" | "reading" | "editing" | "done"
-type AiDesignMessage = { role: "user" | "assistant"; text: string }
 type ModelHttpResponse = { status: number; headers: Array<[string, string]>; body: number[] }
 
 const MAX_TOOL_CALLS = 80
@@ -90,12 +89,11 @@ function configuredModel(config: AiDesignConfiguration): Model<Api> {
 }
 
 function systemPrompt(project: AiDesignProject): string {
-  const selection = project.selectedSections.length ? project.selectedSections.join(", ") : "无"
   return `你是百度输入法皮肤编辑器中的受限修复代理。你只能通过下列工具查询和修改当前打开的皮肤项目，不能访问磁盘、网络、命令行或项目外文件。
 
-当前项目：格式 ${project.format.toUpperCase()}，主题 ${project.theme}，方向 ${project.orientation}，布局 ${project.layout}，当前文件 ${project.selectedPath ?? "无"}，用户当前选择“${project.selectedTarget}”，对应配置节 ${selection}。
+当前项目：格式 ${project.format.toUpperCase()}，当前预览主题 ${project.theme}，方向 ${project.orientation}，布局 ${project.layout}。
 
-选择范围要求：如果存在选中的按键或配置节，用户的设计要求默认只作用于这些对象；不得顺带重做未选按键或整个布局。只有当前没有局部选择，或用户明确要求全局调整时，才把任务理解为当前布局整体修改。
+用户的设计要求默认作用于整个皮肤项目（所有可编辑配置），不受编辑器当前文件、按键或配置节选择状态限制。只有用户在当前要求中明确指定更小范围时，才缩小修改范围。
 
 可用修复接口：
 1. inspect_project：查看项目上下文、权限和硬限制。编辑或分析项目时先调用它；普通问候和聊天直接回答。
@@ -133,9 +131,6 @@ function toolsFor(workspace: AiSkinWorkspace, project: AiDesignProject): AgentTo
         theme: project.theme,
         orientation: project.orientation,
         layout: project.layout,
-        selectedPath: project.selectedPath,
-        selectedTarget: project.selectedTarget,
-        selectedSections: project.selectedSections,
         permissions: {
           filesystem: false,
           shell: false,
@@ -258,10 +253,14 @@ function finalResponse(agent: Agent): string {
   return message.content.flatMap((content) => content.type === "text" ? [content.text] : []).join("\n").trim()
 }
 
-function conversationContext(history: readonly AiDesignMessage[]): string {
-  const messages = history.slice(-6).map(({ role, text }) => `${role === "user" ? "用户" : "助手"}：${text.trim()}`)
-  if (!messages.length) return ""
-  return `此前同一皮肤的对话（仅作上下文，仍以当前项目内容为准）：\n${messages.join("\n").slice(-8_000)}\n\n当前要求：\n`
+function recentConversation(messages: readonly AgentMessage[]): AgentMessage[] {
+  const conversational = messages.flatMap<AgentMessage>((message) => {
+    if (message.role === "user") return [message]
+    if (message.role !== "assistant" || message.stopReason === "toolUse") return []
+    const content = message.content.filter((part) => part.type === "text")
+    return content.length ? [{ ...message, content }] : []
+  })
+  return conversational.slice(-6)
 }
 
 async function nativeModelFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
@@ -280,9 +279,10 @@ export async function runAiSkinDesign(
   project: AiDesignProject,
   prompt: string,
   options: {
-    history?: readonly AiDesignMessage[]
+    history?: readonly AgentMessage[]
     signal?: AbortSignal
     onStatus?: (kind: StatusKind, text: string) => void
+    onTextDelta?: (delta: string) => void | Promise<void>
   } = {},
 ): Promise<AiDesignResult> {
   if (!normalizedUrl(config.apiUrl)) throw new Error("请先配置模型 API 地址")
@@ -319,6 +319,7 @@ export async function runAiSkinDesign(
       model,
       thinkingLevel: model.reasoning ? "medium" : "off",
       tools: toolsFor(workspace, project),
+      messages: [...(options.history ?? [])],
     },
     streamFn: models.streamSimple.bind(models),
     getApiKey: () => config.apiKey.trim(),
@@ -335,9 +336,12 @@ export async function runAiSkinDesign(
     },
     maxRetryDelayMs: 10_000,
   })
-  const unsubscribe = agent.subscribe((event) => {
+  const unsubscribe = agent.subscribe(async (event) => {
     const status = eventStatus(event)
     if (status) options.onStatus?.(status.kind, status.text)
+    if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
+      await options.onTextDelta?.(event.assistantMessageEvent.delta)
+    }
   })
   const abort = () => agent.abort()
   if (options.signal?.aborted) abort()
@@ -346,10 +350,15 @@ export async function runAiSkinDesign(
   // ponytail: one AI run is allowed at a time; replace fetch only for that run so every provider avoids WebView CORS.
   globalThis.fetch = nativeModelFetch
   try {
-    await agent.prompt(`${conversationContext(options.history ?? [])}${prompt.trim()}`)
+    await agent.prompt(prompt.trim())
     if (options.signal?.aborted) throw new DOMException("AI 设计已取消", "AbortError")
     if (agent.state.errorMessage) throw new Error(agent.state.errorMessage)
-    return { changes: workspace.changes(), response: finalResponse(agent), toolCalls }
+    return {
+      changes: workspace.changes(),
+      response: finalResponse(agent),
+      toolCalls,
+      conversation: recentConversation(agent.state.messages),
+    }
   } finally {
     globalThis.fetch = webviewFetch
     options.signal?.removeEventListener("abort", abort)

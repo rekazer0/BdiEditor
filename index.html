@@ -250,7 +250,6 @@
             <button id="inspector-groups-drag" type="button" aria-label="拖动属性分组栏" title="拖动属性分组栏">⋮⋮</button>
           </nav>
           <div class="inspector-title key-inspector-title">
-            <button id="inspector-layout-back" type="button" hidden>← 整体布局</button>
             <span id="selected-key-preview" class="key-inspector-preview" aria-hidden="true" hidden>ABC</span>
             <div class="key-inspector-copy">
               <strong id="selected-key">选择画布中的按键</strong>
@@ -525,24 +524,12 @@
           </div>
         </div>
         <div id="ai-design-panel" hidden>
-          <form id="ai-design-form">
-            <div class="ai-design-conversation" aria-live="polite" aria-label="AI 设计对话">
-              <div id="ai-design-messages" role="log" aria-label="聊天记录"></div>
-                <button class="ai-design-settings" type="button" data-app-dialog="settings">配置 AI 模型</button>
-                <p id="ai-design-status" class="ai-design-status" aria-live="polite"></p>
-            </div>
-            <div class="ai-design-composer">
-              <div class="ai-design-target"><span class="system-symbol" data-system-symbol="scope" aria-hidden="true">◎</span><span>作用于</span><strong id="ai-design-target">当前布局</strong></div>
-              <textarea id="ai-design-prompt" rows="3" required aria-label="设计要求" placeholder="描述要如何设计选中的按键或布局"></textarea>
-              <p class="ai-design-help">Enter 发送 · Shift + Enter 换行 · 修改后可撤销</p>
-              <footer>
-                <div class="ai-design-options">
-                  <label><span>模型</span><select id="ai-design-model" aria-label="对话模型"></select></label>
-                </div>
-                <div class="ai-design-actions"><button id="ai-design-cancel" type="button" hidden>取消</button><button class="primary" type="submit" aria-label="发送设计要求" title="发送设计要求"><span class="system-symbol" data-system-symbol="arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="m6 11 6-6 6 6M12 5v14"/></svg></span><span class="ai-design-submit-label">发送</span></button></div>
-              </footer>
-            </div>
-          </form>
+          <header class="ai-design-toolbar">
+            <label><span>模型</span><select id="ai-design-model" aria-label="对话模型"></select></label>
+            <button class="ai-design-settings" type="button" data-app-dialog="settings">配置 AI 模型</button>
+          </header>
+          <p id="ai-design-status" class="ai-design-status" aria-live="polite"></p>
+          <deep-chat id="ai-design-chat" aria-label="AI 设计对话"></deep-chat>
         </div>
         <div id="asset" hidden>
           <div class="asset-toolbar">

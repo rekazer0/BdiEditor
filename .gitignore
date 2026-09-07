@@ -18,8 +18,16 @@ src-tauri/gen/
 /design-qa.md
 /design-qa-*.png
 /implementation-*.png
+/*-comparison*.png
+/*-comparison*.jpg
+/*-implementation.png
+/inspector-design-*.png
+/inspector-reference-*.png
+/codex-clipboard-*.png
 /island-skin-*.png
 /tmp-*.mjs
+/scripts/verify-*
+/whiten_background.py
 /public/iphone-notes-keyboard-blank.png
 /public/iphone-notes-reference.png
 /public/iphone-notes-reference-dark.png

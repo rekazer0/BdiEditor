@@ -6,6 +6,8 @@ import { getCurrentWebview } from "@tauri-apps/api/webview"
 import { message, open, save } from "@tauri-apps/plugin-dialog"
 import { readFile, watch, writeFile, type UnwatchFn } from "@tauri-apps/plugin-fs"
 import "./style.css"
+import type { AiChatController, AiChatRunHooks, AiChatRunResult } from "./ai-chat.ts"
+import type { AiDesignConversation } from "./ai-design.ts"
 import {
   DEFAULT_BDA_PANEL_HEIGHT,
   DEFAULT_BDA_PANEL_WIDTH,
@@ -430,7 +432,6 @@ const selectedKeyName = $("#selected-key")
 const selectedKeyPreview = $("#selected-key-preview")
 const selectedKeyContext = $("#selected-key-context")
 const selectedKeySaveState = $("#selected-key-save-state")
-const inspectorLayoutBack = $("#inspector-layout-back") as HTMLButtonElement
 const selectedKeyReset = $("#selected-key-reset") as HTMLButtonElement
 const keyFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-key-field]"))
 const styleFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-style-field]"))
@@ -480,15 +481,11 @@ const inspectorTabButtons = Array.from(
 )
 const inspectorTabs = $(".inspector-tabs")
 const aiDesignPanel = $("#ai-design-panel")
-const aiDesignForm = $("#ai-design-form") as HTMLFormElement
-const aiDesignPrompt = $("#ai-design-prompt") as HTMLTextAreaElement
 const aiDesignStatus = $("#ai-design-status")
-const aiDesignMessages = $("#ai-design-messages")
+const aiDesignChat = $("#ai-design-chat")
 const aiDesignModel = $("#ai-design-model") as HTMLSelectElement
+const aiDesignSettings = $(".ai-design-settings") as HTMLButtonElement
 const modelProfile = $("#model-profile") as HTMLSelectElement
-const aiDesignTarget = $("#ai-design-target")
-const aiDesignSubmit = aiDesignForm.querySelector<HTMLButtonElement>('button[type="submit"]')!
-const aiDesignCancel = $("#ai-design-cancel") as HTMLButtonElement
 const browserOpen = $("#browser-open") as HTMLInputElement
 const imageOpen = $("#image-open") as HTMLInputElement
 const theme = $("#theme") as HTMLSelectElement
@@ -653,10 +650,11 @@ let sourceHistoryHighlight: readonly [number, number] | undefined
 type LayoutImageConfig = "none" | "image-follows-layout" | "layout-follows-image"
 let undoStack: Change[] = []
 let redoStack: Change[] = []
-let aiDesignController: AbortController | undefined
 let aiDesignConversationTarget: SkinArchive | undefined
 // ponytail: keep three exchanges in memory; persist sessions only if cross-restart chat is needed.
-let aiDesignConversation: Array<{ role: "user" | "assistant"; text: string }> = []
+let aiDesignConversation: AiDesignConversation = []
+let aiChatController: AiChatController | undefined
+let aiChatInitialization: Promise<AiChatController> | undefined
 let layoutImageBytes: Uint8Array | undefined
 let layoutImageWidth = 0
 let layoutImageHeight = 0
@@ -1538,13 +1536,10 @@ function setMobileInspectorGroup(id: string, scroll = true): void {
     button.classList.toggle("active", active)
     button.setAttribute("aria-pressed", String(active))
   }
-  if (scroll && (mobilePortraitQuery.matches || !inspectorGroupedDisplay.checked)) {
-    const group = quickInspector.querySelector<HTMLElement>(`.mobile-inspector-managed[data-mobile-inspector-group="${CSS.escape(id)}"]`)
-    if (group) {
-      const top = group.getBoundingClientRect().top - quickInspector.getBoundingClientRect().top + quickInspector.scrollTop
-      quickInspector.scrollTo({ top, behavior: "smooth" })
-    }
-  } else if (scroll) quickInspector.scrollTop = 0
+  // Each group owns its scrolling area. Scrolling the outer grid here moves the
+  // summary card and category rail together, so switching tabs appears to make
+  // the controls jump away from the pointer.
+  if (scroll) quickInspector.scrollTop = 0
 }
 
 function syncMobileInspectorGroups(): void {
@@ -6012,11 +6007,9 @@ function populateKeyInspector(): void {
   selectedKeyContext.textContent = hasSelection
     ? `${selectedPath.split("/").pop()} · 已选 ${sections.length} 个按键`
     : selectedPath === layoutPath ? "编辑整体属性，或点击画布中的按键单独编辑" : "更改会自动写回配置"
-  inspectorLayoutBack.hidden = selectedPath !== layoutPath || !(hasSelection || candidateSelected)
   selectedKeySaveState.hidden = !hasSelection
   selectedKeyReset.hidden = !hasSelection
   selectedKeyReset.disabled = undoStack.length === 0
-  syncAiDesignTarget()
   syncMobileInspectorHeader()
   for (const field of skinFields) {
     field.value = skinSelected ? selectedDocument?.get("", field.dataset.skinField ?? "") ?? "" : ""
@@ -7866,6 +7859,9 @@ async function loadArchive(
   assetURL = releaseImagePreviewURL(assetURL)
   clearImageSlicePicker()
   archive = nextArchive
+  aiDesignConversationTarget = nextArchive
+  aiDesignConversation = []
+  aiChatController?.clear()
   if (pendingSourceDirectory !== undefined) sourceWorkspacePendingArchive = nextArchive
   sourceTransfer = undefined
   const availableThemes = ["light", "dark"].filter((value) =>
@@ -8386,7 +8382,7 @@ for (const button of settingsNavItems) {
 
 const nativeSettings = isTauri() || location.hostname === "127.0.0.1" && ["1420", "4173"].includes(location.port)
 settingsStorageNav.hidden = !nativeSettings
-aiDesignForm.querySelector<HTMLButtonElement>(".ai-design-settings")!.hidden = !nativeSettings
+aiDesignSettings.hidden = !nativeSettings
 settingsModelNav.hidden = !nativeSettings
 settingsStorageSection.toggleAttribute("data-platform-hidden", !nativeSettings)
 settingsModelSection.toggleAttribute("data-platform-hidden", !nativeSettings)
@@ -8435,20 +8431,6 @@ function validatedAiChanges(target: SkinArchive, drafts: readonly AiSkinDraftCha
   })
 }
 
-function setAiDesignBusy(busy: boolean): void {
-  for (const control of aiDesignForm.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLButtonElement | HTMLSelectElement>("input, textarea, button, select")) {
-    control.disabled = busy && control !== aiDesignCancel
-  }
-  aiDesignCancel.hidden = !busy
-  aiDesignSubmit.querySelector<HTMLElement>(".ai-design-submit-label")!.textContent = busy ? "设计中…" : "发送"
-}
-
-function syncAiDesignTarget(): void {
-  if (aiDesignController) return
-  const selected = selectedKeyName.textContent?.trim()
-  aiDesignTarget.textContent = selected || (layout.value ? `${layout.selectedOptions[0]?.textContent ?? layout.value} · 整体布局` : "当前布局")
-}
-
 function aiDesignErrorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
   const normalized = raw.toLowerCase()
@@ -8461,94 +8443,57 @@ function aiDesignErrorMessage(error: unknown): string {
   if (normalized.includes("404") || normalized.includes("not found")) {
     return "找不到模型接口，请检查 API 地址和协议类型是否匹配。"
   }
+  if (normalized.includes("server_error") || normalized.includes("overloaded")
+    || normalized.includes("429") || normalized.includes("503") || normalized.includes("529")) {
+    return "模型服务当前繁忙，请稍后重试。"
+  }
   return `AI 设计失败：${raw}`
 }
 
-aiDesignPrompt.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
-    event.preventDefault()
-    if (!aiDesignSubmit.disabled) aiDesignForm.requestSubmit()
-  }
-})
-
-aiDesignCancel.addEventListener("click", () => {
-  aiDesignController?.abort()
-  aiDesignStatus.textContent = "正在取消…"
-})
-
-aiDesignForm.addEventListener("submit", (event) => void (async () => {
-  event.preventDefault()
-  if (!aiDesignForm.reportValidity() || aiDesignController) return
+async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promise<AiChatRunResult> {
   if (!isTauri()) {
-    aiDesignStatus.textContent = "AI 设计当前仅在桌面应用中可用。"
-    return
+    throw new Error("AI 设计当前仅在桌面应用中可用。")
   }
   if (!archive) {
-    aiDesignStatus.textContent = "请先打开一个皮肤项目。"
-    return
+    throw new Error("请先打开一个皮肤项目。")
   }
   if (!isEditing()) {
-    aiDesignStatus.textContent = "请先切换到编辑模式。"
-    return
+    throw new Error("请先切换到编辑模式。")
   }
-
-  const prompt = aiDesignPrompt.value.trim()
-  if (!prompt) {
-    aiDesignStatus.textContent = "请填写设计要求。"
-    aiDesignPrompt.focus()
-    return
-  }
+  if (!prompt.trim()) throw new Error("请填写设计要求。")
   source.commit()
-  syncAiDesignTarget()
   const target = archive
   const configuration = savedModels[Number(aiDesignModel.value)]
   if (!configuration) {
-    aiDesignStatus.textContent = "请先配置 AI 模型。"
-    return
+    throw new Error("请先配置 AI 模型。")
   }
   if (aiDesignConversationTarget !== target) {
     aiDesignConversationTarget = target
     aiDesignConversation = []
-    aiDesignMessages.replaceChildren()
   }
-  const userMessage = document.createElement("div")
-  userMessage.className = "ai-design-user-message"
-  userMessage.textContent = prompt
-  const aiDesignAnswer = document.createElement("div")
-  aiDesignAnswer.className = "ai-design-assistant-message"
-  aiDesignAnswer.textContent = "正在思考…"
-  aiDesignMessages.append(userMessage, aiDesignAnswer)
-  aiDesignPrompt.value = ""
-  aiDesignAnswer.scrollIntoView({ block: "nearest" })
-  const controller = new AbortController()
-  aiDesignController = controller
   aiDesignStatus.textContent = "正在加载受限 AI 编辑器…"
+  aiDesignModel.disabled = true
+  aiDesignSettings.disabled = true
   try {
     const project = {
       format: target.format,
       theme: theme.value,
       orientation: orientation.value,
       layout: layout.value,
-      selectedPath,
-      selectedTarget: aiDesignTarget.textContent ?? "当前布局",
-      selectedSections: selectedSourceSections(),
       files: aiEditableProjectFiles(target),
     }
-    setAiDesignBusy(true)
     const { runAiSkinDesign } = await import("./ai-design.ts")
     const result = await runAiSkinDesign(configuration, project, prompt, {
       history: aiDesignConversation,
-      signal: controller.signal,
+      signal: hooks.signal,
       onStatus: (_kind, text) => { aiDesignStatus.textContent = text },
+      onTextDelta: hooks.onTextDelta,
     })
     if (archive !== target) throw new Error("AI 运行期间已切换皮肤项目，本轮草稿未应用")
     const changes = validatedAiChanges(target, result.changes)
     if (!changes.length) {
-      aiDesignAnswer.textContent = result.response || "AI 分析完成，没有需要应用的修改。"
-      aiDesignConversation.push({ role: "user", text: prompt }, { role: "assistant", text: aiDesignAnswer.textContent })
-      aiDesignConversation = aiDesignConversation.slice(-6)
-      aiDesignStatus.textContent = ""
-      return
+      aiDesignConversation = result.conversation
+      return { fallback: result.response || "AI 分析完成，没有需要应用的修改。" }
     }
     commitBatch(changes)
     if (target.format === "bda") refreshBdaLayout(layoutPath)
@@ -8557,24 +8502,26 @@ aiDesignForm.addEventListener("submit", (event) => void (async () => {
     refreshPreview()
     populateKeyInspector()
     updateDirty()
-    aiDesignAnswer.textContent = result.response || `AI 已修改 ${changes.length} 个配置文件，可使用撤销恢复。`
-    aiDesignConversation.push({ role: "user", text: prompt }, { role: "assistant", text: aiDesignAnswer.textContent })
-    aiDesignConversation = aiDesignConversation.slice(-6)
-    aiDesignStatus.textContent = ""
+    aiDesignConversation = result.conversation
+    return { fallback: result.response || `AI 已修改 ${changes.length} 个配置文件，可使用撤销恢复。` }
   } catch (error) {
-    aiDesignStatus.textContent = controller.signal.aborted
-      ? "AI 设计已取消，没有应用任何修改。"
-      : aiDesignErrorMessage(error)
-    aiDesignAnswer.textContent = aiDesignStatus.textContent
-    aiDesignPrompt.value = prompt
+    if (hooks.signal.aborted) throw error
+    throw new Error(aiDesignErrorMessage(error))
   } finally {
-    if (aiDesignController === controller) aiDesignController = undefined
-    setAiDesignBusy(false)
-    syncAiDesignTarget()
-    aiDesignAnswer.scrollIntoView({ block: "nearest" })
-    aiDesignPrompt.focus()
+    aiDesignStatus.textContent = ""
+    aiDesignModel.disabled = false
+    aiDesignSettings.disabled = false
   }
-})())
+}
+
+function ensureAiChat(): Promise<AiChatController> {
+  aiChatInitialization ??= import("./ai-chat.ts")
+    .then(({ connectAiChat }) => connectAiChat(aiDesignChat, runAiDesignRequest))
+  return aiChatInitialization.then((controller) => {
+    aiChatController = controller
+    return controller
+  })
+}
 
 function setSourceDirectoryState(path: string, custom: boolean, error = ""): void {
   sourceDirectory.value = path
@@ -8659,7 +8606,7 @@ function syncModelProfiles(): void {
   }
   modelProfile.value = String(editingModelIndex)
   aiDesignModel.value = savedModels[Number(selected)] ? selected : "0"
-  aiDesignForm.querySelector<HTMLButtonElement>(".ai-design-settings")!.hidden = savedModels.length > 0 || !nativeSettings
+  aiDesignSettings.hidden = savedModels.length > 0 || !nativeSettings
 }
 
 modelProfile.addEventListener("change", () => {
@@ -9235,15 +9182,6 @@ for (const [input, key] of [
 undoButton.addEventListener("click", undo)
 redoButton.addEventListener("click", redo)
 selectedKeyReset.addEventListener("click", undo)
-inspectorLayoutBack.addEventListener("click", () => {
-  selectedKeySections = []
-  selectedCandidate = false
-  preview.setSelected([])
-  syncCandidateSelection()
-  populateKeyInspector()
-  updateSourceHighlight()
-  mobileInspectorGroups.querySelector<HTMLButtonElement>("button:not(#inspector-groups-drag)")?.focus()
-})
 browserOpen.addEventListener("change", async () => {
   const file = browserOpen.files?.[0]
   if (file) {
@@ -9477,8 +9415,9 @@ for (const button of inspectorTabButtons) {
     updateInspectorView()
     if (!quickInspector.hidden) populateKeyInspector()
     if (!aiDesignPanel.hidden) {
-      syncAiDesignTarget()
-      requestAnimationFrame(() => aiDesignPrompt.focus())
+      void ensureAiChat()
+        .then((controller) => requestAnimationFrame(() => controller.focus()))
+        .catch((error) => { aiDesignStatus.textContent = aiDesignErrorMessage(error) })
     }
   })
 }
