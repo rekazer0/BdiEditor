@@ -85,6 +85,15 @@ pub fn pick_source_directory<R: Runtime>(app: &AppHandle<R>) -> Result<String, S
 }
 
 #[cfg(target_os = "android")]
+pub async fn choose_project_template<R: Runtime>(app: &AppHandle<R>) -> Result<String, String> {
+    app.state::<NativeShare<R>>()
+        .0
+        .run_mobile_plugin_async("chooseProjectTemplate", ())
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "android")]
 pub fn start_source_observer<R: Runtime>(
     app: &AppHandle<R>,
     uri: String,

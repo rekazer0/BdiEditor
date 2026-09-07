@@ -5959,6 +5959,7 @@ canvas {
 }
 
 .new-project-dialog form {
+  grid-template-rows: auto minmax(0, 1fr) auto;
   max-height: inherit;
   overflow: hidden;
 }
@@ -5966,6 +5967,8 @@ canvas {
 .new-project-dialog fieldset {
   display: grid;
   gap: 7px;
+  min-height: 0;
+  padding-right: 8px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }

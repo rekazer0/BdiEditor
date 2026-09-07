@@ -8229,7 +8229,27 @@ async function shareArchiveToMobile(): Promise<boolean> {
   }
 }
 
-function chooseProjectTemplate(): Promise<string | undefined> {
+async function chooseProjectTemplate(): Promise<string | undefined> {
+  if (isAndroidTauri()) return chooseAndroidProjectTemplate()
+  if (isTauri()) {
+    const templateID = await chooseNativeProjectTemplate()
+    return templateID === EMBEDDED_PROJECT_FALLBACK
+      ? chooseEmbeddedProjectTemplate()
+      : templateID
+  }
+  return chooseEmbeddedProjectTemplate()
+}
+
+async function chooseAndroidProjectTemplate(): Promise<string | undefined> {
+  try {
+    return await invoke<string>("choose_project_template")
+  } catch (error) {
+    if (String(error).includes("project template selection cancelled")) return undefined
+    throw error
+  }
+}
+
+function chooseEmbeddedProjectTemplate(): Promise<string | undefined> {
   newProjectDialog.returnValue = ""
   newProjectDialog.showModal()
   return new Promise((resolve) => {
@@ -8248,18 +8268,95 @@ function chooseProjectTemplate(): Promise<string | undefined> {
   })
 }
 
-async function newDocument(): Promise<boolean> {
-  const templateID = await chooseProjectTemplate()
-  if (!templateID) return false
+let nativeProjectChoice: Promise<string | undefined> | undefined
+let resolveNativeProjectChoice: ((templateID: string | undefined) => void) | undefined
+let nativeProjectWindowReady = false
+let nativeProjectReadyTimer: number | undefined
+const EMBEDDED_PROJECT_FALLBACK = "__embedded-project-fallback__"
+
+function finishNativeProjectChoice(templateID?: string): void {
+  if (!resolveNativeProjectChoice) return
+  window.clearTimeout(nativeProjectReadyTimer)
+  nativeProjectReadyTimer = undefined
+  const resolve = resolveNativeProjectChoice
+  resolveNativeProjectChoice = undefined
+  nativeProjectChoice = undefined
+  resolve(templateID)
+}
+
+async function chooseNativeProjectTemplate(): Promise<string | undefined> {
+  if (nativeProjectChoice) {
+    void WebviewWindow.getByLabel("new-project").then((window) => window?.setFocus())
+    return nativeProjectChoice
+  }
+
+  // Remove a window left behind by a previous reload before installing the new
+  // resolver. Its close event must not be allowed to cancel the next request.
+  const existing = await WebviewWindow.getByLabel("new-project")
+  if (existing) await existing.close().catch(() => undefined)
+
+  const choice = new Promise<string | undefined>((resolve) => {
+    resolveNativeProjectChoice = resolve
+  })
+  nativeProjectChoice = choice
+  nativeProjectWindowReady = false
+
+  try {
+    const projectWindow = new WebviewWindow("new-project", {
+      url: "new-project.html",
+      title: "新建皮肤",
+      width: 620,
+      height: 760,
+      minWidth: 540,
+      minHeight: 600,
+      maxWidth: 760,
+      center: true,
+      decorations: true,
+      resizable: true,
+      focus: true,
+      visible: true,
+      minimizable: false,
+      maximizable: false,
+      skipTaskbar: false,
+      preventOverflow: { width: 24, height: 24 },
+      parent: navigator.userAgent.includes("Macintosh") ? undefined : "main",
+    })
+    void projectWindow.once("tauri://destroyed", () => {
+      finishNativeProjectChoice(nativeProjectWindowReady ? undefined : EMBEDDED_PROJECT_FALLBACK)
+    })
+    void projectWindow.once("tauri://error", () => finishNativeProjectChoice(EMBEDDED_PROJECT_FALLBACK))
+    nativeProjectReadyTimer = window.setTimeout(() => {
+      if (nativeProjectWindowReady || !resolveNativeProjectChoice) return
+      void WebviewWindow.getByLabel("new-project").then((window) => window?.close())
+      finishNativeProjectChoice(EMBEDDED_PROJECT_FALLBACK)
+    }, 2500)
+  } catch {
+    finishNativeProjectChoice(EMBEDDED_PROJECT_FALLBACK)
+  }
+
+  return choice
+}
+
+async function newDocument(templateID: string): Promise<boolean> {
   if (!(await prepareDocumentReplacement())) return false
   await loadArchive(await loadBuiltInProjectTemplate(templateID), "", true)
   return true
 }
 
+async function startNewDocument(): Promise<void> {
+  if (fileOperationRunning) return
+  const templateID = await chooseProjectTemplate()
+  if (!templateID) {
+    showStatus("新建皮肤已取消。")
+    return
+  }
+  await runFileOperation("新建皮肤", () => newDocument(templateID))
+}
+
 fileMenu.addEventListener("click", (event) => {
   if ((event.target as Element).closest("button")) fileMenu.open = false
 })
-newButton.addEventListener("click", () => void runFileOperation("新建皮肤", newDocument))
+newButton.addEventListener("click", () => void startNewDocument())
 openButton.addEventListener("click", () => {
   if (isTauri()) void runFileOperation("打开", openNative)
   else {
@@ -9985,6 +10082,16 @@ styleImageResourceClose.addEventListener("click", () => {
 styleImageResourceSearch.addEventListener("input", renderStyleImageResources)
 
 if (isTauri()) {
+  void listen("new-project-ready", () => {
+    nativeProjectWindowReady = true
+    window.clearTimeout(nativeProjectReadyTimer)
+    nativeProjectReadyTimer = undefined
+    void WebviewWindow.getByLabel("new-project").then((window) => window?.setFocus())
+  })
+  void listen<{ templateID: string }>("new-project-select", (event) => {
+    finishNativeProjectChoice(event.payload.templateID)
+  })
+  void listen("new-project-cancel", () => finishNativeProjectChoice())
   void listen<{ mode: "image" | "resource" }>("picker-window-ready", (event) => {
     const label = event.payload.mode === "image" ? "image-picker" : "resource-picker"
     const payload = event.payload.mode === "image" ? nativeImagePickerPayload : nativeResourcePickerPayload

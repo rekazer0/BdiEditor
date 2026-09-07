@@ -36,6 +36,32 @@ Denies the applySourceChanges command without any pre-configured scope.
 <tr>
 <td>
 
+`native-share:allow-chooseProjectTemplate`
+
+</td>
+<td>
+
+Enables the chooseProjectTemplate command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-share:deny-chooseProjectTemplate`
+
+</td>
+<td>
+
+Denies the chooseProjectTemplate command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `native-share:allow-createSourceWorkspace`
 
 </td>

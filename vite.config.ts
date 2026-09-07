@@ -4,7 +4,7 @@ export default defineConfig({
   base: "./",
   build: {
     manifest: true,
-    rollupOptions: { input: ["index.html", "picker.html"] },
+    rollupOptions: { input: ["index.html", "picker.html", "new-project.html"] },
   },
   server: {
     host: "127.0.0.1",

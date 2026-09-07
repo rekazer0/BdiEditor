@@ -1,0 +1,171 @@
+:root {
+  font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #202124;
+  color-scheme: light;
+  background: #f4f5f6;
+  --line: rgb(0 0 0 / 10%);
+  --panel: #f4f5f6;
+  --secondary: #74747b;
+  --control: #fff;
+  --hover: rgb(0 0 0 / 4%);
+  --accent: #0a7ff5;
+}
+
+:root[data-app-theme="dark"] {
+  color: #f2f3f4;
+  color-scheme: dark;
+  background: #202225;
+  --line: rgb(255 255 255 / 12%);
+  --panel: #282b2e;
+  --secondary: #a6a9ae;
+  --control: #34373b;
+  --hover: rgb(255 255 255 / 7%);
+  --accent: #3395ff;
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+body {
+  color: inherit;
+  font-size: 16px;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input { font: inherit; }
+
+form {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+header { padding: 24px 26px 18px; }
+
+h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.3;
+}
+
+header p {
+  margin: 7px 0 0;
+  color: var(--secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.templates {
+  min-height: 0;
+  padding: 0 20px 18px 26px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.template-heading {
+  padding-bottom: 9px;
+  color: var(--secondary);
+  font-size: 13px;
+}
+
+.template-list {
+  display: grid;
+  gap: 8px;
+}
+
+.template-option {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--control);
+  cursor: pointer;
+}
+
+.template-option:hover { background: color-mix(in srgb, var(--control) 88%, var(--hover)); }
+
+.template-option:has(input:checked) {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.template-option input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.template-option span {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.template-option strong {
+  overflow-wrap: anywhere;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.template-option small {
+  color: var(--secondary);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding: 14px 26px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+footer button {
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: inherit;
+  background: var(--control);
+  cursor: pointer;
+}
+
+footer button:hover { background: color-mix(in srgb, var(--control) 88%, var(--hover)); }
+
+footer .primary {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
+}
+
+footer .primary:hover { filter: brightness(1.05); }
+
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-height: 620px) {
+  header { padding-block: 18px 14px; }
+  header p { margin-top: 4px; }
+  .template-option { padding-block: 11px; }
+  footer { padding-block: 12px; }
+}

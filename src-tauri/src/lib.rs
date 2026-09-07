@@ -684,6 +684,17 @@ fn pick_source_directory(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn choose_project_template(app: tauri::AppHandle) -> Result<String, String> {
+    #[cfg(target_os = "android")]
+    return tauri_plugin_native_share::choose_project_template(&app).await;
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        Err("native project template selection is only available on Android".into())
+    }
+}
+
+#[tauri::command]
 fn start_source_observer(
     app: tauri::AppHandle,
     path: String,
@@ -1549,6 +1560,7 @@ pub fn run() {
         read_source_changes,
         path_is_directory,
         pick_source_directory,
+        choose_project_template,
         start_source_observer,
         stop_source_observer
     ]);
@@ -1580,6 +1592,7 @@ pub fn run() {
         read_source_changes,
         path_is_directory,
         pick_source_directory,
+        choose_project_template,
         start_source_observer,
         stop_source_observer
     ]);

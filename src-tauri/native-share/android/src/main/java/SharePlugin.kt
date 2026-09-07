@@ -87,6 +87,42 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
   private val sourceExecutor = Executors.newSingleThreadExecutor()
   private val sourcePollExecutor = Executors.newSingleThreadScheduledExecutor()
 
+  @Command
+  fun chooseProjectTemplate(invoke: Invoke) {
+    val names = arrayOf(
+      "百度官方 Android BDA 默认皮肤\n官方 1080p 横竖屏样式与资源",
+      "百度官方 Android BDS 默认皮肤\n官方旧格式 480px 横竖屏布局",
+      "OPPO皮肤加下滑功能\n互联网整理 BDS 皮肤",
+      "OPPO默认双色皮肤\n互联网整理 BDS 皮肤",
+      "IQOO提取圆角黑色\n互联网整理 BDS 皮肤",
+      "小米默认皮肤(统一颜色键盘版3)_适配圆角模糊\n互联网整理 BDS 皮肤",
+      "华为提取上滑符号1080\n互联网整理 BDS 皮肤",
+    )
+    val ids = arrayOf(
+      "default-android",
+      "official-android-bds",
+      "oppo-swipe-down",
+      "oppo-dual-color",
+      "iqoo-rounded-black",
+      "xiaomi-unified-rounded-blur",
+      "huawei-swipe-symbols-1080",
+    )
+    var selected = 0
+    AlertDialog.Builder(activity)
+      .setTitle("新建皮肤")
+      .setSingleChoiceItems(names, selected) { _, index -> selected = index }
+      .setNegativeButton("取消") { _, _ ->
+        invoke.reject("project template selection cancelled")
+      }
+      .setPositiveButton("创建皮肤") { _, _ ->
+        invoke.resolveObject(ids[selected])
+      }
+      .setOnCancelListener {
+        invoke.reject("project template selection cancelled")
+      }
+      .show()
+  }
+
   private fun runSourceIO(invoke: Invoke, fallbackMessage: String, operation: () -> Any?) {
     sourceExecutor.execute {
       try {
