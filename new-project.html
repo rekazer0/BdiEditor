@@ -12,10 +12,10 @@
       <header>
         <h1>新建皮肤</h1>
         <p>选择一个内置模板作为皮肤起点。</p>
-        <p>内置皮肤为互联网搜集整理，仅限技术交流请勿用于商业用途。如有侵权请联系作者下架。</p>
+        <p class="usage-note">内置皮肤来自互联网整理，仅供技术交流，请勿商用。<br />如有侵权，请联系作者下架。</p>
       </header>
       <section class="templates" aria-labelledby="template-heading">
-        <div id="template-heading" class="template-heading">默认模板</div>
+        <div id="template-heading" class="template-heading">内置模板 <span>7 款可选</span></div>
         <div class="template-list" role="radiogroup" aria-labelledby="template-heading">
         <label class="template-option">
           <input type="radio" name="project-template" value="default-android" checked />
@@ -48,6 +48,7 @@
         </div>
       </section>
       <footer>
+        <p id="project-error" role="alert" hidden></p>
         <button id="cancel" type="button">取消</button>
         <button class="primary" type="submit">创建皮肤</button>
       </footer>

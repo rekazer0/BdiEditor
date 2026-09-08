@@ -18,14 +18,14 @@
         <details class="toolbar-more file-menu">
           <summary title="文件" aria-label="文件菜单"><span class="system-symbol" data-system-symbol="line.3.horizontal" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h14" /></svg></span></summary>
           <div class="toolbar-menu file-actions" aria-label="文件操作">
-            <button id="new" type="button">新建皮肤…</button>
-            <button id="open" type="button">打开皮肤…</button>
-            <button id="save" type="button" disabled>保存皮肤</button>
+            <button id="new" type="button"><span class="system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14"/></svg></span><span>新建皮肤…</span></button>
+            <button id="open" type="button"><span class="system-symbol" data-system-symbol="folder" aria-hidden="true"></span><span>打开皮肤…</span></button>
+            <button id="save" type="button" disabled><span class="system-symbol" data-system-symbol="externaldrive" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M3 11h14M13 13.5h1"/></svg></span><span>保存皮肤</span></button>
             <span class="toolbar-menu-separator" role="separator"></span>
-            <button class="export-action" data-export-format="bdi" disabled>导出 iOS 皮肤 (.bdi)…</button>
-            <button class="export-action" data-export-format="bds" disabled>导出 Android 皮肤 (.bds)…</button>
-            <button class="export-action" data-export-format="bda" data-bda-platform="ios" disabled>导出新版 iOS 皮肤 (.bda)…</button>
-            <button class="export-action" data-export-format="bda" data-bda-platform="android" disabled>导出新版 Android 皮肤 (.bda)…</button>
+            <button class="export-action" data-export-format="bdi" disabled><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出 iOS 皮肤 (.bdi)…</span></button>
+            <button class="export-action" data-export-format="bds" disabled><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出 Android 皮肤 (.bds)…</span></button>
+            <button class="export-action" data-export-format="bda" data-bda-platform="ios" disabled><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出新版 iOS 皮肤 (.bda)…</span></button>
+            <button class="export-action" data-export-format="bda" data-bda-platform="android" disabled><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出新版 Android 皮肤 (.bda)…</span></button>
           </div>
         </details>
         <span class="toolbar-divider"></span>
@@ -231,11 +231,12 @@
       <div class="inspector-resize-handle" id="inspector-resize-handle" aria-hidden="true"></div>
       <section class="source">
         <div class="pane-heading source-heading">
-          <div>
+          <div class="inspector-context">
             <h2>检查器</h2>
             <span id="source-name">配置文本</span>
             <strong id="mobile-inspector-selection"></strong>
           </div>
+          <div class="ai-design-heading"><strong>AI 设计</strong><span>描述想法，一起完善皮肤</span></div>
           <div class="inspector-view-controls">
             <button id="source-find-toggle" class="toolbar-button" type="button" title="显示查找" aria-label="显示查找" aria-pressed="false" hidden><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m12.5 12.5 4 4"/></svg></span></button>
             <div class="inspector-tabs" aria-label="检查器视图">
@@ -246,9 +247,7 @@
           </div>
         </div>
         <div id="quick-inspector" hidden>
-          <nav id="mobile-inspector-groups" aria-label="属性分组">
-            <button id="inspector-groups-drag" type="button" aria-label="拖动属性分组栏" title="拖动属性分组栏">⋮⋮</button>
-          </nav>
+          <nav id="mobile-inspector-groups" aria-label="属性分组"></nav>
           <div class="inspector-title key-inspector-title">
             <span id="selected-key-preview" class="key-inspector-preview" aria-hidden="true" hidden>ABC</span>
             <div class="key-inspector-copy">
@@ -270,25 +269,25 @@
           <div class="inspector-group skin-fields" hidden>
             <h3>皮肤信息</h3>
             <div class="inspector-grid action-fields">
-              <label>名称（Name） <input data-skin-field="Name" /></label>
-              <label>描述（Description） <input data-skin-field="Description" /></label>
-              <label>作者（Author） <input data-skin-field="Author" /></label>
-              <label>版本（Version） <input data-skin-field="Version" /></label>
-              <label>最低输入法版本（MinImeCode） <input data-skin-field="MinImeCode" /></label>
-              <label>支持平台（SupportPlatform） <input data-skin-field="SupportPlatform" /></label>
-              <label>支持深色模式（SupportDarkMode） <input data-skin-field="SupportDarkMode" /></label>
+              <label>名称 <input data-skin-field="Name" /></label>
+              <label>描述 <input data-skin-field="Description" /></label>
+              <label>作者 <input data-skin-field="Author" /></label>
+              <label>版本 <input data-skin-field="Version" /></label>
+              <label>最低输入法版本 <input data-skin-field="MinImeCode" /></label>
+              <label>支持平台 <input data-skin-field="SupportPlatform" /></label>
+              <label>支持深色模式 <input data-skin-field="SupportDarkMode" /></label>
             </div>
           </div>
           <div class="keyboard-fields" hidden></div>
           <div class="inspector-group toolbar-fields" hidden>
             <h3>候选栏与工具栏</h3>
             <div class="inspector-grid action-fields">
-              <label>显示区域（VIEW_RECT） <input data-toolbar-field="VIEW_RECT" /></label>
-              <label>背景样式（BACK_STYLE） <span class="style-field"><input data-toolbar-field="BACK_STYLE" /></span></label>
-              <label>前景样式（FORE_STYLE） <span class="style-field"><input data-toolbar-field="FORE_STYLE" /></span></label>
-              <label>内边距（PADDING） <input data-toolbar-field="PADDING" /></label>
-              <label>首个候选前景（FIRST_FORE） <span class="style-field"><input data-toolbar-field="FIRST_FORE" /></span></label>
-              <label>首个候选背景（FIRST_BACK） <span class="style-field"><input data-toolbar-field="FIRST_BACK" /></span></label>
+              <label>显示区域 <input data-toolbar-field="VIEW_RECT" /></label>
+              <label>背景样式 <span class="style-field"><input data-toolbar-field="BACK_STYLE" /></span></label>
+              <label>前景样式 <span class="style-field"><input data-toolbar-field="FORE_STYLE" /></span></label>
+              <label>内边距 <input data-toolbar-field="PADDING" /></label>
+              <label>首个候选前景 <span class="style-field"><input data-toolbar-field="FIRST_FORE" /></span></label>
+              <label>首个候选背景 <span class="style-field"><input data-toolbar-field="FIRST_BACK" /></span></label>
             </div>
           </div>
           <div class="inspector-group document-fields" hidden>
@@ -310,15 +309,19 @@
           <section class="inspector-group inspector-disclosure key-only key-layout-fields" data-inspector-group-label="布局">
             <h3>布局</h3>
             <div class="inspector-grid geometry-fields">
-              <label>X（VIEW_RECT） <input data-key-field="x" type="number" /></label>
-              <label>Y（VIEW_RECT） <input data-key-field="y" type="number" /></label>
-              <label>宽（VIEW_RECT） <input data-key-field="width" type="number" min="1" /></label>
-              <label>高（VIEW_RECT） <input data-key-field="height" type="number" min="1" /></label>
+              <div class="inspector-card-heading"><strong>位置与尺寸</strong><span>px</span></div>
+              <label>X 位置 <input data-key-field="x" type="number" /></label>
+              <label>Y 位置 <input data-key-field="y" type="number" /></label>
+              <label>宽度 <input data-key-field="width" type="number" min="1" /></label>
+              <label>高度 <input data-key-field="height" type="number" min="1" /></label>
             </div>
-            <p class="inspector-note">选中按键后，可使用方向键移动；按住 Shift 每次移动 10 像素。</p>
+            <p class="inspector-note">方向键移动 1 px · Shift + 方向键移动 10 px</p>
+            <section class="inspector-advanced" id="inspector-multi-layout">
+              <h4>对齐与间距 <span>选择多个按键后可用</span></h4>
             <div class="inspector-grid gap-fields">
-              <label>水平间距（VIEW_RECT） <input data-gap-field="horizontal" type="number" /></label>
-              <label>垂直间距（VIEW_RECT） <input data-gap-field="vertical" type="number" /></label>
+              <div class="inspector-card-heading"><strong>间距</strong><span>多选按键后调整 · px</span></div>
+              <label>水平间距 <input data-gap-field="horizontal" type="number" /></label>
+              <label>垂直间距 <input data-gap-field="vertical" type="number" /></label>
             </div>
             <div class="layout-actions" aria-label="对齐与分布">
               <div class="layout-action-group" aria-label="对齐">
@@ -352,6 +355,7 @@
                 </div>
               </div>
             </div>
+            </section>
           </section>
           <section class="inspector-group inspector-disclosure key-only key-appearance-fields" data-inspector-group-label="样式">
             <h3>样式</h3>
@@ -359,41 +363,41 @@
               <div class="appearance-section appearance-visual-styles">
                 <div class="appearance-section-heading"><strong>视觉样式</strong><span>正常 / 按下</span></div>
                 <div class="appearance-reference-grid">
-                  <label class="style-ref-row" title="按键引用的共享背景样式编号">背景（BACK_STYLE）
+                  <label class="style-ref-row" title="按键引用的共享背景样式编号">背景
                     <span class="style-field">
                       <input data-key-field="BACK_STYLE" />
                     </span>
                   </label>
-                  <label class="style-ref-row" title="按键引用的共享前景样式编号">前景（FORE_STYLE）
+                  <label class="style-ref-row" title="按键引用的共享前景样式编号">前景
                     <span class="style-field">
                       <input data-key-field="FORE_STYLE" />
                     </span>
                   </label>
                 </div>
               </div>
-              <div class="appearance-section appearance-layout-fields">
-                <div class="appearance-section-heading"><strong>状态与排布</strong></div>
+              <section class="appearance-section appearance-layout-fields inspector-advanced">
+                <h4>高级排布</h4>
                 <div class="appearance-property-grid">
-                  <label title="状态样式（S状态_样式，多组用 | 分隔；S0 表示无状态样式）">状态样式（STAT_STYLE）
+                  <label title="状态样式（S状态_样式，多组用 | 分隔；S0 表示无状态样式）">状态样式
                     <span class="style-field">
                       <input data-key-field="STAT_STYLE" />
                     </span>
                   </label>
-                  <label title="每层前景偏移（x,y；多组用 ; 分隔）">前景偏移（FORE_OFFSET）
+                  <label title="每层前景偏移（x,y；多组用 ; 分隔）">前景偏移
                     <span class="style-field">
                       <input data-key-field="FORE_OFFSET" />
                     </span>
                   </label>
-                  <label title="每层前景位置类型（逗号分隔）">位置类型（POS_TYPE）
+                  <label title="每层前景位置类型（逗号分隔）">位置类型
                     <span class="style-field">
                       <input data-key-field="POS_TYPE" />
                     </span>
                   </label>
                 </div>
-              </div>
+              </section>
               <div class="appearance-section appearance-sound-field">
                 <div class="appearance-section-heading"><strong>音效</strong></div>
-                <label title="按键引用的按键音效样式编号">按键音效（SOUND_STYLE）
+                <label title="按键引用的按键音效样式编号">按键音效
                   <span class="style-field">
                     <input data-key-field="SOUND_STYLE" />
                   </span>
@@ -405,17 +409,17 @@
             <h3><span class="typography-heading-default">文字</span><span class="typography-heading-override">文字覆盖</span></h3>
             <p class="inspector-group-subtitle"><span class="typography-subtitle-default">显示内容与字体颜色</span><span class="typography-subtitle-override">仅当前状态</span></p>
             <div class="inspector-grid typography-content-fields">
-              <label>显示内容（SHOW） <input data-key-field="SHOW" /></label>
+              <label>显示内容 <input data-key-field="SHOW" /></label>
               <div id="primary-css-fields" class="primary-css-fields"></div>
             </div>
             <div class="appearance-section appearance-typography-fields">
               <div class="appearance-property-grid typography-property-grid">
-                <label data-text-style>字体（FONT_NAME） <input data-style-field="FONT_NAME" /></label>
-                <label data-text-style>字重（FONT_WEIGHT） <input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
-                <label data-text-style>字号（FONT_SIZE） <input data-style-field="FONT_SIZE" type="number" /></label>
+                <label data-text-style>字体 <input data-style-field="FONT_NAME" /></label>
+                <label data-text-style>字重 <input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
+                <label data-text-style>字号 <input data-style-field="FONT_SIZE" type="number" /></label>
                 <div class="color-pair-field" data-text-style>
-                  <label>正常颜色（NM_COLOR） <span class="color-control"><input data-style-field="NM_COLOR" /><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色（NM_COLOR）"><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度（NM_COLOR）"></span></label>
-                  <label>按下颜色（HL_COLOR） <span class="color-control"><input data-style-field="HL_COLOR" /><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色（HL_COLOR）"><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度（HL_COLOR）"></span></label>
+                  <label>正常颜色 <span class="color-control"><input data-style-field="NM_COLOR" /><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色"><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度"></span></label>
+                  <label>按下颜色 <span class="color-control"><input data-style-field="HL_COLOR" /><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色"><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度"></span></label>
                 </div>
               </div>
             </div>
@@ -424,14 +428,14 @@
             <h3>手势与动作</h3>
             <p class="inspector-group-subtitle">设置点击输出；下方按方向设置滑动动作，留空表示未配置。</p>
             <div class="inspector-grid primary-actions">
-              <label>点击动作（CENTER） <input data-key-field="CENTER" list="baidu-action-codes" /><small data-action-meaning="CENTER"></small></label>
+              <label>点击动作 <input data-key-field="CENTER" list="baidu-action-codes" /><small data-action-meaning="CENTER"></small></label>
             </div>
             <div class="direction-editor" aria-label="滑动与长按动作">
-              <label class="direction-up"><span>↑ 上滑（UP）</span><input data-key-field="UP" list="baidu-action-codes" /><small data-action-meaning="UP"></small></label>
-              <label class="direction-left"><span>← 左滑（LEFT）</span><input data-key-field="LEFT" list="baidu-action-codes" /><small data-action-meaning="LEFT"></small></label>
-              <label class="direction-hold"><span>● 长按（HOLD）</span><input data-key-field="HOLD" list="baidu-action-codes" /><small data-action-meaning="HOLD"></small></label>
-              <label class="direction-right"><span>右滑（RIGHT）→</span><input data-key-field="RIGHT" list="baidu-action-codes" /><small data-action-meaning="RIGHT"></small></label>
-              <label class="direction-down"><span>↓ 下滑（DOWN）</span><input data-key-field="DOWN" list="baidu-action-codes" /><small data-action-meaning="DOWN"></small></label>
+              <label class="direction-up"><span>↑ 上滑</span><input data-key-field="UP" list="baidu-action-codes" /><small data-action-meaning="UP"></small></label>
+              <label class="direction-left"><span>← 左滑</span><input data-key-field="LEFT" list="baidu-action-codes" /><small data-action-meaning="LEFT"></small></label>
+              <label class="direction-hold"><span>● 长按</span><input data-key-field="HOLD" list="baidu-action-codes" /><small data-action-meaning="HOLD"></small></label>
+              <label class="direction-right"><span>右滑→</span><input data-key-field="RIGHT" list="baidu-action-codes" /><small data-action-meaning="RIGHT"></small></label>
+              <label class="direction-down"><span>↓ 下滑</span><input data-key-field="DOWN" list="baidu-action-codes" /><small data-action-meaning="DOWN"></small></label>
             </div>
           </section>
         </div>
@@ -524,12 +528,15 @@
           </div>
         </div>
         <div id="ai-design-panel" hidden>
-          <header class="ai-design-toolbar">
-            <label><span>模型</span><select id="ai-design-model" aria-label="对话模型"></select></label>
-            <button class="ai-design-settings" type="button" data-app-dialog="settings">配置 AI 模型</button>
-          </header>
-          <p id="ai-design-status" class="ai-design-status" aria-live="polite"></p>
-          <deep-chat id="ai-design-chat" aria-label="AI 设计对话"></deep-chat>
+          <p id="ai-design-status" class="ai-design-status" role="status" aria-live="polite"></p>
+          <div class="ai-design-composer">
+            <deep-chat id="ai-design-chat" aria-label="AI 设计对话"></deep-chat>
+            <div class="ai-design-resize" role="separator" tabindex="0" aria-label="调整输入框高度" aria-orientation="horizontal" aria-controls="ai-design-chat" aria-valuemin="144" aria-valuemax="420" aria-valuenow="184" title="上下拖动调整高度，双击恢复默认；也可使用上下方向键"><span></span></div>
+            <footer class="ai-design-toolbar">
+              <label><span>模型</span><select id="ai-design-model" aria-label="对话模型" disabled><option value="">请先配置模型</option></select></label>
+              <button class="ai-design-settings" type="button" data-app-dialog="settings">配置 AI 模型</button>
+            </footer>
+          </div>
         </div>
         <div id="asset" hidden>
           <div class="asset-toolbar">
@@ -754,7 +761,7 @@
               <label class="settings-row"><span>外观模式</span><select id="app-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
               <label class="settings-row settings-switch"><span>窗口材质</span><input id="window-material" type="checkbox" role="switch" checked></label>
               <label id="window-material-opacity-setting" class="settings-row settings-range"><span id="window-material-opacity-label">玻璃不透明度</span><span class="settings-range-control"><input id="window-material-opacity" type="range" min="20" max="100" step="1" value="100" aria-labelledby="window-material-opacity-label window-material-opacity-value"><output id="window-material-opacity-value" for="window-material-opacity">100%</output></span></label>
-              <label class="settings-row settings-switch"><span>检查器分组显示</span><input id="inspector-grouped-display" type="checkbox" role="switch"></label>
+              <label class="settings-row settings-switch"><span>检查器使用侧边分类</span><input id="inspector-grouped-display" type="checkbox" role="switch"></label>
             </div>
           </section>
 

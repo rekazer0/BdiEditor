@@ -6,6 +6,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview"
 import { message, open, save } from "@tauri-apps/plugin-dialog"
 import { readFile, watch, writeFile, type UnwatchFn } from "@tauri-apps/plugin-fs"
 import "./style.css"
+import { initializeSettingsPreviews } from "./settings-preview"
 import type { AiChatController, AiChatRunHooks, AiChatRunResult } from "./ai-chat.ts"
 import type { AiDesignConversation } from "./ai-design.ts"
 import {
@@ -57,7 +58,6 @@ import {
   exportName,
   type ExportFormat,
 } from "./export.ts"
-import { inspectorGroupPositionPercent } from "./inspector-groups.ts"
 import {
   applyDecodedBdaAppearancePart,
   applyDecodedBdaSource,
@@ -425,7 +425,6 @@ const panelTargetHeight = $("#panel-target-height") as HTMLInputElement
 const panelScaleSummary = $("#panel-scale-summary")
 const quickInspector = $("#quick-inspector")
 const mobileInspectorGroups = $("#mobile-inspector-groups")
-const inspectorGroupsDrag = $("#inspector-groups-drag") as HTMLButtonElement
 const keyToolbar = $(".key-toolbar")
 const keyInspectorTitle = $(".key-inspector-title")
 const selectedKeyName = $("#selected-key")
@@ -1506,13 +1505,15 @@ function mobileInspectorGroupLabel(group: HTMLElement): string {
   if (group.classList.contains("toolbar-fields")) return "候选栏"
   if (group.classList.contains("document-fields")) return "文档"
   if (group.classList.contains("bda-config-fields")) return "BDA"
-  const label = group.querySelector(":scope > summary, :scope > h3")?.textContent?.trim() ?? "属性"
+  const label = group.querySelector(":scope > h3")?.textContent?.trim() ?? "属性"
   if (label.includes("样式")) return "样式"
   if (label.includes("滑动")) return "手势"
   return label.split(/[、与（(]/)[0]
 }
 
 function mobileInspectorGroupSymbol(label: string): string {
+  if (/提示栏|候选栏/.test(label)) return "text.bubble"
+  if (/扩展区域/.test(label)) return "square.2.layers.3d"
   if (/布局|面板|输入区/.test(label)) return "rectangle.3.group"
   if (/样式|外观|颜色/.test(label)) return "paintbrush"
   if (/文字|字体|内容/.test(label)) return "doc.text"
@@ -1529,7 +1530,6 @@ function setMobileInspectorGroup(id: string, scroll = true): void {
   for (const group of Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))) {
     const active = group.dataset.mobileInspectorGroup === id
     group.classList.toggle("mobile-inspector-active", active)
-    if (active && group instanceof HTMLDetailsElement) group.open = true
   }
   for (const button of Array.from(mobileInspectorGroups.querySelectorAll<HTMLButtonElement>("button"))) {
     const active = button.dataset.mobileInspectorGroup === id
@@ -1579,7 +1579,7 @@ function syncMobileInspectorGroups(): void {
   // Keep the horizontal inspector navigation evenly distributed when the
   // available groups change (for example: 面板 / 提示栏 / 扩展区域).
   mobileInspectorGroups.style.setProperty("--inspector-group-count", String(Math.max(groups.length, 1)))
-  mobileInspectorGroups.replaceChildren(inspectorGroupsDrag, ...groups.map((group) => {
+  mobileInspectorGroups.replaceChildren(...groups.map((group) => {
     const button = document.createElement("button")
     button.type = "button"
     const label = mobileInspectorGroupLabel(group)
@@ -1605,51 +1605,6 @@ for (const button of bdaInspectorStateButtons) {
       item.setAttribute("aria-pressed", String(active))
     }
   })
-}
-
-{
-  let dragging = false
-  let pointerId = -1
-  let pointerToCenterY = 0
-  const savedPosition = Number(localStorage.getItem("desktop-inspector-groups-y"))
-  if (Number.isFinite(savedPosition) && savedPosition >= 15 && savedPosition <= 85) {
-    quickInspector.style.setProperty("--desktop-inspector-groups-y", `${savedPosition}%`)
-  } else {
-    quickInspector.style.setProperty("--desktop-inspector-groups-y", "50%")
-  }
-
-  inspectorGroupsDrag.addEventListener("pointerdown", (event) => {
-    if (mobilePortraitQuery.matches) return
-    dragging = true
-    pointerId = event.pointerId
-    const groupRect = mobileInspectorGroups.getBoundingClientRect()
-    pointerToCenterY = event.clientY - (groupRect.top + groupRect.height / 2)
-    mobileInspectorGroups.classList.add("dragging")
-    inspectorGroupsDrag.setPointerCapture(pointerId)
-    event.preventDefault()
-  })
-  inspectorGroupsDrag.addEventListener("pointermove", (event) => {
-    if (!dragging || event.pointerId !== pointerId) return
-    const rect = quickInspector.getBoundingClientRect()
-    const percent = inspectorGroupPositionPercent(
-      event.clientY,
-      rect.top,
-      rect.height,
-      mobileInspectorGroups.offsetHeight,
-      pointerToCenterY,
-    )
-    quickInspector.style.setProperty("--desktop-inspector-groups-y", `${percent}%`)
-  })
-  const stopDragging = (event: PointerEvent) => {
-    if (!dragging || event.pointerId !== pointerId) return
-    dragging = false
-    mobileInspectorGroups.classList.remove("dragging")
-    localStorage.setItem("desktop-inspector-groups-y", quickInspector.style.getPropertyValue("--desktop-inspector-groups-y").replace("%", ""))
-    inspectorGroupsDrag.releasePointerCapture(pointerId)
-    pointerId = -1
-  }
-  inspectorGroupsDrag.addEventListener("pointerup", stopDragging)
-  inspectorGroupsDrag.addEventListener("pointercancel", stopDragging)
 }
 
 function setMobilePane(pane: "layout" | "inspector"): void {
@@ -5746,15 +5701,15 @@ function populateDocumentInspector(): void {
       }
       const advanced = sectionEntries.filter((entry) => !used.has(entry.key))
       if (advanced.length) {
-        const details = document.createElement("details")
-        details.className = "particle-advanced-properties"
-        const summary = document.createElement("summary")
-        summary.textContent = `高级参数（${advanced.length}）`
+        const advancedSection = document.createElement("section")
+        advancedSection.className = "particle-advanced-properties"
+        const heading = document.createElement("h4")
+        heading.textContent = `高级参数（${advanced.length}）`
         const grid = document.createElement("div")
         grid.className = "document-property-grid"
         grid.append(...advanced.map((entry) => renderEntry(entry)))
-        details.append(summary, grid)
-        sectionPanel.append(details)
+        advancedSection.append(heading, grid)
+        sectionPanel.append(advancedSection)
       }
       documentFields.append(sectionPanel)
       continue
@@ -5910,7 +5865,8 @@ function syncBdaKeyFieldLabels(bdaSelected: boolean): void {
     const name = field.dataset.keyField ?? field.dataset.styleField ?? ""
     label.dataset.defaultInspectorCaption ??= textNode.textContent.trim()
     const caption = bdaSelected ? bdaKeyFieldLabels[name] : label.dataset.defaultInspectorCaption
-    if (caption) textNode.textContent = `${caption} `
+    if (caption) textNode.textContent = `${caption.replace(/（[A-Za-z_]+）/g, "")} `
+    label.title ||= name
   }
 }
 
@@ -6153,6 +6109,14 @@ function populateKeyInspector(): void {
     const property = label.querySelector<HTMLInputElement>("[data-style-field]")?.dataset.styleField ?? ""
     label.hidden = !bdaTextPropertyAvailability.get(property)
   }
+  const multiLayout = $("#inspector-multi-layout")
+  const multiAvailable = sections.length > 1 && archive?.format !== "bda" && !sections.some(isListCell)
+  multiLayout.querySelector("h4 span")!.textContent = archive?.format === "bda"
+    ? "此格式不支持布局编辑" : multiAvailable ? `已选 ${sections.length} 个按键` : "选择多个按键后可用"
+  const layoutNote = keyLayoutFieldsGroup.querySelector<HTMLElement>(".inspector-note")!
+  layoutNote.textContent = archive?.format === "bda"
+    ? "此格式的位置与尺寸仅供查看。外观和文字可在对应分类中修改。"
+    : "方向键移动 1 px · Shift + 方向键移动 10 px"
   const listSelected = sections.some(isListCell)
   const keyToolsAvailable = hasSelection && isEditing() && archive?.format !== "bda" && !listSelected
   for (const button of keyModeButtons) button.disabled = !keyToolsAvailable
@@ -8583,10 +8547,15 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
     const result = await runAiSkinDesign(configuration, project, prompt, {
       history: aiDesignConversation,
       signal: hooks.signal,
-      onStatus: (_kind, text) => { aiDesignStatus.textContent = text },
+      onStatus: async (_kind, text) => {
+        aiDesignStatus.textContent = text
+        await hooks.onStatus?.(text)
+      },
       onTextDelta: hooks.onTextDelta,
     })
+    if (hooks.signal.aborted) throw new DOMException("AI 设计已取消", "AbortError")
     if (archive !== target) throw new Error("AI 运行期间已切换皮肤项目，本轮草稿未应用")
+    if (!isEditing()) throw new Error("已退出编辑模式，本轮草稿未应用")
     const changes = validatedAiChanges(target, result.changes)
     if (!changes.length) {
       aiDesignConversation = result.conversation
@@ -8600,13 +8569,13 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
     populateKeyInspector()
     updateDirty()
     aiDesignConversation = result.conversation
-    return { fallback: result.response || `AI 已修改 ${changes.length} 个配置文件，可使用撤销恢复。` }
+    return { fallback: result.response, summary: `已应用 ${changes.length} 个配置文件的修改，可使用撤销恢复。` }
   } catch (error) {
     if (hooks.signal.aborted) throw error
     throw new Error(aiDesignErrorMessage(error))
   } finally {
     aiDesignStatus.textContent = ""
-    aiDesignModel.disabled = false
+    aiDesignModel.disabled = savedModels.length === 0
     aiDesignSettings.disabled = false
   }
 }
@@ -8702,8 +8671,11 @@ function syncModelProfiles(): void {
       new Option(`${configuration.model} · ${modelProviderPreset(configuration.provider).label}`, String(index))))
   }
   modelProfile.value = String(editingModelIndex)
-  aiDesignModel.value = savedModels[Number(selected)] ? selected : "0"
-  aiDesignSettings.hidden = savedModels.length > 0 || !nativeSettings
+  aiDesignModel.value = selected !== "" && savedModels[Number(selected)] ? selected : "0"
+  if (!savedModels.length) aiDesignModel.replaceChildren(new Option("请先配置模型", ""))
+  aiDesignModel.disabled = savedModels.length === 0
+  aiDesignSettings.hidden = !nativeSettings
+  aiDesignSettings.textContent = savedModels.length ? "模型设置" : "配置 AI 模型"
 }
 
 modelProfile.addEventListener("change", () => {
@@ -10483,3 +10455,5 @@ updateDevicePreview()
 updateSourceHighlight()
 updateInspectorView()
 void refreshUpdateStatus()
+
+initializeSettingsPreviews(settingsDialog)

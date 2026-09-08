@@ -6,6 +6,8 @@ const cancelButton = document.querySelector<HTMLButtonElement>("#cancel")!
 const isTauri = "__TAURI_INTERNALS__" in window
 const appWindow = isTauri ? getCurrentWindow() : undefined
 let finished = false
+let resultSent = false
+const errorMessage = document.querySelector<HTMLElement>("#project-error")!
 
 const themePreference = localStorage.getItem("app-theme")
 const resolvedTheme = themePreference === "light" || themePreference === "dark"
@@ -18,10 +20,26 @@ if (appWindow) void appWindow.setTheme(themePreference === "light" || themePrefe
 async function finish(templateID?: string): Promise<void> {
   if (finished) return
   finished = true
-  if (!appWindow) return
-  if (templateID) await emitTo("main", "new-project-select", { templateID })
-  else await emitTo("main", "new-project-cancel")
-  await appWindow.close()
+  errorMessage.hidden = true
+  const controls = form.querySelectorAll<HTMLInputElement | HTMLButtonElement>("input, button")
+  controls.forEach((control) => { control.disabled = true })
+  try {
+    if (!appWindow) throw new Error("请在桌面应用中使用新建皮肤功能。")
+    if (!resultSent) {
+      if (templateID) await emitTo("main", "new-project-select", { templateID })
+      else await emitTo("main", "new-project-cancel")
+      resultSent = true
+    }
+    // close() re-enters onCloseRequested; destroy the completed chooser directly.
+    await appWindow.destroy()
+  } catch (error) {
+    finished = false
+    controls.forEach((control) => { control.disabled = false })
+    errorMessage.textContent = resultSent
+      ? "窗口未能关闭，请点击取消重试。"
+      : `操作未完成，请重试。${String(error)}`
+    errorMessage.hidden = false
+  }
 }
 
 form.addEventListener("submit", (event) => {
@@ -36,7 +54,6 @@ document.addEventListener("keydown", (event) => {
 })
 if (appWindow) {
   void appWindow.onCloseRequested(async (event) => {
-    if (finished) return
     event.preventDefault()
     await finish()
   })

@@ -49,7 +49,7 @@ form {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
-header { padding: 24px 26px 18px; }
+header { padding: 24px 24px 18px; }
 
 h1 {
   margin: 0;
@@ -64,19 +64,32 @@ header p {
   line-height: 1.55;
 }
 
+header .usage-note {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .templates {
   min-height: 0;
-  padding: 0 20px 18px 26px;
+  padding: 0 18px 18px 24px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
 }
 
 .template-heading {
+  display: flex;
+  justify-content: space-between;
   padding-bottom: 9px;
   color: var(--secondary);
   font-size: 13px;
 }
+
+.template-heading span { font-size: 12px; }
 
 .template-list {
   display: grid;
@@ -89,7 +102,7 @@ header p {
   grid-template-columns: auto minmax(0, 1fr);
   gap: 12px;
   align-items: center;
-  padding: 14px;
+  padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 9px;
   background: var(--control);
@@ -100,8 +113,11 @@ header p {
 
 .template-option:has(input:checked) {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--control));
+  box-shadow: inset 3px 0 var(--accent);
 }
+
+.template-option:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 .template-option input {
   width: 16px;
@@ -118,7 +134,8 @@ header p {
 
 .template-option strong {
   overflow-wrap: anywhere;
-  font-size: 16px;
+  font-size: 14px;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -130,15 +147,21 @@ header p {
 
 footer {
   display: flex;
+  flex-wrap: wrap;
+  position: relative;
   justify-content: flex-end;
   gap: 9px;
-  padding: 14px 26px 18px;
+  padding: 16px 24px;
   border-top: 1px solid var(--line);
   background: var(--panel);
 }
 
+#project-error { flex-basis: 100%; margin: 0; color: #d14343; font-size: 12px; overflow-wrap: anywhere; }
+button:disabled { opacity: .55; cursor: wait; }
+
 footer button {
-  height: 34px;
+  height: 36px;
+  min-width: 76px;
   padding: 0 16px;
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -168,4 +191,10 @@ input:focus-visible {
   header p { margin-top: 4px; }
   .template-option { padding-block: 11px; }
   footer { padding-block: 12px; }
+}
+
+@media (max-width: 420px) {
+  header { padding-inline: 16px; }
+  .templates { padding-inline: 16px 10px; }
+  footer { padding-inline: 16px; }
 }
