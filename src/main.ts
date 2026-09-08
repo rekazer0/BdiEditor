@@ -6,6 +6,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview"
 import { message, open, save } from "@tauri-apps/plugin-dialog"
 import { readFile, watch, writeFile, type UnwatchFn } from "@tauri-apps/plugin-fs"
 import "./style.css"
+import { initPerformanceOptimization } from "./performance-init"
 import { initializeSettingsPreviews } from "./settings-preview"
 import type { AiChatController, AiChatRunHooks, AiChatRunResult } from "./ai-chat.ts"
 import type { AiDesignConversation } from "./ai-design.ts"
@@ -10448,6 +10449,10 @@ if (isTauri()) {
     })
     .catch((error) => showError(error, "读取启动文件"))
 }
+
+// 初始化性能优化
+initPerformanceOptimization()
+
 mode.value = "preview"
 applyModeState()
 syncLayoutImageConfig()

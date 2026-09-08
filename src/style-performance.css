@@ -1,0 +1,86 @@
+/* CSS 性能优化 */
+
+/* 使用 will-change 提示浏览器优化 */
+.canvas-wrap,
+.workspace,
+.preview-toolbar,
+#preview,
+#candidate-background,
+#toolbar-preview {
+  will-change: transform;
+}
+
+/* 使用 GPU 加速 */
+.device-shell,
+.keyboard-dock,
+.preview-zoom-control,
+.mobile-workspace-tabs {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* 优化滚动性能 */
+.sidebar,
+.source,
+.resource-gallery,
+#files,
+.inspector-group {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* 减少重绘 */
+.toolbar-button,
+.preview-tool-toggle,
+button,
+select,
+input {
+  contain: layout style paint;
+}
+
+/* 字体渲染优化 */
+body,
+input,
+button,
+select,
+textarea {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Canvas 优化 */
+canvas {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* 避免布局抖动 */
+.empty-state,
+.inspector-title,
+.resource-detail-heading {
+  contain: layout;
+}
+
+/* 延迟动画直到需要时 */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 优化重排 */
+.glass-module,
+.toolbar-menu,
+.style-picker-dialog {
+  contain: layout style;
+}
+
+/* 硬件加速的过渡效果 */
+.inspector-resize-handle,
+.mobile-split-handle {
+  transform: translate3d(0, 0, 0);
+}

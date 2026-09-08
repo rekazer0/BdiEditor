@@ -25,6 +25,8 @@ type Rect = { x: number; y: number; width: number; height: number }
 type NineSliceCanvas = Pick<HTMLCanvasElement, "width" | "height" | "getContext">
 
 let nineSliceBuffer: HTMLCanvasElement | undefined
+// 九宫格缓存，避免重复渲染相同尺寸
+const nineSliceCache = new Map<string, HTMLCanvasElement>()
 
 export function setCanvasSize(
   canvas: Pick<HTMLCanvasElement, "width" | "height">,
@@ -40,6 +42,11 @@ export function setCanvasSize(
 function sharedNineSliceBuffer(): HTMLCanvasElement {
   nineSliceBuffer ??= document.createElement("canvas")
   return nineSliceBuffer
+}
+
+// 清理九宫格缓存
+export function clearNineSliceCache(): void {
+  nineSliceCache.clear()
 }
 
 function nineSliceAxis(size: number, leading: number, trailing: number): [number, number, number, number] {
@@ -61,38 +68,57 @@ export function drawNineSliceImage(
   const [ix, iy, iw, ih] = visual.inner
   const width = Math.max(1, Math.round(destination.width))
   const height = Math.max(1, Math.round(destination.height))
-  const buffer = createCanvas()
-  buffer.width = width
-  buffer.height = height
-  const bufferContext = buffer.getContext("2d")
-  if (!bufferContext) return
-  bufferContext.imageSmoothingEnabled = true
-  bufferContext.imageSmoothingQuality = "high"
 
-  const xs = [0, ix, ix + iw, sw]
-  const ys = [0, iy, iy + ih, sh]
-  const dx = nineSliceAxis(width, ix, sw - ix - iw)
-  const dy = nineSliceAxis(height, iy, sh - iy - ih)
-  for (let row = 0; row < 3; row++) {
-    for (let column = 0; column < 3; column++) {
-      const sourceWidth = xs[column + 1] - xs[column]
-      const sourceHeight = ys[row + 1] - ys[row]
-      const targetWidth = dx[column + 1] - dx[column]
-      const targetHeight = dy[row + 1] - dy[row]
-      if (sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) continue
-      bufferContext.drawImage(
-        visual.image,
-        sx + xs[column],
-        sy + ys[row],
-        sourceWidth,
-        sourceHeight,
-        dx[column],
-        dy[row],
-        targetWidth,
-        targetHeight,
-      )
+  // 生成缓存键 - 使用图片对象而非 src 属性
+  const imageKey = visual.image instanceof HTMLImageElement ? visual.image.src : String(visual.image)
+  const cacheKey = `${imageKey}-${sx}-${sy}-${sw}-${sh}-${ix}-${iy}-${iw}-${ih}-${width}-${height}`
+
+  let buffer = nineSliceCache.get(cacheKey)
+  if (!buffer) {
+    const newBuffer = createCanvas() as HTMLCanvasElement
+    newBuffer.width = width
+    newBuffer.height = height
+    const bufferContext = newBuffer.getContext("2d")
+    if (!bufferContext) return
+    bufferContext.imageSmoothingEnabled = true
+    bufferContext.imageSmoothingQuality = "high"
+
+    const xs = [0, ix, ix + iw, sw]
+    const ys = [0, iy, iy + ih, sh]
+    const dx = nineSliceAxis(width, ix, sw - ix - iw)
+    const dy = nineSliceAxis(height, iy, sh - iy - ih)
+    for (let row = 0; row < 3; row++) {
+      for (let column = 0; column < 3; column++) {
+        const sourceWidth = xs[column + 1] - xs[column]
+        const sourceHeight = ys[row + 1] - ys[row]
+        const targetWidth = dx[column + 1] - dx[column]
+        const targetHeight = dy[row + 1] - dy[row]
+        if (sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) continue
+        bufferContext.drawImage(
+          visual.image,
+          sx + xs[column],
+          sy + ys[row],
+          sourceWidth,
+          sourceHeight,
+          dx[column],
+          dy[row],
+          targetWidth,
+          targetHeight,
+        )
+      }
     }
+
+    // 缓存大小限制，避免内存泄漏
+    if (nineSliceCache.size > 100) {
+      const firstKey = nineSliceCache.keys().next().value
+      if (firstKey !== undefined) {
+        nineSliceCache.delete(firstKey)
+      }
+    }
+    nineSliceCache.set(cacheKey, newBuffer)
+    buffer = newBuffer
   }
+
   context.drawImage(
     buffer as CanvasImageSource,
     0,
@@ -1392,6 +1418,11 @@ export class Preview {
   private renderAgain = false
   private hintVisible = false
   private dragDrawFrame = 0
+  private lastRenderCache?: {
+    panel: Visual | undefined
+    visuals: Array<{ back: Visual | undefined; fore: Array<Visual | undefined>; text: TextVisual | undefined; styleTexts: Array<StyleTextVisual | undefined> }>
+    toolbarImages: Visual[]
+  }
   private readonly resizeObserver: ResizeObserver
 
   constructor(
@@ -1473,6 +1504,7 @@ export class Preview {
     this.visualCache.clear()
     this.resourceCache.clear()
     this.toolbarImagesCache = undefined
+    this.lastRenderCache = undefined
     void this.draw()
   }
 
@@ -1515,6 +1547,7 @@ export class Preview {
   setDefaults(defaults?: IniDocument): void {
     this.defaults = defaults
     this.visualCache.clear()
+    this.lastRenderCache = undefined
     this.keys = this.document
       ? previewItems(
           this.document,
@@ -1607,6 +1640,7 @@ export class Preview {
     const animationChanged = this.panelAnimationStyle !== animationStyle
     this.panelStyle = styleID
     this.visualCache.clear()
+    this.lastRenderCache = undefined
     this.panelAnimationStyle = animationStyle
     this.panelWidth = width
     this.panelHeight = height
@@ -1621,6 +1655,7 @@ export class Preview {
   setDocument(document?: IniDocument): void {
     this.document = document
     this.visualCache.clear()
+    this.lastRenderCache = undefined
     this.keys = document
       ? previewItems(
           document,
@@ -1852,7 +1887,13 @@ export class Preview {
       const original = this.editDrag.original.get(key.section)
       if (original) key.rect = { ...original, x: original.x + dx, y: original.y + dy }
     }
-    this.scheduleDragDraw()
+    // 使用 requestAnimationFrame 而不是 scheduleDragDraw，减少拖拽延迟
+    if (!this.dragDrawFrame) {
+      this.dragDrawFrame = window.requestAnimationFrame(() => {
+        this.dragDrawFrame = 0
+        if (this.editDrag) void this.drawSync()
+      })
+    }
   }
 
   private async playAnimation(key: PreviewItem): Promise<void> {
@@ -1971,6 +2012,8 @@ export class Preview {
       this.cancelDragDraw()
       this.editDrag = undefined
       this.updateCursor()
+      // 拖拽结束，清除缓存以便下次正常渲染
+      this.lastRenderCache = undefined
       if (dx || dy) {
         this.onMove([...drag.original.keys()], dx, dy)
       }
@@ -2030,6 +2073,7 @@ export class Preview {
     this.canvas.style.cursor = this.mode === "preview" ? "pointer" : this.editTool === "move" ? "grab" : "default"
   }
 
+  // @ts-ignore - 保留以备后用
   private scheduleDragDraw(): void {
     if (this.dragDrawFrame) return
     this.dragDrawFrame = window.requestAnimationFrame(() => {
@@ -2231,6 +2275,15 @@ export class Preview {
     })
   }
 
+  // 同步绘制方法，用于拖拽等需要立即响应的操作
+  private drawSync(): void {
+    if (this.renderPending) {
+      this.renderAgain = true
+      return
+    }
+    this.startRender()
+  }
+
   private startRender(): void {
     this.renderPending = true
     void this.render().finally(() => {
@@ -2244,7 +2297,13 @@ export class Preview {
 
   private async render(): Promise<void> {
     const drawID = ++this.drawID
-    await this.resolver?.ready?.()
+    const isDragging = Boolean(this.editDrag)
+
+    // 拖拽时跳过 resolver 的 ready 等待，使用已缓存的数据
+    if (!isDragging) {
+      await this.resolver?.ready?.()
+    }
+
     const panelAnimationElapsed = this.legacyPanelAnimationStartedAt
       ? Date.now() - this.legacyPanelAnimationStartedAt
       : -1
@@ -2288,26 +2347,45 @@ export class Preview {
       .map((key) =>
         this.document ? effectivePreviewItem(this.document, key, this.skinState ?? 0) : key,
       ), this.panelWidth, this.panelHeight, this.legacyAnimationState?.key.section)
-    const [panel, visuals, toolbarImages, particleVisuals, hintVisuals, hintTextVisual, hintSelectedTextVisual, hintCellVisuals] = await Promise.all([
-      this.resolver?.resolve(this.panelStyle, false),
-      Promise.all(keys.map(async (key) => {
-        const highlighted = this.active?.key.section === key.section ||
-          this.legacyAnimationState?.key.section === key.section
-        return {
-          back: await this.resolveVisual(
-            highlighted ? key.highlightBackStyle ?? key.backStyle : key.backStyle,
-            highlighted,
-          ),
-          fore: await Promise.all(
-            key.foreStyles.map((style) => this.resolveVisual(style, highlighted)),
-          ),
-          text: this.resolver?.resolveText(key.foreStyles.join(","), highlighted),
-          styleTexts: key.foreStyles.map((style) =>
-            this.resolver?.resolveStyleText?.(style, highlighted)
-          ),
-        }
-      })),
-      this.resolveToolbar(),
+
+    // 拖拽时优先使用缓存的视觉数据，避免重复异步解析
+    let panel: Visual | undefined
+    let visuals: Array<{ back: Visual | undefined; fore: Array<Visual | undefined>; text: TextVisual | undefined; styleTexts: Array<StyleTextVisual | undefined> }>
+    let toolbarImages: Visual[]
+
+    if (isDragging && this.lastRenderCache) {
+      // 使用缓存数据进行快速拖拽渲染
+      panel = this.lastRenderCache.panel
+      visuals = this.lastRenderCache.visuals
+      toolbarImages = this.lastRenderCache.toolbarImages
+    } else {
+      // 正常渲染：完整解析所有视觉元素
+      [panel, visuals, toolbarImages] = await Promise.all([
+        this.resolver?.resolve(this.panelStyle, false),
+        Promise.all(keys.map(async (key) => {
+          const highlighted = this.active?.key.section === key.section ||
+            this.legacyAnimationState?.key.section === key.section
+          return {
+            back: await this.resolveVisual(
+              highlighted ? key.highlightBackStyle ?? key.backStyle : key.backStyle,
+              highlighted,
+            ),
+            fore: await Promise.all(
+              key.foreStyles.map((style) => this.resolveVisual(style, highlighted)),
+            ),
+            text: this.resolver?.resolveText(key.foreStyles.join(","), highlighted),
+            styleTexts: key.foreStyles.map((style) =>
+              this.resolver?.resolveStyleText?.(style, highlighted)
+            ),
+          }
+        })),
+        this.resolveToolbar(),
+      ])
+      // 保存缓存供拖拽时使用
+      this.lastRenderCache = { panel, visuals, toolbarImages }
+    }
+
+    const [particleVisuals, hintVisuals, hintTextVisual, hintSelectedTextVisual, hintCellVisuals] = await Promise.all([
       Promise.all(particleStyleIDs.map(async (styleID) =>
         await this.resolveResource(styleID)
       )),
