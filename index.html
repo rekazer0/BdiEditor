@@ -14,24 +14,22 @@
   </head>
   <body>
     <header class="titlebar" data-tauri-drag-region>
-      <div class="brand" data-tauri-drag-region>
-        <span class="brand-logo" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="3" /><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10" /></svg></span>
-        <span class="brand-text"><strong>键设</strong><small>bdiEditor</small></span>
-      </div>
       <nav class="toolbar-group" aria-label="文件操作">
         <button id="mobile-share" class="toolbar-button mobile-only-action" disabled title="分享皮肤" aria-label="分享皮肤">
           <span class="icon system-symbol" data-system-symbol="square.and.arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 13V3m-4 4 4-4 4 4M4 10v6h12v-6" /></svg></span><span>分享</span>
         </button>
-        <button id="new" class="toolbar-button pen-text-action" type="button" title="新建皮肤" aria-label="新建皮肤"><span class="icon system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14"/></svg></span><span>新建</span></button>
-        <button id="open" class="toolbar-button pen-text-action" type="button" title="打开皮肤" aria-label="打开皮肤"><span class="icon system-symbol" data-system-symbol="folder" aria-hidden="true"></span><span>打开</span></button>
-        <button id="save" class="toolbar-button pen-text-action" type="button" disabled title="保存皮肤" aria-label="保存皮肤"><span class="icon system-symbol" data-system-symbol="externaldrive" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M3 11h14M13 13.5h1"/></svg></span><span>保存</span></button>
-        <details class="toolbar-more file-menu pen-export-menu">
-          <summary class="toolbar-button pen-text-action" title="导出皮肤" aria-label="导出皮肤"><span class="icon system-symbol" data-system-symbol="share" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 13V3m-4 4 4-4 4 4M4 10v6h12v-6" /></svg></span><span>导出</span></summary>
-          <div class="toolbar-menu export-actions" aria-label="导出格式">
-            <button class="export-action" data-export-format="bdi" disabled><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出 iOS 皮肤 (.bdi)…</span></button>
-            <button class="export-action" data-export-format="bds" disabled><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出 Android 皮肤 (.bds)…</span></button>
-            <button class="export-action" data-export-format="bda" data-bda-platform="ios" disabled><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出新版 iOS 皮肤 (.bda)…</span></button>
-            <button class="export-action" data-export-format="bda" data-bda-platform="android" disabled><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出新版 Android 皮肤 (.bda)…</span></button>
+        <details class="toolbar-more file-menu pen-file-menu">
+          <summary class="toolbar-button pen-icon-action" title="文件操作" aria-label="文件操作" aria-haspopup="menu"><span class="icon system-symbol" data-system-symbol="line.3.horizontal" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" /></svg></span></summary>
+          <div class="toolbar-menu file-actions" role="menu" aria-label="文件操作">
+            <button id="new" type="button" role="menuitem" title="新建皮肤" aria-label="新建皮肤"><span class="system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14"/></svg></span><span>新建皮肤…</span></button>
+            <button id="open" type="button" role="menuitem" title="打开皮肤" aria-label="打开皮肤"><span class="system-symbol" data-system-symbol="folder" aria-hidden="true"></span><span>打开皮肤…</span></button>
+            <button id="save" type="button" role="menuitem" disabled title="保存皮肤" aria-label="保存皮肤"><span class="system-symbol" data-system-symbol="externaldrive" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M3 11h14M13 13.5h1"/></svg></span><span>保存皮肤</span></button>
+            <span class="toolbar-menu-separator" role="separator"></span>
+            <span class="toolbar-menu-label">导出</span>
+            <button class="export-action" type="button" role="menuitem" data-export-format="bdi" disabled><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出 iOS 皮肤 (.bdi)…</span></button>
+            <button class="export-action" type="button" role="menuitem" data-export-format="bds" disabled><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出 Android 皮肤 (.bds)…</span></button>
+            <button class="export-action" type="button" role="menuitem" data-export-format="bda" data-bda-platform="ios" disabled><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出新版 iOS 皮肤 (.bda)…</span></button>
+            <button class="export-action" type="button" role="menuitem" data-export-format="bda" data-bda-platform="android" disabled><span class="system-symbol" data-system-symbol="arrow.down" aria-hidden="true"></span><span>导出新版 Android 皮肤 (.bda)…</span></button>
           </div>
         </details>
         <span class="toolbar-divider"></span>
@@ -399,12 +397,27 @@
             <figcaption id="workspace-image-error" hidden>无法预览此 PNG</figcaption>
           </figure>
           <output id="preview-coordinates" aria-label="鼠标坐标" hidden><span class="preview-crosshair" aria-hidden="true"></span><span class="preview-coordinate-label">x: <span id="preview-coordinate-x">—</span>  y: <span id="preview-coordinate-y">—</span></span></output>
+          <div id="canvas-multi-toolbar" class="canvas-multi-toolbar" role="toolbar" aria-label="多选批量布局" data-available="false">
+            <span class="canvas-multi-count" id="canvas-multi-count" role="status">选择 2 个或更多按键</span>
+            <span class="canvas-multi-divider" aria-hidden="true"></span>
+            <button data-layout-action="left" title="左对齐" aria-label="左对齐"><span class="system-symbol" data-system-symbol="align.horizontal.left" aria-hidden="true"></span></button>
+            <button data-layout-action="right" title="右对齐" aria-label="右对齐"><span class="system-symbol" data-system-symbol="align.horizontal.right" aria-hidden="true"></span></button>
+            <button data-layout-action="top" title="顶对齐" aria-label="顶对齐"><span class="system-symbol" data-system-symbol="align.vertical.top" aria-hidden="true"></span></button>
+            <button data-layout-action="bottom" title="底对齐" aria-label="底对齐"><span class="system-symbol" data-system-symbol="align.vertical.bottom" aria-hidden="true"></span></button>
+            <span class="canvas-multi-divider" aria-hidden="true"></span>
+            <button data-layout-action="same-width" title="等宽" aria-label="等宽"><span class="system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"></span></button>
+            <button data-layout-action="same-height" title="等高" aria-label="等高"><span class="system-symbol" data-system-symbol="arrow.up.and.down" aria-hidden="true"></span></button>
+            <span class="canvas-multi-divider" aria-hidden="true"></span>
+            <button data-layout-action="horizontal-gap" title="水平等间距" aria-label="水平等间距"><span class="system-symbol" data-system-symbol="arrow.left.and.right.righttriangle.left.righttriangle.right" aria-hidden="true"></span></button>
+            <button data-layout-action="vertical-gap" title="垂直等间距" aria-label="垂直等间距"><span class="system-symbol" data-system-symbol="arrow.up.and.down.righttriangle.up.righttriangle.down" aria-hidden="true"></span></button>
+          </div>
         </div>
         <button id="mobile-toggle-guides" class="preview-tool-toggle glass-module mobile-guides-toggle" aria-label="辅助线" title="辅助线" aria-pressed="false"><span class="system-symbol" data-system-symbol="ruler" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="10" rx="2"/><path d="M7 7v5m4-5v3m4-3v5m4-5v3"/></svg></span></button>
         <div class="preview-zoom-control" aria-label="画布缩放">
-          <button id="preview-zoom-out" type="button" aria-label="缩小画布" title="缩小"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10" /></svg></button>
-          <button id="preview-zoom-fit" type="button" aria-label="适配窗口，双击锁定画布" title="适配窗口（双击锁定画布）" aria-pressed="false"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v4m8-4h4v4M8 16H4v-4m8 4h4v-4" /></svg></button>
           <button id="preview-zoom-in" type="button" aria-label="放大画布" title="放大"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M10 5v10" /></svg></button>
+          <span id="preview-zoom-value" role="status" aria-label="当前画布缩放">100%</span>
+          <button id="preview-zoom-out" type="button" aria-label="缩小画布" title="缩小"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10" /></svg></button>
+          <button id="preview-zoom-fit" type="button" aria-label="适配窗口，双击锁定画布" title="适配窗口（双击锁定画布）" aria-pressed="false"><span id="preview-zoom-label" aria-hidden="true">适应</span></button>
         </div>
         <div class="workspace-status"><div id="event-log" aria-live="polite">打开皮肤后可预览按键。</div><div id="panel-status">面板：-- × -- · 预览缩放：--%</div></div>
       </section>
@@ -709,6 +722,18 @@
         </div>
         <div id="ai-design-panel" hidden>
           <p id="ai-design-status" class="ai-design-status" role="status" aria-live="polite"></p>
+          <section id="ai-draft-panel" class="ai-draft-panel" aria-label="AI 修改草稿" hidden>
+            <header class="ai-draft-head">
+              <h3>待确认的修改草稿</h3>
+              <span id="ai-draft-summary" role="status">涉及 0 个文件</span>
+            </header>
+            <ul id="ai-draft-files" class="ai-draft-files"></ul>
+            <p class="ai-draft-note">画布上以橙色虚线标出受影响的按键。确认后一次性写入，并可整体撤销。</p>
+            <div class="ai-draft-actions">
+              <button id="ai-draft-apply" type="button" class="ai-draft-apply">应用到皮肤</button>
+              <button id="ai-draft-cancel" type="button" class="ai-draft-cancel">取消草稿</button>
+            </div>
+          </section>
           <div class="ai-design-composer">
             <deep-chat id="ai-design-chat" aria-label="AI 设计对话">
               <section class="ai-welcome" aria-label="开始设计">

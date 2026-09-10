@@ -7,6 +7,8 @@ import { message, open, save } from "@tauri-apps/plugin-dialog"
 import { readFile, watch, writeFile, type UnwatchFn } from "@tauri-apps/plugin-fs"
 import "./style.css"
 import "./pen-design-application.css"
+import "./pen-sidebar.css"
+import "./pen-components.css"
 import { initPerformanceOptimization } from "./performance-init"
 import { initializeSettingsPreviews } from "./settings-preview"
 import type { AiChatController, AiChatRunHooks, AiChatRunResult } from "./ai-chat.ts"
@@ -100,7 +102,7 @@ import { convertBdaArchive } from "./bda-convert.ts"
 import { bdaCompatibilityWarnings, bdaPlatform, convertBdaPlatform, type BdaPlatform } from "./bda-platform.ts"
 import { IniDocument } from "./ini.ts"
 import { adaptIos26KeyboardLayout, adaptIos26Variant } from "./ios26.ts"
-import { findTextMatches, iniSectionRanges, insertedTextRange, jsonPropertyRanges, replaceTextMatches } from "./highlight.ts"
+import { findTextMatches, iniSectionAtOffset, iniSectionRanges, insertedTextRange, jsonPropertyAtOffset, jsonPropertyRanges, replaceTextMatches } from "./highlight.ts"
 import { pushChange, type Change } from "./history.ts"
 import type { AiSkinDraftChange, AiSkinEditableFile } from "./ai-skin-workspace.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
@@ -158,6 +160,7 @@ import {
   previewContentVerticalBounds,
   previewItems,
   previewStateImpact,
+  type GestureDirection,
   type PreviewEvent,
 } from "./preview.ts"
 import { firstExistingPath, resourceImagePaths } from "./resources.ts"
@@ -179,7 +182,7 @@ import {
   type SourceWriteSnapshot,
 } from "./source-tree.ts"
 import { LazySourceCodeEditor } from "./lazy-source-editor.ts"
-import type { SourceEditorValueClick, SourceEditorValueRange } from "./lazy-source-editor.ts"
+import type { SourceEditorCursorMove, SourceEditorValueClick, SourceEditorValueRange } from "./lazy-source-editor.ts"
 import { replacedSourceColor, replacedSourceStyle, sourceValueRanges } from "./source-value-ranges.ts"
 import {
   SOUND_ACCEPT,
@@ -408,6 +411,7 @@ const previewCoordinateY = $("#preview-coordinate-y")
 const previewZoomOut = $("#preview-zoom-out") as HTMLButtonElement
 const previewZoomFit = $("#preview-zoom-fit") as HTMLButtonElement
 const previewZoomIn = $("#preview-zoom-in") as HTMLButtonElement
+const previewZoomValue = $("#preview-zoom-value") as HTMLSpanElement
 const panelScaleButton = $("#panel-scale") as HTMLButtonElement
 const adaptIos26Button = $("#adapt-ios26") as HTMLButtonElement
 const ios26Dialog = $("#ios26-dialog") as HTMLDialogElement
@@ -463,6 +467,8 @@ const bdaKeyFieldLabels: Record<string, string> = {
   HL_COLOR: "高亮文字颜色（highlightColor）",
 }
 const gapFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-gap-field]"))
+const canvasMultiToolbar = $("#canvas-multi-toolbar") as HTMLElement
+const canvasMultiCount = $("#canvas-multi-count") as HTMLElement
 const layoutActionButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-layout-action]"),
 )
@@ -483,6 +489,11 @@ const aiDesignStatus = $("#ai-design-status")
 const aiDesignChat = $("#ai-design-chat")
 const aiDesignModel = $("#ai-design-model") as HTMLSelectElement
 const aiDesignSettings = $(".ai-design-settings") as HTMLButtonElement
+const aiDraftPanel = $("#ai-draft-panel") as HTMLElement
+const aiDraftSummary = $("#ai-draft-summary") as HTMLElement
+const aiDraftFiles = $("#ai-draft-files") as HTMLElement
+const aiDraftApply = $("#ai-draft-apply") as HTMLButtonElement
+const aiDraftCancel = $("#ai-draft-cancel") as HTMLButtonElement
 const modelProfile = $("#model-profile") as HTMLSelectElement
 const browserOpen = $("#browser-open") as HTMLInputElement
 const imageOpen = $("#image-open") as HTMLInputElement
@@ -649,6 +660,19 @@ type LayoutImageConfig = "none" | "image-follows-layout" | "layout-follows-image
 let undoStack: Change[] = []
 let redoStack: Change[] = []
 let aiDesignConversationTarget: SkinArchive | undefined
+/**
+ * A finished AI run held for confirmation. Nothing reaches the archive until
+ * the user applies it, so a draft can be discarded without side effects.
+ */
+type AiDraft = {
+  target: SkinArchive
+  changes: Change[]
+  drafts: AiSkinDraftChange[]
+  sections: string[]
+  conversation: AiDesignConversation
+  response: string
+}
+let aiDesignDraft: AiDraft | undefined
 // ponytail: keep three exchanges in memory; persist sessions only if cross-restart chat is needed.
 let aiDesignConversation: AiDesignConversation = []
 let aiChatController: AiChatController | undefined
@@ -761,6 +785,28 @@ const deviceFrameProperties = [
   "--device-island-offset",
 ] as const
 
+/** Focuses the inspector input that edits the gesture picked on the canvas. */
+function focusGestureField(direction: GestureDirection): void {
+  const field = keyFields.find((candidate) => candidate.dataset.keyField === direction.toUpperCase())
+  if (!field) return
+  if (mobilePortraitQuery.matches) setMobilePane("inspector")
+  // A canvas click leaves the caret on the canvas, so the properties tab may
+  // not be the visible one; switch before focusing or focus would be dropped.
+  if (inspectorTab !== "properties") updateInspectorView()
+  const group = field.closest<HTMLElement>(".inspector-disclosure")
+  if (group) {
+    if (group.hidden) group.hidden = false
+    // Grouped inspector layouts show one group at a time; the gesture group
+    // has to be the visible one or focus would land on a hidden input.
+    if (group.classList.contains("mobile-inspector-managed") && group.dataset.mobileInspectorGroup) {
+      setMobileInspectorGroup(group.dataset.mobileInspectorGroup)
+    }
+  }
+  field.scrollIntoView({ block: "center" })
+  field.focus()
+  field.select()
+}
+
 const REFERENCE_PHONE_WIDTH_SCALE = 1
 
 const preview = new Preview(
@@ -782,6 +828,7 @@ const preview = new Preview(
   false,
   (sections, deltaX, deltaY) => moveSelectedKeys(deltaX, deltaY, sections),
   $("#hint-preview") as HTMLCanvasElement,
+  (direction) => focusGestureField(direction),
 )
 
 function updatePointerCoordinates(
@@ -2731,6 +2778,7 @@ function applyPreviewZoom(value: number, anchor?: { x: number; y: number }): voi
   previewZoom = Math.min(3, Math.max(0.4, Math.round(value * 10) / 10))
   previewZoomOut.disabled = previewZoom <= 0.4
   previewZoomIn.disabled = previewZoom >= 3
+  previewZoomValue.textContent = `${Math.round(previewZoom * 100)}%`
   if (currentDeviceValue() === "canvas") fitCanvasPreview()
   else setPreviewPan(previewPanX, previewPanY)
   if (anchor && before) {
@@ -2961,6 +3009,9 @@ function updateDevicePreview(): void {
   }
   preview.setTransparent(devicePreviewTransparent())
   applyPreviewZoom(previewZoom)
+  // Device switches change whether the canvas is the panel surface, which
+  // decides if the gesture hot zones can line up.
+  populateKeyInspector()
 }
 
 function panelSizeFrom(document: IniDocument | undefined): [number, number] | undefined {
@@ -6109,7 +6160,7 @@ function populateKeyInspector(): void {
       ? isListCell(sections[0])
         ? "LIST · 候选栏"
         : `${effectiveKeySection(sections[0])} · ${effectiveKeyValue(sections[0], "CENTER") || "未配置点击动作"}`
-      : `已选择 ${sections.length} 个按键`
+      : `将修改 ${sections.length} 个按键`
   const previewValue = hasSelection && !bdaSelected
     ? effectiveKeyValue(sections[0], "SHOW") || effectiveKeyValue(sections[0], "CENTER") || "ABC"
     : hasSelection && bdaSelected
@@ -6266,15 +6317,26 @@ function populateKeyInspector(): void {
   const multiLayout = $("#inspector-multi-layout")
   const multiAvailable = sections.length > 1 && archive?.format !== "bda" && !sections.some(isListCell)
   multiLayout.dataset.available = String(multiAvailable)
-  multiLayout.querySelector("h4 span")!.textContent = archive?.format === "bda"
+  canvasMultiToolbar.dataset.available = String(multiAvailable)
+  const multiLabel = archive?.format === "bda"
     ? "此格式不支持布局编辑" : sections.some(isListCell) ? "列表单元不支持批量布局"
-      : multiAvailable ? `已选 ${sections.length} 个按键` : "选择 2 个或更多按键"
+      : multiAvailable ? `将修改 ${sections.length} 个按键` : "选择 2 个或更多按键"
+  multiLayout.querySelector("h4 span")!.textContent = multiLabel
+  canvasMultiCount.textContent = multiLabel
   const layoutNote = keyLayoutFieldsGroup.querySelector<HTMLElement>(".inspector-note")!
   layoutNote.textContent = archive?.format === "bda"
     ? "此格式的位置与尺寸仅供查看。外观和文字可在对应分类中修改。"
     : "方向键移动 1 px · Shift + 方向键移动 10 px"
   const listSelected = sections.some(isListCell)
   const keyToolsAvailable = hasSelection && isEditing() && archive?.format !== "bda" && !listSelected
+  // Gesture hot zones only make sense for exactly one editable key, and only
+  // when the canvas is the panel surface: on a device mock-up the shell is
+  // transformed, so overlay coordinates would no longer line up.
+  preview.setGestureZones(
+    Boolean(isEditing() && inspectorTab === "properties" && sections.length === 1 && !listSelected &&
+      selectedPath === layoutPath && archive?.format !== "bda" &&
+      deviceShell.classList.contains("canvas-only")),
+  )
   for (const button of keyModeButtons) button.disabled = !keyToolsAvailable
   for (const button of keyActionButtons) {
     button.disabled = !keyToolsAvailable || (
@@ -7981,6 +8043,7 @@ async function loadArchive(
   archive = nextArchive
   aiDesignConversationTarget = nextArchive
   aiDesignConversation = []
+  setAiDesignDraft(undefined)
   aiChatController?.clear()
   if (pendingSourceDirectory !== undefined) sourceWorkspacePendingArchive = nextArchive
   sourceTransfer = undefined
@@ -8820,15 +8883,19 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
       aiDesignConversation = result.conversation
       return { fallback: result.response || "AI 分析完成，没有需要应用的修改。" }
     }
-    commitBatch(changes)
-    if (target.format === "bda") refreshBdaLayout(layoutPath)
-    renderFiles()
-    if (selectedPath && target.getBytes(selectedPath)) selectFile(selectedPath, sidebarView, "document", true)
-    refreshPreview()
-    populateKeyInspector()
-    updateDirty()
     aiDesignConversation = result.conversation
-    return { fallback: result.response, summary: `已应用 ${changes.length} 个配置文件的修改，可使用撤销恢复。` }
+    setAiDesignDraft({
+      target,
+      changes,
+      drafts: result.changes,
+      sections: aiDraftSections(result.changes),
+      conversation: result.conversation,
+      response: result.response,
+    })
+    return {
+      fallback: result.response,
+      summary: `已生成包含 ${changes.length} 个文件的修改草稿，画布已标出受影响的按键。确认后才会写入皮肤。`,
+    }
   } catch (error) {
     if (hooks.signal.aborted) throw error
     throw new Error(aiDesignErrorMessage(error))
@@ -8839,6 +8906,109 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
   }
 }
 
+/**
+ * Derives the canvas sections an AI draft would touch, by comparing the INI
+ * sections (or JSON keys) present before and after each proposed file change.
+ */
+function aiDraftSections(changes: readonly AiSkinDraftChange[]): string[] {
+  const sections = new Set<string>()
+  for (const change of changes) {
+    if (change.syntax === "json") {
+      const before = new Set(jsonPropertyAtOffsetKeys(change.before))
+      const after = new Set(jsonPropertyAtOffsetKeys(change.after))
+      for (const key of new Set([...before, ...after])) {
+        if (key !== "cand") sections.add(key)
+      }
+      continue
+    }
+    const before = new Map(iniSectionTexts(change.before))
+    const after = new Map(iniSectionTexts(change.after))
+    for (const [name, text] of after) {
+      if (before.get(name) !== text) sections.add(name)
+    }
+    for (const name of before.keys()) if (!after.has(name)) sections.add(name)
+  }
+  return [...sections]
+}
+
+function iniSectionTexts(source: string): Array<[string, string]> {
+  const headers = [...source.matchAll(/^\s*\[([^\]]+)]\s*$/gm)]
+  return headers.map((header, index) => [
+    header[1],
+    source.slice(header.index ?? 0, headers[index + 1]?.index ?? source.length),
+  ])
+}
+
+function jsonPropertyAtOffsetKeys(source: string): string[] {
+  return [...source.matchAll(/^\s*"((?:\\.|[^"\\])*)"\s*:/gm)].map((match) => JSON.parse(match[1]) as string)
+}
+
+/** One changed hunk per file, reduced to the first differing lines for display. */
+function aiDraftDiffHtml(change: AiSkinDraftChange): string {
+  const before = change.before.split(/\r?\n/)
+  const after = change.after.split(/\r?\n/)
+  const limit = Math.min(before.length, after.length)
+  let head = 0
+  while (head < limit && before[head] === after[head]) head += 1
+  let tail = 0
+  while (tail < limit - head && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail += 1
+  const removed = before.slice(head, before.length - tail).slice(0, 4)
+  const added = after.slice(head, after.length - tail).slice(0, 4)
+  const escape = (line: string) => line.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!)
+  const parts = [
+    ...removed.map((line) => `<del>- ${escape(line)}</del>`),
+    ...added.map((line) => `<ins>+ ${escape(line)}</ins>`),
+  ]
+  return parts.length ? parts.join("\n") : "（内容有变化）"
+}
+
+function setAiDesignDraft(draft: AiDraft | undefined): void {
+  aiDesignDraft = draft
+  aiDraftPanel.hidden = !draft
+  preview.setDraftSections(draft?.sections ?? [])
+  if (!draft) {
+    aiDraftFiles.replaceChildren()
+    return
+  }
+  aiDraftSummary.textContent = `涉及 ${draft.changes.length} 个文件` +
+    (draft.sections.length ? ` · ${draft.sections.length} 个配置块` : "")
+  aiDraftFiles.replaceChildren(...draft.drafts.map((change) => {
+    const item = document.createElement("li")
+    const head = document.createElement("div")
+    head.className = "ai-draft-file-head"
+    const name = document.createElement("span")
+    name.textContent = change.path.split("/").pop() ?? change.path
+    const meta = document.createElement("em")
+    meta.textContent = change.syntax.toUpperCase()
+    head.append(name, meta)
+    const diff = document.createElement("pre")
+    diff.className = "ai-draft-diff"
+    diff.innerHTML = aiDraftDiffHtml(change)
+    item.append(head, diff)
+    return item
+  }))
+}
+
+function applyAiDesignDraft(): void {
+  const draft = aiDesignDraft
+  if (!draft) return
+  if (archive !== draft.target) {
+    setAiDesignDraft(undefined)
+    aiDesignStatus.textContent = "皮肤项目已切换，草稿已丢弃。"
+    return
+  }
+  setAiDesignDraft(undefined)
+  commitBatch(draft.changes)
+  const target = draft.target
+  if (target.format === "bda") refreshBdaLayout(layoutPath)
+  renderFiles()
+  if (selectedPath && target.getBytes(selectedPath)) selectFile(selectedPath, sidebarView, "document", true)
+  refreshPreview()
+  populateKeyInspector()
+  updateDirty()
+  aiDesignStatus.textContent = `已应用 ${draft.changes.length} 个配置文件的修改，可使用撤销恢复。`
+}
+
 function ensureAiChat(): Promise<AiChatController> {
   aiChatInitialization ??= import("./ai-chat.ts")
     .then(({ connectAiChat }) => connectAiChat(aiDesignChat, runAiDesignRequest))
@@ -8847,6 +9017,13 @@ function ensureAiChat(): Promise<AiChatController> {
     return controller
   })
 }
+
+aiDraftApply.addEventListener("click", () => applyAiDesignDraft())
+aiDraftCancel.addEventListener("click", () => {
+  if (!aiDesignDraft) return
+  setAiDesignDraft(undefined)
+  aiDesignStatus.textContent = "草稿已取消，皮肤未做任何修改。"
+})
 
 function setSourceDirectoryState(path: string, custom: boolean, error = ""): void {
   sourceDirectory.value = path
@@ -9615,6 +9792,53 @@ source.addEventListener("input", () => {
 })
 source.addEventListener("change", commitBdaSourceEdit)
 sourceColorPicker.addEventListener("change", applySourceColorPicker)
+/**
+ * Reverse direction of the canvas ↔ source link: putting the caret inside a
+ * configuration block selects the key that block describes. The canvas is
+ * updated without echoing back into the editor, so the two stay in step
+ * without fighting over the caret.
+ */
+function selectKeyFromSourceOffset(offset: number): void {
+  if (!isEditing() || !archive || !selectedPath) return
+  if (selectedPath !== layoutPath) return
+  const bdaSource = archive.format === "bda" && (
+    archive.isBdaConfig(selectedPath) || isBdaVirtualTextPath(selectedPath) || isBdaAppearancePartPath(selectedPath)
+  )
+  const property = bdaSource ? jsonPropertyAtOffset(source.value, offset) : undefined
+  const section = bdaSource ? undefined : iniSectionAtOffset(source.value, offset)
+  const panelKey = property && property !== "cand" ? property : undefined
+  if (!section && !panelKey) return
+  if (!layoutDocument) return
+  const items = previewItems(layoutDocument)
+  const match = items.find((item) => item.editable && (
+    section !== undefined
+      ? item.section === section || item.sections.includes(section)
+      : item.center.trim().toLowerCase() === panelKey
+  ))
+  if (!match) return
+  if (selectedKeySections.length === 1 && selectedKeySections[0] === match.section) return
+  selectedCandidate = false
+  syncCandidateSelection()
+  selectedKeySections = [match.section]
+  preview.setSelected(selectedKeySections)
+  populateKeyInspector()
+}
+
+/**
+ * Reverse direction of the canvas ↔ source link: putting the caret inside a
+ * configuration block selects the key that block describes. The canvas is
+ * updated without echoing back into the editor, so the two stay in step
+ * without fighting over the caret.
+ *
+ * The lazy editor is a plain EventTarget rather than a DOM node, so this is
+ * bound to the instance (the editor also re-raises with `bubbles`, which the
+ * document-level listener below picks up if that ever changes).
+ */
+source.addEventListener("cursormove", (event) => {
+  const detail = (event as CustomEvent<SourceEditorCursorMove>).detail
+  if (!detail) return
+  selectKeyFromSourceOffset(detail.offset)
+})
 source.addEventListener("valueclick", (event) => {
   const detail = (event as CustomEvent<SourceEditorValueClick>).detail
   if (!detail || detail.kind === "action") return

@@ -376,61 +376,6 @@ summary:focus-visible {
   backdrop-filter: saturate(170%) blur(28px);
 }
 
-/* 品牌标记：标题栏最左侧的蓝色标识 */
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-  padding: 3px 8px 3px 3px;
-  border-radius: var(--radius-sm);
-}
-
-.brand-logo {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  flex: none;
-  border-radius: 7px;
-  background: var(--accent);
-  color: #fff;
-}
-
-.brand-logo svg {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.brand-text {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.brand-text strong {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.brand-text small {
-  font-size: 11px;
-  color: var(--tertiary);
-}
-
-@media (max-width: 980px) {
-  .brand-text {
-    display: none;
-  }
-}
-
 :root.macos .titlebar {
   padding-top: calc(40px + var(--safe-area-top));
 }
@@ -13133,29 +13078,9 @@ dialog[open]::backdrop {
 }
 
 /* ── 左侧导航 ── */
-#files button,
-#files .source-tree-row {
-  height: 30px;
-  padding: 0 8px;
-  border-radius: var(--radius-xs);
-  font-size: 12px;
-  color: var(--secondary);
-}
-
-#files button:hover,
-#files .source-tree-row:hover {
-  background: var(--hover);
-  color: var(--text);
-}
-
-#files button.selected,
-#files button.active,
-#files button[aria-current="true"],
-#files .source-tree-row.selected {
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 500;
-}
+/* 左侧栏列表（概览 / 源文件）的行、图标、分组标题与状态样式统一由
+   pen-design-application.css 的 "Sidebar lists" 段落定义，这里不再重复声明，
+   否则两个视图会被两套特异性不同的规则分别命中。 */
 
 #files section > h3,
 #files .nav-group-title,

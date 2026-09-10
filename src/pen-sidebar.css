@@ -1,0 +1,1237 @@
+/*
+ * Pen design application layer — right sidebar (属性检查器).
+ *
+ * The Pen document is the visual source of truth. This file mirrors the
+ * "组件 / 属性检查器" component and loads after every other stylesheet, so it is
+ * also where the older inspector styling in style.css is retired:
+ *
+ *   Inspector Tabs      42px flat row, 12px tabs, 2px brand underline
+ *   Selection Header    62px, 34px key swatch, 13px/600 title, 11px mono path
+ *   Section             12px/14px padding, 10px gap, hairline bottom
+ *   Section Head        12px/600 label + 10.5px mono hint
+ *   Field               10.5px faint label over a 30px sunken box (12px mono)
+ *   Prop Row            28px, 12.5px muted label, right-aligned value
+ *   Action              28px sunken button, 13px glyphs
+ *   Group switcher      Pen "分段控件": 8px sunken track, 30px options
+ *
+ * style.css specifies the inspector down to the pixel in several successive
+ * generations, the last of them with `!important`. This layer therefore carries
+ * `.source`/`#quick-inspector` prefixes plus `!important` of its own: it is the
+ * final word on the right sidebar, and nothing here needs to be undone by a
+ * later layer.
+ */
+
+/* $on-brand now lives with the rest of the Pen tokens in
+   pen-design-application.css; this alias keeps the older name in sync. */
+:root {
+  --pen-on-accent: var(--pen-on-brand);
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Panel shell
+ * ------------------------------------------------------------------------------------------------- */
+
+.source {
+  grid-template-rows: auto minmax(0, 1fr);
+  border-left: 1px solid var(--pen-line);
+  background: var(--pen-surface);
+  box-shadow: none;
+}
+
+.source > .pane-heading.source-heading {
+  height: auto;
+  min-height: 42px;
+  padding: 0;
+  border-bottom: 0;
+  background: var(--pen-surface);
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Inspector Tabs + Selection Header
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (min-width: 761px) {
+  /* The Pen header is two stacked rows: the tab strip, then the selection.
+     The app keeps both in one heading element, so the heading becomes a grid
+     and the view-controls wrapper dissolves into it. */
+  .source .pane-heading.source-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 42px auto;
+    align-items: center;
+    gap: 0;
+    height: auto;
+    min-height: 0;
+  }
+
+  .source .source-heading > .inspector-view-controls {
+    display: contents;
+  }
+
+  /* style.css turns the heading back into a flex row while the AI pane is open;
+     it keeps the same two stacked rows here. */
+  .source:has(#ai-design-panel:not([hidden])) .source-heading.pane-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 42px auto;
+    align-items: center;
+    gap: 0;
+    height: auto;
+    min-height: 0;
+  }
+
+  .source .source-heading .inspector-tabs {
+    grid-area: 1 / 1 / 2 / -1;
+    align-self: stretch;
+    height: 42px;
+    gap: 0;
+    margin: 0;
+    padding: 0 8px;
+    border: 0;
+    border-bottom: 1px solid var(--pen-line);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .source .source-heading .inspector-tabs button {
+    min-width: 0;
+    min-height: 0;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    color: var(--pen-tertiary);
+    background: transparent;
+    box-shadow: none;
+    font-size: 12px;
+    font-weight: 400;
+  }
+
+  .source .source-heading .inspector-tabs button:hover {
+    color: var(--pen-secondary);
+  }
+
+  .source .source-heading .inspector-tabs button.active {
+    color: var(--pen-text);
+    border-bottom-color: var(--pen-accent);
+    background: transparent;
+    box-shadow: none;
+    animation: none;
+    font-weight: 600;
+  }
+
+  /* Selection Header */
+  .source .source-heading .inspector-view-controls > .key-inspector-title {
+    grid-area: 2 / 1 / 3 / 2;
+    min-width: 0;
+    min-height: 62px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 0 14px;
+    border: 0;
+    border-bottom: 1px solid var(--pen-line);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  /* Key Swatch */
+  .source .source-heading .key-inspector-preview {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border: 1.5px solid var(--pen-selection);
+    border-radius: var(--pen-radius-sm);
+    background: var(--pen-selection-soft);
+    color: var(--pen-text);
+    font-family: "Inter", var(--font-ui);
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .source .source-heading .key-inspector-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .source .source-heading .key-inspector-copy strong,
+  .source .source-heading .key-inspector-copy span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .source .source-heading .key-inspector-copy strong {
+    color: var(--pen-text);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .source .source-heading .key-inspector-copy span {
+    color: var(--pen-tertiary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.35;
+  }
+
+  /* Selection Action */
+  .source .source-heading .inspector-view-controls > #inspector-back:not([hidden]) {
+    grid-area: 2 / 2 / 3 / 3;
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    display: grid;
+    place-items: center;
+    margin: 0 14px 0 0;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--pen-tertiary);
+    box-shadow: none;
+  }
+
+  .source .source-heading .inspector-view-controls > #inspector-back:hover:not(:disabled) {
+    background: var(--pen-surface-subtle);
+    color: var(--pen-text);
+  }
+
+  .source .source-heading #inspector-back .system-symbol,
+  .source .source-heading #inspector-back .system-symbol svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  /* Non-key contexts reuse the same summary row, without the swatch. Their
+     visibility stays with style.css, so no `display` is forced here. */
+  .source .source-heading > .inspector-context,
+  .source .source-heading > .ai-design-heading {
+    grid-area: 2 / 1 / 3 / -1;
+    min-width: 0;
+    min-height: 62px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--pen-line);
+  }
+
+  /* A hidden context stays hidden: both rules below outrank the `display: none`
+     that style.css applies through :has(). */
+  .source .source-heading > .inspector-context {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+  }
+
+  .source:has(#ai-design-panel:not([hidden])) .source-heading > .ai-design-heading {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+  }
+
+  .source .source-heading > .inspector-context h2 {
+    margin: 0;
+    color: var(--pen-text);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .source .source-heading > .inspector-context #source-name {
+    max-width: none;
+    margin: 0;
+    color: var(--pen-tertiary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.35;
+    opacity: 1;
+  }
+
+  .source .source-heading > .ai-design-heading strong {
+    color: var(--pen-text);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .source .source-heading > .ai-design-heading span {
+    color: var(--pen-tertiary);
+    font-size: 11px;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Inspector body
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (min-width: 761px) {
+  .source #quick-inspector:not([hidden]) {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    position: static;
+    overflow: hidden auto !important;
+  }
+
+  /* Group switcher — Pen "组件 / 分段控件": 8px sunken track, 30px options. */
+  .source #quick-inspector > #mobile-inspector-groups {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    flex: none !important;
+    float: none !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 2px !important;
+    min-height: 0 !important;
+    margin: 10px 14px !important;
+    padding: 3px !important;
+    border: 0 !important;
+    border-radius: var(--pen-radius-sm) !important;
+    background: var(--pen-surface-subtle) !important;
+    box-shadow: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .source #quick-inspector > #mobile-inspector-groups button {
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    height: 30px !important;
+    flex: 1 1 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    padding: 0 10px !important;
+    border: 1px solid transparent !important;
+    border-radius: var(--pen-radius-xs) !important;
+    color: var(--pen-secondary) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    line-height: 1 !important;
+    transform: none !important;
+  }
+
+  .source #quick-inspector > #mobile-inspector-groups button .system-symbol,
+  .source #quick-inspector > #mobile-inspector-groups button .system-symbol svg {
+    display: none !important;
+  }
+
+  .source #quick-inspector > #mobile-inspector-groups button:hover:not(.active) {
+    color: var(--pen-text) !important;
+    background: transparent !important;
+  }
+
+  .source #quick-inspector > #mobile-inspector-groups button.active {
+    color: var(--pen-text) !important;
+    border-color: var(--pen-line) !important;
+    background: var(--pen-surface) !important;
+    box-shadow: none !important;
+    font-weight: 500 !important;
+    transform: none !important;
+  }
+
+  /* Grouped sections flow inside the scroller instead of owning a nested one. */
+  .source #quick-inspector > .mobile-inspector-managed {
+    flex: none !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Sections
+ * ------------------------------------------------------------------------------------------------- */
+
+/* Only the group the switcher points at is on screen — the app hides the rest,
+   and this rule must not resurrect them. */
+.source #quick-inspector .mobile-inspector-managed.mobile-inspector-active:not([hidden]),
+.source #quick-inspector .inspector-group:not(.mobile-inspector-managed),
+.source #quick-inspector > .keyboard-fields,
+.source #quick-inspector > .document-fields,
+.source #quick-inspector > .bda-config-fields,
+.source #quick-inspector > .skin-fields,
+.source #quick-inspector > .toolbar-fields {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 12px 14px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--pen-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.source #quick-inspector > :is(.keyboard-fields, .document-fields, .bda-config-fields, .skin-fields, .toolbar-fields)[hidden] {
+  display: none !important;
+}
+
+.source #quick-inspector .inspector-group + .inspector-group {
+  margin: 0 !important;
+  padding-top: 12px !important;
+  border-top: 0 !important;
+}
+
+/* Nested appearance blocks are rows inside a section, not cards of their own:
+   they read as a Pen section head followed by its rows. */
+.source #quick-inspector .key-appearance-fields .appearance-section {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.source #quick-inspector .appearance-section + .appearance-section {
+  margin: 10px 0 0 !important;
+  padding: 10px 0 0 !important;
+  border-top: 1px solid var(--pen-line) !important;
+}
+
+/* Section Head — 12px/600 label with a 10.5px mono hint on the far side.
+   While the group switcher is on screen it already names the group, so the
+   group's own heading would only repeat it. */
+.source #quick-inspector:has(> #mobile-inspector-groups:not([hidden])) .mobile-inspector-managed > h3 {
+  display: none !important;
+}
+
+.source #quick-inspector .mobile-inspector-managed > h3,
+.source #quick-inspector .inspector-group h3,
+.source #quick-inspector .inspector-card-heading,
+.source #quick-inspector .appearance-section-heading,
+.source #quick-inspector .bda-selected-style-heading,
+.source #quick-inspector .inspector-advanced > h4,
+.source #quick-inspector .tile-heading h3 {
+  min-height: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--pen-text) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  line-height: 1.4 !important;
+}
+
+.source #quick-inspector .inspector-card-heading strong,
+.source #quick-inspector .appearance-section-heading strong {
+  color: var(--pen-text) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+.source #quick-inspector .inspector-card-heading > span,
+.source #quick-inspector .appearance-section-heading > span,
+.source #quick-inspector .inspector-advanced > h4 > span,
+.source #quick-inspector .bda-selected-style-heading p {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--pen-tertiary) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 10.5px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+}
+
+.source #quick-inspector .inspector-group-subtitle,
+.source #quick-inspector .mobile-inspector-managed > h3 + .inspector-group-subtitle {
+  margin: 0 !important;
+  color: var(--pen-tertiary) !important;
+  font-size: 10.5px !important;
+  font-weight: 400 !important;
+  line-height: 1.55 !important;
+  opacity: 1 !important;
+}
+
+.source #quick-inspector .inspector-note {
+  margin: 0 !important;
+  color: var(--pen-tertiary) !important;
+  font-size: 10.5px !important;
+  font-weight: 400 !important;
+  line-height: 1.55 !important;
+  text-align: left !important;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Fields — Pen "Field": a faint 10.5px label above a 30px sunken box
+ * ------------------------------------------------------------------------------------------------- */
+
+.source #quick-inspector .inspector-grid,
+.source #quick-inspector .document-property-grid,
+.source #quick-inspector .appearance-property-grid,
+.source #quick-inspector .appearance-reference-grid,
+.source #quick-inspector .bda-style-controls,
+.source #quick-inspector .bda-frame-controls {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.source #quick-inspector .typography-content-fields,
+.source #quick-inspector .primary-actions,
+.source #quick-inspector .appearance-fields,
+.source #quick-inspector .skin-fields .action-fields,
+.source #quick-inspector .toolbar-fields .action-fields,
+.source #quick-inspector .appearance-reference-grid {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.source #quick-inspector .inspector-grid > label,
+.source #quick-inspector .inspector-grid > .style-ref-row,
+.source #quick-inspector .document-property-field,
+.source #quick-inspector .bda-text-field,
+.source #quick-inspector .bda-range-field,
+.source #quick-inspector .bda-color-field,
+.source #quick-inspector .color-pair-field > label,
+.source #quick-inspector .direction-editor label {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  gap: 5px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--pen-tertiary) !important;
+  font-size: 10.5px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+}
+
+/* Field Box */
+.source #quick-inspector .inspector-group :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]):not([type="file"]),
+    select,
+    textarea
+  ),
+.source #quick-inspector .mobile-inspector-managed :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]):not([type="file"]),
+    select,
+    textarea
+  ),
+.source #quick-inspector .document-fields :is(input:not([type="checkbox"]):not([type="color"]), select, textarea),
+.source #quick-inspector .bda-config-fields :is(input:not([type="checkbox"]):not([type="color"]), select, textarea),
+.source #quick-inspector .skin-fields :is(input:not([type="checkbox"]), select, textarea),
+.source #quick-inspector .toolbar-fields :is(input:not([type="checkbox"]), select, textarea),
+.source #quick-inspector .keyboard-fields :is(input:not([type="checkbox"]), select, textarea) {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  margin: 0 !important;
+  padding: 0 9px !important;
+  border: 1px solid var(--pen-line) !important;
+  border-radius: var(--pen-radius-sm) !important;
+  background: var(--pen-surface-subtle) !important;
+  color: var(--pen-text) !important;
+  box-shadow: none !important;
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+  text-align: left !important;
+  transition: border-color 140ms ease, box-shadow 140ms ease !important;
+}
+
+.source #quick-inspector textarea {
+  height: auto !important;
+  min-height: 60px !important;
+  padding: 7px 9px !important;
+  line-height: 1.5 !important;
+}
+
+.source #quick-inspector .inspector-group :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]):not([type="file"]),
+    select,
+    textarea
+  ):focus,
+.source #quick-inspector .mobile-inspector-managed :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]):not([type="file"]),
+    select,
+    textarea
+  ):focus {
+  border-color: var(--pen-accent) !important;
+  outline: 0 !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pen-accent) 18%, transparent) !important;
+}
+
+.source #quick-inspector .inspector-group :is(
+    input:not([type="checkbox"]):not([type="color"]):not([type="range"]),
+    select,
+    textarea
+  ):disabled {
+  color: var(--pen-tertiary) !important;
+  background: transparent !important;
+}
+
+/* Secondary text inside a field */
+.source #quick-inspector .inspector-grid small,
+.source #quick-inspector .inspector-group small {
+  color: var(--pen-tertiary) !important;
+  font-size: 10.5px !important;
+  font-weight: 400 !important;
+  line-height: 1.5 !important;
+}
+
+.source #quick-inspector .style-field,
+.source #quick-inspector .color-control {
+  display: block !important;
+  min-width: 0 !important;
+}
+
+.source #quick-inspector .style-field > input {
+  width: 100% !important;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Property rows — Pen "Prop Row": 28px, muted 12.5px label, value on the right
+ * ------------------------------------------------------------------------------------------------- */
+
+.source #quick-inspector .style-ref-row {
+  min-height: 28px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  color: var(--pen-secondary) !important;
+  font-size: 12.5px !important;
+  font-weight: 400 !important;
+}
+
+.source #quick-inspector .color-pair-field {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px 12px !important;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Actions — Pen "Selection Action" / "More Row" chrome
+ * ------------------------------------------------------------------------------------------------- */
+
+.source #quick-inspector .mobile-inspector-managed :is(button, summary),
+.source #quick-inspector .inspector-group :is(button, summary) {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 28px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 0 10px !important;
+  border: 1px solid var(--pen-line) !important;
+  border-radius: var(--pen-radius-sm) !important;
+  background: var(--pen-surface-subtle) !important;
+  color: var(--pen-secondary) !important;
+  box-shadow: none !important;
+  font-size: 11.5px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  transform: none !important;
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease !important;
+}
+
+.source #quick-inspector .mobile-inspector-managed :is(button, summary):hover:not(:disabled),
+.source #quick-inspector .inspector-group :is(button, summary):hover:not(:disabled) {
+  color: var(--pen-text) !important;
+  border-color: var(--pen-line-strong) !important;
+  background: var(--pen-surface-subtle) !important;
+  transform: none !important;
+}
+
+.source #quick-inspector .mobile-inspector-managed :is(button, summary):disabled,
+.source #quick-inspector .inspector-group :is(button, summary):disabled {
+  color: var(--pen-tertiary) !important;
+  background: transparent !important;
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+.source #quick-inspector .mobile-inspector-managed button .system-symbol,
+.source #quick-inspector .mobile-inspector-managed button .system-symbol svg,
+.source #quick-inspector .inspector-group button .system-symbol,
+.source #quick-inspector .inspector-group button .system-symbol svg {
+  width: 13px !important;
+  height: 13px !important;
+  flex: none !important;
+  color: inherit !important;
+}
+
+/* Icon-only tool clusters sit on a sunken track (Pen "画布工具条"). */
+.source #quick-inspector .tile-toolbar,
+.source #quick-inspector .key-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  margin: 0 !important;
+  padding: 2px !important;
+  border: 0 !important;
+  border-radius: var(--pen-radius-sm) !important;
+  background: var(--pen-surface-subtle) !important;
+  box-shadow: none !important;
+}
+
+.source #quick-inspector .tile-toolbar .toolbar-button,
+.source #quick-inspector .key-toolbar .toolbar-button {
+  width: 26px !important;
+  min-width: 26px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--pen-radius-xs) !important;
+  background: transparent !important;
+  color: var(--pen-tertiary) !important;
+}
+
+.source #quick-inspector .tile-toolbar .toolbar-button:hover:not(:disabled),
+.source #quick-inspector .key-toolbar .toolbar-button:hover:not(:disabled) {
+  color: var(--pen-text) !important;
+  background: transparent !important;
+}
+
+.source #quick-inspector .tile-toolbar .toolbar-button.active,
+.source #quick-inspector .key-toolbar .toolbar-button.active {
+  color: var(--pen-text) !important;
+  border-color: var(--pen-line) !important;
+  background: var(--pen-surface) !important;
+}
+
+.source #quick-inspector .tile-toolbar .tile-mode-control,
+.source #quick-inspector .key-toolbar .key-mode-control {
+  display: flex !important;
+  gap: 2px !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+.source #quick-inspector .key-toolbar [data-key-action="delete"] {
+  margin-left: auto !important;
+}
+
+/* Alignment / distribution grid */
+.source #quick-inspector .inspector-advanced {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+.source #quick-inspector .key-layout-fields .inspector-advanced {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  margin: 0 !important;
+  padding: 10px 0 0 !important;
+  border-top: 1px solid var(--pen-line) !important;
+}
+
+.source #quick-inspector .key-layout-fields .layout-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px 12px !important;
+  margin: 0 !important;
+}
+
+.source #quick-inspector .key-layout-fields .layout-action-group {
+  display: grid !important;
+  align-content: start !important;
+  gap: 6px !important;
+  padding: 0 !important;
+}
+
+.source #quick-inspector .key-layout-fields .layout-action-label {
+  margin: 0 !important;
+  color: var(--pen-tertiary) !important;
+  font-size: 10.5px !important;
+  font-weight: 400 !important;
+}
+
+.source #quick-inspector .key-layout-fields .layout-action-buttons {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 4px !important;
+}
+
+.source #quick-inspector .key-layout-fields .layout-action-buttons button {
+  width: 100% !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  gap: 5px !important;
+  padding: 0 8px !important;
+  color: var(--pen-secondary) !important;
+  background: var(--pen-surface-subtle) !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+}
+
+/* State switch (正常 / 按下) — Pen segmented control */
+.source #quick-inspector .inspector-state-switch {
+  display: flex !important;
+  gap: 2px !important;
+  padding: 3px !important;
+  border: 0 !important;
+  border-radius: var(--pen-radius-sm) !important;
+  background: var(--pen-surface-subtle) !important;
+}
+
+.source #quick-inspector .inspector-state-switch button {
+  height: 26px !important;
+  min-height: 26px !important;
+  padding: 0 12px !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--pen-radius-xs) !important;
+  background: transparent !important;
+  color: var(--pen-secondary) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+}
+
+.source #quick-inspector .inspector-state-switch button.active {
+  color: var(--pen-text) !important;
+  border-color: var(--pen-line) !important;
+  background: var(--pen-surface) !important;
+  font-weight: 500 !important;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Gesture rows — Pen "Field" applied to the five directions
+ * ------------------------------------------------------------------------------------------------- */
+
+.source #quick-inspector .direction-editor {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.source #quick-inspector .direction-editor label > span {
+  color: var(--pen-tertiary) !important;
+  font-size: 10.5px !important;
+  font-weight: 400 !important;
+}
+
+.source #quick-inspector .direction-editor label small {
+  grid-column: auto !important;
+  min-height: 0 !important;
+  color: var(--pen-tertiary) !important;
+  font-size: 10.5px !important;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Resource inspector (皮肤图片 / 切片) — the same section rhythm
+ * ------------------------------------------------------------------------------------------------- */
+
+.source #resource-inspector .inspector-title,
+.source #resource-inspector .resource-detail-heading {
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--pen-line);
+}
+
+.source #resource-inspector .inspector-title strong,
+.source #resource-inspector .resource-detail-heading strong {
+  color: var(--pen-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.source #resource-inspector .inspector-title #resource-count,
+.source #resource-inspector .resource-detail-heading small {
+  color: var(--pen-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.source #resource-inspector .inspector-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--pen-line);
+}
+
+.source #resource-inspector .tile-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+}
+
+.source #resource-inspector .tile-toolbar .toolbar-button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--pen-radius-xs);
+  background: transparent;
+  color: var(--pen-tertiary);
+}
+
+.source #resource-inspector .tile-toolbar .toolbar-button.active {
+  color: var(--pen-text);
+  border-color: var(--pen-line);
+  background: var(--pen-surface);
+}
+
+.source #resource-inspector .geometry-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.source #resource-inspector .geometry-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0;
+  color: var(--pen-tertiary);
+  font-size: 10.5px;
+  font-weight: 400;
+}
+
+.source #resource-inspector .geometry-fields input,
+.source #resource-inspector :is(input:not([type="checkbox"]), select, textarea) {
+  width: 100%;
+  height: 30px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Source pane — Pen "窗格 · 源代码"
+ *
+ * 21px code lines on the surface colour, 10px mono line numbers, 11.5px mono
+ * tokens, and the cursor line marked by a sunken band plus a 2px brand gutter
+ * mark. The find affordance takes the Pen "查找按钮" chrome.
+ * ------------------------------------------------------------------------------------------------- */
+
+.source #source-editor,
+.source #source .cm-editor,
+.source #source .cm-gutters {
+  background: var(--pen-surface);
+}
+
+.source #source .cm-gutters {
+  border-right: 1px solid var(--pen-line);
+  color: var(--pen-tertiary);
+}
+
+.source #source .cm-content {
+  padding: 12px 0 56px;
+}
+
+.source #source .cm-line {
+  padding: 1px 14px;
+  color: var(--pen-text);
+  font-size: 11.5px;
+  line-height: 21px;
+}
+
+.source #source .cm-lineNumbers .cm-gutterElement {
+  min-width: 44px;
+  padding: 1px 12px 1px 8px;
+  color: var(--pen-tertiary);
+  font-size: 10px;
+  line-height: 21px;
+}
+
+.source #source .cm-activeLine {
+  background: var(--pen-surface-subtle);
+  box-shadow: inset 2px 0 0 var(--pen-accent);
+}
+
+.source #source .cm-activeLineGutter {
+  background: transparent;
+  color: var(--pen-secondary);
+}
+
+.source #source .cm-selectionBackground,
+.source #source .cm-content ::selection {
+  background: color-mix(in srgb, var(--pen-accent) 22%, transparent) !important;
+}
+
+.source #source .cm-cursor {
+  border-left-color: var(--pen-text);
+}
+
+/* Search matches reuse the brand tint so results read as annotations. */
+.source #source .cm-source-search-match {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--pen-accent) 16%, transparent);
+}
+
+.source #source .cm-source-search-active {
+  background: color-mix(in srgb, var(--pen-accent) 34%, transparent);
+}
+
+/* 查找按钮 */
+.source #source-find-toggle.source-find-fab {
+  right: 14px;
+  bottom: calc(14px + var(--source-find-bar-height, 0px));
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-xs);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-tertiary);
+  box-shadow: none;
+}
+
+.source #source-find-toggle.source-find-fab:hover {
+  color: var(--pen-text);
+  border-color: var(--pen-line-strong);
+  background: var(--pen-surface-subtle);
+  box-shadow: none;
+  transform: none;
+}
+
+.source #source-find-toggle.source-find-fab:active {
+  transform: none;
+}
+
+.source #source-find-toggle.source-find-fab:focus-visible {
+  border-radius: var(--pen-radius-xs);
+  outline: 2px solid color-mix(in srgb, var(--pen-accent) 40%, transparent);
+  outline-offset: 2px;
+}
+
+.source #source-find-toggle .system-symbol,
+.source #source-find-toggle .system-symbol svg,
+.source #source-find-toggle .source-find-fab-close {
+  width: 13px;
+  height: 13px;
+}
+
+/* Find / replace bar */
+.source .source-toolbar {
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--pen-line);
+  background: var(--pen-surface);
+  box-shadow: 0 -8px 20px -12px rgb(18 20 25 / 24%);
+}
+
+.source .source-toolbar .search-control {
+  height: 30px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+}
+
+.source .source-toolbar .search-control > input {
+  height: 28px;
+  min-height: 28px;
+  color: var(--pen-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.source .source-toolbar .search-control .system-symbol,
+.source .source-toolbar .search-control .system-symbol svg {
+  width: 13px;
+  height: 13px;
+  color: var(--pen-tertiary);
+}
+
+.source #source-search-count {
+  color: var(--pen-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+.source .source-search-actions {
+  gap: 2px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+}
+
+.source .source-search-actions button,
+.source .source-toolbar button {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--pen-radius-xs);
+  background: transparent;
+  color: var(--pen-secondary);
+  font-size: 11.5px;
+}
+
+.source .source-search-actions button {
+  width: 26px;
+  padding: 0;
+}
+
+.source .source-search-actions button + button {
+  border-left: 0;
+}
+
+.source .source-toolbar button:hover:not(:disabled) {
+  color: var(--pen-text);
+  background: transparent;
+}
+
+.source .source-search-actions button[aria-expanded="true"] {
+  color: var(--pen-text);
+  border-color: var(--pen-line);
+  background: var(--pen-surface);
+}
+
+.source .source-toolbar button:disabled {
+  color: var(--pen-tertiary);
+  opacity: 0.5;
+}
+
+.source .source-toolbar button .system-symbol,
+.source .source-toolbar button .system-symbol svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * AI pane chrome — Pen "窗格 · AI 设计"
+ *
+ * The conversation itself is drawn by deep-chat and configured in ai-chat.ts;
+ * what lives here is the panel around it: the composer toolbar, the resize
+ * handle and the composer hint.
+ * ------------------------------------------------------------------------------------------------- */
+
+.source .ai-design-status:not(:empty) {
+  margin: 10px 14px 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--pen-tertiary);
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+.source .ai-composer-hint {
+  color: var(--pen-tertiary);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.source .ai-design-toolbar {
+  gap: 8px;
+}
+
+.source .ai-design-toolbar select {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-sm);
+  background-color: var(--pen-surface-subtle);
+  color: var(--pen-text);
+  font-size: 11.5px;
+}
+
+.source .ai-design-toolbar select:hover:not(:disabled) {
+  border-color: var(--pen-line-strong);
+}
+
+.source .ai-design-settings {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-secondary);
+  font-size: 11.5px;
+  line-height: 1;
+}
+
+.source .ai-design-settings:hover {
+  color: var(--pen-text);
+  background: var(--pen-surface-subtle);
+}
+
+.source .ai-design-resize span {
+  width: 32px;
+  height: 3px;
+  border-radius: var(--pen-radius-pill);
+  background: var(--pen-line-strong);
+  box-shadow: none;
+  opacity: 1;
+}
+
+.source .ai-design-resize:hover span,
+.source .ai-design-resize.is-resizing span {
+  width: 44px;
+  background: var(--pen-tertiary);
+  opacity: 1;
+}

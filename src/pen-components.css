@@ -1,0 +1,1196 @@
+/*
+ * Pen design system — component lock.
+ *
+ * Every rule in this file pins one *basic control* or *design component* to the
+ * value the Pen document defines for it, so the editor cannot drift away from
+ * the design system again. It deliberately:
+ *
+ *   • loads last (after style.css, pen-design-application.css, pen-sidebar.css);
+ *   • writes each selector with a `:root body` prefix, which outranks every
+ *     older layer without needing `!important` — earlier layers specify the
+ *     same controls down to the pixel and are still in the cascade;
+ *   • restates the component, never the page layout. Screens may rearrange
+ *     components; a component may not change shape.
+ *
+ * Sources in the Pen document:
+ *   设计系统 · Design System   button / segmented control / field / tabs / key cap
+ *   组件 / 标题栏               title bar, document pill, mode switch
+ *   组件 / 画布工具条            canvas toolbar pills, device select, zoom group
+ *   组件 / 缩放控件 · 悬浮        floating zoom control
+ *   多选对齐工具条 (桌面 · 编辑模式)
+ *   弹层 · 设置                 settings sheet, switches, rows
+ *   组件 / 左侧导航              navigation rows, group headings
+ */
+
+/* =================================================================================================
+ * 1 · Icon button  (设计系统: Icon Button 30×30 · r8 · $bg-sunken · icon 15 · $ink-muted)
+ *     Title bar intentionally uses the 组件 / 标题栏 variant: 28×28 · icon 14.
+ * ================================================================================================= */
+
+:root body .toolbar-button,
+:root body .toolbar-more > summary {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-secondary);
+  box-shadow: none;
+  transform: none;
+}
+
+:root body .toolbar-button .icon,
+:root body .toolbar-button .system-symbol,
+:root body .toolbar-more > summary .icon,
+:root body .toolbar-more > summary .system-symbol {
+  color: var(--pen-secondary);
+  font-size: 15px;
+  line-height: 1;
+}
+
+:root body .toolbar-button .icon svg,
+:root body .toolbar-button .system-symbol,
+:root body .toolbar-button .system-symbol svg,
+:root body .toolbar-more > summary .icon svg,
+:root body .toolbar-more > summary .system-symbol,
+:root body .toolbar-more > summary .system-symbol svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+:root body .toolbar-button:hover:not(:disabled),
+:root body .toolbar-more > summary:hover {
+  background: color-mix(in srgb, var(--pen-surface-subtle) 82%, var(--pen-line));
+  color: var(--pen-text);
+}
+
+:root body .toolbar-button:active:not(:disabled),
+:root body .toolbar-more > summary:active {
+  background: color-mix(in srgb, var(--pen-surface-subtle) 72%, var(--pen-line));
+}
+
+:root body .toolbar-button:disabled {
+  opacity: 0.38;
+  color: var(--pen-secondary);
+}
+
+:root body .toolbar-button:disabled .icon,
+:root body .toolbar-button:disabled .system-symbol {
+  color: var(--pen-secondary);
+}
+
+/* The title bar keeps the 28px control the 组件 / 标题栏 component draws. */
+:root body .titlebar .toolbar-button,
+:root body .titlebar .toolbar-more > summary {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+}
+
+:root body .titlebar .toolbar-button .icon svg,
+:root body .titlebar .toolbar-button .system-symbol,
+:root body .titlebar .toolbar-button .system-symbol svg,
+:root body .titlebar .toolbar-more > summary .system-symbol,
+:root body .titlebar .toolbar-more > summary .system-symbol svg {
+  width: 14px;
+  height: 14px;
+}
+
+:root body .titlebar .toolbar-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--pen-line);
+}
+
+/* =================================================================================================
+ * 2 · Segmented control  (设计系统: gap 2 · padding 3 · r8 · $bg-sunken;
+ *     selected segment r5 · $bg-surface · 1px $line · 12/500 $ink)
+ * ================================================================================================= */
+
+:root body .mode-control,
+:root body .sidebar-view-control {
+  gap: 2px;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* The canvas toolbar groups (方向 / 外观) are the 画布工具条 icon variant: 26px discs. */
+:root body .preview-choice {
+  gap: 2px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body .mode-control button,
+:root body .sidebar-view-control button {
+  height: 28px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: var(--pen-radius-xs);
+  background: transparent;
+  color: var(--pen-secondary);
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+:root body .preview-choice button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pen-radius-xs);
+  background: transparent;
+  color: var(--pen-tertiary);
+  box-shadow: none;
+}
+
+:root body .preview-choice button .system-symbol,
+:root body .preview-choice button .system-symbol svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+:root body .mode-control button.active,
+:root body .sidebar-view-control button.active {
+  color: var(--pen-text);
+  background: var(--pen-surface);
+  box-shadow: inset 0 0 0 1px var(--pen-line);
+  font-weight: 500;
+  animation: none;
+}
+
+:root body .preview-choice button.active {
+  color: var(--pen-accent);
+  background: var(--pen-raised);
+  box-shadow: inset 0 0 0 1px var(--pen-line);
+}
+
+:root body .preview-choice button:hover:not(.active):not(:disabled) {
+  color: var(--pen-text);
+}
+
+:root body .mode-control button:hover:not(.active) {
+  color: var(--pen-text);
+}
+
+/* =================================================================================================
+ * 3 · Tabs  (组件 / 属性检查器: 42px row · gap 18 · padding 0 12 · 1px $line bottom;
+ *     active 12.5/600 $ink + 2px $brand, idle 12.5/400 $ink-faint)
+ * ================================================================================================= */
+
+:root body .inspector-tabs {
+  gap: 18px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 1px solid var(--pen-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body .source .inspector-tabs,
+:root body .source .source-heading .inspector-tabs {
+  gap: 18px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 1px solid var(--pen-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body .inspector-tabs button,
+:root body .source .inspector-tabs button {
+  min-width: 0;
+  height: 42px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--pen-tertiary);
+  box-shadow: none;
+  font-size: 12.5px;
+  font-weight: 400;
+  transition: color 200ms cubic-bezier(0.2, 0, 0, 1), border-color 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+:root body .inspector-tabs button:hover:not(.active):not(:disabled) {
+  color: var(--pen-secondary);
+  background: transparent;
+}
+
+:root body .inspector-tabs button.active,
+:root body .source .inspector-tabs button.active {
+  color: var(--pen-text);
+  border-bottom-color: var(--pen-accent);
+  background: transparent;
+  box-shadow: none;
+  font-weight: 600;
+  animation: none;
+}
+
+/* =================================================================================================
+ * 4 · Field / input  (设计系统: label 11/400 $ink-faint · gap 5;
+ *     box 30px · padding 0 9 · r8 · $bg-sunken · 1px $line · value 12 $ink)
+ * ================================================================================================= */
+
+:root body #quick-inspector .inspector-grid label,
+:root body #quick-inspector .inspector-grid > label > span:first-child,
+:root body #quick-inspector .inspector-field-label,
+:root body #quick-inspector .field-label {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+:root body #quick-inspector input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+:root body #quick-inspector select,
+:root body #quick-inspector textarea,
+:root body .source .source-toolbar input:not([type="checkbox"]):not([type="radio"]),
+:root body .source .source-toolbar select,
+:root body .app-dialog select,
+:root body .app-dialog input[type="number"],
+:root body .settings-path-control input {
+  min-height: 30px;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-text);
+  font-size: 12px;
+  font-weight: 400;
+  box-shadow: none;
+}
+
+:root body #quick-inspector textarea {
+  height: auto;
+  min-height: 30px;
+  padding: 6px 9px;
+  line-height: 1.5;
+}
+
+:root body #quick-inspector input:focus,
+:root body #quick-inspector select:focus,
+:root body #quick-inspector textarea:focus,
+:root body .app-dialog select:focus,
+:root body .app-dialog input[type="number"]:focus {
+  border-color: var(--pen-accent);
+  outline: 0;
+  box-shadow: none;
+}
+
+:root body #quick-inspector input::placeholder,
+:root body #quick-inspector textarea::placeholder {
+  color: var(--pen-tertiary);
+}
+
+/* Search box: one sunken capsule, the inner input is bare. */
+:root body .search-control {
+  height: 30px;
+  padding: 0 10px;
+  gap: 8px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-secondary);
+  box-shadow: none;
+}
+
+:root body .search-control .system-symbol,
+:root body .search-control .system-symbol svg {
+  width: 13px;
+  height: 13px;
+  color: var(--pen-tertiary);
+}
+
+:root body .search-control input {
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--pen-text);
+  font-size: 12px;
+  box-shadow: none;
+}
+
+:root body .search-control input:focus {
+  outline: 0;
+  box-shadow: none;
+}
+
+/* Stepper (设计系统: 28px sunken capsule, 12px glyphs, 11.5px mono value) */
+:root body #quick-inspector .stepper,
+:root body #quick-inspector .number-stepper {
+  height: 28px;
+  padding: 0 3px;
+  gap: 2px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+}
+
+:root body #quick-inspector .stepper button,
+:root body #quick-inspector .number-stepper button {
+  width: 20px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--pen-radius-xs);
+  background: transparent;
+  color: var(--pen-secondary);
+}
+
+:root body #quick-inspector .stepper button .system-symbol,
+:root body #quick-inspector .stepper button .system-symbol svg,
+:root body #quick-inspector .number-stepper button .system-symbol,
+:root body #quick-inspector .number-stepper button .system-symbol svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* =================================================================================================
+ * 5 · Switch  (组件 / 开关: 36×20 · padding 2 · $radius-pill · 16px thumb $on-brand)
+ *     off = $bg-sunken + 1px $line-strong, on = $brand with no hairline.
+ * ================================================================================================= */
+
+/* `#quick-inspector` / `#settings-dialog` prefixes are required: the retired
+ * inspector layer in style.css pins these controls with an ID selector, and an
+ * ID outranks any number of `:root body` class selectors. */
+:root body .settings-switch input,
+:root body .inspector-switch input,
+:root body input[role="switch"][type="checkbox"],
+:root body #settings-dialog .settings-switch input,
+:root body #quick-inspector .inspector-switch input,
+:root body #quick-inspector input[role="switch"][type="checkbox"] {
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  position: relative;
+  flex: none;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--pen-line-strong);
+  border-radius: var(--pen-radius-pill);
+  background: var(--pen-surface-subtle);
+  box-shadow: none;
+  transition: background 160ms cubic-bezier(0.4, 0, 0.2, 1), border-color 160ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:root body .settings-switch input::after,
+:root body .inspector-switch input::after,
+:root body input[role="switch"][type="checkbox"]::after,
+:root body #settings-dialog .settings-switch input::after,
+:root body #quick-inspector .inspector-switch input::after,
+:root body #quick-inspector input[role="switch"][type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--pen-on-brand);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 20%);
+  transition: transform 160ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:root body .settings-switch input:checked,
+:root body .inspector-switch input:checked,
+:root body input[role="switch"][type="checkbox"]:checked,
+:root body #settings-dialog .settings-switch input:checked,
+:root body #quick-inspector .inspector-switch input:checked,
+:root body #quick-inspector input[role="switch"][type="checkbox"]:checked {
+  border-color: transparent;
+  background: var(--pen-accent);
+}
+
+:root body .settings-switch input:checked::after,
+:root body .inspector-switch input:checked::after,
+:root body input[role="switch"][type="checkbox"]:checked::after,
+:root body #settings-dialog .settings-switch input:checked::after,
+:root body #quick-inspector .inspector-switch input:checked::after,
+:root body #quick-inspector input[role="switch"][type="checkbox"]:checked::after {
+  transform: translateX(16px);
+}
+
+/* =================================================================================================
+ * 6 · Button  (设计系统: 32px · padding 0 14 · r8 · 12/500;
+ *     primary $brand + $on-brand, secondary $bg-surface + 1px $line-strong + $ink,
+ *     ghost $bg-sunken + $ink-muted)
+ * ================================================================================================= */
+
+/* `:where()` keeps the exclusion out of the specificity maths, so the header
+ * close button below can still outrank this default. */
+:root body .app-dialog button:where(:not([data-settings-page])),
+:root body .project-dialog button,
+:root body .toolbar-menu button,
+:root body .ai-draft-actions button {
+  min-height: 32px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--pen-line-strong);
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface);
+  color: var(--pen-text);
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: none;
+}
+
+:root body .toolbar-menu button {
+  min-height: 32px;
+  height: 32px;
+  justify-content: flex-start;
+  border-color: transparent;
+  background: transparent;
+  color: var(--pen-text);
+  font-weight: 400;
+}
+
+:root body .toolbar-menu button:hover:not(:disabled) {
+  background: var(--pen-surface-subtle);
+}
+
+:root body .app-dialog button.primary,
+:root body .project-dialog button.primary,
+:root body .ai-draft-apply {
+  border-color: transparent;
+  background: var(--pen-accent);
+  color: var(--pen-on-brand);
+  font-weight: 500;
+}
+
+:root body .app-dialog button.secondary,
+:root body .project-dialog button.secondary {
+  border-color: var(--pen-line-strong);
+  background: var(--pen-surface);
+  color: var(--pen-text);
+}
+
+/* The sheet header close affordance is the quiet ghost button. */
+:root body .app-dialog header button,
+:root body .project-dialog header button {
+  min-height: 28px;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--pen-radius-xs);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+:root body .app-dialog header button:hover,
+:root body .project-dialog header button:hover {
+  color: var(--pen-text);
+}
+
+/* =================================================================================================
+ * 7 · Settings sheet  (弹层 · 设置: header 56px · nav 172px $bg-sunken · content padding 22/24)
+ * ================================================================================================= */
+
+:root body .app-dialog {
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-lg);
+  background: var(--pen-surface);
+  color: var(--pen-text);
+  box-shadow: 0 24px 60px rgb(18 20 25 / 18%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body .app-dialog header,
+:root body .project-dialog header,
+:root body :is(#settings-dialog, #about-dialog, #new-style-dialog, #layout-image-dialog, #unsaved-dialog, #file-operation-dialog, #panel-scale-dialog, #ios26-dialog, #new-project-dialog) header {
+  min-height: 56px;
+  padding: 0 20px;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid var(--pen-line);
+}
+
+:root body .app-dialog header h2,
+:root body .project-dialog header h2 {
+  color: var(--pen-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+:root body .settings-sidebar {
+  padding: 12px 10px;
+  gap: 2px;
+  border-right: 1px solid var(--pen-line);
+  background: var(--pen-surface-subtle);
+}
+
+/* 172px is the pen's category rail; narrow sheets keep their stacked layout. */
+@media (min-width: 641px) {
+  :root body .settings-layout {
+    grid-template-columns: 172px minmax(0, 1fr);
+  }
+}
+
+:root body .settings-nav-item {
+  width: 100%;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 10px;
+  gap: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  border: 1px solid transparent;
+  border-radius: var(--pen-radius-sm);
+  background: transparent;
+  color: var(--pen-secondary);
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+:root body .settings-nav-item .system-symbol,
+:root body .settings-nav-item .system-symbol svg {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  color: var(--pen-tertiary);
+}
+
+:root body .settings-nav-item:hover:not([aria-selected="true"]) {
+  background: color-mix(in srgb, var(--pen-surface-subtle) 76%, var(--pen-line));
+  color: var(--pen-text);
+}
+
+:root body .settings-nav-item[aria-selected="true"] {
+  border-color: var(--pen-line);
+  background: var(--pen-surface);
+  color: var(--pen-text);
+  font-weight: 500;
+  box-shadow: none;
+}
+
+:root body .settings-nav-item[aria-selected="true"] .system-symbol {
+  color: var(--pen-accent);
+}
+
+:root body .settings-content {
+  padding: 22px 24px;
+  gap: 16px;
+}
+
+:root body .settings-section-heading h3 {
+  color: var(--pen-text);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+:root body .settings-section-heading p {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+}
+
+:root body .settings-group-title,
+:root body .settings-list > h4 {
+  color: var(--pen-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+:root body .app-dialog .settings-row,
+:root body .settings-row {
+  min-height: 40px;
+  padding: 0 2px;
+  gap: 16px;
+  border-top: 1px solid var(--pen-line);
+  border-bottom: 0;
+  color: var(--pen-text);
+  font-size: 13px;
+}
+
+:root body .settings-row > span:first-child {
+  color: var(--pen-text);
+  font-size: 13px;
+}
+
+:root body .settings-row small {
+  color: var(--pen-secondary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+/* =================================================================================================
+ * 8 · Floating zoom control  (组件 / 缩放控件 · 悬浮: 84px frosted pill,
+ *     padding 8 · gap 2 · 20px discs · mono value · 适应 hint)
+ * ================================================================================================= */
+
+:root body .preview-zoom-control {
+  width: 84px;
+  height: auto;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--pen-zoom-border);
+  border-radius: var(--pen-radius-pill);
+  background: var(--pen-zoom-bg);
+  box-shadow: 0 6px 18px -2px var(--pen-zoom-shadow);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+:root body .preview-zoom-control button {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--pen-radius-pill);
+  background: var(--pen-zoom-btn);
+  color: var(--pen-secondary);
+  box-shadow: none;
+}
+
+:root body .preview-zoom-control button:hover:not(:disabled) {
+  color: var(--pen-text);
+  background: color-mix(in srgb, var(--pen-zoom-btn) 100%, var(--pen-text) 6%);
+}
+
+:root body .preview-zoom-control button[aria-pressed="true"] {
+  background: var(--pen-accent-soft);
+  color: var(--pen-accent);
+}
+
+:root body .preview-zoom-control button:disabled {
+  opacity: 0.4;
+}
+
+:root body .preview-zoom-control svg,
+:root body .preview-zoom-control button .system-symbol,
+:root body .preview-zoom-control button .system-symbol svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The fit affordance is the pen's plain "适应" hint, not a fourth disc. */
+:root body #preview-zoom-fit {
+  width: 100%;
+  height: 12px;
+  min-height: 12px;
+  padding: 0;
+  border-radius: var(--pen-radius-pill);
+  background: transparent;
+  color: var(--pen-tertiary);
+}
+
+:root body #preview-zoom-fit:hover:not(:disabled) {
+  background: var(--pen-zoom-btn);
+  color: var(--pen-text);
+}
+
+:root body #preview-zoom-value,
+:root body #preview-zoom-label {
+  display: block;
+  color: var(--pen-text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+:root body #preview-zoom-label {
+  color: var(--pen-tertiary);
+  font-size: 9.5px;
+  font-weight: 400;
+}
+
+/* =================================================================================================
+ * 9 · Floating multi-select toolbar  (多选对齐工具条: raised bar · r12 · 1px $line ·
+ *     28px discs r5 · $key-sel count chip)
+ * ================================================================================================= */
+
+:root body .canvas-multi-toolbar {
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-md);
+  background: var(--pen-raised);
+  box-shadow: 0 14px 34px -8px rgb(18 20 25 / 26%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body .canvas-multi-count {
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 7px;
+  border-radius: var(--pen-radius-pill);
+  background: var(--pen-selection-soft);
+  color: var(--pen-selection);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+:root body .canvas-multi-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: var(--pen-line);
+}
+
+:root body .canvas-multi-toolbar button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pen-radius-xs);
+  background: transparent;
+  color: var(--pen-secondary);
+}
+
+:root body .canvas-multi-toolbar button:hover:not(:disabled) {
+  background: var(--pen-surface-subtle);
+  color: var(--pen-text);
+}
+
+:root body .canvas-multi-toolbar button:disabled {
+  opacity: 0.34;
+}
+
+:root body .canvas-multi-toolbar button .system-symbol,
+:root body .canvas-multi-toolbar button .system-symbol svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+/* =================================================================================================
+ * 10 · Canvas toolbar  (组件 / 画布工具条: 44px bar · pill groups on $bg-sunken ·
+ *      device select 28px r8)
+ * ================================================================================================= */
+
+:root body .preview-toolbar {
+  min-height: 44px;
+  padding: 0 16px;
+  gap: 12px;
+  border-bottom: 1px solid var(--pen-line);
+  background: var(--pen-surface);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body .preview-heading strong {
+  color: var(--pen-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+:root body .preview-heading span {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+}
+
+:root body .preview-tool-toggle {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-secondary);
+  box-shadow: none;
+}
+
+:root body .preview-tool-toggle .system-symbol,
+:root body .preview-tool-toggle .system-symbol svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+:root body .preview-tool-toggle.active,
+:root body .preview-tool-toggle[aria-pressed="true"] {
+  color: var(--pen-accent);
+  background: var(--pen-raised);
+  box-shadow: inset 0 0 0 1px var(--pen-line);
+}
+
+:root body #device-control,
+:root body #skin-state-control {
+  gap: 6px;
+  min-height: 28px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-text);
+  box-shadow: none;
+}
+
+:root body #device-control select,
+:root body #device,
+:root body #skin-state {
+  height: 26px;
+  min-height: 26px;
+  padding: 0 20px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--pen-text);
+  font-size: 11.5px;
+  font-weight: 500;
+  box-shadow: none;
+}
+
+:root body #skin-state-control .skin-state-value {
+  color: var(--pen-text);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 26px;
+}
+
+:root body .preview-toolbar-divider,
+:root body .preview-toolbar .toolbar-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: var(--pen-line);
+}
+
+/* =================================================================================================
+ * 11 · Status bar
+ *     Chinese prose uses $ui-font; only the numeric readout is monospaced.
+ * ================================================================================================= */
+
+:root body .workspace-status {
+  min-height: 30px;
+  padding: 0 14px;
+  gap: 16px;
+  border-top: 1px solid var(--pen-line);
+  background: var(--pen-surface);
+  color: var(--pen-tertiary);
+  font-family: var(--font-ui);
+  font-size: 11px;
+}
+
+:root body #event-log {
+  color: var(--pen-secondary);
+  font-family: var(--font-ui);
+  font-size: 11px;
+}
+
+:root body #panel-status {
+  color: var(--pen-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* =================================================================================================
+ * 12 · Navigation rows  (组件 / 左侧导航: row padding 8/10 · r5 · 12.5px;
+ *     selected = $brand-soft ground + $brand label 600 · group head 12.5/600)
+ * ================================================================================================= */
+
+:root body #files .sidebar-overview button.nav-item,
+:root body #files .raw-files .source-tree-row {
+  border-radius: var(--pen-radius-xs);
+  font-size: 12.5px;
+}
+
+:root body #files .sidebar-overview .nav-label,
+:root body #files .raw-files .nav-label {
+  font-size: 12.5px;
+}
+
+:root body #files .sidebar-overview .nav-section,
+:root body #files .raw-files .source-folder-row {
+  border-radius: var(--pen-radius-xs);
+  font-size: 12.5px;
+}
+
+/* =================================================================================================
+ * 13 · Document pill + saved state  (组件 / 标题栏)
+ * ================================================================================================= */
+
+:root body .document-title {
+  gap: 8px;
+  min-height: 34px;
+  padding: 5px 10px;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+}
+
+:root body .document-title strong {
+  color: var(--pen-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+:root body #dirty {
+  min-height: 22px;
+  padding: 2px 7px;
+  gap: 5px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-pill);
+  background: var(--pen-surface);
+  color: var(--pen-secondary);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+/* =================================================================================================
+ * 14 · Source panel chrome
+ * ================================================================================================= */
+
+:root body .source-toolbar {
+  padding: 8px 10px;
+  gap: 8px;
+  border-top: 1px solid var(--pen-line);
+  border-bottom: 1px solid var(--pen-line);
+  background: var(--pen-surface);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* =================================================================================================
+ * 16 · Inspector sub-controls that older layers styled with the retired card palette
+ *     ($card-control / $card-border) instead of the design-system tokens.
+ * ================================================================================================= */
+
+/* 按下 / 正常 state switch — the design-system segmented control.
+   Segment metrics (26px, 0/12 padding, r5) already come from the pen layer in
+   style.css; only the container still carried the retired card chrome. */
+:root body #quick-inspector .inspector-state-switch {
+  gap: 2px;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  box-shadow: none;
+}
+
+/* The selected segment keeps the design-system 1px $line hairline. */
+:root body #quick-inspector .inspector-state-switch button.active {
+  box-shadow: inset 0 0 0 1px var(--pen-line) !important;
+}
+
+/* Property fields — the design-system Field box. */
+:root body #quick-inspector .document-property-field input:where(:not([role="switch"])) {
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-text);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+:root body #quick-inspector .document-property-field input:where(:not([role="switch"])):hover {
+  background: var(--pen-surface-subtle);
+}
+
+:root body #quick-inspector .document-property-field input:where(:not([role="switch"])):focus {
+  border-color: var(--pen-accent);
+  background: var(--pen-surface-subtle);
+  outline: 0;
+  box-shadow: none;
+}
+
+:root body #quick-inspector .document-property-field > span {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+/* Colour swatch input. */
+:root body #quick-inspector .bda-color-controls input[type="color"] {
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+}
+
+/* Toggle label colour and the inline style-preview surface — both still carried
+   the retired card palette ($card-tertiary / $card-control / $card-border). */
+:root body #quick-inspector .inspector-switch input {
+  color: var(--pen-secondary);
+}
+
+:root body #quick-inspector .style-picker-state canvas {
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-xs);
+  background: var(--pen-surface-subtle);
+}
+
+/* =================================================================================================
+ * 15 · Mobile — 组件 / 移动 · 底部导航 rendered as the pane switcher.
+ *
+ * The pen draws a labelled dock (56px raised bar, 40px tabs, $brand-soft ground
+ * on the live tab). style.css had reduced the same control to an invisible 18px
+ * strip of 4px indicator bars, so this section restores the component and moves
+ * the hard-coded 18px layout budgets onto one variable.
+ * ================================================================================================= */
+
+@media (max-width: 760px) {
+  :root {
+    --mobile-dock-h: 56px;
+  }
+
+  :root body .mobile-workspace-tabs {
+    height: var(--mobile-dock-h);
+    gap: 6px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--pen-line);
+    background: var(--pen-surface);
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  :root body .mobile-workspace-tabs button[data-mobile-pane] {
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: var(--pen-radius-sm);
+    color: var(--pen-secondary);
+    background: transparent;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1;
+  }
+
+  :root body .mobile-workspace-tabs button[data-mobile-pane]::before {
+    content: none;
+    display: none;
+  }
+
+  :root body .mobile-workspace-tabs button[data-mobile-pane].active {
+    color: var(--pen-accent);
+    background: var(--pen-accent-soft);
+    box-shadow: none;
+    font-weight: 500;
+  }
+
+  /* The pane splitter is a grab handle on the dock's lower edge. */
+  :root body .mobile-split-handle {
+    width: 72px;
+    height: 12px;
+    top: auto;
+    bottom: 0;
+    border-radius: var(--pen-radius-pill);
+  }
+
+  :root body .mobile-split-handle::before {
+    width: 32px;
+    height: 3px;
+    top: 50%;
+    margin-top: -1.5px;
+    border-radius: var(--pen-radius-pill);
+    background: var(--pen-line-strong);
+  }
+
+  /* Layout budgets below used to hard-code the retired 18px strip. */
+  :root body aside,
+  :root body .source {
+    height: calc(50% - var(--mobile-dock-h));
+  }
+
+  :root[data-mobile-preview-position="top"] body .mobile-workspace-tabs {
+    top: var(--mobile-workspace-split, 50%);
+  }
+
+  :root[data-mobile-preview-position="top"] body :is(aside, .source) {
+    top: calc(var(--mobile-workspace-split, 50%) + var(--mobile-dock-h));
+    height: calc(100% - var(--mobile-workspace-split, 50%) - var(--mobile-dock-h));
+  }
+
+  :root:not([data-mobile-preview-position="top"]) body .mobile-workspace-tabs {
+    top: calc(100% - var(--mobile-workspace-split, 50%));
+  }
+
+  :root:not([data-mobile-preview-position="top"]) body .workspace {
+    top: calc(100% - var(--mobile-workspace-split, 50%) + var(--mobile-dock-h));
+    height: calc(var(--mobile-workspace-split, 50%) - var(--mobile-dock-h));
+  }
+
+  :root:not([data-mobile-preview-position="top"]) body :is(aside, .source) {
+    top: var(--mobile-dock-h);
+    height: calc(100% - var(--mobile-workspace-split, 50%) - var(--mobile-dock-h));
+  }
+
+  :root[data-mobile-preview-collapsed="true"] body :is(aside, .source) {
+    top: var(--mobile-dock-h) !important;
+    height: calc(100% - var(--mobile-dock-h)) !important;
+  }
+
+  :root body .preview-zoom-control {
+    width: auto;
+    height: auto;
+    flex-direction: row;
+    gap: 4px;
+    padding: 4px 6px;
+    bottom: 14px;
+    box-shadow: 0 3px 10px rgb(18 20 25 / 12%);
+  }
+
+  :root body #preview-zoom-fit {
+    width: auto;
+    height: 22px;
+    padding: 0 6px;
+  }
+
+  :root body #event-log {
+    display: none;
+  }
+}

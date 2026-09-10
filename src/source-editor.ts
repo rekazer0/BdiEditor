@@ -9,6 +9,7 @@ import {
 import { json } from "@codemirror/lang-json"
 import { properties } from "@codemirror/legacy-modes/mode/properties"
 import {
+  Annotation,
   Compartment,
   EditorSelection,
   EditorState,
@@ -62,12 +63,22 @@ export type SourceEditorValueClick = SourceEditorValueRange & {
   }
 }
 
+/** Emitted when the user moves the caret, so the canvas can follow along. */
+export type SourceEditorCursorMove = {
+  offset: number
+}
+
 export type SourceEditorValuePreviewRenderer = (
   canvas: HTMLCanvasElement,
   range: SourceEditorValueRange,
 ) => void
 
 const replaceDecorations = StateEffect.define<SourceEditorDecorations>()
+/**
+ * Marks a transaction whose selection was set by the editor itself (canvas →
+ * source). Such a transaction must not echo back as a source → canvas move.
+ */
+const programmaticSelection = Annotation.define<boolean>()
 const replaceExplanation = StateEffect.define<string>()
 
 class ExplanationWidget extends WidgetType {
@@ -234,7 +245,14 @@ export class SourceCodeEditor extends EventTarget {
           this.languageCompartment.of(iniLanguage),
           this.editableCompartment.of(this.editableExtensions()),
           EditorView.updateListener.of((update) => {
-            if (update.selectionSet) this.refreshExplanation()
+            if (update.selectionSet) {
+              this.refreshExplanation()
+              if (!update.transactions.some((tr) => tr.annotation(programmaticSelection))) {
+                this.dispatchEvent(new CustomEvent<SourceEditorCursorMove>("cursormove", {
+                  detail: { offset: update.state.selection.main.head },
+                }))
+              }
+            }
             if (!update.docChanged || this.suppressInput) return
             this.changedSinceCommit = true
             this.dispatchEvent(new Event("input"))
@@ -283,7 +301,7 @@ export class SourceCodeEditor extends EventTarget {
     this.view.dispatch({
       changes: { from: 0, to: this.view.state.doc.length, insert: value },
       selection: { anchor: 0 },
-      annotations: Transaction.addToHistory.of(false),
+      annotations: [Transaction.addToHistory.of(false), programmaticSelection.of(true)],
     })
     this.suppressInput = false
     this.changedSinceCommit = false
@@ -350,6 +368,7 @@ export class SourceCodeEditor extends EventTarget {
     const range = EditorSelection.range(from, to)
     this.view.dispatch({
       selection: range,
+      annotations: programmaticSelection.of(true),
       effects: reveal ? EditorView.scrollIntoView(range, { y: "center" }) : undefined,
     })
   }

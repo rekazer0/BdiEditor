@@ -26,11 +26,19 @@ function themeColor(element: HTMLElement, property: string, fallback: string): s
 }
 
 function configureAppearance(chat: DeepChat): void {
-  const text = themeColor(chat, "--text", "#1f2328")
-  const muted = themeColor(chat, "--muted", "#667085")
-  const control = themeColor(chat, "--control", "#ffffff")
-  const line = themeColor(chat, "--line", "#d0d5dd")
-  const accent = themeColor(chat, "--accent", "#1677ff")
+  // The Pen design tokens are the visual source of truth for the right pane, so
+  // the chat reads them directly instead of the older generic palette.
+  const text = themeColor(chat, "--pen-text", "#121419")
+  const muted = themeColor(chat, "--pen-tertiary", "#8b919e")
+  const secondary = themeColor(chat, "--pen-secondary", "#5b616e")
+  const control = themeColor(chat, "--pen-surface", "#ffffff")
+  const sunken = themeColor(chat, "--pen-surface-subtle", "#f4f5f8")
+  const line = themeColor(chat, "--pen-line", "#e3e6eb")
+  const accent = themeColor(chat, "--pen-accent", "#3a6df0")
+  const onAccent = themeColor(chat, "--pen-on-brand", "#ffffff")
+  const radiusSm = themeColor(chat, "--pen-radius-sm", "8px")
+  const radiusMd = themeColor(chat, "--pen-radius-md", "12px")
+  const radiusPill = themeColor(chat, "--pen-radius-pill", "999px")
   chat.chatStyle = {
     width: "100%",
     height: "100%",
@@ -51,15 +59,15 @@ function configureAppearance(chat: DeepChat): void {
     placeholder: { text: "描述你想要的皮肤效果…", style: { color: muted } },
     characterLimit: 8_000,
     styles: {
-      text: { color: text, fontSize: "13px", lineHeight: "1.75", padding: "14px 14px",
-        boxSizing: "border-box", height: "calc(100% - 52px)", overflowY: "auto" },
+      text: { color: text, fontSize: "12px", lineHeight: "1.75", padding: "10px 12px",
+        boxSizing: "border-box", height: "calc(100% - 46px)", overflowY: "auto" },
       container: {
         width: "100%", boxSizing: "border-box", margin: "0",
         height: "var(--ai-input-height, 148px)", minHeight: "128px", maxHeight: "none", overflow: "hidden",
-        border: `1px solid ${line}`, borderRadius: "14px",
-        backgroundColor: control, boxShadow: `0 2px 8px rgb(0 0 0 / 6%), inset 0 1px rgb(255 255 255 / 60%)`,
+        border: `1px solid ${line}`, borderRadius: radiusMd,
+        backgroundColor: sunken, boxShadow: "none",
       },
-      focus: { borderColor: accent, boxShadow: `0 0 0 3px color-mix(in srgb, ${accent} 12%, transparent), 0 2px 8px rgb(0 0 0 / 8%)`, outline: "none" },
+      focus: { borderColor: accent, boxShadow: `0 0 0 2px color-mix(in srgb, ${accent} 18%, transparent)`, outline: "none" },
     },
   }
   chat.auxiliaryStyle = `
@@ -69,44 +77,35 @@ function configureAppearance(chat: DeepChat): void {
       bottom: calc(var(--ai-input-height, 148px) + 42px); height: auto; margin: 0;
       overflow-y: auto; align-items: flex-start; }
     .ai-welcome { width: 100%; }
-    .ai-welcome { box-sizing: border-box; max-width: 540px; margin: 0 auto;
-      padding: clamp(24px, 4vh, 48px) 24px 24px; text-align: left; color: ${text}; }
-    .ai-welcome-icon { display: grid; place-items: center; width: 44px; height: 44px;
-      color: ${accent}; background: color-mix(in srgb, ${accent} 9%, ${control});
-      border: 1px solid color-mix(in srgb, ${accent} 15%, ${line}); border-radius: 14px; font-size: 26px; }
-    .ai-welcome-eyebrow { margin: 20px 0 8px; font-size: 11px; color: ${muted}; }
-    .ai-welcome h2 { margin: 0; font-size: clamp(19px, 3vw, 24px); font-weight: 600; letter-spacing: -.5px; }
-    .ai-welcome-description { margin: 12px 0 24px; font-size: 12px; color: ${muted}; line-height: 1.8; }
-    .ai-suggestions { display: grid; gap: 8px; }
-    .ai-suggestions button { display: flex; align-items: center; gap: 12px; width: 100%;
-      padding: 13px 14px; text-align: left; font: inherit; color: ${text}; background: ${control};
-      border: 1px solid ${line}; border-radius: 12px; cursor: pointer;
-      transition: background .15s, border-color .15s; }
-    .ai-suggestions button:hover { border-color: color-mix(in srgb, ${accent} 45%, ${line});
-      background: color-mix(in srgb, ${accent} 4%, ${control}); }
-    .ai-suggestions button:focus-visible { outline: 2px solid ${accent}; outline-offset: 3px; }
-    .ai-suggestion-icon { display: grid; place-items: center; width: 32px; height: 32px;
-      border-radius: 8px; background: color-mix(in srgb, ${accent} 7%, ${control}); color: ${accent}; font-size: 16px; flex-shrink: 0; }
-    .ai-suggestions strong { display: block; font-size: 12px; font-weight: 500; }
-    .ai-suggestions small { display: block; margin-top: 4px; font-size: 11px; color: ${muted}; }
-    .ai-suggestion-arrow { margin-left: auto; color: ${muted}; }
-    .ai-welcome-note { margin: 14px 0 0; font-size: 11px; color: ${muted}; }
+    /* Pen "AI Head": a 24px brand tile over a 14px title and an 11px subtitle. */
+    .ai-welcome { box-sizing: border-box; max-width: none; margin: 0;
+      padding: 16px; text-align: left; color: ${text}; }
+    .ai-welcome-icon { display: grid; place-items: center; width: 24px; height: 24px;
+      color: ${onAccent}; background: ${accent};
+      border: 0; border-radius: 7px; font-size: 13px; }
+    .ai-welcome-eyebrow { margin: 10px 0 0; font-size: 11px; color: ${muted}; }
+    .ai-welcome h2 { margin: 4px 0 0; font-size: 14px; font-weight: 600; letter-spacing: 0; }
+    .ai-welcome-description { margin: 8px 0 16px; font-size: 11px; color: ${muted}; line-height: 1.7; }
+    /* Pen "Suggestions": a wrapped row of 30px sunken pills. */
+    .ai-suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .ai-suggestions button { display: inline-flex; align-items: center; gap: 0; width: auto;
+      padding: 5px 10px; text-align: left; font: inherit; color: ${secondary}; background: ${sunken};
+      border: 1px solid ${line}; border-radius: ${radiusPill}; cursor: pointer;
+      transition: background .15s, border-color .15s, color .15s; }
+    .ai-suggestions button:hover { border-color: color-mix(in srgb, ${accent} 40%, ${line});
+      background: color-mix(in srgb, ${accent} 6%, ${sunken}); color: ${text}; }
+    .ai-suggestions button:focus-visible { outline: 2px solid ${accent}; outline-offset: 2px; }
+    .ai-suggestion-icon, .ai-suggestion-arrow, .ai-suggestions small { display: none; }
+    .ai-suggestions strong { display: block; font-size: 10px; font-weight: 400; }
+    .ai-welcome-note { margin: 10px 0 0; font-size: 10px; color: ${muted}; }
     @media (max-height: 650px) {
-      .ai-welcome { padding-top: 20px; }
+      .ai-welcome { padding-top: 12px; }
       .ai-welcome-icon, .ai-welcome-eyebrow { display: none; }
-      .ai-welcome-description { margin-bottom: 16px; }
+      .ai-welcome-description { margin-bottom: 12px; }
     }
     @container (max-width: 300px) {
       .ai-welcome { padding-inline: 14px; }
-      .ai-welcome h2 { font-size: 18px; letter-spacing: -.6px; }
       .ai-welcome-description br { display: none; }
-      .ai-suggestions button { padding: 10px; gap: 8px; }
-      .ai-suggestion-icon { width: 26px; height: 26px; }
-      .ai-suggestion-arrow { display: none; }
-    }
-    #text-input-container::after {
-      content: ""; position: absolute; left: 14px; right: 14px; bottom: 51px;
-      height: 1px; background: ${line}; opacity: .65; pointer-events: none;
     }
     #text-input:empty::before { font-weight: 400; }
     .message-bubble { max-width: 88%; overflow-wrap: anywhere; text-align: left; }
@@ -128,14 +127,14 @@ function configureAppearance(chat: DeepChat): void {
   `
   chat.messageStyles = {
     default: {
-      shared: { bubble: { fontSize: "13px", lineHeight: "1.7", padding: "16px 18px" } },
+      shared: { bubble: { fontSize: "12px", lineHeight: "1.7", padding: "10px 12px" } },
       user: {
         bubble: {
-          color: text,
-          backgroundColor: `color-mix(in srgb, ${accent} 10%, ${control})`,
-          border: `1px solid color-mix(in srgb, ${accent} 20%, ${line})`,
-          borderRadius: "16px 16px 4px 16px",
-          boxShadow: "0 2px 8px rgb(0 0 0 / 4%)",
+          color: onAccent,
+          backgroundColor: accent,
+          border: "0",
+          borderRadius: radiusMd,
+          boxShadow: "none",
         },
       },
       ai: {
@@ -143,8 +142,8 @@ function configureAppearance(chat: DeepChat): void {
           color: text,
           backgroundColor: control,
           border: `1px solid ${line}`,
-          borderRadius: "14px",
-          boxShadow: "0 2px 8px rgb(0 0 0 / 4%)",
+          borderRadius: radiusSm,
+          boxShadow: "none",
         },
       },
     },
@@ -154,18 +153,18 @@ function configureAppearance(chat: DeepChat): void {
     tooltip: { text: "发送；生成时点击可停止" },
     submit: {
       container: {
-        default: { backgroundColor: accent, borderRadius: "10px", width: "32px", height: "32px", bottom: "10px", right: "10px",
-          boxShadow: `0 2px 8px color-mix(in srgb, ${accent} 30%, transparent)` },
-        hover: { filter: "brightness(1.08)", transform: "scale(1.02)" },
+        default: { backgroundColor: accent, borderRadius: radiusSm, width: "26px", height: "26px", bottom: "10px", right: "10px",
+          boxShadow: "none" },
+        hover: { filter: "brightness(1.06)", transform: "none" },
       },
       svg: { styles: { default: { filter: "brightness(0) invert(1)" } } },
     },
     disabled: {
-      container: { default: { backgroundColor: `color-mix(in srgb, ${text} 8%, ${control})`, borderRadius: "10px", width: "32px", height: "32px", bottom: "10px", right: "10px", cursor: "not-allowed", boxShadow: "none" } },
+      container: { default: { backgroundColor: sunken, border: `1px solid ${line}`, borderRadius: radiusSm, width: "26px", height: "26px", bottom: "10px", right: "10px", cursor: "not-allowed", boxShadow: "none" } },
       svg: { styles: { default: { fill: muted, opacity: "0.5", filter: "none" } } },
     },
     stop: {
-      container: { default: { border: `1px solid ${line}`, backgroundColor: control, borderRadius: "10px", width: "32px", height: "32px", bottom: "10px", right: "10px", boxShadow: "0 2px 6px rgb(0 0 0 / 6%)" } },
+      container: { default: { border: `1px solid ${line}`, backgroundColor: sunken, borderRadius: radiusSm, width: "26px", height: "26px", bottom: "10px", right: "10px", boxShadow: "none" } },
     },
   }
   chat.focusMode = { smoothScroll: true, streamAutoScroll: true, fade: false }

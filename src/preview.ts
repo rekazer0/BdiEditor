@@ -22,6 +22,9 @@ export type PreviewEvent = {
 
 type Rect = { x: number; y: number; width: number; height: number }
 
+/** The five editable gesture targets a key can bind an action to. */
+export type GestureDirection = "center" | "up" | "down" | "left" | "right" | "hold"
+
 type NineSliceCanvas = Pick<HTMLCanvasElement, "width" | "height" | "getContext">
 
 let nineSliceBuffer: HTMLCanvasElement | undefined
@@ -1366,10 +1369,24 @@ export class Preview {
     holdTimer?: number
   }
   private selected = new Set<string>()
+  /**
+   * Sections touched by an unconfirmed AI draft. Drawn in the selection orange
+   * so the canvas shows what a pending change would affect before it is
+   * committed.
+   */
+  private draftSections = new Set<string>()
+  private pressed?: { section: string; timeout: number }
   private mobileMultiSelect = false
   private selectionAnchor?: string
   private guides = false
   private guidesOverlay?: SVGSVGElement
+  /** Gesture hot zones for the selected key. Rather than making the user pick a
+   * gesture from a dropdown, the key itself shows its four swipe directions
+   * plus the tap centre, each labelled with the action currently bound to it.
+   */
+  private gestureZones = false
+  private gestureOverlay?: SVGSVGElement
+  private onGestureFocus: (direction: GestureDirection) => void
   private skinState?: number
   private persistentOnly = false
   private animation?: BdaAnimation
@@ -1407,11 +1424,13 @@ export class Preview {
     toolbarSlots = false,
     onMove: (sections: string[], deltaX: number, deltaY: number) => void = () => {},
     hintCanvas?: HTMLCanvasElement,
+    onGestureFocus: (direction: GestureDirection) => void = () => {},
   ) {
     this.canvas = canvas
     this.onEvent = onEvent
     this.onSelect = onSelect
     this.onMove = onMove
+    this.onGestureFocus = onGestureFocus
     this.toolbarSlots = toolbarSlots
     this.hintCanvas = hintCanvas
     canvas.addEventListener("pointerdown", (event) => this.pointerDown(event))
@@ -1437,6 +1456,7 @@ export class Preview {
     this.mobileMultiSelect = false
     if (this.active?.holdTimer !== undefined) window.clearTimeout(this.active.holdTimer)
     this.active = undefined
+    this.clearPress()
     this.cancelEditTouch()
     this.cancelEditDrag()
     this.updateCursor()
@@ -1448,6 +1468,7 @@ export class Preview {
     this.cancelDragDraw()
     if (this.active?.holdTimer !== undefined) window.clearTimeout(this.active.holdTimer)
     this.active = undefined
+    this.clearPress()
     this.cancelEditTouch()
     this.cancelEditDrag()
     this.updateCursor()
@@ -1468,10 +1489,49 @@ export class Preview {
     void this.draw()
   }
 
+  /**
+   * Edit mode keeps selection and pressing independent: a plain click still
+   * selects, but it also flashes the key's highlight style so the editor can
+   * see the pressed appearance without leaving edit mode.
+   */
+  private flashPress(key: PreviewItem): void {
+    if (this.pressed?.timeout !== undefined) window.clearTimeout(this.pressed.timeout)
+    const timeout = window.setTimeout(() => {
+      if (this.pressed?.section !== key.section) return
+      this.pressed = undefined
+      void this.draw()
+    }, 180)
+    this.pressed = { section: key.section, timeout }
+  }
+
+  private clearPress(): void {
+    if (this.pressed?.timeout !== undefined) window.clearTimeout(this.pressed.timeout)
+    this.pressed = undefined
+  }
+
+  private keyPressed(key: PreviewItem): boolean {
+    if (!this.pressed) return false
+    return this.pressed.section === key.section ||
+      key.sections.includes(this.pressed.section)
+  }
+
   setSelected(sections: readonly string[]): void {
     this.selected = new Set(sections)
     if (!sections.length) this.mobileMultiSelect = false
     void this.draw()
+  }
+
+  /** Marks (or clears) the keys a pending AI draft would change. */
+  setDraftSections(sections: readonly string[]): void {
+    const next = new Set(sections)
+    if (next.size === this.draftSections.size && [...next].every((section) => this.draftSections.has(section))) return
+    this.draftSections = next
+    void this.draw()
+  }
+
+  private itemDrafted(item: PreviewItem): boolean {
+    if (!this.draftSections.size) return false
+    return item.sections.some((section) => this.draftSections.has(section))
   }
 
   setResolver(resolver?: VisualResolver): void {
@@ -1755,6 +1815,7 @@ export class Preview {
     }
     if (this.mode === "edit") {
       this.selectKey(key, event)
+      this.flashPress(key)
       if (this.editTool === "move" && !key.section.startsWith("LIST")) {
         const selectedSections = new Set(
           visiblePreviewItems(this.keys, this.skinState)
@@ -1828,6 +1889,7 @@ export class Preview {
   }
 
   private pointerMove(event: PointerEvent): void {
+    this.updateGestureZoneLiveness(event)
     if (this.active && event.pointerId === this.active.pointerId) {
       const point = this.point(event)
       const direction = gestureDirection(
@@ -2120,8 +2182,119 @@ export class Preview {
     }))
   }
 
-  private drawNineSlice(
-    context: CanvasRenderingContext2D,
+  /**
+   * Renders the gesture hot zones over the selected key: a centre tap zone plus
+   * four edge zones, each showing the action bound to that gesture. Clicking a
+   * zone hands focus to the matching inspector field.
+   */
+  private drawGestureZones(keys: readonly PreviewItem[]): void {
+    const selectedKey = this.mode === "edit"
+      ? keys.find((key) => key.editable && this.itemSelected(key))
+      : undefined
+    if (!this.gestureZones || !selectedKey) {
+      if (this.gestureOverlay) {
+        this.gestureOverlay.replaceChildren()
+        this.gestureOverlay.toggleAttribute("hidden", true)
+      }
+      return
+    }
+    const overlay = this.gestureOverlay ?? document.createElementNS("http://www.w3.org/2000/svg", "svg")
+    if (!this.gestureOverlay) {
+      overlay.classList.add("preview-gestures")
+      this.canvas.insertAdjacentElement("afterend", overlay)
+      this.gestureOverlay = overlay
+    }
+    overlay.toggleAttribute("hidden", false)
+    overlay.dataset.live = overlay.dataset.live === "true" ? "true" : "false"
+    // Zones are placed in the canvas' own logical space, which is what the
+    // pointer hit test uses, rather than the unscaled panel space.
+    const spaceX = this.canvas.width || this.panelWidth
+    const spaceY = this.canvas.height || this.panelHeight
+    overlay.setAttribute("viewBox", `0 0 ${spaceX} ${spaceY}`)
+    const scaleX = spaceX / this.panelWidth
+    const scaleY = spaceY / this.panelHeight
+
+    const rect = selectedKey.rect
+    // The outer third on each side is a swipe zone; the centre third is tap.
+    const third = { x: rect.width / 3, y: rect.height / 3 }
+    const baseZones = [
+      { direction: "up", x: rect.x + third.x, y: rect.y, w: third.x, h: third.y, glyph: "↑" },
+      { direction: "down", x: rect.x + third.x, y: rect.y + third.y * 2, w: third.x, h: third.y, glyph: "↓" },
+      { direction: "left", x: rect.x, y: rect.y + third.y, w: third.x, h: third.y, glyph: "←" },
+      { direction: "right", x: rect.x + third.x * 2, y: rect.y + third.y, w: third.x, h: third.y, glyph: "→" },
+      { direction: "center", x: rect.x + third.x, y: rect.y + third.y, w: third.x, h: third.y, glyph: "点" },
+    ] as const
+    const zones: Array<{ direction: GestureDirection; x: number; y: number; w: number; h: number; glyph: string }> =
+      baseZones.map((zone) => ({
+        direction: zone.direction,
+        glyph: zone.glyph,
+        x: zone.x * scaleX,
+        y: zone.y * scaleY,
+        w: zone.w * scaleX,
+        h: zone.h * scaleY,
+      }))
+    const label = (direction: GestureDirection) => {
+      const action = direction === "center"
+        ? selectedKey.center
+        : direction === "hold" ? selectedKey.hold : selectedKey[direction]
+      return (action || "").trim()
+    }
+    const fontSize = Math.max(8, Math.min(14, rect.height * scaleY * 0.16))
+    overlay.style.setProperty("--preview-gesture-font-size", `${fontSize}px`)
+
+    overlay.replaceChildren(...zones.map((zone) => {      const group = document.createElementNS("http://www.w3.org/2000/svg", "g")
+      group.classList.add("preview-gesture-zone")
+      group.setAttribute("role", "button")
+      const action = label(zone.direction)
+      group.setAttribute("aria-label", `${zone.direction === "center" ? "点击" : zone.direction} 手势${action ? `：${action}` : "（未绑定动作）"}`)
+      const box = document.createElementNS("http://www.w3.org/2000/svg", "rect")
+      box.setAttribute("x", String(zone.x))
+      box.setAttribute("y", String(zone.y))
+      box.setAttribute("width", String(zone.w))
+      box.setAttribute("height", String(zone.h))
+      box.setAttribute("rx", "6")
+      const glyph = document.createElementNS("http://www.w3.org/2000/svg", "text")
+      glyph.setAttribute("x", String(zone.x + zone.w / 2))
+      glyph.setAttribute("y", String(zone.y + zone.h / 2 - fontSize * 0.35))
+      glyph.setAttribute("text-anchor", "middle")
+      glyph.textContent = zone.glyph
+      const caption = document.createElementNS("http://www.w3.org/2000/svg", "text")
+      caption.setAttribute("x", String(zone.x + zone.w / 2))
+      caption.setAttribute("y", String(zone.y + zone.h / 2 + fontSize * 1.05))
+      caption.setAttribute("text-anchor", "middle")
+      caption.classList.add("preview-gesture-caption")
+      caption.textContent = action ? action.slice(0, 12) : "未绑定"
+      group.append(box, glyph, caption)
+      group.addEventListener("pointerdown", (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        this.onGestureFocus(zone.direction)
+      })
+      return group
+    }))
+  }
+
+  setGestureZones(enabled: boolean): void {
+    if (this.gestureZones === enabled) return
+    this.gestureZones = enabled
+    if (this.gestureOverlay) this.gestureOverlay.dataset.live = "false"
+    void this.draw()
+  }
+
+  /**
+   * Zones become interactive only while the pointer is inside the selected
+   * key, so clicks anywhere else still reach the canvas and can select another
+   * key.
+   */
+  private updateGestureZoneLiveness(event: PointerEvent): void {
+    const overlay = this.gestureOverlay
+    if (!overlay || overlay.hasAttribute("hidden")) return
+    const hitKey = this.hit(this.point(event))
+    const live = Boolean(hitKey && this.itemSelected(hitKey))
+    if (overlay.dataset.live !== String(live)) overlay.dataset.live = String(live)
+  }
+
+  private drawNineSlice(    context: CanvasRenderingContext2D,
     visual: Visual,
     destination: Rect,
   ): void {
@@ -2345,7 +2518,8 @@ export class Preview {
           this.resolver?.resolve(this.panelStyle, false).catch(() => undefined),
           Promise.all(keys.map(async (key) => {
             const highlighted = this.active?.key.section === key.section ||
-              this.legacyAnimationState?.key.section === key.section
+              this.legacyAnimationState?.key.section === key.section ||
+              this.keyPressed(key)
             try {
               return {
                 back: await this.resolveVisual(
@@ -2501,9 +2675,26 @@ export class Preview {
       }
 
       if (selected) {
-        context.strokeStyle = "#087ff5"
+        // A press flash in edit mode is marked in the selection orange so it
+        // reads as "momentary feedback", not as the blue selection state.
+        const flash = this.mode === "edit" && this.keyPressed(key)
+        context.strokeStyle = flash ? "#ff6b2c" : "#087ff5"
         context.lineWidth = 4
         context.strokeRect(key.rect.x + 2, key.rect.y + 2, key.rect.width - 4, key.rect.height - 4)
+      } else if (this.mode === "edit" && this.itemDrafted(key)) {
+        // Unconfirmed AI draft: dashed orange, distinct from any solid selection.
+        const inset = 3
+        context.save()
+        context.strokeStyle = "#ff6b2c"
+        context.lineWidth = 3
+        context.setLineDash([9, 6])
+        context.strokeRect(
+          key.rect.x + inset,
+          key.rect.y + inset,
+          Math.max(0, key.rect.width - inset * 2),
+          Math.max(0, key.rect.height - inset * 2),
+        )
+        context.restore()
       }
 
       const textVisual: TextVisual | undefined = visuals[index].text
@@ -2641,6 +2832,7 @@ export class Preview {
     }
 
     this.drawGuides(visiblePreviewItems(this.keys, this.skinState))
+    this.drawGestureZones(visiblePreviewItems(this.keys, this.skinState))
   }
 
   private drawStyleText(

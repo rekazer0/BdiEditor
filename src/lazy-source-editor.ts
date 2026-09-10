@@ -1,5 +1,6 @@
 import type {
   SourceCodeEditor,
+  SourceEditorCursorMove,
   SourceEditorDecorations,
   SourceEditorLanguage,
   SourceEditorValueClick,
@@ -7,6 +8,7 @@ import type {
 } from "./source-editor.ts"
 
 export type {
+  SourceEditorCursorMove,
   SourceEditorDecorations,
   SourceEditorLanguage,
   SourceEditorValueClick,
@@ -99,6 +101,10 @@ export class LazySourceCodeEditor extends EventTarget {
         editor.addEventListener("valueclick", (event) => {
           const detail = (event as CustomEvent<SourceEditorValueClick>).detail
           this.dispatchEvent(new CustomEvent<SourceEditorValueClick>("valueclick", { detail }))
+        })
+        editor.addEventListener("cursormove", (event) => {
+          const detail = (event as CustomEvent<SourceEditorCursorMove>).detail
+          this.dispatchEvent(new CustomEvent<SourceEditorCursorMove>("cursormove", { detail, bubbles: true }))
         })
 
         this.editor = editor

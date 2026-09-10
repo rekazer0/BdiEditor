@@ -158,6 +158,39 @@ export function iniSectionRanges(source: string, sections: readonly string[]): A
     : [])
 }
 
+/**
+ * Inverse of {@link iniSectionRanges}: the section whose block contains
+ * `offset`. Keyed selection and range highlighting both need this direction so
+ * clicking in the source can drive the canvas.
+ */
+export function iniSectionAtOffset(source: string, offset: number): string | undefined {
+  if (!source.length) return undefined
+  const position = Math.max(0, Math.min(source.length - 1, Math.trunc(offset)))
+  const headers = [...source.matchAll(/^\s*\[([^\]]+)]\s*$/gm)]
+  let found: string | undefined
+  for (const [index, header] of headers.entries()) {
+    if ((header.index ?? 0) > position) break
+    found = (headers[index + 1]?.index ?? source.length) > position ? header[1] : undefined
+  }
+  return found
+}
+
+/** Top-level JSON property name whose value block contains `offset`. */
+export function jsonPropertyAtOffset(source: string, offset: number): string | undefined {
+  if (!source.length) return undefined
+  const position = Math.max(0, Math.min(source.length - 1, Math.trunc(offset)))
+  const property = /^(\s*)("(?:\\.|[^"\\])*")\s*:\s*([\[{])/gm
+  const entries = [...source.matchAll(property)]
+  let found: string | undefined
+  for (const [index, match] of entries.entries()) {
+    const start = match.index ?? 0
+    if (start > position) break
+    const end = entries[index + 1]?.index ?? source.length
+    if (end > position) found = JSON.parse(match[2]) as string
+  }
+  return found
+}
+
 export function highlightJson(
   source: string,
   searchQuery = "",

@@ -7,25 +7,41 @@
  */
 
 :root {
+  /* Pen document tokens: $ui-font / $mono-font / $display-font */
   --font-ui: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-display: Inter, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 
-  --pen-surface: #ffffff;
-  --pen-surface-subtle: #f4f5f8;
+  /* $bg-* */
+  --pen-surface: #ffffff;          /* $bg-surface  */
+  --pen-raised: #ffffff;           /* $bg-raised   */
+  --pen-surface-subtle: #f4f5f8;   /* $bg-sunken   */
+  --pen-tertiary-bg: #ebebeb;      /* $bg-tertiary */
   --pen-canvas: #f4f5f8;
-  --pen-window: #e9ebef;
+  --pen-window: #e9ebef;           /* $bg-app      */
+  /* $line / $line-strong */
   --pen-line: #e3e6eb;
   --pen-line-strong: #cdd2db;
+  /* $ink / $ink-muted / $ink-faint */
   --pen-text: #121419;
   --pen-secondary: #5b616e;
   --pen-tertiary: #8b919e;
+  /* $brand / $brand-soft / $on-brand */
   --pen-accent: #3a6df0;
   --pen-accent-soft: #e9effe;
+  --pen-on-brand: #ffffff;
+  /* $key-sel / $key-sel-soft */
   --pen-selection: #ff6b2c;
   --pen-selection-soft: #ffefe6;
+  /* $state-* */
   --pen-state-ok: #12a150;
   --pen-state-warn: #b87a00;
   --pen-state-danger: #e5484d;
+  /* 组件 / 缩放控件 · 悬浮 */
+  --pen-zoom-bg: #ffffffb8;
+  --pen-zoom-border: #ffffff;
+  --pen-zoom-shadow: #12141a1f;
+  --pen-zoom-btn: #1111110d;
 
   --inspector-width: 360px;
   --pen-radius-xs: 5px;
@@ -37,7 +53,9 @@
 
 :root[data-app-theme="dark"] {
   --pen-surface: #15171b;
+  --pen-raised: #1e2126;
   --pen-surface-subtle: #1a1d21;
+  --pen-tertiary-bg: #2e2e2e;
   --pen-canvas: #0c0d10;
   --pen-window: #0c0d10;
   --pen-line: #282c33;
@@ -47,11 +65,16 @@
   --pen-tertiary: #6c737e;
   --pen-accent: #7a9bff;
   --pen-accent-soft: #1d2740;
+  --pen-on-brand: #ffffff;
   --pen-selection: #ff8a55;
   --pen-selection-soft: #3a2418;
   --pen-state-ok: #3dd68c;
   --pen-state-warn: #f5c445;
   --pen-state-danger: #ff6b6b;
+  --pen-zoom-bg: #1e2126b8;
+  --pen-zoom-border: #ffffff24;
+  --pen-zoom-shadow: #00000066;
+  --pen-zoom-btn: #ffffff14;
 }
 
 html,
@@ -80,40 +103,6 @@ textarea {
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-}
-
-.brand {
-  gap: 8px;
-  padding: 5px 8px 5px 5px;
-  border-radius: var(--pen-radius-sm);
-}
-
-.brand-logo {
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  background: var(--pen-accent);
-}
-
-.brand-logo svg {
-  width: 14px;
-  height: 14px;
-}
-
-.brand-text {
-  gap: 6px;
-}
-
-.brand-text strong {
-  color: var(--pen-text);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.brand-text small {
-  color: var(--pen-tertiary);
-  font-size: 11px;
-  font-weight: 400;
 }
 
 .toolbar-group {
@@ -340,28 +329,240 @@ main {
   box-shadow: none;
 }
 
-.sidebar-overview,
+/* -------------------------------------------------------------------------------------------------
+ * Sidebar lists — 概览 and 源文件 are one list, not two designs
+ *
+ * Both views live in the single #files scroller and share one geometry: a 16px
+ * icon/chevron column, an 8px gap, 8px row padding, one corner radius and one
+ * hover/selected treatment. Only the content differs (curated groups versus the
+ * file tree); metrics, states and typography never do. Icons stay in the flow,
+ * so no glyph can ever land on a label.
+ * ------------------------------------------------------------------------------------------------- */
+
 #files {
-  padding: 0 8px 16px;
+  padding: 8px 8px 16px;
 }
 
-.sidebar-overview button.nav-item,
-#files button {
-  min-height: 34px;
-  border-radius: var(--pen-radius-sm);
+/* The panes are content, never scrollers: one scrollbar, at the sidebar edge.
+   The phone layout keeps its own two-column overview grid, so this stays desktop-only. */
+@media (min-width: 761px) {
+  .sidebar-overview,
+  .raw-files {
+    min-height: 0;
+    padding: 0;
+    overflow: visible;
+    scroll-behavior: auto;
+  }
+}
+
+/* File operations toolbar: same 8px gutter and 28px controls as the view switch. */
+.source-file-toolbar {
+  height: auto;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+  gap: 4px;
+  padding: 0 8px 10px;
+  border-bottom: 0;
+}
+
+/* The grid above outranks the user-agent [hidden] rule, so hide the 概览 view explicitly. */
+.source-file-toolbar[hidden] {
+  display: none;
+}
+
+.source-file-toolbar .toolbar-button {
+  width: 28px;
+  height: 28px;
+  max-width: 28px;
+  border: 0;
+  border-radius: var(--pen-radius-xs);
   color: var(--pen-secondary);
-  font-size: 12px;
+  background: transparent;
 }
 
-.sidebar-overview button.nav-item:hover,
-#files button:hover {
-  background: var(--pen-surface-subtle);
-}
-
-.sidebar-overview button.nav-item.selected,
-#files button.selected {
+.source-file-toolbar .toolbar-button:hover:not(:disabled) {
   color: var(--pen-text);
   background: var(--pen-surface-subtle);
+  transform: none;
+}
+
+.source-file-toolbar .toolbar-button.active {
+  color: #fff;
+  background: var(--pen-accent);
+  box-shadow: none;
+}
+
+.source-file-toolbar .toolbar-button:disabled {
+  opacity: 0.45;
+}
+
+/* Rows ------------------------------------------------------------------------------------------ */
+
+#files .sidebar-overview button.nav-item,
+#files .raw-files .source-tree-row {
+  width: 100%;
+  min-height: 34px;
+  height: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 3px keeps a two-line 概览 row inside the same 34px box as a one-line tree row. */
+  padding: 3px 8px;
+  border: 0;
+  border-radius: var(--pen-radius-sm);
+  color: var(--pen-secondary);
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  transform: none;
+}
+
+/* 概览 rows carry a subtitle, so label and meta share the column beside the icon. */
+#files .sidebar-overview button.nav-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-content: center;
+  column-gap: 8px;
+  row-gap: 0;
+}
+
+#files .sidebar-overview button.nav-item > .system-symbol {
+  grid-row: 1 / span 2;
+}
+
+#files .sidebar-overview button.nav-item > .nav-label,
+#files .sidebar-overview button.nav-item > .nav-meta {
+  grid-column: 2;
+}
+
+#files .sidebar-overview button.nav-item > .system-symbol,
+#files .raw-files .source-tree-row > .system-symbol {
+  position: static;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  display: grid;
+  place-items: center;
+  color: var(--pen-tertiary);
+  font-size: 16px;
+  transform: none;
+}
+
+#files .raw-files .source-folder-row > .system-symbol {
+  color: var(--pen-accent);
+}
+
+/* The disclosure chevron is the same glyph in a group heading and in a folder row. */
+#files .source-disclosure {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  margin: 0;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  color: var(--pen-tertiary);
+  transform: rotate(-45deg);
+  transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#files .nav-group[open] > .nav-section > .source-disclosure,
+#files .raw-folder[open] > .source-folder-row > .source-disclosure {
+  color: var(--pen-accent);
+  transform: rotate(45deg);
+}
+
+/* Labels ---------------------------------------------------------------------------------------- */
+
+#files .sidebar-overview .nav-label,
+#files .raw-files .nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#files .sidebar-overview .nav-meta {
+  min-width: 0;
+  margin-top: 0;
+  overflow: hidden;
+  color: var(--pen-tertiary);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Group headings and folder rows ----------------------------------------------------------------- */
+
+#files .sidebar-overview .nav-section,
+#files .raw-files .source-folder-row {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 3px 8px;
+  border-radius: var(--pen-radius-sm);
+  color: var(--pen-tertiary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#files .sidebar-overview > .nav-group > .nav-section {
+  margin-top: 8px;
+}
+
+#files .sidebar-overview > .nav-group:first-child > .nav-section {
+  margin-top: 0;
+}
+
+#files .raw-files .source-folder-row {
+  color: var(--pen-secondary);
+}
+
+/* States ---------------------------------------------------------------------------------------- */
+
+#files .sidebar-overview button.nav-item:hover,
+#files .sidebar-overview .nav-section:hover,
+#files .raw-files .source-tree-row:hover:not(.selected) {
+  color: var(--pen-text);
+  background: var(--pen-surface-subtle);
+  transform: none;
+}
+
+#files .sidebar-overview button.nav-item.selected,
+#files .sidebar-overview button.nav-item.selected:hover,
+#files .raw-files .source-tree-row.selected,
+#files .raw-files .source-tree-row.selected:hover {
+  color: var(--pen-accent);
+  background: var(--pen-accent-soft);
+  box-shadow: none;
+  transform: none;
+  font-weight: 600;
+}
+
+#files .sidebar-overview button.nav-item.selected > .system-symbol,
+#files .sidebar-overview button.nav-item.selected .nav-meta,
+#files .raw-files .source-tree-row.selected > .system-symbol {
+  color: var(--pen-accent);
+}
+
+#files button:disabled {
+  opacity: 0.45;
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -564,6 +765,421 @@ main {
 }
 
 /* -------------------------------------------------------------------------------------------------
+ * Canvas toolbar controls
+ *
+ * Mirrors the Pen "画布工具条" component: a pill of 26px icon buttons on a
+ * sunken track, the active item raised on the surface colour with a 1px
+ * inner hairline. Group padding and gap are 2px, radii come from the scale.
+ * ------------------------------------------------------------------------------------------------- */
+
+.preview-tool-toggle,
+.preview-choice,
+#canvas-background-choice {
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid transparent;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.preview-tool-toggle {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--pen-radius-sm);
+}
+
+.preview-tool-toggle .system-symbol,
+.preview-tool-toggle .system-symbol svg,
+.preview-choice button .system-symbol,
+.preview-choice button .system-symbol svg {
+  width: 15px;
+  height: 15px;
+}
+
+.preview-choice button,
+#canvas-background-choice button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: var(--pen-radius-xs);
+  color: var(--pen-tertiary);
+  background: transparent;
+  box-shadow: none;
+}
+
+.preview-choice button:hover:not(:disabled),
+#canvas-background-choice button:hover:not(:disabled) {
+  color: var(--pen-text);
+}
+
+.preview-choice button.active,
+#canvas-background-choice button.active,
+.preview-tool-toggle.active {
+  color: var(--pen-accent);
+  background: var(--pen-surface);
+  box-shadow: inset 0 0 0 1px var(--pen-line);
+}
+
+/* The device pill carries the model name next to a leading glyph. */
+#device-control {
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+}
+
+#device-control > span {
+  display: none;
+}
+
+#device-control select,
+#device {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 22px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--pen-text);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+#device-control select:focus,
+#device:focus {
+  outline: 0;
+  box-shadow: none;
+}
+
+.toolbar-divider,
+.preview-toolbar-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: var(--pen-line);
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Floating zoom control
+ *
+ * Mirrors the Pen "缩放控件 · 悬浮" component: a vertical frosted pill with
+ * in / out discs, the numeric zoom, and a 适应 affordance.
+ * ------------------------------------------------------------------------------------------------- */
+
+.preview-zoom-control {
+  bottom: 18px;
+  width: auto;
+  height: auto;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-pill);
+  background: color-mix(in srgb, var(--pen-surface) 72%, transparent);
+  box-shadow: 0 6px 18px -2px rgb(18 20 25 / 22%);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+.preview-zoom-control button {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--pen-radius-pill);
+  color: var(--pen-secondary);
+  background: color-mix(in srgb, var(--pen-text) 5%, transparent);
+}
+
+.preview-zoom-control button:hover:not(:disabled) {
+  color: var(--pen-text);
+  background: color-mix(in srgb, var(--pen-text) 10%, transparent);
+}
+
+#preview-zoom-value,
+#preview-zoom-label {
+  color: var(--pen-text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+}
+
+#preview-zoom-label {
+  color: var(--pen-tertiary);
+  font-size: 9.5px;
+  font-weight: 400;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Floating multi-select toolbar
+ *
+ * Mirrors the Pen "多选对齐工具条": a raised bar that appears at the BOTTOM of
+ * the canvas whenever more than one key is selected, carrying the selection
+ * count and the align / size / distribute actions.
+ * ------------------------------------------------------------------------------------------------- */
+
+.canvas-multi-toolbar {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  z-index: 6;
+  display: none;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-md);
+  background: var(--pen-surface);
+  box-shadow: 0 14px 34px -8px rgb(18 20 25 / 26%);
+  transform: translateX(-50%);
+}
+
+.canvas-multi-toolbar[data-available="true"] {
+  display: flex;
+}
+
+/* The bar is an edit-mode affordance; interaction preview stays clean. */
+.canvas-wrap:has(.device-shell[data-mode="preview"]) .canvas-multi-toolbar[data-available="true"] {
+  display: none;
+}
+
+.canvas-multi-count {
+  padding: 0 8px;
+  color: var(--pen-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.canvas-multi-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--pen-line);
+}
+
+.canvas-multi-toolbar button {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--pen-radius-sm);
+  background: transparent;
+  color: var(--pen-secondary);
+  cursor: pointer;
+}
+
+.canvas-multi-toolbar button:hover:not(:disabled) {
+  background: var(--pen-surface-subtle);
+  color: var(--pen-text);
+}
+
+.canvas-multi-toolbar button:disabled {
+  opacity: 0.34;
+  cursor: default;
+}
+
+.canvas-multi-toolbar button .system-symbol,
+.canvas-multi-toolbar button .system-symbol svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * AI draft review
+ *
+ * The AI never writes straight into the skin: a finished run becomes a draft
+ * that lists the touched files and their before/after snippets until the user
+ * applies it. Keys the draft would change are marked on the canvas.
+ * ------------------------------------------------------------------------------------------------- */
+
+.ai-draft-panel {
+  margin: 0 12px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--pen-line);
+  border-left: 3px solid var(--pen-selection);
+  border-radius: var(--pen-radius-md);
+  background: var(--pen-surface);
+}
+
+.ai-draft-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ai-draft-head h3 {
+  margin: 0;
+  color: var(--pen-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ai-draft-head span {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+}
+
+.ai-draft-files {
+  max-height: 210px;
+  margin: 8px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.ai-draft-files li {
+  padding: 7px 0;
+  border-top: 1px solid var(--pen-line);
+}
+
+.ai-draft-file-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--pen-text);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.ai-draft-file-head em {
+  color: var(--pen-tertiary);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.ai-draft-diff {
+  margin: 5px 0 0;
+  padding: 6px 8px;
+  border-radius: var(--pen-radius-xs);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-secondary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.ai-draft-diff del {
+  color: var(--pen-state-danger);
+  text-decoration: line-through;
+}
+
+.ai-draft-diff ins {
+  color: var(--pen-state-ok);
+  text-decoration: none;
+}
+
+.ai-draft-note {
+  margin: 8px 0 0;
+  color: var(--pen-tertiary);
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+
+.ai-draft-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ai-draft-actions button {
+  flex: 1;
+  height: 30px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ai-draft-apply {
+  border-color: transparent !important;
+  background: var(--pen-accent) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
+.ai-draft-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Gesture hot zones
+ *
+ * Shown over the selected key so 点击 / 上下左右滑动 / 长按 are visible and
+ * directly pickable instead of living only in a dropdown.
+ * ------------------------------------------------------------------------------------------------- */
+
+.preview-gestures {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.preview-gestures[hidden] {
+  display: none;
+}
+
+.preview-gesture-zone {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* Zones are revealed by the canvas hit test, not by CSS hover, because the
+ * overlay itself is click-through until a zone is live. */
+.preview-gestures[data-live="false"] .preview-gesture-zone {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.preview-gestures[data-live="true"] .preview-gesture-zone {
+  opacity: 1;
+}
+
+.preview-gesture-zone rect {
+  fill: color-mix(in srgb, var(--pen-surface) 82%, transparent);
+  stroke: var(--pen-selection);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.preview-gesture-zone:hover rect {
+  fill: var(--pen-selection-soft);
+}
+
+.preview-gesture-zone text {
+  fill: var(--pen-text);
+  font-size: var(--preview-gesture-font-size, 12px);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.preview-gesture-zone .preview-gesture-caption {
+  fill: var(--pen-secondary);
+  font-size: calc(var(--preview-gesture-font-size, 12px) * 0.72);
+  font-weight: 400;
+}
+
+/* -------------------------------------------------------------------------------------------------
  * Dialogs / overlays
  * ------------------------------------------------------------------------------------------------- */
 
@@ -639,58 +1255,100 @@ main {
   }
 
   .preview-zoom-control {
-    bottom: 26px;
+    /* The vertical pill is a desktop affordance; on a phone-sized viewport it
+       would eat too much of the canvas, so it goes back to a flat strip. */
+    bottom: 14px;
+    flex-direction: row;
+    gap: 4px;
+    padding: 4px 6px;
     box-shadow: 0 3px 10px rgb(18 20 25 / 12%);
+  }
+
+  .preview-zoom-control button {
+    width: 22px;
+    height: 22px;
+  }
+
+  #preview-zoom-label {
+    display: none;
+  }
+
+  .canvas-multi-toolbar {
+    bottom: 10px;
+    max-width: calc(100% - 16px);
+    overflow-x: auto;
+  }
+
+  .canvas-multi-count {
+    padding: 0 6px;
+    font-size: 10.5px;
   }
 }
 
-/* Desktop text actions: match the Pen title bar file operations. */
-.toolbar-button.pen-text-action,
-.toolbar-more.pen-export-menu > summary.pen-text-action {
-  width: auto;
-  min-width: 0;
+/* Title bar file operations are collapsed into one overflow (hamburger) menu. */
+.toolbar-more.pen-file-menu {
+  flex: none;
+}
+
+.toolbar-more.pen-file-menu > summary {
+  width: 28px;
+  min-width: 28px;
   height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0 10px;
-  border-radius: var(--pen-radius-sm);
-  background: transparent;
-  color: var(--pen-secondary);
+  padding: 0;
+  display: grid;
+  place-items: center;
 }
 
-.toolbar-button.pen-text-action > span:not(.icon):not(.system-symbol),
-.toolbar-more.pen-export-menu > summary.pen-text-action > span:not(.icon):not(.system-symbol) {
-  display: inline;
-  color: inherit;
-  font-size: 12px;
-  font-weight: 400;
+.toolbar-more.pen-file-menu > summary .system-symbol,
+.toolbar-more.pen-file-menu > summary .system-symbol svg {
+  width: 16px;
+  height: 16px;
 }
 
-.toolbar-button.pen-text-action:hover:not(:disabled),
-.toolbar-more.pen-export-menu > summary.pen-text-action:hover {
-  background: var(--pen-surface-subtle);
+.toolbar-more.pen-file-menu[open] > summary {
+  background: color-mix(in srgb, var(--pen-surface-subtle) 78%, var(--pen-line));
   color: var(--pen-text);
 }
 
-.toolbar-button.pen-text-action:active:not(:disabled),
-.toolbar-more.pen-export-menu > summary.pen-text-action:active {
-  background: color-mix(in srgb, var(--pen-surface-subtle) 76%, var(--pen-line));
+.pen-file-menu .toolbar-menu {
+  width: 268px;
+  max-width: calc(100vw - 24px);
+  transform-origin: top left;
 }
 
-.pen-export-menu .export-actions {
-  min-width: 228px;
-}
-
-.pen-export-menu .export-actions .export-action {
+.pen-file-menu .file-actions button {
   width: 100%;
+  display: flex;
+  align-items: center;
   justify-content: flex-start;
+  gap: 8px;
+  white-space: nowrap;
+  text-align: left;
 }
 
-@media (max-width: 760px) {
-  .toolbar-button.pen-text-action,
-  .toolbar-more.pen-export-menu {
-    display: none;
+.pen-file-menu .file-actions button .system-symbol {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.toolbar-menu-label {
+  display: block;
+  padding: 5px 9px 3px;
+  color: var(--pen-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 950px) and (max-height: 600px) and (orientation: landscape) {
+  .toolbar-more.pen-file-menu > summary {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+  }
+
+  .pen-file-menu .toolbar-menu {
+    max-width: calc(100vw - 16px);
   }
 }
