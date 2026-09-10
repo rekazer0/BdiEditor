@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>检查器扁平化UI - 简洁设计</title>
+  <link rel="stylesheet" href="src/style.css">
+  <style>
+    body {
+      padding: 20px;
+      max-width: 380px;
+      margin: 0 auto;
+      background: var(--panel);
+    }
+
+    .demo-inspector {
+      background: var(--inspector);
+      border-radius: var(--radius-xl);
+      padding: var(--space-lg);
+      box-shadow: 0 4px 20px rgb(0 0 0 / 8%);
+    }
+
+    .demo-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-xl);
+      padding-bottom: var(--space-md);
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .demo-title {
+      display: grid;
+      gap: 4px;
+    }
+
+    .demo-title strong {
+      font-size: var(--text-lg);
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .demo-title small {
+      font-size: var(--text-sm);
+      color: var(--secondary);
+    }
+
+    .demo-actions {
+      display: flex;
+      gap: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-inspector">
+    <!-- 头部 -->
+    <div class="demo-header">
+      <div class="demo-title">
+        <strong>KEY5 · k</strong>
+        <small>py_9.ini · 已选 1 个按键</small>
+      </div>
+      <div class="demo-actions">
+        <button class="inspector-tool-button" title="选择">
+          <svg class="system-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
+          </svg>
+        </button>
+        <button class="inspector-tool-button" title="移动">
+          <svg class="system-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 9l-3 3 3 3M9 5l3-3 3 3m0 14l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/>
+          </svg>
+        </button>
+        <button class="inspector-tool-button" title="复制">
+          <svg class="system-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+        </button>
+        <button class="inspector-tool-button" title="删除">
+          <svg class="system-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 位置与尺寸 -->
+    <div class="inspector-group">
+      <h3>位置与尺寸</h3>
+
+      <!-- 位置 -->
+      <div class="geometry-fields" style="margin-bottom: 8px;">
+        <label>
+          <span style="font-size: 10px; color: var(--tertiary);">X 位置</span>
+          <input type="number" value="427" />
+        </label>
+        <label>
+          <span style="font-size: 10px; color: var(--tertiary);">Y 位置</span>
+          <input type="number" value="143" />
+        </label>
+        <label>
+          <span style="font-size: 10px; color: var(--tertiary);">宽度</span>
+          <input type="number" value="227" />
+        </label>
+        <label>
+          <span style="font-size: 10px; color: var(--tertiary);">高度</span>
+          <input type="number" value="133" />
+        </label>
+      </div>
+
+      <p class="geometry-hint">方向键移动 1 px · Shift + 方向键移动 10 px</p>
+    </div>
+
+    <!-- 对齐与间距 -->
+    <div class="inspector-group">
+      <h3>对齐与间距</h3>
+
+      <!-- 间距输入 -->
+      <div class="gap-fields" style="margin-bottom: 12px;">
+        <label>
+          <span style="font-size: 10px; color: var(--tertiary); display: block; margin-bottom: 4px;">水平间距</span>
+          <input type="number" placeholder="多选后启用" disabled />
+        </label>
+        <label>
+          <span style="font-size: 10px; color: var(--tertiary); display: block; margin-bottom: 4px;">垂直间距</span>
+          <input type="number" placeholder="多选后启用" disabled />
+        </label>
+      </div>
+
+      <!-- 对齐按钮 -->
+      <div class="alignment-section">
+        <div class="alignment-group">
+          <div class="alignment-label">对齐</div>
+          <div class="alignment-buttons">
+            <button class="alignment-button">
+              <svg class="system-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="17" y1="10" x2="3" y2="10"/>
+                <line x1="21" y1="6" x2="3" y2="6"/>
+                <line x1="21" y1="14" x2="3" y2="14"/>
+                <line x1="17" y1="18" x2="3" y2="18"/>
+              </svg>
+              左对齐
+            </button>
+            <button class="alignment-button">
+              <svg class="system-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="10" x2="6" y2="10"/>
+                <line x1="21" y1="6" x2="3" y2="6"/>
+                <line x1="21" y1="14" x2="3" y2="14"/>
+                <line x1="18" y1="18" x2="6" y2="18"/>
+              </svg>
+              右对齐
+            </button>
+            <button class="alignment-button">
+              <svg class="system-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="10" x2="12" y2="2"/>
+                <line x1="12" y1="14" x2="12" y2="22"/>
+                <line x1="6" y1="12" x2="6" y2="12"/>
+                <line x1="18" y1="12" x2="18" y2="12"/>
+              </svg>
+              顶对齐
+            </button>
+            <button class="alignment-button">
+              <svg class="system-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="2" x2="12" y2="10"/>
+                <line x1="12" y1="22" x2="12" y2="14"/>
+                <line x1="6" y1="12" x2="6" y2="12"/>
+                <line x1="18" y1="12" x2="18" y2="12"/>
+              </svg>
+              底对齐
+            </button>
+          </div>
+        </div>
+
+        <!-- 尺寸 -->
+        <div class="alignment-group">
+          <div class="alignment-label">尺寸</div>
+          <div class="alignment-buttons">
+            <button class="alignment-button">
+              <svg class="system-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="5" y1="3" x2="19" y2="3"/>
+                <line x1="5" y1="21" x2="19" y2="21"/>
+                <polyline points="9 6 12 3 15 6"/>
+                <polyline points="9 18 12 21 15 18"/>
+              </svg>
+              统一宽度
+            </button>
+            <button class="alignment-button">
+              <svg class="system-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="5" x2="3" y2="19"/>
+                <line x1="21" y1="5" x2="21" y2="19"/>
+                <polyline points="18 9 21 12 18 15"/>
+                <polyline points="6 9 3 12 6 15"/>
+              </svg>
+              统一高度
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 分布 -->
+    <div class="inspector-group">
+      <h3>分布</h3>
+
+      <div class="distribution-section">
+        <div class="alignment-group">
+          <div class="alignment-label">分布</div>
+          <div class="distribution-buttons">
+            <button class="distribution-button">
+              <svg class="system-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="4" y1="6" x2="4" y2="18"/>
+                <line x1="8" y1="6" x2="8" y2="18"/>
+                <line x1="16" y1="6" x2="16" y2="18"/>
+                <line x1="20" y1="6" x2="20" y2="18"/>
+              </svg>
+              水平等间距
+            </button>
+            <button class="distribution-button">
+              <svg class="system-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="6" y1="4" x2="18" y2="4"/>
+                <line x1="6" y1="8" x2="18" y2="8"/>
+                <line x1="6" y1="16" x2="18" y2="16"/>
+                <line x1="6" y1="20" x2="18" y2="20"/>
+              </svg>
+              垂直等间距
+            </button>
+          </div>
+        </div>
+
+        <div class="alignment-group">
+          <div class="alignment-label">操作</div>
+          <div class="distribution-buttons">
+            <button class="distribution-button">
+              <svg class="system-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                <line x1="10" y1="11" x2="10" y2="17"/>
+                <line x1="14" y1="11" x2="14" y2="17"/>
+              </svg>
+              交换位置
+            </button>
+            <button class="distribution-button">
+              <svg class="system-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 12V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6"/>
+                <path d="M4 18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6H4v6z"/>
+                <line x1="12" y1="2" x2="12" y2="12"/>
+              </svg>
+              合并按键
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 自动保存提示 -->
+    <div style="margin-top: var(--space-xl); text-align: center;">
+      <span class="autosave-indicator">已自动保存</span>
+    </div>
+  </div>
+
+  <script>
+    // 主题切换
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (isDark) {
+      document.documentElement.setAttribute('data-app-theme', 'dark');
+    }
+  </script>
+</body>
+</html>

@@ -12,7 +12,7 @@ import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messag
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy"
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy"
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy"
-import { invoke } from "@tauri-apps/api/core"
+import { Channel, invoke } from "@tauri-apps/api/core"
 import { AiSkinWorkspace, type AiSkinDraftChange, type AiSkinEditableFile } from "./ai-skin-workspace.ts"
 import type { ModelProtocol } from "./model-providers.ts"
 
@@ -42,7 +42,7 @@ export type AiDesignResult = {
 export type AiDesignConversation = AgentMessage[]
 
 type StatusKind = "thinking" | "reading" | "editing" | "done"
-type ModelHttpResponse = { status: number; headers: Array<[string, string]>; body: number[] }
+type ModelHttpEvent = { type: "headers"; status: number; headers: Array<[string, string]> } | { type: "chunk"; body: number[] }
 
 const MAX_TOOL_CALLS = 80
 const MAX_TURNS = 12
@@ -268,10 +268,37 @@ async function nativeModelFetch(input: RequestInfo | URL, init: RequestInit = {}
   const headers = new Headers(input instanceof Request ? input.headers : undefined)
   new Headers(init.headers).forEach((value, name) => headers.set(name, value))
   if (init.body != null && typeof init.body !== "string") throw new Error("模型请求体格式不受支持")
-  const response = await invoke<ModelHttpResponse>("model_http_request", {
-    request: { url, method: init.method ?? (input instanceof Request ? input.method : "POST"), headers: [...headers], body: init.body ?? null },
+  const signal = init.signal ?? (input instanceof Request ? input.signal : undefined)
+  signal?.throwIfAborted()
+  return new Promise<Response>((resolve, reject) => {
+    let stream: ReadableStreamDefaultController<Uint8Array>
+    let finished = false
+    const finish = (error?: unknown) => {
+      if (finished) return
+      finished = true
+      signal?.removeEventListener("abort", abort)
+      if (error) { stream.error(error); reject(error) }
+      else stream.close()
+    }
+    const abort = () => finish(new DOMException("AI 设计已取消", "AbortError"))
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) { stream = controller },
+      cancel() { finished = true; signal?.removeEventListener("abort", abort) },
+    })
+    const events = new Channel<ModelHttpEvent>()
+    events.onmessage = (event) => {
+      if (finished) return
+      if (event.type === "headers") {
+        resolve(new Response([204, 205, 304].includes(event.status) ? null : body, { status: event.status, headers: event.headers }))
+      } else stream.enqueue(new Uint8Array(event.body))
+    }
+    signal?.addEventListener("abort", abort, { once: true })
+    if (signal?.aborted) { abort(); return }
+    void invoke("model_http_request", {
+      request: { url, method: init.method ?? (input instanceof Request ? input.method : "POST"), headers: [...headers], body: init.body ?? null },
+      events,
+    }).then(() => finish(), (error) => finish(new Error(String(error))))
   })
-  return new Response(new Uint8Array(response.body), { status: response.status, headers: response.headers })
 }
 
 export async function runAiSkinDesign(
@@ -283,6 +310,7 @@ export async function runAiSkinDesign(
     signal?: AbortSignal
     onStatus?: (kind: StatusKind, text: string) => void
     onTextDelta?: (delta: string) => void | Promise<void>
+    onThinking?: (text: string) => void | Promise<void>
   } = {},
 ): Promise<AiDesignResult> {
   if (!normalizedUrl(config.apiUrl)) throw new Error("请先配置模型 API 地址")
@@ -336,7 +364,12 @@ export async function runAiSkinDesign(
     },
     maxRetryDelayMs: 10_000,
   })
+  let thinking = ""
   const unsubscribe = agent.subscribe(async (event) => {
+    if (event.type === "message_update" && event.assistantMessageEvent.type === "thinking_delta") {
+      thinking += event.assistantMessageEvent.delta
+      await options.onThinking?.(thinking)
+    }
     const status = eventStatus(event)
     if (status) options.onStatus?.(status.kind, status.text)
     if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {

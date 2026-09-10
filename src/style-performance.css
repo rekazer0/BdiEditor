@@ -19,8 +19,7 @@
   backface-visibility: hidden;
 }
 
-/* 优化滚动性能 */
-.sidebar,
+/* 优化滚动性能（侧栏自身不滚动，由 #files 承担滚动） */
 .source,
 .resource-gallery,
 #files,

@@ -11,7 +11,7 @@
     "deploy:cloudbase": "tcb app deploy",
     "version:feature": "node scripts/bump-version.mjs feature",
     "version:bugfix": "node scripts/bump-version.mjs bugfix",
-    "tauri": "tauri"
+    "tauri": "node scripts/tauri.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.0",

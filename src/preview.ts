@@ -25,8 +25,6 @@ type Rect = { x: number; y: number; width: number; height: number }
 type NineSliceCanvas = Pick<HTMLCanvasElement, "width" | "height" | "getContext">
 
 let nineSliceBuffer: HTMLCanvasElement | undefined
-// 九宫格缓存，避免重复渲染相同尺寸
-const nineSliceCache = new Map<string, HTMLCanvasElement>()
 
 export function setCanvasSize(
   canvas: Pick<HTMLCanvasElement, "width" | "height">,
@@ -42,11 +40,6 @@ export function setCanvasSize(
 function sharedNineSliceBuffer(): HTMLCanvasElement {
   nineSliceBuffer ??= document.createElement("canvas")
   return nineSliceBuffer
-}
-
-// 清理九宫格缓存
-export function clearNineSliceCache(): void {
-  nineSliceCache.clear()
 }
 
 function nineSliceAxis(size: number, leading: number, trailing: number): [number, number, number, number] {
@@ -68,57 +61,39 @@ export function drawNineSliceImage(
   const [ix, iy, iw, ih] = visual.inner
   const width = Math.max(1, Math.round(destination.width))
   const height = Math.max(1, Math.round(destination.height))
+  // 此画布会被下一次绘制覆盖，不能作为不同样式或尺寸的缓存结果。
+  const buffer = createCanvas()
+  buffer.width = width
+  buffer.height = height
+  const bufferContext = buffer.getContext("2d")
+  if (!bufferContext) return
+  bufferContext.imageSmoothingEnabled = true
+  bufferContext.imageSmoothingQuality = "high"
 
-  // 生成缓存键 - 使用图片对象而非 src 属性
-  const imageKey = visual.image instanceof HTMLImageElement ? visual.image.src : String(visual.image)
-  const cacheKey = `${imageKey}-${sx}-${sy}-${sw}-${sh}-${ix}-${iy}-${iw}-${ih}-${width}-${height}`
-
-  let buffer = nineSliceCache.get(cacheKey)
-  if (!buffer) {
-    const newBuffer = createCanvas() as HTMLCanvasElement
-    newBuffer.width = width
-    newBuffer.height = height
-    const bufferContext = newBuffer.getContext("2d")
-    if (!bufferContext) return
-    bufferContext.imageSmoothingEnabled = true
-    bufferContext.imageSmoothingQuality = "high"
-
-    const xs = [0, ix, ix + iw, sw]
-    const ys = [0, iy, iy + ih, sh]
-    const dx = nineSliceAxis(width, ix, sw - ix - iw)
-    const dy = nineSliceAxis(height, iy, sh - iy - ih)
-    for (let row = 0; row < 3; row++) {
-      for (let column = 0; column < 3; column++) {
-        const sourceWidth = xs[column + 1] - xs[column]
-        const sourceHeight = ys[row + 1] - ys[row]
-        const targetWidth = dx[column + 1] - dx[column]
-        const targetHeight = dy[row + 1] - dy[row]
-        if (sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) continue
-        bufferContext.drawImage(
-          visual.image,
-          sx + xs[column],
-          sy + ys[row],
-          sourceWidth,
-          sourceHeight,
-          dx[column],
-          dy[row],
-          targetWidth,
-          targetHeight,
-        )
-      }
+  const xs = [0, ix, ix + iw, sw]
+  const ys = [0, iy, iy + ih, sh]
+  const dx = nineSliceAxis(width, ix, sw - ix - iw)
+  const dy = nineSliceAxis(height, iy, sh - iy - ih)
+  for (let row = 0; row < 3; row++) {
+    for (let column = 0; column < 3; column++) {
+      const sourceWidth = xs[column + 1] - xs[column]
+      const sourceHeight = ys[row + 1] - ys[row]
+      const targetWidth = dx[column + 1] - dx[column]
+      const targetHeight = dy[row + 1] - dy[row]
+      if (sourceWidth <= 0 || sourceHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) continue
+      bufferContext.drawImage(
+        visual.image,
+        sx + xs[column],
+        sy + ys[row],
+        sourceWidth,
+        sourceHeight,
+        dx[column],
+        dy[row],
+        targetWidth,
+        targetHeight,
+      )
     }
-
-    // 缓存大小限制，避免内存泄漏
-    if (nineSliceCache.size > 100) {
-      const firstKey = nineSliceCache.keys().next().value
-      if (firstKey !== undefined) {
-        nineSliceCache.delete(firstKey)
-      }
-    }
-    nineSliceCache.set(cacheKey, newBuffer)
-    buffer = newBuffer
   }
-
   context.drawImage(
     buffer as CanvasImageSource,
     0,
@@ -2301,7 +2276,12 @@ export class Preview {
 
     // 拖拽时跳过 resolver 的 ready 等待，使用已缓存的数据
     if (!isDragging) {
-      await this.resolver?.ready?.()
+      try {
+        await this.resolver?.ready?.()
+      } catch (error) {
+        console.warn("预览解析准备失败:", error)
+        return
+      }
     }
 
     const panelAnimationElapsed = this.legacyPanelAnimationStartedAt
@@ -2360,47 +2340,65 @@ export class Preview {
       toolbarImages = this.lastRenderCache.toolbarImages
     } else {
       // 正常渲染：完整解析所有视觉元素
-      [panel, visuals, toolbarImages] = await Promise.all([
-        this.resolver?.resolve(this.panelStyle, false),
-        Promise.all(keys.map(async (key) => {
-          const highlighted = this.active?.key.section === key.section ||
-            this.legacyAnimationState?.key.section === key.section
-          return {
-            back: await this.resolveVisual(
-              highlighted ? key.highlightBackStyle ?? key.backStyle : key.backStyle,
-              highlighted,
-            ),
-            fore: await Promise.all(
-              key.foreStyles.map((style) => this.resolveVisual(style, highlighted)),
-            ),
-            text: this.resolver?.resolveText(key.foreStyles.join(","), highlighted),
-            styleTexts: key.foreStyles.map((style) =>
-              this.resolver?.resolveStyleText?.(style, highlighted)
-            ),
-          }
-        })),
-        this.resolveToolbar(),
-      ])
-      // 保存缓存供拖拽时使用
-      this.lastRenderCache = { panel, visuals, toolbarImages }
+      try {
+        [panel, visuals, toolbarImages] = await Promise.all([
+          this.resolver?.resolve(this.panelStyle, false).catch(() => undefined),
+          Promise.all(keys.map(async (key) => {
+            const highlighted = this.active?.key.section === key.section ||
+              this.legacyAnimationState?.key.section === key.section
+            try {
+              return {
+                back: await this.resolveVisual(
+                  highlighted ? key.highlightBackStyle ?? key.backStyle : key.backStyle,
+                  highlighted,
+                ).catch(() => undefined),
+                fore: await Promise.all(
+                  key.foreStyles.map((style) => this.resolveVisual(style, highlighted).catch(() => undefined)),
+                ),
+                text: this.resolver?.resolveText(key.foreStyles.join(","), highlighted),
+                styleTexts: key.foreStyles.map((style) =>
+                  this.resolver?.resolveStyleText?.(style, highlighted)
+                ),
+              }
+            } catch (error) {
+              console.warn(`解析按键 ${key.section} 失败:`, error)
+              return {
+                back: undefined,
+                fore: [],
+                text: undefined,
+                styleTexts: [],
+              }
+            }
+          })),
+          this.resolveToolbar().catch(() => []),
+        ])
+        // 保存缓存供拖拽时使用
+        this.lastRenderCache = { panel, visuals, toolbarImages }
+      } catch (error) {
+        console.warn("预览渲染解析失败:", error)
+        // 使用空数据继续渲染，避免完全失败
+        panel = undefined
+        visuals = keys.map(() => ({ back: undefined, fore: [], text: undefined, styleTexts: [] }))
+        toolbarImages = []
+      }
     }
 
     const [particleVisuals, hintVisuals, hintTextVisual, hintSelectedTextVisual, hintCellVisuals] = await Promise.all([
       Promise.all(particleStyleIDs.map(async (styleID) =>
-        await this.resolveResource(styleID)
+        await this.resolveResource(styleID).catch(() => undefined)
       )),
       hintIcon
         ? Promise.all([
-            this.resolveVisual(hintIcon.backStyle, false),
-            this.resolveVisual(hintIcon.foreStyle, false),
+            this.resolveVisual(hintIcon.backStyle, false).catch(() => undefined),
+            this.resolveVisual(hintIcon.foreStyle, false).catch(() => undefined),
           ])
         : Promise.resolve([undefined, undefined]),
       hintIcon ? this.resolver?.resolveText(hintIcon.foreStyle, false) : undefined,
       hintIcon ? this.resolver?.resolveText(hintIcon.foreStyle, true) : undefined,
       hintBar && hintConfig?.cellStyle
         ? Promise.all([
-            this.resolveVisual(hintConfig.cellStyle, false),
-            this.resolveVisual(hintConfig.cellStyle, true),
+            this.resolveVisual(hintConfig.cellStyle, false).catch(() => undefined),
+            this.resolveVisual(hintConfig.cellStyle, true).catch(() => undefined),
           ])
         : Promise.resolve([undefined, undefined]),
     ])

@@ -6,6 +6,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview"
 import { message, open, save } from "@tauri-apps/plugin-dialog"
 import { readFile, watch, writeFile, type UnwatchFn } from "@tauri-apps/plugin-fs"
 import "./style.css"
+import "./pen-design-application.css"
 import { initPerformanceOptimization } from "./performance-init"
 import { initializeSettingsPreviews } from "./settings-preview"
 import type { AiChatController, AiChatRunHooks, AiChatRunResult } from "./ai-chat.ts"
@@ -426,13 +427,9 @@ const panelTargetHeight = $("#panel-target-height") as HTMLInputElement
 const panelScaleSummary = $("#panel-scale-summary")
 const quickInspector = $("#quick-inspector")
 const mobileInspectorGroups = $("#mobile-inspector-groups")
-const keyToolbar = $(".key-toolbar")
-const keyInspectorTitle = $(".key-inspector-title")
 const selectedKeyName = $("#selected-key")
 const selectedKeyPreview = $("#selected-key-preview")
 const selectedKeyContext = $("#selected-key-context")
-const selectedKeySaveState = $("#selected-key-save-state")
-const selectedKeyReset = $("#selected-key-reset") as HTMLButtonElement
 const keyFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-key-field]"))
 const styleFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-style-field]"))
 const primaryCssFields = $("#primary-css-fields")
@@ -480,6 +477,7 @@ const inspectorTabButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-inspector-tab]"),
 )
 const inspectorTabs = $(".inspector-tabs")
+const inspectorBackButton = $("#inspector-back") as HTMLButtonElement
 const aiDesignPanel = $("#ai-design-panel")
 const aiDesignStatus = $("#ai-design-status")
 const aiDesignChat = $("#ai-design-chat")
@@ -1488,10 +1486,6 @@ function syncSegmentedControls(): void {
 function syncMobileInspectorHeader(): void {
   mobileInspectorSelection.textContent = selectedKeyName.textContent
   sourceHeading.dataset.mobileKeyTools = selectedKeySections.length ? "on" : "off"
-  // Keep the key operation selector attached to the selected-key card. Moving
-  // it into the gesture fields (or the pane heading on mobile) makes the
-  // controls appear detached at the bottom of the inspector.
-  if (keyToolbar.parentElement !== keyInspectorTitle) keyInspectorTitle.append(keyToolbar)
 }
 
 function mobileInspectorGroupLabel(group: HTMLElement): string {
@@ -1514,7 +1508,9 @@ function mobileInspectorGroupLabel(group: HTMLElement): string {
 
 function mobileInspectorGroupSymbol(label: string): string {
   if (/提示栏|候选栏/.test(label)) return "text.bubble"
+  if (/粒子|动画|动效/.test(label)) return "sparkles"
   if (/扩展区域/.test(label)) return "square.2.layers.3d"
+  if (/基本信息|全局/.test(label)) return "info.circle"
   if (/布局|面板|输入区/.test(label)) return "rectangle.3.group"
   if (/样式|外观|颜色/.test(label)) return "paintbrush"
   if (/文字|字体|内容/.test(label)) return "doc.text"
@@ -2050,7 +2046,6 @@ function updateDirty(): void {
 function updateHistoryButtons(): void {
   undoButton.disabled = undoStack.length === 0
   redoButton.disabled = redoStack.length === 0
-  selectedKeyReset.disabled = undoStack.length === 0
 }
 
 function commitText(path: string, before: string, after: string, coalesce = false): void {
@@ -3413,12 +3408,12 @@ function drawAtlas(): void {
     const [x, y, width, height] = slice.source
     const selected = slice.index === selectedTileIndex || slice.source === tileDraft
     context.lineWidth = selected ? lineWidth * 2 : lineWidth
-    context.strokeStyle = selected ? "#ff3b30" : "#0a7ff5"
+    context.strokeStyle = selected ? "#ff6b2c" : "#3a6df0"
     context.strokeRect(x + context.lineWidth / 2, y + context.lineWidth / 2, width - context.lineWidth, height - context.lineWidth)
     const usage = bdaTileUsages.find((item) => item.index === slice.index)
     const label = usage?.label ?? `IMG${slice.index}`
     const labelWidth = context.measureText(label).width + 6
-    context.fillStyle = selected ? "#ff3b30" : "#0a7ff5"
+    context.fillStyle = selected ? "#ff6b2c" : "#3a6df0"
     context.fillRect(x, y, labelWidth, Math.max(15, lineWidth * 9))
     context.fillStyle = "#fff"
     context.fillText(label, x + 3, y + 2)
@@ -3454,7 +3449,7 @@ function drawTilePreview(): void {
     destination.x, destination.y, destination.width, destination.height,
   )
   context.lineWidth = 2
-  context.strokeStyle = "#ff3b30"
+  context.strokeStyle = "#ff6b2c"
   context.strokeRect(destination.x + 1, destination.y + 1, destination.width - 2, destination.height - 2)
   if (slice.inner) {
     const inner = tilePreviewInnerRect(slice.source, slice.inner, destination)
@@ -4179,6 +4174,7 @@ workspaceImage.addEventListener("load", clearImagePreviewError)
 workspaceImage.addEventListener("error", showImagePreviewError)
 
 function updateInspectorView(): void {
+  inspectorBackButton.hidden = resourceConfigActive || Boolean(archive?.isImage(selectedPath)) || inspectorTab === "ai"
   const imageSelected = Boolean(archive?.isImage(selectedPath))
   const overviewSelected = Boolean(
     files.querySelector(`.sidebar-overview button[data-path="${CSS.escape(selectedPath)}"]`),
@@ -4235,12 +4231,37 @@ function updateInspectorView(): void {
   loadVisibleSourceEditor()
 }
 
+function syncSourceFindBarOffset(): void {
+  // 悬浮按钮始终贴在搜索栏上方，避免被底部弹出的搜索栏盖住。
+  const height = sourceToolbar.hidden ? 0 : sourceToolbar.offsetHeight
+  sourceEditor.style.setProperty("--source-find-bar-height", `${height}px`)
+}
+
 function updateSourceFindVisibility(): void {
-  const mobileSourceVisible = mobilePortraitQuery.matches && !sourceEditor.hidden
-  sourceFindToggle.hidden = !mobileSourceVisible
-  sourceFindToggle.setAttribute("aria-pressed", String(mobileSourceVisible && sourceFindVisible))
-  sourceFindToggle.title = sourceFindToggle.ariaLabel = sourceFindVisible ? "隐藏查找" : "显示查找"
-  sourceToolbar.hidden = mobileSourceVisible && !sourceFindVisible
+  // 圆形查找按钮悬浮在源代码右下角，点击后底部弹出搜索栏；Ctrl/Cmd + F 也可唤出。
+  const sourceVisible = !sourceEditor.hidden
+  const expanded = sourceVisible && sourceFindVisible
+  sourceFindToggle.hidden = !sourceVisible
+  sourceFindToggle.setAttribute("aria-pressed", String(expanded))
+  sourceFindToggle.setAttribute("aria-expanded", String(expanded))
+  sourceFindToggle.title = sourceFindToggle.ariaLabel = sourceFindVisible ? "收起查找" : "查找（Ctrl/⌘ + F）"
+  sourceToolbar.hidden = !expanded
+  syncSourceFindBarOffset()
+}
+
+function openSourceFind(): void {
+  if (sourceEditor.hidden) return
+  sourceFindVisible = true
+  updateSourceFindVisibility()
+  sourceSearch.focus()
+  sourceSearch.select()
+}
+
+function closeSourceFind(): void {
+  if (!sourceFindVisible) return
+  sourceFindVisible = false
+  updateSourceFindVisibility()
+  sourceFindToggle.focus()
 }
 
 const SOURCE_SEARCH_HIGHLIGHT_LIMIT = 20_000
@@ -5460,6 +5481,24 @@ const documentSectionLabels: Record<string, string> = {
   GLOBAL: "全局设置",
 }
 
+const documentPairFieldLabels: Record<string, [string, string]> = {
+  SIZE: ["宽度", "高度"],
+  POS: ["X", "Y"],
+  CELL_SIZE: ["宽度", "高度"],
+  FIX_SIZE: ["宽度", "高度"],
+}
+
+const documentQuadFieldLabels: Record<string, [string, string, string, string]> = {
+  VIEW_RECT: ["X", "Y", "宽度", "高度"],
+  PADDING: ["左", "上", "右", "下"],
+}
+
+const documentSwitchFields = new Set(["NO_BLUR"])
+const documentNumericFields = new Set([
+  "KEY_NUM", "TIP_NUM", "LIST_NUM", "OFFSET_NUM", "FORE_STYLE_NUM", "ANIM_NUM", "BUILD_NUM",
+  "REPEAT_CNT", "FONT_SIZE", "FONT_WEIGHT",
+])
+
 function translatedConfigLabel(key: string): string {
   return `${documentFieldLabels[key] ?? "扩展配置"}（${key}）`
 }
@@ -5585,9 +5624,17 @@ function populateDocumentInspector(): void {
     if (entry.value.length > 18 || /(?:RECT|IMG|PADDING|ORDER|LIST|SOURCE|FONT_NAME)/.test(entry.key)) {
       label.classList.add("wide")
     }
+    label.dataset.documentKey = entry.key
     const caption = document.createElement("span")
-    caption.textContent = translatedConfigLabel(entry.key)
-    caption.title = entry.key
+    caption.className = "document-field-caption"
+    caption.title = translatedConfigLabel(entry.key)
+    const captionName = document.createElement("span")
+    captionName.className = "document-field-name"
+    captionName.textContent = documentFieldLabels[entry.key] ?? "扩展配置"
+    const captionCode = document.createElement("code")
+    captionCode.className = "document-field-code"
+    captionCode.textContent = entry.key
+    caption.append(captionName, captionCode)
     label.append(caption)
 
     if (specialized && (particlePairFields.has(entry.key) || entry.key === "EMIT_REGION")) {
@@ -5615,11 +5662,98 @@ function populateDocumentInspector(): void {
       return label
     }
 
+    const pairLabels = documentPairFieldLabels[entry.key]
+    const pairValues = entry.value.split(",").map((value) => value.trim())
+    if (!specialized && pairLabels && pairValues.length === pairLabels.length) {
+      const row = document.createElement("span")
+      row.className = "document-pair-inputs"
+      const separator = /SIZE$/.test(entry.key) ? "×" : ","
+      pairLabels.forEach((name, index) => {
+        if (index > 0) {
+          const mark = document.createElement("span")
+          mark.className = "document-pair-separator"
+          mark.textContent = separator
+          row.append(mark)
+        }
+        const input = document.createElement("input")
+        input.type = "number"
+        input.step = "1"
+        input.value = pairValues[index] ?? ""
+        input.placeholder = name
+        input.disabled = !isEditing()
+        input.setAttribute("aria-label", `${translatedConfigLabel(entry.key)} ${name}`)
+        input.addEventListener("change", () => {
+          pairValues[index] = input.value
+          update(entry.section, entry.key, pairValues.join(","))
+        })
+        row.append(input)
+      })
+      label.classList.add("document-pair-field")
+      label.append(row)
+      return label
+    }
+
+    const quadLabels = documentQuadFieldLabels[entry.key]
+    const quadValues = entry.value.split(",").map((value) => value.trim())
+    if (!specialized && quadLabels && quadValues.length === quadLabels.length) {
+      const row = document.createElement("span")
+      row.className = "document-quad-inputs"
+      quadLabels.forEach((name, index) => {
+        const item = document.createElement("span")
+        item.className = "document-subfield"
+        const small = document.createElement("small")
+        small.textContent = name
+        const input = document.createElement("input")
+        input.type = "number"
+        input.step = "1"
+        input.value = quadValues[index] ?? ""
+        input.placeholder = name
+        input.disabled = !isEditing()
+        input.setAttribute("aria-label", `${translatedConfigLabel(entry.key)} ${name}`)
+        input.addEventListener("change", () => {
+          quadValues[index] = input.value
+          update(entry.section, entry.key, quadValues.join(","))
+        })
+        item.append(small, input)
+        row.append(item)
+      })
+      label.classList.add("wide", "document-quad-field")
+      label.append(row)
+      return label
+    }
+
+    if (!specialized && documentSwitchFields.has(entry.key)) {
+      const input = document.createElement("input")
+      input.type = "checkbox"
+      input.checked = !["0", "false", "off", ""].includes(entry.value.trim().toLowerCase())
+      input.disabled = !isEditing()
+      input.setAttribute("aria-label", translatedConfigLabel(entry.key))
+      const control = document.createElement("span")
+      control.className = "document-switch-control"
+      const state = document.createElement("span")
+      state.className = "document-switch-state"
+      state.textContent = input.checked ? "开启" : "关闭"
+      input.addEventListener("change", () => {
+        state.textContent = input.checked ? "开启" : "关闭"
+        update(entry.section, entry.key, input.checked ? "1" : "0")
+      })
+      control.append(input, state)
+      label.classList.add("document-switch-field")
+      label.append(control)
+      return label
+    }
+
     const input = document.createElement("input")
     input.value = entry.value
     input.classList.add("document-property-input")
     input.title = `${translatedConfigLabel(entry.key)}：${entry.value}`
     input.disabled = !isEditing()
+    input.setAttribute("aria-label", translatedConfigLabel(entry.key))
+    if (documentNumericFields.has(entry.key)) {
+      input.type = "number"
+      input.step = "1"
+      input.inputMode = "numeric"
+    }
     if (specialized && ["TOTAL_NUMBER", "BIRTH_RATE"].includes(entry.key)) {
       const value = Math.max(Number(entry.value) || 1, entry.key === "BIRTH_RATE" ? 0.1 : 1)
       input.type = "number"
@@ -5665,8 +5799,29 @@ function populateDocumentInspector(): void {
     const sectionEntries = entries.filter((item) => item.section === section)
     const particle = isParticleSection(selectedDocument, section)
     if (particle) sectionPanel.classList.add("particle-property-section")
+    const sectionLabel = particle
+      ? `粒子动效 ${section.replace(/^ANIM/, "")}（${section}）`
+      : section ? translatedSectionLabel(section) : "基本信息"
+    const sectionName = sectionLabel.replace(/\s*[（(][^）)]*[）)]\s*$/, "")
+    sectionPanel.dataset.inspectorGroupLabel = sectionName
     const heading = document.createElement("h3")
-    heading.textContent = particle ? `粒子动效 ${section.replace(/^ANIM/, "")}（${section}）` : section ? translatedSectionLabel(section) : "基本信息"
+    heading.className = "document-section-heading"
+    const icon = createSystemSymbol(mobileInspectorGroupSymbol(sectionName))
+    icon.classList.add("document-section-icon")
+    const title = document.createElement("span")
+    title.className = "document-section-title"
+    title.textContent = sectionName
+    const meta = document.createElement("span")
+    meta.className = "document-section-meta"
+    meta.textContent = `${sectionEntries.length} 项`
+    heading.append(icon, title)
+    if (section) {
+      const code = document.createElement("span")
+      code.className = "document-section-code"
+      code.textContent = section
+      heading.append(code)
+    }
+    heading.append(meta)
     sectionPanel.append(heading)
     if (particle) {
       const toolbar = document.createElement("div")
@@ -5925,6 +6080,7 @@ function populateKeyInspector(): void {
   const bdaConfigSelected = Boolean(archive?.isBdaConfig(selectedPath))
   const bdaSelected = archive?.format === "bda"
   const candidateSelected = Boolean(bdaSelected && selectedCandidate && selectedPath === layoutPath)
+  inspectorBackButton.disabled = !(hasSelection || toolbarHasSelection || candidateSelected)
   syncBdaKeyFieldLabels(bdaSelected)
   skinFieldsGroup.hidden = !skinSelected || bdaSelected
   toolbarFieldsGroup.hidden = !toolbarSelected || bdaSelected || toolbarHasSelection
@@ -5961,12 +6117,9 @@ function populateKeyInspector(): void {
       : ""
   selectedKeyPreview.textContent = previewValue.length > 8 ? previewValue.slice(0, 8) : previewValue
   selectedKeyPreview.hidden = !hasSelection
-  selectedKeyContext.textContent = hasSelection
-    ? `${selectedPath.split("/").pop()} · 已选 ${sections.length} 个按键`
-    : selectedPath === layoutPath ? "编辑整体属性，或点击画布中的按键单独编辑" : "更改会自动写回配置"
-  selectedKeySaveState.hidden = !hasSelection
-  selectedKeyReset.hidden = !hasSelection
-  selectedKeyReset.disabled = undoStack.length === 0
+  selectedKeyName.title = selectedKeyName.textContent ?? ""
+  selectedKeyContext.textContent = selectedPath || "选择文件以查看属性"
+  selectedKeyContext.title = selectedPath
   syncMobileInspectorHeader()
   for (const field of skinFields) {
     field.value = skinSelected ? selectedDocument?.get("", field.dataset.skinField ?? "") ?? "" : ""
@@ -6112,8 +6265,10 @@ function populateKeyInspector(): void {
   }
   const multiLayout = $("#inspector-multi-layout")
   const multiAvailable = sections.length > 1 && archive?.format !== "bda" && !sections.some(isListCell)
+  multiLayout.dataset.available = String(multiAvailable)
   multiLayout.querySelector("h4 span")!.textContent = archive?.format === "bda"
-    ? "此格式不支持布局编辑" : multiAvailable ? `已选 ${sections.length} 个按键` : "选择多个按键后可用"
+    ? "此格式不支持布局编辑" : sections.some(isListCell) ? "列表单元不支持批量布局"
+      : multiAvailable ? `已选 ${sections.length} 个按键` : "选择 2 个或更多按键"
   const layoutNote = keyLayoutFieldsGroup.querySelector<HTMLElement>(".inspector-note")!
   layoutNote.textContent = archive?.format === "bda"
     ? "此格式的位置与尺寸仅供查看。外观和文字可在对应分类中修改。"
@@ -6609,14 +6764,14 @@ function drawImageSlicePicker(): void {
     const [x, y, sliceWidth, sliceHeight] = slice.source
     const selected = slice.index === pickerSelectedIndex
     context.lineWidth = selected ? lineWidth * 2 : lineWidth
-    context.strokeStyle = selected ? "#ff3b30" : "#0a7ff5"
+    context.strokeStyle = selected ? "#ff6b2c" : "#3a6df0"
     context.strokeRect(
       pickerOffset.x + x * pickerScale,
       pickerOffset.y + y * pickerScale,
       sliceWidth * pickerScale,
       sliceHeight * pickerScale,
     )
-    context.fillStyle = selected ? "#ff3b30" : "#0a7ff5"
+    context.fillStyle = selected ? "#ff6b2c" : "#3a6df0"
     context.fillRect(pickerOffset.x + x * pickerScale, pickerOffset.y + y * pickerScale, context.measureText(`IMG${slice.index}`).width + 6, 15)
     context.fillStyle = "#fff"
     context.fillText(`IMG${slice.index}`, pickerOffset.x + x * pickerScale + 3, pickerOffset.y + y * pickerScale + 2)
@@ -7849,6 +8004,7 @@ async function loadArchive(
   documentName.textContent = isNew
     ? exportName("未命名", archive.format)
     : displayName || path.split(/[\\/]/).pop() || "未命名皮肤"
+  if (!isNew && isTauri() && path) recordRecentFile(path, documentName.textContent)
   saveButton.disabled = false
   for (const button of exportButtons) {
     const format = button.dataset.exportFormat as ExportFormat
@@ -8318,8 +8474,8 @@ async function startNewDocument(): Promise<void> {
   await runFileOperation("新建皮肤", () => newDocument(templateID))
 }
 
-fileMenu.addEventListener("click", (event) => {
-  if ((event.target as Element).closest("button")) fileMenu.open = false
+fileMenu?.addEventListener("click", (event) => {
+  if (fileMenu && (event.target as Element).closest("button")) fileMenu.open = false
 })
 newButton.addEventListener("click", () => void startNewDocument())
 openButton.addEventListener("click", () => {
@@ -8333,6 +8489,107 @@ openButton.addEventListener("click", () => {
   }
 })
 emptyOpenButton.addEventListener("click", () => openButton.click())
+
+const recentFilesKey = "recent-files"
+const recentFilesLimit = 6
+
+interface RecentFile {
+  path: string
+  name: string
+  at: number
+}
+
+function readRecentFiles(): RecentFile[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(recentFilesKey) || "[]")
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (item): item is RecentFile =>
+        Boolean(item)
+        && typeof item.path === "string"
+        && typeof item.name === "string"
+        && typeof item.at === "number",
+    )
+  } catch {
+    return []
+  }
+}
+
+function recordRecentFile(path: string, name: string): void {
+  if (!path || path.startsWith("content://")) return
+  const next = [{ path, name, at: Date.now() }, ...readRecentFiles().filter((item) => item.path !== path)]
+    .slice(0, recentFilesLimit)
+  localStorage.setItem(recentFilesKey, JSON.stringify(next))
+  renderRecentFiles()
+}
+
+function formatRecentTime(at: number): string {
+  const minute = 60_000
+  const diff = Date.now() - at
+  if (diff < minute) return "刚刚"
+  if (diff < 60 * minute) return `${Math.floor(diff / minute)} 分钟前`
+  if (diff < 24 * 60 * minute) return `${Math.floor(diff / (60 * minute))} 小时前`
+  const days = Math.floor(diff / (24 * 60 * minute))
+  if (days === 1) return "昨天"
+  if (days < 7) return `${days} 天前`
+  if (days < 30) return `${Math.floor(days / 7)} 周前`
+  return new Date(at).toLocaleDateString("zh-CN")
+}
+
+function renderRecentFiles(): void {
+  const list = $("#recent-list")
+  const empty = $("#recent-empty")
+  const clear = $("#recent-clear")
+  if (!list || !empty) return
+  const items = readRecentFiles()
+  clear?.toggleAttribute("hidden", items.length === 0)
+  empty.hidden = items.length > 0
+  list.replaceChildren(...items.map((item) => {
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = "recent-item"
+    button.title = item.path
+    const icon = document.createElement("span")
+    icon.className = "recent-icon"
+    icon.append(createSystemSymbol("keyboard"))
+    const copy = document.createElement("span")
+    copy.className = "recent-copy"
+    const name = document.createElement("span")
+    name.className = "recent-name"
+    name.textContent = item.name
+    const path = document.createElement("span")
+    path.className = "recent-path"
+    path.textContent = item.path
+    copy.append(name, path)
+    const time = document.createElement("span")
+    time.className = "recent-time"
+    time.textContent = formatRecentTime(item.at)
+    button.append(icon, copy, time)
+    button.addEventListener("click", () => {
+      if (fileOperationRunning) return
+      void runFileOperation("打开", async () => {
+        if (!(await prepareDocumentReplacement())) return false
+        return loadNativePath(item.path)
+      })
+    })
+    return button
+  }))
+}
+
+$("#recent-clear")?.addEventListener("click", () => {
+  localStorage.removeItem(recentFilesKey)
+  renderRecentFiles()
+})
+renderRecentFiles()
+
+// 欢迎页模板卡：直接以该模板新建，不再弹选择器
+for (const card of document.querySelectorAll<HTMLButtonElement>(".template-card")) {
+  card.addEventListener("click", () => {
+    const templateID = card.dataset.template
+    if (!templateID || fileOperationRunning) return
+    void runFileOperation("新建皮肤", () => newDocument(templateID))
+  })
+}
 saveButton.addEventListener("click", () => {
   void runFileOperation("保存", () => saveArchive(false, currentExportFormat()))
 })
@@ -8533,7 +8790,7 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
     aiDesignConversationTarget = target
     aiDesignConversation = []
   }
-  aiDesignStatus.textContent = "正在加载受限 AI 编辑器…"
+  aiDesignStatus.textContent = "正在准备设计…"
   aiDesignModel.disabled = true
   aiDesignSettings.disabled = true
   try {
@@ -8553,6 +8810,7 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
         await hooks.onStatus?.(text)
       },
       onTextDelta: hooks.onTextDelta,
+      onThinking: hooks.onThinking,
     })
     if (hooks.signal.aborted) throw new DOMException("AI 设计已取消", "AbortError")
     if (archive !== target) throw new Error("AI 运行期间已切换皮肤项目，本轮草稿未应用")
@@ -8669,7 +8927,7 @@ function syncModelProfiles(): void {
   const selected = aiDesignModel.value
   for (const select of [modelProfile, aiDesignModel]) {
     select.replaceChildren(...savedModels.map((configuration, index) =>
-      new Option(`${configuration.model} · ${modelProviderPreset(configuration.provider).label}`, String(index))))
+      new Option(select === aiDesignModel ? configuration.model : `${configuration.model} · ${modelProviderPreset(configuration.provider).label}`, String(index))))
   }
   modelProfile.value = String(editingModelIndex)
   aiDesignModel.value = selected !== "" && savedModels[Number(selected)] ? selected : "0"
@@ -9251,7 +9509,6 @@ for (const [input, key] of [
 })
 undoButton.addEventListener("click", undo)
 redoButton.addEventListener("click", redo)
-selectedKeyReset.addEventListener("click", undo)
 browserOpen.addEventListener("change", async () => {
   const file = browserOpen.files?.[0]
   if (file) {
@@ -9369,6 +9626,11 @@ sourceSearch.addEventListener("input", () => {
   scheduleSourceSearch()
 })
 sourceSearch.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault()
+    closeSourceFind()
+    return
+  }
   if (event.key !== "Enter") return
   event.preventDefault()
   findSourceMatch(event.shiftKey ? -1 : 1)
@@ -9376,15 +9638,21 @@ sourceSearch.addEventListener("keydown", (event) => {
 sourceSearchPrevious.addEventListener("click", () => findSourceMatch(-1))
 sourceSearchNext.addEventListener("click", () => findSourceMatch(1))
 sourceFindToggle.addEventListener("click", () => {
-  sourceFindVisible = !sourceFindVisible
-  updateSourceFindVisibility()
-  if (sourceFindVisible) sourceSearch.focus()
+  if (sourceFindVisible) closeSourceFind()
+  else openSourceFind()
+})
+window.addEventListener("keydown", (event) => {
+  if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== "f") return
+  if (sourceEditor.hidden) return
+  event.preventDefault()
+  openSourceFind()
 })
 sourceReplaceToggle.addEventListener("click", () => {
   const expanded = sourceReplaceRow.hidden
   sourceReplaceRow.hidden = !expanded
   sourceReplaceToggle.setAttribute("aria-expanded", String(expanded))
   sourceReplaceToggle.title = sourceReplaceToggle.ariaLabel = expanded ? "收起替换" : "展开替换"
+  syncSourceFindBarOffset()
   if (expanded) sourceReplacement.focus()
 })
 sourceReplace.addEventListener("click", () => replaceSourceMatches(false))
@@ -9477,6 +9745,20 @@ for (const button of keyActionButtons) {
     else deleteSelectedKeys()
   })
 }
+inspectorBackButton.addEventListener("click", () => {
+  source.commit()
+  selectedKeySections = []
+  selectedToolbarSections = []
+  selectedCandidate = false
+  preview.setSelected([])
+  toolbarPreview.setSelected([])
+  inspectorTab = "properties"
+  syncCandidateSelection()
+  updateInspectorView()
+  populateKeyInspector()
+  updateSourceHighlight()
+  scrollSelectedSource()
+})
 for (const button of inspectorTabButtons) {
   button.addEventListener("click", () => {
     const tab = button.dataset.inspectorTab
@@ -9486,7 +9768,6 @@ for (const button of inspectorTabButtons) {
     if (!quickInspector.hidden) populateKeyInspector()
     if (!aiDesignPanel.hidden) {
       void ensureAiChat()
-        .then((controller) => requestAnimationFrame(() => controller.focus()))
         .catch((error) => { aiDesignStatus.textContent = aiDesignErrorMessage(error) })
     }
   })
@@ -10088,8 +10369,8 @@ if (isTauri()) {
 {
   const MIN_W = 220
   const MAX_W = Math.max(700, window.innerWidth - 720)
-  const DEFAULT_W = Math.max(520, Math.round(window.innerWidth * 0.34))
-  const storageKey = "inspectorWidthV4"
+  const DEFAULT_W = 360
+  const storageKey = "inspectorWidthV5"
   const stored = Number(localStorage.getItem(storageKey) || DEFAULT_W)
   const initialW = Math.max(MIN_W, Math.min(MAX_W, stored))
   document.documentElement.style.setProperty("--inspector-width", `${initialW}px`)

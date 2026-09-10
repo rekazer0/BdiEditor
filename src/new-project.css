@@ -1,26 +1,47 @@
 :root {
   font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #202124;
+  color: #121419;
   color-scheme: light;
   background: #f4f5f6;
+
+  /* 间距系统 */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+
+  /* 字号系统 */
+  --text-xs: 10px;
+  --text-sm: 11px;
+  --text-base: 12px;
+  --text-md: 13px;
+  --text-lg: 14px;
+
+  /* 圆角系统 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+
   --line: rgb(0 0 0 / 10%);
   --panel: #f4f5f6;
-  --secondary: #74747b;
+  --secondary: #5b616e;
   --control: #fff;
   --hover: rgb(0 0 0 / 4%);
-  --accent: #0a7ff5;
+  --accent: #3a6df0;
 }
 
 :root[data-app-theme="dark"] {
   color: #f2f3f4;
   color-scheme: dark;
   background: #202225;
-  --line: rgb(255 255 255 / 12%);
+  --line: rgb(255 255 255 / 14%);
   --panel: #282b2e;
   --secondary: #a6a9ae;
   --control: #34373b;
-  --hover: rgb(255 255 255 / 7%);
-  --accent: #3395ff;
+  --hover: rgb(255 255 255 / 8%);
+  --accent: #7a9bff;
 }
 
 * { box-sizing: border-box; }
@@ -35,7 +56,7 @@ body {
 
 body {
   color: inherit;
-  font-size: 16px;
+  font-size: 18px;
   user-select: none;
   -webkit-font-smoothing: antialiased;
 }
@@ -49,28 +70,31 @@ form {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
-header { padding: 24px 24px 18px; }
+header { padding: var(--space-xl) var(--space-xl) 18px; }
 
 h1 {
   margin: 0;
   font-size: 24px;
-  line-height: 1.3;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
 }
 
 header p {
-  margin: 7px 0 0;
+  margin: var(--space-sm) 0 0;
   color: var(--secondary);
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: var(--text-lg);
+  line-height: 1.6;
 }
 
 header .usage-note {
-  margin-top: 14px;
-  padding: 10px 12px;
+  margin-top: var(--space-lg);
+  padding: var(--space-md);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.6;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--control) 50%, transparent);
+  font-size: var(--text-base);
+  line-height: 1.65;
 }
 
 .templates {
@@ -86,10 +110,10 @@ header .usage-note {
   justify-content: space-between;
   padding-bottom: 9px;
   color: var(--secondary);
-  font-size: 13px;
+  font-size: 14px;
 }
 
-.template-heading span { font-size: 12px; }
+.template-heading span { font-size: 13px; }
 
 .template-list {
   display: grid;
@@ -100,28 +124,38 @@ header .usage-note {
   min-width: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--space-md);
   align-items: center;
-  padding: 12px 14px;
+  padding: var(--space-md) var(--space-lg);
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: var(--radius-xl);
   background: var(--control);
   cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: none;
 }
 
-.template-option:hover { background: color-mix(in srgb, var(--control) 88%, var(--hover)); }
+.template-option:hover {
+  background: var(--hover);
+  transform: none;
+  box-shadow: none;
+}
 
 .template-option:has(input:checked) {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 7%, var(--control));
+  background: color-mix(in srgb, var(--accent) 10%, var(--control));
   box-shadow: inset 3px 0 var(--accent);
+  transform: none;
 }
 
-.template-option:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.template-option:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 .template-option input {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   margin: 0;
   accent-color: var(--accent);
 }
@@ -129,20 +163,20 @@ header .usage-note {
 .template-option span {
   min-width: 0;
   display: grid;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .template-option strong {
   overflow-wrap: anywhere;
-  font-size: 14px;
+  font-size: var(--text-lg);
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .template-option small {
   color: var(--secondary);
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: var(--text-md);
+  line-height: 1.4;
 }
 
 footer {
@@ -150,39 +184,67 @@ footer {
   flex-wrap: wrap;
   position: relative;
   justify-content: flex-end;
-  gap: 9px;
-  padding: 16px 24px;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-xl);
   border-top: 1px solid var(--line);
   background: var(--panel);
 }
 
-#project-error { flex-basis: 100%; margin: 0; color: #d14343; font-size: 12px; overflow-wrap: anywhere; }
-button:disabled { opacity: .55; cursor: wait; }
+#project-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: #d14343;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 footer button {
-  height: 36px;
-  min-width: 76px;
-  padding: 0 16px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
+  height: 38px;
+  min-width: 84px;
+  padding: 0 var(--space-lg);
+  border: none;
+  border-radius: var(--radius-lg);
   color: inherit;
   background: var(--control);
+  font-size: var(--text-md);
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: none;
 }
 
-footer button:hover { background: color-mix(in srgb, var(--control) 88%, var(--hover)); }
+footer button:hover:not(:disabled) {
+  background: var(--hover);
+  transform: none;
+  box-shadow: none;
+}
+
+footer button:active:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
 
 footer .primary {
-  border-color: var(--accent);
+  border: none;
   color: #fff;
   background: var(--accent);
+  box-shadow: none;
 }
 
-footer .primary:hover { filter: brightness(1.05); }
+footer .primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 90%, #000);
+  box-shadow: none;
+}
 
 button:focus-visible,
 input:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 

@@ -214,18 +214,21 @@ export function createStreamingEnhancer(): StreamingEnhancer {
   const addCharacter = (char: string) => {
     if (!currentContainer || !cursor) return
 
-    const span = document.createElement("span")
-    span.textContent = char
-    span.className = "char-fade-in"
+    // 优化：直接插入文本节点，避免过多DOM元素
+    const textNode = document.createTextNode(char)
+    currentContainer.insertBefore(textNode, cursor)
 
-    currentContainer.insertBefore(span, cursor)
-
-    // 自动滚动到最新内容
-    const messageElement = currentContainer.closest(".message-bubble")
-    if (messageElement) {
-      messageElement.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    // 优化：节流滚动，避免过度触发
+    if (Date.now() - lastScrollTime > 150) {
+      lastScrollTime = Date.now()
+      const messageElement = currentContainer.closest(".message-bubble")
+      if (messageElement) {
+        messageElement.scrollIntoView({ behavior: "smooth", block: "nearest" })
+      }
     }
   }
+
+  let lastScrollTime = 0
 
   const showThinking = (text: string) => {
     if (!currentContainer) return
@@ -246,30 +249,19 @@ export function createStreamingEnhancer(): StreamingEnhancer {
       const firstChild = messageContainer.firstChild
       messageContainer.insertBefore(thinkingBlock.element, firstChild)
 
-      // 添加淡入动画
-      requestAnimationFrame(() => {
-        thinkingBlock?.element.style.opacity = "0"
-        thinkingBlock?.element.style.transform = "translateY(10px)"
-        setTimeout(() => {
-          if (thinkingBlock) {
-            thinkingBlock.element.style.transition = "opacity 0.3s ease, transform 0.3s ease"
-            thinkingBlock.element.style.opacity = "1"
-            thinkingBlock.element.style.transform = "translateY(0)"
-          }
-        }, 10)
-      })
+      // 优化：使用CSS动画类而非JS动画，性能更好
+      thinkingBlock.element.classList.add("thinking-fade-in")
     }
   }
 
   const hideThinking = () => {
     if (thinkingBlock) {
-      // 添加淡出动画
-      thinkingBlock.element.style.opacity = "0"
-      thinkingBlock.element.style.transform = "translateY(-10px)"
+      // 优化：使用CSS动画类
+      thinkingBlock.element.classList.add("thinking-fade-out")
       setTimeout(() => {
         thinkingBlock?.remove()
         thinkingBlock = null
-      }, 300)
+      }, 250)
     }
   }
 
@@ -282,32 +274,18 @@ export function createStreamingEnhancer(): StreamingEnhancer {
     const messageContainer = currentContainer.closest(".message-bubble")
     if (messageContainer) {
       messageContainer.appendChild(interruptGuide)
-
-      // 添加淡入动画
-      requestAnimationFrame(() => {
-        if (interruptGuide) {
-          interruptGuide.style.opacity = "0"
-          interruptGuide.style.transform = "translateY(5px)"
-          setTimeout(() => {
-            if (interruptGuide) {
-              interruptGuide.style.transition = "opacity 0.25s ease, transform 0.25s ease"
-              interruptGuide.style.opacity = "1"
-              interruptGuide.style.transform = "translateY(0)"
-            }
-          }, 10)
-        }
-      })
+      // 优化：使用CSS动画类
+      interruptGuide.classList.add("interrupt-fade-in")
     }
   }
 
   const hideInterruptGuide = () => {
     if (interruptGuide) {
-      interruptGuide.style.opacity = "0"
-      interruptGuide.style.transform = "translateY(5px)"
+      interruptGuide.classList.add("interrupt-fade-out")
       setTimeout(() => {
         interruptGuide?.remove()
         interruptGuide = null
-      }, 250)
+      }, 200)
     }
   }
 

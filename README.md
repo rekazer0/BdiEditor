@@ -90,6 +90,8 @@ npm run build
 npm run tauri dev
 ```
 
+桌面开发启动会自动选择空闲的本地端口，并同步给 Tauri 窗口；已有预览服务占用 1420 端口时无需关闭它。退出桌面开发命令时，其前端服务也会关闭。
+
 构建 macOS `.app`：
 
 ```bash

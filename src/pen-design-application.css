@@ -1,0 +1,696 @@
+/*
+ * Pen design application layer.
+ *
+ * The Pen document is the visual source of truth for the flat editor UI.
+ * This file intentionally loads after style.css and only overrides presentation:
+ * layout dimensions, surfaces, borders, radii, typography and control chrome.
+ */
+
+:root {
+  --font-ui: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --pen-surface: #ffffff;
+  --pen-surface-subtle: #f4f5f8;
+  --pen-canvas: #f4f5f8;
+  --pen-window: #e9ebef;
+  --pen-line: #e3e6eb;
+  --pen-line-strong: #cdd2db;
+  --pen-text: #121419;
+  --pen-secondary: #5b616e;
+  --pen-tertiary: #8b919e;
+  --pen-accent: #3a6df0;
+  --pen-accent-soft: #e9effe;
+  --pen-selection: #ff6b2c;
+  --pen-selection-soft: #ffefe6;
+  --pen-state-ok: #12a150;
+  --pen-state-warn: #b87a00;
+  --pen-state-danger: #e5484d;
+
+  --inspector-width: 360px;
+  --pen-radius-xs: 5px;
+  --pen-radius-sm: 8px;
+  --pen-radius-md: 12px;
+  --pen-radius-lg: 16px;
+  --pen-radius-pill: 999px;
+}
+
+:root[data-app-theme="dark"] {
+  --pen-surface: #15171b;
+  --pen-surface-subtle: #1a1d21;
+  --pen-canvas: #0c0d10;
+  --pen-window: #0c0d10;
+  --pen-line: #282c33;
+  --pen-line-strong: #3a3f48;
+  --pen-text: #f3f5f8;
+  --pen-secondary: #a1a8b3;
+  --pen-tertiary: #6c737e;
+  --pen-accent: #7a9bff;
+  --pen-accent-soft: #1d2740;
+  --pen-selection: #ff8a55;
+  --pen-selection-soft: #3a2418;
+  --pen-state-ok: #3dd68c;
+  --pen-state-warn: #f5c445;
+  --pen-state-danger: #ff6b6b;
+}
+
+html,
+body {
+  background: var(--pen-window);
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-ui);
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Title bar
+ * ------------------------------------------------------------------------------------------------- */
+
+.titlebar {
+  height: var(--titlebar-height);
+  gap: 10px;
+  padding: calc(5px + var(--safe-area-top)) max(16px, env(safe-area-inset-right)) 5px max(16px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--pen-line);
+  background: var(--pen-surface);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.brand {
+  gap: 8px;
+  padding: 5px 8px 5px 5px;
+  border-radius: var(--pen-radius-sm);
+}
+
+.brand-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--pen-accent);
+}
+
+.brand-logo svg {
+  width: 14px;
+  height: 14px;
+}
+
+.brand-text {
+  gap: 6px;
+}
+
+.brand-text strong {
+  color: var(--pen-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.brand-text small {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.toolbar-group {
+  gap: 4px;
+}
+
+.toolbar-divider {
+  height: 20px;
+  margin: 0 6px;
+  background: var(--pen-line);
+}
+
+.toolbar-button,
+.toolbar-more > summary {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-secondary);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.toolbar-button .icon,
+.toolbar-button .system-symbol,
+.toolbar-button .system-symbol svg {
+  width: 16px;
+  height: 16px;
+}
+
+.toolbar-button:hover:not(:disabled),
+.toolbar-more > summary:hover {
+  background: color-mix(in srgb, var(--pen-surface-subtle) 82%, var(--pen-line));
+  color: var(--pen-text);
+}
+
+.toolbar-button:active:not(:disabled),
+.toolbar-more > summary:active {
+  background: color-mix(in srgb, var(--pen-surface-subtle) 72%, var(--pen-line));
+}
+
+.toolbar-button:disabled,
+.toolbar-menu button:disabled {
+  opacity: 0.38;
+}
+
+.file-menu > summary,
+.toolbar-more > summary {
+  width: auto;
+  min-width: 28px;
+  padding: 0 8px;
+}
+
+.file-menu > summary::after,
+.toolbar-more > summary::after {
+  display: none;
+}
+
+.toolbar-menu,
+.file-actions,
+.app-actions,
+.mobile-command-actions {
+  padding: 6px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-md);
+  background: var(--pen-surface);
+  box-shadow: 0 12px 28px rgb(18 20 25 / 12%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.toolbar-menu button {
+  min-height: 32px;
+  border-radius: var(--pen-radius-sm);
+  color: var(--pen-text);
+  font-size: 12px;
+}
+
+.toolbar-menu button:hover:not(:disabled) {
+  background: var(--pen-surface-subtle);
+}
+
+.toolbar-menu-separator,
+.mobile-menu-separator {
+  background: var(--pen-line);
+}
+
+.document-title {
+  bottom: 50%;
+  transform: translate(-50%, 50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 5px 10px;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  pointer-events: auto;
+}
+
+.document-title strong {
+  max-width: 330px;
+  color: var(--pen-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+#dirty {
+  display: none;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+  margin: 0;
+  padding: 2px 7px;
+  border-radius: var(--pen-radius-pill);
+  background: var(--pen-surface);
+  color: var(--pen-secondary);
+  font-size: 11px;
+}
+
+#dirty:not([hidden]) {
+  display: inline-flex;
+}
+
+#dirty::before {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--pen-state-ok);
+  content: "";
+}
+
+.mode-control,
+.preview-choice,
+.sidebar-view-control,
+.inspector-tabs {
+  gap: 2px;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.mode-control button,
+.preview-choice button {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: var(--pen-radius-xs);
+  color: var(--pen-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.mode-control button.active,
+.preview-choice button.active {
+  color: var(--pen-text);
+  background: var(--pen-surface);
+  box-shadow: none;
+  animation: none;
+}
+
+.mobile-choice-toggle,
+.mobile-title-choices,
+.mobile-quick-actions,
+.mobile-command-menu,
+.mobile-workspace-tabs {
+  display: none;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Main shell
+ * ------------------------------------------------------------------------------------------------- */
+
+main {
+  background: var(--pen-canvas);
+}
+
+@media (min-width: 761px) {
+  main {
+    grid-template-columns: 248px minmax(500px, 1fr) 4px var(--inspector-width, 360px);
+  }
+}
+
+.sidebar,
+.source {
+  border-color: var(--pen-line);
+  background: var(--pen-surface);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.sidebar {
+  padding-top: 12px;
+  border-right-width: 1px;
+}
+
+.pane-heading {
+  min-height: 42px;
+  padding: 0 8px 10px;
+  border-bottom: 0;
+}
+
+.sidebar-view-control {
+  width: 100%;
+  min-height: 34px;
+}
+
+.sidebar-view-control button {
+  height: 28px;
+  border-radius: var(--pen-radius-xs);
+  color: var(--pen-secondary);
+  font-size: 12px;
+}
+
+.sidebar-view-control button.active {
+  color: var(--pen-text);
+  background: var(--pen-surface);
+  box-shadow: none;
+}
+
+.sidebar-overview,
+#files {
+  padding: 0 8px 16px;
+}
+
+.sidebar-overview button.nav-item,
+#files button {
+  min-height: 34px;
+  border-radius: var(--pen-radius-sm);
+  color: var(--pen-secondary);
+  font-size: 12px;
+}
+
+.sidebar-overview button.nav-item:hover,
+#files button:hover {
+  background: var(--pen-surface-subtle);
+}
+
+.sidebar-overview button.nav-item.selected,
+#files button.selected {
+  color: var(--pen-text);
+  background: var(--pen-surface-subtle);
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Workspace / preview
+ * ------------------------------------------------------------------------------------------------- */
+
+.workspace {
+  grid-template-rows: 48px minmax(0, 1fr) 30px;
+  border: 0;
+  background: var(--pen-canvas);
+}
+
+.preview-toolbar {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--pen-line);
+  background: var(--pen-surface);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.preview-tool-toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--pen-radius-sm);
+  color: var(--pen-secondary);
+  background: var(--pen-surface-subtle);
+  box-shadow: none;
+}
+
+.preview-tool-toggle.active {
+  color: #fff;
+  background: var(--pen-accent);
+  box-shadow: none;
+}
+
+.field-control select,
+#layout,
+#device,
+#orientation,
+#theme,
+#skin-state {
+  min-height: 30px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface);
+  color: var(--pen-text);
+  font-size: 12px;
+}
+
+#skin-state-control .skin-state-value {
+  line-height: 30px;
+}
+
+.canvas-wrap {
+  padding: 24px;
+  background: var(--pen-canvas);
+}
+
+.preview-zoom-control {
+  bottom: 40px;
+  height: 34px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--pen-radius-pill);
+  background: var(--pen-surface);
+  box-shadow: 0 4px 12px rgb(18 20 25 / 12%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.preview-zoom-control button {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: var(--pen-secondary);
+}
+
+.preview-zoom-control button:hover:not(:disabled) {
+  background: var(--pen-surface-subtle);
+  color: var(--pen-text);
+}
+
+.workspace-status {
+  min-height: 30px;
+  border-top: 1px solid var(--pen-line);
+  background: var(--pen-surface);
+  color: var(--pen-secondary);
+  font-size: 11px;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Inspector / source
+ * ------------------------------------------------------------------------------------------------- */
+
+.source {
+  border-left: 1px solid var(--pen-line);
+}
+
+.source > .pane-heading {
+  min-height: 48px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--pen-line);
+}
+
+.inspector-tabs {
+  gap: 18px;
+  padding: 0 12px;
+  border-radius: 0;
+  border-bottom: 1px solid var(--pen-line);
+  background: transparent;
+}
+
+.inspector-tabs button {
+  min-width: 0;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--pen-secondary);
+  background: transparent;
+  font-size: 12px;
+}
+
+.inspector-tabs button.active {
+  color: var(--pen-text);
+  border-bottom-color: var(--pen-accent);
+  background: transparent;
+  box-shadow: none;
+  animation: none;
+}
+
+#quick-inspector {
+  padding: 0;
+}
+
+.inspector-group,
+.keyboard-fields,
+.bda-config-fields,
+.document-fields,
+.skin-fields,
+.toolbar-fields,
+.appearance-section {
+  border-bottom: 1px solid var(--pen-line);
+  background: transparent;
+}
+
+.inspector-group {
+  padding: 10px 14px;
+}
+
+.inspector-group h3,
+.inspector-card-heading,
+.appearance-section-heading {
+  color: var(--pen-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.inspector-group-subtitle {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+}
+
+.inspector-grid {
+  gap: 5px;
+}
+
+.inspector-grid input,
+.inspector-grid select,
+.inspector-grid textarea,
+.field-control input,
+.field-control select,
+.search-control input {
+  min-height: 28px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-xs);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-text);
+  font-size: 12px;
+}
+
+.inspector-grid input:focus,
+.inspector-grid select:focus,
+.inspector-grid textarea:focus,
+.field-control input:focus,
+.field-control select:focus,
+.search-control input:focus {
+  border-color: var(--pen-accent);
+  outline: 0;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pen-accent) 18%, transparent);
+}
+
+.inspector-grid label,
+.inspector-grid span,
+.inspector-note {
+  color: var(--pen-secondary);
+  font-size: 11px;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Dialogs / overlays
+ * ------------------------------------------------------------------------------------------------- */
+
+.project-dialog,
+.app-dialog {
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-lg);
+  background: var(--pen-surface);
+  box-shadow: 0 24px 60px rgb(18 20 25 / 18%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.project-dialog::backdrop,
+.app-dialog::backdrop {
+  background: rgb(18 20 25 / 34%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.project-dialog header,
+.app-dialog header {
+  border-bottom: 1px solid var(--pen-line);
+}
+
+.project-dialog header h2,
+.app-dialog header h2 {
+  color: var(--pen-text);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Mobile frames
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .titlebar {
+    height: var(--titlebar-height);
+    padding: calc(4px + var(--safe-area-top)) 12px 4px;
+    background: var(--pen-surface);
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .mobile-workspace-tabs {
+    display: flex;
+    background: var(--pen-surface);
+    border-bottom: 1px solid var(--pen-line);
+  }
+
+  .mobile-workspace-tabs button {
+    color: var(--pen-secondary);
+    font-size: 12px;
+  }
+
+  .mobile-workspace-tabs button.active {
+    color: var(--pen-text);
+    border-bottom-color: var(--pen-accent);
+  }
+
+  .mobile-workspace-tabs,
+  .sidebar,
+  .workspace,
+  .source {
+    border-color: var(--pen-line);
+  }
+
+  .preview-toolbar {
+    padding: 6px 10px;
+    background: var(--pen-surface);
+  }
+
+  .preview-zoom-control {
+    bottom: 26px;
+    box-shadow: 0 3px 10px rgb(18 20 25 / 12%);
+  }
+}
+
+/* Desktop text actions: match the Pen title bar file operations. */
+.toolbar-button.pen-text-action,
+.toolbar-more.pen-export-menu > summary.pen-text-action {
+  width: auto;
+  min-width: 0;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: var(--pen-radius-sm);
+  background: transparent;
+  color: var(--pen-secondary);
+}
+
+.toolbar-button.pen-text-action > span:not(.icon):not(.system-symbol),
+.toolbar-more.pen-export-menu > summary.pen-text-action > span:not(.icon):not(.system-symbol) {
+  display: inline;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.toolbar-button.pen-text-action:hover:not(:disabled),
+.toolbar-more.pen-export-menu > summary.pen-text-action:hover {
+  background: var(--pen-surface-subtle);
+  color: var(--pen-text);
+}
+
+.toolbar-button.pen-text-action:active:not(:disabled),
+.toolbar-more.pen-export-menu > summary.pen-text-action:active {
+  background: color-mix(in srgb, var(--pen-surface-subtle) 76%, var(--pen-line));
+}
+
+.pen-export-menu .export-actions {
+  min-width: 228px;
+}
+
+.pen-export-menu .export-actions .export-action {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+@media (max-width: 760px) {
+  .toolbar-button.pen-text-action,
+  .toolbar-more.pen-export-menu {
+    display: none;
+  }
+}

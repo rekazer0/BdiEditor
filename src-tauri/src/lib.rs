@@ -87,11 +87,11 @@ struct ModelHttpRequest {
     body: Option<String>,
 }
 
-#[derive(serde::Serialize)]
-struct ModelHttpResponse {
-    status: u16,
-    headers: Vec<(String, String)>,
-    body: Vec<u8>,
+#[derive(Clone, serde::Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+enum ModelHttpEvent {
+    Headers { status: u16, headers: Vec<(String, String)> },
+    Chunk { body: Vec<u8> },
 }
 
 #[derive(serde::Serialize)]
@@ -1173,7 +1173,8 @@ async fn test_model_connection(
 async fn model_http_request(
     app: tauri::AppHandle,
     request: ModelHttpRequest,
-) -> Result<ModelHttpResponse, String> {
+    events: tauri::ipc::Channel<ModelHttpEvent>,
+) -> Result<(), String> {
     if !request.method.eq_ignore_ascii_case("POST") {
         return Err("模型对话只允许 POST 请求".into());
     }
@@ -1209,7 +1210,7 @@ async fn model_http_request(
         }
         outgoing = outgoing.header(&name, &value);
     }
-    let response = outgoing
+    let mut response = outgoing
         .body(request.body.unwrap_or_default())
         .send()
         .await
@@ -1225,19 +1226,16 @@ async fn model_http_request(
                 .map(|value| (name.to_string(), value.to_string()))
         })
         .collect();
-    let body = response
-        .bytes()
-        .await
-        .map_err(|error| error.to_string())?
-        .to_vec();
-    if body.len() > MAX_MODEL_CHAT_BYTES {
-        return Err("模型响应过大".into());
+    events.send(ModelHttpEvent::Headers { status, headers }).map_err(|error| error.to_string())?;
+    let mut received = 0usize;
+    while let Some(chunk) = response.chunk().await.map_err(|error| error.to_string())? {
+        received += chunk.len();
+        if received > MAX_MODEL_CHAT_BYTES {
+            return Err("模型响应过大".into());
+        }
+        events.send(ModelHttpEvent::Chunk { body: chunk.to_vec() }).map_err(|error| error.to_string())?;
     }
-    Ok(ModelHttpResponse {
-        status,
-        headers,
-        body,
-    })
+    Ok(())
 }
 
 #[cfg(test)]

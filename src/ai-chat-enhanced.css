@@ -1,54 +1,76 @@
-/* AI Chat Enhanced Styles - 优化的流式输出UI */
+/* AI Chat Enhanced Styles - 简洁扁平化设计 */
 
-/* 思考内容区块 - 优化样式 */
+/* 思考内容区块 - 扁平简洁 */
 .thinking-block {
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--accent) 4%, var(--control)) 0%,
-    color-mix(in srgb, var(--accent) 2%, var(--control)) 100%);
-  border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--line));
+  background: var(--control);
+  border: 1px solid var(--line);
   border-radius: 10px;
   margin-bottom: 14px;
   overflow: hidden;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 4%);
+}
+
+/* 优化：使用CSS动画类而非JS */
+.thinking-fade-in {
+  animation: thinking-fade-in 0.25s ease forwards;
+}
+
+.thinking-fade-out {
+  animation: thinking-fade-out 0.2s ease forwards;
+}
+
+@keyframes thinking-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes thinking-fade-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
 }
 
 .thinking-block:hover {
-  border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 6%);
 }
 
 .thinking-header {
   display: flex;
   align-items: center;
-  padding: 11px 14px;
+  padding: 10px 12px;
   cursor: pointer;
   user-select: none;
   transition: background 0.2s ease;
-  gap: 10px;
+  gap: 8px;
 }
 
 .thinking-header:hover {
-  background: color-mix(in srgb, var(--accent) 3%, transparent);
-}
-
-.thinking-header:active {
   background: color-mix(in srgb, var(--accent) 5%, transparent);
 }
 
 .thinking-icon {
-  color: var(--accent);
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--secondary);
+  transition: transform 0.2s ease, color 0.2s ease;
   font-size: 13px;
   line-height: 1;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.thinking-header:hover .thinking-icon {
+  color: var(--accent);
 }
 
 .thinking-icon.expanded {
@@ -57,107 +79,81 @@
 
 .thinking-title {
   flex: 1;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text);
-  letter-spacing: -0.01em;
   min-width: 0;
 }
 
 .thinking-status {
-  font-size: 11px;
-  color: var(--accent);
-  font-weight: 500;
+  font-size: 12px;
+  color: var(--secondary);
   flex-shrink: 0;
-  padding: 2px 7px;
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  transition: background 0.2s ease;
+  transition: color 0.2s ease;
 }
 
 .thinking-header:hover .thinking-status {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
 }
 
 .thinking-content {
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  padding: 0 14px;
+  transition: max-height 0.25s ease, padding 0.25s ease;
+  padding: 0 12px;
 }
 
 .thinking-content.expanded {
-  max-height: 500px;
-  padding: 0 14px 12px 14px;
+  max-height: 400px;
+  padding: 0 12px 10px 12px;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 .thinking-text {
   font-size: 12px;
   color: var(--secondary);
-  line-height: 1.65;
-  font-family: ui-monospace, 'SF Mono', Monaco, 'Cascadia Mono', 'Segoe UI Mono', monospace;
+  line-height: 1.6;
+  font-family: ui-monospace, 'SF Mono', Monaco, monospace;
   white-space: pre-wrap;
   word-break: break-word;
-  padding: 10px;
-  background: color-mix(in srgb, var(--control) 60%, transparent);
-  border-radius: 7px;
-  border: 1px solid var(--line-soft);
+  padding: 8px;
+  background: color-mix(in srgb, var(--control) 50%, transparent);
+  border-radius: 6px;
+  border-left: 2px solid var(--accent);
 }
 
-/* 流式输出光标 - 更精美的动画 */
+/* 流式输出光标 - 简洁 */
 .typing-cursor {
   display: inline-block;
   width: 2px;
-  height: 1.1em;
+  height: 1em;
   background: var(--accent);
   margin-left: 1px;
-  animation: cursor-blink 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: cursor-blink 1s ease-in-out infinite;
   vertical-align: baseline;
-  border-radius: 1px;
 }
 
 @keyframes cursor-blink {
-  0%, 45% { opacity: 1; transform: scaleY(1); }
-  50%, 95% { opacity: 0.3; transform: scaleY(0.95); }
-  100% { opacity: 1; transform: scaleY(1); }
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
 }
 
-/* 字符淡入效果 - 更自然的过渡 */
-.char-fade-in {
-  animation: char-fade-in 0.15s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
+/* 移除不再使用的字符淡入动画 */
 
-@keyframes char-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 加载指示器 - 更流畅的动画 */
+/* 加载指示器 - 简洁扁平 */
 .stream-loading-indicator {
   height: 3px;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    var(--accent) 20%,
-    var(--accent) 40%,
-    transparent 60%);
-  background-size: 200% 100%;
-  animation: loading-slide 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  background: linear-gradient(90deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 60%, transparent) 100%);
   margin-top: 10px;
   border-radius: 2px;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.2s ease;
+  animation: loading-slide 1.2s ease-in-out infinite;
+  background-size: 200% 100%;
 }
 
 .stream-loading-indicator.active {
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 @keyframes loading-slide {
@@ -165,19 +161,20 @@
   100% { background-position: -200% 0; }
 }
 
-/* 状态提示 - 精美的指示器 */
+/* 状态提示 - 扁平简洁 */
 .stream-status-indicator {
   display: inline-flex;
   align-items: center;
-  font-size: 11px;
+  gap: 8px;
+  font-size: 13px;
   color: var(--secondary);
-  margin-top: 8px;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  padding: 5px 10px;
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  margin-top: 10px;
+  padding: 6px 10px;
+  background: var(--control);
   border-radius: 6px;
-  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  border: 1px solid var(--line);
 }
 
 .stream-status-indicator.active {
@@ -185,62 +182,93 @@
 }
 
 .status-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--accent);
-  animation: status-pulse 1.8s ease-in-out infinite;
-  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
+  animation: status-pulse 1.2s ease-in-out infinite;
+  box-shadow: 0 0 6px var(--accent);
 }
 
 @keyframes status-pulse {
   0%, 100% {
     opacity: 1;
     transform: scale(1);
-    box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
   }
   50% {
-    opacity: 0.6;
-    transform: scale(1.3);
-    box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 80%, transparent);
+    opacity: 0.5;
+    transform: scale(0.85);
   }
 }
 
-/* 打断引导按钮 */
+/* 打断引导 - 扁平按钮 */
 .interrupt-guide {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 12px;
-  margin-top: 10px;
-  background: color-mix(in srgb, var(--accent) 10%, var(--control));
-  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
+  padding: 8px 14px;
+  margin-top: 12px;
+  background: var(--control);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  color: var(--accent);
-  font-size: 11.5px;
+  color: var(--text);
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 5%);
 }
 
 .interrupt-guide:hover {
-  background: color-mix(in srgb, var(--accent) 15%, var(--control));
   border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--control));
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 20%, transparent);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
 }
 
 .interrupt-guide:active {
   transform: translateY(0);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 5%);
+}
+
+.interrupt-fade-in {
+  animation: interrupt-fade-in 0.2s ease forwards;
+}
+
+.interrupt-fade-out {
+  animation: interrupt-fade-out 0.15s ease forwards;
+}
+
+@keyframes interrupt-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes interrupt-fade-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 .interrupt-icon {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
 }
 
-/* 输入区域增强 */
+/* 输入工具栏 - 简洁扁平 */
 .ai-input-enhanced {
   position: relative;
 }
@@ -249,120 +277,103 @@
   position: absolute;
   bottom: 10px;
   left: 14px;
-  right: 56px; /* 为发送按钮留空间 */
+  right: 56px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0;
   pointer-events: none;
   z-index: 1;
+  /* 优化：减少重绘 */
+  contain: layout style;
 }
 
 .ai-input-toolbar > * {
   pointer-events: auto;
 }
 
-.toolbar-left {
+.ai-input-toolbar .toolbar-left {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.toolbar-button {
+/* 工具按钮 - 去掉背景和边框 */
+.ai-input-toolbar .toolbar-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--line);
-  background: var(--control);
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
   color: var(--secondary);
-  border-radius: 7px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  font-size: 15px;
+  transition: all 0.2s ease;
+  font-size: 16px;
   line-height: 1;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-.toolbar-button:hover {
-  background: var(--hover);
+.ai-input-toolbar .toolbar-button:hover {
   color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
-.toolbar-button:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+.ai-input-toolbar .toolbar-button:active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
-.toolbar-button:disabled {
+.ai-input-toolbar .toolbar-button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-  transform: none;
 }
 
-.toolbar-button:disabled:hover {
-  background: var(--control);
+.ai-input-toolbar .toolbar-button:disabled:hover {
+  background: transparent;
   color: var(--secondary);
-  border-color: var(--line);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-/* 字数统计 - 更精致的显示 */
-.char-count {
-  font-size: 11px;
+/* 字数统计 - 扁平文本 */
+.ai-input-toolbar .char-count {
+  font-size: 12px;
   color: var(--tertiary);
   user-select: none;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease;
   font-variant-numeric: tabular-nums;
-  padding: 4px 8px;
-  background: color-mix(in srgb, var(--control) 80%, transparent);
-  border-radius: 6px;
-  border: 1px solid var(--line-soft);
   font-weight: 500;
+  /* 优化：避免数字变化时的布局抖动 */
+  min-width: 2ch;
+  text-align: right;
 }
 
-.char-count.warning {
+.ai-input-toolbar .char-count.warning {
   color: #f59e0b;
-  background: color-mix(in srgb, #f59e0b 8%, var(--control));
-  border-color: color-mix(in srgb, #f59e0b 20%, var(--line));
 }
 
-.char-count.error {
+.ai-input-toolbar .char-count.error {
   color: #ef4444;
-  background: color-mix(in srgb, #ef4444 8%, var(--control));
-  border-color: color-mix(in srgb, #ef4444 20%, var(--line));
-  animation: shake 0.4s ease;
 }
 
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-3px); }
-  75% { transform: translateX(3px); }
-}
-
-/* 附件徽章 - 更精美的设计 */
+/* 附件徽章 - 简洁扁平 */
 .attachment-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
-  background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 85%, #000) 100%);
-  color: white;
-  border-radius: 8px;
-  font-size: 11px;
+  padding: 4px 8px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  border-radius: 6px;
+  font-size: 12px;
   font-weight: 500;
-  max-width: 200px;
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 30%, transparent);
+  max-width: 180px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
   transition: all 0.2s ease;
 }
 
 .attachment-badge:hover {
-  box-shadow: 0 3px 10px color-mix(in srgb, var(--accent) 40%, transparent);
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color: var(--accent);
 }
 
 .attachment-badge-text {
@@ -375,51 +386,41 @@
 
 .attachment-remove {
   cursor: pointer;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 3px;
-  font-weight: bold;
-  opacity: 0.85;
-  line-height: 1;
-  font-size: 14px;
-  transition: all 0.2s ease;
-  background: rgba(255, 255, 255, 0.15);
+  font-size: 13px;
+  transition: background 0.2s ease;
   flex-shrink: 0;
+  opacity: 0.7;
 }
 
 .attachment-remove:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.25);
-  transform: scale(1.1);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
-/* 快捷键提示 - 更优雅的样式 */
+/* 快捷键提示 */
 .shortcut-hint {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--tertiary);
   user-select: none;
-  padding: 3px 7px;
-  background: color-mix(in srgb, var(--text) 4%, transparent);
-  border-radius: 4px;
-  border: 1px solid var(--line-soft);
   font-family: ui-monospace, 'SF Mono', Monaco, monospace;
-  font-weight: 500;
-  letter-spacing: 0.5px;
 }
 
-/* Deep Chat 消息样式覆盖 */
+/* Deep Chat 消息样式 */
 deep-chat .message-bubble {
   position: relative;
-  animation: message-slide-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: message-fade-in 0.18s ease;
 }
 
-@keyframes message-slide-in {
+@keyframes message-fade-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -427,64 +428,47 @@ deep-chat .message-bubble {
   }
 }
 
-/* 消息内容容器 */
+/* 消息内容 */
 .message-content {
   line-height: 1.7;
   word-break: break-word;
 }
 
-/* 代码块美化 */
+/* 代码块 - 简洁样式 */
 .message-content code {
-  background: color-mix(in srgb, var(--accent) 8%, var(--control));
-  padding: 2px 6px;
+  background: color-mix(in srgb, var(--control) 80%, transparent);
+  padding: 2px 5px;
   border-radius: 4px;
   font-size: 0.92em;
-  border: 1px solid color-mix(in srgb, var(--accent) 12%, var(--line));
 }
 
 .message-content pre {
-  background: color-mix(in srgb, var(--control) 95%, var(--text));
-  padding: 12px;
-  border-radius: 8px;
+  background: color-mix(in srgb, var(--control) 90%, transparent);
+  padding: 10px;
+  border-radius: 6px;
   overflow-x: auto;
-  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
   margin: 8px 0;
 }
 
 .message-content pre code {
   background: none;
   padding: 0;
-  border: none;
 }
 
-/* 适配暗色主题 */
-:root[data-app-theme="dark"] .thinking-block {
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--accent) 6%, var(--control)) 0%,
-    color-mix(in srgb, var(--accent) 3%, var(--control)) 100%);
-  border-color: color-mix(in srgb, var(--accent) 18%, var(--line));
-}
-
-:root[data-app-theme="dark"] .thinking-header:hover {
-  background: color-mix(in srgb, var(--accent) 5%, transparent);
-}
-
+/* 暗色主题适配 */
 :root[data-app-theme="dark"] .thinking-text {
-  background: color-mix(in srgb, var(--control) 40%, transparent);
+  background: color-mix(in srgb, var(--control) 30%, transparent);
 }
 
-:root[data-app-theme="dark"] .toolbar-button {
-  background: color-mix(in srgb, var(--control) 90%, transparent);
-}
-
-:root[data-app-theme="dark"] .char-count {
+:root[data-app-theme="dark"] .message-content pre {
   background: color-mix(in srgb, var(--control) 60%, transparent);
 }
 
-/* 响应式设计 */
+/* 响应式 */
 @media (max-width: 760px) {
   .thinking-header {
-    padding: 10px 12px;
+    padding: 9px 10px;
   }
 
   .thinking-content.expanded {
@@ -497,16 +481,16 @@ deep-chat .message-bubble {
     right: 50px;
   }
 
-  .toolbar-button {
-    width: 28px;
-    height: 28px;
-    font-size: 14px;
+  .ai-input-toolbar .toolbar-button {
+    width: 26px;
+    height: 26px;
+    font-size: 15px;
   }
 }
 
-/* 滚动条美化 */
+/* 滚动条 - 简洁样式 */
 .thinking-content.expanded::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 .thinking-content.expanded::-webkit-scrollbar-track {
@@ -514,10 +498,10 @@ deep-chat .message-bubble {
 }
 
 .thinking-content.expanded::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 3px;
+  background: var(--line);
+  border-radius: 2px;
 }
 
 .thinking-content.expanded::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover);
+  background: var(--secondary);
 }
