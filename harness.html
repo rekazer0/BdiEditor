@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>layout inspector harness</title>
+</head>
+<body>
+  <section class="source">
+    <div id="quick-inspector" data-inspector-group-display="grouped">
+      <nav id="mobile-inspector-groups" aria-label="属性分组"></nav>
+      <div class="inspector-group bda-config-fields">
+        <div id="bda-selected-style-heading" class="bda-selected-style-heading" hidden>
+          <div><h3>样式</h3><p>正常与按下状态</p></div>
+          <div class="inspector-state-switch" role="group" aria-label="按键状态">
+            <button class="active" type="button" data-bda-inspector-state="normal" aria-pressed="true">正常</button>
+            <button type="button" data-bda-inspector-state="pressed" aria-pressed="false">按下</button>
+          </div>
+        </div>
+        <div id="bda-config-fields"></div>
+      </div>
+    </div>
+  </section>
+  <div id="report"></div>
+  <script type="module" src="/harness.ts"></script>
+</body>
+</html>

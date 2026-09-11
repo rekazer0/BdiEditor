@@ -16,7 +16,6 @@
  *   设计系统 · Design System   button / segmented control / field / tabs / key cap
  *   组件 / 标题栏               title bar, document pill, mode switch
  *   组件 / 画布工具条            canvas toolbar pills, device select, zoom group
- *   组件 / 缩放控件 · 悬浮        floating zoom control
  *   多选对齐工具条 (桌面 · 编辑模式)
  *   弹层 · 设置                 settings sheet, switches, rows
  *   组件 / 左侧导航              navigation rows, group headings
@@ -646,103 +645,6 @@
 }
 
 /* =================================================================================================
- * 8 · Floating zoom control  (组件 / 缩放控件 · 悬浮: 84px frosted pill,
- *     padding 8 · gap 2 · 20px discs · mono value · 适应 hint)
- * ================================================================================================= */
-
-:root body .preview-zoom-control {
-  width: 84px;
-  height: auto;
-  min-height: 0;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  padding: 8px;
-  border: 1px solid var(--pen-zoom-border);
-  border-radius: var(--pen-radius-pill);
-  background: var(--pen-zoom-bg);
-  box-shadow: 0 6px 18px -2px var(--pen-zoom-shadow);
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
-}
-
-:root body .preview-zoom-control button {
-  width: 20px;
-  height: 20px;
-  min-width: 20px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: var(--pen-radius-pill);
-  background: var(--pen-zoom-btn);
-  color: var(--pen-secondary);
-  box-shadow: none;
-}
-
-:root body .preview-zoom-control button:hover:not(:disabled) {
-  color: var(--pen-text);
-  background: color-mix(in srgb, var(--pen-zoom-btn) 100%, var(--pen-text) 6%);
-}
-
-:root body .preview-zoom-control button[aria-pressed="true"] {
-  background: var(--pen-accent-soft);
-  color: var(--pen-accent);
-}
-
-:root body .preview-zoom-control button:disabled {
-  opacity: 0.4;
-}
-
-:root body .preview-zoom-control svg,
-:root body .preview-zoom-control button .system-symbol,
-:root body .preview-zoom-control button .system-symbol svg {
-  width: 12px;
-  height: 12px;
-  display: block;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-/* The fit affordance is the pen's plain "适应" hint, not a fourth disc. */
-:root body #preview-zoom-fit {
-  width: 100%;
-  height: 12px;
-  min-height: 12px;
-  padding: 0;
-  border-radius: var(--pen-radius-pill);
-  background: transparent;
-  color: var(--pen-tertiary);
-}
-
-:root body #preview-zoom-fit:hover:not(:disabled) {
-  background: var(--pen-zoom-btn);
-  color: var(--pen-text);
-}
-
-:root body #preview-zoom-value,
-:root body #preview-zoom-label {
-  display: block;
-  color: var(--pen-text);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1;
-  text-align: center;
-  white-space: nowrap;
-}
-
-:root body #preview-zoom-label {
-  color: var(--pen-tertiary);
-  font-size: 9.5px;
-  font-weight: 400;
-}
-
-/* =================================================================================================
  * 9 · Floating multi-select toolbar  (多选对齐工具条: raised bar · r12 · 1px $line ·
  *     28px discs r5 · $key-sel count chip)
  * ================================================================================================= */
@@ -1174,23 +1076,490 @@
     height: calc(100% - var(--mobile-dock-h)) !important;
   }
 
-  :root body .preview-zoom-control {
-    width: auto;
-    height: auto;
-    flex-direction: row;
-    gap: 4px;
-    padding: 4px 6px;
-    bottom: 14px;
-    box-shadow: 0 3px 10px rgb(18 20 25 / 12%);
-  }
-
-  :root body #preview-zoom-fit {
-    width: auto;
-    height: 22px;
-    padding: 0 6px;
-  }
-
   :root body #event-log {
     display: none;
   }
+}
+
+/* =================================================================================================
+ * 17 · Title bar layout  (组件 / 标题栏: 54px bar · 16px padding · left 打开/保存/导出 ·
+ *      centred document pill · right mode switch + 更多)
+ *
+ * The screen layer was built around a hamburger file menu; the Pen document draws the
+ * three file actions inline and keeps only 更多 as an icon button. These rules restate
+ * the bar and give the leading actions their labelled shape.
+ * ================================================================================================= */
+
+:root body .titlebar {
+  height: var(--titlebar-height);
+  min-height: var(--titlebar-height);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--pen-line);
+  background: var(--pen-surface);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body .titlebar-left,
+:root body .titlebar-right {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+:root body .titlebar-right {
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+:root body .titlebar-left > .spacer {
+  flex: 0 1 0;
+  min-width: 0;
+}
+
+:root body .titlebar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  min-width: 0;
+}
+
+:root body .titlebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+:root body .titlebar .titlebar-actions .titlebar-action {
+  display: inline-flex;
+  height: auto;
+  width: auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--pen-radius-sm);
+  background: transparent;
+  color: var(--pen-secondary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body .titlebar .titlebar-actions .titlebar-action:hover:not(:disabled) {
+  background: var(--pen-surface-subtle);
+  color: var(--pen-text);
+}
+
+:root body .titlebar .titlebar-actions .titlebar-action:active:not(:disabled) {
+  background: color-mix(in srgb, var(--pen-surface-subtle) 72%, var(--pen-line));
+}
+
+:root body .titlebar .titlebar-actions .titlebar-action:disabled {
+  opacity: 0.42;
+  color: var(--pen-secondary);
+}
+
+:root body .titlebar .titlebar-action .icon,
+:root body .titlebar .titlebar-action .system-symbol,
+:root body .titlebar .titlebar-action .system-symbol svg,
+:root body .titlebar .titlebar-action .icon svg {
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  display: block;
+  color: currentColor;
+  font-size: 14px;
+  line-height: 1;
+}
+
+:root body .titlebar .titlebar-action-primary,
+:root body .titlebar .titlebar-export > summary.titlebar-action-primary {
+  padding: 6px 12px;
+  background: var(--pen-accent);
+  color: var(--pen-on-brand);
+  font-weight: 600;
+}
+
+:root body .titlebar .titlebar-action-primary:hover:not(:disabled),
+:root body .titlebar .titlebar-export > summary.titlebar-action-primary:hover {
+  background: color-mix(in srgb, var(--pen-accent) 86%, #000000);
+  color: var(--pen-on-brand);
+}
+
+:root body .titlebar .titlebar-export.toolbar-more {
+  position: relative;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  display: block;
+  background: transparent;
+}
+
+:root body .titlebar .titlebar-export > summary {
+  list-style: none;
+}
+
+:root body .titlebar .titlebar-export > summary::-webkit-details-marker {
+  display: none;
+}
+
+:root body .titlebar-icon-button,
+:root body .titlebar .toolbar-more > summary.titlebar-icon-button {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-secondary);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+:root body .titlebar-icon-button:hover {
+  background: color-mix(in srgb, var(--pen-surface-subtle) 82%, var(--pen-line));
+  color: var(--pen-text);
+}
+
+:root body .titlebar-icon-button .system-symbol,
+:root body .titlebar-icon-button .system-symbol svg,
+:root body .titlebar-icon-button .icon svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+/* Document pill — 组件 / 标题栏 文档 */
+:root body .titlebar .document-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: auto;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  box-shadow: none;
+}
+
+:root body .titlebar .document-title .document-icon,
+:root body .titlebar .document-title .document-icon svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+  color: var(--pen-secondary);
+}
+
+:root body .titlebar .document-title strong {
+  color: var(--pen-text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+:root body .titlebar .document-title #dirty {
+  display: none;
+}
+
+:root body .document-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: var(--pen-radius-pill);
+  background: var(--pen-surface);
+  box-shadow: inset 0 0 0 1px var(--pen-line);
+}
+
+:root body .document-state::after {
+  content: "本地模式";
+  color: var(--pen-secondary);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+:root body .document-state-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--pen-tertiary);
+}
+
+:root body[data-doc-open="true"] .document-state::after {
+  content: "已保存";
+}
+
+:root body[data-doc-open="true"] .document-state-dot {
+  background: var(--pen-state-ok);
+}
+
+:root body[data-doc-dirty="true"] .document-state::after {
+  content: "已编辑";
+}
+
+:root body[data-doc-dirty="true"] .document-state-dot {
+  background: var(--pen-state-warn);
+}
+
+/* Mode switch keeps the 组件 / 标题栏 metric: 5px 11px options inside a 3px track. */
+:root body .titlebar .mode-control button {
+  height: auto;
+  padding: 5px 11px;
+}
+
+:root body .titlebar .mobile-choice-toggle,
+:root body .mobile-command-menu,
+:root body .mobile-quick-actions,
+:root body .mobile-title-choices {
+  display: none;
+}
+
+/* =================================================================================================
+ * 18 · Welcome screen  (桌面 · 新建皮肤: main padding 40/48 · gap 26 · 2-up template grid ·
+ *      aside 340 · 28/24 · 18px gap · device tip pinned to the bottom)
+ * ================================================================================================= */
+
+:root body .welcome-main {
+  gap: 26px;
+  padding: 40px 48px;
+  background: var(--pen-window);
+}
+
+:root body .welcome-hero {
+  gap: 8px;
+}
+
+:root body .welcome-hero h1 {
+  color: var(--pen-text);
+  font-family: var(--font-ui);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+:root body .welcome-hero p {
+  max-width: none;
+  color: var(--pen-secondary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 21px;
+}
+
+:root body .welcome-section {
+  gap: 10px;
+}
+
+:root body .welcome-section-head {
+  gap: 10px;
+}
+
+:root body .welcome-section-head h2 {
+  color: var(--pen-text);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+:root body .welcome-section-head span {
+  color: var(--pen-tertiary);
+  font-size: 12px;
+}
+
+:root body .template-grid {
+  gap: 16px;
+}
+
+:root body .template-grid-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+:root body .template-card {
+  gap: 12px;
+  padding: 14px;
+  border: 0;
+  border-radius: var(--pen-radius-md);
+  outline: 1px solid var(--pen-line);
+  outline-offset: -1px;
+  background: var(--pen-surface);
+  box-shadow: none;
+  transition: outline-color 160ms ease, box-shadow 160ms ease;
+}
+
+:root body .template-card:hover {
+  border-color: transparent;
+  outline-color: var(--pen-accent);
+  box-shadow: 0 4px 14px -4px rgb(18 20 25 / 14%);
+}
+
+:root body .template-preview {
+  border-radius: var(--pen-radius-sm);
+}
+
+:root body .template-name {
+  color: var(--pen-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+:root body .template-go {
+  color: var(--pen-tertiary);
+}
+
+:root body .template-meta {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+}
+
+:root body .template-meta em {
+  border-radius: var(--pen-radius-xs);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-secondary);
+  font-size: 9px;
+}
+
+:root body .welcome-open {
+  gap: 12px;
+  padding: 14px;
+  border: 0;
+  border-radius: var(--pen-radius-md);
+  outline: 1px solid var(--pen-line);
+  outline-offset: -1px;
+  background: var(--pen-surface);
+}
+
+:root body .welcome-open-icon {
+  color: var(--pen-secondary);
+}
+
+:root body .welcome-open-copy strong {
+  color: var(--pen-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+:root body .welcome-open-copy span {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+}
+
+:root body .welcome-open button {
+  padding: 9px 16px;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-accent);
+  color: var(--pen-on-brand);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+:root body .welcome-open button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--pen-accent) 86%, #000000);
+}
+
+:root body .welcome-note {
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+}
+
+:root body .welcome-note p {
+  color: var(--pen-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+:root body .welcome-note .system-symbol {
+  color: var(--pen-tertiary);
+}
+
+:root body .welcome-aside {
+  gap: 18px;
+  padding: 28px 24px;
+  border-left: 1px solid var(--pen-line);
+  background: var(--pen-surface);
+}
+
+:root body .welcome-aside-head strong {
+  color: var(--pen-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+:root body .welcome-aside-head button {
+  color: var(--pen-accent);
+  font-size: 11px;
+}
+
+:root body .recent-item {
+  border-radius: var(--pen-radius-sm);
+}
+
+:root body .recent-item:hover {
+  background: var(--pen-surface-subtle);
+}
+
+:root body .recent-icon {
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-secondary);
+}
+
+:root body .recent-name {
+  color: var(--pen-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+:root body .recent-path {
+  direction: ltr;
+  color: var(--pen-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-align: left;
+}
+
+:root body .recent-time {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+}
+
+:root body .recent-empty {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+}
+
+:root body .welcome-rule {
+  background: var(--pen-line);
+}
+
+:root body .device-tip {
+  border-radius: var(--pen-radius-md);
+  background: var(--pen-surface-subtle);
 }

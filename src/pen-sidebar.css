@@ -78,6 +78,7 @@
     gap: 0;
     height: auto;
     min-height: 0;
+    padding: 0;
   }
 
   .source .source-heading .inspector-tabs {
@@ -293,8 +294,15 @@
     overflow: hidden auto !important;
   }
 
+  .source #quick-inspector[data-inspector-group-display="grouped"]:not([hidden]) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 95px !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    overflow: hidden !important;
+  }
+
   /* Group switcher — Pen "组件 / 分段控件": 8px sunken track, 30px options. */
-  .source #quick-inspector > #mobile-inspector-groups {
+  .source #quick-inspector > #mobile-inspector-groups:not([hidden]) {
     position: sticky;
     top: 0;
     z-index: 3;
@@ -314,6 +322,16 @@
     box-shadow: none !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
+  }
+
+  .source #quick-inspector[data-inspector-group-display="grouped"] > #mobile-inspector-groups:not([hidden]) {
+    grid-column: 2;
+    grid-row: 1;
+    width: 75px !important;
+    align-self: stretch !important;
+    flex-direction: column !important;
+    margin: 10px !important;
+    overflow: hidden auto !important;
   }
 
   .source #quick-inspector > #mobile-inspector-groups button {
@@ -336,6 +354,12 @@
     font-weight: 400 !important;
     line-height: 1 !important;
     transform: none !important;
+  }
+
+  .source #quick-inspector[data-inspector-group-display="grouped"] > #mobile-inspector-groups button {
+    width: 100% !important;
+    flex: 0 0 42px !important;
+    padding: 0 4px !important;
   }
 
   .source #quick-inspector > #mobile-inspector-groups button .system-symbol,
@@ -364,6 +388,14 @@
     max-height: none !important;
     overflow: visible !important;
   }
+
+  .source #quick-inspector[data-inspector-group-display="grouped"] > .mobile-inspector-managed,
+  .source #quick-inspector[data-inspector-group-display="grouped"] > :is(.document-fields, .bda-config-fields):has(.mobile-inspector-active) {
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 0 !important;
+    overflow: hidden auto !important;
+  }
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -373,7 +405,7 @@
 /* Only the group the switcher points at is on screen — the app hides the rest,
    and this rule must not resurrect them. */
 .source #quick-inspector .mobile-inspector-managed.mobile-inspector-active:not([hidden]),
-.source #quick-inspector .inspector-group:not(.mobile-inspector-managed),
+.source #quick-inspector .inspector-group:not(.mobile-inspector-managed):not([hidden]),
 .source #quick-inspector > .keyboard-fields,
 .source #quick-inspector > .document-fields,
 .source #quick-inspector > .bda-config-fields,
@@ -393,7 +425,7 @@
   box-shadow: none !important;
 }
 
-.source #quick-inspector > :is(.keyboard-fields, .document-fields, .bda-config-fields, .skin-fields, .toolbar-fields)[hidden] {
+.source #quick-inspector > :is(.inspector-group, .keyboard-fields, .document-fields, .bda-config-fields, .skin-fields, .toolbar-fields)[hidden] {
   display: none !important;
 }
 

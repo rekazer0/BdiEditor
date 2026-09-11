@@ -282,7 +282,6 @@ const saveButton = $("#save") as HTMLButtonElement
 const mobileShareButton = $("#mobile-share") as HTMLButtonElement
 const undoButton = $("#undo") as HTMLButtonElement
 const redoButton = $("#redo") as HTMLButtonElement
-const fileMenu = $(".file-menu") as HTMLDetailsElement
 const toolbarMenus = Array.from(document.querySelectorAll<HTMLDetailsElement>(".toolbar-more"))
 const mobileCommandMenu = $(".mobile-command-menu") as HTMLDetailsElement
 const mobileUndoButton = $("#mobile-undo") as HTMLButtonElement
@@ -411,7 +410,6 @@ const previewCoordinateY = $("#preview-coordinate-y")
 const previewZoomOut = $("#preview-zoom-out") as HTMLButtonElement
 const previewZoomFit = $("#preview-zoom-fit") as HTMLButtonElement
 const previewZoomIn = $("#preview-zoom-in") as HTMLButtonElement
-const previewZoomValue = $("#preview-zoom-value") as HTMLSpanElement
 const panelScaleButton = $("#panel-scale") as HTMLButtonElement
 const adaptIos26Button = $("#adapt-ios26") as HTMLButtonElement
 const ios26Dialog = $("#ios26-dialog") as HTMLDialogElement
@@ -1371,6 +1369,7 @@ const mobileShareLabel = isAndroidTauri()
     : isIOSWeb()
       ? "分享 iOS 皮肤"
       : "分享皮肤"
+mobileShareButton.querySelector("span:last-child")!.textContent = mobileShareLabel
 mobileShareButton.title = mobileShareLabel
 mobileShareButton.setAttribute("aria-label", mobileShareLabel)
 mobileShareMenuLabel.textContent = mobileShareLabel
@@ -1482,11 +1481,14 @@ for (const button of mobileCommandButtons) {
     target.click()
   })
 }
-new MutationObserver(syncMobileCommands).observe($(".toolbar-group"), {
-  subtree: true,
-  attributes: true,
-  attributeFilter: ["disabled"],
-})
+for (const target of [document.querySelector(".titlebar-actions"), document.querySelector(".app-more")]) {
+  if (!target) continue
+  new MutationObserver(syncMobileCommands).observe(target, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["disabled"],
+  })
+}
 syncMobileCommands()
 
 for (const [button, target] of [[mobileUndoButton, undoButton], [mobileRedoButton, redoButton]] as const) {
@@ -2778,7 +2780,6 @@ function applyPreviewZoom(value: number, anchor?: { x: number; y: number }): voi
   previewZoom = Math.min(3, Math.max(0.4, Math.round(value * 10) / 10))
   previewZoomOut.disabled = previewZoom <= 0.4
   previewZoomIn.disabled = previewZoom >= 3
-  previewZoomValue.textContent = `${Math.round(previewZoom * 100)}%`
   if (currentDeviceValue() === "canvas") fitCanvasPreview()
   else setPreviewPan(previewPanX, previewPanY)
   if (anchor && before) {
@@ -8537,9 +8538,11 @@ async function startNewDocument(): Promise<void> {
   await runFileOperation("新建皮肤", () => newDocument(templateID))
 }
 
-fileMenu?.addEventListener("click", (event) => {
-  if (fileMenu && (event.target as Element).closest("button")) fileMenu.open = false
-})
+for (const menu of toolbarMenus) {
+  menu.addEventListener("click", (event) => {
+    if ((event.target as Element).closest("button")) menu.open = false
+  })
+}
 newButton.addEventListener("click", () => void startNewDocument())
 openButton.addEventListener("click", () => {
   if (isTauri()) void runFileOperation("打开", openNative)
@@ -9654,16 +9657,13 @@ inspectorTabsVisible.addEventListener("change", () => {
   localStorage.setItem("inspector-tabs-visible", inspectorTabsVisible.checked ? "on" : "off")
   applyInspectorTabsVisibility()
 })
-inspectorGroupedDisplay.checked = localStorage.getItem("inspector-grouped-display") === "on"
+inspectorGroupedDisplay.checked = true
+inspectorGroupedDisplay.disabled = true
 function applyInspectorGroupedDisplay(): void {
-  quickInspector.dataset.inspectorGroupDisplay = inspectorGroupedDisplay.checked ? "grouped" : "all"
-  if (inspectorGroupedDisplay.checked) quickInspector.scrollTop = 0
+  quickInspector.dataset.inspectorGroupDisplay = "grouped"
+  quickInspector.scrollTop = 0
 }
 applyInspectorGroupedDisplay()
-inspectorGroupedDisplay.addEventListener("change", () => {
-  localStorage.setItem("inspector-grouped-display", inspectorGroupedDisplay.checked ? "on" : "off")
-  applyInspectorGroupedDisplay()
-})
 sourceCompletionEnabled.checked = localStorage.getItem("source-completion-enabled") === "on"
 sourceValueHintsEnabled.checked = localStorage.getItem("source-value-hints-enabled") === "on"
 sourceLineExplanationEnabled.checked = localStorage.getItem("source-line-explanation-enabled") === "on"

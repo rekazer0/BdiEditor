@@ -37,11 +37,6 @@
   --pen-state-ok: #12a150;
   --pen-state-warn: #b87a00;
   --pen-state-danger: #e5484d;
-  /* 组件 / 缩放控件 · 悬浮 */
-  --pen-zoom-bg: #ffffffb8;
-  --pen-zoom-border: #ffffff;
-  --pen-zoom-shadow: #12141a1f;
-  --pen-zoom-btn: #1111110d;
 
   --inspector-width: 360px;
   --pen-radius-xs: 5px;
@@ -71,10 +66,6 @@
   --pen-state-ok: #3dd68c;
   --pen-state-warn: #f5c445;
   --pen-state-danger: #ff6b6b;
-  --pen-zoom-bg: #1e2126b8;
-  --pen-zoom-border: #ffffff24;
-  --pen-zoom-shadow: #00000066;
-  --pen-zoom-btn: #ffffff14;
 }
 
 html,
@@ -622,30 +613,6 @@ main {
   background: var(--pen-canvas);
 }
 
-.preview-zoom-control {
-  bottom: 40px;
-  height: 34px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: var(--pen-radius-pill);
-  background: var(--pen-surface);
-  box-shadow: 0 4px 12px rgb(18 20 25 / 12%);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-.preview-zoom-control button {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  color: var(--pen-secondary);
-}
-
-.preview-zoom-control button:hover:not(:disabled) {
-  background: var(--pen-surface-subtle);
-  color: var(--pen-text);
-}
-
 .workspace-status {
   min-height: 30px;
   border-top: 1px solid var(--pen-line);
@@ -863,57 +830,6 @@ main {
   height: 16px;
   margin: 0 2px;
   background: var(--pen-line);
-}
-
-/* -------------------------------------------------------------------------------------------------
- * Floating zoom control
- *
- * Mirrors the Pen "缩放控件 · 悬浮" component: a vertical frosted pill with
- * in / out discs, the numeric zoom, and a 适应 affordance.
- * ------------------------------------------------------------------------------------------------- */
-
-.preview-zoom-control {
-  bottom: 18px;
-  width: auto;
-  height: auto;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-pill);
-  background: color-mix(in srgb, var(--pen-surface) 72%, transparent);
-  box-shadow: 0 6px 18px -2px rgb(18 20 25 / 22%);
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
-}
-
-.preview-zoom-control button {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--pen-radius-pill);
-  color: var(--pen-secondary);
-  background: color-mix(in srgb, var(--pen-text) 5%, transparent);
-}
-
-.preview-zoom-control button:hover:not(:disabled) {
-  color: var(--pen-text);
-  background: color-mix(in srgb, var(--pen-text) 10%, transparent);
-}
-
-#preview-zoom-value,
-#preview-zoom-label {
-  color: var(--pen-text);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1;
-  text-align: center;
-}
-
-#preview-zoom-label {
-  color: var(--pen-tertiary);
-  font-size: 9.5px;
-  font-weight: 400;
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -1252,25 +1168,6 @@ main {
   .preview-toolbar {
     padding: 6px 10px;
     background: var(--pen-surface);
-  }
-
-  .preview-zoom-control {
-    /* The vertical pill is a desktop affordance; on a phone-sized viewport it
-       would eat too much of the canvas, so it goes back to a flat strip. */
-    bottom: 14px;
-    flex-direction: row;
-    gap: 4px;
-    padding: 4px 6px;
-    box-shadow: 0 3px 10px rgb(18 20 25 / 12%);
-  }
-
-  .preview-zoom-control button {
-    width: 22px;
-    height: 22px;
-  }
-
-  #preview-zoom-label {
-    display: none;
   }
 
   .canvas-multi-toolbar {

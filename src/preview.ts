@@ -1405,7 +1405,7 @@ export class Preview {
   private legacyPanelAnimationStartedAt = 0
   private legacyPanelAnimationTimer?: number
   private drawID = 0
-  private drawQueued = false
+  private drawQueued = 0
   private renderPending = false
   private renderAgain = false
   private hintVisible = false
@@ -2412,9 +2412,9 @@ export class Preview {
       return
     }
     if (this.drawQueued) return
-    this.drawQueued = true
-    queueMicrotask(() => {
-      this.drawQueued = false
+    // Coalesce updates across event handlers and promise callbacks into one frame.
+    this.drawQueued = requestAnimationFrame(() => {
+      this.drawQueued = 0
       if (this.renderPending) {
         this.renderAgain = true
         return
@@ -2425,6 +2425,10 @@ export class Preview {
 
   // 同步绘制方法，用于拖拽等需要立即响应的操作
   private drawSync(): void {
+    if (this.drawQueued) {
+      cancelAnimationFrame(this.drawQueued)
+      this.drawQueued = 0
+    }
     if (this.renderPending) {
       this.renderAgain = true
       return
@@ -2438,7 +2442,7 @@ export class Preview {
       this.renderPending = false
       if (this.renderAgain) {
         this.renderAgain = false
-        this.startRender()
+        this.draw()
       }
     })
   }
