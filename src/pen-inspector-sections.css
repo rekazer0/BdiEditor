@@ -1,0 +1,346 @@
+/*
+ * Pen inspector layer 2/4 — sections, groups, collapse and the category rail.
+ *
+ * Design reference: /Users/kaze/Downloads/bdi.pen
+ *   · Sections: q6j56 (内容) D589e (外观) QI75x (布局) MepfG (交互) XufGS (资源)
+ *   · Section Head component: dqAaL
+ *   · Live HTML reference: http://127.0.0.1:1420/inspector-redesign.html
+ *
+ * Scope of this file (do not style rows/controls or the panel shell here):
+ *   .inspector-group, .inspector-group > h3, .pin-chevron, .pin-hint, .pin-summary,
+ *   .inspector-group-subtitle, .inspector-disclosure, details/summary.inspector-advanced,
+ *   #mobile-inspector-groups and its buttons, group separators / scroll rhythm.
+ *
+ * Use the shared tokens from pen-inspector.css (--pin-*).
+ *
+ * DOM contract (injected by inspector-shell.ts):
+ *   section.inspector-group[.inspector-disclosure][.pin-collapsed][hidden]
+ *     h3[role=button]
+ *       .pin-chevron                    ← 14px arrow, turns when collapsed
+ *       "布局"                          ← 12px / 600 title
+ *       .pin-summary  "140 × 143"       ← 10.5px mono digest (collapsed only)
+ *       .pin-hint     "key.layout"      ← 9.5px mono ini key (expanded only)
+ *     …section body (hidden while .pin-collapsed)
+ *
+ * The grouped desktop grid itself (rows/columns, scroll areas) lives in
+ * pen-inspector.css; this layer only dresses the pieces inside it.
+ */
+
+/* ================================================================== *
+ * 1 · Section list — flat, hairline-separated, never a card
+ * ================================================================== */
+:root body .source #quick-inspector .inspector-group:not([hidden]):not(:has(> .mobile-inspector-managed)) {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 6px 8px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--pin-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Sections sit edge to edge: the hairline is the only separator. */
+:root body .source #quick-inspector .inspector-group + .inspector-group {
+  margin: 0 !important;
+  padding-top: 6px !important;
+  border-top: 0 !important;
+}
+
+/* Never close the list twice — the sticky action bar draws its own top line. */
+:root body .source #quick-inspector .inspector-group:not([hidden]):not(:has(~ .inspector-group:not([hidden]))) {
+  border-bottom: 0 !important;
+}
+
+/* Rail mode paints one section at a time (the rest are display:none, not
+   [hidden]), so the visible section is the last one by definition. */
+:root body .source #quick-inspector[data-inspector-group-display="grouped"] > .inspector-group.mobile-inspector-active {
+  border-bottom: 0 !important;
+}
+
+/* ================================================================== *
+ * 2 · Section head — 34px row: chevron · title · ini key / digest
+ * ================================================================== */
+:root body .source #quick-inspector .inspector-group > h3 {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  height: var(--pin-head-h) !important;
+  min-height: var(--pin-head-h) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--pin-ink) !important;
+  font-family: var(--font-ui, inherit) !important;
+  font-size: var(--inspector-section-title-size, 12px) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+}
+
+/* The rail already names the active group, but the head is also the collapse
+   control — it stays on screen in every display mode. */
+:root body .source #quick-inspector:has(> #mobile-inspector-groups:not([hidden])) .mobile-inspector-managed > h3 {
+  display: flex !important;
+}
+
+/* Collapsible heads read as buttons, without becoming one. */
+:root body .source #quick-inspector .inspector-disclosure > h3 {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+:root body .source #quick-inspector .inspector-disclosure > h3:hover {
+  color: var(--pin-accent) !important;
+}
+
+:root body .source #quick-inspector .inspector-disclosure > h3:focus-visible {
+  outline: 2px solid var(--pin-accent);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
+/* Chevron — 14px arrow drawn with a mask so `color` drives it. */
+:root body .source #quick-inspector .inspector-group > h3 .pin-chevron {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  color: var(--pin-ink-faint);
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+  transition: transform 160ms ease, color 140ms ease;
+}
+
+:root body .source #quick-inspector .inspector-disclosure > h3:hover .pin-chevron {
+  color: var(--pin-accent);
+}
+
+/* ini key — pushed to the far right, mono and faint. */
+:root body .source #quick-inspector .inspector-group > h3 .pin-hint {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--pin-ink-faint);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--inspector-hint-size, 9.5px);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Collapsed digest — takes over the ini key's slot. */
+:root body .source #quick-inspector .inspector-group > h3 .pin-summary {
+  display: none;
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--pin-ink-muted);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ================================================================== *
+ * 3 · Collapsed state (.pin-collapsed sits on the section)
+ * ================================================================== */
+:root body .source #quick-inspector .inspector-group.pin-collapsed > :not(h3) {
+  display: none !important;
+}
+
+:root body .source #quick-inspector .inspector-group.pin-collapsed > h3 .pin-hint {
+  display: none !important;
+}
+
+:root body .source #quick-inspector .inspector-group.pin-collapsed > h3 .pin-summary {
+  display: inline-flex !important;
+}
+
+:root body .source #quick-inspector .inspector-group.pin-collapsed > h3 .pin-chevron {
+  transform: rotate(-90deg);
+}
+
+:root body .source #quick-inspector .inspector-group.pin-collapsed > h3:hover {
+  color: var(--pin-ink) !important;
+}
+
+/* ================================================================== *
+ * 4 · Subtitle / inline disclosure inside a section
+ * ================================================================== */
+:root body .source #quick-inspector .inspector-group-subtitle {
+  margin: 0 0 2px !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-ui, inherit) !important;
+  font-size: 11.5px !important;
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+  line-height: 1.5 !important;
+  opacity: 1 !important;
+}
+
+:root body .source #quick-inspector .inspector-advanced {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-top: 1px solid var(--pin-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root body .source #quick-inspector .inspector-advanced > h4,
+:root body .source #quick-inspector details.inspector-advanced > summary {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 6px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--pin-ink-muted) !important;
+  font-family: var(--font-ui, inherit) !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+  line-height: 1 !important;
+  list-style: none !important;
+  cursor: pointer !important;
+}
+
+:root body .source #quick-inspector details.inspector-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+:root body .source #quick-inspector details.inspector-advanced > summary::marker {
+  content: "";
+}
+
+:root body .source #quick-inspector details.inspector-advanced > summary::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  border-left: 4px solid currentColor;
+  transform-origin: 25% 50%;
+  transition: transform 160ms ease;
+}
+
+:root body .source #quick-inspector details.inspector-advanced > summary:hover,
+:root body .source #quick-inspector details.inspector-advanced[open] > summary {
+  color: var(--pin-ink) !important;
+}
+
+:root body .source #quick-inspector details.inspector-advanced[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+/* ================================================================== *
+ * 5 · Desktop category rail — 60px column, 38px options
+ * ================================================================== */
+@media (min-width: 761px) {
+  /* No categories to switch between → no rail, no empty gutter. */
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"]:has(> #mobile-inspector-groups:is([hidden], :empty)):not([hidden]) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  :root body .source #quick-inspector > #mobile-inspector-groups:empty {
+    display: none !important;
+  }
+
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > #mobile-inspector-groups:not([hidden]) {
+    position: static !important;
+    inset: auto !important;
+    float: none !important;
+    align-self: stretch !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 4px !important;
+    width: var(--pin-rail-w) !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 8px 4px !important;
+    border: 0 !important;
+    border-left: 1px solid var(--pin-line) !important;
+    border-radius: 0 !important;
+    background: var(--pin-surface) !important;
+    box-shadow: none !important;
+    transform: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    overflow: hidden auto !important;
+    scrollbar-width: none;
+  }
+
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > #mobile-inspector-groups:not([hidden])::-webkit-scrollbar {
+    display: none;
+  }
+
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > #mobile-inspector-groups:not([hidden]) button {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    padding: 0 4px !important;
+    border: 0 !important;
+    border-radius: 7px !important;
+    background: transparent !important;
+    color: var(--pin-ink-muted) !important;
+    box-shadow: none !important;
+    font-family: var(--font-ui, inherit) !important;
+    font-size: 11.5px !important;
+    font-weight: 400 !important;
+    line-height: 1 !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    transform: none !important;
+    transition: background-color 140ms ease, color 140ms ease !important;
+  }
+
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > #mobile-inspector-groups:not([hidden]) button:hover:not(.active) {
+    color: var(--pin-ink) !important;
+    background: var(--pin-hover) !important;
+  }
+
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > #mobile-inspector-groups:not([hidden]) button.active {
+    color: var(--pin-accent) !important;
+    background: var(--pin-accent-soft) !important;
+    font-weight: 600 !important;
+  }
+
+  /* Labels only — icons would crowd a 60px column. */
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > #mobile-inspector-groups:not([hidden]) button :is(.system-symbol, svg) {
+    display: none !important;
+  }
+
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > #mobile-inspector-groups:not([hidden]) .inspector-group-label {
+    overflow: hidden;
+    max-width: 100%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

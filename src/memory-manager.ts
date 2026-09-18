@@ -166,14 +166,14 @@ export function getMemoryReport(): MemoryReport | null {
 // 内存压力检测
 export function isMemoryPressure(): boolean {
   const report = getMemoryReport()
-  if (!report) return false
-  return report.percentage > 85 // 超过85%使用率视为内存压力
+  // Allocated heap grows on demand; its occupancy is not the engine limit.
+  if (!report?.limit || !Number.isFinite(report.limit) || report.limit <= 0) return false
+  return report.used / report.limit > 0.85
 }
 
 // 在内存压力下强制清理
 export function handleMemoryPressure(): void {
   console.warn("Memory pressure detected, performing aggressive cleanup")
   clearImageCache()
-  cleanupCanvasCache()
   performMemoryCleanup()
 }

@@ -1002,23 +1002,21 @@
   font-size: 12px;
 }
 
-/* -------------------------------------------------------------------------------------------------
- * Source pane — Pen "窗格 · 源代码"
- *
- * 21px code lines on the surface colour, 10px mono line numbers, 11.5px mono
- * tokens, and the cursor line marked by a sunken band plus a 2px brand gutter
- * mark. The find affordance takes the Pen "查找按钮" chrome.
- * ------------------------------------------------------------------------------------------------- */
-
+/* Source pane: airy code, quiet line numbers, and a continuous active-line band. */
 .source #source-editor,
 .source #source .cm-editor,
 .source #source .cm-gutters {
-  background: var(--pen-surface);
+  background: #fafbff;
 }
 
 .source #source .cm-gutters {
-  border-right: 1px solid var(--pen-line);
-  color: var(--pen-tertiary);
+  border-right: 0;
+  color: #8b93a3;
+}
+
+.source #source .cm-scroller {
+  font-size: var(--source-font-size, 13px);
+  line-height: 1.7;
 }
 
 .source #source .cm-content {
@@ -1026,28 +1024,20 @@
 }
 
 .source #source .cm-line {
-  padding: 1px 14px;
-  color: var(--pen-text);
-  font-size: 11.5px;
-  line-height: 21px;
+  padding: 0 16px 0 12px;
+  color: #606575;
 }
 
 .source #source .cm-lineNumbers .cm-gutterElement {
-  min-width: 44px;
-  padding: 1px 12px 1px 8px;
-  color: var(--pen-tertiary);
-  font-size: 10px;
-  line-height: 21px;
+  min-width: 42px;
+  padding: 0 10px 0 12px;
+  color: #8b93a3;
 }
 
-.source #source .cm-activeLine {
-  background: var(--pen-surface-subtle);
-  box-shadow: inset 2px 0 0 var(--pen-accent);
-}
-
+.source #source .cm-activeLine,
 .source #source .cm-activeLineGutter {
-  background: transparent;
-  color: var(--pen-secondary);
+  background: #eaf0ff;
+  box-shadow: none;
 }
 
 .source #source .cm-selectionBackground,

@@ -1,5 +1,7 @@
 import { IniDocument } from "./ini.ts"
-import { updateTileSlice, type TileRect, type TileSlice } from "./tiles.ts"
+import { nextTileIndex, updateTileSlice, type TileRect, type TileSlice } from "./tiles.ts"
+
+export { nextTileIndex } from "./tiles.ts"
 
 export type LayoutKeyGeometry = { section: string; rect: TileRect }
 export type LayoutImageTarget = "panel" | "key-normal" | "key-highlight" | "fore-normal" | "fore-highlight" | "candidate"
@@ -30,16 +32,6 @@ export function validateKeyRects(keys: readonly LayoutKeyGeometry[], panelWidth:
       return `${section} 的 VIEW_RECT 超出键盘面板范围`
     }
   }
-}
-
-export function nextTileIndex(tiles: IniDocument): number {
-  const used = new Set(tiles.sections().flatMap((section) => {
-    const match = section.match(/^IMG(\d+)$/i)
-    return match ? [Number(match[1])] : []
-  }))
-  let index = 1
-  while (used.has(index)) index += 1
-  return index
 }
 
 export function nextStyleID(styles: IniDocument): number {
@@ -162,7 +154,7 @@ function updateStyleCounter(styles: IniDocument): void {
 
 function cloneBackground(styles: IniDocument, config: IniDocument, section: string, plan: LayoutImagePlan, base: string): void {
   const nextID = nextStyleID(styles)
-  const source = config.get(section, "BACK_STYLE") ?? "STYLE0"
+  const source = `STYLE${config.get(section, "BACK_STYLE") ?? "0"}`
   const cloned = cloneStyle(styles, source, nextID)
   styles.set(cloned, "NM_IMG", `${base},${plan.panelIndex}`)
   styles.set(cloned, "HL_IMG", `${base},${plan.panelIndex}`)

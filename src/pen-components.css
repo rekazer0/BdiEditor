@@ -149,7 +149,16 @@
   font-weight: 400;
 }
 
+:root body .sidebar-view-control button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
 :root body .preview-choice button {
+  display: grid;
+  place-items: center;
   width: 26px;
   height: 26px;
   padding: 0;
@@ -723,6 +732,40 @@
   backdrop-filter: none;
 }
 
+/* These wrappers are layout groups, not additional rows in the fixed-height bar. */
+.preview-toolbar-start,
+.preview-toolbar-end,
+.desktop-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.preview-toolbar-start { margin-right: auto; }
+.preview-toolbar-end { margin-left: auto; }
+
+:root body .preview-toolbar :is(#device-control, #skin-state-control) {
+  position: relative;
+  left: auto;
+  transform: none;
+}
+
+:root body .preview-toolbar #device-control {
+  flex: 0 1 240px;
+  min-width: 0;
+}
+
+:root body .preview-toolbar #device {
+  width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 760px) {
+  .desktop-quick-actions { display: none; }
+}
+
 :root body .preview-heading strong {
   color: var(--pen-text);
   font-size: 13px;
@@ -787,6 +830,10 @@
   font-size: 11.5px;
   font-weight: 500;
   box-shadow: none;
+}
+
+:root body #skin-state {
+  color: transparent;
 }
 
 :root body #skin-state-control .skin-state-value {
@@ -1282,53 +1329,51 @@
   display: none;
 }
 
-:root body .document-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 7px;
-  border-radius: var(--pen-radius-pill);
-  background: var(--pen-surface);
-  box-shadow: inset 0 0 0 1px var(--pen-line);
-}
+/* Desktop title actions follow the rounded, raised reference toolbar. */
+@media (min-width: 761px) {
+  :root body .titlebar-right,
+  :root body .desktop-quick-actions {
+    gap: 6px;
+  }
 
-:root body .document-state::after {
-  content: "本地模式";
-  color: var(--pen-secondary);
-  font-family: var(--font-ui);
-  font-size: 10px;
-  font-weight: 400;
-  line-height: 1.3;
-  white-space: nowrap;
-}
+  :root body .titlebar-right .titlebar-icon-button {
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: 8px;
+    background: var(--pen-surface-subtle);
+  }
 
-:root body .document-state-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--pen-tertiary);
-}
+  :root body .titlebar-right .titlebar-icon-button .system-symbol,
+  :root body .titlebar-right .titlebar-icon-button .system-symbol svg {
+    width: 16px;
+    height: 16px;
+  }
 
-:root body[data-doc-open="true"] .document-state::after {
-  content: "已保存";
-}
+  :root body .titlebar .mode-control {
+    flex: none;
+  }
 
-:root body[data-doc-open="true"] .document-state-dot {
-  background: var(--pen-state-ok);
-}
+  :root body .titlebar .mode-control,
+  :root body .sidebar-view-control {
+    gap: 2px;
+    padding: 2px;
+    border-radius: 10px;
+  }
 
-:root body[data-doc-dirty="true"] .document-state::after {
-  content: "已编辑";
-}
+  :root body .titlebar .mode-control button,
+  :root body .sidebar-view-control button {
+    height: 28px;
+    padding: 0 11px;
+    border-radius: 8px;
+    font-size: 11px;
+  }
 
-:root body[data-doc-dirty="true"] .document-state-dot {
-  background: var(--pen-state-warn);
-}
-
-/* Mode switch keeps the 组件 / 标题栏 metric: 5px 11px options inside a 3px track. */
-:root body .titlebar .mode-control button {
-  height: auto;
-  padding: 5px 11px;
+  :root body .titlebar .mode-control button.active,
+  :root body .sidebar-view-control button.active {
+    box-shadow: 0 2px 4px rgb(0 0 0 / 12%);
+    font-weight: 600;
+  }
 }
 
 :root body .titlebar .mobile-choice-toggle,
@@ -1390,13 +1435,13 @@
 }
 
 :root body .template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 280px);
   gap: 16px;
 }
 
 :root body .template-grid-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  display: contents;
 }
 
 :root body .template-card {
@@ -1419,6 +1464,22 @@
 
 :root body .template-preview {
   border-radius: var(--pen-radius-sm);
+}
+
+:root body .template-grid .template-preview {
+  height: 160px;
+  padding: 0;
+  align-items: center;
+  background: var(--pen-surface-subtle);
+  color: var(--pen-tertiary);
+  font-size: 11px;
+}
+
+:root body .template-grid .template-preview canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 :root body .template-name {
@@ -1563,3 +1624,52 @@
   border-radius: var(--pen-radius-md);
   background: var(--pen-surface-subtle);
 }
+
+/* File operation sheet: bounded icon and a compact, readable progress layout. */
+:root body #file-operation-dialog {
+  width: min(400px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+}
+:root body #file-operation-dialog > form { gap: 20px; padding: 24px; }
+:root body #file-operation-dialog header {
+  display: flex;
+  min-height: 0;
+  padding: 0;
+  gap: 12px;
+  border: 0;
+}
+:root body #file-operation-dialog .file-operation-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--pen-accent-soft, var(--control));
+  color: var(--pen-accent);
+}
+:root body #file-operation-dialog .file-operation-icon svg { width: 24px; height: 24px; }
+:root body #file-operation-dialog .file-operation-subtitle { font-size: 12px; line-height: 1.5; }
+:root body #file-operation-dialog .file-operation-progress-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--pen-secondary);
+}
+:root body #file-operation-detail { margin: 0; overflow-wrap: anywhere; }
+:root body #file-operation-percent { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+:root body #file-operation-dialog progress { display: block; height: 6px; }
+:root body #file-operation-result { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+:root body #file-operation-dialog[data-outcome="success"] #file-operation-result { display: none; }
+:root body #file-operation-dialog footer {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 16px;
+}
+:root body #file-operation-dialog .file-operation-hint { font-size: 11px; color: var(--pen-secondary); }
+:root body #file-operation-close { flex-shrink: 0; min-width: 64px; }

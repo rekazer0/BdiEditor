@@ -28,7 +28,8 @@
     "@tauri-apps/plugin-fs": "^2.5.1",
     "@wasm-audio-decoders/ogg-vorbis": "^0.1.20",
     "deep-chat": "^2.5.1",
-    "fflate": "^0.8.2"
+    "fflate": "^0.8.2",
+    "lucide": "^1.45.0"
   },
   "devDependencies": {
     "@cloudbase/cli": "^3.8.1",

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN" data-mobile-pane="inspector">
+<head>
+<meta charset="utf-8">
+<title>probe: pin-actions top</title>
+<style>
+  body { margin: 0; padding: 24px; display: flex; flex-direction: column; gap: 24px; background: #dfe5ec; font-family: -apple-system, sans-serif; }
+  .case { display: flex; flex-direction: column; gap: 6px; }
+  .case h1 { font-size: 13px; margin: 0; color: #333; }
+  .case .source { height: 620px; border: 1px solid #aab; border-radius: 10px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
+  .probe-content { padding: 14px 12px; }
+  .probe-content label { display: flex; justify-content: space-between; align-items: center; min-height: 44px; border-bottom: 1px solid #eee; font-size: 12px; }
+  .probe-content input { width: 140px; height: 26px; border: 1px solid #ccc; border-radius: 6px; padding: 0 8px; }
+</style>
+<script type="module">
+import "./src/style.css";
+import "./src/pen-design-application.css";
+import "./src/pen-sidebar.css";
+import "./src/pen-components.css";
+import "./src/inspector.css";
+import "./src/pen-inspector-sections.css";
+import "./src/pen-inspector-rows.css";
+import "./src/pen-inspector-panels.css";
+import "./src/pen-inspector.css";
+import "./src/inspector-fidelity.css";
+</script>
+</head>
+<body>
+
+<div class="case" id="case-desktop">
+  <h1>A · grouped 桌面宽（pane 980px / 视口 1280）</h1>
+  <section class="source" style="width: 980px">
+    <div class="pane-heading source-heading"><div class="inspector-context"><h2>检查器</h2></div></div>
+    <div id="quick-inspector" data-inspector-group-display="grouped">
+      <div class="pin-actions">
+        <span class="pin-actions-slot">
+          <span class="inspector-mode-segment"><button class="pin-action active" title="选择">➤</button><button class="pin-action" title="移动">✥</button></span>
+          <button class="pin-action" title="复制">⧉</button><button class="pin-action" title="交换">⇄</button><button class="pin-action is-danger" title="删除">🗑</button>
+        </span>
+        <span class="pin-actions-meta" data-count="0">未修改</span>
+      </div>
+      <nav id="mobile-inspector-groups"></nav>
+      <div class="inspector-group bda-config-fields mobile-inspector-managed mobile-inspector-active">
+        <div class="probe-content" id="rows-a"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="case" id="case-flat">
+  <h1>B · flat 平铺模式（无 grouped 属性，桌面宽）</h1>
+  <section class="source" style="width: 980px">
+    <div class="pane-heading source-heading"><div class="inspector-context"><h2>检查器</h2></div></div>
+    <div id="quick-inspector">
+      <div class="pin-actions">
+        <span class="pin-actions-slot">
+          <span class="inspector-mode-segment"><button class="pin-action active" title="选择">➤</button><button class="pin-action" title="移动">✥</button></span>
+          <button class="pin-action" title="复制">⧉</button><button class="pin-action" title="交换">⇄</button><button class="pin-action is-danger" title="删除">🗑</button>
+        </span>
+        <span class="pin-actions-meta" data-count="0">未修改</span>
+      </div>
+      <div class="inspector-group skin-fields">
+        <div class="probe-content" id="rows-b"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="case" id="case-narrow">
+  <h1>C · grouped 窄面板（pane 100% / 视口 400，模拟用户截图）</h1>
+  <section class="source" style="width: 100%">
+    <div class="pane-heading source-heading"><div class="inspector-context"><h2>检查器</h2></div></div>
+    <div id="quick-inspector" data-inspector-group-display="grouped">
+      <div class="pin-actions">
+        <span class="pin-actions-slot">
+          <span class="inspector-mode-segment"><button class="pin-action active" title="选择">➤</button><button class="pin-action" title="移动">✥</button></span>
+          <button class="pin-action" title="复制">⧉</button><button class="pin-action" title="交换">⇄</button><button class="pin-action is-danger" title="删除">🗑</button>
+        </span>
+        <span class="pin-actions-meta" data-count="0">未修改</span>
+      </div>
+      <nav id="mobile-inspector-groups"><button type="button" class="active">布局</button><button type="button">样式</button><button type="button">文字</button><button type="button">动作</button></nav>
+      <div class="inspector-group bda-config-fields mobile-inspector-managed mobile-inspector-active">
+        <div class="probe-content" id="rows-c"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script type="module">
+const diag = document.createElement("pre");
+diag.id = "diag";
+diag.style.cssText = "position:fixed;left:0;top:0;z-index:9999;margin:0;padding:2px 4px;background:#ffc;color:#000;font:9px monospace;white-space:pre-wrap;max-width:100vw;";
+document.body.append(diag);
+window.addEventListener("load", () => {
+  if (new URL(location.href).searchParams.get("scroll")) {
+    setTimeout(() => {
+      const scroller = (only ? document.getElementById(only) : document)?.querySelector("#quick-inspector");
+      if (scroller) scroller.scrollTop = Number(new URL(location.href).searchParams.get("scroll"));
+    }, 800);
+  }
+  const scope = document.querySelector(".case:last-of-type") ?? document;
+  const pick = (sel) => (only ? document.querySelector("#" + only + " " + sel) : scope.querySelector(sel));
+  const nodes = { qi: "#quick-inspector", bar: ".pin-actions", rail: "#mobile-inspector-groups", content: ".mobile-inspector-active", src: ".source" };
+  const lines = ["vw=" + window.innerWidth];
+  for (const [k, sel] of Object.entries(nodes)) {
+    const el = pick(sel);
+    if (!el) { lines.push(k + ": missing"); continue; }
+    const cs = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    lines.push(k + ": " + cs.display + " pos=" + cs.position + " area=" + cs.gridArea + " rect=" + Math.round(r.width) + "x" + Math.round(r.height) + "@" + Math.round(r.left) + "," + Math.round(r.top));
+  }
+  const qi = pick("#quick-inspector");
+  if (qi) lines.push("qi-rows=" + getComputedStyle(qi).gridTemplateRows + " cols=" + getComputedStyle(qi).gridTemplateColumns + " scr=" + qi.scrollTop + "/" + qi.scrollHeight + "/" + qi.clientHeight + " labels=" + qi.querySelectorAll("label").length);
+  for (const [k, sel] of Object.entries({ label: ".probe-content label", railBtn: "#mobile-inspector-groups button" })) {
+    const el = pick(sel);
+    if (!el) { lines.push(k + ": missing"); continue; }
+    const cs = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    lines.push(k + ": " + cs.display + " vis=" + cs.visibility + " color=" + cs.color + " fs=" + cs.fontSize + " rect=" + Math.round(r.width) + "x" + Math.round(r.height) + "@" + Math.round(r.left) + "," + Math.round(r.top));
+  }
+  diag.textContent = lines.join("\n");
+});
+const only = new URL(location.href).searchParams.get("only");
+if (only) document.querySelectorAll(".case").forEach((el) => { if (el.id !== only) el.remove(); });
+for (const id of ["rows-a", "rows-b", "rows-c"]) {
+  const box = document.getElementById(id);
+  if (!box) continue;
+  for (let i = 0; i < 40; i++) {
+    const label = document.createElement("label");
+    label.innerHTML = "属性行 " + (i + 1) + " <input value=\"0,0,0,0,1\">";
+    box.append(label);
+  }
+}
+</script>
+</body>
+</html>
+

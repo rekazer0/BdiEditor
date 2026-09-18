@@ -5,6 +5,7 @@ import {
   createProvider,
   envApiKeyAuth,
   type Api,
+  type ImageContent,
   type Model,
   type ProviderStreams,
 } from "@earendil-works/pi-ai"
@@ -26,9 +27,18 @@ export type AiDesignConfiguration = {
 
 export type AiDesignProject = {
   format: "bdi" | "bds" | "bda"
+  skinName: string
+  skinPath: string
   theme: string
   orientation: string
   layout: string
+  keyboard: string
+  selectedKey: {
+    label: string
+    sections: string[]
+    values: Record<string, string>
+  }
+  preview?: ImageContent
   files: readonly AiSkinEditableFile[]
 }
 
@@ -58,6 +68,10 @@ function normalizedUrl(value: string): string {
   return value.trim().replace(/\/+$/, "")
 }
 
+function contextText(value: string, max = 160): string {
+  return value.replace(/[\r\n]+/g, " ").trim().slice(0, max) || "未提供"
+}
+
 function modelApi(protocol: ModelProtocol): Api {
   if (protocol === "anthropic") return "anthropic-messages"
   if (protocol === "google") return "google-generative-ai"
@@ -81,7 +95,7 @@ function configuredModel(config: AiDesignConfiguration): Model<Api> {
     provider: "bdi-editor",
     baseUrl: normalizedUrl(config.apiUrl),
     reasoning: /^(?:o\d|gpt-5|claude-(?:3-7|4)|gemini-2\.5)/i.test(config.model.trim()),
-    input: ["text"],
+    input: ["text", "image"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 128_000,
     maxTokens: 8_192,
@@ -89,9 +103,26 @@ function configuredModel(config: AiDesignConfiguration): Model<Api> {
 }
 
 function systemPrompt(project: AiDesignProject): string {
+  const selected = project.selectedKey.sections.length
+    ? `${contextText(project.selectedKey.label, 80)}（配置节：${project.selectedKey.sections.map((section) => contextText(section, 80)).join("、")}）`
+    : "当前没有选中的按键"
+  const selectedValues = Object.entries(project.selectedKey.values)
+    .filter(([, value]) => value.trim())
+    .map(([key, value]) => `${contextText(key, 80)}=${contextText(value)}`)
+    .join("；")
   return `你是百度输入法皮肤编辑器中的受限修复代理。你只能通过下列工具查询和修改当前打开的皮肤项目，不能访问磁盘、网络、命令行或项目外文件。
 
-当前项目：格式 ${project.format.toUpperCase()}，当前预览主题 ${project.theme}，方向 ${project.orientation}，布局 ${project.layout}。
+当前项目：皮肤“${contextText(project.skinName, 120)}”（${contextText(project.skinPath, 120)}），格式 ${contextText(project.format, 20).toUpperCase()}，当前预览主题 ${contextText(project.theme, 20)}，方向 ${contextText(project.orientation, 20)}，布局 ${contextText(project.layout, 80)}，键盘设备 ${contextText(project.keyboard, 80)}。
+当前选择：${selected}${selectedValues ? `；已暴露字段：${selectedValues}` : ""}。这些信息只描述编辑器当前视图；除非用户明确要求，否则设计要求仍作用于整个皮肤项目。
+${project.preview ? "本轮请求附带当前画布预览图（候选栏与面板），请结合图像判断颜色、层次和可读性；图像仅供观察，不能据此猜测不存在的配置字段。" : "当前没有可用的画布预览图，请仅依据配置文件进行判断。"}
+
+视觉修改指南（请先阅读配置，再用最少的精确修改实现）：
+- 配色：优先沿用现有颜色字段和明暗语义，保证普通/高亮/禁用状态有足够对比度；不要凭空创建新的配置节。
+- 字体：只调整已有 FONT_NAME、FONT_SIZE、NM_COLOR、HL_COLOR 等字段，保持按键动作、数量和几何不变。
+- 质感：通过已有背景样式、边框、圆角、阴影或样式引用统一风格；除非用户明确要求，不要替换资源文件。
+- 布局：用户说“保留布局”时禁止修改位置、尺寸、间距、按键数量、动作和配置节结构；只改视觉属性。
+- 范围：用户点名当前按键时可缩小到该按键；用户说“整个皮肤/全局”时检查所有相关主题和方向的配置。
+- 验证：每次写入前必须 read_project_file；修改完成后复读关键片段并在总结中说明影响范围。
 
 用户的设计要求默认作用于整个皮肤项目（所有可编辑配置），不受编辑器当前文件、按键或配置节选择状态限制。只有用户在当前要求中明确指定更小范围时，才缩小修改范围。
 
@@ -128,9 +159,14 @@ function toolsFor(workspace: AiSkinWorkspace, project: AiDesignProject): AgentTo
       inspected = true
       return jsonResult({
         format: project.format,
-        theme: project.theme,
-        orientation: project.orientation,
-        layout: project.layout,
+        skinName: contextText(project.skinName, 120),
+        skinPath: contextText(project.skinPath, 120),
+        theme: contextText(project.theme, 20),
+        orientation: contextText(project.orientation, 20),
+        layout: contextText(project.layout, 80),
+        keyboard: contextText(project.keyboard, 80),
+        selectedKey: project.selectedKey,
+        preview: project.preview ? { attached: true, mimeType: project.preview.mimeType } : { attached: false },
         permissions: {
           filesystem: false,
           shell: false,
@@ -241,7 +277,20 @@ function eventStatus(event: AgentEvent): { kind: StatusKind; text: string } | un
   if (event.type === "agent_start") return { kind: "thinking", text: "AI 正在分析当前皮肤…" }
   if (event.type === "tool_execution_start") {
     const editing = ["set_ini_value", "remove_ini_value", "replace_project_text"].includes(event.toolName)
-    return { kind: editing ? "editing" : "reading", text: editing ? "AI 正在生成受限修改草稿…" : "AI 正在读取项目配置…" }
+    const labels: Record<string, string> = {
+      inspect_project: "检查当前皮肤与编辑权限",
+      list_project_files: "读取皮肤文件列表",
+      read_project_file: "读取皮肤配置片段",
+      set_ini_value: "写入 INI 样式草稿",
+      remove_ini_value: "写入删除属性草稿",
+      replace_project_text: "写入 BDA 精确替换草稿",
+    }
+    const path = typeof event.args?.path === "string" ? ` · ${event.args.path}` : ""
+    return { kind: editing ? "editing" : "reading", text: `AI ${labels[event.toolName] ?? "处理项目"}${path}…` }
+  }
+  if (event.type === "tool_execution_end") {
+    const editing = ["set_ini_value", "remove_ini_value", "replace_project_text"].includes(event.toolName)
+    return { kind: editing ? "editing" : "reading", text: event.isError ? `AI 操作失败：${event.toolName}` : `AI ${editing ? "草稿写入" : "读取"}完成` }
   }
   if (event.type === "agent_end") return { kind: "done", text: "AI 已完成分析，正在校验修改…" }
   return undefined
@@ -313,6 +362,7 @@ export async function runAiSkinDesign(
     onThinking?: (text: string) => void | Promise<void>
   } = {},
 ): Promise<AiDesignResult> {
+  if (options.signal?.aborted) throw new DOMException("AI 设计已取消", "AbortError")
   if (!normalizedUrl(config.apiUrl)) throw new Error("请先配置模型 API 地址")
   if (!config.model.trim()) throw new Error("请先配置模型名称")
   if (!config.apiKey.trim()) throw new Error("请先配置模型 API 密钥")
@@ -383,7 +433,8 @@ export async function runAiSkinDesign(
   // ponytail: one AI run is allowed at a time; replace fetch only for that run so every provider avoids WebView CORS.
   globalThis.fetch = nativeModelFetch
   try {
-    await agent.prompt(prompt.trim())
+    const images = project.preview ? [project.preview] : undefined
+    await agent.prompt(prompt.trim(), images)
     if (options.signal?.aborted) throw new DOMException("AI 设计已取消", "AbortError")
     if (agent.state.errorMessage) throw new Error(agent.state.errorMessage)
     return {

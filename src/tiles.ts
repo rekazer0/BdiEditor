@@ -54,14 +54,14 @@ export function tileSlices(document: IniDocument): TileSlice[] {
 }
 
 export function nextTileIndex(document: IniDocument): number {
-  const used = new Set(tileSlices(document).map((slice) => slice.index))
+  const used = new Set(document.sections().map(tileSectionIndex))
   let index = 1
   while (used.has(index)) index++
   return index
 }
 
 export function updateTileSlice(document: IniDocument, slice: TileSlice): void {
-  const section = `IMG${slice.index}`
+  const section = document.sections().find((name) => tileSectionIndex(name) === slice.index) ?? `IMG${slice.index}`
   if (!document.sections().includes(section)) {
     document.appendSection(section, [
       { key: "SOURCE_RECT", value: slice.source.join(",") },
@@ -80,12 +80,12 @@ export function boundedTileRect(
   width: number,
   height: number,
 ): TileRect | undefined {
-  const left = Math.max(0, Math.min(start.x, end.x, width))
-  const top = Math.max(0, Math.min(start.y, end.y, height))
-  const right = Math.max(0, Math.min(Math.max(start.x, end.x), width))
-  const bottom = Math.max(0, Math.min(Math.max(start.y, end.y), height))
+  const left = Math.round(Math.max(0, Math.min(start.x, end.x, width)))
+  const top = Math.round(Math.max(0, Math.min(start.y, end.y, height)))
+  const right = Math.round(Math.max(0, Math.min(Math.max(start.x, end.x), width)))
+  const bottom = Math.round(Math.max(0, Math.min(Math.max(start.y, end.y), height)))
   if (right <= left || bottom <= top) return
-  return [left, top, right - left, bottom - top].map(Math.round) as TileRect
+  return [left, top, right - left, bottom - top]
 }
 
 export function tileSliceAt(slices: readonly TileSlice[], point: TilePoint): TileSlice | undefined {
@@ -94,7 +94,12 @@ export function tileSliceAt(slices: readonly TileSlice[], point: TilePoint): Til
 }
 
 export function removeTileSlice(document: IniDocument, index: number): boolean {
-  return document.removeSections([`IMG${index}`])
+  return document.removeSections(document.sections().filter((name) => tileSectionIndex(name) === index))
+}
+
+function tileSectionIndex(section: string): number | undefined {
+  const match = section.match(/^IMG(\d+)$/i)
+  return match ? Number(match[1]) : undefined
 }
 
 export function moveTileRect(
@@ -111,6 +116,24 @@ export function moveTileRect(
     width,
     height,
   ].map(Math.round) as TileRect
+}
+
+export function resizeTileSlice(slice: TileSlice, corner: number, point: TilePoint, imageWidth: number, imageHeight: number): TileSlice {
+  const [x, y, width, height] = slice.source
+  const right = Boolean(corner % 2)
+  const bottom = corner >= 2
+  const px = Math.round(Math.max(right ? x + 1 : 0, Math.min(point.x, right ? imageWidth : x + width - 1)))
+  const py = Math.round(Math.max(bottom ? y + 1 : 0, Math.min(point.y, bottom ? imageHeight : y + height - 1)))
+  const source: TileRect = [right ? x : px, bottom ? y : py, right ? px - x : x + width - px, bottom ? py - y : y + height - py]
+  const result: TileSlice = { index: slice.index, source }
+  if (slice.inner) {
+    const ix = Math.max(source[0], slice.inner[0])
+    const iy = Math.max(source[1], slice.inner[1])
+    const iw = Math.min(source[0] + source[2], slice.inner[0] + slice.inner[2]) - ix
+    const ih = Math.min(source[1] + source[3], slice.inner[1] + slice.inner[3]) - iy
+    if (iw > 0 && ih > 0) result.inner = [ix, iy, iw, ih]
+  }
+  return result
 }
 
 export function duplicateTileSlice(

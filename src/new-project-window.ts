@@ -1,3 +1,4 @@
+import { initializeProjectChooser, projectChoice } from "./project-chooser"
 import { emitTo } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 
@@ -5,6 +6,8 @@ const form = document.querySelector<HTMLFormElement>("#new-project-window-form")
 const cancelButton = document.querySelector<HTMLButtonElement>("#cancel")!
 const isTauri = "__TAURI_INTERNALS__" in window
 const appWindow = isTauri ? getCurrentWindow() : undefined
+initializeProjectChooser(form)
+form.addEventListener("project-import", () => void finish("__import__"))
 let finished = false
 let resultSent = false
 const errorMessage = document.querySelector<HTMLElement>("#project-error")!
@@ -19,6 +22,7 @@ if (appWindow) void appWindow.setTheme(themePreference === "light" || themePrefe
 
 async function finish(templateID?: string): Promise<void> {
   if (finished) return
+  const choice = projectChoice(form)
   finished = true
   errorMessage.hidden = true
   const controls = form.querySelectorAll<HTMLInputElement | HTMLButtonElement>("input, button")
@@ -26,7 +30,7 @@ async function finish(templateID?: string): Promise<void> {
   try {
     if (!appWindow) throw new Error("请在桌面应用中使用新建皮肤功能。")
     if (!resultSent) {
-      if (templateID) await emitTo("main", "new-project-select", { templateID })
+      if (templateID) await emitTo("main", "new-project-select", { ...choice, templateID })
       else await emitTo("main", "new-project-cancel")
       resultSent = true
     }

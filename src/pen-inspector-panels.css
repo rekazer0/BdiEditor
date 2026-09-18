@@ -1,0 +1,2063 @@
+/*
+ * Pen inspector layer 4/4 — the remaining inspector panels.
+ *
+ * Design reference: /Users/kaze/Downloads/bdi.pen
+ *   · 检查器 · 布局配置（选中面板时） (Vqy7m) and the state cards in 检查器 · 交互逻辑 (b5zobx)
+ *   · 桌面端 · 浅色 / 深色 · 主编辑器 (C4oLc / DXdPr) — section heads, icon toolbars, state switch
+ *   · 桌面端 · 资源图集与切片 (ilkDg) · 桌面端 · 源代码视图 (XtUPo) · 桌面端 · AI 设计 (qgZ4g)
+ *   · Component specs: GDfNC Icon Toolbar · c4mVST 对齐工具 · xhIpU Media Tile ·
+ *     bmNSG Suggestion Row · W9X02 Field Row · xisXv / E6NWYI buttons
+ *   · Live HTML reference: http://127.0.0.1:1420/inspector-redesign.html
+ *
+ * Scope of this file (do not style the key property rows or the panel shell here):
+ *   .skin-fields, .toolbar-fields, .document-fields, .bda-config-fields,
+ *   .bda-selected-style-heading, .inspector-state-switch, .appearance-section + headings,
+ *   .tile-toolbar / .key-toolbar, .layout-actions, #resource-inspector and its gallery,
+ *   the AI 设计 pane and the 源代码 pane.
+ *
+ * Language: flat surfaces, hairline separators, 32px rows, 26px controls with a 6px radius,
+ * sunken control wells and `--pin-line` borders — the same language as the key property rows.
+ *
+ * Use the shared tokens from pen-inspector.css (--pin-*).
+ */
+
+:root {
+  /* Semantic aliases the panels need; the shell only carries the base palette. */
+  --pin-on-brand: var(--pen-on-brand, #ffffff);
+  --pin-sel: var(--pen-selection, #ff6b2c);
+  --pin-sel-soft: var(--pen-selection-soft, #ffefe7);
+  --pin-ok: var(--pen-state-ok, #10a15a);
+  --pin-toolbar-radius: 9px;
+  --pin-toolbar-btn: 7px;
+}
+
+/* ================================================================== *
+ * 1. Panel sections
+ *    Skin / toolbar / document / BDA panels are flat stacks of rows
+ *    separated by hairlines, exactly like the key property sections.
+ * ================================================================== */
+
+@media (min-width: 761px) {
+  :root body .source #quick-inspector
+    > :is(.skin-fields, .toolbar-fields, .document-fields, .bda-config-fields):not([hidden]) {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 6px 8px !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--pin-line) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* In grouped mode these panels own the scroll area of the category rail. */
+  :root body .source
+    #quick-inspector[data-inspector-group-display="grouped"]
+    > :is(.document-fields, .bda-config-fields):not([hidden]) {
+    min-height: 0 !important;
+    overflow: hidden auto !important;
+  }
+
+  /* Section head of a panel (皮肤信息 / 候选栏与工具栏) — the group switcher already
+     names the group, so the duplicated heading only adds a spacer. */
+  :root body .source #quick-inspector
+    > :is(.skin-fields, .toolbar-fields, .document-fields, .bda-config-fields)[hidden] {
+    display: none !important;
+  }
+}
+
+/* Panel grids collapse to a single column so every field reads as one row. */
+:root body .source #quick-inspector
+  :is(.skin-fields, .toolbar-fields) :is(.action-fields, .inspector-grid),
+:root body .source #quick-inspector .document-fields .document-property-grid,
+:root body .source #quick-inspector .bda-config-fields :is(.bda-style-controls, .bda-frame-controls),
+:root body .source #quick-inspector .appearance-fields {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Document / BDA panels stack their sections as flat, hairline-separated blocks. */
+:root body .source #quick-inspector #document-fields,
+:root body .source #quick-inspector #bda-config-fields {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  min-width: 0 !important;
+}
+
+:root body .source
+  #quick-inspector
+  #document-fields
+  > :is(.document-property-section, .particle-property-section),
+:root body .source #quick-inspector #bda-config-fields > .bda-inspector-section {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 0 6px !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--pin-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root body .source
+  #quick-inspector
+  #document-fields
+  > :is(.document-property-section, .particle-property-section)
+  > :is(h3, h4, .document-section-heading),
+:root body .source
+  #quick-inspector
+  #bda-config-fields
+  > .bda-inspector-section
+  > .bda-card-heading {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  min-height: 24px !important;
+  margin: 0 !important;
+  padding: 0 8px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--pin-ink) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+}
+
+:root body .source #quick-inspector .document-section-icon {
+  flex: 0 0 auto !important;
+  width: 13px !important;
+  height: 13px !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 0 !important;
+  color: var(--pin-ink-faint) !important;
+  background: transparent !important;
+}
+
+:root body .source #quick-inspector .document-section-icon svg {
+  width: 13px !important;
+  height: 13px !important;
+}
+
+:root body .source #quick-inspector .document-section-title {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  color: var(--pin-ink) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+:root body .source
+  #quick-inspector
+  #document-fields
+  :is(.document-section-code, .document-section-meta),
+:root body .source #quick-inspector #bda-config-fields .bda-card-heading > small {
+  flex: 0 0 auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10.5px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+  opacity: 1 !important;
+}
+
+:root body .source #quick-inspector #document-fields .document-section-meta,
+:root body .source #quick-inspector #bda-config-fields .bda-card-heading > small {
+  margin-left: auto !important;
+  max-width: 60% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+:root body .source #quick-inspector .document-field-caption {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+:root body .source #quick-inspector .document-field-code {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10px !important;
+  font-weight: 400 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Wide / grouped document fields stack their inputs under the caption. */
+:root body .source
+  #quick-inspector
+  .document-fields
+  :is(.document-property-field.wide, .document-quad-field, .particle-property-field) {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  min-height: 0 !important;
+  padding: 6px 8px !important;
+}
+
+:root body .source
+  #quick-inspector
+  .document-fields
+  .document-property-field.wide
+  .document-pair-inputs {
+  width: 100% !important;
+}
+
+:root body .source
+  #quick-inspector
+  .document-fields
+  .document-property-field.wide
+  .document-pair-inputs
+  > input {
+  flex: 1 1 0 !important;
+  width: auto !important;
+}
+
+:root body .source #quick-inspector .document-switch-field {
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  min-height: 32px !important;
+  padding: 0 8px !important;
+}
+
+/* BDA style card — preview tiles and a flat stack of rows. */
+:root body .source #quick-inspector .bda-config-fields .bda-style-preview {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+:root body .source #quick-inspector .bda-style-preview > :is(figure, button) {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: var(--pin-ink-faint) !important;
+  font-size: 10px !important;
+  text-align: left !important;
+}
+
+:root body .source #quick-inspector .bda-style-preview > button {
+  padding: 0 !important;
+  cursor: pointer !important;
+}
+
+:root body .source #quick-inspector .bda-style-preview > button:not(:disabled):hover {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--pin-ink) !important;
+}
+
+:root body
+  .source
+  #quick-inspector
+  .bda-style-preview
+  :is(canvas, .bda-style-preview-placeholder) {
+  width: 100% !important;
+  height: 112px !important;
+  aspect-ratio: auto !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+:root body .source
+  #quick-inspector
+  .bda-config-fields
+  :is(.bda-style-resource-name, .bda-style-reference-state-label, .bda-style-reference-label) {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10px !important;
+  font-weight: 400 !important;
+  text-align: left !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+:root body .source #quick-inspector .bda-config-fields > #bda-config-fields > .bda-style-controls {
+  padding: 6px 0 0 !important;
+}
+
+:root body .source #quick-inspector .bda-advanced-fields,
+:root body .source #quick-inspector .bda-advanced-note {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+:root body .source #quick-inspector .bda-advanced-note {
+  padding: 4px 8px 0 !important;
+  color: var(--pin-ink-faint) !important;
+  font-size: 10.5px !important;
+}
+
+/* ================================================================== *
+ * 2. Section headings inside panels
+ *    12px/600 ink label with a 10.5px mono hint pinned to the far side.
+ * ================================================================== */
+
+:root body .source #quick-inspector
+  :is(.appearance-section-heading, .inspector-card-heading) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  min-height: 24px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--pin-ink) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+}
+
+:root body .source #quick-inspector
+  :is(.appearance-section-heading, .inspector-card-heading) > strong {
+  color: var(--pin-ink) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+:root body .source #quick-inspector
+  :is(.appearance-section-heading, .inspector-card-heading) > span {
+  margin: 0 0 0 auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10.5px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+}
+
+/* 样式 (正常 / 按下状态) heading of the BDA style panel. */
+:root body .source #bda-selected-style-heading:not([hidden]) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  min-height: 36px !important;
+  margin: 0 !important;
+  padding: 2px 8px 6px !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+:root body .source #bda-selected-style-heading h3 {
+  margin: 0 !important;
+  color: var(--pin-ink) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+}
+
+:root body .source #bda-selected-style-heading p {
+  margin: 2px 0 0 !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10.5px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+}
+
+/* ================================================================== *
+ * 3. Panel rows and controls
+ *    Label left, control right, 32px row, 26px sunken well.
+ * ================================================================== */
+
+:root body .source #quick-inspector
+  :is(.skin-fields, .toolbar-fields, .document-fields, .bda-config-fields)
+  :is(.inspector-grid > label, .document-property-field, .bda-text-field, .bda-range-field,
+      .bda-color-field, .bda-readonly-field),
+:root body .source #quick-inspector
+  .appearance-section
+  :is(.appearance-reference-grid, .appearance-property-grid, .typography-property-grid, .color-pair-field) > label {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 32px !important;
+  margin: 0 !important;
+  padding: 0 8px !important;
+  border: 0 !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--pin-ink-muted) !important;
+  font-size: 12.5px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+}
+
+/* Wide/grouped fields keep the caption above their stacked inputs. */
+:root body .source #quick-inspector .document-quad-field {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  min-height: 0 !important;
+  padding: 6px 8px !important;
+}
+
+/* Field wells — sunken, hairline bordered, 26px tall, mono values. */
+:root body .source
+  #quick-inspector
+  :is(.skin-fields, .toolbar-fields, .document-fields, .bda-config-fields)
+  :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]):not([type="file"]),
+    select,
+    textarea
+  ),
+:root body .source
+  #quick-inspector
+  .appearance-section
+  :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]):not([type="file"]),
+    select,
+    textarea
+  ),
+:root body .source #quick-inspector .style-detail-field-row input {
+  flex: 0 1 auto !important;
+  width: var(--pin-ctrl-wide) !important;
+  min-width: 0 !important;
+  height: var(--pin-ctrl-h) !important;
+  min-height: var(--pin-ctrl-h) !important;
+  margin: 0 !important;
+  padding: 0 8px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  color: var(--pin-ink) !important;
+  box-shadow: none !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+  text-align: left !important;
+}
+
+:root body .source
+  #quick-inspector
+  :is(.skin-fields, .toolbar-fields, .document-fields, .bda-config-fields)
+  textarea {
+  height: auto !important;
+  min-height: 60px !important;
+  padding: 6px 8px !important;
+  line-height: 1.5 !important;
+}
+
+:root body .source
+  #quick-inspector
+  :is(.skin-fields, .toolbar-fields, .document-fields, .bda-config-fields)
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]), select, textarea):focus,
+:root body .source
+  #quick-inspector
+  .appearance-section
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]), select, textarea):focus {
+  border-color: var(--pin-accent) !important;
+  outline: 0 !important;
+  box-shadow: 0 0 0 2px var(--pin-accent-soft) !important;
+}
+
+:root body .source
+  #quick-inspector
+  :is(.skin-fields, .toolbar-fields, .document-fields, .bda-config-fields)
+  :is(input, select, textarea):disabled {
+  color: var(--pin-ink-faint) !important;
+  background: transparent !important;
+  opacity: 1 !important;
+}
+
+/* Colour rows keep the swatch, hex and alpha inside one line. */
+:root body .source #quick-inspector .appearance-section .color-pair-field {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+:root body .source #quick-inspector .appearance-section .color-control {
+  display: flex !important;
+  flex: 0 1 auto !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+
+:root body .source #quick-inspector .appearance-section .color-control > input:first-child {
+  width: var(--pin-ctrl-min) !important;
+}
+
+:root body .source #quick-inspector .appearance-section .color-control > input[type="color"] {
+  flex: 0 0 auto !important;
+  width: var(--pin-ctrl-h) !important;
+  height: var(--pin-ctrl-h) !important;
+  padding: 2px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  box-shadow: none !important;
+}
+
+:root body .source #quick-inspector .appearance-section .color-control > input[type="number"] {
+  width: 52px !important;
+}
+
+/* Multi-value fields (X, Y / W, H) sit in one row of wells on the right. */
+:root body .source #quick-inspector :is(.document-pair-inputs, .document-quad-inputs, .particle-range-inputs) {
+  display: flex !important;
+  flex: 0 1 auto !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+:root body .source #quick-inspector :is(.document-pair-inputs, .document-quad-inputs, .particle-range-inputs) > input {
+  width: 58px !important;
+}
+
+:root body .source #quick-inspector .document-subfield {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+}
+
+:root body .source #quick-inspector .document-subfield > small,
+:root body .source #quick-inspector .document-pair-separator {
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 9.5px !important;
+  font-weight: 400 !important;
+}
+
+:root body .source #quick-inspector .document-subfield > input {
+  width: 100% !important;
+}
+
+/* BDA colour row — swatch, alpha track and hex readout inside one row. */
+:root body .source #quick-inspector .bda-color-controls {
+  display: flex !important;
+  flex: 0 1 auto !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+
+:root body .source #quick-inspector .bda-color-field input[type="color"] {
+  flex: 0 0 auto !important;
+  width: var(--pin-ctrl-h) !important;
+  height: var(--pin-ctrl-h) !important;
+  padding: 2px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  box-shadow: none !important;
+}
+
+:root body .source #quick-inspector .bda-color-field input[type="range"] {
+  flex: 0 1 auto !important;
+  width: 72px !important;
+  height: 4px !important;
+  margin: 0 !important;
+  accent-color: var(--pin-accent);
+}
+
+:root body .source
+  #quick-inspector
+  :is(.bda-color-field, .bda-range-field, .bda-readonly-field)
+  > output {
+  flex: 0 0 auto !important;
+  min-width: 34px !important;
+  color: var(--pin-ink) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10.5px !important;
+  text-align: right !important;
+}
+
+:root body .source #quick-inspector .bda-range-field > span {
+  display: flex !important;
+  flex: 0 1 auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+}
+
+:root body .source #quick-inspector .bda-range-field input[type="range"] {
+  flex: 0 1 auto !important;
+  width: 96px !important;
+  height: 4px !important;
+  margin: 0 !important;
+  accent-color: var(--pin-accent);
+}
+
+/* ================================================================== *
+ * 4. State switch — 26px segmented control on a sunken track
+ * ================================================================== */
+
+:root body .source #quick-inspector .inspector-state-switch {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  gap: 2px !important;
+  height: var(--pin-ctrl-h) !important;
+  min-height: var(--pin-ctrl-h) !important;
+  margin: 0 !important;
+  padding: 2px !important;
+  border: 0 !important;
+  border-radius: var(--pin-toolbar-btn) !important;
+  background: var(--pin-sunken) !important;
+  box-shadow: none !important;
+}
+
+:root body .source #quick-inspector .inspector-state-switch > button {
+  height: 22px !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 12px !important;
+  border: 1px solid transparent !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  color: var(--pin-ink-muted) !important;
+  font-family: var(--font-ui, inherit) !important;
+  font-size: 11.5px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+:root body .source #quick-inspector .inspector-state-switch > button:hover:not(.active) {
+  color: var(--pin-ink) !important;
+  background: transparent !important;
+}
+
+:root body .source #quick-inspector .inspector-state-switch > button.active {
+  color: var(--pin-ink) !important;
+  border-color: transparent !important;
+  background: var(--pin-surface) !important;
+  font-weight: 500 !important;
+  box-shadow: var(--pin-shadow-raised) !important;
+}
+
+/* ================================================================== *
+ * 5. Appearance sections — rows inside a section, never cards
+ * ================================================================== */
+
+:root body .source #quick-inspector .appearance-section {
+  display: grid !important;
+  align-content: start !important;
+  gap: 0 !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root body .source #quick-inspector .appearance-section + .appearance-section {
+  margin-top: 6px !important;
+  padding-top: 6px !important;
+  border-top: 1px solid var(--pin-line) !important;
+}
+
+:root body .source #quick-inspector .appearance-section-heading {
+  min-height: 24px !important;
+}
+
+/* ================================================================== *
+ * 6. Icon toolbars — 26 × 24 buttons on a sunken track
+ * ================================================================== */
+
+:root body .source
+  #quick-inspector
+  :is(.tile-toolbar, .key-toolbar),
+:root body .source #resource-inspector .tile-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  margin: 0 !important;
+  padding: 2px !important;
+  border: 0 !important;
+  border-radius: var(--pin-toolbar-radius) !important;
+  background: var(--pin-sunken) !important;
+  box-shadow: none !important;
+}
+
+:root body .source
+  #quick-inspector
+  :is(.tile-toolbar, .key-toolbar)
+  .toolbar-button:not([hidden]),
+:root body .source #resource-inspector .tile-toolbar .toolbar-button:not([hidden]) {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 26px !important;
+  min-width: 26px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--pin-toolbar-btn) !important;
+  background: transparent !important;
+  color: var(--pin-ink-faint) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+:root body .source
+  #quick-inspector
+  :is(.tile-toolbar, .key-toolbar)
+  .toolbar-button:hover:not(:disabled),
+:root body .source #resource-inspector .tile-toolbar .toolbar-button:hover:not(:disabled) {
+  color: var(--pin-ink) !important;
+  background: var(--pin-hover) !important;
+}
+
+:root body .source
+  #quick-inspector
+  :is(.tile-toolbar, .key-toolbar)
+  .toolbar-button.active,
+:root body .source #resource-inspector .tile-toolbar .toolbar-button.active {
+  color: var(--pin-ink) !important;
+  border-color: var(--pin-line) !important;
+  background: var(--pin-surface) !important;
+  box-shadow: none !important;
+}
+
+:root body .source
+  #quick-inspector
+  :is(.tile-toolbar, .key-toolbar)
+  .toolbar-button
+  :is(.system-symbol, .system-symbol svg, svg),
+:root body .source #resource-inspector .tile-toolbar .toolbar-button :is(.system-symbol, .system-symbol svg, svg) {
+  width: 14px !important;
+  height: 14px !important;
+  flex: 0 0 auto !important;
+  color: inherit !important;
+}
+
+:root body .source #quick-inspector :is(.tile-toolbar, .key-toolbar) .toolbar-button:disabled,
+:root body .source #resource-inspector .tile-toolbar .toolbar-button:disabled {
+  color: var(--pin-ink-faint) !important;
+  opacity: 0.45 !important;
+}
+
+:root body .source #quick-inspector :is(.tile-mode-control, .key-mode-control),
+:root body .source #resource-inspector .tile-mode-control {
+  display: flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+/* Destructive and trailing actions move to the far side of the track. */
+:root body .source #quick-inspector .key-toolbar [data-key-action="delete"],
+:root body .source #resource-inspector .tile-toolbar #delete-tile {
+  margin-left: auto !important;
+}
+
+/* ================================================================== *
+ * 7. Alignment / distribution — flat icon buttons, 14px glyphs
+ * ================================================================== */
+
+:root body .source #quick-inspector .layout-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+:root body .source #quick-inspector .layout-action-group {
+  display: grid !important;
+  align-content: start !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root body .source #quick-inspector .layout-action-label {
+  margin: 0 !important;
+  color: var(--pin-ink-faint) !important;
+  font-size: 10.5px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+}
+
+:root body .source #quick-inspector .layout-action-buttons {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 4px !important;
+}
+
+:root body .source #quick-inspector .layout-actions button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: var(--pin-ctrl-h) !important;
+  min-height: var(--pin-ctrl-h) !important;
+  margin: 0 !important;
+  padding: 0 8px !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: transparent !important;
+  color: var(--pin-ink-muted) !important;
+  box-shadow: none !important;
+  font-family: var(--font-ui, inherit) !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  transform: none !important;
+}
+
+:root body .source #quick-inspector .layout-actions button:hover:not(:disabled) {
+  color: var(--pin-ink) !important;
+  border-color: transparent !important;
+  background: var(--pin-sunken) !important;
+  transform: none !important;
+}
+
+:root body .source #quick-inspector .layout-actions button:active:not(:disabled) {
+  transform: none !important;
+}
+
+:root body .source #quick-inspector .layout-actions button:disabled {
+  color: var(--pin-ink-faint) !important;
+  background: transparent !important;
+  opacity: 0.4 !important;
+}
+
+:root body .source
+  #quick-inspector
+  .layout-actions
+  button
+  :is(.system-symbol, .system-symbol svg, svg) {
+  width: 14px !important;
+  height: 14px !important;
+  flex: 0 0 auto !important;
+  color: inherit !important;
+  opacity: 1 !important;
+}
+
+/* ================================================================== *
+ * 8. Resource inspector — 皮肤图片 / 样式 list, gallery and detail
+ * ================================================================== */
+
+:root body .source #resource-inspector:not([hidden]) {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden auto !important;
+  background: var(--pin-surface) !important;
+}
+
+/* List head: title + count, search row, icon toolbar. */
+:root body .source #resource-inspector #resource-list-view > .inspector-title:not([hidden]) {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-rows: auto auto auto !important;
+  gap: 10px 8px !important;
+  align-items: center !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 3 !important;
+  margin: 0 !important;
+  padding: 12px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--pin-line) !important;
+  background: var(--pin-surface) !important;
+}
+
+:root body .source #resource-inspector .inspector-title > strong {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  min-width: 0 !important;
+  color: var(--pin-ink) !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+}
+
+:root body .source #resource-inspector .inspector-title > #resource-count {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  justify-self: end !important;
+  margin: 0 !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10.5px !important;
+  opacity: 1 !important;
+}
+
+:root body .source #resource-inspector .inspector-title > .resource-filters {
+  grid-column: 1 / -1 !important;
+  grid-row: 2 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+}
+
+:root body .source #resource-inspector .resource-filters .search-control {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: var(--pin-ctrl-h) !important;
+  gap: 8px !important;
+  padding: 0 8px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  box-shadow: none !important;
+}
+
+:root body .source #resource-inspector .resource-filters .search-control :is(.system-symbol, .system-symbol svg, svg) {
+  width: 13px !important;
+  height: 13px !important;
+  color: var(--pin-ink-faint) !important;
+}
+
+:root body .source #resource-inspector #resource-search {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--pin-ink) !important;
+  font-family: var(--font-ui, inherit) !important;
+  font-size: 11.5px !important;
+  outline: 0 !important;
+}
+
+:root body .source #resource-inspector #resource-category {
+  flex: 0 0 auto !important;
+  width: 105px !important;
+  min-width: 0 !important;
+  height: var(--pin-ctrl-h) !important;
+  min-height: var(--pin-ctrl-h) !important;
+  padding: 0 8px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  color: var(--pin-ink) !important;
+  box-shadow: none !important;
+  font-family: var(--font-ui, inherit) !important;
+  font-size: 11.5px !important;
+}
+
+:root body .source #resource-inspector .inspector-title > .resource-actions {
+  grid-column: 1 / -1 !important;
+  grid-row: 3 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 2px !important;
+  margin: 0 !important;
+  padding: 2px !important;
+  border-radius: var(--pin-toolbar-radius) !important;
+  background: var(--pin-sunken) !important;
+  justify-self: start !important;
+}
+
+:root body .source #resource-inspector .resource-actions .toolbar-button:not([hidden]) {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--pin-toolbar-btn) !important;
+  background: transparent !important;
+  color: var(--pin-ink-faint) !important;
+  box-shadow: none !important;
+}
+
+:root body .source #resource-inspector .resource-actions .toolbar-button:hover:not(:disabled) {
+  color: var(--pin-ink) !important;
+  background: var(--pin-hover) !important;
+}
+
+:root body .source
+  #resource-inspector
+  .resource-actions
+  .toolbar-button
+  :is(.system-symbol, .system-symbol svg, svg) {
+  width: 14px !important;
+  height: 14px !important;
+  color: inherit !important;
+}
+
+:root body .source #resource-inspector .resource-actions .toolbar-button:disabled {
+  opacity: 0.45 !important;
+}
+
+/* Gallery — two media tiles per row, thumbnail above a mono caption. */
+:root body .source #resource-inspector #resource-gallery.resource-gallery {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  align-content: start !important;
+  margin: 0 !important;
+  padding: 2px 12px 12px !important;
+}
+
+:root body .source #resource-inspector .resource-item {
+  display: grid !important;
+  grid-template-rows: auto auto auto !important;
+  gap: 6px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--pin-radius, 10px) !important;
+  background: transparent !important;
+  color: var(--pin-ink) !important;
+  text-align: left !important;
+  box-shadow: none !important;
+}
+
+:root body .source #resource-inspector .resource-item:hover {
+  background: transparent !important;
+}
+
+:root body .source #resource-inspector .resource-item > strong {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  color: var(--pin-ink) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  line-height: 1.3 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+:root body .source #resource-inspector .resource-item > small {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10px !important;
+  font-weight: 400 !important;
+  line-height: 1.3 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+:root body .source #resource-inspector .resource-item > img,
+:root body .source #resource-inspector .resource-item > .resource-style-previews {
+  width: 100% !important;
+  height: 72px !important;
+  overflow: hidden !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: 8px !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+:root body .source #resource-inspector .resource-item > img {
+  object-fit: contain !important;
+}
+
+:root body .source #resource-inspector .resource-style-previews {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 2px !important;
+  padding: 2px !important;
+}
+
+:root body .source #resource-inspector .resource-style-previews > canvas {
+  width: 100% !important;
+  height: 88px !important;
+  border-radius: 6px !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  object-fit: contain !important;
+}
+
+:root body .source #resource-inspector .resource-item.selected {
+  border-color: var(--pin-accent) !important;
+  box-shadow: none !important;
+}
+
+:root body .source #resource-inspector .resource-item.selected > img,
+:root body .source #resource-inspector .resource-item.selected > .resource-style-previews {
+  border-color: var(--pin-accent) !important;
+}
+
+:root body .source #resource-inspector .resource-item:focus-visible {
+  outline: 2px solid var(--pin-accent) !important;
+  outline-offset: 2px !important;
+}
+
+:root body .source #resource-inspector .resource-item.has-sound :is(strong, small) {
+  padding-right: 26px !important;
+}
+
+:root body .source #resource-inspector .sound-style-badge {
+  top: auto !important;
+  right: 6px !important;
+  bottom: 34px !important;
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 999px !important;
+  background: var(--pin-surface) !important;
+  color: var(--pin-ink-muted) !important;
+  box-shadow: none !important;
+}
+
+/* Detail view — a 52px header plus the same section rhythm as the inspector. */
+:root body .source #resource-inspector #resource-detail:not([hidden]) {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+}
+
+:root body .source #resource-inspector .resource-detail-heading {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-height: 52px !important;
+  margin: 0 !important;
+  padding: 0 12px !important;
+  border-bottom: 1px solid var(--pin-line) !important;
+  background: var(--pin-surface) !important;
+}
+
+:root body .source #resource-inspector .resource-detail-heading > div {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+}
+
+:root body .source #resource-inspector .resource-detail-heading strong {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  color: var(--pin-ink) !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  line-height: 1.3 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+:root body .source #resource-inspector .resource-detail-heading small {
+  margin: 0 !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10.5px !important;
+  line-height: 1.3 !important;
+}
+
+:root body .source #resource-inspector .resource-detail-heading > .toolbar-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--pin-ctrl-h) !important;
+  min-width: var(--pin-ctrl-h) !important;
+  height: var(--pin-ctrl-h) !important;
+  min-height: var(--pin-ctrl-h) !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--pin-toolbar-btn) !important;
+  background: transparent !important;
+  color: var(--pin-ink-faint) !important;
+  box-shadow: none !important;
+}
+
+:root body .source #resource-inspector .resource-detail-heading > .toolbar-button:hover:not(:disabled) {
+  color: var(--pin-ink) !important;
+  background: var(--pin-hover) !important;
+}
+
+:root body .source #resource-inspector .resource-detail-heading .toolbar-button :is(.system-symbol, svg) {
+  width: 14px !important;
+  height: 14px !important;
+  color: inherit !important;
+}
+
+:root body .source #resource-inspector #tile-inspector.inspector-group {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  margin: 0 !important;
+  padding: 14px 16px !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+:root body .source #resource-inspector .tile-heading {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  min-height: 24px !important;
+  margin: 0 !important;
+}
+
+:root body .source #resource-inspector .tile-heading h3 {
+  margin: 0 !important;
+  color: var(--pin-ink) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+}
+
+:root body .source #resource-inspector #bda-tile-usage {
+  flex: 0 1 auto !important;
+  width: auto !important;
+  max-width: 60% !important;
+  height: var(--pin-ctrl-h) !important;
+  min-height: var(--pin-ctrl-h) !important;
+  padding: 0 8px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  color: var(--pin-ink) !important;
+  font-family: var(--font-ui, inherit) !important;
+  font-size: 11.5px !important;
+}
+
+:root body .source #resource-inspector #tile-preview-wrap:not([hidden]) {
+  display: grid !important;
+  place-items: center !important;
+  width: 100% !important;
+  height: 104px !important;
+  aspect-ratio: auto;
+  grid-template-rows: minmax(0, 1fr);
+  margin: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-radius, 10px) !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+:root body .source #resource-inspector #tile-preview {
+  min-height: 0;
+  min-width: 0;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
+:root body .source #resource-inspector .geometry-fields {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root body .source #resource-inspector .geometry-fields > label {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--pin-ink-faint) !important;
+  font-size: 10.5px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+}
+
+:root body .source
+  #resource-inspector
+  .geometry-fields
+  :is(
+    input:not([type="checkbox"]):not([type="color"]),
+    select,
+    textarea
+  ) {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: var(--pin-ctrl-h) !important;
+  min-height: var(--pin-ctrl-h) !important;
+  padding: 0 8px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  color: var(--pin-ink) !important;
+  box-shadow: none !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 12px !important;
+}
+
+:root body .source #resource-inspector .geometry-fields :is(input, select):focus {
+  border-color: var(--pin-accent) !important;
+  outline: 0 !important;
+  box-shadow: 0 0 0 2px var(--pin-accent-soft) !important;
+}
+
+:root body .source #resource-inspector #tile-inner-title {
+  margin: 0 !important;
+  color: var(--pin-ink) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+:root body .source #resource-inspector .style-detail-previews {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+:root body .source #resource-inspector .style-detail-previews > button {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: var(--pin-ink-faint) !important;
+  box-shadow: none !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10px !important;
+}
+
+:root body .source #resource-inspector .style-detail-previews > button:hover {
+  background: transparent !important;
+  color: var(--pin-ink) !important;
+}
+
+:root body .source #resource-inspector .style-detail-previews > button > canvas {
+  width: 100% !important;
+  height: 112px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: 8px !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  object-fit: contain !important;
+}
+
+:root body .source #resource-inspector #image-resource-detail:not([hidden]),
+:root body .source #resource-inspector #style-resource-detail:not([hidden]) {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+}
+
+:root body .source #resource-inspector #image-resource-detail > .tile-toolbar,
+:root body .source #resource-inspector #style-resource-detail > .tile-toolbar {
+  width: fit-content !important;
+  margin: 12px 16px 0 !important;
+}
+
+:root body .source #resource-inspector .style-detail-group {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+:root body .source #resource-inspector .style-detail-group > legend {
+  margin: 0 0 2px !important;
+  padding: 0 !important;
+  color: var(--pin-ink) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+:root body .source #resource-inspector .style-detail-group-fields {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+:root body .source #resource-inspector .style-detail-field {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  min-height: 32px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 8px !important;
+  color: var(--pin-ink-muted) !important;
+  font-size: 12.5px !important;
+}
+
+:root body .source #resource-inspector .style-detail-field-row {
+  display: flex !important;
+  flex: 0 1 auto !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+
+:root body .source #resource-inspector .style-detail-field-row > input {
+  width: var(--pin-ctrl-wide) !important;
+  min-width: 0 !important;
+  height: var(--pin-ctrl-h) !important;
+  min-height: var(--pin-ctrl-h) !important;
+  padding: 0 8px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  color: var(--pin-ink) !important;
+  box-shadow: none !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 12px !important;
+}
+
+:root body .source #resource-inspector .style-detail-field .color-control {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+:root body .source #resource-inspector .style-detail-sound-card {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+
+:root body .source #resource-inspector .style-detail-sound-play {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: var(--pin-ctrl-h) !important;
+  min-width: var(--pin-ctrl-h) !important;
+  height: var(--pin-ctrl-h) !important;
+  min-height: var(--pin-ctrl-h) !important;
+  padding: 0 !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  color: var(--pin-ink-muted) !important;
+  box-shadow: none !important;
+}
+
+/* BDA style card (样式 preview + controls) inside the detail pane. */
+:root body .source #resource-inspector .bda-style-card {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root body .source #resource-inspector .bda-style-card > h3,
+:root body .source #resource-inspector .bda-style-card > h4 {
+  margin: 0 !important;
+  color: var(--pin-ink) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+}
+
+:root body .source #resource-inspector .bda-advanced-note {
+  margin: 0 !important;
+  color: var(--pin-ink-faint) !important;
+  font-size: 10.5px !important;
+}
+
+/* ================================================================== *
+ * 9. Source pane — shell around the code editor
+ * ================================================================== */
+
+:root body .source #source-editor:not([hidden]) {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  background: var(--pin-surface) !important;
+}
+
+:root body .source .source-code {
+  background: var(--pin-surface) !important;
+}
+
+:root body .source .source-toolbar {
+  gap: 8px !important;
+  padding: 8px 12px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--pin-line) !important;
+  background: var(--pin-surface) !important;
+  box-shadow: none !important;
+}
+
+:root body .source .source-toolbar .search-control {
+  height: var(--pin-ctrl-h) !important;
+  padding: 0 8px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  box-shadow: none !important;
+}
+
+:root body .source .source-toolbar .search-control > input {
+  height: 100% !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--pin-ink) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 11.5px !important;
+}
+
+:root body .source .source-toolbar .search-control :is(.system-symbol, .system-symbol svg, svg) {
+  width: 13px !important;
+  height: 13px !important;
+  color: var(--pin-ink-faint) !important;
+}
+
+:root body .source #source-search-count {
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10.5px !important;
+}
+
+:root body .source .source-search-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  padding: 2px !important;
+  border: 0 !important;
+  border-radius: var(--pin-toolbar-radius) !important;
+  background: var(--pin-sunken) !important;
+}
+
+:root body .source .source-search-actions > button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 26px !important;
+  min-width: 26px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--pin-toolbar-btn) !important;
+  background: transparent !important;
+  color: var(--pin-ink-faint) !important;
+  box-shadow: none !important;
+}
+
+:root body .source .source-search-actions > button:hover:not(:disabled) {
+  color: var(--pin-ink) !important;
+  background: var(--pin-hover) !important;
+}
+
+:root body .source .source-search-actions > button[aria-expanded="true"] {
+  color: var(--pin-ink) !important;
+  border-color: var(--pin-line) !important;
+  background: var(--pin-surface) !important;
+}
+
+:root body .source .source-search-actions > button :is(.system-symbol, .system-symbol svg, svg) {
+  width: 14px !important;
+  height: 14px !important;
+  color: inherit !important;
+}
+
+:root body .source .source-toolbar .source-replace-row > button {
+  height: var(--pin-ctrl-h) !important;
+  min-height: var(--pin-ctrl-h) !important;
+  padding: 0 10px !important;
+  border: 1px solid var(--pin-line-strong) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-surface) !important;
+  color: var(--pin-ink) !important;
+  box-shadow: none !important;
+  font-size: 11.5px !important;
+}
+
+:root body .source .source-toolbar .source-replace-row > button:hover:not(:disabled) {
+  border-color: var(--pin-accent) !important;
+  color: var(--pin-accent) !important;
+}
+
+:root body .source #source-find-toggle.source-find-fab {
+  width: var(--pin-ctrl-h) !important;
+  height: var(--pin-ctrl-h) !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: 50% !important;
+  background: var(--pin-surface) !important;
+  color: var(--pin-ink-faint) !important;
+  box-shadow: none !important;
+}
+
+:root body .source #source-find-toggle.source-find-fab:hover {
+  color: var(--pin-ink) !important;
+  border-color: var(--pin-line-strong) !important;
+  background: var(--pin-surface) !important;
+  transform: none !important;
+}
+
+:root body .source #source-find-toggle .system-symbol,
+:root body .source #source-find-toggle .system-symbol svg,
+:root body .source #source-find-toggle .source-find-fab-close {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* ================================================================== *
+ * 10. AI 设计 pane — context strip, draft panel, composer chrome
+ *
+ * The conversation itself is drawn by deep-chat and configured in
+ * ai-chat.ts; the panel owns the frame around it. The reference is a task
+ * timeline — one quiet context strip, the timeline, one composer. There is
+ * deliberately no second title block and no separate activity card.
+ * ================================================================== */
+
+:root body .source #ai-design-panel:not([hidden]) {
+  display: flex !important;
+  flex: 1 1 0;
+  flex-direction: column !important;
+  gap: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: var(--pin-surface) !important;
+}
+
+/* —— 状态提示：只在面板有话要说时占位 —— */
+:root body .source .ai-design-status:not(:empty) {
+  margin: 12px 14px 0 !important;
+  padding: 7px 10px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: var(--pin-accent-soft) !important;
+  color: var(--pin-accent) !important;
+  font-size: 11.5px !important;
+  line-height: 1.5 !important;
+}
+
+/* —— 上下文条：模型能看见什么，一行 chips —— */
+:root body .source .ai-design-context {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 11px 14px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--pin-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+:root body .source .ai-context-chip,
+:root body .source .ai-context-preview {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  padding: 4px 8px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: var(--pin-sunken) !important;
+  color: var(--pin-ink-muted) !important;
+  font-size: 10.5px !important;
+  line-height: 1.3 !important;
+}
+
+:root body .source .ai-context-chip > b {
+  color: var(--pin-ink-faint) !important;
+  font-weight: 500 !important;
+}
+
+:root body .source .ai-context-chip > span {
+  overflow: hidden !important;
+  color: var(--pin-ink) !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+:root body .source .ai-context-preview {
+  background: var(--pin-accent-soft) !important;
+  color: var(--pin-accent) !important;
+}
+
+:root body .source #ai-context-preview[hidden] { display: none !important; }
+
+/* —— 修改草稿：唯一需要用户做决定的地方 —— */
+:root body .source #ai-draft-panel:not([hidden]) {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  margin: 12px 14px 0 !important;
+  padding: 12px !important;
+  border: 1px solid color-mix(in srgb, var(--pin-sel) 32%, var(--pin-line)) !important;
+  border-radius: 12px !important;
+  background: var(--pin-sel-soft) !important;
+  box-shadow: none !important;
+}
+
+:root body .source .ai-draft-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+
+:root body .source .ai-draft-head > h3 {
+  margin: 0 !important;
+  color: var(--pin-ink) !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+}
+
+:root body .source #ai-draft-summary {
+  color: var(--pin-ink-muted) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10px !important;
+}
+
+:root body .source #ai-draft-files.ai-draft-files {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  list-style: none !important;
+}
+
+:root body .source #ai-draft-files > li {
+  margin: 0 !important;
+  padding: 7px 9px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: var(--pin-surface) !important;
+}
+
+:root body .source .ai-draft-file-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  color: var(--pin-ink) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 11px !important;
+}
+
+:root body .source .ai-draft-file-head > em {
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10px !important;
+  font-style: normal !important;
+}
+
+:root body .source .ai-draft-diff {
+  margin: 5px 0 0 !important;
+  padding: 0 !important;
+  color: var(--pin-ink-muted) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10px !important;
+  line-height: 1.55 !important;
+  white-space: pre-wrap !important;
+  word-break: break-all !important;
+}
+
+:root body .source .ai-draft-diff > ins {
+  color: var(--pin-ok) !important;
+  text-decoration: none !important;
+}
+
+:root body .source .ai-draft-diff > del { color: var(--pin-ink-faint) !important; }
+
+:root body .source .ai-draft-note {
+  margin: 0 !important;
+  color: var(--pin-ink-muted) !important;
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+}
+
+:root body .source .ai-draft-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+:root body .source .ai-draft-actions > button {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 14px !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+:root body .source .ai-draft-actions > button.ai-draft-apply {
+  background: var(--pin-accent) !important;
+  color: var(--pin-on-brand) !important;
+}
+
+:root body .source .ai-draft-actions > button.ai-draft-apply:hover {
+  background: color-mix(in srgb, var(--pin-accent) 88%, #000) !important;
+}
+
+:root body .source .ai-draft-actions > button.ai-draft-cancel {
+  border-color: var(--pin-line-strong) !important;
+  background: var(--pin-surface) !important;
+  color: var(--pin-ink) !important;
+}
+
+:root body .source .ai-draft-actions > button.ai-draft-cancel:hover {
+  border-color: var(--pin-line-strong) !important;
+  background: var(--pin-hover) !important;
+}
+
+/* —— 编辑器：对话在上、输入框在下 —— */
+:root body .source .ai-design-composer {
+  display: flex !important;
+  flex: 1 1 0 !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  min-height: 190px !important;
+  padding-top: 0 !important;
+  border-top: 0 !important;
+}
+
+:root body .source #ai-design-chat { min-height: 0 !important; }
+
+:root body .source .ai-composer-hint {
+  color: var(--pin-ink-faint) !important;
+  font-size: 10px !important;
+  line-height: 1.4 !important;
+}
+
+/* 抓取条只在悬停、聚焦或拖动时现身，避免成为空白对话里的噪点。 */
+:root body .source .ai-design-resize > span {
+  width: 34px !important;
+  height: 3px !important;
+  border-radius: 999px !important;
+  background: var(--pin-line-strong) !important;
+  box-shadow: none !important;
+  opacity: 0 !important;
+  transition: opacity .15s, width .15s !important;
+}
+
+:root body .source .ai-design-composer:hover .ai-design-resize > span,
+:root body .source .ai-design-resize:focus-visible > span,
+:root body .source .ai-design-resize.is-resizing > span {
+  width: 42px !important;
+  background: var(--pin-ink-faint) !important;
+  opacity: 1 !important;
+}
+
+:root body .source .ai-design-toolbar { gap: 6px !important; }
+
+:root body .source .ai-design-toolbar > label {
+  color: var(--pin-ink-faint) !important;
+  font-size: 10.5px !important;
+}
+
+:root body .source .ai-design-toolbar > label > span { display: none !important; }
+
+:root body .source .ai-design-toolbar select {
+  height: 26px !important;
+  min-height: 26px !important;
+  padding: 0 6px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: 7px !important;
+  background: var(--pin-surface) !important;
+  color: var(--pin-ink) !important;
+  font-size: 11px !important;
+}
+
+:root body .source .ai-design-toolbar select:hover:not(:disabled) {
+  border-color: var(--pin-line-strong) !important;
+}
+
+:root body .source .ai-design-toolbar select:disabled { color: var(--pin-ink-faint) !important; }
+
+:root body .source .ai-design-settings {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  padding: 0 9px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  color: var(--pin-ink-muted) !important;
+  box-shadow: none !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+}
+
+:root body .source .ai-design-settings:hover {
+  border-color: var(--pin-line-strong) !important;
+  background: var(--pin-surface) !important;
+  color: var(--pin-ink) !important;
+}
+
+/* AI pane header copy — the shell keeps it hidden while the properties tabs are on top. */
+:root body .source .ai-design-heading > strong {
+  color: var(--pin-ink) !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+}
+
+:root body .source .ai-design-heading > span {
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10.5px !important;
+}
+
+/* BDA object context: keep panel, candidate bar and key fields distinct. */
+:root body .source #quick-inspector .bda-inspector-context {
+  display:flex; align-items:center; gap:8px; min-height:36px; padding:0 var(--pin-gutter);
+  border-bottom:1px solid var(--pin-line); color:var(--pin-ink-muted); font-size:11px;
+}
+:root body .source #quick-inspector .bda-inspector-context-badge {
+  padding:3px 7px; border-radius:999px; background:var(--pin-accent-soft); color:var(--pin-accent); font-size:10px; font-weight:700;
+}
+:root body .source #quick-inspector .bda-key-inspector .bda-inspector-context-badge { background:color-mix(in srgb,var(--pin-accent) 12%,transparent); }
+:root body .source #quick-inspector .bda-key-inspector .bda-panel-property-section,
+:root body .source #quick-inspector .bda-candidate-inspector .bda-panel-property-section { display:none; }
+
+/* BDA layout editor: cards and two-column property rows. */
+:root body .source #quick-inspector #bda-config-fields { padding: 12px var(--pin-gutter) 24px; }
+:root body .source #quick-inspector #bda-config-fields > .bda-inspector-context { margin: -12px calc(var(--pin-gutter) * -1) 12px; }
+:root body .source #quick-inspector #bda-config-fields > .bda-inspector-section {
+  margin: 0 0 10px; padding: 0; border: 1px solid var(--pin-line); border-radius: 10px; overflow: hidden; background: var(--pin-surface);
+}
+:root body .source #quick-inspector #bda-config-fields > .bda-inspector-section > .bda-card-heading,
+:root body .source #quick-inspector #bda-config-fields > .bda-inspector-section > h3 {
+  display:flex; align-items:center; min-height:36px; margin:0; padding:0 12px; border-bottom:1px solid var(--pin-line); background:var(--pin-sunken); color:var(--pin-ink); font-size:12px;
+}
+:root body .source #quick-inspector #bda-config-fields .document-property-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; padding:1px; background:var(--pin-line); }
+:root body .source #quick-inspector #bda-config-fields .document-property-field { min-width:0; margin:0; padding:9px 10px; background:var(--pin-surface); }
+:root body .source #quick-inspector #bda-config-fields .document-property-field.wide { grid-column:1/-1; }
+:root body .source #quick-inspector #bda-config-fields .bda-key-style-block { grid-column:1/-1; margin:0; padding:8px; background:var(--pin-surface); border-top:1px solid var(--pin-line); }
+:root body .source #quick-inspector #bda-config-fields .bda-key-style-block h4 { margin:0 0 6px; color:var(--pin-ink-muted); font-size:11px; font-weight:600; }
+
+/* Compact inspector surface: dense editor rhythm, no dashboard cards. */
+:root body .source #quick-inspector #bda-config-fields { padding: 8px 12px 16px !important; }
+:root body .source #quick-inspector #bda-config-fields > .bda-inspector-context { margin: -8px -12px 8px !important; min-height: 30px !important; }
+:root body .source #quick-inspector #bda-config-fields > .bda-inspector-section { margin:0 !important; border:0 !important; border-bottom:1px solid var(--pin-line) !important; border-radius:0 !important; background:transparent !important; }
+:root body .source #quick-inspector #bda-config-fields > .bda-inspector-section > :is(.bda-card-heading,h3) { min-height:30px !important; padding:0 4px !important; background:transparent !important; border:0 !important; font-size:11px !important; }
+:root body .source #quick-inspector #bda-config-fields .document-property-grid { display:grid !important; grid-template-columns:minmax(150px, 42%) minmax(0,1fr) !important; gap:0 !important; padding:0 !important; background:transparent !important; }
+:root body .source #quick-inspector #bda-config-fields .document-property-field { display:grid !important; grid-template-columns:minmax(0,1fr) minmax(100px,1.3fr) !important; align-items:center !important; gap:8px !important; min-height:34px !important; padding:5px 4px !important; border-top:1px solid color-mix(in srgb,var(--pin-line) 65%,transparent) !important; background:transparent !important; }
+:root body .source #quick-inspector #bda-config-fields .document-property-field.wide { grid-column:1/-1 !important; }
+:root body .source #quick-inspector #bda-config-fields .document-property-field > :is(span:first-child,.bda-style-reference-label) { font-size:11px !important; color:var(--pin-ink) !important; }
+:root body .source #quick-inspector #bda-config-fields .document-property-field :is(input,button,select) { min-height:26px !important; height:26px !important; font-size:11px !important; }
+:root body .source #quick-inspector #bda-config-fields .bda-key-style-block { grid-column:1/-1 !important; padding:4px 0 !important; border-top:1px solid var(--pin-line) !important; }
+
+/* Unified property table for INI/BDA document inspectors. */
+:root body .source #quick-inspector #document-fields { padding:8px 12px 16px !important; }
+:root body .source #quick-inspector #document-fields > .document-property-section { margin:0 !important; padding:0 0 8px !important; border-bottom:1px solid var(--pin-line) !important; }
+:root body .source #quick-inspector #document-fields > .document-property-section > :is(h3,h4,.document-section-heading) { min-height:30px !important; padding:0 4px !important; font-size:11px !important; }
+:root body .source #quick-inspector #document-fields .document-property-grid { display:grid !important; grid-template-columns:minmax(145px,40%) minmax(0,1fr) !important; gap:0 !important; }
+:root body .source #quick-inspector #document-fields .document-property-field { display:grid !important; grid-template-columns:minmax(0,1fr) minmax(100px,1.4fr) !important; align-items:center !important; min-height:34px !important; padding:4px !important; border-top:1px solid color-mix(in srgb,var(--pin-line) 60%,transparent) !important; }
+:root body .source #quick-inspector #document-fields .document-property-field > :is(span:first-child,.document-property-label) { font-size:11px !important; color:var(--pin-ink) !important; }
+:root body .source #quick-inspector #document-fields .document-property-field :is(input,select,textarea,button) { height:26px !important; min-height:26px !important; font-size:11px !important; }

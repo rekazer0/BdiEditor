@@ -308,9 +308,6 @@ function stylePreview(
       })
     }
     const canvas = element("canvas")
-    const caption = ref.type === "image" ? element("span") : element("figcaption")
-    caption.className = "bda-style-reference-state-label"
-    caption.textContent = label
     const resourceName = imageResourceNames?.[index]
     if (resourceName) {
       const name = element("span", "bda-style-resource-name")
@@ -318,7 +315,7 @@ function stylePreview(
       name.title = resourceName
       state.append(name)
     }
-    state.append(canvas, caption)
+    state.append(canvas)
     preview.append(state)
     void resolver?.resolve(bdaStyleID(ref), highlighted)
       .then((visual) => { if (canvas.isConnected) drawVisual(canvas, visual) })
@@ -421,11 +418,11 @@ function booleanField(
   value: boolean,
   disabled: boolean,
   onChange: (value: boolean) => void,
-  technicalName?: string,
+  _technicalName?: string,
 ): HTMLElement {
   const field = element("label", "document-property-field wide inspector-switch bda-boolean-field")
   const caption = element("span")
-  const accessibleLabel = technicalName ? `${label}（${technicalName}）` : label
+  const accessibleLabel = label
   caption.textContent = label
   caption.title = accessibleLabel
   const input = element("input")
@@ -526,6 +523,17 @@ export function renderBdaLayoutEditor(container: HTMLElement, options: LayoutEdi
   const panel = options.appearance.panels.get(options.panelName.replace(/\.ini$/i, ""))
   if (!panel) return
   const scope = options.scope ?? "panel"
+  container.dataset.bdaScope = options.keys.length ? "key" : scope
+  container.classList.toggle("bda-key-inspector", options.keys.length > 0)
+  container.classList.toggle("bda-panel-inspector", options.keys.length === 0 && scope === "panel")
+  container.classList.toggle("bda-candidate-inspector", options.keys.length === 0 && scope === "candidate")
+  const context = element("div", "bda-inspector-context")
+  const badge = element("span", "bda-inspector-context-badge")
+  badge.textContent = options.keys.length ? "按键" : scope === "candidate" ? "候选栏" : "面板"
+  const name = element("strong")
+  name.textContent = options.panelName
+  context.append(badge, name)
+  container.append(context)
   const groups = bdaLayoutStyleGroups(panel, options.keys, scope)
 
   const styleReferenceField = (item: BdaLayoutStyleItem): HTMLElement => {
@@ -536,13 +544,13 @@ export function renderBdaLayoutEditor(container: HTMLElement, options: LayoutEdi
     caption.className = "bda-style-reference-label"
     caption.textContent = item.label
     // 说明与源码字段对应，避免展示 INI 字段名造成误导。
-    caption.title = `${item.label}（${item.field}）`
+    caption.title = item.label
     const control = element("span", "style-reference-input bda-style-reference-input")
     const keyInput = element("input")
     keyInput.className = "document-property-input"
     keyInput.value = String(item.ref.key)
     keyInput.disabled = !options.editable
-    keyInput.setAttribute("aria-label", `${item.label} key`)
+    keyInput.setAttribute("aria-label", `${item.label}编号`)
     const currentRef = (): BdaStyleRef => ({ type: item.ref.type, key: Number(keyInput.value) })
     const commit = () => {
       const key = Number(keyInput.value)
@@ -652,7 +660,7 @@ export function renderBdaLayoutEditor(container: HTMLElement, options: LayoutEdi
       if (panel.shouldBgBlur !== undefined) grid.append(booleanField("背景模糊", panel.shouldBgBlur, !options.editable, (value) => options.onPanelPropertyChange("shouldBgBlur", value), "shouldBgBlur"))
       if (panel.shouldKeySlotting !== undefined) grid.append(booleanField("按键开槽", panel.shouldKeySlotting, !options.editable, (value) => options.onPanelPropertyChange("shouldKeySlotting", value), "shouldKeySlotting"))
       if (panel.trackColor !== undefined) {
-        const field = colorField("滑动轨迹颜色（trackColor）", panel.trackColor, !options.editable, (value) => options.onPanelPropertyChange("trackColor", value))
+        const field = colorField("滑动轨迹颜色", panel.trackColor, !options.editable, (value) => options.onPanelPropertyChange("trackColor", value))
         field.classList.add("document-property-field", "wide")
         grid.append(field)
       }

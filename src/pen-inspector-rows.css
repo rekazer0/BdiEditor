@@ -1,0 +1,495 @@
+/*
+ * Pen inspector layer 3/4 — property rows and their controls.
+ *
+ * Design reference: /Users/kaze/Downloads/bdi.pen
+ *   · Row components: jkJSA (数字行) Yobgh (文本行) wfFq9 (选择行) ZIYFB (分段行)
+ *                     n4lEsQ (双列数字行) PPKbB (颜色行) RhapN (开关行) IBWPv (滑块行)
+ *   · Live HTML reference: http://127.0.0.1:1420/inspector-redesign.html
+ *
+ * Scope of this file (do not style section chrome or the panel shell here):
+ *   .inspector-grid > label, label > span, input / select / textarea inside the inspector,
+ *   .style-field, .color-control, .direction-editor, .inspector-card-heading,
+ *   .pin-dot, .pin-reset, small hints, focus / hover / disabled control states.
+ *
+ * Use the shared tokens from pen-inspector.css (--pin-*).
+ *
+ * Row anatomy (matches Pen design spec from 属性检查器.pen):
+ *   [ 4px dot lane ] label ·································· control [ reset ]
+ *   30px tall · 8px gap · control 30px / radius 6px / sunken fill / mono 11.5
+ *   Label: 12px left-aligned, secondary color
+ *   Value: 11.5px mono, right-aligned for numbers, tabular-nums
+
+/* Decorative eyedropper glyph for the colour row (masked, so it inherits a token colour). */
+:root {
+  --pin-icon-pipette: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='24'%20height='24'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='m12%209-8.414%208.414A2%202%200%200%200%203%2018.828v1.344a2%202%200%200%201-.586%201.414A2%202%200%200%201%203.828%2021h1.344a2%202%200%200%200%201.414-.586L15%2012'/%3E%3Cpath%20d='m18%209%20.4.4a1%201%200%201%201-3%203l-3.8-3.8a1%201%200%201%201%203-3l.4.4%203.4-3.4a1%201%200%201%201%203%203z'/%3E%3Cpath%20d='m2%2022%20.414-.414'/%3E%3C/svg%3E");
+}
+
+/* ================================================================== *
+ * 1. Row anatomy — label left, control right
+ * ================================================================== */
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) {
+  position: relative !important;
+  display: flex !important;
+  flex-flow: row nowrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  min-height: var(--inspector-row-height, 30px) !important;
+  height: auto !important;
+  padding: 0 8px 0 12px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--pin-ink-muted) !important;
+  font-family: var(--font-ui, inherit) !important;
+  font-size: var(--inspector-section-title-size, 12px) !important;
+  font-weight: 400 !important;
+  line-height: 1.35 !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+}
+
+/* A modified row turns its label to full ink and marks it with the dot. */
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search):has(> .pin-dot) {
+  color: var(--pin-ink) !important;
+}
+
+/* ================================================================== *
+ * 2. Modification marker + hover reset
+ * ================================================================== */
+:root body .source #quick-inspector#quick-inspector .pin-dot {
+  position: absolute !important;
+  top: 50% !important;
+  left: 0 !important;
+  width: 4px !important;
+  height: 4px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: var(--pin-accent) !important;
+  transform: translateY(-50%) !important;
+  flex: 0 0 auto !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .pin-reset {
+  flex: 0 0 auto !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 0 6px !important;
+  border: 0 !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-ui, inherit) !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.12s ease, color 0.12s ease, background-color 0.12s ease !important;
+}
+
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search):hover > .pin-reset,
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search):focus-within > .pin-reset {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .pin-reset:hover {
+  color: var(--pin-accent) !important;
+  background: var(--pin-hover) !important;
+}
+
+/* ================================================================== *
+ * 3. Controls — 26px box, radius 6, sunken fill, mono 11.5
+ * ================================================================== */
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) > :is(input:not([type="color"]):not([type="checkbox"]), select, textarea) {
+  box-sizing: border-box !important;
+  width: auto !important;
+  height: var(--inspector-field-height, 30px) !important;
+  min-height: var(--inspector-field-height, 30px) !important;
+  margin: 0 !important;
+  padding: 0 8px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  color: var(--pin-ink) !important;
+  box-shadow: none !important;
+  outline: none !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 11.5px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+  font-variant-numeric: tabular-nums !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, color 0.15s ease !important;
+}
+
+
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) > :is(input:not([type="color"]):not([type="checkbox"]), textarea) {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) > select {
+  padding-right: 22px !important;
+  cursor: pointer !important;
+}
+
+/* Numbers read from the right edge, like jkJSA / n4lEsQ. */
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) > input[type="number"] {
+  text-align: right !important;
+}
+
+:root body .source #quick-inspector#quick-inspector input[type="number"]::-webkit-outer-spin-button,
+:root body .source #quick-inspector#quick-inspector input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  margin: 0 !important;
+}
+
+/* Direct control of a row sits at the right end of the row. */
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) > :is(input:not([type="color"]):not([type="checkbox"]), select, textarea),
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) > .style-field,
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) > .color-control {
+  flex: 0 0 auto !important;
+  margin-left: auto !important;
+}
+
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) > :is(input:not([type="color"]):not([type="checkbox"]), select, textarea),
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) > .style-field {
+  width: var(--pin-ctrl-wide) !important; /* 132 — text / enum row (Yobgh, wfFq9) */
+}
+
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) > input[type="number"] {
+  width: var(--pin-ctrl-min) !important; /* 84 — number row (jkJSA) */
+}
+
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) > .color-control {
+  width: 136px !important; /* 136 — colour row (PPKbB) */
+}
+
+/* Double row (n4lEsQ): the geometry / gap grids pack two 64px fields per line. */
+:root body .source #quick-inspector#quick-inspector .inspector-grid.geometry-fields > label:not(.pin-search) > input[type="number"],
+:root body .source #quick-inspector#quick-inspector .inspector-grid.gap-fields > label:not(.pin-search) > input[type="number"] {
+  width: 64px !important;
+}
+
+/* ================================================================== *
+ * 4. Field wrappers: .style-field and .color-control
+ * ================================================================== */
+:root body .source #quick-inspector#quick-inspector .style-field {
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  height: var(--inspector-field-height, 30px) !important;
+  min-height: var(--inspector-field-height, 30px) !important;
+  padding: 0 8px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .style-field input {
+  box-sizing: border-box !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--pin-ink) !important;
+  box-shadow: none !important;
+  outline: none !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 11.5px !important;
+  line-height: 1 !important;
+  text-align: left !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .color-control {
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  height: var(--pin-ctrl-h) !important;
+  min-height: var(--pin-ctrl-h) !important;
+  padding: 0 8px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+/* 14px swatch leads the colour row. */
+:root body .source #quick-inspector#quick-inspector .color-control > input[type="color"] {
+  order: -1 !important;
+  flex: 0 0 auto !important;
+  box-sizing: border-box !important;
+  width: 14px !important;
+  height: 14px !important;
+  min-height: 14px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px solid var(--pin-line-strong) !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  overflow: hidden !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .color-control > input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0 !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .color-control > input[type="color"]::-webkit-color-swatch {
+  border: 0 !important;
+  border-radius: 3px !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .color-control > input[type="color"]::-moz-color-swatch {
+  border: 0 !important;
+  border-radius: 3px !important;
+}
+
+/* Hex value fills, alpha trails it in the faint 10px mono. */
+:root body .source #quick-inspector#quick-inspector .color-control > input:not([type="color"]):not([type="checkbox"]) {
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--pin-ink) !important;
+  box-shadow: none !important;
+  outline: none !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 11.5px !important;
+  line-height: 1 !important;
+  text-align: left !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .color-control > input[type="number"] {
+  display: block !important;
+  flex: 0 0 auto !important;
+  width: 26px !important;
+  color: var(--pin-ink-faint) !important;
+  font-size: 10px !important;
+  text-align: right !important;
+}
+
+/* Trailing eyedropper affordance (decorative). */
+:root body .source #quick-inspector#quick-inspector .color-control::after {
+  content: "" !important;
+  flex: 0 0 auto !important;
+  width: 12px !important;
+  height: 12px !important;
+  background-color: var(--pin-ink-faint) !important;
+  -webkit-mask: var(--pin-icon-pipette) center / 12px 12px no-repeat !important;
+  mask: var(--pin-icon-pipette) center / 12px 12px no-repeat !important;
+}
+
+/* ================================================================== *
+ * 5. One property per line — nested property grids collapse to a column
+ * ================================================================== */
+:root body .source #quick-inspector#quick-inspector .appearance-property-grid,
+:root body .source #quick-inspector#quick-inspector .document-property-grid,
+:root body .source #quick-inspector#quick-inspector .typography-property-grid,
+:root body .source #quick-inspector#quick-inspector .color-pair-field {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 8px !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .color-pair-field {
+  grid-column: 1 / -1 !important;
+}
+
+/* ================================================================== *
+ * 6. Group heading inside a grid + small hints
+ * ================================================================== */
+:root body .source #quick-inspector#quick-inspector .inspector-card-heading {
+  grid-column: 1 / -1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  min-height: 24px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .inspector-card-heading > strong {
+  color: var(--pin-ink) !important;
+  font-family: var(--font-ui, inherit) !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .inspector-card-heading > span {
+  margin-left: auto !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10px !important;
+  font-weight: 400 !important;
+  line-height: 1.35 !important;
+}
+
+:root body .source #quick-inspector#quick-inspector small {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10px !important;
+  font-weight: 400 !important;
+  line-height: 1.3 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* ================================================================== *
+ * 7. Direction editor — same control language, compass arrangement
+ * ================================================================== */
+:root body .source #quick-inspector#quick-inspector .direction-editor.direction-editor {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  grid-template-areas:
+    ". up ."
+    "left center right"
+    ". down ."
+    "hold hold hold" !important;
+  gap: 8px !important;
+  margin: 8px 0 0 !important;
+  padding: 8px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: 10px !important;
+  background: var(--pin-sunken) !important;
+  box-shadow: none !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .direction-editor.direction-editor > label {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 7px 6px 8px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: 8px !important;
+  background: var(--pin-surface) !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-ui, inherit) !important;
+  font-size: 11.5px !important;
+  font-weight: 400 !important;
+  line-height: 1.3 !important;
+  text-align: center !important;
+  white-space: normal !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .direction-editor.direction-editor > label > span {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  color: var(--pin-ink-faint) !important;
+  font-size: 11.5px !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .direction-editor.direction-editor > label > input {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: var(--pin-ctrl-h) !important;
+  min-height: var(--pin-ctrl-h) !important;
+  margin: 0 !important;
+  padding: 0 6px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  color: var(--pin-ink) !important;
+  box-shadow: none !important;
+  outline: none !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 11.5px !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .direction-editor.direction-editor small {
+  min-height: 0 !important;
+  overflow: hidden !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10px !important;
+  line-height: 1.3 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+:root body .source #quick-inspector#quick-inspector .direction-up { grid-area: up !important; }
+:root body .source #quick-inspector#quick-inspector .direction-left { grid-area: left !important; }
+:root body .source #quick-inspector#quick-inspector .direction-center { grid-area: center !important; }
+:root body .source #quick-inspector#quick-inspector .direction-hold { grid-area: hold !important; }
+:root body .source #quick-inspector#quick-inspector .direction-right { grid-area: right !important; }
+:root body .source #quick-inspector#quick-inspector .direction-down { grid-area: down !important; }
+
+/* ================================================================== *
+ * 8. Interactive states
+ * ================================================================== */
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search):hover > :is(input:not([type="color"]):not([type="checkbox"]), select, textarea),
+:root body .source #quick-inspector#quick-inspector .style-field:hover,
+:root body .source #quick-inspector#quick-inspector .color-control:hover,
+:root body .source #quick-inspector#quick-inspector .direction-editor.direction-editor > label > input:hover:not(:focus):not(:disabled) {
+  border-color: var(--pin-line-strong) !important;
+}
+
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) :is(input:not([type="color"]):not([type="checkbox"]), select, textarea):focus,
+:root body .source #quick-inspector#quick-inspector .style-field:focus-within,
+:root body .source #quick-inspector#quick-inspector .color-control:focus-within,
+:root body .source #quick-inspector#quick-inspector .direction-editor.direction-editor > label > input:focus {
+  border-color: var(--pin-accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pin-accent) 16%, transparent) !important;
+  outline: none !important;
+}
+
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) :is(input, select, textarea):disabled {
+  color: var(--pin-ink-faint) !important;
+  background: var(--pin-sunken) !important;
+  cursor: not-allowed !important;
+}
+
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search):has(:disabled) {
+  color: var(--pin-ink-faint) !important;
+}
+
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) :is(input, select, textarea)::placeholder {
+  color: var(--pin-ink-faint) !important;
+}
+

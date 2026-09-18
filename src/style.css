@@ -3,6 +3,14 @@
 @import "./style-performance.css";
 @import "./source-files-redesign.css";
 
+@font-face {
+  font-family: "Source JetBrains Mono";
+  src: url("/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #121419;
@@ -250,17 +258,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  *:hover {
-    scrollbar-color: var(--scrollbar-thumb) transparent;
-  }
-
-  *:hover::-webkit-scrollbar-thumb {
-    border-color: var(--scrollbar-thumb-border);
-    background: var(--scrollbar-thumb);
-    box-shadow: inset 0 1px var(--scrollbar-thumb-highlight);
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
+  .scrollbar-active::-webkit-scrollbar-thumb:hover {
     background: var(--scrollbar-thumb-hover);
   }
 }
@@ -329,6 +327,8 @@ select {
 }
 
 button {
+  appearance: none;
+  -webkit-appearance: none;
   border: 0;
 }
 
@@ -1287,9 +1287,28 @@ h2 {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background:
-    linear-gradient(#ff9500 0 0) 0 calc(var(--crosshair-y) - 1px) / 100% 2px no-repeat,
-    linear-gradient(#ff9500 0 0) calc(var(--crosshair-x) - 1px) 0 / 2px 100% no-repeat;
+}
+
+.preview-crosshair::before,
+.preview-crosshair::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: #ff9500;
+  will-change: transform;
+}
+
+.preview-crosshair::before {
+  width: 100%;
+  height: 2px;
+  transform: translate3d(0, calc(var(--crosshair-y) - 1px), 0);
+}
+
+.preview-crosshair::after {
+  width: 2px;
+  height: 100%;
+  transform: translate3d(calc(var(--crosshair-x) - 1px), 0, 0);
 }
 
 #panel-viewport {
@@ -1331,13 +1350,13 @@ h2 {
 
 .preview-coordinate-label {
   position: absolute;
-  left: var(--coordinate-label-x);
-  top: var(--coordinate-label-y);
+  left: 0;
+  top: 0;
   width: 112px;
   padding: 5px 8px;
   border: 1px solid var(--glass-border);
   border-radius: 7px;
-  transform: translateY(-50%);
+  transform: translate3d(var(--coordinate-label-x), calc(var(--coordinate-label-y) - 50%), 0);
   background: var(--glass-surface);
   box-shadow: var(--glass-shadow);
   white-space: pre;
@@ -6874,7 +6893,7 @@ body:has(.canvas-wrap.empty) .workspace {
   position: relative;
   font-size: var(--source-font-size, 11px);
   line-height: 1.6;
-  font-family: var(--font-mono);
+  font-family: "Source JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 #source .cm-editor {
@@ -7030,27 +7049,27 @@ body:has(.canvas-wrap.empty) .workspace {
 #source .cm-source-completion button:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 
 .token-comment {
-  color: #6a8759;
+  color: #8b93a3;
 }
 
 .token-section {
-  color: #7d3f98;
+  color: #376bff;
 }
 
 .token-key {
-  color: #2459a9;
+  color: #9147e8;
 }
 
 .token-operator {
-  color: #8a8a8f;
+  color: #606575;
 }
 
 .token-action {
-  color: #c04a13;
+  color: #00a85a;
 }
 
 .token-number {
-  color: #087f8c;
+  color: #b77708;
 }
 
 .cm-source-selected {
@@ -13400,7 +13419,69 @@ dialog[open]::backdrop {
   font-weight: 500;
 }
 
-/* ── 滚动条 ── */
-* {
-  scrollbar-color: var(--scrollbar-thumb) transparent;
+/* Section markers replace the vertical thumb while preserving horizontal scrolling. */
+.source-section-scrollbar {
+  display: none;
+}
+
+:root:not([data-source-section-scrollbar="false"]) #source [data-section-scrollbar="true"] .cm-scroller::-webkit-scrollbar {
+  width: 0;
+}
+
+:root:not([data-source-section-scrollbar="false"]) #source [data-section-scrollbar="true"] .cm-scroller {
+  scrollbar-width: auto;
+  margin-right: 38px;
+}
+
+:root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"] > .source-section-scrollbar {
+  position: absolute;
+  z-index: 5;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  width: 30px;
+  max-height: calc(100% - 100px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+:root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"]:has(.cm-scroller.scrollbar-active) > .source-section-scrollbar,
+:root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"] > .source-section-scrollbar:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.source-section-scrollbar > button {
+  flex: 1 0 8px;
+  min-height: 8px;
+  width: 30px;
+  border: 0;
+  padding: 0 2px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.source-section-scrollbar > button::before {
+  content: "";
+  width: 26px;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text) 20%, transparent);
+}
+
+.source-section-scrollbar > button[aria-current="true"]::before {
+  width: 16px;
+  background: var(--text);
+}
+
+.source-section-scrollbar > button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }

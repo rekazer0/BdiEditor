@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>检查器预览 · 新设计</title>
+<link rel="stylesheet" href="/src/style.css" />
+<link rel="stylesheet" href="/src/pen-design-application.css" />
+<link rel="stylesheet" href="/src/pen-sidebar.css" />
+<link rel="stylesheet" href="/src/pen-components.css" />
+<link rel="stylesheet" href="/src/inspector.css" />
+<link rel="stylesheet" href="/src/pen-inspector-sections.css" />
+<link rel="stylesheet" href="/src/pen-inspector-rows.css" />
+<link rel="stylesheet" href="/src/pen-inspector-panels.css" />
+<link rel="stylesheet" href="/src/pen-inspector.css" />
+<style>
+  html, body { margin: 0; height: 100%; background: var(--bg-app, #edeef2); }
+  body { display: flex; justify-content: flex-end; }
+  #preview-mount { flex: 0 0 360px; width: 360px; height: 100vh; overflow: hidden; }
+  #preview-mount > .source { width: 360px !important; max-width: 360px; height: 100%; }
+</style>
+</head>
+<body>
+  <div id="preview-mount"></div>
+  <script type="module" src="/src/inspector-preview.ts"></script>
+</body>
+</html>

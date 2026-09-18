@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>AI 设计预览</title>
+<style>
+  html, body { margin: 0; height: 100%; background: var(--bg-app, #edeef2); }
+  /* 面板填满视口：app 的 .source 是覆盖式侧栏，固定舞台反而会让它漂移。 */
+  #preview-stage { position: relative; width: 100%; height: 100vh; overflow: hidden; }
+  #preview-mount { width: 100%; height: 100%; }
+  #preview-mount > .source { width: 100% !important; max-width: 100% !important; height: 100% !important;
+    position: static !important; transform: none !important; }
+  #preview-hud { position: fixed; left: 8px; bottom: 8px; z-index: 9; display: flex; flex-wrap: wrap; gap: 6px;
+    align-content: flex-start; width: 316px; }
+  #preview-hud button, #preview-hud select {
+    height: 26px; padding: 0 9px; border: 1px solid #d5d8e0; border-radius: 7px;
+    background: #fff; color: #14161b; font: 500 11px/1 -apple-system, "PingFang SC", sans-serif;
+  }
+  #preview-hud button { cursor: pointer; }
+  body[data-scenario] #preview-hud { display: none; }
+</style>
+</head>
+<body>
+  <div id="preview-stage">
+    <div id="preview-hud"></div>
+    <div id="preview-mount"></div>
+  </div>
+  <script type="module" src="/src/ai-design-preview.ts"></script>
+</body>
+</html>

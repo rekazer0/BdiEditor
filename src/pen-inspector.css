@@ -1,0 +1,1111 @@
+/*
+ * Pen inspector shell — design layer (foundation of the inspector redesign).
+ *
+ * Design source of truth: /Users/kaze/Downloads/bdi.pen
+ *   · 桌面端 · 浅色 · 主编辑器 / 桌面端 · 深色 · 主编辑器  → inspector panel
+ *   · 检查器 · 布局配置（选中面板时）                      → panel-scope inspector
+ *   · 检查器 · 交互逻辑                                    → interaction rules
+ *   · Inspector Shell / Section 内容|外观|布局|交互|资源 / Inspector 行组件
+ *
+ * Layer order (loaded after inspector.css):
+ *   pen-inspector.css          ← this file: tokens + shell (header / tabs / action bar)
+ *   pen-inspector-sections.css ← groups, section heads, collapse, rail
+ *   pen-inspector-rows.css     ← property rows and controls
+ *   pen-inspector-panels.css   ← other panels (skin / toolbar / document / style / actions / resources)
+ *
+ * Shared tokens — every layer must use these instead of hard-coded values.
+ */
+:root {
+  /* Layout rhythm */
+  --pin-gutter: 16px;
+  --pin-gutter-sm: 8px;
+  --pin-row-h: 32px;
+  --pin-head-h: 34px;
+  --pin-action-h: 52px;
+  --pin-rail-w: 60px;
+
+  /* Controls */
+  --pin-ctrl-h: 26px;
+  --pin-ctrl-radius: 6px;
+  --pin-ctrl-min: 84px;
+  --pin-ctrl-wide: 132px;
+  --pin-ctrl-surface: var(--pen-surface-subtle, #f4f5f8);
+  --pin-line: var(--pen-line, #e6e8ee);
+  --pin-line-strong: var(--pen-line-strong, #d2d6df);
+  --pin-ink: var(--pen-text, #14161b);
+  --pin-ink-muted: var(--pen-secondary, #5a6070);
+  --pin-ink-faint: var(--pen-tertiary, #8c93a1);
+  --pin-accent: var(--pen-accent, #2f6bff);
+  --pin-accent-soft: var(--pen-accent-soft, #ebf1ff);
+  --pin-surface: var(--pen-surface, #fff);
+  --pin-sunken: var(--pen-surface-subtle, #f4f5f8);
+  --pin-hover: var(--pen-surface-subtle, #f4f5f8);
+  --pin-radius: 10px;
+  --pin-shadow-raised: 0 1px 3px rgb(18 20 40 / 12%);
+}
+
+/* ------------------------------------------------------------------ *
+ * Panel frame: header (tabs + target bar) · body · actions
+ * ------------------------------------------------------------------ */
+:root body .source {
+  display: flex;
+  flex-direction: column !important;
+  min-width: 0;
+  background: var(--pin-surface);
+}
+
+/* Header keeps the tabs on top and the selected-object row underneath. */
+:root body .source > .pane-heading.source-heading {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  height: auto;
+  padding: 0 !important;
+  border-bottom: 0;
+  background: var(--pin-surface);
+}
+
+:root body .source #quick-inspector:not([hidden]) {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+:root body .source > .pane-heading.source-heading > .inspector-context,
+:root body .source > .pane-heading.source-heading > .ai-design-heading,
+:root body .source > .pane-heading.source-heading > #mobile-inspector-selection,
+:root body .source:has(#ai-design-panel:not([hidden])) > .pane-heading.source-heading > .ai-design-heading {
+  display: none;
+}
+
+/* AI 设计 must not restyle the header: tabs stay on the same left-aligned row. */
+:root body .source:has(#ai-design-panel:not([hidden])) > .pane-heading.source-heading {
+  display: block;
+  padding: 0 !important;
+}
+
+:root body .source .inspector-view-controls {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  padding: 0 !important;
+}
+
+/* Tabs row — 属性 / 源代码 / AI 设计 */
+:root body .source .source-heading .inspector-tabs {
+  order: 1;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-end;
+  align-self: stretch;
+  gap: 18px;
+  width: auto;
+  height: 44px;
+  margin: 0;
+  padding: 0 var(--pin-gutter);
+  border-bottom: 0;
+  background: var(--pin-surface);
+}
+
+:root body .source .source-heading .inspector-tabs > button {
+  position: relative;
+  flex: 0 0 auto;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pin-ink-muted);
+  font-family: var(--font-ui, inherit);
+  font-size: 12.5px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+:root body .source .source-heading .inspector-tabs > button.active {
+  color: var(--pin-ink);
+  font-weight: 600;
+}
+
+:root body .source .inspector-tabs > button.active::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--pin-accent);
+}
+
+/* Selected object row */
+:root body .source .inspector-title.key-inspector-title {
+  order: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 48px 0 var(--pin-gutter);
+  border-bottom: 0;
+}
+
+:root body .source .key-inspector-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: var(--pin-sunken);
+  color: var(--pin-ink);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+:root body .source .key-inspector-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+:root body .source .key-inspector-copy > strong {
+  overflow: hidden;
+  color: var(--pin-ink);
+  font-family: var(--font-ui, inherit);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root body .source .key-inspector-copy > span {
+  overflow: hidden;
+  color: var(--pin-ink-faint);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root body .source #inspector-back {
+  z-index: 1;
+  order: 3;
+  position: absolute;
+  top: 46px;
+  right: 10px;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--pin-ink-faint);
+}
+
+:root body .source #inspector-back:hover:not(:disabled) {
+  background: var(--pin-hover);
+  color: var(--pin-ink);
+}
+
+/* Sticky action bar */
+:root body .source #quick-inspector > .pin-actions {
+  position: sticky;
+  z-index: 4;
+  bottom: 0;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--pin-action-h);
+  margin-top: auto;
+  padding: 8px var(--pin-gutter);
+  border-top: 1px solid var(--pin-line);
+  background: var(--pin-surface);
+}
+
+:root body .source .pin-actions-slot {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+:root body .source .pin-actions-meta {
+  margin-left: auto;
+  color: var(--pin-ink-faint);
+  font-family: var(--font-ui, inherit);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+:root body .source .pin-actions-meta[data-count="0"] {
+  visibility: hidden;
+}
+
+:root body .source .pin-reset-all {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--pin-line-strong);
+  border-radius: 8px;
+  background: var(--pin-surface);
+  color: var(--pin-ink-muted);
+  font-family: var(--font-ui, inherit);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+:root body .source .pin-reset-all:hover {
+  border-color: var(--pin-accent);
+  color: var(--pin-accent);
+}
+
+:root body .source #quick-inspector .pin-actions-slot[hidden],
+:root body .source #quick-inspector .pin-actions-slot[hidden] > *,
+:root body .source #quick-inspector .pin-reset-all[hidden] {
+  display: none !important;
+}
+
+:root body .source #quick-inspector .pin-actions-slot {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+:root body .source #quick-inspector .pin-actions .key-toolbar,
+:root body .source #quick-inspector .pin-actions .tile-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--pin-sunken);
+}
+
+:root body .source #quick-inspector .pin-actions .key-toolbar .toolbar-button {
+  width: 28px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--pin-ink-muted);
+}
+
+:root body .source #quick-inspector .pin-actions .key-toolbar .toolbar-button:hover:not(:disabled) {
+  background: var(--pin-surface);
+  color: var(--pin-ink);
+}
+
+:root body .source #quick-inspector .pin-actions .toolbar-button.is-danger:hover:not(:disabled),
+:root body .source #quick-inspector .pin-actions .key-toolbar [data-key-action="delete"]:hover:not(:disabled) {
+  color: var(--danger, #e5484d);
+}
+
+/* Section title row: keep the summary/hint pinned to the right edge. */
+:root body .source #quick-inspector .pin-summary,
+:root body .source #quick-inspector .pin-hint {
+  margin-left: auto;
+}
+
+/* Action bar buttons (mirrors of the key toolbar) */
+:root body .source #quick-inspector > .pin-actions .pin-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--pin-sunken);
+  color: var(--pin-ink-muted);
+  font-family: var(--font-ui, inherit);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+:root body .source #quick-inspector > .pin-actions .pin-action > svg,
+:root body .source #quick-inspector > .pin-actions .pin-action > .system-symbol,
+:root body .source #quick-inspector > .pin-actions .pin-action > .icon {
+  width: 14px;
+  height: 14px;
+}
+
+:root body .source #quick-inspector > .pin-actions .pin-action:hover:not(:disabled) {
+  border-color: var(--pin-line);
+  background: var(--pin-surface);
+  color: var(--pin-ink);
+}
+
+:root body .source #quick-inspector > .pin-actions .pin-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+:root body .source #quick-inspector > .pin-actions .pin-action.is-danger:hover:not(:disabled) {
+  color: var(--danger, #e5484d);
+}
+
+/* ------------------------------------------------------------------ *
+ * Fixed frame for the grouped (desktop) display.
+ * Later in the cascade than the sticky base rules above, so it wins.
+ * ------------------------------------------------------------------ */
+@media (min-width: 761px) {
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"]:not([hidden]) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) var(--pin-rail-w) !important;
+    grid-template-rows: minmax(0, 1fr) auto !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Selector text mirrors inspector.css so the cascade decides by order, not specificity. */
+  :root body .source #quick-inspector > .inspector-group,
+  :root body .source #quick-inspector > #resource-inspector,
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > .mobile-inspector-managed,
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > :is(.document-fields, .bda-config-fields):has(.mobile-inspector-active) {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    min-width: 0;
+    min-height: 0 !important;
+    overflow: hidden auto !important;
+    overscroll-behavior: contain;
+  }
+
+  :root body .source #quick-inspector > #mobile-inspector-groups,
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > #mobile-inspector-groups:not([hidden]) {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: var(--pin-rail-w) !important;
+    max-height: none;
+    overflow: hidden auto;
+  }
+
+  :root body .source #quick-inspector > .pin-actions {
+    position: relative !important;
+    bottom: auto !important;
+    grid-area: 2 / 1 / 3 / -1 !important;
+  }
+}
+
+@media (max-width: 760px) {
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"]:not([hidden]) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    overflow: hidden !important;
+  }
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > * {
+    grid-column: 1 !important;
+    position: static !important;
+    order: 0;
+    min-width: 0;
+  }
+  :root body .source #quick-inspector > .pin-actions { grid-row: 3 !important; }
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > #mobile-inspector-groups {
+    grid-row: 1 !important;
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 4px 8px;
+    gap: 4px;
+    overflow: auto hidden;
+  }
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > #mobile-inspector-groups button {
+    flex: 1 0 auto;
+    width: auto;
+    min-height: 30px;
+    height: 30px;
+  }
+  :root body .source #quick-inspector > #mobile-inspector-groups .system-symbol { display: none; }
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > :is(.mobile-inspector-managed, .document-fields, .bda-config-fields, #resource-inspector) {
+    grid-row: 2 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden auto !important;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Visibility guards must outrank row and nested-panel display rules.
+ * ------------------------------------------------------------------ */
+:root body .source #quick-inspector#quick-inspector [hidden],
+:root body .source #quick-inspector#quick-inspector .inspector-group.pin-collapsed > :not(h3) {
+  display: none !important;
+}
+
+:root body .source #quick-inspector#quick-inspector[data-inspector-group-display="grouped"] .mobile-inspector-managed:not(.mobile-inspector-active),
+:root body .source #quick-inspector#quick-inspector[data-inspector-group-display="grouped"] > :is(.document-fields, .bda-config-fields):not(.mobile-inspector-active):not(:has(.mobile-inspector-active)) {
+  display: none !important;
+}
+
+/* The key actions live in the sticky action bar now — drop the inline copy. */
+:root body .source #quick-inspector .inspector-group > .key-toolbar,
+:root body .source #quick-inspector .mobile-inspector-managed > .key-toolbar {
+  display: none !important;
+}
+
+/* Inspector: a horizontal category bar and one property per row. */
+:root body .source #quick-inspector#quick-inspector[data-inspector-group-display="grouped"]:not([hidden]) {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+}
+:root body .source #quick-inspector#quick-inspector > #mobile-inspector-groups:not([hidden]) {
+  grid-area: 1 / 1 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 4px !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--pin-line) !important;
+  overflow: auto hidden !important;
+  background: var(--pin-surface) !important;
+}
+:root body .source #quick-inspector#quick-inspector > #mobile-inspector-groups button {
+  flex: 1 0 auto !important;
+  width: auto !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 0 12px !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+}
+:root body .source #quick-inspector#quick-inspector > #mobile-inspector-groups button .inspector-group-label {
+  overflow: visible !important;
+  white-space: nowrap !important;
+}
+:root body .source #quick-inspector#quick-inspector > #mobile-inspector-groups .system-symbol { display: none !important; }
+:root body .source #quick-inspector#quick-inspector[data-inspector-group-display="grouped"] > :is(.mobile-inspector-managed, .document-fields, .bda-config-fields, #resource-inspector) {
+  grid-area: 2 / 1 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden auto !important;
+}
+:root body .source #quick-inspector#quick-inspector > .pin-actions {
+  grid-area: 3 / 1 !important;
+  position: static !important;
+  min-height: 44px !important;
+}
+:root body .source #quick-inspector#quick-inspector :is(#document-fields, #bda-config-fields) .document-property-grid,
+:root body .source #quick-inspector#quick-inspector .inspector-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 4px !important;
+}
+:root body .source #quick-inspector#quick-inspector .document-property-section {
+  display: block !important;
+  min-width: 0 !important;
+}
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) {
+  min-width: 0 !important;
+  min-height: 44px !important;
+  padding: 6px 4px !important;
+  gap: 12px !important;
+  white-space: normal !important;
+  font-size: 12px !important;
+}
+:root body .source #quick-inspector#quick-inspector label > :is(span:first-child, .document-field-caption) {
+  flex: 1 1 38% !important;
+  min-width: 0 !important;
+  color: var(--pin-ink-muted) !important;
+  line-height: 1.5 !important;
+  overflow-wrap: anywhere;
+}
+:root body .source #quick-inspector#quick-inspector .document-field-caption { display: block !important; }
+:root body .source #quick-inspector#quick-inspector :is(.document-field-code, .document-section-code) { display: none !important; }
+
+:root body .source #quick-inspector#quick-inspector label > :is(input:not([type="checkbox"]):not([type="color"]), select, textarea, .style-field) {
+  flex: 0 1 58% !important;
+  width: 58% !important;
+  min-width: 0 !important;
+  min-height: 32px !important;
+  border-radius: 7px !important;
+  font-family: var(--font-ui, inherit) !important;
+  font-size: 12px !important;
+}
+:root body .source #quick-inspector#quick-inspector label :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent, #526dff) !important;
+  outline-offset: 2px !important;
+}
+:root body .source #quick-inspector#quick-inspector :is(.document-pair-inputs, .document-quad-inputs) {
+  flex: 0 1 58% !important;
+  width: 58% !important;
+  min-width: 0 !important;
+}
+:root body .source #quick-inspector#quick-inspector .document-quad-inputs {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+:root body .source #quick-inspector#quick-inspector .document-subfield { min-width: 0 !important; }
+:root body .source #quick-inspector#quick-inspector .document-subfield input { width: 100% !important; box-sizing: border-box; }
+:root body .source #quick-inspector#quick-inspector .document-switch-control {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin-left: auto !important;
+}
+:root body .source #quick-inspector#quick-inspector label input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  position: relative !important;
+  flex: 0 0 34px !important;
+  width: 34px !important;
+  height: 20px !important;
+  min-height: 20px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: 999px !important;
+  background: var(--pin-sunken) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  accent-color: var(--accent, #526dff);
+}
+/* Do not let the presentation layer reveal inactive groups. */
+:root body .source #quick-inspector#quick-inspector [hidden],
+:root body .source #quick-inspector#quick-inspector[data-inspector-group-display="grouped"] .mobile-inspector-managed:not(.mobile-inspector-active) { display: none !important; }
+:root body .source #quick-inspector#quick-inspector > #mobile-inspector-groups:not([hidden]) {
+  justify-self: stretch !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+:root body .source #quick-inspector#quick-inspector :is(#document-fields, #bda-config-fields) {
+  display: block !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  padding: 12px 16px 20px !important;
+}
+:root body .source #quick-inspector#quick-inspector .document-property-section {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  flex: none !important;
+}
+:root body .source #quick-inspector#quick-inspector > .keyboard-fields:empty { display: none !important; }
+
+:root body .source #quick-inspector#quick-inspector label input[type="checkbox"]::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0003;
+  transition: transform 150ms ease;
+}
+:root body .source #quick-inspector#quick-inspector label input[type="checkbox"]:checked { background: var(--accent, #526dff) !important; }
+:root body .source #quick-inspector#quick-inspector label input[type="checkbox"]:checked::after { transform: translateX(14px); }
+:root body .source #quick-inspector#quick-inspector #bda-config-fields .style-reference-field:not(.fore-styles-reference-field) {
+  display: grid !important; grid-template-columns: minmax(80px, 1fr) minmax(0, 1.4fr) !important;
+  min-height: 60px !important; align-items: center !important; overflow: visible !important;
+}
+:root body .source #quick-inspector#quick-inspector #bda-config-fields .bda-style-reference-input {
+  display: flex !important; width: 100% !important; min-width: 0 !important; gap: 8px !important;
+}
+:root body .source #quick-inspector#quick-inspector #bda-config-fields .bda-style-reference-input > input {
+  width: 56px !important; flex: 0 0 56px !important; min-width: 0 !important;
+}
+:root body .source #quick-inspector#quick-inspector #bda-config-fields .bda-style-reference-preview {
+  flex: 1 1 auto !important; min-width: 0 !important; min-height: 44px !important; height: 44px !important;
+}
+
+/* Categories stay in the right-hand sidebar, including narrow inspectors. */
+:root body .source #quick-inspector#quick-inspector[data-inspector-group-display="grouped"]:not([hidden]) {
+  grid-template-columns: minmax(0, 1fr) 76px !important;
+  grid-template-rows: minmax(0, 1fr) auto !important;
+}
+:root body .source #quick-inspector#quick-inspector > #mobile-inspector-groups:not([hidden]) {
+  grid-area: 1 / 2 !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  padding: 10px 6px !important;
+  gap: 6px !important;
+  border-bottom: 0 !important;
+  border-left: 1px solid var(--pin-line) !important;
+  overflow: hidden auto !important;
+}
+:root body .source #quick-inspector#quick-inspector > #mobile-inspector-groups button {
+  flex: 0 0 auto !important;
+  height: auto !important;
+  min-height: 38px !important;
+  padding: 8px 4px !important;
+  line-height: 1.4 !important;
+}
+:root body .source #quick-inspector#quick-inspector > #mobile-inspector-groups button .inspector-group-label {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+}
+:root body .source #quick-inspector#quick-inspector[data-inspector-group-display="grouped"] > :is(.mobile-inspector-managed, .document-fields, .bda-config-fields, #resource-inspector) { grid-area: 1 / 1 !important; }
+:root body .source #quick-inspector#quick-inspector > .pin-actions { grid-area: 2 / 1 / 3 / -1 !important; }
+:root body .source #quick-inspector#quick-inspector[data-inspector-group-display="grouped"]:has(> #mobile-inspector-groups[hidden]) { grid-template-columns: minmax(0, 1fr) !important; }
+/* ------------------------------------------------------------------ *
+ * Pen spec lock — /Users/kaze/Downloads/属性检查器.pen
+ * 30px rows, 9.5px section hints, BDS $sel / BDA $brand chips.
+ * ------------------------------------------------------------------ */
+:root body .source .pin-mode-chip {
+  flex: 0 0 auto;
+  margin-left: auto;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-family: var(--font-ui, inherit);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+}
+:root body .source[data-inspector-kind="bds"] .pin-mode-chip,
+:root body .source #quick-inspector[data-inspector-kind="bds"] .pin-actions-meta:not([data-count="0"]) {
+  color: var(--selection, #ff6b2c);
+  background: var(--selection-soft, #ffefe7);
+}
+:root body .source[data-inspector-kind="bda"] .pin-mode-chip,
+:root body .source #quick-inspector[data-inspector-kind="bda"] .pin-actions-meta:not([data-count="0"]) {
+  color: var(--accent, #2f6bff);
+  background: var(--accent-soft, #ebf1ff);
+}
+:root body .source .pin-mode-chip[hidden] { display: none; }
+
+:root body .source #quick-inspector[data-inspector-kind="bds"] {
+  --pin-mark: var(--selection, #ff6b2c);
+}
+:root body .source #quick-inspector[data-inspector-kind="bda"] {
+  --pin-mark: var(--accent, #2f6bff);
+}
+:root body .source #quick-inspector#quick-inspector .pin-dot {
+  background: var(--pin-mark, var(--pin-accent)) !important;
+}
+:root body .source #quick-inspector > .pin-actions .pin-actions-meta {
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  line-height: 20px;
+}
+:root body .source #quick-inspector > .pin-actions .pin-actions-meta[data-count="0"] {
+  background: transparent;
+}
+
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search):not(.style-reference-field):not(.fore-styles-reference-field) {
+  min-height: var(--inspector-row-height, 30px) !important;
+  padding: 0 8px 0 12px !important;
+  gap: 8px !important;
+  font-size: var(--inspector-section-title-size, 12px) !important;
+}
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) > :is(input:not([type="color"]):not([type="checkbox"]), select, textarea) {
+  height: var(--inspector-field-height, 30px) !important;
+  min-height: var(--inspector-field-height, 30px) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 11.5px !important;
+  font-variant-numeric: tabular-nums !important;
+}
+:root body .source #quick-inspector#quick-inspector label:not(.pin-search) > input[type="number"] {
+  text-align: right !important;
+}
+:root body .source #quick-inspector#quick-inspector .inspector-group > h3 .pin-hint {
+  display: inline-flex !important;
+}
+:root body .source #quick-inspector#quick-inspector .inspector-group.pin-collapsed > h3 .pin-hint {
+  display: none !important;
+}
+:root body .source #quick-inspector#quick-inspector .inspector-group:not(.pin-collapsed) > h3 .pin-summary {
+  display: none !important;
+}
+:root body .source #quick-inspector#quick-inspector .document-field-code,
+:root body .source #quick-inspector#quick-inspector .document-section-code {
+  display: none !important;
+}
+:root body .source #quick-inspector#quick-inspector > #mobile-inspector-groups button {
+  font-size: 9.5px !important;
+}
+
+/* 属性检查器.pen · MCP nodes oXAZq / Uu3OJ: shared inspector geometry. */
+:root body .source {
+  --pin-gutter: 14px;
+  --pin-rail-w: 64px;
+  --pin-row-h: 30px;
+  --pin-ctrl-h: 30px;
+  --pin-action-h: 50px;
+}
+:root body .source .inspector-title.key-inspector-title {
+  min-height: 59px;
+  padding-left: 14px;
+}
+:root body .source .key-inspector-preview {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--pin-accent-soft);
+  color: var(--pin-accent);
+}
+:root body .source .key-inspector-copy > span { font-size: 9.5px; }
+:root body .source #quick-inspector#quick-inspector[data-inspector-group-display="grouped"]:not([hidden]) {
+  grid-template-columns: minmax(0, 1fr) var(--pin-rail-w) !important;
+  grid-template-rows: minmax(0, 1fr) auto !important;
+}
+:root body .source #quick-inspector#quick-inspector > #mobile-inspector-groups:not([hidden]) {
+  grid-area: 1 / 2 / 3 / 3 !important;
+  padding: 10px 6px !important;
+  gap: 4px !important;
+}
+:root body .source #quick-inspector#quick-inspector > #mobile-inspector-groups button {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  min-height: 48px !important;
+  padding: 8px 2px !important;
+  border-radius: 6px !important;
+  color: var(--pin-ink-faint) !important;
+}
+:root body .source #quick-inspector#quick-inspector > #mobile-inspector-groups button.active {
+  color: var(--pin-accent) !important;
+  background: var(--pin-accent-soft) !important;
+}
+:root body .source #quick-inspector#quick-inspector > #mobile-inspector-groups .system-symbol {
+  display: inline-flex !important;
+  width: 15px !important;
+  height: 15px !important;
+}
+:root body .source #quick-inspector#quick-inspector > .pin-actions {
+  grid-area: 2 / 1 !important;
+  min-height: 50px !important;
+  gap: 4px;
+  padding: 10px 12px;
+}
+:root body .source #quick-inspector > .pin-actions .pin-action {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 28px;
+  justify-content: center;
+  padding: 0;
+  border-radius: 6px;
+  background: transparent;
+}
+:root body .source #quick-inspector > .pin-actions .pin-action[data-key-mode-mirror] {
+  background: var(--pin-sunken);
+}
+:root body .source #quick-inspector > .pin-actions .pin-action.active {
+  background: var(--pin-accent-soft);
+  color: var(--pin-accent);
+}
+:root body .source .pin-actions-slot { gap: 2px; }
+:root body .source .pin-reset-all { padding: 0 4px; border: 0; background: transparent; }
+:root body .source #quick-inspector > .pin-actions .pin-actions-meta[data-count="0"] {
+  visibility: visible;
+  padding: 0;
+  color: var(--pin-ink-faint);
+}
+:root body .source #quick-inspector#quick-inspector > .inspector-group.mobile-inspector-active {
+  padding: 16px 14px 18px !important;
+  gap: 14px !important;
+}
+:root body .source #quick-inspector#quick-inspector .geometry-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+:root body .source #quick-inspector#quick-inspector .geometry-fields > :is(.inspector-card-heading, .inspector-note) {
+  grid-column: 1 / -1 !important;
+}
+:root body .source #quick-inspector#quick-inspector .inspector-grid.geometry-fields > label:not(.pin-search) {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  padding: 0 !important;
+  gap: 5px !important;
+  font-size: 10.5px !important;
+}
+:root body .source #quick-inspector#quick-inspector .inspector-grid.geometry-fields > label:not(.pin-search) > input[type="number"] {
+  flex: none !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+:root body .source #quick-inspector#quick-inspector .geometry-fields .pin-reset {
+  position: absolute;
+  right: 0;
+  top: -4px;
+}
+:root body .source #quick-inspector#quick-inspector .geometry-fields .pin-dot { left: -8px !important; }
+:root body .source #quick-inspector#quick-inspector .inspector-group > h3 {
+  min-height: 26px !important;
+  height: 26px !important;
+  padding-bottom: 8px !important;
+  border-bottom: 1px solid var(--pin-line) !important;
+}
+:root body .source #quick-inspector#quick-inspector .pin-hint {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Normal and pressed previews share a transparent checkerboard card. */
+:root body .source #quick-inspector#quick-inspector :is(.style-ref-row, .style-reference-field:not(.fore-styles-reference-field)) {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  padding: 0 !important;
+  font-size: 10.5px !important;
+}
+:root body .source #quick-inspector#quick-inspector :is(.style-ref-row, .style-reference-field) > .style-field {
+  flex: none !important;
+  width: 100% !important;
+}
+:root body .source #quick-inspector#quick-inspector .style-reference-input:not(.sound-style-reference) {
+  display: flex !important;
+  width: 100% !important;
+  height: 96px !important;
+  min-height: 96px !important;
+  gap: 0 !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+:root body .source #quick-inspector#quick-inspector .style-reference-input:not(.sound-style-reference) > input {
+  flex: 0 0 64px !important;
+  width: 64px !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--pin-surface) !important;
+  text-align: center !important;
+  font: 500 12px var(--font-mono) !important;
+}
+:root body .source #quick-inspector#quick-inspector .style-reference-input:not(.sound-style-reference) > .style-picker-trigger {
+  flex: 1 1 0 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+:root body .source #quick-inspector#quick-inspector .style-picker-states {
+  display: flex !important;
+  width: 100% !important;
+  height: 100% !important;
+  gap: 4px !important;
+  padding: 8px !important;
+  box-sizing: border-box;
+}
+:root body .source #quick-inspector#quick-inspector .style-picker-state {
+  display: flex !important;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 4px !important;
+  height: 100% !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+:root body .source #quick-inspector#quick-inspector .style-picker-state canvas {
+  width: 100% !important;
+  height: 64px !important;
+  object-fit: contain;
+}
+:root body .source #quick-inspector#quick-inspector .style-picker-state-caption {
+  display: block !important;
+  color: var(--pin-ink-muted);
+  font: 10px var(--font-ui);
+}
+:root body .source #quick-inspector#quick-inspector:has(> #mobile-inspector-groups[hidden]) {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+:root body .source .pin-search-controls {
+  order: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--pin-line);
+}
+:root body .source .pin-search-controls input {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--pin-line);
+  border-radius: 6px;
+  background: var(--pin-sunken);
+  color: var(--pin-ink);
+  font: 11.5px var(--font-ui);
+}
+:root body .source .pin-search-controls input:focus-visible { outline: 2px solid var(--pin-accent); outline-offset: 1px; }
+:root body .source .pin-search-controls [role=status] {
+  flex: 0 0 auto;
+  color: var(--pin-ink-faint);
+  font-size: 10.5px;
+}
+:root body .source:has([data-inspector-tab="source"].active, [data-inspector-tab="ai"].active) .pin-search-controls { display: none; }
+:root body .source #quick-inspector#quick-inspector.pin-searching .inspector-group.pin-collapsed > :not(h3):not([hidden]) { display: block !important; }
+:root body .source #quick-inspector#quick-inspector :is(label, .document-property-field).pin-search-miss { display: none !important; }
+/* Override legacy field grids only for the preview-card rows. */
+:root body .source #quick-inspector#quick-inspector#quick-inspector :is(label.style-ref-row, .style-reference-field:not(.fore-styles-reference-field), .appearance-sound-field > label) {
+  display: flex !important;
+  flex-flow: column nowrap !important;
+  align-items: stretch !important;
+  grid-template-columns: none !important;
+  gap: 8px !important;
+  padding: 0 !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector :is(label.style-ref-row, .appearance-sound-field > label) > .style-field {
+  display: block !important;
+  flex: none !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .bda-style-reference-input {
+  flex: none !important;
+  width: 100% !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .bda-style-reference-preview {
+  display: flex !important;
+  align-items: stretch !important;
+  min-height: 96px !important;
+  height: 96px !important;
+  flex: 1 1 0 !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .style-picker-state {
+  min-width: 0 !important;
+  width: 0 !important;
+  max-width: none !important;
+  flex: 1 1 0 !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .sound-style-reference {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  width: 100% !important;
+  min-height: 58px !important;
+  padding: 8px !important;
+  box-sizing: border-box;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: 8px !important;
+  background: var(--pin-sunken) !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .sound-style-main {
+  display: flex !important;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .sound-style-main-icon {
+  flex: 0 0 22px !important;
+  width: 22px !important;
+  height: 22px !important;
+  background: transparent !important;
+  color: var(--pin-accent) !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .sound-style-main-icon svg { width: 18px !important; height: 18px !important; }
+:root body .source #quick-inspector#quick-inspector#quick-inspector .sound-style-main-meta { min-width: 0 !important; flex: 1 1 0 !important; }
+:root body .source #quick-inspector#quick-inspector#quick-inspector .sound-style-main-meta :is(strong, small) {
+  display: block !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 10.5px !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .sound-style-trigger {
+  flex: 0 0 32px !important;
+  width: 32px !important;
+  min-height: 30px !important;
+  align-self: center !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector #mobile-inspector-groups .system-symbol svg {
+  display: block !important;
+  width: 15px !important;
+  height: 15px !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .fore-styles-reference-field {
+  display: block !important;
+  grid-template-columns: none !important;
+  padding: 0 !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .bda-fore-styles-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  width: 100% !important;
+  gap: 12px !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .bda-style-reference-input > input {
+  flex: 0 0 64px !important;
+  width: 64px !important;
+  padding: 0 4px !important;
+  font-size: 12px !important;
+}
+/* Visibility is semantic: field styling must never reveal unsupported controls. */
+:root body .source #quick-inspector#quick-inspector#quick-inspector [hidden] {
+  display: none !important;
+}
+
+/* Each referenced style owns a full row of normal/pressed previews. */
+:root body .source #quick-inspector#quick-inspector .style-reference-input:has(.style-reference-row),
+:root body .source #quick-inspector#quick-inspector .style-reference-input > .style-picker-trigger:has(.style-reference-row) {
+  height: auto !important;
+}
+:root body .source #quick-inspector#quick-inspector .style-picker-trigger:has(.style-reference-row) {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+}
+:root body .source #quick-inspector#quick-inspector .style-reference-input:has(.style-reference-row) {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+:root body .source #quick-inspector#quick-inspector .style-reference-input:has(.style-reference-row) > input {
+  display: none !important;
+}
+:root body .source #quick-inspector#quick-inspector .style-reference-row {
+  display: flex;
+  flex: none;
+  width: 100%;
+  height: 96px;
+  box-sizing: border-box;
+  border: 1px solid var(--pin-line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .style-reference-row > .style-reference-number {
+  flex: 0 0 64px !important;
+  width: 64px !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  padding: 0 4px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--pin-surface) !important;
+  text-align: center !important;
+  font: 500 12px var(--font-mono) !important;
+}
+:root body .source #quick-inspector#quick-inspector .style-reference-row > .style-picker-states {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+}
+:root body .source #quick-inspector#quick-inspector .style-reference-row .style-picker-state canvas {
+  height: 100% !important;
+}

@@ -195,7 +195,19 @@ const sourceHighlightStyle = HighlightStyle.define([
   { tag: [tags.operator, tags.punctuation, tags.separator], class: "token-operator" },
 ])
 
-const iniLanguage = StreamLanguage.define(properties)
+const iniLanguage = StreamLanguage.define({
+  ...properties,
+  token(stream, state) {
+    const token = properties.token(stream, state)
+    if (token === "quote") {
+      const value = stream.string.slice(stream.string.search(/[=:]/) + 1).trim()
+      return /^(?:#[\da-f]{6}(?:[\da-f]{2})?|[FS]\d+(?:_\d+)?|[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:\s*,\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+))*)$/i.test(value)
+        ? "number"
+        : "string"
+    }
+    return token ?? (/^[=:]$/.test(stream.current()) ? "operator" : null)
+  },
+})
 const baseExtensions: Extension[] = [
   lineNumbers(),
   highlightActiveLineGutter(),
@@ -234,6 +246,8 @@ export class SourceCodeEditor extends EventTarget {
   private completionItems: SourceCompletionItem[] = []
   private completionIndex = 0
   private completionFrom = 0
+  private readonly sectionScrollbar = document.createElement("nav")
+  private sectionMarkers: { from: number; button: HTMLButtonElement }[] = []
 
   constructor(parent: HTMLElement) {
     super()
@@ -245,6 +259,8 @@ export class SourceCodeEditor extends EventTarget {
           this.languageCompartment.of(iniLanguage),
           this.editableCompartment.of(this.editableExtensions()),
           EditorView.updateListener.of((update) => {
+            if (update.docChanged) this.rebuildSectionScrollbar()
+            if (update.docChanged || update.geometryChanged) this.measureSectionScrollbar()
             if (update.selectionSet) {
               this.refreshExplanation()
               if (!update.transactions.some((tr) => tr.annotation(programmaticSelection))) {
@@ -288,7 +304,56 @@ export class SourceCodeEditor extends EventTarget {
         ],
       }),
     })
+    this.sectionScrollbar.className = "source-section-scrollbar"
+    this.sectionScrollbar.setAttribute("aria-label", "按节定位")
+    this.view.dom.append(this.sectionScrollbar)
+    this.view.scrollDOM.addEventListener("scroll", () => this.measureSectionScrollbar())
+    this.rebuildSectionScrollbar()
     this.refreshExplanation()
+  }
+
+  private rebuildSectionScrollbar(): void {
+    this.sectionMarkers = []
+    if (this.language === "ini") {
+      const doc = this.view.state.doc
+      for (let number = 1; number <= doc.lines; number++) {
+        const line = doc.line(number)
+        const match = /^\s*\[([^\]\r\n]+)\]\s*(?:[;#].*)?$/.exec(line.text)
+        if (!match) continue
+        const button = document.createElement("button")
+        button.type = "button"
+        button.title = `[${match[1]}] · 第 ${number} 行`
+        button.setAttribute("aria-label", button.title)
+        button.addEventListener("click", () => {
+          this.view.dispatch({
+            selection: { anchor: line.from },
+            effects: EditorView.scrollIntoView(line.from, { y: "start", yMargin: 0 }),
+          })
+          this.view.focus()
+        })
+        this.sectionMarkers.push({ from: line.from, button })
+      }
+    }
+    this.sectionScrollbar.replaceChildren(...this.sectionMarkers.map(marker => marker.button))
+    this.sectionScrollbar.style.height = `${this.sectionMarkers.length * 20}px`
+    this.view.dom.dataset.sectionScrollbar = String(this.sectionMarkers.length > 0)
+    this.measureSectionScrollbar()
+  }
+
+  private measureSectionScrollbar(): void {
+    this.view.requestMeasure({
+      key: this.sectionScrollbar,
+      read: view => view.lineBlockAtHeight(Math.max(0, view.scrollDOM.scrollTop + 1)).from,
+      write: from => {
+        let active = 0
+        for (let index = 0; index < this.sectionMarkers.length; index++) {
+          if (this.sectionMarkers[index].from <= from) active = index
+        }
+        this.sectionMarkers.forEach(({ button }, index) => {
+          button.setAttribute("aria-current", String(index === active))
+        })
+      },
+    })
   }
 
   get value(): string {
@@ -337,6 +402,7 @@ export class SourceCodeEditor extends EventTarget {
     this.view.dispatch({
       effects: this.languageCompartment.reconfigure(language === "json" ? json() : iniLanguage),
     })
+    this.rebuildSectionScrollbar()
   }
 
   setDecorations(value: SourceEditorDecorations): void {

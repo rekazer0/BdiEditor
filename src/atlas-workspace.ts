@@ -1,0 +1,171 @@
+import { ArrowLeft, Copy, FolderInput, Grid2x2, Maximize, Minus, Plus, createElement } from "lucide"
+import type { IconNode } from "lucide"
+import type { TileSlice } from "./tiles"
+import "./atlas-workspace.css"
+
+type AtlasState = {
+  active: boolean
+  path: string
+  width: number
+  height: number
+  slices: TileSlice[]
+  selected?: TileSlice
+  editable: boolean
+  bda: boolean
+  guides: boolean
+  reference: string
+}
+
+export function createAtlasWorkspace(actions: {
+  back(): void
+  copy(): void
+  create(name: string, width: number, height: number): void
+  import(files: File[]): void
+  guides(): void
+  stretch(enabled: boolean): void
+}) {
+  const get = (selector: string) => document.querySelector<HTMLElement>(selector)!
+  const list = get("#resource-list-view")
+  const listHome = list.parentElement!
+  const toolbar = get("#image-resource-detail > .tile-toolbar")
+  const toolbarHome = toolbar.parentElement!
+  const sidebar = get(".sidebar")
+  const workspace = get(".workspace")
+  const canvas = get("#atlas-canvas") as HTMLCanvasElement
+  const wrap = get(".canvas-wrap")
+  const header = document.createElement("div")
+  header.className = "atlas-header"
+  header.innerHTML = '<div class="atlas-image-title"><strong></strong><small></small></div><span class="atlas-selection"></span>'
+  const title = header.querySelector("strong")!
+  const meta = header.querySelector("small")!
+  const badge = header.querySelector<HTMLElement>(".atlas-selection")!
+  workspace.prepend(header)
+  const button = (id: string, label: string, icon: IconNode, action: () => void) => {
+    const element = document.createElement("button")
+    element.id = id
+    element.type = "button"
+    element.className = "toolbar-button"
+    element.title = label
+    element.setAttribute("aria-label", label)
+    element.append(createElement(icon, { width: 16, height: 16 }))
+    element.addEventListener("click", action)
+    return element
+  }
+  const back = button("atlas-back", "返回布局", ArrowLeft, actions.back)
+  list.querySelector(".inspector-title")!.prepend(back)
+  const copy = button("atlas-copy-image", "复制图片及切片", Copy, actions.copy)
+  const createDialog = document.createElement("dialog")
+  createDialog.id = "atlas-create-dialog"
+  createDialog.className = "app-dialog"
+  createDialog.innerHTML = '<form method="dialog"><h2>新建图片</h2><label>名称<input name="name" aria-label="图片名称" value="image.png" required></label><div class="inspector-grid geometry-fields"><label>宽<input name="width" aria-label="图片宽度" type="number" min="1" max="8192" value="512" required></label><label>高<input name="height" aria-label="图片高度" type="number" min="1" max="8192" value="512" required></label></div><div class="dialog-actions"><button type="submit" value="cancel" formnovalidate>取消</button><button type="submit" value="create">创建</button></div></form>'
+  createDialog.querySelector("form")!.addEventListener("submit", event => {
+    if ((event as SubmitEvent).submitter?.getAttribute("value") !== "create") return
+    const data = new FormData(createDialog.querySelector("form")!)
+    actions.create(String(data.get("name")).trim(), Number(data.get("width")), Number(data.get("height")))
+  })
+  document.body.append(createDialog)
+  const create = button("atlas-create-image", "新建图片", Plus, () => createDialog.showModal())
+  const input = document.createElement("input")
+  input.type = "file"
+  input.multiple = true
+  input.setAttribute("webkitdirectory", "")
+  input.hidden = true
+  input.addEventListener("change", () => {
+    actions.import(Array.from(input.files ?? []).filter(file => /\.(png|til)$/i.test(file.name)))
+    input.value = ""
+  })
+  const folder = button("atlas-import-folder", "导入图片目录", FolderInput, () => input.click())
+  const extras = document.createElement("span")
+  extras.className = "atlas-resource-extras"
+  extras.append(copy, create, folder, input)
+  list.querySelector(".resource-actions")!.append(extras)
+  const grid = button("atlas-grid", "显示切片网格", Grid2x2, actions.guides)
+  toolbar.append(grid)
+  const reference = document.createElement("div")
+  reference.className = "atlas-reference"
+  reference.innerHTML = '<span>引用</span><output></output>'
+  get("#tile-preview-wrap").after(reference)
+  const sourceHeading = document.createElement("h3")
+  sourceHeading.className = "atlas-source-heading"
+  sourceHeading.textContent = "SOURCE"
+  get("#tile-source-fields").before(sourceHeading)
+  const stretch = document.createElement("label")
+  stretch.className = "atlas-stretch"
+  stretch.innerHTML = '<span>按九宫格拉伸</span><input type="checkbox" role="switch" aria-label="按九宫格拉伸">'
+  const toggle = stretch.querySelector("input")!
+  toggle.addEventListener("change", () => actions.stretch(toggle.checked))
+  get("#tile-inspector").append(stretch)
+  const status = document.createElement("div")
+  status.className = "atlas-status"
+  status.setAttribute("role", "status")
+  workspace.append(status)
+  const zoom = document.createElement("div")
+  zoom.className = "atlas-zoom"
+  const percent = document.createElement("output")
+  percent.setAttribute("aria-label", "图集缩放比例")
+  let state: AtlasState | undefined
+  let zoomValue = 1
+  let fitted = true
+  let desktopActive = false
+  let lastPath = ""
+  const resize = () => {
+    if (!desktopActive || !state?.width) return
+    if (fitted) zoomValue = Math.max(0.01, Math.min(1, (wrap.clientWidth - 64) / state.width, (wrap.clientHeight - 64) / state.height))
+    canvas.style.width = `${Math.round(state.width * zoomValue)}px`
+    canvas.style.height = `${Math.round(state.height * zoomValue)}px`
+    percent.textContent = `${Math.round(zoomValue * 100)}%`
+  }
+  const zoomBy = (factor: number) => {
+    fitted = false
+    zoomValue = Math.min(4, Math.max(0.05, zoomValue * factor))
+    resize()
+  }
+  zoom.append(button("atlas-zoom-out", "缩小图集", Minus, () => zoomBy(1 / 1.2)), percent,
+    button("atlas-zoom-in", "放大图集", Plus, () => zoomBy(1.2)),
+    button("atlas-zoom-fit", "适配图集", Maximize, () => { fitted = true; resize() }))
+  workspace.append(zoom)
+  wrap.addEventListener("wheel", event => {
+    if (!desktopActive || !(event.ctrlKey || event.metaKey)) return
+    event.preventDefault()
+    zoomBy(event.deltaY < 0 ? 1.1 : 1 / 1.1)
+  }, { passive: false })
+  new ResizeObserver(resize).observe(wrap)
+  const media = matchMedia("(min-width: 1000px)")
+  const update = (next: AtlasState) => {
+    state = next
+    desktopActive = next.active && media.matches
+    document.body.classList.toggle("atlas-workspace", desktopActive)
+    if (desktopActive) {
+      if (list.parentElement !== sidebar) sidebar.append(list)
+      if (toolbar.parentElement !== header) header.insertBefore(toolbar, badge)
+      list.hidden = false
+    } else {
+      if (list.parentElement !== listHome) {
+        listHome.prepend(list)
+        list.hidden = next.active && Boolean(next.path)
+      }
+      if (toolbar.parentElement !== toolbarHome) toolbarHome.prepend(toolbar)
+      canvas.style.removeProperty("width")
+      canvas.style.removeProperty("height")
+    }
+    const slice = next.selected
+    title.textContent = next.path.split("/").pop() || "皮肤图片"
+    title.title = next.path
+    get(".source-heading .inspector-context h2").textContent = desktopActive ? (slice ? `切片 #${slice.index}` : "切片") : "检查器"
+    meta.textContent = next.path ? `${next.width} × ${next.height} · ${next.slices.length} 个切片` : "未选择图片"
+    badge.textContent = slice ? `切片 #${slice.index} · ${slice.source[2]} × ${slice.source[3]}` : "未选择切片"
+    reference.querySelector("output")!.textContent = next.reference || "无引用"
+    toggle.checked = Boolean(slice?.inner)
+    toggle.disabled = !slice || !next.editable || next.bda
+    stretch.hidden = next.bda
+    copy.disabled = !next.path || !next.editable
+    create.disabled = folder.disabled = !next.editable
+    grid.classList.toggle("active", next.guides)
+    grid.setAttribute("aria-pressed", String(next.guides))
+    status.textContent = `${slice ? `已选 1 个切片 · 切片 #${slice.index}` : "未选择切片"} · 原图 ${next.width} × ${next.height}`
+    if (lastPath !== next.path) { lastPath = next.path; fitted = true }
+    resize()
+  }
+  media.addEventListener("change", () => { if (state) update(state) })
+  return { update }
+}

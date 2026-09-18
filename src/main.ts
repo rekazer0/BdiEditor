@@ -5,12 +5,48 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { getCurrentWebview } from "@tauri-apps/api/webview"
 import { message, open, save } from "@tauri-apps/plugin-dialog"
 import { readFile, watch, writeFile, type UnwatchFn } from "@tauri-apps/plugin-fs"
+import {
+  ClipboardPaste,
+  Copy,
+  Download,
+  Scissors,
+  Trash2,
+  Upload,
+  Crosshair,
+  Moon,
+  RectangleHorizontal,
+  RectangleVertical,
+  SquareDashed,
+  Smartphone,
+  Sun,
+  HardDrive,
+  ImageDown,
+  Palette,
+  createElement as createLucideElement,
+  type IconNode,
+} from "lucide"
 import "./style.css"
 import "./pen-design-application.css"
 import "./pen-sidebar.css"
 import "./pen-components.css"
+import "./inspector.css"
+import "./pen-inspector-sections.css"
+import "./pen-inspector-rows.css"
+import "./pen-inspector-panels.css"
+import "./pen-inspector.css"
+import "./inspector-fidelity.css"
+import { initializeProjectChooser, projectChoice, type ProjectChoice } from "./project-chooser"
+import { hydrateTemplateCardPreviews } from "./template-preview"
+import { initInspectorShell, setInspectorKind, syncInspectorRows } from "./inspector-shell.ts"
+import { inspectorIcon, inspectorGroupIcon } from "./inspector-icons"
+import "./style-library.css"
+import "./design-workbench.css"
+import { createDraftReview, changedJsonSections } from "./ai-draft-review"
+import "./project-chooser.css"
+import { initializeSettings } from "./settings"
+import { createAtlasWorkspace } from "./atlas-workspace"
+import { resizeTileSlice } from "./tiles"
 import { initPerformanceOptimization } from "./performance-init"
-import { initializeSettingsPreviews } from "./settings-preview"
 import type { AiChatController, AiChatRunHooks, AiChatRunResult } from "./ai-chat.ts"
 import type { AiDesignConversation } from "./ai-design.ts"
 import {
@@ -103,7 +139,8 @@ import { bdaCompatibilityWarnings, bdaPlatform, convertBdaPlatform, type BdaPlat
 import { IniDocument } from "./ini.ts"
 import { adaptIos26KeyboardLayout, adaptIos26Variant } from "./ios26.ts"
 import { findTextMatches, iniSectionAtOffset, iniSectionRanges, insertedTextRange, jsonPropertyAtOffset, jsonPropertyRanges, replaceTextMatches } from "./highlight.ts"
-import { pushChange, type Change } from "./history.ts"
+import type { Change } from "./history.ts"
+import { createGestureHistory } from "./gesture-history"
 import type { AiSkinDraftChange, AiSkinEditableFile } from "./ai-skin-workspace.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
 import {
@@ -140,7 +177,7 @@ import {
 } from "./layout.ts"
 import { mixedCoordinateDelta, shouldClearMixedInput } from "./mixed-input.ts"
 import { MODEL_PROVIDER_PRESETS, modelProviderPreset, type ModelProtocol } from "./model-providers.ts"
-import { installNumberInputWheel } from "./number-input-wheel.ts"
+import { installNumberInputWheel, numberInputGesture, flushNumberInputWheel, deferNumberInputRefresh } from "./number-input-wheel.ts"
 import { loadBuiltInProjectTemplate, operationError } from "./operations.ts"
 import {
   archiveCopyPaths,
@@ -160,7 +197,6 @@ import {
   previewContentVerticalBounds,
   previewItems,
   previewStateImpact,
-  type GestureDirection,
   type PreviewEvent,
 } from "./preview.ts"
 import { firstExistingPath, resourceImagePaths } from "./resources.ts"
@@ -224,7 +260,13 @@ installSafeAreaLock()
 
 document.documentElement.classList.toggle("macos", isTauri() && navigator.userAgent.includes("Macintosh"))
 document.documentElement.classList.toggle("windows", isTauri() && navigator.userAgent.includes("Windows"))
-installNumberInputWheel()
+installNumberInputWheel(document, {
+  isMixed: (field) => Boolean(mixedCoordinateDelta(field.dataset.keyField ?? "", field.placeholder, field.disabled, 1)),
+  moveMixed: (field, steps) => {
+    const delta = mixedCoordinateDelta(field.dataset.keyField ?? "", field.placeholder, field.disabled, steps)
+    if (delta) moveSelectedKeys(delta[0] * Math.abs(steps), delta[1] * Math.abs(steps))
+  },
+})
 
 const scrollbarIdleTimers = new WeakMap<HTMLElement, number>()
 document.addEventListener("scroll", (event) => {
@@ -286,6 +328,8 @@ const toolbarMenus = Array.from(document.querySelectorAll<HTMLDetailsElement>(".
 const mobileCommandMenu = $(".mobile-command-menu") as HTMLDetailsElement
 const mobileUndoButton = $("#mobile-undo") as HTMLButtonElement
 const mobileRedoButton = $("#mobile-redo") as HTMLButtonElement
+const desktopUndoButton = $("#desktop-undo") as HTMLButtonElement
+const desktopRedoButton = $("#desktop-redo") as HTMLButtonElement
 const mobileCommandButtons = Array.from(
   mobileCommandMenu.querySelectorAll<HTMLButtonElement>("[data-mobile-command], [data-mobile-export-format]"),
 )
@@ -299,7 +343,6 @@ const settingsPages = Array.from(settingsDialog.querySelectorAll<HTMLElement>("[
 const settingsStorageNav = $("#settings-storage-nav") as HTMLButtonElement
 const settingsModelNav = $("#settings-model-nav") as HTMLButtonElement
 const settingsModelSection = $("#settings-model-section")
-const aboutDialog = $("#about-dialog") as HTMLDialogElement
 const copyQqGroupButton = $("#copy-qq-group") as HTMLButtonElement
 const aboutUpdate = $("#about-update")
 const checkUpdateButton = $("#check-update") as HTMLButtonElement
@@ -392,6 +435,12 @@ const sidebarViewButtons = Array.from(document.querySelectorAll<HTMLButtonElemen
 const sidebarViewControl = $(".sidebar-view-control")
 const sidebarViewHeading = sidebarViewControl.closest<HTMLElement>(".pane-heading")!
 const documentName = $("#document-name")
+const sidebarProjectName = $("#sidebar-project-name")
+if (sidebarProjectName) {
+  const syncSidebarProjectName = () => { sidebarProjectName.textContent = documentName?.textContent?.trim() || "未打开皮肤" }
+  syncSidebarProjectName()
+  new MutationObserver(syncSidebarProjectName).observe(documentName, { childList: true, characterData: true, subtree: true })
+}
 const sourceName = $("#source-name")
 const dirty = $("#dirty")
 const eventLog = $("#event-log")
@@ -399,6 +448,7 @@ const fileOperationDialog = $("#file-operation-dialog") as HTMLDialogElement
 const fileOperationTitle = $("#file-operation-title")
 const fileOperationDetail = $("#file-operation-detail")
 const fileOperationProgress = $("#file-operation-progress") as HTMLProgressElement
+const fileOperationPercent = $("#file-operation-percent")
 const fileOperationResult = $("#file-operation-result")
 const fileOperationClose = $("#file-operation-close") as HTMLButtonElement
 const LARGE_SKIN_BYTES = 5 * 1024 * 1024
@@ -454,7 +504,6 @@ const colorAlphas = Array.from(document.querySelectorAll<HTMLInputElement>("[dat
 const keyOnlyGroups = Array.from(document.querySelectorAll<HTMLElement>(".key-only"))
 const keyLayoutFieldsGroup = $(".key-layout-fields")
 const keyTypographyFieldsGroup = $(".key-typography-fields")
-const keyGestureFieldsGroup = $(".key-gesture-fields")
 const bdaKeyFieldLabels: Record<string, string> = {
   BACK_STYLE: "背景样式（backStyle）",
   FORE_STYLE: "前景样式（foreStyles）",
@@ -487,6 +536,8 @@ const aiDesignStatus = $("#ai-design-status")
 const aiDesignChat = $("#ai-design-chat")
 const aiDesignModel = $("#ai-design-model") as HTMLSelectElement
 const aiDesignSettings = $(".ai-design-settings") as HTMLButtonElement
+const aiContextKey = $("#ai-context-key")
+const aiContextPreview = $("#ai-context-preview")
 const aiDraftPanel = $("#ai-draft-panel") as HTMLElement
 const aiDraftSummary = $("#ai-draft-summary") as HTMLElement
 const aiDraftFiles = $("#ai-draft-files") as HTMLElement
@@ -500,11 +551,12 @@ const orientation = $("#orientation") as HTMLSelectElement & { value: "port" | "
 const layout = $("#layout") as HTMLSelectElement
 const mode = $("#mode") as HTMLSelectElement
 const device = $("#device") as HTMLSelectElement
+const deviceControlIcon = $("#device-control .device-control-icon")
 function currentDeviceValue(): string {
   return effectiveDeviceValue(device.value)
 }
 const toggleGuides = $("#toggle-guides") as HTMLButtonElement
-const mobileToggleGuides = $("#mobile-toggle-guides") as HTMLButtonElement
+const mobileToggleGuides = document.createElement("button")
 const skinStateControl = $("#skin-state-control")
 const skinState = $("#skin-state") as HTMLSelectElement
 const skinStateValue = $(".skin-state-value")
@@ -656,6 +708,7 @@ let sourceSearchTimer: number | undefined
 let sourceHistoryHighlight: readonly [number, number] | undefined
 type LayoutImageConfig = "none" | "image-follows-layout" | "layout-follows-image"
 let undoStack: Change[] = []
+const recordChange = createGestureHistory()
 let redoStack: Change[] = []
 let aiDesignConversationTarget: SkinArchive | undefined
 /**
@@ -671,6 +724,9 @@ type AiDraft = {
   response: string
 }
 let aiDesignDraft: AiDraft | undefined
+let aiDesignBusy = false
+let aiLastPrompt = ""
+let savedModels: ModelConfiguration[] = []
 // ponytail: keep three exchanges in memory; persist sessions only if cross-restart chat is needed.
 let aiDesignConversation: AiDesignConversation = []
 let aiChatController: AiChatController | undefined
@@ -758,6 +814,9 @@ let tileMode: "select" | "move" = "select"
 let keyMode: "select" | "move" = "select"
 let movingTile: TileSlice | undefined
 let moveStart: TilePoint | undefined
+let atlasWorkspace: ReturnType<typeof createAtlasWorkspace> | undefined
+let tileResizeCorner: number | undefined
+let tileDragOriginal: TileSlice | undefined
 let moveSource: TileRect | undefined
 let copiedTile: TileSlice | undefined
 
@@ -783,28 +842,6 @@ const deviceFrameProperties = [
   "--device-island-offset",
 ] as const
 
-/** Focuses the inspector input that edits the gesture picked on the canvas. */
-function focusGestureField(direction: GestureDirection): void {
-  const field = keyFields.find((candidate) => candidate.dataset.keyField === direction.toUpperCase())
-  if (!field) return
-  if (mobilePortraitQuery.matches) setMobilePane("inspector")
-  // A canvas click leaves the caret on the canvas, so the properties tab may
-  // not be the visible one; switch before focusing or focus would be dropped.
-  if (inspectorTab !== "properties") updateInspectorView()
-  const group = field.closest<HTMLElement>(".inspector-disclosure")
-  if (group) {
-    if (group.hidden) group.hidden = false
-    // Grouped inspector layouts show one group at a time; the gesture group
-    // has to be the visible one or focus would land on a hidden input.
-    if (group.classList.contains("mobile-inspector-managed") && group.dataset.mobileInspectorGroup) {
-      setMobileInspectorGroup(group.dataset.mobileInspectorGroup)
-    }
-  }
-  field.scrollIntoView({ block: "center" })
-  field.focus()
-  field.select()
-}
-
 const REFERENCE_PHONE_WIDTH_SCALE = 1
 
 const preview = new Preview(
@@ -826,7 +863,6 @@ const preview = new Preview(
   false,
   (sections, deltaX, deltaY) => moveSelectedKeys(deltaX, deltaY, sections),
   $("#hint-preview") as HTMLCanvasElement,
-  (direction) => focusGestureField(direction),
 )
 
 function updatePointerCoordinates(
@@ -848,11 +884,12 @@ function updatePointerCoordinates(
   const wrapBounds = geometry?.wrap ?? canvasWrap.getBoundingClientRect()
   const wrapWidth = geometry?.wrapWidth ?? canvasWrap.clientWidth
   const wrapHeight = geometry?.wrapHeight ?? canvasWrap.clientHeight
+  const overlayGeometry = { left: canvasWrap.scrollLeft, top: canvasWrap.scrollTop, width: wrapWidth, height: wrapHeight }
   let x = Math.min(bounds.width - 1, Math.max(0, event.clientX - bounds.left))
   let y = Math.min(bounds.height - 1, Math.max(0, event.clientY - bounds.top))
   const snapPreview = canvas === previewCanvas ? preview : canvas === toolbarCanvas ? toolbarPreview : undefined
   const logicalSize = snapPreview?.logicalSize() ?? { width: canvas.width, height: canvas.height }
-  const point = editorCrosshair.checked && editorCoordinateSnap.checked && snapPreview
+  const point = !previewPanStart && editorCrosshair.checked && editorCoordinateSnap.checked && snapPreview
     ? snapPreview.snapPoint(
       { x: x / bounds.width * logicalSize.width, y: y / bounds.height * logicalSize.height },
       bounds,
@@ -864,15 +901,17 @@ function updatePointerCoordinates(
   const logicalY = Math.floor(snappedY)
   x = snappedX / logicalSize.width * bounds.width
   y = snappedY / logicalSize.height * bounds.height
-  previewCoordinateX.textContent = String(logicalX)
-  previewCoordinateY.textContent = String(logicalY)
+  if (previewCoordinateX.textContent !== String(logicalX)) previewCoordinateX.textContent = String(logicalX)
+  if (previewCoordinateY.textContent !== String(logicalY)) previewCoordinateY.textContent = String(logicalY)
   if (!editorCrosshair.checked) {
     previewCoordinates.hidden = false
     return
   }
-  const crosshairX = Math.round(bounds.left - wrapBounds.left + x)
-  const crosshairY = Math.round(bounds.top - wrapBounds.top + y)
-  const overlayGeometry = { left: canvasWrap.scrollLeft, top: canvasWrap.scrollTop, width: wrapWidth, height: wrapHeight }
+  // While panning, the crosshair follows the actual pointer, not a snapped/clamped
+  // artwork coordinate (which can lag behind the pointer or stick to an edge).
+  const outsideCanvas = event.clientX < bounds.left || event.clientX >= bounds.right || event.clientY < bounds.top || event.clientY >= bounds.bottom
+  const crosshairX = previewPanStart || outsideCanvas ? event.clientX - wrapBounds.left : bounds.left - wrapBounds.left + x
+  const crosshairY = previewPanStart || outsideCanvas ? event.clientY - wrapBounds.top : bounds.top - wrapBounds.top + y
   if (
     !pointerOverlayGeometry ||
     pointerOverlayGeometry.left !== overlayGeometry.left ||
@@ -921,20 +960,30 @@ function schedulePointerCoordinates(
     canvas,
     geometry,
   }
-  if (pointerCoordinatesFrame) return
-  pointerCoordinatesFrame = requestAnimationFrame(() => {
-    pointerCoordinatesFrame = 0
-    const pending = pendingPointerCoordinates
-    pendingPointerCoordinates = undefined
-    if (pending) updatePointerCoordinates(pending.event, pending.target, pending.canvas, pending.geometry)
-  })
+  schedulePreviewInteractionFrame()
 }
 
-previewCanvas.addEventListener("pointermove", (event) => {
-  schedulePointerCoordinates(event, previewCanvas, previewCanvas)
-})
-toolbarStrip.addEventListener("pointermove", (event) => {
-  schedulePointerCoordinates(event, toolbarStrip, toolbarCanvas)
+function paintPreviewInteraction(): void {
+  if (pointerCoordinatesFrame) cancelAnimationFrame(pointerCoordinatesFrame)
+  pointerCoordinatesFrame = 0
+  const coordinates = pendingPointerCoordinates
+  const pan = pendingPreviewPan
+  pendingPointerCoordinates = undefined
+  pendingPreviewPan = undefined
+  // All geometry reads occur before changing the shell transform. The overlay and
+  // artwork are painted from the same latest pointer snapshot, in a single frame.
+  if (coordinates) updatePointerCoordinates(coordinates.event, coordinates.target, coordinates.canvas, coordinates.geometry)
+  if (pan) setPreviewPan(pan.x, pan.y)
+}
+
+function schedulePreviewInteractionFrame(): void {
+  if (!pointerCoordinatesFrame) pointerCoordinatesFrame = requestAnimationFrame(paintPreviewInteraction)
+}
+
+canvasWrap.addEventListener("pointermove", (event) => {
+  if (previewPanStart || deviceShell.hidden) return
+  const onToolbar = toolbarStrip.contains(event.target as Node)
+  schedulePointerCoordinates(event, onToolbar ? toolbarStrip : previewCanvas, onToolbar ? toolbarCanvas : previewCanvas)
 })
 document.addEventListener("pointermove", (event) => {
   if (previewPanStart) return
@@ -1375,6 +1424,25 @@ mobileShareButton.setAttribute("aria-label", mobileShareLabel)
 mobileShareMenuLabel.textContent = mobileShareLabel
 
 const svgNamespace = "http://www.w3.org/2000/svg"
+const lucideToolbarIcons: Record<string, IconNode> = {
+  externaldrive: HardDrive,
+  "photo.badge.arrow.down": ImageDown,
+  "iphone.gen3.badge.checkmark": [...Smartphone, ["path", { d: "m9 11 2 2 4-4" }]],
+  paintpalette: Palette,
+  "rectangle.dashed": SquareDashed,
+  upload: Upload,
+  download: Download,
+  copy: Copy,
+  "clipboard-paste": ClipboardPaste,
+  scissors: Scissors,
+  "trash-2": Trash2,
+  "lucide-crosshair": Crosshair,
+  "lucide-moon": Moon,
+  "lucide-rectangle-horizontal": RectangleHorizontal,
+  "lucide-rectangle-vertical": RectangleVertical,
+  "lucide-smartphone": Smartphone,
+  "lucide-sun": Sun,
+}
 const fallbackSymbolPaths: Record<string, string[]> = {
   "info.circle": ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18", "M12 10v7", "M12 7h.01"],
   keyboard: ["M3 6h18v12H3z", "M6 10h2m2 0h2m2 0h2m2 0h1M7 14h10"],
@@ -1388,7 +1456,11 @@ const fallbackSymbolPaths: Record<string, string[]> = {
   "music.note": ["M9 18V5l12-2v13", "M9 9l12-2", "M9 18a3 3 0 1 1-3-3h3", "M21 16a3 3 0 1 1-3-3h3"],
   "speaker.wave.2": ["M4 9h4l5-4v14l-5-4H4z", "M16 9a4 4 0 0 1 0 6", "M18.5 6.5a8 8 0 0 1 0 11"],
   "speaker.slash": ["M4 9h4l5-4v14l-5-4H4z", "m17 9 4 6M21 9l-4 6"],
-  gearshape: ["M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8", "M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"],
+  // 齿轮：8 齿多边形轮廓 + 中心孔，替代此前与 `sun.max` 混淆的「圆+射线」画法。
+  gearshape: [
+    "M10.48 1.91L13.52 1.91L13.71 4.39L16.17 5.41L18.06 3.80L20.20 5.94L18.59 7.83L19.61 10.29L22.09 10.48L22.09 13.52L19.61 13.71L18.59 16.17L20.20 18.06L18.06 20.20L16.17 18.59L13.71 19.61L13.52 22.09L10.48 22.09L10.29 19.61L7.83 18.59L5.94 20.20L3.80 18.06L5.41 16.17L4.39 13.71L1.91 13.52L1.91 10.48L4.39 10.29L5.41 7.83L3.80 5.94L5.94 3.80L7.83 5.41L10.29 4.39Z",
+    "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6",
+  ],
   "text.bubble": ["M4 4h16v12H9l-5 4z", "M8 8h8M8 12h5"],
   app: ["M4 4h16v16H4z", "M8 8h8v8H8z"],
   "rectangle.and.hand.point": ["M3 4h18v14H3z", "M8 8h8M12 8v6m0 0 3-3m-3 3-3-3"],
@@ -1398,6 +1470,8 @@ const fallbackSymbolPaths: Record<string, string[]> = {
   "doc.on.doc": ["M8 7V3h10l3 3v12h-4", "M5 7h10v14H5z", "M9 12h2m-2 4h2"],
   "arrow.uturn.backward": ["m7 5-4 3.5L7 12", "M4 8.5h7.2a5 5 0 0 1 5 5"],
   "arrow.uturn.forward": ["m13 5 4 3.5-4 3.5", "M16 8.5H8.8a5 5 0 0 0-5 5"],
+  "arrow.uturn.left": ["M9 14.25 4.5 9.75m0 0L9 5.25m-4.5 4.5h10.125a6.375 6.375 0 0 1 0 12.75H12"],
+  "arrow.uturn.right": ["m15 14.25 4.5-4.5m0 0-4.5-4.5m4.5 4.5H9.375a6.375 6.375 0 0 0 0 12.75H12"],
   "arrow.left.and.right": ["M3 7h18M3 7l4-4M3 7l4 4M21 17H3m18 0-4-4m4 4-4 4"],
   "arrow.up.and.down": ["M7 3v18M7 3 3 7m4-4 4 4M17 21V3m0 18 4-4m-4 4-4-4"],
   "align.horizontal.left": ["M4 4v16M8 7h12M8 12h8M8 17h10"],
@@ -1408,6 +1482,8 @@ const fallbackSymbolPaths: Record<string, string[]> = {
   "arrow.up.and.down.righttriangle.up.righttriangle.down": ["M12 3v18M12 3 8 7h8zm0 18-4-4h8z"],
   "square.2.layers.3d": ["M4 7h12v12H4zM8 3h12v12M8 7h8"],
   "arrow.clockwise": ["M19 8a8 8 0 1 0 1 6", "M19 3v5h-5"],
+  "slider.horizontal.3": ["M4 6h4m4 0h8M4 12h10m4 0h2M4 18h2m4 0h10M8 3v6m6 0v6M6 15v6"],
+  ruler: ["m3 16 13-13 5 5L8 21zM7 12l2 2m2-6 2 2m2-6 2 2"],
   paintbrush: ["m4 17 10-10 3 3-10 10H4z", "m14 7 2-2 3 3-2 2", "M4 20h5"],
   "rectangle.3.group": ["M3 5h18v4H3zM3 11h8v8H3zM13 11h8v8h-8z"],
   eye: ["M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6", "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6"],
@@ -1415,6 +1491,8 @@ const fallbackSymbolPaths: Record<string, string[]> = {
   internaldrive: ["M4 5h16l2 11H2z", "M2 16v3h20v-3M17 12h1"],
   sparkles: ["m12 2 1.4 4.6L18 8l-4.6 1.4L12 14l-1.4-4.6L6 8l4.6-1.4z", "m19 14 .8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8z", "m5 14 .8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8z"],
   "rectangle.portrait": ["M6 2.5h12v19H6z", "M9 5h6M9 19h6"],
+  smartphone: ["M7 2.5h10A1.5 1.5 0 0 1 18.5 4v16a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 20V4A1.5 1.5 0 0 1 7 2.5z", "M11 18.5h2"],
+  "rectangle.dashed": ["M4 5h3M10.5 5h3M17 5h3M20 8v3M20 14v3M17 19h-3M10.5 19h-3M4 19v-3M4 13v-3M4 8V5"],
   "rectangle.landscape": ["M2.5 6h19v12h-19z", "M5 9v6M19 9v6"],
   "sun.max": ["M12 4V2m0 20v-2M4 12H2m20 0h-2M5.6 5.6 4.2 4.2m15.6 15.6-1.4-1.4m0-12.8 1.4-1.4M5.6 18.4l-1.4 1.4", "M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10"],
   moon: ["M20 15.5A8 8 0 0 1 8.5 4 8 8 0 1 0 20 15.5z"],
@@ -1429,6 +1507,11 @@ function createSystemSymbol(name: string): HTMLSpanElement {
   symbol.className = "system-symbol"
   symbol.dataset.systemSymbol = name
   symbol.ariaHidden = "true"
+  const lucideIcon = lucideToolbarIcons[name]
+  if (lucideIcon) {
+    symbol.append(createLucideElement(lucideIcon, { class: "system-symbol-fallback canvas-toolbar-icon" }))
+    return symbol
+  }
   const existingFallback = document.querySelector<SVGSVGElement>(
     `[data-system-symbol="${CSS.escape(name)}"] .system-symbol-fallback`,
   )
@@ -1446,6 +1529,14 @@ function createSystemSymbol(name: string): HTMLSpanElement {
   }
   symbol.append(fallback)
   return symbol
+}
+
+function syncDeviceControlIcon(): void {
+  const name = currentDeviceValue() === "canvas" ? "rectangle.dashed" : "lucide-smartphone"
+  if (deviceControlIcon.dataset.systemSymbol === name && deviceControlIcon.childElementCount) return
+  const rendered = createSystemSymbol(name)
+  deviceControlIcon.dataset.systemSymbol = name
+  deviceControlIcon.replaceChildren(...rendered.childNodes)
 }
 
 for (const symbol of Array.from(document.querySelectorAll<HTMLElement>(".system-symbol[data-system-symbol]:empty"))) {
@@ -1471,6 +1562,8 @@ function syncMobileCommands(): void {
   }
   mobileUndoButton.disabled = undoButton.disabled
   mobileRedoButton.disabled = redoButton.disabled
+  desktopUndoButton.disabled = undoButton.disabled
+  desktopRedoButton.disabled = redoButton.disabled
 }
 
 for (const button of mobileCommandButtons) {
@@ -1481,7 +1574,7 @@ for (const button of mobileCommandButtons) {
     target.click()
   })
 }
-for (const target of [document.querySelector(".titlebar-actions"), document.querySelector(".app-more")]) {
+for (const target of [document.querySelector(".titlebar-actions"), document.querySelector(".app-more"), document.querySelector(".pen-file-menu")]) {
   if (!target) continue
   new MutationObserver(syncMobileCommands).observe(target, {
     subtree: true,
@@ -1492,6 +1585,11 @@ for (const target of [document.querySelector(".titlebar-actions"), document.quer
 syncMobileCommands()
 
 for (const [button, target] of [[mobileUndoButton, undoButton], [mobileRedoButton, redoButton]] as const) {
+  button.addEventListener("click", () => {
+    if (!target.disabled) target.click()
+  })
+}
+for (const [button, target] of [[desktopUndoButton, undoButton], [desktopRedoButton, redoButton]] as const) {
   button.addEventListener("click", () => {
     if (!target.disabled) target.click()
   })
@@ -1585,16 +1683,18 @@ function setMobileInspectorGroup(id: string, scroll = true): void {
   // Each group owns its scrolling area. Scrolling the outer grid here moves the
   // summary card and category rail together, so switching tabs appears to make
   // the controls jump away from the pointer.
-  if (scroll) quickInspector.scrollTop = 0
+  if (scroll) {
+    quickInspector.scrollTop = 0
+    mobileInspectorGroups.querySelector<HTMLButtonElement>("button.active")?.scrollIntoView({ block: "nearest", inline: "nearest" })
+  }
 }
 
 function syncMobileInspectorGroups(): void {
+  const combinedBda = archive?.format === "bda" && selectedKeySections.length > 0 && !selectedCandidate
+  if (combinedBda && keyTypographyFieldsGroup.parentElement !== bdaConfigFieldsGroup) bdaConfigFieldsGroup.append(keyTypographyFieldsGroup)
+  else if (!combinedBda && keyTypographyFieldsGroup.parentElement !== quickInspector) quickInspector.insertBefore(keyTypographyFieldsGroup, quickInspector.querySelector(".key-gesture-fields"))
   const previousGroup = quickInspector.querySelector<HTMLElement>(".mobile-inspector-active")
   const previousLabel = previousGroup ? mobileInspectorGroupLabel(previousGroup) : ""
-  for (const group of Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))) {
-    group.classList.remove("mobile-inspector-managed", "mobile-inspector-active")
-    delete group.dataset.mobileInspectorGroup
-  }
   let groups = Array.from(quickInspector.querySelectorAll<HTMLElement>(":scope > .inspector-group"))
     .filter((group) => !group.hidden)
     .flatMap((group) => {
@@ -1606,11 +1706,19 @@ function syncMobileInspectorGroups(): void {
       }
       return [group]
     })
+  const managed = Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))
+  if (archive?.format !== "bda" && groups.length === managed.length && groups.every((group, index) =>
+    group === managed[index] && mobileInspectorGroupLabel(group) === mobileInspectorGroups.children[index]?.getAttribute("title"),
+  )) return
+  for (const group of Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))) {
+    group.classList.remove("mobile-inspector-managed", "mobile-inspector-active")
+    delete group.dataset.mobileInspectorGroup
+  }
   const selectedBdaKey = archive?.format === "bda" && selectedKeySections.length > 0 && !selectedCandidate
   bdaSelectedStyleHeading.hidden = !selectedBdaKey
   if (selectedBdaKey) {
     bdaConfigFieldsGroup.dataset.inspectorGroupLabel = "样式"
-    groups = [keyLayoutFieldsGroup, bdaConfigFieldsGroup, keyTypographyFieldsGroup, keyGestureFieldsGroup]
+    groups = [bdaConfigFieldsGroup]
       .filter((group) => !group.hidden)
   } else {
     delete bdaConfigFieldsGroup.dataset.inspectorGroupLabel
@@ -1632,14 +1740,44 @@ function syncMobileInspectorGroups(): void {
     const text = document.createElement("span")
     text.className = "inspector-group-label"
     text.textContent = label
-    button.append(createSystemSymbol(mobileInspectorGroupSymbol(label)), text)
+    button.append(inspectorGroupIcon(label), text)
     button.title = label
     button.dataset.mobileInspectorGroup = group.dataset.mobileInspectorGroup
     button.addEventListener("click", () => setMobileInspectorGroup(group.dataset.mobileInspectorGroup ?? "0"))
     return button
   }))
   setMobileInspectorGroup(active?.dataset.mobileInspectorGroup ?? "", false)
+  if (archive && selectedKeySections.length) {
+    const addDestination = (label: string, action: () => void) => {
+      const button = document.createElement("button")
+      button.type = "button"
+      button.title = label
+      button.append(inspectorGroupIcon(label), Object.assign(document.createElement("span"), { className: "inspector-group-label", textContent: label }))
+      button.addEventListener("click", action)
+      mobileInspectorGroups.append(button)
+    }
+    if (archive.format === "bda") {
+      addDestination("面板", () => inspectorBackButton.click())
+      for (const [kind, label] of [["animation", "动画"], ["sound", "声音"]] as const) {
+        const path = bdaConfigPath(archive, theme.value, orientation.value, kind)
+        if (path) addDestination(label, () => selectFile(path, "overview"))
+      }
+      mobileInspectorGroups.hidden = false
+    }
+  }
 }
+
+mobileInspectorGroups.addEventListener("keydown", (event) => {
+  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return
+  const buttons = Array.from(mobileInspectorGroups.querySelectorAll<HTMLButtonElement>("button"))
+  const current = buttons.indexOf(document.activeElement as HTMLButtonElement)
+  if (current < 0) return
+  event.preventDefault()
+  const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1
+    : (current + (["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1) + buttons.length) % buttons.length
+  buttons[next].click()
+  buttons[next].focus()
+})
 
 for (const button of bdaInspectorStateButtons) {
   button.addEventListener("click", () => {
@@ -1814,6 +1952,7 @@ function applyModeState(): void {
 function selectChoice(select: HTMLSelectElement, value: string): void {
   if (select.value === value) return
   select.value = value
+  syncAiDesignContext()
   select.dispatchEvent(new Event("change"))
 }
 
@@ -2065,6 +2204,7 @@ function chooseUnsavedDecision(): Promise<UnsavedDecision> {
 }
 
 async function prepareDocumentReplacement(): Promise<boolean> {
+  flushNumberInputWheel()
   try {
     await flushSourceAutosave()
   } catch (error) {
@@ -2101,16 +2241,16 @@ function commitText(path: string, before: string, after: string, coalesce = fals
   if (!archive || before === after) return
   sourceHistoryHighlight = undefined
   archive.setText(path, after)
-  pushChange(undoStack, { kind: "text", path, before, after }, coalesce)
+  recordChange(undoStack, { kind: "text", path, before, after }, numberInputGesture(), coalesce)
   redoStack = []
   scheduleSourceAutosave([path])
   updateHistoryButtons()
 }
 
-function commitBytes(path: string, before: Uint8Array, after: Uint8Array): void {
-  if (!archive || before.length === after.length && before.every((byte, index) => byte === after[index])) return
+function commitBytes(path: string, before: Uint8Array | undefined, after: Uint8Array): void {
+  if (!archive || before && before.length === after.length && before.every((byte, index) => byte === after[index])) return
   archive.setBytes(path, after)
-  undoStack.push({ kind: "bytes", path, before, after })
+  recordChange(undoStack, { kind: "bytes", path, before, after }, numberInputGesture())
   redoStack = []
   scheduleSourceAutosave([path])
   updateHistoryButtons()
@@ -2125,7 +2265,7 @@ function commitBatch(changes: Change[]): void {
       else archive.delete(change.path)
     }
   }
-  undoStack.push({ kind: "batch", changes })
+  recordChange(undoStack, { kind: "batch", changes }, numberInputGesture())
   redoStack = []
   scheduleSourceAutosave(changes.flatMap((change) => change.kind === "batch" ? [] : [change.path]))
   updateHistoryButtons()
@@ -2156,30 +2296,41 @@ function applyTextSnapshot(path: string, text: string): void {
   updateDirty()
 }
 
+function refreshHistorySelection(): void {
+  const path = selectedResourcePath
+  const index = selectedTileIndex
+  const resourceMode = resourceConfigActive ? resourceInspectorMode : "document"
+  renderFiles()
+  if (selectedPath && (archive?.getBytes(selectedPath) || isBdaAppearancePartPath(selectedPath))) {
+    selectFile(selectedPath, sidebarView, resourceMode)
+    if (resourceMode === "image" && archive?.isImage(path)) {
+      selectResourceImage(path)
+      selectedTileIndex = slices.some(slice => slice.index === index) ? index : undefined
+      populateTileInspector()
+      drawAtlas()
+    }
+  }
+  updateHistoryButtons()
+}
+
 function undo(): void {
+  flushNumberInputWheel()
   const change = undoStack.pop()
   if (!change) return
   sourceHistoryHighlight = undefined
   redoStack.push(change)
   applyChangeSnapshot(change, "before")
-  renderFiles()
-  if (selectedPath && (archive?.getBytes(selectedPath) || isBdaAppearancePartPath(selectedPath))) {
-    selectFile(selectedPath, sidebarView)
-  }
-  updateHistoryButtons()
+  refreshHistorySelection()
 }
 
 function redo(): void {
+  flushNumberInputWheel()
   const change = redoStack.pop()
   if (!change) return
   sourceHistoryHighlight = undefined
   undoStack.push(change)
   applyChangeSnapshot(change, "after")
-  renderFiles()
-  if (selectedPath && (archive?.getBytes(selectedPath) || isBdaAppearancePartPath(selectedPath))) {
-    selectFile(selectedPath, sidebarView)
-  }
-  updateHistoryButtons()
+  refreshHistorySelection()
 }
 
 function applyChangeSnapshot(change: Change, side: "before" | "after"): void {
@@ -2292,6 +2443,7 @@ function isBdaAppearancePartPath(path: string): boolean {
 }
 
 function refreshSelectedBdaSource(): void {
+  if (deferNumberInputRefresh(refreshSelectedBdaSource, refreshSelectedBdaSource)) return
   if (!archive || archive.format !== "bda") return
   const part = bdaAppearancePart(selectedPath)
   if (part) {
@@ -2702,8 +2854,9 @@ function skinStateDocuments(): IniDocument[] {
 
 function fitCanvasPreview(): void {
   if (!canvasLogicalSize) return
-  const availableWidth = canvasWrap.clientWidth - 36
-  const availableHeight = canvasWrap.clientHeight - 36
+  const canvasStyle = getComputedStyle(canvasWrap)
+  const availableWidth = canvasWrap.clientWidth - parseFloat(canvasStyle.paddingLeft) - parseFloat(canvasStyle.paddingRight)
+  const availableHeight = canvasWrap.clientHeight - parseFloat(canvasStyle.paddingTop) - parseFloat(canvasStyle.paddingBottom)
   if (availableWidth <= 0 || availableHeight <= 0) return
   const width = canvasFitWidth(
     availableWidth,
@@ -2739,13 +2892,12 @@ function updateCanvasPanelStatus(renderedWidth: number): void {
 let fitCanvasDebounce: ReturnType<typeof setTimeout> | undefined
 let canvasFitFrozen = false
 let previewZoom = 1
-let previewPanLocked = false
+let previewPanLocked = true
 let previewPanX = 0
 let previewPanY = 0
-let previewPanStart: { x: number; y: number; panX: number; panY: number } | undefined
+let previewPanStart: { pointerId: number; x: number; y: number; panX: number; panY: number } | undefined
 let previewPanCandidate: { pointerId: number; x: number; y: number; panX: number; panY: number } | undefined
 let pendingPreviewPan: { x: number; y: number } | undefined
-let previewPanFrame = 0
 let previewPanGeometry: { target: DOMRect; wrap: DOMRect; wrapWidth: number; wrapHeight: number } | undefined
 
 function setPreviewPan(x: number, y: number): void {
@@ -2756,21 +2908,11 @@ function setPreviewPan(x: number, y: number): void {
 
 function schedulePreviewPan(x: number, y: number): void {
   pendingPreviewPan = { x, y }
-  if (previewPanFrame) return
-  previewPanFrame = requestAnimationFrame(() => {
-    previewPanFrame = 0
-    const pending = pendingPreviewPan
-    pendingPreviewPan = undefined
-    if (pending) setPreviewPan(pending.x, pending.y)
-  })
+  schedulePreviewInteractionFrame()
 }
 
 function flushPreviewPan(): void {
-  if (previewPanFrame) cancelAnimationFrame(previewPanFrame)
-  previewPanFrame = 0
-  const pending = pendingPreviewPan
-  pendingPreviewPan = undefined
-  if (pending) setPreviewPan(pending.x, pending.y)
+  paintPreviewInteraction()
 }
 
 function applyPreviewZoom(value: number, anchor?: { x: number; y: number }): void {
@@ -2832,11 +2974,8 @@ canvasWrap.addEventListener("wheel", (event) => {
 }, { passive: false })
 
 window.addEventListener("blur", () => {
-  flushPreviewPan()
-  previewPanCandidate = undefined
-  previewPanStart = undefined
-  preview.setPointerInteractionLocked(false)
-  canvasWrap.classList.remove("preview-pan-ready", "preview-panning")
+  finishPreviewPan()
+  if (editorCrosshair.checked) previewCoordinates.hidden = true
 })
 
 canvasWrap.addEventListener("pointerdown", (event) => {
@@ -2868,7 +3007,7 @@ canvasWrap.addEventListener("pointermove", (event) => {
     // Cache layout before the first transform write. Every subsequent frame
     // can derive the transformed canvas bounds from this snapshot and the pan
     // delta, avoiding forced reflow in the crosshair update path.
-  previewPanGeometry = {
+    previewPanGeometry = {
       target: previewCanvas.getBoundingClientRect(),
       wrap: canvasWrap.getBoundingClientRect(),
       wrapWidth: canvasWrap.clientWidth,
@@ -2880,7 +3019,7 @@ canvasWrap.addEventListener("pointermove", (event) => {
     canvasWrap.classList.add("preview-panning")
     canvasWrap.setPointerCapture(event.pointerId)
   }
-  if (!previewPanStart) return
+  if (!previewPanStart || previewPanStart.pointerId !== event.pointerId) return
   event.preventDefault()
   schedulePreviewPan(
     previewPanStart.panX + event.clientX - previewPanStart.x,
@@ -2903,16 +3042,19 @@ canvasWrap.addEventListener("pointermove", (event) => {
 })
 
 function finishPreviewPan(): void {
+  const pointerId = previewPanStart?.pointerId
   flushPreviewPan()
   previewPanCandidate = undefined
   previewPanStart = undefined
   previewPanGeometry = undefined
   preview.setPointerInteractionLocked(false)
   canvasWrap.classList.remove("preview-pan-ready", "preview-panning")
+  if (pointerId !== undefined && canvasWrap.hasPointerCapture(pointerId)) canvasWrap.releasePointerCapture(pointerId)
 }
 
 canvasWrap.addEventListener("pointerup", finishPreviewPan)
 canvasWrap.addEventListener("pointercancel", finishPreviewPan)
+canvasWrap.addEventListener("lostpointercapture", finishPreviewPan)
 
 function updateCanvasCandidateGeometry(candidateHeight: number): void {
   if (!canvasLogicalSize) return
@@ -2941,11 +3083,10 @@ function updatePanelTools(
     panelVisibleHeight: content.height,
   }
   fitCanvasPreview()
-  const bdaSkin = archive?.format === "bda"
-  const states = bdaSkin ? [] : availableSkinStates(...skinStateDocuments())
+  const states = availableSkinStates(...skinStateDocuments())
   const selected = skinState.value
   const selectedState = selected ? Number(selected) : undefined
-  if (!bdaSkin && selectedState && selectedState <= 122 && !states.includes(selectedState)) {
+  if (selectedState !== undefined && selectedState <= 122 && !states.includes(selectedState)) {
     states.push(selectedState)
     states.sort((a, b) => a - b)
   }
@@ -2953,7 +3094,7 @@ function updatePanelTools(
     new Option("默认", ""),
     ...states.map((state) => new Option(skinStateLabel(state), String(state))),
   )
-  skinState.value = selectedState && states.includes(selectedState) ? selected : ""
+  skinState.value = selectedState !== undefined && states.includes(selectedState) ? selected : ""
   skinStateValue.textContent = skinState.value ? `S${Number(skinState.value)}` : "默认"
   skinStateControl.hidden = states.length === 0
   applySkinState(skinState.value ? Number(skinState.value) : undefined)
@@ -3216,6 +3357,7 @@ function showError(error: unknown, action = "操作"): void {
 function updateFileOperationProgress(value: number, detail: string): void {
   fileOperationProgress.value = Math.max(0, Math.min(100, value))
   fileOperationProgress.textContent = `${Math.round(fileOperationProgress.value)}%`
+  fileOperationPercent.textContent = fileOperationProgress.textContent
   fileOperationDetail.textContent = detail
 }
 
@@ -3353,6 +3495,7 @@ async function runFileOperation(
     if (fileOperationProgressVisible) {
       fileOperationDialog.dataset.outcome = "error"
       fileOperationTitle.textContent = `${action}失败`
+      fileOperationDetail.textContent = "处理已停止"
       fileOperationResult.textContent = operationError(action, error)
       fileOperationResult.hidden = false
     }
@@ -3434,7 +3577,44 @@ function bdaImageTiles(path: string): { slices: TileSlice[]; usages: BdaTileUsag
   return { slices, usages }
 }
 
+function syncAtlasWorkspace(): void {
+  if (resourceConfigActive && resourceInspectorMode === "image" && inspectorTab === "properties" && selectedResourcePath) sourceName.textContent = selectedResourcePath
+  const slice = movingTile ?? slices.find(item => item.index === selectedTileIndex)
+  const references: string[] = []
+  if (slice && archive?.isText(styleConfigPath())) {
+    const styles = IniDocument.parse(archive.getText(styleConfigPath()))
+    const name = selectedResourcePath.split("/").pop()?.replace(/\.png$/i, "")
+    for (const section of styles.sections()) {
+      for (const key of ["NM_IMG", "HL_IMG"]) {
+        const value = styles.get(section, key)?.split(",").map(item => item.trim())
+        if (value && value[0] === name && Number(value[1]) === slice.index) references.push(`${section} · ${key}`)
+      }
+    }
+  }
+  atlasWorkspace?.update({
+    active: resourceConfigActive && resourceInspectorMode === "image",
+    path: selectedResourcePath,
+    width: workspaceImage.naturalWidth,
+    height: workspaceImage.naturalHeight,
+    slices, selected: slice, editable: isEditing(), bda: archive?.format === "bda",
+    guides: guidesVisible, reference: selectedBdaTileUsage()?.label ?? references.join("、"),
+  })
+}
+
+let atlasDrawFrame = 0
+
+function scheduleAtlasDraw(): void {
+  if (atlasDrawFrame) return
+  atlasDrawFrame = requestAnimationFrame(() => {
+    atlasDrawFrame = 0
+    drawAtlas()
+  })
+}
+
 function drawAtlas(): void {
+  if (atlasDrawFrame) cancelAnimationFrame(atlasDrawFrame)
+  atlasDrawFrame = 0
+  syncAtlasWorkspace()
   if (!workspaceImage.complete || !workspaceImage.naturalWidth) return
   if (atlasCanvas.width !== workspaceImage.naturalWidth) atlasCanvas.width = workspaceImage.naturalWidth
   if (atlasCanvas.height !== workspaceImage.naturalHeight) atlasCanvas.height = workspaceImage.naturalHeight
@@ -3456,19 +3636,30 @@ function drawAtlas(): void {
   const lineWidth = Math.max(1, Math.round(Math.min(atlasCanvas.width, atlasCanvas.height) / 500))
   context.font = `${Math.max(11, lineWidth * 7)}px ui-monospace, monospace`
   context.textBaseline = "top"
+  const accent = getComputedStyle(atlasCanvas).getPropertyValue("--accent").trim() || "#3a6df0"
+  const handle = 7 * atlasCanvas.width / Math.max(1, atlasCanvas.getBoundingClientRect().width)
   for (const slice of visible) {
     const [x, y, width, height] = slice.source
     const selected = slice.index === selectedTileIndex || slice.source === tileDraft
     context.lineWidth = selected ? lineWidth * 2 : lineWidth
-    context.strokeStyle = selected ? "#ff6b2c" : "#3a6df0"
+    context.strokeStyle = selected ? accent : "#8d96a7"
     context.strokeRect(x + context.lineWidth / 2, y + context.lineWidth / 2, width - context.lineWidth, height - context.lineWidth)
     const usage = bdaTileUsages.find((item) => item.index === slice.index)
     const label = usage?.label ?? `IMG${slice.index}`
     const labelWidth = context.measureText(label).width + 6
-    context.fillStyle = selected ? "#ff6b2c" : "#3a6df0"
+    context.fillStyle = selected ? accent : "#68758a"
     context.fillRect(x, y, labelWidth, Math.max(15, lineWidth * 9))
     context.fillStyle = "#fff"
     context.fillText(label, x + 3, y + 2)
+    if (selected) {
+      for (const [hx, hy] of [[x, y], [x + width, y], [x, y + height], [x + width, y + height]]) {
+        context.fillStyle = accent
+        context.fillRect(hx - handle / 2, hy - handle / 2, handle, handle)
+        context.strokeStyle = "#fff"
+        context.lineWidth = handle / 7
+        context.strokeRect(hx - handle / 2, hy - handle / 2, handle, handle)
+      }
+    }
     if (slice.inner && (archive?.format === "bda" || selected)) {
       const [innerX, innerY, innerWidth, innerHeight] = slice.inner
       if (innerWidth > 0 && innerHeight > 0) {
@@ -3501,7 +3692,7 @@ function drawTilePreview(): void {
     destination.x, destination.y, destination.width, destination.height,
   )
   context.lineWidth = 2
-  context.strokeStyle = "#ff6b2c"
+  context.strokeStyle = getComputedStyle(atlasCanvas).getPropertyValue("--accent").trim() || "#3a6df0"
   context.strokeRect(destination.x + 1, destination.y + 1, destination.width - 2, destination.height - 2)
   if (slice.inner) {
     const inner = tilePreviewInnerRect(slice.source, slice.inner, destination)
@@ -3538,19 +3729,23 @@ function populateTileInspector(): void {
   newTileButton.disabled = !selectedResourcePath || !isEditing() || bdaSelected
   duplicateTileButton.disabled = !slice || !isEditing() || bdaSelected
   deleteTileButton.disabled = !slice || !isEditing() || bdaSelected
-  tileTitle.textContent = usage ? "图片样式切片" : (slice ? `IMG${slice.index}` : bdaSelected ? "未被当前 BDA 外观引用" : "切片")
+  tileTitle.textContent = usage ? "图片样式切片" : (slice ? `切片 #${slice.index}` : bdaSelected ? "未被当前 BDA 外观引用" : "未选择切片")
   for (const field of tileSourceFields) {
     const index = Number(field.dataset.tileSource)
+    if (field.parentElement?.firstChild?.nodeType === Node.TEXT_NODE) field.parentElement.firstChild.textContent = `${["X", "Y", "宽", "高"][index]} `
     field.value = slice ? String(slice.source[index]) : ""
     field.disabled = !slice || !isEditing() || bdaSelected
   }
   for (const field of tileInnerFields) {
     const index = Number(field.dataset.tileInner)
-    field.value = slice?.inner ? String(slice.inner[index]) : ""
-    field.min = bdaSelected ? "0" : index >= 2 ? "1" : ""
+    const margins = slice?.inner && [slice.inner[0] - slice.source[0], slice.inner[1] - slice.source[1], slice.source[0] + slice.source[2] - slice.inner[0] - slice.inner[2], slice.source[1] + slice.source[3] - slice.inner[1] - slice.inner[3]]
+    field.value = slice?.inner ? String(bdaSelected ? slice.inner[index] : margins![index]) : ""
+    if (field.parentElement?.firstChild?.nodeType === Node.TEXT_NODE) field.parentElement.firstChild.textContent = `${(bdaSelected ? ["X", "Y", "宽", "高"] : ["左", "上", "右", "下"])[index]} `
+    field.min = "0"
     field.disabled = !slice || !isEditing()
   }
   drawTilePreview()
+  syncAtlasWorkspace()
 }
 
 function loadTiles(path: string): void {
@@ -3862,6 +4057,7 @@ function selectStyleResource(styleID: string): void {
 function selectResourceImage(path: string): void {
   if (!archive?.isImage(path)) return
   selectedResourcePath = path
+  selectedResourceGalleryPath = path
   resourceListView.hidden = true
   resourceDetail.hidden = false
   resourceInspector.scrollTop = 0
@@ -3873,6 +4069,8 @@ function selectResourceImage(path: string): void {
   tileModeButtons.forEach((button) => button.classList.toggle("active", button.dataset.tileMode === tileMode))
   showImage(path)
   loadTiles(path)
+  syncAtlasWorkspace()
+  updateResourceActionButtons()
   for (const item of resourceGallery.querySelectorAll<HTMLElement>(".resource-item")) {
     item.classList.toggle("selected", item.dataset.path === path)
   }
@@ -4125,7 +4323,7 @@ function renderResourceInspector(): void {
     .filter((path) => !query || path.toLowerCase().includes(query))
   const bdaUsageCounts = archive.format === "bda" ? bdaImageUsageCounts() : new Map<string, number>()
   resourceCount.textContent = `${paths.length} 张图片`
-  resourceListView.hidden = Boolean(selectedResourcePath)
+  resourceListView.hidden = Boolean(selectedResourcePath) && !document.body.classList.contains("atlas-workspace")
   resourceDetail.hidden = !selectedResourcePath
   for (const path of paths) {
     const bytes = archive.getBytes(path)
@@ -4153,15 +4351,7 @@ function renderResourceInspector(): void {
       meta.textContent = `${image.naturalWidth} × ${image.naturalHeight} · ${meta.textContent}`
     })
     button.append(image, name, meta)
-    let clickTimer: ReturnType<typeof setTimeout> | undefined
     button.addEventListener("click", () => {
-      clearTimeout(clickTimer)
-      clickTimer = setTimeout(() => {
-        selectGalleryItem(path, resourceGallery)
-      }, 200)
-    })
-    button.addEventListener("dblclick", () => {
-      clearTimeout(clickTimer)
       selectGalleryItem(path, resourceGallery)
       selectResourceImage(path)
     })
@@ -4174,6 +4364,7 @@ function renderResourceInspector(): void {
     }
   }
   updateResourceActionButtons()
+  syncAtlasWorkspace()
 }
 
 function showResourceList(): void {
@@ -4226,6 +4417,7 @@ workspaceImage.addEventListener("load", clearImagePreviewError)
 workspaceImage.addEventListener("error", showImagePreviewError)
 
 function updateInspectorView(): void {
+  syncAtlasWorkspace()
   inspectorBackButton.hidden = resourceConfigActive || Boolean(archive?.isImage(selectedPath)) || inspectorTab === "ai"
   const imageSelected = Boolean(archive?.isImage(selectedPath))
   const overviewSelected = Boolean(
@@ -4459,6 +4651,7 @@ function scrollSelectedSource(): void {
 }
 
 function setSourceValue(text: string): void {
+  if (deferNumberInputRefresh(setSourceValue, () => setSourceValue(text))) return
   source.value = text
   updateSourceHighlight()
 }
@@ -4944,7 +5137,7 @@ function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferen
     soundMain.setAttribute("role", "button")
     soundMain.tabIndex = 0
     soundMain.setAttribute("aria-label", "播放按键音效")
-    const musicIcon = createSystemSymbol("music.note")
+    const musicIcon = inspectorIcon("music", 13)
     musicIcon.classList.add("sound-style-main-icon")
     const soundMeta = document.createElement("span")
     soundMeta.className = "sound-style-main-meta"
@@ -4965,7 +5158,13 @@ function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferen
     soundMain.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") { event.preventDefault(); playCurrent() }
     })
-    wrapper.append(soundMain)
+    const play = document.createElement("button")
+    play.type = "button"
+    play.className = "inspector-sound-play"
+    play.setAttribute("aria-label", "播放按键音效")
+    play.append(inspectorIcon("play", 12))
+    play.addEventListener("click", playCurrent)
+    wrapper.append(soundMain, play)
   } else {
     wrapper.append(input)
   }
@@ -4976,28 +5175,8 @@ function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferen
   if (soundStyle) {
     button.title = "点击更换样式；Command/Ctrl 点击编辑样式"
     button.setAttribute("aria-label", "更换或编辑引用样式")
-    button.append(createSystemSymbol("speaker.wave.2"), Object.assign(document.createElement("span"), { textContent: "更换" }))
-  } else {
-    const previews = document.createElement("span")
-    previews.className = "style-picker-states"
-    for (let index = 0; index < 2; index += 1) {
-      const item = document.createElement("button")
-      const highlighted = index === 1
-      item.type = "button"
-      item.className = "style-picker-state"
-      item.dataset.styleState = highlighted ? "highlighted" : "normal"
-      item.title = `点击编辑${highlighted ? "按下" : "正常"}图片；Command/Ctrl 点击编辑样式`
-      item.setAttribute("aria-label", item.title)
-      const canvas = retinaThumbnail(document.createElement("canvas"), 152, 76)
-      canvas.setAttribute("aria-hidden", "true")
-      item.append(canvas)
-      item.addEventListener("click", (event) => {
-        if (event.metaKey || event.ctrlKey) openStyleReferenceEditor(input.value.split(",")[0]?.trim() ?? "")
-        else void openStyleReferenceStateImage(input, key, highlighted)
-      })
-      previews.append(item)
-    }
-    button.append(previews)
+    button.append(inspectorIcon("ellipsis", 14))
+
   }
   if (button instanceof HTMLButtonElement) button.addEventListener("click", (event) => {
     if (event.metaKey || event.ctrlKey) openStyleReferenceEditor(input.value.split(",")[0]?.trim() ?? "")
@@ -5010,6 +5189,57 @@ function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferen
   if (soundStyle) void refreshStyleReferenceThumbnail(button, input, key)
 }
 
+function renderStyleReferenceRows(button: HTMLElement, input: HTMLInputElement, key: string): string[] {
+  const styleIDs = input.value.split(",").map((value) => value.trim()).filter(Boolean)
+  button.replaceChildren()
+  for (const [styleIndex, styleID] of (styleIDs.length ? styleIDs : [""]).entries()) {
+    const rowInput = () => {
+      const target = input.cloneNode(false) as HTMLInputElement
+      target.value = styleID
+      target.addEventListener("change", () => {
+        const values = input.value.split(",").map((value) => value.trim()).filter(Boolean)
+        values[styleIndex] = target.value
+        input.value = values.join(",")
+        input.dispatchEvent(new Event("input", { bubbles: true }))
+        input.dispatchEvent(new Event("change", { bubbles: true }))
+      })
+      return target
+    }
+    const wrapper = document.createElement("div")
+    wrapper.className = "style-reference-row"
+    const numberInput = rowInput()
+    numberInput.className = "style-reference-number"
+    numberInput.removeAttribute("id")
+    numberInput.setAttribute("aria-label", `样式 ${styleIndex + 1} 编号`)
+    const previews = document.createElement("span")
+    previews.className = "style-picker-states"
+    for (let index = 0; index < 2; index += 1) {
+      const item = document.createElement("button")
+      const highlighted = index === 1
+      item.type = "button"
+      item.className = "style-picker-state"
+      item.dataset.styleState = highlighted ? "highlighted" : "normal"
+      item.title = `选择样式或图片；Alt 点击编辑${highlighted ? "按下" : "正常"}图片；Command/Ctrl 点击编辑样式`
+      item.setAttribute("aria-label", item.title)
+      const canvas = retinaThumbnail(document.createElement("canvas"), 152, 76)
+      canvas.setAttribute("aria-hidden", "true")
+      const caption = document.createElement("span")
+      caption.className = "style-picker-state-caption"
+      caption.textContent = highlighted ? "按下" : "正常"
+      item.append(canvas, caption)
+      item.addEventListener("click", (event) => {
+        if (event.metaKey || event.ctrlKey) openStyleReferenceEditor(styleID)
+        else if (event.altKey) void openStyleReferenceStateImage(rowInput(), key, highlighted)
+        else openStylePicker(rowInput(), highlighted)
+      })
+      previews.append(item)
+    }
+    wrapper.append(numberInput, previews)
+    button.append(wrapper)
+  }
+  return styleIDs
+}
+
 function styleReferenceForeground(key: string): boolean {
   return /FORE|INPUT_STYLE|SCAND_STYLE|CELL_STYLE/.test(key)
 }
@@ -5018,6 +5248,7 @@ async function refreshStyleReferenceThumbnail(
   button: HTMLElement,
   input: HTMLInputElement,
   key: string,
+  resolver = visualResolver(),
 ): Promise<void> {
   const drawID = (styleReferenceDrawIDs.get(button) ?? 0) + 1
   styleReferenceDrawIDs.set(button, drawID)
@@ -5027,8 +5258,10 @@ async function refreshStyleReferenceThumbnail(
     const main = button.parentElement?.querySelector<HTMLElement>(".sound-style-main")
     const title = main?.querySelector<HTMLElement>(".sound-style-name")
     const file = main?.querySelector<HTMLElement>(".sound-style-file")
-    if (title) title.textContent = styleID ? `STYLE${styleID}` : "未选择音效样式"
-    if (file) file.textContent = path ? (path.split("/").pop() ?? path) : "未找到音乐文件"
+    if (title) title.textContent = path?.split("/").pop() || (styleID ? `STYLE${styleID}` : "未选择音效")
+    if (file) file.textContent = path ? `STYLE${styleID} · 点击试听` : "选择一个音乐文件"
+    const play = button.parentElement?.querySelector<HTMLButtonElement>(".inspector-sound-play")
+    if (play) play.disabled = !path
     if (main) {
       main.classList.toggle("has-sound", Boolean(path))
       main.setAttribute("aria-disabled", String(!path))
@@ -5036,9 +5269,8 @@ async function refreshStyleReferenceThumbnail(
     button.classList.toggle("has-sound", Boolean(path))
     return
   }
+  const styleIDs = renderStyleReferenceRows(button, input, key)
   const canvases = Array.from(button.querySelectorAll<HTMLCanvasElement>("canvas"))
-  const resolver = visualResolver()
-  const styleIDs = input.value.split(",").map((value) => value.trim()).filter(Boolean)
   if (canvases.length < 2 || !resolver || !styleIDs.length) {
     for (const canvas of canvases) {
       const context = canvas.getContext("2d")
@@ -5046,11 +5278,11 @@ async function refreshStyleReferenceThumbnail(
     }
     return
   }
-  const visuals = await Promise.all([false, true].map((highlighted) => Promise.all(
-    styleIDs.map((styleID) => resolver.resolve(styleID, highlighted).catch(() => undefined)),
-  )))
+  const visuals = await Promise.all(styleIDs.flatMap((styleID) =>
+    [false, true].map((highlighted) => resolver.resolve(styleID, highlighted).catch(() => undefined)),
+  ))
   if (drawID !== styleReferenceDrawIDs.get(button)) return
-  visuals.forEach((layers, index) => drawVisualPreview(canvases[index], layers, styleReferenceForeground(key)))
+  visuals.forEach((visual, index) => drawVisualPreview(canvases[index], [visual], styleReferenceForeground(key)))
 }
 
 function styleWriteTarget(
@@ -5175,10 +5407,200 @@ function availableStyleIDs(): string[] {
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
 }
 
+let styleLibraryMode: "styles" | "images" = "styles"
+let styleLibraryFilter = "all"
+let styleLibraryHighlighted = false
+let styleLibrarySelected: { styleID?: string; imagePath?: string } | undefined
+const styleLibraryPreview = $("#style-library-preview")
+const styleLibraryPreviewImage = $("#style-library-preview-image")
+const styleLibraryApply = $("#style-library-apply") as HTMLButtonElement
+const styleLibraryEdit = $("#style-library-edit") as HTMLButtonElement
+
+function styleLibraryCategories(styleID: string): Set<string> {
+  const categories = new Set<string>()
+  for (const { section, key, value } of layoutDocument?.entries() ?? []) {
+    if (!isStyleReferenceKey(key) || !value.split(",").map((value) => value.trim()).includes(styleID)) continue
+    if (/CAND|INPUT|CELL/.test(section + key)) categories.add("candidate")
+    else if (styleReferenceForeground(key)) categories.add("foreground")
+    else if (section === "PANEL") categories.add("panel")
+    else categories.add("key")
+  }
+  return categories
+}
+
+function applyStyleLibrarySelection(): void {
+  const target = stylePickerTarget
+  const selected = styleLibrarySelected
+  if (!target || target.disabled || !selected || !isEditing()) return
+  if (selected.styleID) {
+    const ref = bdaStyleRef(selected.styleID)
+    if (target.dataset.bdaStyleType && ref?.type !== target.dataset.bdaStyleType) return
+    target.value = selected.styleID
+    target.dispatchEvent(new Event("input", { bubbles: true }))
+    target.dispatchEvent(new Event("change", { bubbles: true }))
+    stylePickerDialog.close()
+  } else if (selected.imagePath) {
+    const styleID = target.value.split(",")[0]?.trim() ?? ""
+    if (archive?.format === "bda") {
+      const ref = bdaStyleRef(styleID)
+      if (ref?.type !== "image") return
+      if (updateBdaRefs([ref], styleLibraryHighlighted ? "HL_IMG" : "NM_IMG", bdaImageResourceID(selected.imagePath))) {
+        stylePickerDialog.close()
+        void refreshStyleReferenceThumbnails()
+      }
+    } else {
+      stylePickerDialog.close()
+      openImageSlicePicker(selected.imagePath, styleWriteTarget(styleReferenceForeground(styleReferenceKey(target)) ? "FORE_STYLE" : "BACK_STYLE", styleLibraryHighlighted ? "HL_IMG" : "NM_IMG", [styleID]))
+    }
+  }
+}
+
+function previewStyleLibraryItem(
+  button: HTMLButtonElement,
+  selected: { styleID?: string; imagePath?: string },
+  visuals: Array<Visual | undefined> = [],
+): void {
+  styleLibrarySelected = selected
+  stylePickerGrid.querySelectorAll(".previewing").forEach((item) => item.classList.remove("previewing"))
+  button.classList.add("previewing")
+  styleLibraryPreviewImage.replaceChildren()
+  if (selected.imagePath) {
+    const bytes = archive?.getBytes(selected.imagePath)
+    if (!bytes) return
+    const image = new Image()
+    image.alt = selected.imagePath.split("/").pop() ?? selected.imagePath
+    image.src = imageDataURL(bytes)
+    styleLibraryPreviewImage.append(image)
+  } else {
+    for (const visual of visuals) {
+      const canvas = retinaThumbnail(document.createElement("canvas"), 180, 120)
+      drawVisualPreview(canvas, [visual], false)
+      styleLibraryPreviewImage.append(canvas)
+    }
+  }
+  $("#style-library-preview-title").textContent = selected.imagePath?.split("/").pop() ?? `样式 ${stylePickerLabel(selected.styleID!)}`
+  $("#style-library-preview-meta").textContent = selected.imagePath ?? "正常 / 按下 · 确认后应用到当前项"
+  const targetType = stylePickerTarget?.dataset.bdaStyleType
+  const ref = bdaStyleRef(selected.styleID ?? stylePickerTarget?.value.split(",")[0]?.trim() ?? "")
+  const compatible = !targetType || (selected.imagePath ? ref?.type === "image" : ref?.type === targetType)
+  styleLibraryApply.disabled = !compatible || !isEditing()
+  styleLibraryApply.textContent = !compatible ? "样式类型不兼容" : selected.imagePath && archive?.format !== "bda" ? "选择切片并应用" : "应用到当前项"
+  styleLibraryPreview.hidden = false
+}
+
+styleLibraryApply.addEventListener("click", applyStyleLibrarySelection)
+styleLibraryEdit.addEventListener("click", () => {
+  const selected = styleLibrarySelected
+  if (!selected) return
+  stylePickerDialog.close()
+  if (selected.styleID) openStyleReferenceEditor(selected.styleID)
+  else if (selected.imagePath) selectFile(selected.imagePath, "overview")
+})
+$("#style-library-preview-close").addEventListener("click", () => { styleLibraryPreview.hidden = true })
+for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-mode]")) {
+  button.addEventListener("click", () => {
+    styleLibraryMode = button.dataset.styleLibraryMode as "styles" | "images"
+    styleLibraryFilter = "all"
+    stylePickerSearch.value = ""
+    styleLibraryPreview.hidden = true
+    void renderStylePicker()
+  })
+}
+for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-filter]")) {
+  button.addEventListener("click", () => {
+    styleLibraryFilter = button.dataset.styleLibraryFilter!
+    styleLibraryPreview.hidden = true
+    void renderStylePicker()
+  })
+}
+
+async function renderStyleLibraryItems(renderID: number, styleIDs: string[], resolver: VisualResolver): Promise<void> {
+  const query = stylePickerSearch.value.trim().toLowerCase().replace(/^#/, "")
+  const allItems = await Promise.all(styleIDs.map(async (styleID) => ({
+    styleID,
+    visuals: await Promise.all([resolver.resolve(styleID, false).catch(() => undefined), resolver.resolve(styleID, true).catch(() => undefined)]),
+  })))
+  if (renderID !== stylePickerRenderID || !stylePickerDialog.open) return
+  const paths = resourceImagePaths(archive?.names() ?? [], theme.value, orientation.value)
+  const currentID = stylePickerTarget?.value.split(",")[0]?.trim()
+  const currentImages = allItems.find((item) => item.styleID === currentID)?.visuals.map((visual) => visual?.imagePath) ?? []
+  const imageCategories = new Map<string, Set<string>>()
+  for (const item of allItems) {
+    for (const visual of item.visuals) {
+      if (!visual?.imagePath) continue
+      const categories = imageCategories.get(visual.imagePath) ?? new Set<string>()
+      for (const category of styleLibraryCategories(item.styleID)) categories.add(category)
+      imageCategories.set(visual.imagePath, categories)
+    }
+  }
+  const items = styleLibraryMode === "images"
+    ? paths.filter((path) => path.toLowerCase().includes(query) && (styleLibraryFilter === "all" || imageCategories.get(path)?.has(styleLibraryFilter)))
+      .map((imagePath) => ({ styleID: "", imagePath, visuals: [] as Array<Visual | undefined> }))
+    : allItems.filter(({ styleID, visuals }) => {
+      const searchText = [styleID, stylePickerLabel(styleID), ...visuals.map((visual) => visual?.imagePath ?? "")].join(" ").toLowerCase()
+      return searchText.includes(query) && (styleLibraryFilter === "all" || styleLibraryCategories(styleID).has(styleLibraryFilter))
+    }).map((item) => ({ ...item, imagePath: "" }))
+  stylePickerGrid.replaceChildren()
+  stylePickerCount.textContent = `${allItems.length} 个样式 · ${paths.length} 张图片`
+  stylePickerEmpty.hidden = items.length > 0
+  stylePickerEmpty.textContent = styleLibraryMode === "images" ? "没有匹配的图片" : "没有匹配的样式"
+  $("#style-library-status").textContent = `显示 ${items.length} 项${currentID ? ` · 当前 ${stylePickerLabel(currentID)}` : ""}`
+  $("#style-library-source").textContent = `来源 ${layoutPath.split("/").pop() || "当前皮肤"}`
+  for (const { styleID, imagePath, visuals } of items) {
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = "style-picker-item"
+    button.classList.toggle("selected", imagePath ? currentImages.includes(imagePath) : currentID === styleID)
+    button.setAttribute("aria-pressed", String(button.classList.contains("selected")))
+    const previews = document.createElement("span")
+    previews.className = "style-picker-previews"
+    if (imagePath) {
+      const bytes = archive?.getBytes(imagePath)
+      if (!bytes) continue
+      const image = new Image()
+      image.alt = ""
+      image.loading = "lazy"
+      image.src = imageDataURL(bytes)
+      previews.append(image)
+    } else {
+      for (const [index, visual] of visuals.entries()) {
+        const canvas = retinaThumbnail(document.createElement("canvas"), 128, 88)
+        canvas.setAttribute("aria-label", index ? "按下状态" : "正常状态")
+        drawVisualPreview(canvas, [visual], styleReferenceForeground(styleReferenceKey(stylePickerTarget!)))
+        previews.append(canvas)
+      }
+    }
+    const label = document.createElement("strong")
+    label.textContent = imagePath ? imagePath.split("/").pop()! : `样式 ${stylePickerLabel(styleID)}`
+    button.title = imagePath || `${label.textContent} · 单击预览，双击应用，Command/Ctrl 单击编辑`
+    const meta = document.createElement("small")
+    meta.textContent = imagePath ? (imageCategories.has(imagePath) ? "已引用" : "图片资源") : `#${stylePickerLabel(styleID)}`
+    button.append(previews, label, meta)
+    button.addEventListener("click", (event) => {
+      previewStyleLibraryItem(button, imagePath ? { imagePath } : { styleID }, visuals)
+      if (event.metaKey || event.ctrlKey) styleLibraryEdit.click()
+    })
+    button.addEventListener("dblclick", () => { if (!styleLibraryApply.disabled) applyStyleLibrarySelection() })
+    stylePickerGrid.append(button)
+  }
+}
+
 async function renderStylePicker(): Promise<void> {
   const renderID = ++stylePickerRenderID
+  for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-mode]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.styleLibraryMode === styleLibraryMode))
+    button.disabled = styleReferenceKey(stylePickerTarget!) === "SOUND_STYLE" && button.dataset.styleLibraryMode === "images"
+  }
+  for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-filter]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.styleLibraryFilter === styleLibraryFilter))
+    button.disabled = styleReferenceKey(stylePickerTarget!) === "SOUND_STYLE"
+  }
+  stylePickerSearch.placeholder = styleLibraryMode === "images" ? "搜索图片名称" : "搜索样式名称或编号"
   const query = stylePickerSearch.value.trim().toLowerCase()
   const soundOnly = styleReferenceKey(stylePickerTarget!) === "SOUND_STYLE"
+  stylePickerDialog.querySelector(".style-picker-hint")!.textContent = soundOnly
+    ? "单击应用声音样式 · Command/Ctrl 单击编辑"
+    : "单击预览 · 双击应用 · Command/Ctrl 单击编辑"
   const bdaTargetType = archive?.format === "bda" ? stylePickerTarget?.dataset.bdaStyleType : undefined
   const stylesPath = styleConfigPath()
   const styles = archive?.isText(stylesPath) ? IniDocument.parse(archive.getText(stylesPath)) : undefined
@@ -5193,6 +5615,8 @@ async function renderStylePicker(): Promise<void> {
   stylePickerCount.textContent = `${styleIDs.length} 个${soundOnly ? "声音" : ""}样式`
   stylePickerEmpty.hidden = styleIDs.length > 0
   if (soundOnly) {
+    $("#style-library-status").textContent = `显示 ${styleIDs.length} 个声音样式`
+    $("#style-library-source").textContent = `来源 ${stylesPath.split("/").pop()}`
     for (const styleID of styleIDs) {
       const filename = styles?.get(`STYLE${styleID}`, "PRESS_SOUND_PATH")?.trim() ?? ""
       const card = document.createElement("div")
@@ -5237,53 +5661,24 @@ async function renderStylePicker(): Promise<void> {
     }
     return
   }
-  if (!resolver) return
-  const foreground = /FORE|INPUT_STYLE|SCAND_STYLE|CELL_STYLE/.test(styleReferenceKey(stylePickerTarget!))
-  const items = await Promise.all(styleIDs.map(async (styleID) => ({
-    styleID,
-    visuals: await Promise.all([
-      resolver.resolve(styleID, false).catch(() => undefined),
-      resolver.resolve(styleID, true).catch(() => undefined),
-    ]),
-  })))
-  if (renderID !== stylePickerRenderID) return
-  for (const { styleID, visuals } of items) {
-    const displayID = stylePickerLabel(styleID)
-    const button = document.createElement("button")
-    button.type = "button"
-    button.className = "style-picker-item"
-    button.classList.toggle("selected", stylePickerTarget?.value.split(",")[0]?.trim() === styleID)
-    button.title = `点击使用样式 ${displayID}；Command/Ctrl 点击编辑`
-    const label = document.createElement("strong")
-    label.textContent = displayID
-    const previews = document.createElement("span")
-    previews.className = "style-picker-previews"
-    for (const [index, visual] of visuals.entries()) {
-      const canvas = retinaThumbnail(document.createElement("canvas"), 128, 88)
-      canvas.setAttribute("aria-label", index === 0 ? "正常状态" : "按下状态")
-      drawVisualPreview(canvas, [visual], foreground)
-      previews.append(canvas)
-    }
-    button.append(label, previews)
-    button.addEventListener("click", (event) => {
-      if (event.metaKey || event.ctrlKey) {
-        stylePickerDialog.close()
-        openStyleReferenceEditor(styleID)
-        return
-      }
-      if (!stylePickerTarget) return
-      stylePickerTarget.value = styleID
-      stylePickerTarget.dispatchEvent(new Event("input", { bubbles: true }))
-      stylePickerTarget.dispatchEvent(new Event("change", { bubbles: true }))
-      stylePickerDialog.close()
-    })
-    stylePickerGrid.append(button)
+  if (!resolver) {
+    stylePickerEmpty.hidden = false
+    stylePickerEmpty.textContent = "当前皮肤没有可预览的样式"
+    return
   }
+  stylePickerEmpty.hidden = false
+  stylePickerEmpty.textContent = "正在加载预览…"
+  await renderStyleLibraryItems(renderID, availableStyleIDs(), resolver)
 }
 
-function openStylePicker(input: HTMLInputElement): void {
+function openStylePicker(input: HTMLInputElement, highlighted = false): void {
+  styleLibraryHighlighted = highlighted
   if (input.disabled || !availableStyleIDs().length) return
   stylePickerTarget = input
+  styleLibraryMode = "styles"
+  styleLibraryFilter = "all"
+  styleLibrarySelected = undefined
+  styleLibraryPreview.hidden = true
   stylePickerSearch.value = ""
   stylePickerDialog.showModal()
   void renderStylePicker()
@@ -5291,10 +5686,12 @@ function openStylePicker(input: HTMLInputElement): void {
 }
 
 for (const input of [...keyboardFields, ...toolbarFields, ...keyFields]) decorateStyleReferenceInput(input)
-stylePickerSearch.addEventListener("input", () => void renderStylePicker())
+stylePickerSearch.addEventListener("input", () => { styleLibraryPreview.hidden = true; void renderStylePicker() })
+stylePickerDialog.addEventListener("close", () => { ++stylePickerRenderID; styleLibrarySelected = undefined })
 stylePickerClose.addEventListener("click", () => stylePickerDialog.close())
 stylePickerDialog.addEventListener("click", (event) => {
-  if (event.target === stylePickerDialog) stylePickerDialog.close()
+  const rect = stylePickerDialog.getBoundingClientRect()
+  if (event.target === stylePickerDialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) stylePickerDialog.close()
 })
 
 async function updateStylePreviews(): Promise<void> {
@@ -5302,21 +5699,22 @@ async function updateStylePreviews(): Promise<void> {
 }
 
 function refreshStyleReferenceThumbnails(): void {
+  const resolver = visualResolver()
   for (const button of Array.from(document.querySelectorAll<HTMLElement>(".style-picker-trigger"))) {
     const input = button.previousElementSibling
     if (input instanceof HTMLInputElement) {
-      void refreshStyleReferenceThumbnail(button, input, styleReferenceKey(input))
+      void refreshStyleReferenceThumbnail(button, input, styleReferenceKey(input), resolver)
     }
   }
 }
 
-function selectedStylePropertyContext(property: string):
+function selectedStylePropertyContext(property: string, styles?: IniDocument):
   | { document: IniDocument; path: string; sources: StylePropertySource[] }
   | undefined {
   if (!archive || !layoutDocument || !selectedKeySections.length) return
   const path = styleConfigPath()
   if (!archive.isText(path)) return
-  const document = IniDocument.parse(archive.getText(path))
+  const document = styles ?? IniDocument.parse(archive.getText(path))
   const sources = resolveStylePropertySources(
     document,
     selectedKeySections.map((section) =>
@@ -5535,13 +5933,13 @@ const documentSectionLabels: Record<string, string> = {
 
 const documentPairFieldLabels: Record<string, [string, string]> = {
   SIZE: ["宽度", "高度"],
-  POS: ["X", "Y"],
+  POS: ["横向", "纵向"],
   CELL_SIZE: ["宽度", "高度"],
   FIX_SIZE: ["宽度", "高度"],
 }
 
 const documentQuadFieldLabels: Record<string, [string, string, string, string]> = {
-  VIEW_RECT: ["X", "Y", "宽度", "高度"],
+  VIEW_RECT: ["横向", "纵向", "宽度", "高度"],
   PADDING: ["左", "上", "右", "下"],
 }
 
@@ -5552,7 +5950,7 @@ const documentNumericFields = new Set([
 ])
 
 function translatedConfigLabel(key: string): string {
-  return `${documentFieldLabels[key] ?? "扩展配置"}（${key}）`
+  return documentFieldLabels[key] ?? "扩展配置"
 }
 
 function translatedSectionLabel(section: string): string {
@@ -5683,10 +6081,7 @@ function populateDocumentInspector(): void {
     const captionName = document.createElement("span")
     captionName.className = "document-field-name"
     captionName.textContent = documentFieldLabels[entry.key] ?? "扩展配置"
-    const captionCode = document.createElement("code")
-    captionCode.className = "document-field-code"
-    captionCode.textContent = entry.key
-    caption.append(captionName, captionCode)
+    caption.append(captionName)
     label.append(caption)
 
     if (specialized && (particlePairFields.has(entry.key) || entry.key === "EMIT_REGION")) {
@@ -5867,12 +6262,6 @@ function populateDocumentInspector(): void {
     meta.className = "document-section-meta"
     meta.textContent = `${sectionEntries.length} 项`
     heading.append(icon, title)
-    if (section) {
-      const code = document.createElement("span")
-      code.className = "document-section-code"
-      code.textContent = section
-      heading.append(code)
-    }
     heading.append(meta)
     sectionPanel.append(heading)
     if (particle) {
@@ -6048,10 +6437,17 @@ function addNavButton(
   labelNode.className = "nav-label"
   labelNode.textContent = label
   button.append(labelNode)
-  const metaNode = document.createElement("span")
-  metaNode.className = "nav-meta"
-  metaNode.textContent = meta
-  button.append(metaNode)
+  // English layouts are already identified by their Chinese labels; the raw
+  // `en_*.ini` filename adds noise in the compact overview.
+  const filename = meta || path.split("/").pop() || ""
+  if (!/(^|_)en(?:_|\.|$)/i.test(filename)) {
+    const metaNode = document.createElement("span")
+    metaNode.className = "nav-meta"
+    metaNode.textContent = meta
+    button.append(metaNode)
+  } else {
+    button.classList.add("nav-item-no-meta")
+  }
   button.addEventListener("click", () => {
     if (path.endsWith("py_9.ini") || path.endsWith("py_26.ini")) {
       layout.value = path.endsWith("_9.ini") ? "py_9.ini" : "py_26.ini"
@@ -6114,6 +6510,7 @@ function populatePrimaryCssFields(hasSelection: boolean, sections: string[]): vo
 }
 
 function populateKeyInspector(): void {
+  if (deferNumberInputRefresh(populateKeyInspector, populateKeyInspector)) return
   if (selectedPath !== layoutPath && selectedKeySections.length) {
     selectedKeySections = []
     preview.setSelected([])
@@ -6138,7 +6535,7 @@ function populateKeyInspector(): void {
   toolbarFieldsGroup.hidden = !toolbarSelected || bdaSelected || toolbarHasSelection
   keyboardFieldsGroup.hidden = bdaSelected || skinSelected || toolbarSelected || bdaConfigSelected || candidateSelected || selectedPath !== layoutPath || hasSelection
   for (const group of keyOnlyGroups) {
-    const availableForBda = group === keyLayoutFieldsGroup || group === keyTypographyFieldsGroup || group === keyGestureFieldsGroup
+    const availableForBda = group === keyTypographyFieldsGroup
     group.hidden = skinSelected || bdaConfigSelected || !hasSelection || bdaSelected && !availableForBda
   }
   selectedKeyName.textContent = skinSelected
@@ -6161,17 +6558,23 @@ function populateKeyInspector(): void {
       ? isListCell(sections[0])
         ? "LIST · 候选栏"
         : `${effectiveKeySection(sections[0])} · ${effectiveKeyValue(sections[0], "CENTER") || "未配置点击动作"}`
-      : `将修改 ${sections.length} 个按键`
-  const previewValue = hasSelection && !bdaSelected
-    ? effectiveKeyValue(sections[0], "SHOW") || effectiveKeyValue(sections[0], "CENTER") || "ABC"
-    : hasSelection && bdaSelected
-      ? "ABC"
-      : ""
-  selectedKeyPreview.textContent = previewValue.length > 8 ? previewValue.slice(0, 8) : previewValue
-  selectedKeyPreview.hidden = !hasSelection
+      : `已选 ${sections.length} 个按键`
+  if (hasSelection) selectedKeyName.textContent = sections.length > 1 ? `已选 ${sections.length} 个按键` : "按键"
+  selectedKeyPreview.replaceChildren(inspectorIcon(hasSelection ? bdaSelected ? "component" : sections.length > 1 ? "layers" : "key-round" : "panel-top"))
+  selectedKeyPreview.hidden = false
   selectedKeyName.title = selectedKeyName.textContent ?? ""
-  selectedKeyContext.textContent = selectedPath || "选择文件以查看属性"
+  selectedKeyContext.textContent = hasSelection
+    ? `${selectedPath.split("/").pop()} · ${sections.length > 1 ? "keys.*" : sections[0]}`
+    : selectedPath || "选择文件以查看属性"
+  syncAiDesignContext()
+  quickInspector.dataset.selectionCount = String(hasSelection ? sections.length : 0)
+  quickInspector.dataset.selectionNames = JSON.stringify(hasSelection ? sections : [])
+  for (const field of keyFields.filter((field) => field.dataset.keyField === "SHOW")) {
+    const label = field.closest("label")
+    if (label) label.hidden = bdaSelected
+  }
   selectedKeyContext.title = selectedPath
+  setInspectorKind(archive?.format === "bda" ? "bda" : archive ? "bds" : "")
   syncMobileInspectorHeader()
   for (const field of skinFields) {
     field.value = skinSelected ? selectedDocument?.get("", field.dataset.skinField ?? "") ?? "" : ""
@@ -6214,7 +6617,7 @@ function populateKeyInspector(): void {
     // BDA 样式引用由源码结构控件编辑，旧格式按键字段只负责非 BDA 皮肤。
     field.disabled = !hasSelection || archive?.format === "bda"
     field.placeholder = ""
-    if (!hasSelection) {
+    if (!hasSelection || bdaSelected) {
       field.value = ""
       continue
     }
@@ -6237,6 +6640,7 @@ function populateKeyInspector(): void {
     const rectIndex = ["x", "y", "width", "height"].indexOf(name)
     const values = sections.map((section) => {
       if (rectIndex < 0) {
+        if (name.startsWith("PADDING.")) return (effectiveKeyValue(section, "PADDING") ?? "0,0,0,0").split(",")[Number(name.split(".")[1])] ?? "0"
         if (name === "STAT_STYLE") return document?.get(section, name) ?? ""
         if (name === "SOUND_STYLE") {
           const effective = effectiveKeySection(section)
@@ -6277,7 +6681,7 @@ function populateKeyInspector(): void {
       if (property.endsWith("COLOR")) syncColorControl(field)
       continue
     }
-    const context = selectedStylePropertyContext(property)
+    const context = selectedStylePropertyContext(property, keyboard?.styles)
     const values = context?.sources.map((source) => source.value)
     const common = values?.every((value) => value === values[0]) ? values[0] : ""
     field.disabled = !context
@@ -6293,7 +6697,7 @@ function populateKeyInspector(): void {
   }
   const hasTextStyle = archive?.format === "bda"
     ? selectedBdaRefs("FORE_STYLE", "text").length > 0
-    : styleFields.some((field) => Boolean(selectedStylePropertyContext(field.dataset.styleField ?? "")))
+    : styleFields.some((field) => Boolean(selectedStylePropertyContext(field.dataset.styleField ?? "", keyboard?.styles)))
   for (const label of textStyleLabels) {
     if (!hasSelection || !hasTextStyle) {
       label.hidden = true
@@ -6315,6 +6719,8 @@ function populateKeyInspector(): void {
     const property = label.querySelector<HTMLInputElement>("[data-style-field]")?.dataset.styleField ?? ""
     label.hidden = !bdaTextPropertyAvailability.get(property)
   }
+  const paddingSection = quickInspector.querySelector<HTMLElement>(".inspector-padding-section")
+  if (paddingSection) paddingSection.hidden = bdaSelected || !hasSelection || sections.some(isListCell) || !sections.every((section) => effectiveKeyValue(section, "PADDING") !== undefined)
   const multiLayout = $("#inspector-multi-layout")
   const multiAvailable = sections.length > 1 && archive?.format !== "bda" && !sections.some(isListCell)
   multiLayout.dataset.available = String(multiAvailable)
@@ -6330,14 +6736,6 @@ function populateKeyInspector(): void {
     : "方向键移动 1 px · Shift + 方向键移动 10 px"
   const listSelected = sections.some(isListCell)
   const keyToolsAvailable = hasSelection && isEditing() && archive?.format !== "bda" && !listSelected
-  // Gesture hot zones only make sense for exactly one editable key, and only
-  // when the canvas is the panel surface: on a device mock-up the shell is
-  // transformed, so overlay coordinates would no longer line up.
-  preview.setGestureZones(
-    Boolean(isEditing() && inspectorTab === "properties" && sections.length === 1 && !listSelected &&
-      selectedPath === layoutPath && archive?.format !== "bda" &&
-      deviceShell.classList.contains("canvas-only")),
-  )
   for (const button of keyModeButtons) button.disabled = !keyToolsAvailable
   for (const button of keyActionButtons) {
     button.disabled = !keyToolsAvailable || (
@@ -6390,8 +6788,14 @@ function populateKeyInspector(): void {
   void updateStylePreviews()
   populateDocumentInspector()
   populateBdaConfigInspector()
+  if (bdaSelected) {
+    for (const field of keyFields) {
+      if (field.dataset.keyField === "SHOW") field.closest("label")?.setAttribute("hidden", "")
+    }
+  }
   syncMobileInspectorGroups()
   applyModeState()
+  syncInspectorRows(JSON.stringify([selectedPath, selectedKeySections, mode.value]))
 }
 
 function updateSkinInfo(field: HTMLInputElement): void {
@@ -6564,7 +6968,13 @@ function updateSelectedKey(field: HTMLInputElement): void {
       layoutDocument.set(section, "VIEW_RECT", rect.map(Math.round).join(","))
     } else {
       const target = name === "STAT_STYLE" ? section : effectiveKeySection(section)
-      layoutDocument.set(target, name, field.value)
+      if (name.startsWith("PADDING.")) {
+        const values = (effectiveKeyValue(section, "PADDING") ?? "0,0,0,0").split(",")
+        const value = Number(field.value)
+        if (!Number.isFinite(value)) continue
+        values[Number(name.split(".")[1])] = String(value)
+        layoutDocument.set(target, "PADDING", values.join(","))
+      } else layoutDocument.set(target, name, field.value)
     }
   }
   const text = layoutDocument.toString()
@@ -7033,9 +7443,10 @@ function commitBdaTileInnerRect(rect: TileRect): void {
 }
 
 function commitTile(slice: TileSlice, coalesce = false): void {
-  if (!archive || !selectedResourcePath || !isEditing()) return
+  if (!archive || archive.format === "bda" || !selectedResourcePath || !isEditing()) return
   const [x, y, width, height] = slice.source
   if (
+    slice.source.some(value => !Number.isInteger(value)) ||
     width <= 0 || height <= 0 || x < 0 || y < 0 ||
     x + width > atlasCanvas.width || y + height > atlasCanvas.height
   ) return
@@ -7090,7 +7501,7 @@ function moveSelectedTile(deltaX: number, deltaY: number, coalesce = false): voi
 }
 
 function deleteSelectedTile(): void {
-  if (!archive || !selectedResourcePath || !isEditing() || selectedTileIndex === undefined) return
+  if (!archive || archive.format === "bda" || !selectedResourcePath || !isEditing() || selectedTileIndex === undefined) return
   const before = tileDocument.toString()
   if (!removeTileSlice(tileDocument, selectedTileIndex)) return
   commitText(tilePath, before, tileDocument.toString())
@@ -7114,13 +7525,22 @@ function updateSelectedTile(): void {
   if (!existing) return
   const innerValues = tileInnerFields.map((field) => field.value.trim())
   const innerNumbers = innerValues.map(Number) as TileRect
-  const inner = innerValues.every(Boolean) && innerNumbers.every(Number.isFinite) ? innerNumbers : undefined
+  let inner = innerValues.every(Boolean) && innerNumbers.every(Number.isFinite) ? innerNumbers : undefined
   if (archive?.format === "bda") {
     if (inner) commitBdaTileInnerRect(inner)
     return
   }
   const source = tileSourceFields.map((field) => Number(field.value)) as TileRect
   if (source.some((value) => !Number.isFinite(value))) return
+  if (inner) {
+    const [left, top, right, bottom] = inner
+    if (inner.some(value => value < 0 || !Number.isInteger(value)) || left + right >= source[2] || top + bottom >= source[3]) {
+      populateTileInspector()
+      showStatus("九宫格边距不能超出切片范围")
+      return
+    }
+    inner = [source[0] + left, source[1] + top, source[2] - left - right, source[3] - top - bottom]
+  }
   commitTile({ index: existing.index, source, ...(inner ? { inner } : {}) })
 }
 
@@ -7461,6 +7881,10 @@ function selectFile(
   }
   updateInspectorView()
   if (resourceConfigActive) renderResourceInspector()
+  if (resourceMode === "image" && archive) {
+    const firstImage = resourceImagePaths(archive.names(), theme.value, orientation.value)[0]
+    if (firstImage) selectResourceImage(firstImage)
+  }
   if (!quickInspector.hidden) populateKeyInspector()
   selectedFileButton?.classList.remove("selected")
   if (preferredSidebarView === "source") ensureSourcePathRendered(path)
@@ -7495,6 +7919,7 @@ let mobileOverviewGroup = ""
 function renderFiles(): void {
   files.replaceChildren()
   selectedFileButton = undefined
+  document.documentElement.dataset.archiveFormat = archive?.format ?? ""
   if (!archive) return
 
   const overview = document.createElement("div")
@@ -7518,19 +7943,23 @@ function renderFiles(): void {
     }
   }
 
-  const section = (title: string): HTMLElement => {
+  const section = (title: string, count = 0): HTMLElement => {
     const disclosure = document.createElement("details")
     disclosure.className = "nav-group"
     disclosure.dataset.overviewGroup = title
-    disclosure.open = overviewGroupState.get(title) ?? true
+    disclosure.open = overviewGroupState.get(title) ?? title === "键盘布局"
     disclosure.addEventListener("toggle", () => overviewGroupState.set(title, disclosure.open))
     const summary = document.createElement("summary")
     summary.className = "nav-section"
     const marker = document.createElement("span")
     marker.className = "source-disclosure"
     const label = document.createElement("span")
+    label.className = "nav-label"
     label.textContent = title
-    summary.append(marker, label)
+    const countNode = document.createElement("span")
+    countNode.className = "nav-section-count"
+    countNode.textContent = String(count)
+    summary.append(marker, label, countNode)
     const body = document.createElement("div")
     body.className = "nav-group-body"
     disclosure.append(summary, body)
@@ -7577,13 +8006,18 @@ function renderFiles(): void {
   }
 
   const iniTypes: Record<string, Omit<NavEntry, "path">> = {
-    "py_9.ini": { group: "键盘布局", label: "中文 9 键", className: "nav-layout", icon: "keyboard" },
+    "bh.ini": { group: "键盘布局", label: "笔画键盘", className: "nav-layout", icon: "pencil" },
+    "def_9.ini": { group: "键盘布局", label: "五笔 9 键", className: "nav-layout", icon: "keyboard" },
+    "def_26.ini": { group: "键盘布局", label: "五笔 26 键", className: "nav-layout", icon: "keyboard" },
+    "def_26_new.ini": { group: "键盘布局", label: "五笔 26 键（无上划）", className: "nav-layout", icon: "keyboard" },
+    "py_9.ini": { group: "键盘布局", label: "拼音 9 键", className: "nav-layout", icon: "keyboard" },
     "py_26.ini": { group: "键盘布局", label: "中文 26 键", className: "nav-layout", icon: "keyboard" },
     "en_9.ini": { group: "键盘布局", label: "英文 9 键", className: "nav-layout", icon: "keyboard" },
     "en_9s.ini": { group: "键盘布局", label: "英文 9 键 Shift", className: "nav-layout", icon: "keyboard" },
     "en_26.ini": { group: "键盘布局", label: "英文 26 键", className: "nav-layout", icon: "keyboard" },
     "en_26s.ini": { group: "键盘布局", label: "英文 26 键 Shift", className: "nav-layout", icon: "keyboard" },
-    "bh.ini": { group: "键盘布局", label: "笔画键盘", className: "nav-layout", icon: "pencil" },
+    "en_26_new.ini": { group: "键盘布局", label: "英文 26 键（无上划）", className: "nav-layout", icon: "keyboard" },
+    "en_26s_new.ini": { group: "键盘布局", label: "英文 26 键 Shift（无上划）", className: "nav-layout", icon: "keyboard" },
     "num_9.ini": { group: "数字与符号", label: "数字键盘", className: "nav-component", icon: "square.grid.2x2" },
     "num_26.ini": { group: "数字与符号", label: "26 键数字键盘", className: "nav-component", icon: "square.grid.2x2" },
     "num2.ini": { group: "数字与符号", label: "数字键盘 2", className: "nav-component", icon: "square.grid.2x2" },
@@ -7597,8 +8031,8 @@ function renderFiles(): void {
     "voice.ini": { group: "键盘组件", label: "语音键盘", className: "nav-component", icon: "keyboard" },
     "dial.ini": { group: "键盘布局", label: "拨号键盘", className: "nav-layout", icon: "keyboard" },
     "email.ini": { group: "键盘布局", label: "邮箱键盘", className: "nav-layout", icon: "keyboard" },
-    "net.ini": { group: "键盘布局", label: "网络键盘", className: "nav-layout", icon: "keyboard" },
-    "net_shifts.ini": { group: "键盘布局", label: "网络键盘 Shift", className: "nav-layout", icon: "keyboard" },
+    "net.ini": { group: "键盘布局", label: "网址键盘", className: "nav-layout", icon: "keyboard" },
+    "net_shifts.ini": { group: "键盘布局", label: "网址键盘大写", className: "nav-layout", icon: "keyboard" },
     "sel_ch_h.ini": { group: "手写与选择", label: "中文选择栏（加高）", className: "nav-component", icon: "list.bullet" },
     "sel_en_h.ini": { group: "手写与选择", label: "英文选择栏（加高）", className: "nav-component", icon: "list.bullet" },
     "sym_26_cn_h.ini": { group: "数字与符号", label: "中文 26 键符号（加高）", className: "nav-component", icon: "asterisk" },
@@ -7608,7 +8042,7 @@ function renderFiles(): void {
     "logo.ini": { group: "键盘组件", label: "输入法标识", className: "nav-component", icon: "app" },
     "gen.ini": { group: "资源配置", label: "通用配置", className: "nav-style", icon: "gearshape" },
   }
-  const hiddenLayouts = new Set(["def_9.ini", "def_26.ini"])
+  const hiddenLayouts = new Set<string>()
   const configPrefix = `${theme.value}/skin/${orientation.value}/`
   const appearancePath = bdaAppearancePath(archive, theme.value, orientation.value)
   const appearanceBytes = appearancePath && archive.getBytes(appearancePath)
@@ -7757,7 +8191,7 @@ function renderFiles(): void {
       })
     }
     if (!grouped.length) continue
-    const body = section(group)
+    const body = section(group, grouped.length)
     for (const entry of grouped) {
       addNavButton(body, entry.label, entry.path, entry.className, entry.icon, entry.navMode, entry.meta)
     }
@@ -7788,6 +8222,8 @@ function renderFiles(): void {
     }
     node.paths.push(path)
   }
+  const sourceFileCount = (node: SourceNode): number =>
+    node.paths.length + [...node.folders.values()].reduce((total, child) => total + sourceFileCount(child), 0)
   const selectSourceRow = (row: HTMLElement) => {
     selectedFileButton?.classList.remove("selected")
     selectedFileButton = row
@@ -7798,12 +8234,21 @@ function renderFiles(): void {
     row.focus()
     updateSourceFileActions()
   }
-  const appendNode = (parent: HTMLElement, node: SourceNode, parentPath = "") => {
+  const appendNode = (parent: HTMLElement, node: SourceNode, parentPath = "", depth = 0) => {
     for (const [name, child] of [...node.folders].sort(([a], [b]) => sourceNameCompare(a, b))) {
-      const path = parentPath ? `${parentPath}/${name}` : name
+      const names = [name]
+      let compactNode = child
+      while (compactNode.paths.length === 0 && compactNode.folders.size === 1) {
+        const [nestedName, nestedNode] = compactNode.folders.entries().next().value as [string, SourceNode]
+        names.push(nestedName)
+        compactNode = nestedNode
+      }
+      const compactName = names.join("/")
+      const path = parentPath ? `${parentPath}/${compactName}` : compactName
       const folder = document.createElement("details")
       folder.className = "raw-folder"
       folder.dataset.folderPath = path
+      folder.dataset.treeDepth = String(depth)
       const folderSummary = document.createElement("summary")
       folderSummary.className = "source-tree-row source-folder-row"
       folderSummary.dataset.folderPath = path
@@ -7815,8 +8260,11 @@ function renderFiles(): void {
       disclosure.ariaHidden = "true"
       const title = document.createElement("span")
       title.className = "nav-label"
-      title.textContent = name
-      folderSummary.append(disclosure, createSystemSymbol("folder"), title)
+      title.textContent = `${compactName}/`
+      const count = document.createElement("span")
+      count.className = "nav-meta source-item-count"
+      count.textContent = `${sourceFileCount(compactNode)} 项`
+      folderSummary.append(disclosure, createSystemSymbol("folder"), title, count)
       const children = document.createElement("div")
       children.className = "source-tree-group"
       children.setAttribute("role", "group")
@@ -7825,7 +8273,7 @@ function renderFiles(): void {
       const populate = () => {
         if (populated) return
         populated = true
-        appendNode(children, child, path)
+        appendNode(children, compactNode, path, depth + 1)
       }
       disclosure.addEventListener("click", (event) => {
         event.preventDefault()
@@ -7891,7 +8339,46 @@ function renderFiles(): void {
       parent.append(button)
     }
   }
-  appendNode(sourceFiles, root)
+  const rootFolder = document.createElement("details")
+  rootFolder.className = "raw-folder source-root-folder"
+  rootFolder.open = true
+  const rootSummary = document.createElement("summary")
+  rootSummary.className = "source-tree-row source-folder-row source-root-row"
+  rootSummary.setAttribute("role", "treeitem")
+  rootSummary.setAttribute("aria-expanded", "true")
+  rootSummary.tabIndex = -1
+  const rootDisclosure = document.createElement("span")
+  rootDisclosure.className = "source-disclosure"
+  rootDisclosure.ariaHidden = "true"
+  const rootTitle = document.createElement("span")
+  rootTitle.className = "nav-label"
+  rootTitle.textContent = documentName.textContent?.trim() || `未命名.${archive.format}`
+  const rootCount = document.createElement("span")
+  rootCount.className = "nav-meta source-item-count"
+  rootCount.textContent = `${sourceFileCount(root)} 项`
+  const rootChildren = document.createElement("div")
+  rootChildren.className = "source-tree-group source-root-group"
+  rootChildren.setAttribute("role", "group")
+  rootSummary.append(rootDisclosure, createSystemSymbol("doc.text"), rootTitle, rootCount)
+  rootFolder.append(rootSummary, rootChildren)
+  rootDisclosure.addEventListener("click", (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    rootFolder.open = !rootFolder.open
+  })
+  rootSummary.addEventListener("click", (event) => {
+    event.preventDefault()
+    selectSourceRow(rootSummary)
+  })
+  rootSummary.addEventListener("dblclick", (event) => {
+    event.preventDefault()
+    rootFolder.open = !rootFolder.open
+  })
+  rootFolder.addEventListener("toggle", () => {
+    rootSummary.setAttribute("aria-expanded", String(rootFolder.open))
+  })
+  sourceFiles.append(rootFolder)
+  appendNode(rootChildren, root)
   sourceFiles.addEventListener("dragover", (event) => {
     if (!archive || !isEditing() || !event.dataTransfer?.types.includes("Files")) return
     event.preventDefault()
@@ -8044,6 +8531,9 @@ async function loadArchive(
   archive = nextArchive
   aiDesignConversationTarget = nextArchive
   aiDesignConversation = []
+  aiLastPrompt = ""
+  aiDesignStatus.textContent = ""
+  aiDesignPanel.dataset.state = "idle"
   setAiDesignDraft(undefined)
   aiChatController?.clear()
   if (pendingSourceDirectory !== undefined) sourceWorkspacePendingArchive = nextArchive
@@ -8068,6 +8558,7 @@ async function loadArchive(
   documentName.textContent = isNew
     ? exportName("未命名", archive.format)
     : displayName || path.split(/[\\/]/).pop() || "未命名皮肤"
+  syncAiDesignContext()
   if (!isNew && isTauri() && path) recordRecentFile(path, documentName.textContent)
   saveButton.disabled = false
   for (const button of exportButtons) {
@@ -8373,6 +8864,7 @@ async function saveArchive(
   format: ExportFormat,
   targetBdaPlatform?: Exclude<BdaPlatform, "unknown">,
 ): Promise<boolean> {
+  flushNumberInputWheel()
   const currentName = documentName.textContent?.trim() ?? ""
   const suggestedName = exportName(currentName, format)
   if (targetBdaPlatform) {
@@ -8434,14 +8926,24 @@ async function chooseAndroidProjectTemplate(): Promise<string | undefined> {
   }
 }
 
+let newProjectOptions: ProjectChoice | undefined
+let projectChooserInitialized = false
+
 function chooseEmbeddedProjectTemplate(): Promise<string | undefined> {
+  if (!projectChooserInitialized) {
+    initializeProjectChooser(newProjectForm)
+    newProjectForm.addEventListener("project-import", () => newProjectDialog.close("import"))
+    projectChooserInitialized = true
+  }
   newProjectDialog.returnValue = ""
   newProjectDialog.showModal()
   return new Promise((resolve) => {
     newProjectDialog.addEventListener(
       "close",
       () => {
-        const templateID = new FormData(newProjectForm).get("project-template")
+        newProjectOptions = projectChoice(newProjectForm)
+        const templateID = newProjectOptions.templateID
+        if (newProjectDialog.returnValue === "import") { resolve("__import__"); return }
         resolve(
           newProjectDialog.returnValue === "create" && typeof templateID === "string"
             ? templateID
@@ -8489,12 +8991,11 @@ async function chooseNativeProjectTemplate(): Promise<string | undefined> {
   try {
     const projectWindow = new WebviewWindow("new-project", {
       url: "new-project.html",
-      title: "新建皮肤",
-      width: 620,
-      height: 760,
-      minWidth: 540,
-      minHeight: 600,
-      maxWidth: 760,
+      title: "新建项目",
+      width: 920,
+      height: 660,
+      minWidth: 400,
+      minHeight: 420,
       center: true,
       decorations: true,
       resizable: true,
@@ -8530,12 +9031,28 @@ async function newDocument(templateID: string): Promise<boolean> {
 
 async function startNewDocument(): Promise<void> {
   if (fileOperationRunning) return
+  newProjectOptions = undefined
   const templateID = await chooseProjectTemplate()
+  if (templateID === "__import__") { openButton.click(); return }
   if (!templateID) {
     showStatus("新建皮肤已取消。")
     return
   }
-  await runFileOperation("新建皮肤", () => newDocument(templateID))
+  await runFileOperation("新建皮肤", async () => {
+    if (!(await newDocument(templateID))) return false
+    const options = newProjectOptions
+    if (archive && options?.name) documentName.textContent = exportName(options.name, archive.format)
+    if (archive && options?.savePath) {
+      const bytes = await archive.toBytesAsync(archive.format)
+      await writeNativePath(options.savePath, bytes)
+      currentPath = options.savePath
+      documentName.textContent = options.savePath.split(/[\\/]/).pop() || documentName.textContent
+      archive.markSaved(bytes, archive.format)
+      unsavedNew = false
+      updateDirty()
+    }
+    return true
+  })
 }
 
 for (const menu of toolbarMenus) {
@@ -8648,6 +9165,8 @@ $("#recent-clear")?.addEventListener("click", () => {
 })
 renderRecentFiles()
 
+void hydrateTemplateCardPreviews(document.querySelector(".template-grid")!)
+
 // 欢迎页模板卡：直接以该模板新建，不再弹选择器
 for (const card of document.querySelectorAll<HTMLButtonElement>(".template-card")) {
   card.addEventListener("click", () => {
@@ -8730,10 +9249,10 @@ copyQqGroupButton.addEventListener("click", async () => {
 })
 for (const button of appDialogButtons) {
   button.addEventListener("click", () => {
-    const dialog = button.dataset.appDialog === "settings" ? settingsDialog : aboutDialog
-    dialog.showModal()
+    settingsController.begin()
+    settingsDialog.showModal()
     if (button.classList.contains("ai-design-settings")) showSettingsPage("model")
-    if (dialog === aboutDialog) void refreshUpdateStatus()
+    else if (button.dataset.appDialog === "about") showSettingsPage("about")
     for (const menu of toolbarMenus) menu.open = false
   })
 }
@@ -8742,6 +9261,7 @@ function showSettingsPage(page: string): void {
   const target = settingsPages.find(panel => panel.dataset.settingsPanel === page && !panel.hasAttribute("data-platform-hidden"))
     ?? settingsPages.find(panel => !panel.hasAttribute("data-platform-hidden"))
   if (!target) return
+  $("#settings-crumb").textContent = target.querySelector("h3")?.textContent?.replace(/^关于.*/, "关于") ?? "设置"
   for (const panel of settingsPages) panel.hidden = panel !== target
   for (const button of settingsNavItems) {
     const selected = button.dataset.settingsPage === target.dataset.settingsPanel
@@ -8749,17 +9269,18 @@ function showSettingsPage(page: string): void {
     button.tabIndex = selected ? 0 : -1
   }
   settingsDialog.querySelector<HTMLElement>(".settings-content")?.scrollTo({ top: 0 })
+  if (target.dataset.settingsPanel === "about") void refreshUpdateStatus()
 }
 
 for (const button of settingsNavItems) {
   button.addEventListener("click", () => showSettingsPage(button.dataset.settingsPage ?? "appearance"))
   button.addEventListener("keydown", (event) => {
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return
+    if (!["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return
     event.preventDefault()
     const visibleItems = settingsNavItems.filter(item => !item.hidden)
-    const offset = event.key === "ArrowDown" ? 1 : -1
+    const offset = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1
     const index = visibleItems.indexOf(button)
-    const next = visibleItems[(index + offset + visibleItems.length) % visibleItems.length]
+    const next = event.key === "Home" ? visibleItems[0] : event.key === "End" ? visibleItems.at(-1) : visibleItems[(index + offset + visibleItems.length) % visibleItems.length]
     next?.focus()
     next?.click()
   })
@@ -8773,11 +9294,6 @@ settingsStorageSection.toggleAttribute("data-platform-hidden", !nativeSettings)
 settingsModelSection.toggleAttribute("data-platform-hidden", !nativeSettings)
 showSettingsPage("appearance")
 
-for (const dialog of [settingsDialog, aboutDialog]) {
-  dialog.addEventListener("click", (event) => {
-    if (event.target === dialog) dialog.close()
-  })
-}
 
 function aiEditableProjectFiles(target: SkinArchive): AiSkinEditableFile[] {
   return target.names().flatMap((path) => {
@@ -8794,6 +9310,60 @@ function aiEditableProjectFiles(target: SkinArchive): AiSkinEditableFile[] {
     if (!target.isText(path) || !/\.(?:ini|css|json)$/i.test(path)) return []
     return [{ path, syntax: /\.json$/i.test(path) ? "json" as const : "ini" as const, text: target.getText(path) }]
   })
+}
+
+function aiPreviewImage(): { type: "image"; data: string; mimeType: string } | undefined {
+  if (!previewCanvas.width || !previewCanvas.height) return
+  try {
+    const layers = [
+      !candidateBackgroundCanvas.hidden ? candidateBackgroundCanvas : undefined,
+      !toolbarCanvas.hidden && !toolbarStrip.hidden ? toolbarCanvas : undefined,
+      previewCanvas,
+    ].filter((canvas): canvas is HTMLCanvasElement => Boolean(canvas && canvas.width && canvas.height))
+    const width = Math.max(...layers.map((canvas) => canvas.width))
+    const height = layers.reduce((sum, canvas) => sum + canvas.height, 0)
+    const snapshot = document.createElement("canvas")
+    snapshot.width = width
+    snapshot.height = height
+    const context = snapshot.getContext("2d")
+    if (!context) return
+    context.fillStyle = theme.value === "dark" ? "#17191f" : "#f6f7f9"
+    context.fillRect(0, 0, width, height)
+    let y = 0
+    for (const canvas of layers) {
+      context.drawImage(canvas, 0, y)
+      y += canvas.height
+    }
+    const url = snapshot.toDataURL("image/png")
+    const comma = url.indexOf(",")
+    if (comma < 0) return
+    return { type: "image", mimeType: "image/png", data: url.slice(comma + 1) }
+  } catch {
+    return
+  }
+}
+
+function aiSelectedKeyContext(): { label: string; sections: string[]; values: Record<string, string> } {
+  const sections = selectedKeySections.slice()
+  const keys = ["BACK_STYLE", "FORE_STYLE", "FONT_NAME", "FONT_SIZE", "NM_COLOR", "HL_COLOR", "CENTER", "CLICK", "LONG_CLICK", "SWIPE"]
+  const values: Record<string, string> = {}
+  for (const key of keys) {
+    const value = sections.length ? effectiveKeyValue(sections[0], key) : undefined
+    if (value !== undefined) values[key] = value
+  }
+  return { label: selectedKeyName.textContent?.trim() ?? "", sections, values }
+}
+
+function syncAiDesignContext(): void {
+  aiContextKey.hidden = selectedKeySections.length === 0
+  aiContextKey.textContent = selectedKeySections.length
+    ? selectedKeyName.textContent?.trim() || `${selectedKeySections.length} 个按键`
+    : "未选择"
+  const available = Boolean(archive && previewCanvas.width && previewCanvas.height)
+  aiContextPreview.hidden = false
+  aiContextPreview.textContent = available ? "附加预览" : "暂无预览"
+  ;($("#ai-attach-preview") as HTMLInputElement).disabled = aiDesignBusy || !available
+  syncAiDesignControls()
 }
 
 function validatedAiChanges(target: SkinArchive, drafts: readonly AiSkinDraftChange[]): Change[] {
@@ -8846,6 +9416,8 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
     throw new Error("请先切换到编辑模式。")
   }
   if (!prompt.trim()) throw new Error("请填写设计要求。")
+  if (aiDesignBusy) throw new Error("上一轮设计尚未结束，请稍候。")
+  if (aiDesignDraft) throw new Error("请先应用或丢弃待确认的草稿，再继续对话。")
   source.commit()
   const target = archive
   const configuration = savedModels[Number(aiDesignModel.value)]
@@ -8856,24 +9428,32 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
     aiDesignConversationTarget = target
     aiDesignConversation = []
   }
+  aiLastPrompt = prompt
+  aiDesignBusy = true
+  aiDesignPanel.dataset.state = "running"
   aiDesignStatus.textContent = "正在准备设计…"
-  aiDesignModel.disabled = true
-  aiDesignSettings.disabled = true
+  syncAiDesignControls()
   try {
     const project = {
       format: target.format,
+      skinName: documentName.textContent?.trim() ?? "",
+      skinPath: currentPath.split(/[\\/]/).pop() ?? "",
       theme: theme.value,
       orientation: orientation.value,
       layout: layout.value,
+      keyboard: device.options[device.selectedIndex]?.textContent?.trim() || currentDeviceValue(),
+      selectedKey: aiSelectedKeyContext(),
+      preview: ($("#ai-attach-preview") as HTMLInputElement).checked ? aiPreviewImage() : undefined,
       files: aiEditableProjectFiles(target),
     }
     const { runAiSkinDesign } = await import("./ai-design.ts")
     const result = await runAiSkinDesign(configuration, project, prompt, {
       history: aiDesignConversation,
       signal: hooks.signal,
-      onStatus: async (_kind, text) => {
+      onStatus: async (kind, text) => {
+        if (hooks.signal.aborted || archive !== target) return
         aiDesignStatus.textContent = text
-        await hooks.onStatus?.(text)
+        await hooks.onStatus?.(text, kind)
       },
       onTextDelta: hooks.onTextDelta,
       onThinking: hooks.onThinking,
@@ -8884,9 +9464,11 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
     const changes = validatedAiChanges(target, result.changes)
     if (!changes.length) {
       aiDesignConversation = result.conversation
+      aiDesignPanel.dataset.state = "done"
+      aiDesignStatus.textContent = "分析完成 · 没有文件修改"
       return { fallback: result.response || "AI 分析完成，没有需要应用的修改。" }
     }
-    aiDesignConversation = result.conversation
+    // Keep the committed conversation unchanged until the user accepts the draft.
     setAiDesignDraft({
       target,
       changes,
@@ -8897,15 +9479,18 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
     })
     return {
       fallback: result.response,
-      summary: `已生成包含 ${changes.length} 个文件的修改草稿，画布已标出受影响的按键。确认后才会写入皮肤。`,
+      summary: `已生成 ${changes.length} 个文件的修改草稿。请在上方审阅；确认前不会写入皮肤。`,
     }
   } catch (error) {
+    if (archive === target) {
+      aiDesignPanel.dataset.state = hooks.signal.aborted ? "stopped" : "error"
+      aiDesignStatus.textContent = hooks.signal.aborted ? "已停止 · 未应用任何修改" : aiDesignErrorMessage(error)
+    }
     if (hooks.signal.aborted) throw error
     throw new Error(aiDesignErrorMessage(error))
   } finally {
-    aiDesignStatus.textContent = ""
-    aiDesignModel.disabled = savedModels.length === 0
-    aiDesignSettings.disabled = false
+    aiDesignBusy = false
+    syncAiDesignControls()
   }
 }
 
@@ -8917,11 +9502,7 @@ function aiDraftSections(changes: readonly AiSkinDraftChange[]): string[] {
   const sections = new Set<string>()
   for (const change of changes) {
     if (change.syntax === "json") {
-      const before = new Set(jsonPropertyAtOffsetKeys(change.before))
-      const after = new Set(jsonPropertyAtOffsetKeys(change.after))
-      for (const key of new Set([...before, ...after])) {
-        if (key !== "cand") sections.add(key)
-      }
+      for (const key of changedJsonSections(change.before, change.after)) sections.add(key)
       continue
     }
     const before = new Map(iniSectionTexts(change.before))
@@ -8942,54 +9523,23 @@ function iniSectionTexts(source: string): Array<[string, string]> {
   ])
 }
 
-function jsonPropertyAtOffsetKeys(source: string): string[] {
-  return [...source.matchAll(/^\s*"((?:\\.|[^"\\])*)"\s*:/gm)].map((match) => JSON.parse(match[1]) as string)
-}
-
-/** One changed hunk per file, reduced to the first differing lines for display. */
-function aiDraftDiffHtml(change: AiSkinDraftChange): string {
-  const before = change.before.split(/\r?\n/)
-  const after = change.after.split(/\r?\n/)
-  const limit = Math.min(before.length, after.length)
-  let head = 0
-  while (head < limit && before[head] === after[head]) head += 1
-  let tail = 0
-  while (tail < limit - head && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail += 1
-  const removed = before.slice(head, before.length - tail).slice(0, 4)
-  const added = after.slice(head, after.length - tail).slice(0, 4)
-  const escape = (line: string) => line.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!)
-  const parts = [
-    ...removed.map((line) => `<del>- ${escape(line)}</del>`),
-    ...added.map((line) => `<ins>+ ${escape(line)}</ins>`),
-  ]
-  return parts.length ? parts.join("\n") : "（内容有变化）"
-}
 
 function setAiDesignDraft(draft: AiDraft | undefined): void {
   aiDesignDraft = draft
   aiDraftPanel.hidden = !draft
   preview.setDraftSections(draft?.sections ?? [])
+  syncAiDesignControls()
+  if (draft) {
+    aiDesignPanel.dataset.state = "review"
+    aiDesignStatus.textContent = "草稿已就绪 · 尚未写入皮肤"
+  }
   if (!draft) {
     aiDraftFiles.replaceChildren()
     return
   }
   aiDraftSummary.textContent = `涉及 ${draft.changes.length} 个文件` +
     (draft.sections.length ? ` · ${draft.sections.length} 个配置块` : "")
-  aiDraftFiles.replaceChildren(...draft.drafts.map((change) => {
-    const item = document.createElement("li")
-    const head = document.createElement("div")
-    head.className = "ai-draft-file-head"
-    const name = document.createElement("span")
-    name.textContent = change.path.split("/").pop() ?? change.path
-    const meta = document.createElement("em")
-    meta.textContent = change.syntax.toUpperCase()
-    head.append(name, meta)
-    const diff = document.createElement("pre")
-    diff.className = "ai-draft-diff"
-    diff.innerHTML = aiDraftDiffHtml(change)
-    item.append(head, diff)
-    return item
-  }))
+  aiDraftFiles.replaceChildren(...draft.drafts.map(createDraftReview))
 }
 
 function applyAiDesignDraft(): void {
@@ -9000,8 +9550,23 @@ function applyAiDesignDraft(): void {
     aiDesignStatus.textContent = "皮肤项目已切换，草稿已丢弃。"
     return
   }
+  if (!isEditing() || aiDesignBusy) {
+    aiDesignStatus.textContent = "请在编辑模式下应用草稿，并等待生成结束。"
+    return
+  }
+  try {
+    source.commit()
+    // Revalidate at acceptance, not only at generation: never overwrite manual edits.
+    const changes = validatedAiChanges(draft.target, draft.drafts)
+    commitBatch(changes)
+  } catch (error) {
+    aiDesignPanel.dataset.state = "error"
+    aiDesignStatus.textContent = `${aiDesignErrorMessage(error)}。草稿已保留，请丢弃后重新生成。`
+    return
+  }
+  aiDesignConversation = draft.conversation
   setAiDesignDraft(undefined)
-  commitBatch(draft.changes)
+  aiDesignPanel.dataset.state = "done"
   const target = draft.target
   if (target.format === "bda") refreshBdaLayout(layoutPath)
   renderFiles()
@@ -9015,17 +9580,54 @@ function applyAiDesignDraft(): void {
 function ensureAiChat(): Promise<AiChatController> {
   aiChatInitialization ??= import("./ai-chat.ts")
     .then(({ connectAiChat }) => connectAiChat(aiDesignChat, runAiDesignRequest))
+    .catch((error) => { aiChatInitialization = undefined; throw error })
   return aiChatInitialization.then((controller) => {
     aiChatController = controller
     return controller
   })
 }
 
+function syncAiDesignControls(): void {
+  $("#ai-retry-prompt").hidden = !aiLastPrompt
+  aiDesignModel.disabled = aiDesignBusy || savedModels.length === 0
+  aiDesignSettings.disabled = aiDesignBusy
+  ;($("#ai-new-session") as HTMLButtonElement).disabled = aiDesignBusy || Boolean(aiDesignDraft)
+  ;($("#ai-retry-prompt") as HTMLButtonElement).disabled = aiDesignBusy || Boolean(aiDesignDraft) || !aiLastPrompt
+  ;($("#ai-attach-preview") as HTMLInputElement).disabled = aiDesignBusy || !archive || !previewCanvas.width || !previewCanvas.height
+  aiDraftApply.disabled = aiDesignBusy || !isEditing()
+  aiDraftCancel.disabled = aiDesignBusy
+  const hint = aiDesignPanel.querySelector<HTMLElement>(".ai-composer-hint")
+  if (hint) hint.textContent = !isTauri() ? "AI 设计需在桌面应用中使用"
+    : !archive ? "先打开皮肤项目，再开始设计"
+    : !isEditing() ? "切换到编辑模式后即可开始设计"
+    : !savedModels.length ? "先配置模型，再描述你的设计要求"
+    : aiDesignDraft ? "请先审阅并应用或丢弃上方草稿"
+    : aiDesignBusy ? "正在生成 · 点击输入框中的停止按钮可取消"
+    : "Enter 发送 · Shift + Enter 换行 · 修改需确认"
+}
+
+$("#ai-new-session").addEventListener("click", () => {
+  if (aiDesignBusy || aiDesignDraft) return
+  aiChatController?.clear()
+  aiDesignConversation = []
+  aiLastPrompt = ""
+  aiDesignStatus.textContent = "已开始新对话 · 已应用的修改不受影响"
+  aiDesignPanel.dataset.state = "idle"
+  syncAiDesignControls()
+  aiChatController?.focus()
+})
+$("#ai-retry-prompt").addEventListener("click", () => {
+  if (aiDesignBusy || aiDesignDraft || !aiLastPrompt) return
+  void ensureAiChat().then((controller) => controller.setInput(aiLastPrompt))
+    .catch((error) => { aiDesignStatus.textContent = aiDesignErrorMessage(error) })
+})
+
 aiDraftApply.addEventListener("click", () => applyAiDesignDraft())
 aiDraftCancel.addEventListener("click", () => {
   if (!aiDesignDraft) return
   setAiDesignDraft(undefined)
-  aiDesignStatus.textContent = "草稿已取消，皮肤未做任何修改。"
+  aiDesignPanel.dataset.state = "idle"
+  aiDesignStatus.textContent = "草稿已丢弃 · 本轮未修改皮肤，可调整要求后重试。"
 })
 
 function setSourceDirectoryState(path: string, custom: boolean, error = ""): void {
@@ -9100,7 +9702,6 @@ interface ModelConfigurationState {
   path: string
 }
 
-let savedModels: ModelConfiguration[] = []
 let editingModelIndex = -1
 
 function syncModelProfiles(): void {
@@ -9115,6 +9716,7 @@ function syncModelProfiles(): void {
   aiDesignModel.disabled = savedModels.length === 0
   aiDesignSettings.hidden = !nativeSettings
   aiDesignSettings.textContent = savedModels.length ? "模型设置" : "配置 AI 模型"
+  syncAiDesignControls()
 }
 
 modelProfile.addEventListener("change", () => {
@@ -9211,6 +9813,7 @@ async function persistModelConfiguration(showFeedback = true): Promise<void> {
       configuration,
       configurations,
     })
+    for (const key of ["model-provider", "model-api-url", "model-name", "model-api-key"]) localStorage.removeItem(key)
     savedModels = configurations
     editingModelIndex = index
     syncModelProfiles()
@@ -9263,8 +9866,6 @@ async function initializeModelConfiguration(): Promise<void> {
     }
   } catch (error) {
     setModelConfigurationStatus(`读取配置失败：${String(error)}`, "error")
-  } finally {
-    for (const key of ["model-provider", "model-api-url", "model-name", "model-api-key"]) localStorage.removeItem(key)
   }
 }
 
@@ -9754,10 +10355,16 @@ assetBackButton.addEventListener("click", () => {
 })
 imageOpen.addEventListener("change", async () => {
   const file = imageOpen.files?.[0]
-  if (file && archive?.isImage(selectedPath)) {
+  if (file && isEditing() && archive?.isImage(selectedPath)) {
+    const targetArchive = archive
+    const path = selectedPath
     await runFileOperation("替换图片", async () => {
-      archive?.setBytes(selectedPath, new Uint8Array(await file.arrayBuffer()))
-      showImage(selectedPath)
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }))
+      bitmap.close()
+      if (archive !== targetArchive || !isEditing()) return false
+      commitBytes(path, archive.getBytes(path)?.slice(), bytes)
+      if (selectedPath === path) showImage(path)
       refreshPreview()
       updateDirty()
       return true
@@ -9923,12 +10530,7 @@ function moveMixedCoordinate(field: HTMLInputElement, direction: number, coalesc
   moveSelectedKeys(delta[0], delta[1], selectedKeySections, coalesce)
   return true
 }
-quickInspector.addEventListener("wheel", (event) => {
-  const field = event.target
-  if (!(field instanceof HTMLInputElement) || !moveMixedCoordinate(field, -event.deltaY)) return
-  event.preventDefault()
-  event.stopPropagation()
-}, { passive: false })
+// Mixed coordinate wheel edits share the document-level gesture scheduler/history.
 quickInspector.addEventListener("keydown", (event) => {
   const field = event.target
   if (!(field instanceof HTMLInputElement)) return
@@ -10050,6 +10652,7 @@ for (const button of mobileChoiceButtons) {
 }
 function setGuidesVisible(enabled: boolean): void {
   guidesVisible = enabled
+  ;($("#settings-layout-guides") as HTMLInputElement).checked = enabled
   for (const button of [toggleGuides, mobileToggleGuides]) {
     button.classList.toggle("active", guidesVisible)
     button.setAttribute("aria-pressed", String(guidesVisible))
@@ -10124,7 +10727,7 @@ for (const button of tileModeButtons) {
   })
 }
 atlasCanvas.addEventListener("pointerdown", (event) => {
-  if (!resourceConfigActive) return
+  if (!resourceConfigActive || event.button !== 0) return
   const point = atlasPoint(event)
   if (drawingTile) {
     tileDragStart = point
@@ -10132,14 +10735,28 @@ atlasCanvas.addEventListener("pointerdown", (event) => {
     atlasCanvas.setPointerCapture(event.pointerId)
     return
   }
+  tileResizeCorner = undefined
+  const selected = slices.find(slice => slice.index === selectedTileIndex)
+  if (selected && isEditing() && archive?.format !== "bda" && guidesVisible) {
+    const [x, y, w, h] = selected.source
+    const radius = 9 * atlasCanvas.width / Math.max(1, atlasCanvas.getBoundingClientRect().width)
+    const corner = [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].findIndex(([cx, cy]) => Math.abs(point.x - cx) <= radius && Math.abs(point.y - cy) <= radius)
+    if (corner >= 0) {
+      tileResizeCorner = corner
+      movingTile = tileDragOriginal = selected
+      atlasCanvas.setPointerCapture(event.pointerId)
+      return
+    }
+  }
   const hit = archive?.format === "bda"
     ? slices.find((slice) => slice.index === selectedTileIndex)
     : tileSliceAt(slices, point)
   selectedTileIndex = hit?.index
   updateSourceHighlight()
   if (hit) requestAnimationFrame(scrollSelectedSource)
-  if (tileMode === "move" && hit && isEditing()) {
+  if (tileMode === "move" && hit && isEditing() && archive?.format !== "bda") {
     movingTile = hit
+    tileDragOriginal = hit
     moveStart = point
     moveSource = hit.source
     atlasCanvas.setPointerCapture(event.pointerId)
@@ -10148,9 +10765,14 @@ atlasCanvas.addEventListener("pointerdown", (event) => {
   drawAtlas()
 })
 atlasCanvas.addEventListener("pointermove", (event) => {
+  if (tileResizeCorner !== undefined && tileDragOriginal) {
+    movingTile = resizeTileSlice(tileDragOriginal, tileResizeCorner, atlasPoint(event), atlasCanvas.width, atlasCanvas.height)
+    scheduleAtlasDraw()
+    return
+  }
   if (tileDragStart && drawingTile) {
     tileDraft = boundedTileRect(tileDragStart, atlasPoint(event), atlasCanvas.width, atlasCanvas.height)
-    drawAtlas()
+    scheduleAtlasDraw()
     return
   }
   if (!moveStart || !moveSource || !movingTile) return
@@ -10158,10 +10780,13 @@ atlasCanvas.addEventListener("pointermove", (event) => {
   const source = moveTileRect(moveSource, point.x - moveStart.x, point.y - moveStart.y, atlasCanvas.width, atlasCanvas.height)
   const dx = source[0] - moveSource[0]
   const dy = source[1] - moveSource[1]
-  movingTile = { ...movingTile, source, ...(movingTile.inner ? { inner: moveTileRect(movingTile.inner, dx, dy, atlasCanvas.width, atlasCanvas.height) } : {}) }
-  drawAtlas()
+  movingTile = { ...movingTile, source, ...(tileDragOriginal?.inner ? { inner: moveTileRect(tileDragOriginal.inner, dx, dy, atlasCanvas.width, atlasCanvas.height) } : {}) }
+  scheduleAtlasDraw()
 })
 atlasCanvas.addEventListener("pointerup", (event) => {
+  if (atlasCanvas.hasPointerCapture(event.pointerId)) atlasCanvas.releasePointerCapture(event.pointerId)
+  tileResizeCorner = undefined
+  tileDragOriginal = undefined
   if (tileDragStart && drawingTile) {
     tileDraft = boundedTileRect(tileDragStart, atlasPoint(event), atlasCanvas.width, atlasCanvas.height)
     const source = tileDraft
@@ -10178,6 +10803,8 @@ atlasCanvas.addEventListener("pointerup", (event) => {
   }
 })
 atlasCanvas.addEventListener("pointercancel", () => {
+  tileResizeCorner = undefined
+  tileDragOriginal = undefined
   setDrawingTile(false)
   movingTile = undefined
   moveStart = undefined
@@ -10331,8 +10958,8 @@ async function applyLayoutImage(): Promise<void> {
     const tilPath = `${base}.til`
     const stylePath = styleConfigPath()
     commitBatch([
-      { kind: "bytes", path: pngPath, before: archive.getBytes(pngPath) ?? new Uint8Array(0), after: layoutImageBytes },
-      { kind: "bytes", path: tilPath, before: archive.getBytes(tilPath) ?? new Uint8Array(0), after: tilesBytes },
+      { kind: "bytes", path: pngPath, before: archive.getBytes(pngPath), after: layoutImageBytes },
+      { kind: "bytes", path: tilPath, before: archive.getBytes(tilPath), after: tilesBytes },
       { kind: "text", path: candPath, before: cand.toString(), after: candDoc.toString() },
       { kind: "text", path: stylePath, before: styles.toString(), after: stylesDoc.toString() },
     ])
@@ -10416,8 +11043,8 @@ async function applyLayoutImage(): Promise<void> {
   const targetPath = layoutPath
   const stylePath = styleConfigPath()
   commitBatch([
-    { kind: "bytes", path: pngPath, before: archive.getBytes(pngPath) ?? new Uint8Array(0), after: layoutImageBytes },
-    { kind: "bytes", path: tilPath, before: archive.getBytes(tilPath) ?? new Uint8Array(0), after: tilesBytes },
+    { kind: "bytes", path: pngPath, before: archive.getBytes(pngPath), after: layoutImageBytes },
+    { kind: "bytes", path: tilPath, before: archive.getBytes(tilPath), after: tilesBytes },
     { kind: "text", path: targetPath, before: layout.toString(), after: layoutDoc.toString() },
     { kind: "text", path: stylePath, before: styles.toString(), after: stylesDoc.toString() },
   ])
@@ -10566,7 +11193,8 @@ if (isTauri()) {
     nativeProjectReadyTimer = undefined
     void WebviewWindow.getByLabel("new-project").then((window) => window?.setFocus())
   })
-  void listen<{ templateID: string }>("new-project-select", (event) => {
+  void listen<ProjectChoice>("new-project-select", (event) => {
+    newProjectOptions = event.payload
     finishNativeProjectChoice(event.payload.templateID)
   })
   void listen("new-project-cancel", () => finishNativeProjectChoice())
@@ -10587,6 +11215,21 @@ if (isTauri()) {
   void listen<{ path: string }>("resource-picker-select", (event) => {
     selectImageResource(event.payload.path)
   })
+}
+
+// Sidebar resize handle
+{
+  const MIN_W = 200, MAX_W = 420, DEFAULT_W = 264
+  const stored = Number(localStorage.getItem("sidebarWidthV1") || DEFAULT_W)
+  document.documentElement.style.setProperty("--pen-sidebar-w", `${Math.max(MIN_W, Math.min(MAX_W, stored))}px`)
+  let dragging = false, startX = 0, startW = stored
+  sidebarPane.addEventListener("pointerdown", (e) => {
+    if (e.clientX < sidebarPane.getBoundingClientRect().right - 6) return
+    dragging = true; startX = e.clientX; startW = sidebarPane.getBoundingClientRect().width
+    sidebarPane.setPointerCapture(e.pointerId); document.body.classList.add("sidebar-resizing"); e.preventDefault()
+  })
+  sidebarPane.addEventListener("pointermove", (e) => { if (dragging) document.documentElement.style.setProperty("--pen-sidebar-w", `${Math.max(MIN_W, Math.min(MAX_W, startW + e.clientX - startX))}px`) })
+  sidebarPane.addEventListener("pointerup", () => { if (dragging) { dragging = false; document.body.classList.remove("sidebar-resizing"); localStorage.setItem("sidebarWidthV1", getComputedStyle(sidebarPane).width.replace("px", "")) } })
 }
 
 // Inspector resize handle
@@ -10678,12 +11321,94 @@ newStyleForm.addEventListener("submit", (event) => {
 // Resource image actions
 let selectedResourceGalleryPath = ""
 
+atlasWorkspace = createAtlasWorkspace({
+  back: () => selectFile(layoutPath || currentConfigPath(layout.value)),
+  guides: () => setGuidesVisible(!guidesVisible),
+  stretch: enabled => {
+    const slice = slices.find(item => item.index === selectedTileIndex)
+    if (!slice || !isEditing() || archive?.format === "bda") return
+    const [x, y, width, height] = slice.source
+    const left = Math.floor(width / 4), top = Math.floor(height / 4)
+    commitTile({ index: slice.index, source: slice.source, ...(enabled ? { inner: [x + left, y + top, width - left * 2, height - top * 2] as TileRect } : {}) })
+  },
+  copy: () => {
+    if (!archive || !selectedResourcePath || !isEditing()) return
+    const base = selectedResourcePath.replace(/\.png$/i, "")
+    let target = `${base}_copy`
+    for (let index = 2; archive.getBytes(`${target}.png`) || archive.getBytes(`${target}.til`); index++) target = `${base}_copy${index}`
+    const changes: Change[] = ["png", "til"].flatMap(extension => {
+      const bytes = archive!.getBytes(`${base}.${extension}`)
+      return bytes ? [{ kind: "bytes" as const, path: `${target}.${extension}`, after: bytes.slice() }] : []
+    })
+    commitBatch(changes)
+    renderResourceInspector()
+    selectResourceImage(`${target}.png`)
+    updateDirty()
+  },
+  create: (name, width, height) => {
+    if (!archive || !isEditing()) return
+    if (!/^[^\\/:*?"<>|]+\.png$/i.test(name) || name.startsWith(".")) { showStatus("请输入有效的 PNG 文件名"); return }
+    const size = [width, height]
+    if (size.length !== 2 || size.some(n => !Number.isInteger(n) || n < 1 || n > 8192)) { showStatus("图片宽高必须是 1 至 8192 的整数"); return }
+    const base = selectedResourcePath.substring(0, selectedResourcePath.lastIndexOf("/")) || resourceRootPath()
+    const path = `${base}/${name}`
+    if (archive.getBytes(path)) { showStatus("同名图片已存在"); return }
+    const targetArchive = archive
+    const canvas = document.createElement("canvas")
+    canvas.width = size[0]; canvas.height = size[1]
+    canvas.toBlob(blob => {
+      if (!blob) return
+      void runFileOperation("新建图片", async () => {
+        const bytes = new Uint8Array(await blob.arrayBuffer())
+        if (archive !== targetArchive || !isEditing()) return false
+        commitBatch([{ kind: "bytes", path, after: bytes }])
+        renderResourceInspector()
+        selectResourceImage(path)
+        updateDirty()
+        return true
+      })
+    }, "image/png")
+  },
+  import: files => {
+    if (!archive || !isEditing() || !files.length) return
+    const targetArchive = archive
+    const base = selectedResourcePath.substring(0, selectedResourcePath.lastIndexOf("/")) || resourceRootPath()
+    void runFileOperation("导入图片目录", async () => {
+      const changes: Array<Extract<Change, { kind: "bytes" }>> = []
+      const paths = new Set<string>()
+      for (const file of files) {
+        const relative = file.webkitRelativePath.split("/").slice(1).join("/") || file.name
+        if (relative.split("/").some(part => part === ".." || !part)) throw new Error("无效的资源路径")
+        const path = `${base}/${relative}`
+        if (paths.has(path)) throw new Error(`目录中存在重名资源：${relative}`)
+        paths.add(path)
+        const bytes = new Uint8Array(await file.arrayBuffer())
+        if (/\.png$/i.test(file.name)) {
+          const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }))
+          bitmap.close()
+        }
+        changes.push({ kind: "bytes", path, before: targetArchive.getBytes(path)?.slice(), after: bytes })
+      }
+      if (archive !== targetArchive || !isEditing()) return false
+      if (changes.some(change => change.kind === "bytes" && change.before) && !window.confirm("目录包含已有资源，是否替换？")) return false
+      commitBatch(changes)
+      renderResourceInspector()
+      const image = changes.find(change => /\.png$/i.test(change.path))
+      if (image) selectResourceImage(image.path)
+      updateDirty()
+      return true
+    })
+  },
+})
+
 function updateResourceActionButtons(): void {
   const imageSelected = resourceInspectorMode === "image" && Boolean(selectedResourceGalleryPath)
   const soundSelected = resourceInspectorMode === "sound"
     && Boolean(currentSoundEntries().find((entry) => entry.id === selectedSoundID)?.path)
   resourceDownloadButton.disabled = !imageSelected && !soundSelected
   resourceDeleteButton.disabled = !imageSelected || !isEditing()
+  resourceUploadButton.disabled = !isEditing()
+  syncAtlasWorkspace()
 }
 
 function selectGalleryItem(path: string, container: HTMLElement): void {
@@ -10700,8 +11425,10 @@ resourceUploadButton.addEventListener("click", () => {
   resourceUploadInput.click()
 })
 
-async function uploadKeySound(file: File): Promise<void> {
+async function uploadKeySound(file: File): Promise<boolean> {
   if (!archive || !isSoundPath(file.name)) throw new Error("按键音效仅支持 OGG、WAV 或 AIFF 文件")
+  if (!isEditing()) return false
+  const targetArchive = archive
   const filename = file.name.split(/[\\/]/).pop() ?? file.name
   const entries = currentSoundEntries()
   const selected = entries.find((entry) => entry.id === selectedSoundID)
@@ -10710,45 +11437,45 @@ async function uploadKeySound(file: File): Promise<void> {
     ?? `${theme.value}/skin/res`
   const targetPath = `${base}/${filename}`
   const beforeResource = archive.getBytes(targetPath)?.slice()
-  if (beforeResource && targetPath !== selected?.path && !window.confirm(`音效 ${filename} 已存在，是否替换？`)) return
+  if (beforeResource && targetPath !== selected?.path && !window.confirm(`音效 ${filename} 已存在，是否替换？`)) return false
   const resourceBytes = new Uint8Array(await file.arrayBuffer())
+  if (archive !== targetArchive || !isEditing()) return false
   keySoundBuffers.delete(targetPath)
   releaseKeySound()
-  commitBytes(targetPath, beforeResource ?? new Uint8Array(), resourceBytes)
+  commitBytes(targetPath, beforeResource, resourceBytes)
   selectedSoundID = `file:${targetPath}`
   renderResourceInspector()
   updateDirty()
   showStatus(`按键音效文件已更新：${filename}`)
+  return true
 }
 
 resourceUploadInput.addEventListener("change", () => {
   const file = resourceUploadInput.files?.[0]
-  if (!file || !archive) return
+  if (!file || !archive || !isEditing()) return
   if (resourceInspectorMode === "sound") {
-    void runFileOperation("上传按键音效", async () => {
-      await uploadKeySound(file)
-      return true
-    })
+    void runFileOperation("上传按键音效", () => uploadKeySound(file))
     return
   }
-  const reader = new FileReader()
-  reader.onload = () => {
-    if (!archive) return
-    const bytes = new Uint8Array(reader.result as ArrayBuffer)
+  const targetArchive = archive
+  void runFileOperation("上传图片", async () => {
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }))
+    bitmap.close()
+    if (archive !== targetArchive || !isEditing()) return false
     const paths = resourceImagePaths(archive.names(), theme.value, orientation.value)
     const base = paths[0]?.split("/").slice(0, -1).join("/") ?? `${theme.value}/skin/${orientation.value}/res`
     const targetPath = `${base}/${file.name}`
     const before = archive.getBytes(targetPath)
     if (before) {
-      if (!window.confirm(`图片 ${file.name} 已存在，是否替换？`)) return
+      if (!window.confirm(`图片 ${file.name} 已存在，是否替换？`)) return false
     }
-    commitBytes(targetPath, before ?? new Uint8Array(0), bytes)
+    commitBatch([{ kind: "bytes", path: targetPath, before: before?.slice(), after: bytes }])
     renderResourceInspector()
     updateDirty()
-    selectedResourceGalleryPath = targetPath
-    updateResourceActionButtons()
-  }
-  reader.readAsArrayBuffer(file)
+    selectResourceImage(targetPath)
+    return true
+  })
 })
 
 resourceDownloadButton.addEventListener("click", () => {
@@ -10776,6 +11503,13 @@ resourceDeleteButton.addEventListener("click", () => {
   const before = archive.getBytes(selectedResourceGalleryPath)
   if (!before) return
   commitBatch([{ kind: "bytes", path: selectedResourceGalleryPath, before }])
+  if (selectedResourcePath === selectedResourceGalleryPath) {
+    selectedResourcePath = ""
+    slices = []
+    selectedTileIndex = undefined
+    resourceDetail.hidden = true
+    hideImageWorkspace()
+  }
   selectedResourceGalleryPath = ""
   updateResourceActionButtons()
   renderResourceInspector()
@@ -10785,6 +11519,8 @@ resourceDeleteButton.addEventListener("click", () => {
 device.addEventListener("change", () => {
   const background = canvasBackgroundFromDevice(device.value)
   if (background) applyCanvasBackground(background)
+  syncDeviceControlIcon()
+  syncAiDesignContext()
   updateDevicePreview()
   refreshPreview()
 })
@@ -10961,9 +11697,27 @@ initPerformanceOptimization()
 mode.value = "preview"
 applyModeState()
 syncLayoutImageConfig()
+syncDeviceControlIcon()
 updateDevicePreview()
 updateSourceHighlight()
 updateInspectorView()
 void refreshUpdateStatus()
 
-initializeSettingsPreviews(settingsDialog)
+// 检查器外壳：搜索 / 状态作用域 / 常驻动作条 / 分区折叠
+initInspectorShell()
+
+
+let settingsModelSnapshot: { index: number; configuration: ModelConfiguration }
+const settingsController = initializeSettings(settingsDialog, async () => {
+  if (!isTauri()) throw new Error("请在桌面应用中保存模型配置")
+  await persistModelConfiguration()
+}, setGuidesVisible, {
+  begin() { settingsModelSnapshot = { index: editingModelIndex, configuration: currentModelConfiguration() } },
+  cancel() {
+    editingModelIndex = settingsModelSnapshot.index
+    previousModelProvider = settingsModelSnapshot.configuration.provider
+    applyModelConfiguration(settingsModelSnapshot.configuration)
+    populateModelList([])
+    syncModelProfiles()
+  },
+})

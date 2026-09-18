@@ -1,0 +1,120 @@
+/* Shared AI/inspector polish. Loaded after the legacy inspector layers. */
+:root {
+  --preview-check-light: #fafbfc;
+  --preview-check-dark: #e1e5eb;
+  --preview-checker: conic-gradient(var(--preview-check-dark) 25%, var(--preview-check-light) 0 50%, var(--preview-check-dark) 0 75%, var(--preview-check-light) 0);
+}
+:root[data-app-theme="dark"] {
+  --preview-check-light: #292e37;
+  --preview-check-dark: #20242c;
+}
+:root body .source #ai-design-panel .ai-session-bar {
+  display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 10px 14px; color: var(--pin-ink); font-size: 12px; font-weight: 600;
+}
+#ai-context-key { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--pin-ink-muted); font-size: 10px; font-weight: 400; }
+#ai-new-session { margin-left: auto; }
+:root body .source #ai-design-panel :is(#ai-new-session, #ai-retry-prompt) {
+  flex: none; height: 28px; min-height: 28px; padding: 0 9px; border: 1px solid var(--pin-line);
+  border-radius: 7px; background: var(--pin-surface); color: var(--pin-ink-muted);
+  font: 500 11px var(--font-ui); box-shadow: none; cursor: pointer;
+}
+:root body .source #ai-design-panel :is(#ai-new-session, #ai-retry-prompt):hover:not(:disabled) {
+  background: var(--pin-accent-soft); color: var(--pin-accent); border-color: var(--pin-accent);
+}
+:root body .source #ai-design-panel button:disabled { opacity: .48; cursor: not-allowed; }
+:root body .source #ai-design-panel :is(button, select, summary, input):focus-visible {
+  outline: 2px solid var(--pin-accent) !important; outline-offset: 2px;
+}
+:root body .source #ai-design-panel .ai-preview-toggle {
+  display: inline-flex; flex-direction: row; align-items: center; gap: 5px;
+  width: auto; min-height: 24px; cursor: pointer; font-size: 10px; color: var(--pin-ink-muted);
+}
+:root body .source #ai-design-panel #ai-attach-preview {
+  appearance: auto; width: 13px; height: 13px; min-height: 0; margin: 0; accent-color: var(--pin-accent);
+}
+:root body .source #ai-design-panel .ai-preview-toggle .ai-context-preview {
+  padding: 0 !important; border: 0 !important; background: transparent !important; color: inherit !important;
+}
+:root body .source #ai-design-panel[data-state="error"] .ai-design-status:not(:empty) {
+  color: var(--pin-danger) !important; background: color-mix(in srgb, var(--pin-danger) 9%, var(--pin-surface)) !important;
+}
+:root body .source #ai-design-panel[data-state="review"] .ai-design-status:not(:empty) {
+  color: var(--pin-sel) !important; background: var(--pin-sel-soft) !important;
+}
+:root body .source #ai-design-panel[data-state="done"] .ai-design-status:not(:empty) {
+  color: var(--pin-ok) !important; background: color-mix(in srgb, var(--pin-ok) 9%, var(--pin-surface)) !important;
+}
+:root body .source #ai-design-panel .ai-design-status:not(:empty) { flex-shrink: 0; overflow-wrap: anywhere; }
+:root body .source #ai-design-panel #ai-draft-panel:not([hidden]) {
+  flex: 0 1 auto !important; min-height: 0 !important; max-height: 44%; overflow: auto !important;
+  margin: 10px 14px !important; padding: 12px !important; border: 1px solid var(--pin-line) !important;
+  border-radius: 10px !important; background: var(--pin-sunken) !important; scrollbar-width: thin;
+}
+:root body .source #ai-design-panel #ai-draft-files { max-height: none; }
+:root body .source #ai-design-panel .ai-draft-head { align-items: flex-start !important; flex-wrap: wrap; gap: 4px; }
+:root body .source #ai-design-panel #ai-draft-files > li { padding: 8px !important; background: var(--pin-surface); border-radius: 7px; }
+:root body .source #ai-design-panel .ai-draft-file-head { cursor: pointer; gap: 8px; }
+:root body .source #ai-design-panel .ai-draft-file-head > span { min-width: 0; flex: 1; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 11px; }
+:root body .source #ai-design-panel .ai-draft-file-head > em { flex: none; }
+:root body .source #ai-design-panel .ai-draft-diff {
+  max-height: 200px; overflow: auto !important; margin-top: 8px; padding: 8px !important;
+  border-radius: 5px; background: var(--pin-sunken) !important; white-space: pre; font-size: 10px !important;
+}
+:root body .source #ai-design-panel .ai-draft-diff > ins {
+  text-decoration: none; color: var(--pin-ok) !important; background: color-mix(in srgb, var(--pin-ok) 7%, transparent);
+}
+:root body .source #ai-design-panel .ai-draft-diff > del {
+  text-decoration: none; color: var(--pin-danger) !important; background: color-mix(in srgb, var(--pin-danger) 7%, transparent);
+}
+.ai-draft-full { margin-top: 8px; font-size: 11px; color: var(--pin-ink-muted); }
+.ai-draft-full > summary { cursor: pointer; color: var(--pin-accent); }
+.ai-draft-full h4 { margin: 10px 0 4px; font-size: 10px; }
+.ai-draft-full pre { max-height: 240px; overflow: auto; padding: 8px; background: var(--pin-sunken); border-radius: 5px; font: 10px/1.7 var(--font-mono); }
+:root body .source #ai-design-panel .ai-draft-actions {
+  position: sticky; bottom: -12px; z-index: 1; flex-wrap: wrap; padding: 8px 0; background: var(--pin-sunken);
+}
+:root body .source #ai-design-panel .ai-draft-apply { color: #fff !important; }
+:root body .source #ai-design-panel .ai-design-toolbar { flex-wrap: wrap; padding-bottom: 10px; background: transparent !important; }
+:root body .source #ai-design-panel .ai-design-toolbar > label { min-width: 0; flex: 1 1 110px; }
+:root body .source #ai-design-panel #ai-design-model { width: 100%; min-width: 0; text-overflow: ellipsis; }
+:root body .source #ai-design-panel .ai-composer-hint { color: var(--pin-ink-muted) !important; }
+/* Short viewports retain access to both the draft actions and composer. */
+@media (max-height: 680px) {
+  :root body .source #ai-design-panel:not([hidden]) { overflow-y: auto !important; }
+  :root body .source #ai-design-panel #ai-draft-panel:not([hidden]) { flex-shrink: 0 !important; max-height: 230px; }
+  :root body .source #ai-design-panel .ai-design-composer { flex-shrink: 0 !important; min-height: 300px !important; }
+}
+/* Transparency is UI-only: CSS never paints checker pixels into exported artwork. */
+:root body :is(#style-picker-grid .style-picker-previews, #style-library-preview-image,
+  .resource-style-previews, .style-image-gallery-item, #style-image-picker-canvas) {
+  background-image: var(--preview-checker) !important; background-size: 12px 12px !important;
+  background-color: var(--preview-check-light) !important; background-position: 0 0 !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector :is(.style-picker-state canvas,
+  .bda-style-preview canvas, .bda-style-reference-preview canvas) {
+  background-image: var(--preview-checker) !important; background-size: 12px 12px !important;
+  background-color: var(--preview-check-light) !important; background-position: 0 0 !important;
+}
+:root body .source #resource-inspector .resource-style-previews > canvas { background: transparent !important; }
+:root body .source #quick-inspector#quick-inspector#quick-inspector :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--pin-accent) !important; outline-offset: 1px !important;
+  border-color: var(--pin-accent) !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .style-picker-state:focus-visible {
+  outline: 2px solid var(--pin-accent) !important; outline-offset: -2px !important; z-index: 1 !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .style-picker-state-caption {
+  color: var(--pin-ink-muted) !important; background: var(--pin-surface) !important;
+  border-top: 1px solid var(--pin-line) !important; font-size: 10px !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .style-picker-state:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px var(--pin-accent) !important;
+}
+
+:root body .source #quick-inspector#quick-inspector#quick-inspector .pin-hint {
+  color: var(--pin-ink-muted) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root body .source #ai-design-panel * { scroll-behavior: auto !important; transition: none !important; }
+}

@@ -1,0 +1,90 @@
+/* Inspector: compact fields with a persistent right category rail.
+   Scoped specificity bridges the older inspector and Pen component styles. */
+:root body .source #quick-inspector:not([hidden]) {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  overflow: hidden auto !important;
+  scroll-padding-top: 52px;
+  background: var(--pen-surface);
+}
+/* Desktop categories stay on the right, editing fields use the remaining width. */
+@media (min-width: 761px) {
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"]:not([hidden]) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 64px !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    overflow: hidden !important;
+  }
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > #mobile-inspector-groups:not([hidden]) {
+    grid-column: 2;
+    grid-row: 1;
+    width: 64px !important;
+    margin: 0 !important;
+    padding: 10px 5px !important;
+    gap: 5px !important;
+    border: 0 !important;
+    border-left: 1px solid var(--pen-line) !important;
+    border-radius: 0 !important;
+    background: var(--pen-surface-subtle) !important;
+  }
+  :root body .source #quick-inspector > #mobile-inspector-groups button {
+    flex: 0 0 38px !important;
+    height: 38px !important;
+    padding: 0 4px !important;
+    border: 0 !important;
+    border-radius: 7px !important;
+    font-size: 11px !important;
+  }
+  :root body .source #quick-inspector > #mobile-inspector-groups button.active {
+    color: var(--accent) !important;
+    background: color-mix(in srgb, var(--accent) 10%, var(--pen-surface)) !important;
+    font-weight: 600 !important;
+  }
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > .mobile-inspector-managed,
+  :root body .source #quick-inspector[data-inspector-group-display="grouped"] > :is(.document-fields, .bda-config-fields):has(.mobile-inspector-active) {
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 0 !important;
+    overflow: hidden auto !important;
+    padding: 14px 12px !important;
+  }
+}
+:root body .source #quick-inspector .key-layout-fields :is(.geometry-fields, .gap-fields) {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+:root body .source #quick-inspector .key-layout-fields :is(.geometry-fields, .gap-fields) label {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 0 10px !important;
+  min-height: 38px !important;
+  border: 1px solid var(--pen-line) !important;
+  border-radius: 8px !important;
+  background: var(--pen-surface-subtle) !important;
+  color: var(--pen-secondary) !important;
+}
+:root body .source #quick-inspector .key-layout-fields.mobile-inspector-managed.inspector-group.key-only :is(.geometry-fields, .gap-fields) label input[type=number] {
+  flex: 1;
+  min-width: 0 !important;
+  width: 100% !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+:root body .source #quick-inspector .key-layout-fields :is(.geometry-fields, .gap-fields) label:focus-within { border-color: var(--accent) !important; }
+:root body .source #quick-inspector .geometry-fields .inspector-note { grid-column: 1 / -1; margin: 0 !important; font-size: 10px !important; }
+:root body .source #quick-inspector #inspector-multi-layout[data-available=false] { display: none !important; }
+:root body .source #quick-inspector :is(button, summary, input):focus-visible { outline: 2px solid var(--accent) !important; outline-offset: 2px; }

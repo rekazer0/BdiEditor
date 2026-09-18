@@ -278,7 +278,13 @@ main {
 
 @media (min-width: 761px) {
   main {
-    grid-template-columns: 248px minmax(500px, 1fr) 4px var(--inspector-width, 360px);
+    grid-template-columns: 248px minmax(0, 1fr) 4px var(--inspector-width, 360px);
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1060px) {
+  main {
+    grid-template-columns: 160px minmax(0, 1fr) 4px 300px;
   }
 }
 
@@ -292,13 +298,20 @@ main {
 }
 
 .sidebar {
-  padding-top: 12px;
+  padding-top: 0;
   border-right-width: 1px;
 }
 
 .pane-heading {
   min-height: 42px;
   padding: 0 8px 10px;
+  border-bottom: 0;
+}
+
+.sidebar > .pane-heading {
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0 8px;
   border-bottom: 0;
 }
 
@@ -332,9 +345,14 @@ main {
 
 #files {
   padding: 8px 8px 16px;
+  scrollbar-width: none;
 }
 
-/* The panes are content, never scrollers: one scrollbar, at the sidebar edge.
+#files::-webkit-scrollbar {
+  display: none;
+}
+
+/* The panes are content, never scrollers: #files handles scrolling.
    The phone layout keeps its own two-column overview grid, so this stays desktop-only. */
 @media (min-width: 761px) {
   .sidebar-overview,
@@ -354,7 +372,10 @@ main {
   align-items: center;
   justify-items: center;
   gap: 4px;
-  padding: 0 8px 10px;
+  margin: 0 8px 10px;
+  padding: 2px 0;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
   border-bottom: 0;
 }
 
@@ -379,10 +400,18 @@ main {
   transform: none;
 }
 
-.source-file-toolbar .toolbar-button.active {
-  color: #fff;
-  background: var(--pen-accent);
-  box-shadow: none;
+#source-file-toolbar .toolbar-button.active {
+  color: var(--pen-accent);
+  background: var(--pen-accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen-accent) 24%, transparent);
+}
+
+#source-file-toolbar .toolbar-button.active :is(.icon, .system-symbol) {
+  color: inherit;
+}
+
+#source-file-toolbar .toolbar-button.active:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--pen-accent) 16%, var(--pen-surface));
 }
 
 .source-file-toolbar .toolbar-button:disabled {
@@ -418,6 +447,8 @@ main {
 
 /* 概览 rows carry a subtitle, so label and meta share the column beside the icon. */
 #files .sidebar-overview button.nav-item {
+  min-height: 44px;
+  padding: 8px;
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
   align-content: center;
@@ -427,6 +458,10 @@ main {
 
 #files .sidebar-overview button.nav-item > .system-symbol {
   grid-row: 1 / span 2;
+}
+
+#files .sidebar-overview button.nav-item-no-meta > .system-symbol {
+  grid-row: 1;
 }
 
 #files .sidebar-overview button.nav-item > .nav-label,
@@ -1208,6 +1243,8 @@ main {
 }
 
 .pen-file-menu .toolbar-menu {
+  left: 0;
+  right: auto;
   width: 268px;
   max-width: calc(100vw - 24px);
   transform-origin: top left;
