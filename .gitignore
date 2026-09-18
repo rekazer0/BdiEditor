@@ -33,3 +33,20 @@ src-tauri/gen/
 /.tmp-menu.png
 /.pi/
 /probe/
+
+# Local credentials and signing material
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.jks
+*.keystore
+
+# Local design experiments and scratch files
+/INSPECTOR_REDESIGN_PLAN.md
+/harness.html
+/harness.ts
+/inspector-flat-demo.html
+/pelican-bike.html
+/probe-pin-actions.html
+/public/inspector-fragment.html
