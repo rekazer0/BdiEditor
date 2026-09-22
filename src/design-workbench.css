@@ -1,12 +1,10 @@
 /* Shared AI/inspector polish. Loaded after the legacy inspector layers. */
 :root {
-  --preview-check-light: #fafbfc;
-  --preview-check-dark: #e1e5eb;
-  --preview-checker: conic-gradient(var(--preview-check-dark) 25%, var(--preview-check-light) 0 50%, var(--preview-check-dark) 0 75%, var(--preview-check-light) 0);
-}
-:root[data-app-theme="dark"] {
-  --preview-check-light: #292e37;
-  --preview-check-dark: #20242c;
+  /* 预览缩略图复用画布的马赛克，保证透明区域观感一致 */
+  --preview-check-light: var(--checker-light);
+  --preview-check-dark: var(--checker-dark);
+  --preview-check-size: var(--checker-size);
+  --preview-checker: var(--checker-image);
 }
 :root body .source #ai-design-panel .ai-session-bar {
   display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between;
@@ -88,13 +86,17 @@
 /* Transparency is UI-only: CSS never paints checker pixels into exported artwork. */
 :root body :is(#style-picker-grid .style-picker-previews, #style-library-preview-image,
   .resource-style-previews, .style-image-gallery-item, #style-image-picker-canvas) {
-  background-image: var(--preview-checker) !important; background-size: 12px 12px !important;
-  background-color: var(--preview-check-light) !important; background-position: 0 0 !important;
+  background-image: var(--preview-checker) !important;
+  background-size: var(--preview-check-size) var(--preview-check-size) !important;
+  background-color: var(--preview-check-light) !important;
+  background-position: 0 0, calc(var(--preview-check-size) / 2) calc(var(--preview-check-size) / 2) !important;
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector :is(.style-picker-state canvas,
   .bda-style-preview canvas, .bda-style-reference-preview canvas) {
-  background-image: var(--preview-checker) !important; background-size: 12px 12px !important;
-  background-color: var(--preview-check-light) !important; background-position: 0 0 !important;
+  background-image: var(--preview-checker) !important;
+  background-size: var(--preview-check-size) var(--preview-check-size) !important;
+  background-color: var(--preview-check-light) !important;
+  background-position: 0 0, calc(var(--preview-check-size) / 2) calc(var(--preview-check-size) / 2) !important;
 }
 :root body .source #resource-inspector .resource-style-previews > canvas { background: transparent !important; }
 :root body .source #quick-inspector#quick-inspector#quick-inspector :is(input, select, textarea):focus-visible {
@@ -103,10 +105,6 @@
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector .style-picker-state:focus-visible {
   outline: 2px solid var(--pin-accent) !important; outline-offset: -2px !important; z-index: 1 !important;
-}
-:root body .source #quick-inspector#quick-inspector#quick-inspector .style-picker-state-caption {
-  color: var(--pin-ink-muted) !important; background: var(--pin-surface) !important;
-  border-top: 1px solid var(--pin-line) !important; font-size: 10px !important;
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector .style-picker-state:hover:not(:disabled) {
   box-shadow: inset 0 0 0 1px var(--pin-accent) !important;

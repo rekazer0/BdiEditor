@@ -26,6 +26,20 @@ const builtInProjectTemplatePaths: Record<string, string> = {
   "huawei-swipe-symbols-1080": "/templates/huawei-swipe-symbols-1080.bds",
 }
 
+/**
+ * 包内没有 demo 图的内置模板，用随应用发布的静态预览图兜底。图片是用同一套预览
+ * 逻辑离线导出的，运行时只当普通图片加载，不再实时渲染。
+ */
+const builtInProjectTemplatePreviewPaths: Record<string, string> = {
+  "default-android": "/templates/default-android.png",
+  "official-android-bds": "/templates/official-android-bds.png",
+}
+
+export function builtInProjectTemplatePreviewURL(id: string): string | undefined {
+  const path = builtInProjectTemplatePreviewPaths[id]
+  return path ? new URL(path.replace(/^\//, ""), document.baseURI).href : undefined
+}
+
 export async function loadBuiltInProjectTemplate(
   id: string,
   fetcher: ProjectTemplateFetcher = fetchPublicAsset,

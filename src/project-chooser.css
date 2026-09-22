@@ -45,7 +45,7 @@
 :root body .project-chooser .project-template-card input { position: absolute; right: 16px; top: 16px; width: 18px; height: 18px; margin: 0; accent-color: var(--chooser-accent); z-index: 1; }
 :root body .project-chooser .project-template-card:has(input:focus-visible) { outline: 2px solid var(--chooser-accent); outline-offset: 2px; }
 :root body .project-chooser .template-preview { display: flex; align-items: center; justify-content: center; width: 100%; height: 108px; overflow: hidden; border-radius: 8px; background: var(--chooser-well); color: var(--chooser-muted); font-size: 11px; }
-:root body .project-chooser .template-preview canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
+:root body .project-chooser .template-preview img { display: block; width: 100%; height: 100%; object-fit: contain; }
 :root body .project-chooser .project-template-card > span:not(.template-preview) { display: grid; gap: 5px; min-width: 0; }
 :root body .project-chooser .project-template-card strong { font-size: 12.5px; font-weight: 500; line-height: 1.5; color: inherit; overflow-wrap: anywhere; }
 :root body .project-chooser .project-template-card small { font-size: 10.5px; color: var(--chooser-muted); line-height: 1.5; }

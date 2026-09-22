@@ -9,11 +9,15 @@
   </head>
   <body>
     <header class="picker-toolbar">
+      <button id="picker-back" class="picker-back" type="button" aria-label="切换至全部样式" hidden>
+        <svg class="picker-back-icon" viewBox="0 0 12 12" aria-hidden="true"><path d="M7.5 1.5 3 6l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        <span id="picker-back-label">全部样式</span>
+      </button>
       <div class="picker-heading">
+        <span id="picker-style" hidden></span>
         <strong id="picker-title">图片选择</strong>
         <span id="picker-subtitle"></span>
       </div>
-      <button id="choose-resource" type="button">选择图片资源</button>
       <input id="resource-search" type="search" results="0" placeholder="搜索图片资源" aria-label="搜索图片资源" hidden />
     </header>
     <main>

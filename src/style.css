@@ -90,6 +90,13 @@
   --content: var(--material-content);
   --control: var(--material-control);
   --glass-surface: var(--material-glass-surface);
+  /* 透明马赛克：画布与各预览缩略图共用同一套方格，避免两处样式漂移 */
+  --checker-light: #f7f7f8;
+  --checker-dark: #dfe1e5;
+  --checker-size: 24px;
+  --checker-image:
+    linear-gradient(45deg, var(--checker-dark) 25%, transparent 25%, transparent 75%, var(--checker-dark) 75%),
+    linear-gradient(45deg, var(--checker-dark) 25%, transparent 25%, transparent 75%, var(--checker-dark) 75%);
 }
 
 :root.macos {
@@ -1220,12 +1227,10 @@ h2 {
 }
 
 .canvas-wrap[data-background="checkerboard"] {
-  background-color: #f7f7f8;
-  background-image:
-    linear-gradient(45deg, #dfe1e5 25%, transparent 25%, transparent 75%, #dfe1e5 75%),
-    linear-gradient(45deg, #dfe1e5 25%, transparent 25%, transparent 75%, #dfe1e5 75%);
-  background-position: 0 0, 12px 12px;
-  background-size: 24px 24px;
+  background-color: var(--checker-light);
+  background-image: var(--checker-image);
+  background-position: 0 0, calc(var(--checker-size) / 2) calc(var(--checker-size) / 2);
+  background-size: var(--checker-size) var(--checker-size);
   --canvas-text: #202124;
   --canvas-secondary: #5f6368;
   --canvas-tertiary: #74747b;
@@ -2282,6 +2287,8 @@ canvas {
   z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
+  /* 行高必须受容器约束，否则两列会撑到内容高度，超出的内容既滚不动也被裁掉 */
+  grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
   text-align: left;
   background: var(--window);
@@ -2310,8 +2317,10 @@ body:has(.canvas-wrap.empty) .workspace {
   flex-direction: column;
   gap: 26px;
   min-width: 0;
+  min-height: 0;
   padding: 40px 48px;
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .welcome-hero {
@@ -2358,6 +2367,130 @@ body:has(.canvas-wrap.empty) .workspace {
 .welcome-section-head span {
   font-size: 12px;
   color: var(--tertiary);
+}
+
+/* 「最近打开」与「新建皮肤」是同级区块，标题字号对齐 hero，计数与按钮按基线对齐。 */
+.welcome-recent .welcome-section-head {
+  align-items: baseline;
+  gap: 12px;
+}
+
+.welcome-recent .welcome-section-head h2 {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.welcome-recent .welcome-head-action {
+  align-self: center;
+}
+
+.recent-card-folder {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.welcome-head-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+.welcome-head-action:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.welcome-head-action .system-symbol {
+  width: 14px;
+  height: 14px;
+}
+
+.recent-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.recent-grid[hidden] {
+  display: none;
+}
+
+/* 最近打开的皮肤与“新建皮肤”模板卡共用卡片外观，只把预览底色改为随主题变化。 */
+.recent-grid .template-preview {
+  background: var(--content);
+}
+
+.recent-grid-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+
+.recent-grid-empty[hidden] {
+  display: none;
+}
+
+.recent-grid-empty > .system-symbol {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--tertiary);
+}
+
+.recent-grid-empty-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.recent-grid-empty-copy strong {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.recent-grid-empty-copy span {
+  font-size: 11px;
+  color: var(--tertiary);
+}
+
+.recent-grid-empty button {
+  flex: none;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+.recent-grid-empty button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .template-grid {
@@ -2561,8 +2694,10 @@ body:has(.canvas-wrap.empty) .workspace {
   flex-direction: column;
   gap: 18px;
   min-width: 0;
+  min-height: 0;
   padding: 28px 24px;
   overflow: auto;
+  overscroll-behavior: contain;
   background: var(--panel);
   border-left: 1px solid var(--line);
 }
@@ -2759,9 +2894,18 @@ body:has(.canvas-wrap.empty) .workspace {
 }
 
 @media (max-width: 1080px) {
+  /* 窄窗口改为单列堆叠，整页作为一个文档滚动：行高按内容计算，
+     否则两行会被容器高度压缩，主列的内容会溢出并压到右栏上面。 */
   .canvas-wrap.empty .empty-state {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: max-content max-content;
+    align-content: start;
     overflow: auto;
+  }
+
+  .welcome-main,
+  .welcome-aside {
+    overflow: visible;
   }
 
   .welcome-aside {
@@ -4226,188 +4370,6 @@ body:has(.canvas-wrap.empty) .workspace {
 @container (max-width: 520px) {
   #style-detail-fields {
     grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.app-dialog.layout-image-dialog {
-  width: min(640px, calc(100vw - 32px));
-}
-
-.app-dialog.layout-image-dialog form {
-  height: fit-content;
-}
-
-.layout-image-dialog footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.layout-image-dialog footer button {
-  height: 30px;
-  padding: 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--control);
-  cursor: pointer;
-}
-
-.layout-image-dialog footer .primary {
-  border-color: var(--accent);
-  color: #fff;
-  background: var(--accent);
-}
-
-.layout-image-dialog form {
-  gap: 14px;
-}
-
-.layout-image-file {
-  min-height: 170px;
-  display: grid;
-  align-content: center;
-  place-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 7px;
-  padding: 16px;
-  border: 1px dashed var(--line);
-  border-radius: 8px;
-  color: var(--secondary);
-  background: var(--content);
-  cursor: pointer;
-}
-
-.layout-image-file:hover,
-.layout-image-file.has-image {
-  border-color: var(--accent);
-  background: var(--hover);
-}
-
-.layout-image-file img {
-  max-width: 100%;
-  max-height: 190px;
-  object-fit: contain;
-}
-
-.layout-image-file small,
-.layout-image-dialog header small,
-.layout-image-targets label small {
-  color: var(--tertiary);
-  font-size: 11px;
-}
-
-.layout-image-targets {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.layout-image-targets legend {
-  grid-column: 1 / -1;
-  margin-bottom: 2px;
-  color: var(--secondary);
-  font-size: 12px;
-}
-
-.layout-image-targets label {
-  min-height: 68px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--control);
-  cursor: pointer;
-}
-
-.layout-image-targets label:has(input:checked) {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent);
-  background: var(--hover);
-}
-
-.layout-image-targets input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  opacity: 0;
-}
-
-.layout-image-targets label span {
-  display: grid;
-  gap: 3px;
-}
-
-.layout-image-config {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.layout-image-config legend {
-  color: var(--secondary);
-  font-size: 12px;
-}
-
-.layout-image-config-control {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--glass-border);
-  border-radius: 9px;
-  background: var(--glass-surface);
-}
-
-.layout-image-config-control button {
-  flex: 1;
-  min-width: 0;
-  height: 25px;
-  padding: 0 6px;
-  border-radius: 6px;
-  color: var(--secondary);
-  background: transparent;
-  font-size: 11px;
-}
-
-.layout-image-config-control button.active {
-  color: var(--text);
-  background: var(--glass-highlight);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 10%);
-}
-
-.layout-image-config small {
-  color: var(--tertiary);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.layout-image-config[disabled] .layout-image-config-control button {
-  color: var(--tertiary);
-  cursor: not-allowed;
-}
-
-.layout-image-config[disabled] .layout-image-config-control button.active {
-  color: var(--tertiary);
-  background: transparent;
-  box-shadow: none;
-}
-
-.layout-image-scope,
-.layout-image-error {
-  margin: 0;
-}
-
-@media (max-width: 520px) {
-  .layout-image-targets {
-    grid-template-columns: 1fr;
   }
 }
 

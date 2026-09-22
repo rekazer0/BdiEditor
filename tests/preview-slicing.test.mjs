@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { drawNineSliceImage } from '../src/preview.ts'
+import { constrainedCanvasSize, drawNineSliceImage } from '../src/preview.ts'
 
 // Model the shared scratch canvas: resizing clears it and drawing replaces pixels.
 function setup() {
@@ -52,4 +52,9 @@ test('different bitmap objects and repeated frames keep their own background', (
     assert.equal(frames[index].slices.length, 9)
     for (const slice of frames[index].slices) assert.equal(slice[0], image)
   }
+})
+
+test('thumbnail backing size stays within its pixel budget', () => {
+  assert.deepEqual(constrainedCanvasSize(1206, 2622, 560, 320), { width: 147, height: 320 })
+  assert.deepEqual(constrainedCanvasSize(280, 160, 560, 320), { width: 280, height: 160 })
 })

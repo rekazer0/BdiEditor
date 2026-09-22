@@ -420,7 +420,7 @@ main {
 
 /* Rows ------------------------------------------------------------------------------------------ */
 
-#files .sidebar-overview button.nav-item,
+/* 源文件树保持原有的扁平行；概览条目使用下面的卡片样式。 */
 #files .raw-files .source-tree-row {
   width: 100%;
   min-height: 34px;
@@ -428,7 +428,7 @@ main {
   display: flex;
   align-items: center;
   gap: 8px;
-  /* 3px keeps a two-line 概览 row inside the same 34px box as a one-line tree row. */
+  /* 3px keeps a two-line row inside the same 34px box as a one-line tree row. */
   padding: 3px 8px;
   border: 0;
   border-radius: var(--pen-radius-sm);
@@ -445,31 +445,80 @@ main {
   transform: none;
 }
 
-/* 概览 rows carry a subtitle, so label and meta share the column beside the icon. */
+/* -------------------------------------------------------------------------------------------------
+ * 概览列表 — 与「源文件」树同一套行语言。
+ *
+ * 每个条目只有两件事：名字（左，可截断）与技术文件名（右，等宽、次要色）。行高、圆角、
+ * 图标尺寸与源文件树一致，状态只换颜色不换几何；列表是平铺的行，不再是叠起来的卡片。
+ * ------------------------------------------------------------------------------------------------- */
+
+/* 1px 行距即列表本身的分隔节奏，分组标题负责分段。 */
+#files .sidebar-overview .nav-group-body {
+  gap: 1px;
+}
+
 #files .sidebar-overview button.nav-item {
-  min-height: 44px;
-  padding: 8px;
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  align-content: center;
-  column-gap: 8px;
-  row-gap: 0;
+  width: 100%;
+  min-height: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--pen-radius-sm);
+  /* 描边只留给键盘焦点，列表因此不再是一叠卡片。 */
+  outline: none;
+  color: var(--pen-secondary);
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  transform: none;
+  transition: background-color 140ms ease, color 140ms ease;
 }
 
+/* 图标与源文件树同尺寸同色，去掉底砖后列表更安静。 */
 #files .sidebar-overview button.nav-item > .system-symbol {
-  grid-row: 1 / span 2;
+  position: static;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 0;
+  color: var(--pen-tertiary);
+  background: none;
+  font-size: 15px;
+  transform: none;
+  transition: color 140ms ease;
 }
 
-#files .sidebar-overview button.nav-item-no-meta > .system-symbol {
-  grid-row: 1;
+/* 名字占剩余宽度并可截断；文件名贴右边缘用等宽，和检查器的值列同一种读法。 */
+#files .sidebar-overview button.nav-item > .nav-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
-#files .sidebar-overview button.nav-item > .nav-label,
 #files .sidebar-overview button.nav-item > .nav-meta {
-  grid-column: 2;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 46%;
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.2;
 }
 
-#files .sidebar-overview button.nav-item > .system-symbol,
 #files .raw-files .source-tree-row > .system-symbol {
   position: static;
   width: 16px;
@@ -485,7 +534,6 @@ main {
 #files .raw-files .source-folder-row > .system-symbol {
   color: var(--pen-accent);
 }
-
 /* The disclosure chevron is the same glyph in a group heading and in a folder row. */
 #files .source-disclosure {
   width: 8px;
@@ -548,12 +596,31 @@ main {
   font-weight: 600;
 }
 
+/* 分组标题：列表段落的分隔行 —— 上间距 + 数量胶囊，行高比条目略矮。 */
 #files .sidebar-overview > .nav-group > .nav-section {
-  margin-top: 8px;
+  min-height: 26px;
+  margin-top: 12px;
+  padding: 3px 8px;
+  border-radius: var(--pen-radius-sm);
 }
 
 #files .sidebar-overview > .nav-group:first-child > .nav-section {
   margin-top: 0;
+}
+
+/* 数量胶囊：与卡片同宽的右边界，等宽数字让 1 / 13 对齐。 */
+#files .sidebar-overview .nav-section-count {
+  min-width: 20px;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: var(--pen-radius-pill);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 17px;
+  text-align: center;
 }
 
 #files .raw-files .source-folder-row {
@@ -562,7 +629,46 @@ main {
 
 /* States ---------------------------------------------------------------------------------------- */
 
-#files .sidebar-overview button.nav-item:hover,
+/* 三种状态只换颜色，不换几何：平铺行 → 悬停下沉色 → 选中品牌色浅底。 */
+#files .sidebar-overview button.nav-item:hover {
+  background: var(--pen-surface-subtle);
+  color: var(--pen-text);
+  transform: none;
+}
+
+#files .sidebar-overview button.nav-item:hover > .system-symbol {
+  color: var(--pen-text);
+}
+
+#files .sidebar-overview button.nav-item.selected,
+#files .sidebar-overview button.nav-item.selected:hover {
+  background: var(--pen-accent-soft);
+  color: var(--pen-accent);
+  box-shadow: none;
+  transform: none;
+  font-weight: 600;
+}
+
+#files .sidebar-overview button.nav-item.selected > .nav-label,
+#files .sidebar-overview button.nav-item.selected > .system-symbol {
+  color: var(--pen-accent);
+}
+
+/* 选中只换图标颜色，不再换底砖。 */
+#files .sidebar-overview button.nav-item.selected > .system-symbol {
+  background: none;
+}
+
+#files .sidebar-overview button.nav-item.selected > .nav-meta {
+  color: color-mix(in srgb, var(--pen-accent) 62%, var(--pen-tertiary));
+}
+
+/* 键盘可达性：焦点环画在行内，几何不变。 */
+#files .sidebar-overview button.nav-item:focus-visible {
+  outline: 2px solid var(--pen-accent);
+  outline-offset: -2px;
+}
+
 #files .sidebar-overview .nav-section:hover,
 #files .raw-files .source-tree-row:hover:not(.selected) {
   color: var(--pen-text);
@@ -570,8 +676,6 @@ main {
   transform: none;
 }
 
-#files .sidebar-overview button.nav-item.selected,
-#files .sidebar-overview button.nav-item.selected:hover,
 #files .raw-files .source-tree-row.selected,
 #files .raw-files .source-tree-row.selected:hover {
   color: var(--pen-accent);
@@ -581,8 +685,6 @@ main {
   font-weight: 600;
 }
 
-#files .sidebar-overview button.nav-item.selected > .system-symbol,
-#files .sidebar-overview button.nav-item.selected .nav-meta,
 #files .raw-files .source-tree-row.selected > .system-symbol {
   color: var(--pen-accent);
 }

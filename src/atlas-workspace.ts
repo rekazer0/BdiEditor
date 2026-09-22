@@ -1,4 +1,4 @@
-import { ArrowLeft, Copy, FolderInput, Grid2x2, Maximize, Minus, Plus, createElement } from "lucide"
+import { ArrowLeft, Copy, FolderInput, Grid2x2, Maximize, Minus, Plus, Scissors, createElement } from "lucide"
 import type { IconNode } from "lucide"
 import type { TileSlice } from "./tiles"
 import "./atlas-workspace.css"
@@ -21,8 +21,10 @@ export function createAtlasWorkspace(actions: {
   copy(): void
   create(name: string, width: number, height: number): void
   import(files: File[]): void
+  autoSlice(): void
   guides(): void
   stretch(enabled: boolean): void
+  redraw(): void
 }) {
   const get = (selector: string) => document.querySelector<HTMLElement>(selector)!
   const list = get("#resource-list-view")
@@ -80,7 +82,8 @@ export function createAtlasWorkspace(actions: {
   extras.append(copy, create, folder, input)
   list.querySelector(".resource-actions")!.append(extras)
   const grid = button("atlas-grid", "显示切片网格", Grid2x2, actions.guides)
-  toolbar.append(grid)
+  const autoSlice = button("atlas-auto-slice", "自动切片", Scissors, actions.autoSlice)
+  toolbar.append(grid, autoSlice)
   const reference = document.createElement("div")
   reference.className = "atlas-reference"
   reference.innerHTML = '<span>引用</span><output></output>'
@@ -119,13 +122,14 @@ export function createAtlasWorkspace(actions: {
     fitted = false
     zoomValue = Math.min(4, Math.max(0.05, zoomValue * factor))
     resize()
+    actions.redraw()
   }
   zoom.append(button("atlas-zoom-out", "缩小图集", Minus, () => zoomBy(1 / 1.2)), percent,
     button("atlas-zoom-in", "放大图集", Plus, () => zoomBy(1.2)),
-    button("atlas-zoom-fit", "适配图集", Maximize, () => { fitted = true; resize() }))
+    button("atlas-zoom-fit", "适配图集", Maximize, () => { fitted = true; resize(); actions.redraw() }))
   workspace.append(zoom)
   wrap.addEventListener("wheel", event => {
-    if (!desktopActive || !(event.ctrlKey || event.metaKey)) return
+    if (!desktopActive) return
     event.preventDefault()
     zoomBy(event.deltaY < 0 ? 1.1 : 1 / 1.1)
   }, { passive: false })
@@ -160,6 +164,7 @@ export function createAtlasWorkspace(actions: {
     stretch.hidden = next.bda
     copy.disabled = !next.path || !next.editable
     create.disabled = folder.disabled = !next.editable
+    autoSlice.disabled = !next.path || !next.editable || next.bda
     grid.classList.toggle("active", next.guides)
     grid.setAttribute("aria-pressed", String(next.guides))
     status.textContent = `${slice ? `已选 1 个切片 · 切片 #${slice.index}` : "未选择切片"} · 原图 ${next.width} × ${next.height}`

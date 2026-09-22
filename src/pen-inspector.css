@@ -21,7 +21,6 @@
   --pin-gutter-sm: 8px;
   --pin-row-h: 32px;
   --pin-head-h: 34px;
-  --pin-action-h: 52px;
   --pin-rail-w: 60px;
 
   /* Controls */
@@ -207,41 +206,6 @@
   color: var(--pin-ink);
 }
 
-/* Sticky action bar */
-:root body .source #quick-inspector > .pin-actions {
-  position: sticky;
-  z-index: 4;
-  bottom: 0;
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: var(--pin-action-h);
-  margin-top: auto;
-  padding: 8px var(--pin-gutter);
-  border-top: 1px solid var(--pin-line);
-  background: var(--pin-surface);
-}
-
-:root body .source .pin-actions-slot {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 6px;
-}
-
-:root body .source .pin-actions-meta {
-  margin-left: auto;
-  color: var(--pin-ink-faint);
-  font-family: var(--font-ui, inherit);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-:root body .source .pin-actions-meta[data-count="0"] {
-  visibility: hidden;
-}
-
 :root body .source .pin-reset-all {
   height: 28px;
   padding: 0 10px;
@@ -259,89 +223,14 @@
   color: var(--pin-accent);
 }
 
-:root body .source #quick-inspector .pin-actions-slot[hidden],
-:root body .source #quick-inspector .pin-actions-slot[hidden] > *,
 :root body .source #quick-inspector .pin-reset-all[hidden] {
   display: none !important;
-}
-
-:root body .source #quick-inspector .pin-actions-slot {
-  flex-wrap: nowrap;
-  overflow: hidden;
-}
-
-:root body .source #quick-inspector .pin-actions .key-toolbar,
-:root body .source #quick-inspector .pin-actions .tile-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--pin-sunken);
-}
-
-:root body .source #quick-inspector .pin-actions .key-toolbar .toolbar-button {
-  width: 28px;
-  height: 26px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--pin-ink-muted);
-}
-
-:root body .source #quick-inspector .pin-actions .key-toolbar .toolbar-button:hover:not(:disabled) {
-  background: var(--pin-surface);
-  color: var(--pin-ink);
-}
-
-:root body .source #quick-inspector .pin-actions .toolbar-button.is-danger:hover:not(:disabled),
-:root body .source #quick-inspector .pin-actions .key-toolbar [data-key-action="delete"]:hover:not(:disabled) {
-  color: var(--danger, #e5484d);
 }
 
 /* Section title row: keep the summary/hint pinned to the right edge. */
 :root body .source #quick-inspector .pin-summary,
 :root body .source #quick-inspector .pin-hint {
   margin-left: auto;
-}
-
-/* Action bar buttons (mirrors of the key toolbar) */
-:root body .source #quick-inspector > .pin-actions .pin-action {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: var(--pin-sunken);
-  color: var(--pin-ink-muted);
-  font-family: var(--font-ui, inherit);
-  font-size: 11.5px;
-  cursor: pointer;
-}
-
-:root body .source #quick-inspector > .pin-actions .pin-action > svg,
-:root body .source #quick-inspector > .pin-actions .pin-action > .system-symbol,
-:root body .source #quick-inspector > .pin-actions .pin-action > .icon {
-  width: 14px;
-  height: 14px;
-}
-
-:root body .source #quick-inspector > .pin-actions .pin-action:hover:not(:disabled) {
-  border-color: var(--pin-line);
-  background: var(--pin-surface);
-  color: var(--pin-ink);
-}
-
-:root body .source #quick-inspector > .pin-actions .pin-action:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-:root body .source #quick-inspector > .pin-actions .pin-action.is-danger:hover:not(:disabled) {
-  color: var(--danger, #e5484d);
 }
 
 /* ------------------------------------------------------------------ *
@@ -380,11 +269,6 @@
     overflow: hidden auto;
   }
 
-  :root body .source #quick-inspector > .pin-actions {
-    position: relative !important;
-    bottom: auto !important;
-    grid-area: 2 / 1 / 3 / -1 !important;
-  }
 }
 
 @media (max-width: 760px) {
@@ -400,7 +284,6 @@
     order: 0;
     min-width: 0;
   }
-  :root body .source #quick-inspector > .pin-actions { grid-row: 3 !important; }
   :root body .source #quick-inspector[data-inspector-group-display="grouped"] > #mobile-inspector-groups {
     grid-row: 1 !important;
     display: flex;
@@ -440,11 +323,7 @@
   display: none !important;
 }
 
-/* The key actions live in the sticky action bar now — drop the inline copy. */
-:root body .source #quick-inspector .inspector-group > .key-toolbar,
-:root body .source #quick-inspector .mobile-inspector-managed > .key-toolbar {
-  display: none !important;
-}
+/* The 布局 section header owns the key actions, in panel, above 位置与尺寸. */
 
 /* Inspector: a horizontal category bar and one property per row. */
 :root body .source #quick-inspector#quick-inspector[data-inspector-group-display="grouped"]:not([hidden]) {
@@ -489,11 +368,6 @@
   min-height: 0 !important;
   height: 100% !important;
   overflow: hidden auto !important;
-}
-:root body .source #quick-inspector#quick-inspector > .pin-actions {
-  grid-area: 3 / 1 !important;
-  position: static !important;
-  min-height: 44px !important;
 }
 :root body .source #quick-inspector#quick-inspector :is(#document-fields, #bda-config-fields) .document-property-grid,
 :root body .source #quick-inspector#quick-inspector .inspector-grid {
@@ -639,7 +513,6 @@
   overflow-wrap: anywhere;
 }
 :root body .source #quick-inspector#quick-inspector[data-inspector-group-display="grouped"] > :is(.mobile-inspector-managed, .document-fields, .bda-config-fields, #resource-inspector) { grid-area: 1 / 1 !important; }
-:root body .source #quick-inspector#quick-inspector > .pin-actions { grid-area: 2 / 1 / 3 / -1 !important; }
 :root body .source #quick-inspector#quick-inspector[data-inspector-group-display="grouped"]:has(> #mobile-inspector-groups[hidden]) { grid-template-columns: minmax(0, 1fr) !important; }
 /* ------------------------------------------------------------------ *
  * Pen spec lock — /Users/kaze/Downloads/属性检查器.pen
@@ -677,16 +550,6 @@
 }
 :root body .source #quick-inspector#quick-inspector .pin-dot {
   background: var(--pin-mark, var(--pin-accent)) !important;
-}
-:root body .source #quick-inspector > .pin-actions .pin-actions-meta {
-  height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  line-height: 20px;
-}
-:root body .source #quick-inspector > .pin-actions .pin-actions-meta[data-count="0"] {
-  background: transparent;
 }
 
 :root body .source #quick-inspector#quick-inspector label:not(.pin-search):not(.style-reference-field):not(.fore-styles-reference-field) {
@@ -728,7 +591,6 @@
   --pin-rail-w: 64px;
   --pin-row-h: 30px;
   --pin-ctrl-h: 30px;
-  --pin-action-h: 50px;
 }
 :root body .source .inspector-title.key-inspector-title {
   min-height: 59px;
@@ -749,7 +611,7 @@
   grid-template-rows: minmax(0, 1fr) auto !important;
 }
 :root body .source #quick-inspector#quick-inspector > #mobile-inspector-groups:not([hidden]) {
-  grid-area: 1 / 2 / 3 / 3 !important;
+  grid-area: 1 / 2 !important;
   padding: 10px 6px !important;
   gap: 4px !important;
 }
@@ -772,35 +634,6 @@
   display: inline-flex !important;
   width: 15px !important;
   height: 15px !important;
-}
-:root body .source #quick-inspector#quick-inspector > .pin-actions {
-  grid-area: 2 / 1 !important;
-  min-height: 50px !important;
-  gap: 4px;
-  padding: 10px 12px;
-}
-:root body .source #quick-inspector > .pin-actions .pin-action {
-  flex: 0 0 26px;
-  width: 26px;
-  height: 28px;
-  justify-content: center;
-  padding: 0;
-  border-radius: 6px;
-  background: transparent;
-}
-:root body .source #quick-inspector > .pin-actions .pin-action[data-key-mode-mirror] {
-  background: var(--pin-sunken);
-}
-:root body .source #quick-inspector > .pin-actions .pin-action.active {
-  background: var(--pin-accent-soft);
-  color: var(--pin-accent);
-}
-:root body .source .pin-actions-slot { gap: 2px; }
-:root body .source .pin-reset-all { padding: 0 4px; border: 0; background: transparent; }
-:root body .source #quick-inspector > .pin-actions .pin-actions-meta[data-count="0"] {
-  visibility: visible;
-  padding: 0;
-  color: var(--pin-ink-faint);
 }
 :root body .source #quick-inspector#quick-inspector > .inspector-group.mobile-inspector-active {
   padding: 16px 14px 18px !important;
@@ -912,11 +745,6 @@
   width: 100% !important;
   height: 64px !important;
   object-fit: contain;
-}
-:root body .source #quick-inspector#quick-inspector .style-picker-state-caption {
-  display: block !important;
-  color: var(--pin-ink-muted);
-  font: 10px var(--font-ui);
 }
 :root body .source #quick-inspector#quick-inspector:has(> #mobile-inspector-groups[hidden]) {
   grid-template-columns: minmax(0, 1fr) !important;

@@ -27,7 +27,6 @@
   --pin-row-h: 30px;
   --pin-ctrl-h: 30px;
   --pin-value-h: 28px;
-  --pin-action-h: 50px;
   --pin-ctrl-radius: 6px;
   --inspector-row-height: 30px;
   --inspector-field-height: 30px;
@@ -148,7 +147,7 @@
 :root body .source #quick-inspector#quick-inspector#quick-inspector[data-inspector-group-display="grouped"]:not([hidden]) {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) 60px !important;
-  grid-template-rows: minmax(0, 1fr) auto !important;
+  grid-template-rows: minmax(0, 1fr) !important;
   overflow: hidden !important;
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector > #mobile-inspector-groups:not([hidden]) {
@@ -201,82 +200,147 @@
   height: 15px !important;
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector > #mobile-inspector-groups .system-symbol { display: none !important; }
-:root body .source #quick-inspector#quick-inspector#quick-inspector > .pin-actions {
-  grid-area: 2 / 1 / 3 / -1 !important;
+/* 布局 tool row — the key tools live inside the panel instead of a bottom bar.
+   One sunken well: mode segment, direct actions, then the change counter at the
+   same right edge the property values below use. */
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar {
   display: flex !important;
   align-items: center !important;
-  min-height: 50px !important;
-  gap: 6px;
-  padding: 11px 12px;
-  border-top: 1px solid var(--pin-line);
-  background: var(--pin-surface);
+  gap: 2px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 4px !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: var(--pin-sunken) !important;
+  box-shadow: none !important;
 }
-:root body .source #quick-inspector#quick-inspector#quick-inspector .inspector-mode-segment {
-  display: flex;
-  gap: 2px;
-  box-sizing: border-box;
-  height: 28px;
-  padding: 2px;
-  border-radius: 8px;
-  background: var(--pin-sunken);
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .toolbar-button {
+  display: grid !important;
+  place-items: center !important;
+  flex: 0 0 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--pin-ink-muted) !important;
 }
-:root body .source #quick-inspector#quick-inspector#quick-inspector .inspector-mode-segment .pin-action {
-  width: 26px;
-  height: 24px;
-  background: transparent;
-  color: var(--pin-ink-muted);
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .toolbar-button :is(.system-symbol, svg) {
+  width: 14px !important;
+  height: 14px !important;
+  color: inherit !important;
 }
-:root body .source #quick-inspector#quick-inspector#quick-inspector .inspector-mode-segment .pin-action.active {
-  color: var(--pin-ink);
-  background: var(--pin-surface);
-  box-shadow: 0 1px 3px #0001;
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .toolbar-button:hover:not(:disabled) {
+  color: var(--pin-ink) !important;
+  background: var(--pin-surface) !important;
 }
-:root body .source #quick-inspector#quick-inspector#quick-inspector > .pin-actions .pin-action {
-  display: grid;
-  place-items: center;
-  flex: 0 0 26px;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--pin-ink-muted);
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .toolbar-button:disabled {
+  color: var(--pin-ink-faint) !important;
+  opacity: 0.45 !important;
 }
-:root body .source #quick-inspector#quick-inspector#quick-inspector .pin-action.is-danger { color: var(--pin-danger); }
-:root body .source #quick-inspector#quick-inspector#quick-inspector > .pin-actions .pin-actions-meta {
-  display: inline-flex;
-  align-items: center;
-  height: 23px;
-  padding: 0 9px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  line-height: 23px;
+/* Mode switch: a raised segment inside the well, accent while active. */
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .key-mode-control {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  gap: 2px !important;
+  box-sizing: border-box !important;
+  height: 26px !important;
+  margin: 0 2px 0 0 !important;
+  padding: 2px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: var(--pin-surface) !important;
 }
-:root body .source #quick-inspector#quick-inspector#quick-inspector > .pin-actions .pin-actions-meta:not([data-count="0"]) {
-  color: var(--pin-sel) !important;
-  background: var(--pin-sel-soft) !important;
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .key-mode-control .toolbar-button {
+  flex: 0 0 22px !important;
+  width: 22px !important;
+  min-width: 22px !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  border-radius: 6px !important;
 }
-:root body .source #quick-inspector#quick-inspector#quick-inspector > .pin-actions .pin-actions-meta:not([data-count="0"])::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 6px;
-  background: currentColor;
-  border-radius: 50%;
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .key-mode-control .toolbar-button:hover:not(:disabled) {
+  background: var(--pin-sunken) !important;
 }
-:root body .source #quick-inspector#quick-inspector#quick-inspector > .pin-actions .pin-actions-meta[data-count="0"] {
-  padding: 0;
-  color: var(--pin-ink-faint);
-  background: transparent;
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .key-mode-control .toolbar-button.active {
+  color: var(--pin-accent) !important;
+  background: var(--pin-accent-soft) !important;
 }
-:root body .source .pin-reset-all {
-  padding: 0 4px;
-  border: 0;
-  background: transparent;
-  color: var(--pin-ink-muted);
-  font: 11.5px var(--font-ui);
+/* Destructive action: set apart from the safe tools, never pushed to the status edge. */
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .pin-tool-separator {
+  flex: 0 0 1px !important;
+  align-self: stretch !important;
+  margin: 5px 1px !important;
+  background: var(--pin-line) !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar [data-key-action="delete"] {
+  margin-left: 0 !important;
+  color: var(--pin-ink-muted) !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar [data-key-action="delete"]:hover:not(:disabled) {
+  color: var(--pin-danger) !important;
+  background: color-mix(in srgb, var(--pin-danger) 12%, transparent) !important;
+}
+/* Change counter + reset: the value edge of the tool row. */
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .pin-actions-meta {
+  display: inline-flex !important;
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  align-items: center !important;
+  height: 22px !important;
+  margin-left: auto !important;
+  overflow: hidden !important;
+  padding: 0 7px !important;
+  padding: 0 6px !important;
+  background: transparent !important;
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-ui) !important;
+  font-size: 10px !important;
+  line-height: 22px !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .pin-actions-meta[data-count="0"] {
+  padding: 0 2px !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .pin-actions-meta:not([data-count="0"]) {
+  color: var(--pin-mark, var(--pin-accent)) !important;
+  background: color-mix(in srgb, var(--pin-mark, var(--pin-accent)) 14%, transparent) !important;
+  font-weight: 500 !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .pin-actions-meta:not([data-count="0"])::before {
+  content: "" !important;
+  display: inline-block !important;
+  width: 6px !important;
+  height: 6px !important;
+  margin-right: 6px !important;
+  border-radius: 50% !important;
+  background: currentColor !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .pin-reset-all {
+  flex: 0 0 auto !important;
+  height: 22px !important;
+  margin-left: 3px !important;
+  padding: 0 6px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: 999px !important;
+  background: var(--pin-surface) !important;
+  color: var(--pin-ink-muted) !important;
+  font-family: var(--font-ui) !important;
+  font-size: 10px !important;
+  line-height: 20px !important;
+  cursor: pointer;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .pin-reset-all:hover {
+  border-color: var(--pin-accent) !important;
+  background: var(--pin-accent-soft) !important;
+  color: var(--pin-accent) !important;
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector > .mobile-inspector-active {
   grid-area: 1 / 1 !important;
@@ -457,7 +521,8 @@
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector .appearance-visual-styles { position: relative; z-index: 0; overflow: hidden; }
 :root body .source #quick-inspector#quick-inspector#quick-inspector .appearance-layout-fields { position: relative; z-index: 2; margin-top: 12px; }
-:root body .source #quick-inspector#quick-inspector#quick-inspector :is(.style-ref-row, .style-reference-field:not(.fore-styles-reference-field), .appearance-sound-field > label) {
+:root body .source #quick-inspector#quick-inspector#quick-inspector :is(.style-ref-row, .style-reference-field:not(.fore-styles-reference-field), .appearance-sound-field > label),
+:root body .source #quick-inspector#quick-inspector#quick-inspector #document-fields .document-property-field.style-reference-field:not(.fore-styles-reference-field) {
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch !important;
@@ -769,12 +834,13 @@
     font-weight: 400 !important;
   }
   & .reference-badge { margin-left: auto; padding: 3px 7px; border-radius: 12px; background: var(--pin-sunken); color: var(--pin-ink-faint); font: 10px var(--font-ui); }
-  & .style-ref-row > span:first-child { font-size: 12px !important; color: var(--pin-ink-faint) !important; }
+  & .style-ref-row > span:first-child,
+  & #document-fields .document-property-field.style-reference-field > .document-field-caption { flex: none !important; font-size: 12px !important; color: var(--pin-ink-faint) !important; }
   & .style-ref-row small { font: 10px var(--font-mono); }
   & .style-reference-row { height: 110px !important; border-radius: 12px !important; }
   & .style-reference-row > .style-reference-number { flex-basis: 28% !important; width: 28% !important; font: 600 19px var(--font-mono) !important; }
   & .style-reference-row > .style-picker-states {
-    padding: 12px 8px !important;
+    padding: 8px !important;
     gap: 8px !important;
     background-color: var(--pin-surface) !important;
     background-image: conic-gradient(var(--pin-line) 25%, transparent 0 50%, var(--pin-line) 0 75%, transparent 0) !important;
@@ -782,8 +848,7 @@
   }
   & .style-reference-row .style-picker-state { gap: 5px !important; border-radius: 8px !important; }
   & .style-reference-row .style-picker-state:hover { background: var(--pin-accent-soft) !important; }
-  & .style-reference-row .style-picker-state canvas { height: 62px !important; min-height: 0 !important; }
-  & .style-picker-state-caption { display: block !important; color: var(--pin-ink-muted); font: 11px var(--font-ui); }
+  & .style-reference-row .style-picker-state canvas { height: 100% !important; min-height: 0 !important; }
   & .appearance-property-grid { gap: 12px !important; }
   & .appearance-sound-field { padding: 0 !important; }
   & .sound-style-reference { height: 56px !important; border-radius: 11px !important; background: var(--pin-sunken) !important; }

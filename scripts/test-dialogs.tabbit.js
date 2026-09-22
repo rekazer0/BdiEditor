@@ -31,8 +31,13 @@ await page.locator('#quick-inspector').getByRole('button', { name: '样式', exa
 const trigger = page.locator('.style-picker-state:visible').first();
 const input = trigger.locator('xpath=ancestor::*[contains(@class,"style-reference-input")]').locator('input').first();
 const original = await input.inputValue();
-await trigger.click();
 const library = page.locator('#style-picker-dialog');
+// 预览图点击进入该图片的切片选择器，不再打开样式选择器。
+await trigger.click();
+await expect(library).not.toBeVisible();
+await page.keyboard.press('Escape');
+// 样式选择器保留在 Alt 点击上。
+await trigger.click({ modifiers: ['Alt'] });
 await expect(library.locator('[data-style-library-mode=styles]')).toHaveAttribute('aria-pressed', 'true');
 await expect(library.locator('.style-picker-item').first()).toBeVisible();
 const total = await library.locator('.style-picker-item').count();
@@ -53,7 +58,7 @@ await expect(library.locator('.style-picker-item').first()).toBeVisible();
 await library.locator('.style-picker-item').first().dblclick();
 await expect(library).not.toBeVisible();
 await expect(input).toHaveValue('1');
-await trigger.click();
+await trigger.click({ modifiers: ['Alt'] });
 await library.getByRole('button', { name: '全部图片', exact: true }).click();
 await expect(library.locator('.style-picker-item img').first()).toBeVisible();
 await expect.poll(() => library.locator('.style-picker-item img').evaluateAll(nodes => nodes.every(n => n.complete && n.naturalWidth > 0))).toBe(true);
@@ -64,7 +69,7 @@ await expect(library).not.toBeVisible();
 await expect(page.locator('#style-image-dialog')).toBeVisible();
 await expect(page.locator('#style-image-picker-canvas')).toBeVisible();
 await page.keyboard.press('Escape');
-await trigger.click();
+await trigger.click({ modifiers: ['Alt'] });
 await expect(library.locator('[data-style-library-mode=styles]')).toHaveAttribute('aria-pressed', 'true');
 await page.setViewportSize({ width: 390, height: 844 });
 expect(await library.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
@@ -77,4 +82,4 @@ expect(await project.evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
 await expect(project.getByRole('button', { name: '创建皮肤', exact: true })).toBeInViewport();
 await page.keyboard.press('Escape');
 expect(errors).toEqual([]);
-return { passed: true, styles: total, checks: ['7 template previews', 'invalid name and cancel', 'create and rename BDS', 'categories', 'preview does not mutate', 'empty search', 'double-click applies', 'images load', 'image slice chooser', 'default tab reset', '390px layout', 'Escape closes', 'no page errors'] };
+return { passed: true, styles: total, checks: ['7 template previews', 'invalid name and cancel', 'create and rename BDS', 'categories', 'preview does not mutate', 'preview click opens image slice chooser', 'alt click opens style library', 'empty search', 'double-click applies', 'images load', 'image slice chooser', 'default tab reset', '390px layout', 'Escape closes', 'no page errors'] };

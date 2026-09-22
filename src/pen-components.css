@@ -880,14 +880,24 @@
 }
 
 /* =================================================================================================
- * 12 · Navigation rows  (组件 / 左侧导航: row padding 8/10 · r5 · 12.5px;
- *     selected = $brand-soft ground + $brand label 600 · group head 12.5/600)
+ * 12 · Navigation rows  (组件 / 左侧导航: 概览条目 = 单行列表 · 16px 单色图标 · 30px 行高 · r8;
+ *     selected = $brand-soft ground + $brand label 600 · group head 12.5/600 · tree row r5)
  * ================================================================================================= */
 
-:root body #files .sidebar-overview button.nav-item,
 :root body #files .raw-files .source-tree-row {
   border-radius: var(--pen-radius-xs);
   font-size: 12.5px;
+}
+
+/* 概览条目与源文件树同一套行语言：单行平铺行，无卡片描边与图标底砖。 */
+:root body #files .sidebar-overview button.nav-item {
+  border-radius: var(--pen-radius-sm);
+  font-size: 12px;
+}
+
+/* 概览条目的名字是行内文字，比树行的 12.5px 再收半档。 */
+:root body #files .sidebar-overview button.nav-item > .nav-label {
+  font-size: 12px;
 }
 
 :root body #files .sidebar-overview .nav-label,
@@ -895,7 +905,11 @@
   font-size: 12.5px;
 }
 
-:root body #files .sidebar-overview .nav-section,
+:root body #files .sidebar-overview .nav-section {
+  border-radius: var(--pen-radius-sm);
+  font-size: 12.5px;
+}
+
 :root body #files .raw-files .source-folder-row {
   border-radius: var(--pen-radius-xs);
   font-size: 12.5px;
@@ -1329,23 +1343,28 @@
   display: none;
 }
 
-/* Desktop title actions follow the rounded, raised reference toolbar. */
+/* Desktop title actions follow the rounded, raised reference toolbar.
+   Every titlebar icon button shares one size, so the left and right groups match. */
 @media (min-width: 761px) {
   :root body .titlebar-right,
   :root body .desktop-quick-actions {
     gap: 6px;
   }
 
-  :root body .titlebar-right .titlebar-icon-button {
+  :root body .titlebar .titlebar-icon-button,
+  :root body .titlebar .toolbar-more > summary.titlebar-icon-button {
     width: 30px;
     height: 30px;
+    min-width: 30px;
     flex: none;
     border-radius: 8px;
     background: var(--pen-surface-subtle);
   }
 
-  :root body .titlebar-right .titlebar-icon-button .system-symbol,
-  :root body .titlebar-right .titlebar-icon-button .system-symbol svg {
+  :root body .titlebar .titlebar-icon-button .system-symbol,
+  :root body .titlebar .titlebar-icon-button .system-symbol svg,
+  :root body .titlebar .toolbar-more > summary.titlebar-icon-button .system-symbol,
+  :root body .titlebar .toolbar-more > summary.titlebar-icon-button .system-symbol svg {
     width: 16px;
     height: 16px;
   }
@@ -1434,6 +1453,118 @@
   font-size: 12px;
 }
 
+:root body .welcome-recent .welcome-section-head {
+  gap: 12px;
+}
+
+/* 与「新建皮肤」标题同级，字号对齐 hero。 */
+:root body .welcome-recent .welcome-section-head h2 {
+  color: var(--pen-text);
+  font-family: var(--font-ui);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+:root body .recent-card-folder {
+  color: var(--pen-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+:root body .welcome-head-action {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-secondary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+:root body .welcome-head-action:hover {
+  background: color-mix(in srgb, var(--pen-accent) 12%, var(--pen-surface-subtle));
+  color: var(--pen-accent);
+}
+
+:root body .recent-grid {
+  grid-template-columns: repeat(auto-fill, 280px);
+  gap: 16px;
+}
+
+/* 最近打开的皮肤预览与模板卡同一尺寸与底色，保证两个区块视觉一致。 */
+:root body .recent-grid .template-preview {
+  height: 160px;
+  padding: 0;
+  align-items: center;
+  background: var(--pen-surface-subtle);
+  color: var(--pen-tertiary);
+  font-size: 11px;
+}
+
+:root body .recent-grid .template-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+:root body .recent-grid .template-name {
+  color: var(--pen-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+:root body .recent-grid .template-go {
+  color: var(--pen-tertiary);
+}
+
+:root body .recent-grid .template-meta {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+}
+
+:root body .recent-grid .template-meta em {
+  border-radius: var(--pen-radius-xs);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-secondary);
+  font-size: 9px;
+}
+
+:root body .recent-grid-empty {
+  border: 1px dashed var(--pen-line);
+  border-radius: var(--pen-radius-md);
+  background: var(--pen-surface);
+}
+
+:root body .recent-grid-empty-copy strong {
+  color: var(--pen-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+:root body .recent-grid-empty-copy span {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+}
+
+:root body .recent-grid-empty button {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-secondary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+:root body .recent-grid-empty button:hover {
+  background: color-mix(in srgb, var(--pen-accent) 12%, var(--pen-surface-subtle));
+  color: var(--pen-accent);
+}
+
 :root body .template-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, 280px);
@@ -1475,7 +1606,7 @@
   font-size: 11px;
 }
 
-:root body .template-grid .template-preview canvas {
+:root body .template-grid .template-preview img {
   display: block;
   width: 100%;
   height: 100%;
@@ -1673,3 +1804,291 @@
 }
 :root body #file-operation-dialog .file-operation-hint { font-size: 11px; color: var(--pen-secondary); }
 :root body #file-operation-close { flex-shrink: 0; min-width: 64px; }
+
+/* =================================================================================================
+ * 8 · Replace-keyboard-style sheet  (弹层 · 替换键盘样式)
+ *     §6 的 `.app-dialog button` 默认值（32px 实线按钮）会把投放区压成一行、把分段控件
+ *     的选中态刷成背景色，这里用 #layout-image-dialog 前缀明确本弹窗自己的尺寸与状态。
+ * ================================================================================================= */
+
+:root body #layout-image-dialog {
+  width: min(680px, calc(100vw - 32px));
+}
+
+/* 内容比视口高时只滚动中间，头尾保持可见。 */
+:root body #layout-image-dialog > form {
+  max-height: calc(100dvh - 64px);
+  overflow-y: auto;
+  gap: 14px;
+}
+
+:root body #layout-image-dialog > form > header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--pen-surface);
+}
+
+:root body #layout-image-dialog > form > footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  background: var(--pen-surface);
+}
+
+/* ── 投放区 ── */
+
+:root body #layout-image-dialog .layout-image-file {
+  height: auto;
+  min-height: 148px;
+  display: grid;
+  align-content: center;
+  place-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 18px;
+  border: 1px dashed var(--pen-line-strong);
+  border-radius: var(--pen-radius-md);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+}
+
+:root body #layout-image-dialog .layout-image-file-icon {
+  font-size: 22px;
+  color: var(--pen-tertiary);
+}
+
+:root body #layout-image-dialog .layout-image-file:hover {
+  border-color: var(--pen-accent);
+  background: var(--pen-accent-soft);
+}
+
+:root body #layout-image-dialog .layout-image-file.drop-target {
+  border-style: solid;
+  border-color: var(--pen-accent);
+  background: var(--pen-accent-soft);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pen-accent) 18%, transparent);
+}
+
+:root body #layout-image-dialog .layout-image-file.has-image {
+  min-height: 0;
+  padding: 10px;
+  border-style: solid;
+  border-color: var(--pen-line);
+  background: var(--pen-surface);
+}
+
+:root body #layout-image-dialog .layout-image-file.has-image:hover {
+  border-color: var(--pen-accent);
+}
+
+:root body #layout-image-dialog .layout-image-file.has-image .layout-image-file-icon {
+  display: none;
+}
+
+:root body #layout-image-dialog .layout-image-file img {
+  max-width: 100%;
+  max-height: 168px;
+  border-radius: var(--pen-radius-xs);
+  object-fit: contain;
+}
+
+:root body #layout-image-dialog .layout-image-file small,
+:root body #layout-image-dialog header small {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+/* ── 替换位置：卡片选中态之前只有 1px 描边，单选圆点被隐藏，这里补回来 ── */
+
+:root body #layout-image-dialog .layout-image-targets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+:root body #layout-image-dialog .layout-image-config legend,
+:root body #layout-image-dialog .layout-image-targets legend {
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--pen-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+:root body #layout-image-dialog .layout-image-targets label {
+  display: flex; /* 覆盖 .app-dialog label 的 grid，否则标题与说明会被拉开 */
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface);
+  cursor: pointer;
+}
+
+:root body #layout-image-dialog .layout-image-targets label::before {
+  content: "";
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--pen-line-strong);
+  border-radius: 50%;
+  background: var(--pen-surface);
+  box-shadow: inset 0 0 0 3px var(--pen-surface);
+}
+
+:root body #layout-image-dialog .layout-image-targets label:hover {
+  border-color: var(--pen-line-strong);
+  background: var(--pen-surface-subtle);
+}
+
+:root body #layout-image-dialog .layout-image-targets label:has(input:checked) {
+  border-color: var(--pen-accent);
+  background: var(--pen-accent-soft);
+}
+
+:root body #layout-image-dialog .layout-image-targets label:has(input:checked)::before {
+  border-color: var(--pen-accent);
+  background: var(--pen-accent);
+  box-shadow: inset 0 0 0 3px var(--pen-accent-soft);
+}
+
+:root body #layout-image-dialog .layout-image-targets label:has(input:focus-visible) {
+  outline: 2px solid var(--pen-accent);
+  outline-offset: 2px;
+}
+
+:root body #layout-image-dialog .layout-image-targets input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  opacity: 0;
+}
+
+:root body #layout-image-dialog .layout-image-targets label span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+:root body #layout-image-dialog .layout-image-targets label strong {
+  color: var(--pen-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+:root body #layout-image-dialog .layout-image-targets label small {
+  color: var(--pen-secondary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+/* ── 布局配置：分段控件的选中态原来与背景同色，等于没有反馈 ── */
+
+:root body #layout-image-dialog .layout-image-config {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+:root body #layout-image-dialog .layout-image-config-control {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--pen-line);
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  /* 容器带 glass-module 类：去掉它的投影与毛玻璃，保持扁平细线风格 */
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body #layout-image-dialog .layout-image-config-control button {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--pen-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  box-shadow: none;
+}
+
+:root body #layout-image-dialog .layout-image-config-control button:hover:not(.active) {
+  color: var(--pen-text);
+  background: var(--pen-surface);
+}
+
+:root body #layout-image-dialog .layout-image-config-control button.active {
+  background: var(--pen-raised);
+  color: var(--pen-text);
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgb(18 20 25 / 12%);
+}
+
+:root body #layout-image-dialog .layout-image-config[disabled] {
+  opacity: 0.55;
+}
+
+:root body #layout-image-dialog .layout-image-config[disabled] button {
+  cursor: not-allowed;
+}
+
+:root body #layout-image-dialog .layout-image-config small {
+  color: var(--pen-tertiary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* ── 说明 · 错误 · 底部按钮 ── */
+
+:root body #layout-image-dialog .layout-image-scope {
+  color: var(--pen-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+:root body #layout-image-dialog .field-error {
+  color: var(--pen-state-danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+:root body #layout-image-dialog footer button {
+  min-width: 84px;
+}
+
+:root body #layout-image-dialog footer button.primary:disabled {
+  border-color: var(--pen-line);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-tertiary);
+  cursor: not-allowed;
+}
+
+@media (max-width: 560px) {
+  :root body #layout-image-dialog .layout-image-targets {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

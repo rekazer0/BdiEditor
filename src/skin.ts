@@ -1,4 +1,4 @@
-import { strFromU8, strToU8, Unzip, UnzipInflate, unzip, unzipSync, zipSync } from "fflate"
+import { inflateSync, strFromU8, strToU8, Unzip, UnzipInflate, unzip, unzipSync, zipSync } from "fflate"
 import type { ExportFormat } from "./export.ts"
 
 const TEXT_EXTENSIONS = new Set(["ini", "css", "til", "cnd", "pop", "txt", "plist"])
@@ -171,12 +171,39 @@ function validateArchiveLimits(bytes: Uint8Array): void {
   }
 }
 
+/**
+ * 部分 Android 打包工具（以及少数第三方皮肤）会把 EOCD 里的“本磁盘条目数”留成 0，
+ * 只把总条目数写对。fflate 只读前者，会把整包解出 0 个文件，皮肤因此打不开或预览失败。
+ * 这里按中央目录把 EOCD 的计数补齐，顺带把磁盘号归零，得到常规单磁盘 ZIP。
+ */
+function normalizeEntryCounts(bytes: Uint8Array): Uint8Array {
+  let endOffset: number
+  try {
+    endOffset = findEnd(bytes)
+  } catch {
+    return bytes
+  }
+  const data = view(bytes)
+  const total = data.getUint16(endOffset + 10, true)
+  const repairs: Array<[number, number]> = [
+    [endOffset + 4, 0],
+    [endOffset + 6, 0],
+    [endOffset + 8, total],
+  ]
+  if (repairs.every(([offset, value]) => data.getUint16(offset, true) === value)) return bytes
+  const normalized = bytes.slice()
+  const normalizedView = view(normalized)
+  for (const [offset, value] of repairs) normalizedView.setUint16(offset, value, true)
+  return normalized
+}
+
 async function unzipWithProgress(
   bytes: Uint8Array,
-  onProgress: (value: number) => void,
+  onProgress?: (value: number) => void,
 ): Promise<Record<string, Uint8Array>> {
   const expected = view(bytes).getUint16(findEnd(bytes) + 10, true)
   const files: Record<string, Uint8Array> = {}
+  let discovered = 0
   let completed = 0
   let inputProgress = 0
   let inputDone = false
@@ -188,13 +215,15 @@ async function unzipWithProgress(
     rejectResult = reject
   })
   const finish = () => {
-    onProgress(inputProgress * 0.7 + (expected ? completed / expected : 1) * 0.3)
-    if (inputDone && completed === expected && !settled) {
+    onProgress?.(inputProgress * 0.7 + (expected ? completed / expected : 1) * 0.3)
+    // 以实际读到的条目数为准：EOCD 里的总条目数被写坏时也能正常结束（空包也一样）。
+    if (inputDone && completed === discovered && !settled) {
       settled = true
       resolveResult(files)
     }
   }
   const unzipper = new Unzip((file) => {
+    discovered++
     const chunks: Uint8Array[] = []
     let length = 0
     file.ondata = (error, chunk, final) => {
@@ -228,13 +257,69 @@ async function unzipWithProgress(
       inputProgress = end / bytes.length
       inputDone = end === bytes.length
       finish()
-      if (!inputDone) await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      // 没有进度回调时不需要让出主线程：分段推送只会白白付出 setTimeout 的钳制开销。
+      if (!inputDone && onProgress) await new Promise<void>((resolve) => setTimeout(resolve, 0))
     }
   } catch (error) {
     settled = true
     rejectResult(error)
   }
   return result
+}
+
+/**
+ * 只取出包里的一个文件：顺序扫本地文件头，只解压命中的条目。
+ * 缩略图只要一张 demo 图，没必要把整包十几 MB 都解出来。
+ * 条目大小写在数据描述符里、或压缩方式不常用时会返回 undefined，由调用方退回整包解压。
+ */
+export function readArchiveEntry(
+  bytes: Uint8Array,
+  match: (name: string) => boolean,
+): { name: string; data: Uint8Array } | undefined {
+  const data = view(bytes)
+  const decoder = new TextDecoder()
+  let offset = 0
+  while (offset + 30 <= bytes.length && data.getUint32(offset, true) === LOCAL_SIGNATURE) {
+    if (data.getUint16(offset + 6, true) & 8) return
+    const method = data.getUint16(offset + 8, true)
+    const compressedSize = data.getUint32(offset + 18, true)
+    const nameLength = data.getUint16(offset + 26, true)
+    const extraLength = data.getUint16(offset + 28, true)
+    const start = offset + 30 + nameLength + extraLength
+    const end = start + compressedSize
+    if (end > bytes.length) return
+    const name = decoder.decode(bytes.subarray(offset + 30, offset + 30 + nameLength))
+    if (match(name)) {
+      if (method === 0) return { name, data: bytes.slice(start, end) }
+      if (method === 8) return { name, data: inflateSync(bytes.subarray(start, end)) }
+      return
+    }
+    offset = end
+  }
+  return
+}
+
+/**
+ * 少数第三方“加密”打包工具（如百叶加密）只保证本地文件头正确，中央目录里的压缩方式
+ * 会被写成非法值，fflate 的 unzip/unzipSync 依赖中央目录，于是整包解出 0 个文件。
+ * 这种情况退回流式解包：它顺序读本地文件头，能把这些皮肤正常读出来。
+ */
+async function unpackArchive(
+  bytes: Uint8Array,
+  onProgress?: (value: number) => void,
+): Promise<Record<string, Uint8Array>> {
+  const report = onProgress ? (value: number) => onProgress(value * 0.85) : undefined
+  try {
+    const unpacked = report
+      ? await unzipWithProgress(bytes, report)
+      : await new Promise<Record<string, Uint8Array>>((resolve, reject) => {
+        unzip(bytes, (error, files) => error ? reject(error) : resolve(files))
+      })
+    if (Object.keys(unpacked).length) return unpacked
+  } catch {
+    // 中央目录不可用，交给下面的本地文件头解包。
+  }
+  return unzipWithProgress(bytes)
 }
 
 function bdaThemeRoots(files: Map<string, Uint8Array>): Map<BdaTheme, string> | undefined {
@@ -416,7 +501,8 @@ export class SkinArchive {
 
   static open(bytes: Uint8Array, formatHint?: ExportFormat): SkinArchive {
     validateArchiveLimits(bytes)
-    const unpacked = unzipSync(bytes)
+    const sourceBytes = normalizeEntryCounts(bytes)
+    const unpacked = unzipSync(sourceBytes)
     const names = Object.keys(unpacked)
     if (names.length > MAX_FILES) throw new Error(`皮肤包含过多文件（${names.length}）`)
 
@@ -428,7 +514,7 @@ export class SkinArchive {
       if (total > MAX_UNPACKED_BYTES) throw new Error("皮肤解压后超过 256 MB")
       files.set(name, unpacked[name])
     }
-    return new SkinArchive(files, bytes, formatHint)
+    return new SkinArchive(files, sourceBytes, formatHint)
   }
 
   static async openAsync(
@@ -437,11 +523,8 @@ export class SkinArchive {
     onProgress?: (value: number) => void,
   ): Promise<SkinArchive> {
     validateArchiveLimits(bytes)
-    const unpacked = onProgress
-      ? await unzipWithProgress(bytes, (value) => onProgress(value * 0.85))
-      : await new Promise<Record<string, Uint8Array>>((resolve, reject) => {
-        unzip(bytes, (error, files) => error ? reject(error) : resolve(files))
-      })
+    const sourceBytes = normalizeEntryCounts(bytes)
+    const unpacked = await unpackArchive(sourceBytes, onProgress)
     const names = Object.keys(unpacked)
     if (names.length > MAX_FILES) throw new Error(`皮肤包含过多文件（${names.length}）`)
 
@@ -457,7 +540,7 @@ export class SkinArchive {
         await new Promise<void>((resolve) => setTimeout(resolve, 0))
       }
     }
-    const archive = new SkinArchive(files, bytes, formatHint)
+    const archive = new SkinArchive(files, sourceBytes, formatHint)
     onProgress?.(1)
     return archive
   }

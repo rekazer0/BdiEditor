@@ -732,15 +732,21 @@ fn valid_share_filename(name: &str) -> bool {
         )
 }
 
-#[tauri::command]
-fn read_file(path: String) -> Result<Vec<u8>, String> {
-    let size = fs::metadata(&path)
+fn read_file_bytes(path: &str) -> Result<Vec<u8>, String> {
+    let size = fs::metadata(path)
         .map_err(|error| error.to_string())?
         .len();
     if size > MAX_ARCHIVE_BYTES {
         return Err("skin file exceeds 64 MB".into());
     }
     fs::read(path).map_err(|error| error.to_string())
+}
+
+/// 皮肤动辄十几 MB：必须走二进制 IPC，把 `Vec<u8>` 序列化成 JSON 数字数组会额外产生
+/// 数倍体积的字符串和上亿个数字对象，既慢又占内存。
+#[tauri::command]
+fn read_file(path: String) -> Result<tauri::ipc::Response, String> {
+    read_file_bytes(&path).map(tauri::ipc::Response::new)
 }
 
 #[tauri::command]
@@ -756,7 +762,7 @@ fn skin_file_size(path: String) -> Result<u64, String> {
 fn read_skin_file(
     path: String,
     progress: tauri::ipc::Channel<[u64; 2]>,
-) -> Result<Vec<u8>, String> {
+) -> Result<tauri::ipc::Response, String> {
     let size = fs::metadata(&path)
         .map_err(|error| error.to_string())?
         .len();
@@ -776,7 +782,7 @@ fn read_skin_file(
             .send([output.len() as u64, size])
             .map_err(|error| error.to_string())?;
     }
-    Ok(output)
+    Ok(tauri::ipc::Response::new(output))
 }
 
 #[tauri::command]
@@ -1244,7 +1250,7 @@ mod tests {
     use super::{
         acrylic_alpha, append_client_log_path, apply_source_changes_path, model_list_url,
         parse_model_list, prune_source_workspaces, read_client_log_path, read_file,
-        read_model_configuration_path, read_source_changes_path, read_source_files,
+        read_file_bytes, read_model_configuration_path, read_source_changes_path, read_source_files,
         safe_source_path, valid_share_filename, windows_material_kind, write_file,
         write_model_configuration_path, write_source_files, ModelConfiguration, MAX_ARCHIVE_BYTES,
         SOURCE_MARKER,
@@ -1353,12 +1359,14 @@ mod tests {
         let data = vec![1, 2, 3, 4];
 
         write_file(path_text.clone(), data.clone()).expect("write should succeed");
+        assert!(read_file(path_text.clone()).is_ok());
         assert_eq!(
-            read_file(path_text.clone()).expect("read should succeed"),
+            read_file_bytes(&path_text).expect("read should succeed"),
             data
         );
         fs::remove_file(&path).expect("cleanup should succeed");
-        assert!(read_file(path_text).is_err());
+        assert!(read_file(path_text.clone()).is_err());
+        assert!(read_file_bytes(&path_text).is_err());
 
         let oversized = std::env::temp_dir().join(format!(
             "bdi-edit-oversized-{}-{}.bdi",
@@ -1370,6 +1378,7 @@ mod tests {
             .set_len(MAX_ARCHIVE_BYTES + 1)
             .expect("size sparse test file");
         assert!(read_file(oversized.to_string_lossy().into_owned()).is_err());
+        assert!(read_file_bytes(&oversized.to_string_lossy()).is_err());
         fs::remove_file(oversized).expect("cleanup sparse test file");
     }
 

@@ -2060,4 +2060,6 @@
 :root body .source #quick-inspector #document-fields .document-property-grid { display:grid !important; grid-template-columns:minmax(145px,40%) minmax(0,1fr) !important; gap:0 !important; }
 :root body .source #quick-inspector #document-fields .document-property-field { display:grid !important; grid-template-columns:minmax(0,1fr) minmax(100px,1.4fr) !important; align-items:center !important; min-height:34px !important; padding:4px !important; border-top:1px solid color-mix(in srgb,var(--pin-line) 60%,transparent) !important; }
 :root body .source #quick-inspector #document-fields .document-property-field > :is(span:first-child,.document-property-label) { font-size:11px !important; color:var(--pin-ink) !important; }
-:root body .source #quick-inspector #document-fields .document-property-field :is(input,select,textarea,button) { height:26px !important; min-height:26px !important; font-size:11px !important; }
+/* 26px 的通用控件高度只描述普通字段的单行控件；样式引用的两个状态预览是卡片，
+   必须跟着行高撑开，否则预览图会被压成顶部的一条细条。 */
+:root body .source #quick-inspector #document-fields .document-property-field :is(input,select,textarea,button):not(.style-picker-state) { height:26px !important; min-height:26px !important; font-size:11px !important; }

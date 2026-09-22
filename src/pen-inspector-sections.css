@@ -256,7 +256,8 @@
  * 5 · Desktop category rail — 60px column, 38px options
  * ================================================================== */
 @media (min-width: 761px) {
-  /* No categories to switch between → no rail, no empty gutter. */
+  /* Nothing to show at all → drop the rail and its empty gutter. A panel with a
+     single group keeps the rail so every inspector has the same navigation. */
   :root body .source #quick-inspector[data-inspector-group-display="grouped"]:has(> #mobile-inspector-groups:is([hidden], :empty)):not([hidden]) {
     grid-template-columns: minmax(0, 1fr) !important;
   }

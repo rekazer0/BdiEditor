@@ -36,9 +36,15 @@ import "./pen-inspector-panels.css"
 import "./pen-inspector.css"
 import "./inspector-fidelity.css"
 import { initializeProjectChooser, projectChoice, type ProjectChoice } from "./project-chooser"
-import { hydrateTemplateCardPreviews } from "./template-preview"
+import {
+  hydrateTemplateCardPreviews,
+  MissingPreviewImageError,
+  releaseArchivePreview,
+  renderArchivePreview,
+} from "./template-preview"
 import { initInspectorShell, setInspectorKind, syncInspectorRows } from "./inspector-shell.ts"
 import { inspectorIcon, inspectorGroupIcon } from "./inspector-icons"
+import { sourceKeyLabels } from "./config-labels.ts"
 import "./style-library.css"
 import "./design-workbench.css"
 import { createDraftReview, changedJsonSections } from "./ai-draft-review"
@@ -738,6 +744,7 @@ let layoutImageTarget: LayoutImageTarget | undefined
 let layoutImageConfig: LayoutImageConfig = "none"
 let layoutImageObjectURL = ""
 let layoutImageHighlight = false
+let layoutImageApplying = false
 let fileOperationRunning = false
 let firstCandidateTextVisual: TextVisual | undefined
 let candidateTextWidth = DEFAULT_PANEL_WIDTH
@@ -768,6 +775,7 @@ type NativeImagePickerPayload = {
   slices: TileSlice[]
   selectedIndex?: number
   editable: boolean
+  styleName?: string
 }
 type NativeResourcePickerPayload = { path: string; dataURL: string }[]
 let nativeImagePickerPayload: NativeImagePickerPayload | undefined
@@ -1669,6 +1677,17 @@ function mobileInspectorGroupSymbol(label: string): string {
   return "app"
 }
 
+/**
+ * 分类轨当前分组。属性面板每次重绘都会重建分区元素，DOM 上的高亮无法跨重绘留住，
+ * 所以记住一个稳定的分组标识：文档分区用分区代码，其余分组用分组标签。
+ */
+let inspectorGroupKey = ""
+
+function mobileInspectorGroupKey(group: HTMLElement): string {
+  return group.querySelector(":scope > h3 .document-section-code")?.textContent?.trim()
+    || mobileInspectorGroupLabel(group)
+}
+
 function setMobileInspectorGroup(id: string, scroll = true): void {
   quickInspector.dataset.mobileInspectorGroup = id
   for (const group of Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))) {
@@ -1680,12 +1699,17 @@ function setMobileInspectorGroup(id: string, scroll = true): void {
     button.classList.toggle("active", active)
     button.setAttribute("aria-pressed", String(active))
   }
+  const current = Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))
+    .find((group) => group.dataset.mobileInspectorGroup === id)
+  inspectorGroupKey = current ? mobileInspectorGroupKey(current) : ""
   // Each group owns its scrolling area. Scrolling the outer grid here moves the
   // summary card and category rail together, so switching tabs appears to make
   // the controls jump away from the pointer.
   if (scroll) {
     quickInspector.scrollTop = 0
     mobileInspectorGroups.querySelector<HTMLButtonElement>("button.active")?.scrollIntoView({ block: "nearest", inline: "nearest" })
+    // 样式引用缩略图只在可见时才量得到卡片尺寸，切到该分组时补绘一次。
+    redrawStyleStateCanvases()
   }
 }
 
@@ -1693,8 +1717,6 @@ function syncMobileInspectorGroups(): void {
   const combinedBda = archive?.format === "bda" && selectedKeySections.length > 0 && !selectedCandidate
   if (combinedBda && keyTypographyFieldsGroup.parentElement !== bdaConfigFieldsGroup) bdaConfigFieldsGroup.append(keyTypographyFieldsGroup)
   else if (!combinedBda && keyTypographyFieldsGroup.parentElement !== quickInspector) quickInspector.insertBefore(keyTypographyFieldsGroup, quickInspector.querySelector(".key-gesture-fields"))
-  const previousGroup = quickInspector.querySelector<HTMLElement>(".mobile-inspector-active")
-  const previousLabel = previousGroup ? mobileInspectorGroupLabel(previousGroup) : ""
   let groups = Array.from(quickInspector.querySelectorAll<HTMLElement>(":scope > .inspector-group"))
     .filter((group) => !group.hidden)
     .flatMap((group) => {
@@ -1727,16 +1749,34 @@ function syncMobileInspectorGroups(): void {
     group.dataset.mobileInspectorGroup = `${index}`
     group.classList.add("mobile-inspector-managed")
   }
-  const active = groups.find((group) => mobileInspectorGroupLabel(group) === previousLabel)
+  // 两个分组可能落在同一个短标签上（例如静态候选栏组与 [CAND] 分区）：
+  // 先算出一组唯一名称并写回分组，再按名称找回当前分组，避免选中同名的另一个。
+  const railLabels = new Map<HTMLElement, string>()
+  const usedRailLabels = new Set<string>()
+  for (const group of groups) {
+    let label = mobileInspectorGroupLabel(group)
+    if (usedRailLabels.has(label)) {
+      const code = group.querySelector(":scope > h3 .document-section-code")?.textContent?.trim()
+      if (code && !label.includes(code)) {
+        label = `${label}（${code}）`
+        group.dataset.inspectorGroupLabel = label
+      }
+    }
+    usedRailLabels.add(label)
+    railLabels.set(group, label)
+  }
+  const active = groups.find((group) => mobileInspectorGroupKey(group) === inspectorGroupKey)
     ?? groups[0]
-  mobileInspectorGroups.hidden = groups.length < 2
+  // 分类轨只在检查器没有任何分组时隐藏。单分区文档（例如只有 [PANEL] 的 help.ini）
+  // 此前也会被当成「没有可切换的分组」而整条收起，属性检查器于是少了一侧导航。
+  mobileInspectorGroups.hidden = groups.length === 0
   // Keep the horizontal inspector navigation evenly distributed when the
   // available groups change (for example: 面板 / 提示栏 / 扩展区域).
   mobileInspectorGroups.style.setProperty("--inspector-group-count", String(Math.max(groups.length, 1)))
   mobileInspectorGroups.replaceChildren(...groups.map((group) => {
     const button = document.createElement("button")
     button.type = "button"
-    const label = mobileInspectorGroupLabel(group)
+    const label = railLabels.get(group) ?? mobileInspectorGroupLabel(group)
     const text = document.createElement("span")
     text.className = "inspector-group-label"
     text.textContent = label
@@ -2964,7 +3004,8 @@ previewZoomFit.addEventListener("dblclick", () => {
 })
 previewZoomIn.addEventListener("click", () => applyPreviewZoom(previewZoom + 0.1))
 canvasWrap.addEventListener("wheel", (event) => {
-  if (deviceShell.hidden) return
+  // 欢迎页（未打开皮肤）需要正常的纵向滚动，不能被画布缩放拦截
+  if (deviceShell.hidden || canvasWrap.classList.contains("empty")) return
   event.preventDefault()
   if (previewPanLocked) return
   applyPreviewZoom(
@@ -3396,7 +3437,8 @@ async function readNativeSkinFile(path: string): Promise<Uint8Array> {
     if (!fileOperationProgressVisible) return
     updateFileOperationProgress(2 + loaded / total * 16, `正在读取皮肤文件… ${Math.round(loaded / total * 100)}%`)
   }
-  return new Uint8Array(await invoke<number[]>("read_skin_file", { path, progress }))
+  // 后端直接回传二进制，避免 Vec<u8> 被序列化成 JSON 数字数组。
+  return new Uint8Array(await invoke<ArrayBuffer>("read_skin_file", { path, progress }))
 }
 
 function waitForInterfacePaint(): Promise<void> {
@@ -3633,11 +3675,13 @@ function drawAtlas(): void {
   const visible = archive?.format === "bda"
     ? allVisible.filter((slice) => slice.index === selectedTileIndex)
     : allVisible
-  const lineWidth = Math.max(1, Math.round(Math.min(atlasCanvas.width, atlasCanvas.height) / 500))
-  context.font = `${Math.max(11, lineWidth * 7)}px ui-monospace, monospace`
+  const displayScale = Math.max(0.01, atlasCanvas.getBoundingClientRect().width / Math.max(1, atlasCanvas.width))
+  const lineWidth = Math.max(0.5, Math.min(6, 1.5 / displayScale))
+  context.font = `${Math.max(8, 11 / displayScale)}px ui-monospace, monospace`
   context.textBaseline = "top"
   const accent = getComputedStyle(atlasCanvas).getPropertyValue("--accent").trim() || "#3a6df0"
-  const handle = 7 * atlasCanvas.width / Math.max(1, atlasCanvas.getBoundingClientRect().width)
+  const handle = Math.max(4, 8 / displayScale)
+  const labelHeight = Math.max(10, 17 / displayScale)
   for (const slice of visible) {
     const [x, y, width, height] = slice.source
     const selected = slice.index === selectedTileIndex || slice.source === tileDraft
@@ -3648,9 +3692,9 @@ function drawAtlas(): void {
     const label = usage?.label ?? `IMG${slice.index}`
     const labelWidth = context.measureText(label).width + 6
     context.fillStyle = selected ? accent : "#68758a"
-    context.fillRect(x, y, labelWidth, Math.max(15, lineWidth * 9))
+    context.fillRect(x, y, labelWidth, labelHeight)
     context.fillStyle = "#fff"
-    context.fillText(label, x + 3, y + 2)
+    context.fillText(label, x + 3 / displayScale, y + 2 / displayScale)
     if (selected) {
       for (const [hx, hy] of [[x, y], [x + width, y], [x, y + height], [x + width, y + height]]) {
         context.fillStyle = accent
@@ -4423,11 +4467,14 @@ function updateInspectorView(): void {
   const overviewSelected = Boolean(
     files.querySelector(`.sidebar-overview button[data-path="${CSS.escape(selectedPath)}"]`),
   )
+  const layoutSelected = selectedPath === layoutPath && /\.ini$/i.test(selectedPath)
+  // ini/cnd/pop 布局配置文档自带属性面板，无需依赖概览分组；其余文本仍要求来自概览或当前布局。
+  const configLayoutSelected = showsLayoutProperties(selectedPath)
   const propertiesAvailable = Boolean(
     selectedPath && (
       archive?.isText(selectedPath) || archive?.isBdaConfig(selectedPath) || isBdaLayoutPath(selectedPath) ||
       bdaAppearancePart(selectedPath)
-    ) && overviewSelected && !imageSelected,
+    ) && (configLayoutSelected || overviewSelected || layoutSelected) && !imageSelected,
   )
   for (const button of inspectorTabButtons) {
     const tab = button.dataset.inspectorTab
@@ -4697,6 +4744,19 @@ function isSkinInfoPath(path: string): boolean {
 
 function isToolbarPath(path: string): boolean {
   return /\.cnd$/i.test(path)
+}
+
+/** INI / CND / POP 是属性面板能描述并回写的布局配置文档。 */
+function isConfigLayoutPath(path: string): boolean {
+  return /\.(ini|cnd|pop)$/i.test(path)
+}
+
+/**
+ * 普通皮肤（bds/bdi）里所有布局文档都自带属性面板。
+ * BDA 容器内的同名遗留文件由 bda 解析器处理，不能按普通布局文档放行。
+ */
+function showsLayoutProperties(path: string): boolean {
+  return archive?.format !== "bda" && isConfigLayoutPath(path)
 }
 
 function colorControlKey(field: HTMLInputElement): string {
@@ -5191,6 +5251,7 @@ function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferen
 
 function renderStyleReferenceRows(button: HTMLElement, input: HTMLInputElement, key: string): string[] {
   const styleIDs = input.value.split(",").map((value) => value.trim()).filter(Boolean)
+  for (const canvas of Array.from(button.querySelectorAll("canvas"))) styleStateCanvasObserver.unobserve(canvas)
   button.replaceChildren()
   for (const [styleIndex, styleID] of (styleIDs.length ? styleIDs : [""]).entries()) {
     const rowInput = () => {
@@ -5219,18 +5280,17 @@ function renderStyleReferenceRows(button: HTMLElement, input: HTMLInputElement, 
       item.type = "button"
       item.className = "style-picker-state"
       item.dataset.styleState = highlighted ? "highlighted" : "normal"
-      item.title = `选择样式或图片；Alt 点击编辑${highlighted ? "按下" : "正常"}图片；Command/Ctrl 点击编辑样式`
+      // 预览图就是该状态引用的图片，点击它进入这张图片的切片选择器；
+      // 更换引用的样式挪到 Alt 点击，编号框仍可直接输入。
+      item.title = `点击选择${highlighted ? "按下" : "正常"}图片切片；Alt 点击更换样式；Command/Ctrl 点击编辑样式`
       item.setAttribute("aria-label", item.title)
       const canvas = retinaThumbnail(document.createElement("canvas"), 152, 76)
       canvas.setAttribute("aria-hidden", "true")
-      const caption = document.createElement("span")
-      caption.className = "style-picker-state-caption"
-      caption.textContent = highlighted ? "按下" : "正常"
-      item.append(canvas, caption)
+      item.append(canvas)
       item.addEventListener("click", (event) => {
         if (event.metaKey || event.ctrlKey) openStyleReferenceEditor(styleID)
-        else if (event.altKey) void openStyleReferenceStateImage(rowInput(), key, highlighted)
-        else openStylePicker(rowInput(), highlighted)
+        else if (event.altKey) openStylePicker(rowInput(), highlighted)
+        else void openStyleReferenceStateImage(rowInput(), key, highlighted)
       })
       previews.append(item)
     }
@@ -5282,8 +5342,57 @@ async function refreshStyleReferenceThumbnail(
     [false, true].map((highlighted) => resolver.resolve(styleID, highlighted).catch(() => undefined)),
   ))
   if (drawID !== styleReferenceDrawIDs.get(button)) return
-  visuals.forEach((visual, index) => drawVisualPreview(canvases[index], [visual], styleReferenceForeground(key)))
+  const foreground = styleReferenceForeground(key)
+  visuals.forEach((visual, index) => {
+    const canvas = canvases[index]
+    styleStateVisuals.set(canvas, { visual, foreground })
+    // 量不到尺寸（所在分组隐藏）时先用现有位图绘制，保证切回该分组时不出现空白预览。
+    if (!sizeStyleStateCanvas(canvas)) drawVisualPreview(canvas, [visual], foreground)
+    styleStateCanvasObserver.observe(canvas)
+  })
 }
+
+const styleStateVisuals = new WeakMap<HTMLCanvasElement, { visual: Visual | undefined; foreground: boolean }>()
+const styleStateCanvasSizes = new WeakMap<HTMLCanvasElement, string>()
+
+/*
+ * 缩略图按卡片的实际尺寸绘制：固定 152×76 的宽扁画布经过 object-fit: contain 后只剩卡片
+ * 一半高度，图案显得又小又扁。改用卡片内容盒尺寸作为位图尺寸，样式图才能铺满卡片高度。
+ */
+function sizeStyleStateCanvas(canvas: HTMLCanvasElement): boolean {
+  const { width, height } = canvas.getBoundingClientRect()
+  if (width < 1 || height < 1) return false
+  const size = `${Math.round(width)}x${Math.round(height)}`
+  if (styleStateCanvasSizes.get(canvas) === size) return false
+  styleStateCanvasSizes.set(canvas, size)
+  retinaThumbnail(canvas, width, height)
+  const meta = styleStateVisuals.get(canvas)
+  if (meta) drawVisualPreview(canvas, [meta.visual], meta.foreground)
+  return true
+}
+
+/** 分组切换后为之前量不到尺寸的缩略图补一次按尺寸重绘。 */
+function redrawStyleStateCanvases(): void {
+  for (const canvas of Array.from(document.querySelectorAll<HTMLCanvasElement>(".style-reference-row canvas"))) {
+    sizeStyleStateCanvas(canvas)
+  }
+}
+
+/** 面板宽度变化（选中态切换、窗口缩放）后按新尺寸重绘，避免位图与卡片比例不符。 */
+const styleStateCanvasObserver = new ResizeObserver((entries) => {
+  for (const entry of entries) {
+    const canvas = entry.target
+    if (!(canvas instanceof HTMLCanvasElement)) continue
+    // 被重建替换掉的画布不再需要重绘，及时解绑，避免观察器长期持有已分离的位图。
+    if (!canvas.isConnected) {
+      styleStateCanvasObserver.unobserve(canvas)
+      styleStateVisuals.delete(canvas)
+      styleStateCanvasSizes.delete(canvas)
+      continue
+    }
+    sizeStyleStateCanvas(canvas)
+  }
+})
 
 function styleWriteTarget(
   source: "BACK_STYLE" | "FORE_STYLE",
@@ -5917,6 +6026,39 @@ const documentFieldLabels: Record<string, string> = {
   BUILD_METHOD: "组合播放方式",
   REPEAT_CNT: "重复次数",
   REPEAT_MODE: "重复方式",
+  // 以下键只出现在文档配置节（LIST / BAR / SWITCH / CAND / ICON…），此前都显示为英文原名。
+  NAMES: "列表名称",
+  VALUES: "列表值",
+  NAME: "名称",
+  VERSION: "版本",
+  TEXT_STYLE: "文字样式",
+  BACK_ANIM_STYLE: "背景动画样式",
+  FORE_ANIM_STYLE: "前景动画样式",
+  HW_FORE_STYLE: "手写前景样式",
+  ANIM_LEVEL: "动画层级",
+  ICON_NUM: "工具按钮数量",
+  ICON_INDEX: "图标序号",
+  BACK_ICON: "背景图标",
+  ARROW_ICON: "箭头图标",
+  ICON_UP: "上箭头图标",
+  ICON_DN: "下箭头图标",
+  ICON_LT: "左箭头图标",
+  ICON_RT: "右箭头图标",
+  ANCHOR_TYPE: "锚点类型",
+  PERSIST: "保持状态",
+  CELL_W: "单元格宽度",
+  FIRST_GAP: "首项间距",
+  NML_BACK_STYLE: "普通背景样式",
+  SEL_BACK_STYLE: "选中背景样式",
+  NML_FONT_STYLE: "普通文字样式",
+  SEL_FONT_STYLE: "选中文字样式",
+  HLINE_STYLE: "横线样式",
+  VLINE_STYLE: "竖线样式",
+  SCROLL_SIDE: "滚动方向",
+  SYM_LAYOUT: "符号面板布局",
+  EVENT_NUM: "事件数量",
+  IDLE_TIME: "空闲时间",
+  FIX_SIZE: "固定尺寸",
 }
 
 const documentSectionLabels: Record<string, string> = {
@@ -5929,6 +6071,13 @@ const documentSectionLabels: Record<string, string> = {
   LOGO: "输入法标识",
   EMOJI: "表情面板",
   GLOBAL: "全局设置",
+  // SWITCH / BAR / LIST 等文档分区此前会显示为英文原名。
+  LIST: "列表",
+  BAR: "提示条",
+  SWITCH: "开关",
+  TAB: "标签",
+  DRAW: "绘制",
+  VIEWSTATE: "视图状态",
 }
 
 const documentPairFieldLabels: Record<string, [string, string]> = {
@@ -5947,10 +6096,69 @@ const documentSwitchFields = new Set(["NO_BLUR"])
 const documentNumericFields = new Set([
   "KEY_NUM", "TIP_NUM", "LIST_NUM", "OFFSET_NUM", "FORE_STYLE_NUM", "ANIM_NUM", "BUILD_NUM",
   "REPEAT_CNT", "FONT_SIZE", "FONT_WEIGHT",
+  "CELL_W", "FIRST_GAP", "ICON_NUM", "ICON_INDEX", "EVENT_NUM",
 ])
 
+/** number 输入框会清空非数字值，只有纯数字才切换到数字类型。 */
+function looksNumeric(value: string): boolean {
+  return /^-?\d+(?:\.\d+)?$/.test(value.trim())
+}
+
+/** MORE.SYM_LAYOUT 这类键按 id 绑定布局文件，沿用侧边栏使用的布局名称。 */
+const layoutIDLabels: Record<string, string> = {
+  bh: "笔画键盘",
+  def_9: "五笔 9 键",
+  def_26: "五笔 26 键",
+  py_9: "拼音 9 键",
+  py_26: "拼音 26 键",
+  en_9: "英文 9 键",
+  en_9s: "英文 9 键 Shift",
+  en_9_h: "英文 9 键（加高）",
+  en_9s_h: "英文 9 键 Shift（加高）",
+  en_26: "英文 26 键",
+  en_26s: "英文 26 键 Shift",
+  num_9: "数字键盘",
+  num_9_h: "数字键盘（加高）",
+  num_26: "26 键数字键盘",
+  num2: "数字键盘 2",
+  symbol: "符号面板",
+  symbol_h: "符号面板（加高）",
+  sym_26_cn: "中文 26 键符号",
+  sym_26_cn_h: "中文 26 键符号（加高）",
+  sym_26_en: "英文 26 键符号",
+  sym_26_en_h: "英文 26 键符号（加高）",
+  emoji: "表情面板",
+  hw_grid: "手写面板",
+  hw_full: "全屏手写",
+  help: "帮助面板",
+  sel_ch: "中文选择栏",
+  sel_ch_h: "中文选择栏（加高）",
+  sel_en: "英文选择栏",
+  sel_en_h: "英文选择栏（加高）",
+  voice: "语音键盘",
+  dial: "拨号键盘",
+  email: "邮箱键盘",
+  net: "网址键盘",
+  net_shifts: "网址键盘大写",
+  logo: "输入法标识",
+  en_26_new: "英文 26 键（无上划）",
+  en_26s_new: "英文 26 键 Shift（无上划）",
+  def_26_new: "五笔 26 键（无上划）",
+  en_9_pad: "英文 9 键加高",
+  en_9s_pad: "英文 9 键 Shift 加高",
+}
+
 function translatedConfigLabel(key: string): string {
-  return documentFieldLabels[key] ?? "扩展配置"
+  // 文档标签优先，其次复用源码侧的通用标签表；都没有时保留原始键名，而不是猜一个词。
+  const known = documentFieldLabels[key] ?? sourceKeyLabels[key]
+  if (known) return known
+  const layout = key.match(/^([A-Z0-9_]+)_LAYOUT$/)
+  if (layout) {
+    const id = layout[1].toLowerCase()
+    const name = layoutIDLabels[id] ?? id.replaceAll("_", " ")
+    return /[A-Za-z0-9]$/.test(name) ? `${name} 布局` : `${name}布局`
+  }
+  return key
 }
 
 function translatedSectionLabel(section: string): string {
@@ -5958,6 +6166,7 @@ function translatedSectionLabel(section: string): string {
   const animation = section.match(/^ANIM(\d+)$/)
   const icon = section.match(/^ICON(\d+)$/i)
   const tip = section.match(/^TIP(\d+)$/i)
+  const event = section.match(/^EVENT(\d+)$/i)
   const label = offset
     ? `偏移 ${offset[1]}`
     : animation
@@ -5966,7 +6175,9 @@ function translatedSectionLabel(section: string): string {
         ? `工具按钮 ${icon[1]}`
         : tip
           ? `状态提示 ${tip[1]}`
-          : documentSectionLabels[section] ?? "扩展区域"
+          : event
+            ? `事件 ${event[1]}`
+            : documentSectionLabels[section] ?? section
   return `${label}（${section}）`
 }
 
@@ -6077,11 +6288,19 @@ function populateDocumentInspector(): void {
     label.dataset.documentKey = entry.key
     const caption = document.createElement("span")
     caption.className = "document-field-caption"
-    caption.title = translatedConfigLabel(entry.key)
+    const captionLabel = translatedConfigLabel(entry.key)
+    // 译文之外的原始键名保留在悬停提示里，属性行始终能对应回 ini 的键。
+    caption.title = captionLabel === entry.key ? entry.key : `${captionLabel}（${entry.key}）`
     const captionName = document.createElement("span")
     captionName.className = "document-field-name"
-    captionName.textContent = documentFieldLabels[entry.key] ?? "扩展配置"
+    captionName.textContent = captionLabel
     caption.append(captionName)
+    if (documentFieldLabels[entry.key]) {
+      const code = document.createElement("span")
+      code.className = "document-field-code"
+      code.textContent = entry.key
+      caption.append(code)
+    }
     label.append(caption)
 
     if (specialized && (particlePairFields.has(entry.key) || entry.key === "EMIT_REGION")) {
@@ -6196,7 +6415,8 @@ function populateDocumentInspector(): void {
     input.title = `${translatedConfigLabel(entry.key)}：${entry.value}`
     input.disabled = !isEditing()
     input.setAttribute("aria-label", translatedConfigLabel(entry.key))
-    if (documentNumericFields.has(entry.key)) {
+    // 值不是数字时保持文本输入：number 输入框会清空显示，用户一编辑就丢原值。
+    if (documentNumericFields.has(entry.key) && looksNumeric(entry.value)) {
       input.type = "number"
       input.step = "1"
       input.inputMode = "numeric"
@@ -6262,6 +6482,12 @@ function populateDocumentInspector(): void {
     meta.className = "document-section-meta"
     meta.textContent = `${sectionEntries.length} 项`
     heading.append(icon, title)
+    if (section && sectionName !== section) {
+      const code = document.createElement("span")
+      code.className = "document-section-code"
+      code.textContent = section
+      heading.append(code)
+    }
     heading.append(meta)
     sectionPanel.append(heading)
     if (particle) {
@@ -6437,17 +6663,12 @@ function addNavButton(
   labelNode.className = "nav-label"
   labelNode.textContent = label
   button.append(labelNode)
-  // English layouts are already identified by their Chinese labels; the raw
-  // `en_*.ini` filename adds noise in the compact overview.
-  const filename = meta || path.split("/").pop() || ""
-  if (!/(^|_)en(?:_|\.|$)/i.test(filename)) {
-    const metaNode = document.createElement("span")
-    metaNode.className = "nav-meta"
-    metaNode.textContent = meta
-    button.append(metaNode)
-  } else {
-    button.classList.add("nav-item-no-meta")
-  }
+  // 概览卡片统一为两行内容：标题 + 文件名。英文布局也保留 en_*.ini，
+  // 所有卡片的文字块高度才会完全一致。
+  const metaNode = document.createElement("span")
+  metaNode.className = "nav-meta"
+  metaNode.textContent = meta || path.split("/").pop() || ""
+  button.append(metaNode)
   button.addEventListener("click", () => {
     if (path.endsWith("py_9.ini") || path.endsWith("py_26.ini")) {
       layout.value = path.endsWith("_9.ini") ? "py_9.ini" : "py_26.ini"
@@ -7068,6 +7289,13 @@ function updateSelectedImageReference(target: StyleImagePickerTarget | undefined
 
 let pickerSelectedIndex: number | undefined
 
+// 切片窗口标题栏显示所属样式：优先用引用目标里的 STYLE 段，其次退回资源检查器正在查看的样式。
+function imagePickerStyleName(target: StyleImagePickerTarget): string {
+  const section = target.sections?.find((name) => /^STYLE\d+$/i.test(name))
+  const styleID = section ? section.replace(/^STYLE/i, "") : selectedStyleID
+  return styleID ? `样式 ${stylePickerLabel(styleID)}` : ""
+}
+
 function imageDataURL(bytes: Uint8Array): string {
   let binary = ""
   for (let offset = 0; offset < bytes.length; offset += 0x8000) {
@@ -7104,11 +7332,15 @@ async function showPickerWindow(
 
 function openResourcePickerWindow(): void {
   if (!archive || (!pickerTarget && !resourcePickerSelect)) return
-  nativeResourcePickerPayload = resourceImagePaths(archive.names(), theme.value, orientation.value).flatMap((path) => {
+  nativeResourcePickerPayload = resourcePickerPayload()
+  void showPickerWindow("resource-picker", "resource", "选择图片资源", 860, 640)
+}
+
+function resourcePickerPayload(): NativeResourcePickerPayload {
+  return resourceImagePaths(archive?.names() ?? [], theme.value, orientation.value).flatMap((path) => {
     const bytes = archive?.getBytes(path)
     return bytes ? [{ path, dataURL: imageDataURL(bytes) }] : []
   })
-  void showPickerWindow("resource-picker", "resource", "选择图片资源", 860, 640)
 }
 
 function closeStyleImageResourcePicker(): void {
@@ -7268,6 +7500,7 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
     slices: pickerSlices,
     selectedIndex: pickerSelectedIndex,
     editable: isEditing(),
+    styleName: imagePickerStyleName(target),
   }
   if ("__TAURI_INTERNALS__" in window) {
     if (styleImageDialog.open) styleImageDialog.close()
@@ -7461,6 +7694,37 @@ function commitTile(slice: TileSlice, coalesce = false): void {
   drawAtlas()
   updateDirty()
   renderResourceInspectorMetadata()
+}
+
+async function autoSliceSelectedImage(): Promise<void> {
+  const currentArchive = archive
+  const path = selectedResourcePath
+  if (!currentArchive || currentArchive.format === "bda" || !path || !tilePath || !isEditing()) return
+  const bytes = currentArchive.getBytes(path)
+  if (!bytes) return
+  try {
+    const scan = await decodePngMask(bytes)
+    const cells = detectGridCells(scan.mask, scan.width, scan.height)
+    if (!cells.length) {
+      showStatus("未识别到可切片的透明图块")
+      return
+    }
+    if (slices.length && !window.confirm(`自动切片将替换当前 ${slices.length} 个切片，是否继续？`)) return
+    if (archive !== currentArchive || selectedResourcePath !== path || !isEditing()) return
+    const before = tileDocument.toString()
+    for (const slice of slices) removeTileSlice(tileDocument, slice.index)
+    cells.forEach((source, index) => updateTileSlice(tileDocument, { index: index + 1, source }))
+    commitText(tilePath, before, tileDocument.toString())
+    loadTiles(path)
+    selectedTileIndex = 1
+    updateSourceHighlight()
+    populateTileInspector()
+    drawAtlas()
+    updateDirty()
+    showStatus(`已自动切片 ${cells.length} 个区域`)
+  } catch (error) {
+    showStatus(`自动切片失败：${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 function renderResourceInspectorMetadata(): void {
@@ -7852,7 +8116,8 @@ function selectFile(
       selectedKeySections = []
       preview.setSelected([])
       inspectorTab = "properties"
-    } else if (preferredSidebarView === "overview") {
+    } else if (preferredSidebarView === "overview" || showsLayoutProperties(path)) {
+      // INI/CND/POP 布局文件始终打开属性面板，不论从哪个侧边栏点进来。
       inspectorTab = "properties"
     } else if (path !== layoutPath) {
       inspectorTab = "source"
@@ -7873,10 +8138,10 @@ function selectFile(
   }
   if (preferredSidebarView === "source" && (
     archive?.isText(path) || archive?.isBdaConfig(path) || isBdaAppearancePartPath(path)
-  )) {
+) && path !== layoutPath && !showsLayoutProperties(path)) {
     inspectorTab = "source"
   }
-  if (preserveCurrentInspectorView || (previousInspectorTab === "source" && path === layoutPath)) {
+  if (preserveCurrentInspectorView) {
     inspectorTab = previousInspectorTab
   }
   updateInspectorView()
@@ -8011,7 +8276,7 @@ function renderFiles(): void {
     "def_26.ini": { group: "键盘布局", label: "五笔 26 键", className: "nav-layout", icon: "keyboard" },
     "def_26_new.ini": { group: "键盘布局", label: "五笔 26 键（无上划）", className: "nav-layout", icon: "keyboard" },
     "py_9.ini": { group: "键盘布局", label: "拼音 9 键", className: "nav-layout", icon: "keyboard" },
-    "py_26.ini": { group: "键盘布局", label: "中文 26 键", className: "nav-layout", icon: "keyboard" },
+    "py_26.ini": { group: "键盘布局", label: "拼音 26 键", className: "nav-layout", icon: "keyboard" },
     "en_9.ini": { group: "键盘布局", label: "英文 9 键", className: "nav-layout", icon: "keyboard" },
     "en_9s.ini": { group: "键盘布局", label: "英文 9 键 Shift", className: "nav-layout", icon: "keyboard" },
     "en_26.ini": { group: "键盘布局", label: "英文 26 键", className: "nav-layout", icon: "keyboard" },
@@ -9074,7 +9339,7 @@ openButton.addEventListener("click", () => {
 emptyOpenButton.addEventListener("click", () => openButton.click())
 
 const recentFilesKey = "recent-files"
-const recentFilesLimit = 6
+const recentFilesLimit = 9
 
 interface RecentFile {
   path: string
@@ -9119,56 +9384,241 @@ function formatRecentTime(at: number): string {
   return new Date(at).toLocaleDateString("zh-CN")
 }
 
+function openRecentFile(item: RecentFile): void {
+  if (fileOperationRunning) return
+  void runFileOperation("打开", async () => {
+    if (!(await prepareDocumentReplacement())) return false
+    return loadNativePath(item.path)
+  })
+}
+
+function recentFolderLabel(path: string): string {
+  const parts = path.split(/[\\/]/).filter(Boolean)
+  if (parts.length < 2) return ""
+  const folder = parts.slice(0, -1)
+  return folder.length > 2 ? `…/${folder.slice(-2).join("/")}` : folder.join("/")
+}
+
+function recentAsideItem(item: RecentFile): HTMLButtonElement {
+  const button = document.createElement("button")
+  button.type = "button"
+  button.className = "recent-item"
+  button.title = item.path
+  const icon = document.createElement("span")
+  icon.className = "recent-icon"
+  icon.append(createSystemSymbol("keyboard"))
+  const copy = document.createElement("span")
+  copy.className = "recent-copy"
+  const name = document.createElement("span")
+  name.className = "recent-name"
+  name.textContent = item.name
+  const path = document.createElement("span")
+  path.className = "recent-path"
+  path.textContent = item.path
+  copy.append(name, path)
+  const time = document.createElement("span")
+  time.className = "recent-time"
+  time.textContent = formatRecentTime(item.at)
+  button.append(icon, copy, time)
+  button.addEventListener("click", () => openRecentFile(item))
+  return button
+}
+
+function recentFormatLabel(path: string): string {
+  return path.match(/\.(bdi|bds|bda)$/i)?.[0]?.toLowerCase() ?? "皮肤"
+}
+
+function recentCard(item: RecentFile): HTMLButtonElement {
+  const card = document.createElement("button")
+  card.type = "button"
+  card.className = "template-card recent-card"
+  card.dataset.recent = item.path
+  card.title = `打开 ${item.name}\n${item.path}`
+  const preview = document.createElement("span")
+  preview.className = "template-preview"
+  preview.ariaHidden = "true"
+  preview.textContent = "正在加载预览…"
+  const foot = document.createElement("span")
+  foot.className = "template-foot"
+  const nameRow = document.createElement("span")
+  nameRow.className = "template-name-row"
+  const name = document.createElement("span")
+  name.className = "template-name"
+  name.textContent = item.name
+  const go = createSystemSymbol("arrow.right")
+  go.classList.add("icon", "template-go")
+  nameRow.append(name, go)
+  const meta = document.createElement("span")
+  meta.className = "template-meta"
+  const format = document.createElement("em")
+  format.textContent = recentFormatLabel(item.path)
+  const time = document.createElement("span")
+  time.textContent = formatRecentTime(item.at)
+  meta.append(format, time)
+  const folder = recentFolderLabel(item.path)
+  if (folder) {
+    const place = document.createElement("span")
+    place.className = "recent-card-folder"
+    place.textContent = `· ${folder}`
+    meta.append(place)
+  }
+  foot.append(nameRow, meta)
+  card.append(preview, foot)
+  card.addEventListener("click", () => openRecentFile(item))
+  return card
+}
+
+const recentPreviewCache = new Map<string, HTMLImageElement>()
+// 预览只取包里的 demo 图，不需要解整包；上限与后端可读的整包上限保持一致。
+const recentPreviewMaxBytes = 64 * 1024 * 1024
+
+async function readRecentPreviewBytes(path: string): Promise<Uint8Array> {
+  if (!isTauri()) throw new Error("仅在桌面应用中生成本地预览")
+  if (await invoke<number>("skin_file_size", { path }) > recentPreviewMaxBytes) {
+    throw new Error("皮肤文件过大，暂不生成预览")
+  }
+  return new Uint8Array(await invoke<ArrayBuffer>("read_file", { path }))
+}
+
+function welcomeVisible(): boolean {
+  return canvasWrap.classList.contains("empty")
+}
+
+// 最近皮肤最多 9 张，逐个串行取图，避免同时读多份皮肤阻塞 UI。
+const recentPreviewQueue: HTMLButtonElement[] = []
+const recentPreviewQueued = new Set<HTMLButtonElement>()
+let recentPreviewRunning = false
+
+async function renderRecentPreview(path: string, host: HTMLElement): Promise<HTMLImageElement> {
+  let lastError: unknown
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await renderArchivePreview(await readRecentPreviewBytes(path), host)
+    } catch (error) {
+      lastError = error
+      // 没有 demo 图是稳定结果，重试只会把整包再读一遍。
+      if (attempt || error instanceof MissingPreviewImageError) break
+      await new Promise((resolve) => window.setTimeout(resolve, 120))
+    }
+  }
+  throw lastError
+}
+
+async function drainRecentPreviews(): Promise<void> {
+  if (recentPreviewRunning) return
+  recentPreviewRunning = true
+  try {
+    for (;;) {
+      const card = recentPreviewQueue.shift()
+      if (!card) return
+      recentPreviewQueued.delete(card)
+      if (!welcomeVisible()) {
+        recentPreviewQueue.length = 0
+        recentPreviewQueued.clear()
+        return
+      }
+      if (!card.isConnected) continue
+      const path = card.dataset.recent
+      const host = card.querySelector<HTMLElement>(".template-preview")
+      if (!path || !host || host.classList.contains("is-rendered") || host.dataset.preview === "failed") continue
+      const cached = recentPreviewCache.get(path)
+      if (cached) {
+        host.replaceChildren(cached)
+        host.classList.add("is-rendered")
+        continue
+      }
+      try {
+        const image = await renderRecentPreview(path, host)
+        if (readRecentFiles().some((item) => item.path === path)) recentPreviewCache.set(path, image)
+      } catch {
+        host.dataset.preview = "failed"
+        host.classList.remove("is-rendered")
+        host.textContent = "暂无预览图"
+      }
+    }
+  } finally {
+    recentPreviewRunning = false
+    if (recentPreviewQueue.length && welcomeVisible()) void drainRecentPreviews()
+  }
+}
+
+function queueRecentPreview(card: HTMLButtonElement): void {
+  if (recentPreviewQueued.has(card)) return
+  recentPreviewQueued.add(card)
+  recentPreviewQueue.push(card)
+  void drainRecentPreviews()
+}
+
+// 只渲染真正滚进视野的卡片：9 张十几 MB 的皮肤不该在启动时全部读一遍。
+const welcomeScroller = document.querySelector<HTMLElement>(".welcome-main")
+const recentPreviewObserver = welcomeScroller && "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue
+      recentPreviewObserver?.unobserve(entry.target)
+      queueRecentPreview(entry.target as HTMLButtonElement)
+    }
+  }, { root: welcomeScroller, rootMargin: "240px 0px" })
+  : undefined
+
+function observeRecentPreviews(): void {
+  if (!welcomeVisible()) return
+  recentPreviewObserver?.disconnect()
+  const pending = [...document.querySelectorAll<HTMLButtonElement>(".recent-card[data-recent]")].filter((card) => {
+    const host = card.querySelector<HTMLElement>(".template-preview")
+    return Boolean(host) && !host!.classList.contains("is-rendered") && host!.dataset.preview !== "failed"
+  })
+  for (const card of pending) {
+    if (recentPreviewObserver) recentPreviewObserver.observe(card)
+    else queueRecentPreview(card)
+  }
+}
+
 function renderRecentFiles(): void {
   const list = $("#recent-list")
   const empty = $("#recent-empty")
   const clear = $("#recent-clear")
   if (!list || !empty) return
+  recentPreviewObserver?.disconnect()
+  recentPreviewQueue.length = 0
+  recentPreviewQueued.clear()
   const items = readRecentFiles()
   clear?.toggleAttribute("hidden", items.length === 0)
   empty.hidden = items.length > 0
-  list.replaceChildren(...items.map((item) => {
-    const button = document.createElement("button")
-    button.type = "button"
-    button.className = "recent-item"
-    button.title = item.path
-    const icon = document.createElement("span")
-    icon.className = "recent-icon"
-    icon.append(createSystemSymbol("keyboard"))
-    const copy = document.createElement("span")
-    copy.className = "recent-copy"
-    const name = document.createElement("span")
-    name.className = "recent-name"
-    name.textContent = item.name
-    const path = document.createElement("span")
-    path.className = "recent-path"
-    path.textContent = item.path
-    copy.append(name, path)
-    const time = document.createElement("span")
-    time.className = "recent-time"
-    time.textContent = formatRecentTime(item.at)
-    button.append(icon, copy, time)
-    button.addEventListener("click", () => {
-      if (fileOperationRunning) return
-      void runFileOperation("打开", async () => {
-        if (!(await prepareDocumentReplacement())) return false
-        return loadNativePath(item.path)
-      })
-    })
-    return button
-  }))
+  list.replaceChildren(...items.map(recentAsideItem))
+  const grid = $("#welcome-recent-grid")
+  const gridEmpty = $("#welcome-recent-empty")
+  const hint = $("#welcome-recent-hint")
+  grid?.replaceChildren(...items.map(recentCard))
+  grid?.toggleAttribute("hidden", items.length === 0)
+  if (gridEmpty) gridEmpty.hidden = items.length > 0
+  if (hint) hint.textContent = items.length ? `${items.length} 个文件` : "还没有记录"
+  // 预览图按路径缓存，这里裁掉已不在列表里的条目并释放它们占用的 blob URL
+  const listed = new Set(items.map((item) => item.path))
+  for (const [path, image] of [...recentPreviewCache]) {
+    if (listed.has(path)) continue
+    releaseArchivePreview(image)
+    recentPreviewCache.delete(path)
+  }
+  if (items.length) observeRecentPreviews()
 }
 
 $("#recent-clear")?.addEventListener("click", () => {
   localStorage.removeItem(recentFilesKey)
+  for (const image of recentPreviewCache.values()) releaseArchivePreview(image)
+  recentPreviewCache.clear()
   renderRecentFiles()
 })
+
+for (const trigger of [$("#welcome-recent-open"), $("#welcome-recent-empty-open")]) {
+  trigger?.addEventListener("click", () => openButton.click())
+}
 renderRecentFiles()
 
 void hydrateTemplateCardPreviews(document.querySelector(".template-grid")!)
 
 // 欢迎页模板卡：直接以该模板新建，不再弹选择器
-for (const card of document.querySelectorAll<HTMLButtonElement>(".template-card")) {
+for (const card of document.querySelectorAll<HTMLButtonElement>(".template-card[data-template]")) {
   card.addEventListener("click", () => {
     const templateID = card.dataset.template
     if (!templateID || fileOperationRunning) return
@@ -10861,9 +11311,15 @@ function nextResourceBase(): string {
 }
 
 function updateLayoutImageForm(): void {
-  layoutImageSize.textContent = layoutImageWidth > 0 ? `${layoutImageWidth} × ${layoutImageHeight}` : "未选择图片"
+  const hasImage = layoutImageWidth > 0 && layoutImageHeight > 0
+  layoutImageSize.textContent = hasImage
+    ? `${layoutImageWidth} × ${layoutImageHeight} · 点击可更换`
+    : "支持 PNG · 也可以直接拖到画布"
+  layoutImagePreview.hidden = !hasImage
+  layoutImageFileLabel.hidden = hasImage
+  layoutImageFile.classList.toggle("has-image", hasImage)
   layoutImageApply.disabled =
-    !archive || archive.format === "bda" || layoutImageWidth === 0 || !layoutImageTarget
+    !archive || archive.format === "bda" || !hasImage || !layoutImageTarget || layoutImageApplying
 }
 
 function setLayoutImageHighlight(active: boolean): void {
@@ -10889,23 +11345,32 @@ function openLayoutImageDialog(): void {
     layoutImageTarget = selectedKeySections.length ? "key-normal" : "panel"
     layoutImageTargetInputs.find((input) => input.value === layoutImageTarget)!.checked = true
   }
-  if (!layoutImageBytes) layoutImageFile.click()
-  else updateLayoutImageForm()
+  syncLayoutImageConfig()
+  updateLayoutImageForm()
   layoutImageDialog.showModal()
+  // 选择器必须在 showModal 之后触发，否则部分 WebView（含 Tauri）不会弹出系统文件框。
+  if (!layoutImageBytes) layoutImageFile.click()
 }
 
 function setLayoutImageBytes(bytes: Uint8Array): void {
   if (layoutImageObjectURL) URL.revokeObjectURL(layoutImageObjectURL)
   layoutImageObjectURL = URL.createObjectURL(new Blob([new Uint8Array(bytes).buffer], { type: "image/png" }))
   layoutImageBytes = bytes
+  layoutImageWidth = 0
+  layoutImageHeight = 0
+  layoutImagePreview.src = layoutImageObjectURL
+  layoutImageError.hidden = true
+  layoutImageError.textContent = ""
+  updateLayoutImageForm()
   const image = new Image()
   image.onload = () => {
     layoutImageWidth = image.naturalWidth
     layoutImageHeight = image.naturalHeight
-    layoutImagePreview.src = layoutImageObjectURL
-    layoutImagePreview.hidden = false
-    layoutImageFileLabel.hidden = true
-    layoutImageFile.classList.add("has-image")
+    updateLayoutImageForm()
+  }
+  image.onerror = () => {
+    layoutImageError.textContent = "无法读取该图片，请确认选择的是有效的 PNG 文件。"
+    layoutImageError.hidden = false
     updateLayoutImageForm()
   }
   image.src = layoutImageObjectURL
@@ -10923,10 +11388,31 @@ function layoutImageTargetLabel(target: LayoutImageTarget): string {
 }
 
 async function applyLayoutImage(): Promise<void> {
+  if (layoutImageApplying) return
+  layoutImageApplying = true
+  layoutImageApply.textContent = "正在应用…"
+  updateLayoutImageForm()
+  try {
+    await runLayoutImageReplace()
+  } catch (error) {
+    layoutImageError.textContent = `替换失败：${error instanceof Error ? error.message : String(error)}`
+    layoutImageError.hidden = false
+  } finally {
+    layoutImageApplying = false
+    layoutImageApply.textContent = "应用替换"
+    updateLayoutImageForm()
+  }
+}
+
+async function runLayoutImageReplace(): Promise<void> {
   const layout = currentLayoutDocument()
   const styles = currentStyleDocument()
   const gen = currentGenDocument()
   if (!archive || !layout || !styles || !gen || !layoutImageBytes || !layoutImageTarget) return
+  // 每次都从最初选中的图片开始切片；复用上一次缩放后的字节会逐次降采样。
+  let source = layoutImageBytes
+  let sourceWidth = layoutImageWidth
+  let sourceHeight = layoutImageHeight
   if (layoutImageTarget === "panel" && selectedKeySections.length) {
     layoutImageError.textContent = "键盘背景替换作用于整个布局，请先取消按键选择。"
     layoutImageError.hidden = false
@@ -10943,10 +11429,8 @@ async function applyLayoutImage(): Promise<void> {
       return
     }
     const candidateRect = resolveCandidateRect(cand, gen)
-    if (layoutImageWidth !== candidateRect.width || layoutImageHeight !== candidateRect.height) {
-      layoutImageBytes = await fitPngTo(layoutImageBytes, candidateRect.width, candidateRect.height)
-      layoutImageWidth = candidateRect.width
-      layoutImageHeight = candidateRect.height
+    if (sourceWidth !== candidateRect.width || sourceHeight !== candidateRect.height) {
+      source = await fitPngTo(source, candidateRect.width, candidateRect.height)
     }
     const base = nextResourceBase()
     const plan = planLayoutImage(layoutImageTarget, [], IniDocument.parse(""), candidateRect.width, candidateRect.height)
@@ -10958,7 +11442,7 @@ async function applyLayoutImage(): Promise<void> {
     const tilPath = `${base}.til`
     const stylePath = styleConfigPath()
     commitBatch([
-      { kind: "bytes", path: pngPath, before: archive.getBytes(pngPath), after: layoutImageBytes },
+      { kind: "bytes", path: pngPath, before: archive.getBytes(pngPath), after: source },
       { kind: "bytes", path: tilPath, before: archive.getBytes(tilPath), after: tilesBytes },
       { kind: "text", path: candPath, before: cand.toString(), after: candDoc.toString() },
       { kind: "text", path: stylePath, before: styles.toString(), after: stylesDoc.toString() },
@@ -10978,8 +11462,6 @@ async function applyLayoutImage(): Promise<void> {
   const keys = layoutKeyRects(layout, selectedKeySections, [panel.width, panel.height])
   const layoutDoc = IniDocument.parse(layout.toString())
   let plan: LayoutImagePlan
-  let sourceWidth = panel.width
-  let sourceHeight = panel.height
   if (layoutImageConfig === "none" || layoutImageTarget === "panel") {
     // 布局配置仅对按键类目标生效，面板替换始终按整图处理
     if (layoutImageTarget !== "panel") {
@@ -10990,15 +11472,15 @@ async function applyLayoutImage(): Promise<void> {
         return
       }
     }
-    if (layoutImageWidth !== panel.width || layoutImageHeight !== panel.height) {
-      layoutImageBytes = await fitPngTo(layoutImageBytes, panel.width, panel.height)
-      layoutImageWidth = panel.width
-      layoutImageHeight = panel.height
+    if (sourceWidth !== panel.width || sourceHeight !== panel.height) {
+      source = await fitPngTo(source, panel.width, panel.height)
+      sourceWidth = panel.width
+      sourceHeight = panel.height
     }
     plan = planLayoutImage(layoutImageTarget, keys, IniDocument.parse(""), panel.width, panel.height)
   } else {
     // 图片跟随布局 / 布局跟随图片：按图片空白检测按键网格，切片源取自图片
-    const scan = await decodePngMask(layoutImageBytes)
+    const scan = await decodePngMask(source)
     let cells = detectGridCells(scan.mask, scan.width, scan.height)
     if (!cells.length) {
       layoutImageError.textContent = "无法在图片中识别按键区域，请检查图片是否包含透明间隔。"
@@ -11012,9 +11494,9 @@ async function applyLayoutImage(): Promise<void> {
       if (scale < 1) {
         const width = Math.max(1, Math.round(scan.width * scale))
         const height = Math.max(1, Math.round(scan.height * scale))
-        layoutImageBytes = await fitPngTo(layoutImageBytes, width, height)
-        layoutImageWidth = width
-        layoutImageHeight = height
+        source = await fitPngTo(source, width, height)
+        sourceWidth = width
+        sourceHeight = height
         cells = cells.map(([x, y, cellWidth, cellHeight]) => [
           Math.round(x * scale),
           Math.round(y * scale),
@@ -11043,7 +11525,7 @@ async function applyLayoutImage(): Promise<void> {
   const targetPath = layoutPath
   const stylePath = styleConfigPath()
   commitBatch([
-    { kind: "bytes", path: pngPath, before: archive.getBytes(pngPath), after: layoutImageBytes },
+    { kind: "bytes", path: pngPath, before: archive.getBytes(pngPath), after: source },
     { kind: "bytes", path: tilPath, before: archive.getBytes(tilPath), after: tilesBytes },
     { kind: "text", path: targetPath, before: layout.toString(), after: layoutDoc.toString() },
     { kind: "text", path: stylePath, before: styles.toString(), after: stylesDoc.toString() },
@@ -11064,14 +11546,51 @@ async function applyLayoutImage(): Promise<void> {
 
 replaceLayoutImageButton.addEventListener("click", openLayoutImageDialog)
 layoutImageFile.addEventListener("click", () => layoutImageOpen.click())
-layoutImageOpen.addEventListener("change", () => {
-  const file = layoutImageOpen.files?.[0]
-  if (file) {
-    const reader = new FileReader()
-    reader.onload = () => setLayoutImageBytes(new Uint8Array(reader.result as ArrayBuffer))
-    reader.readAsArrayBuffer(file)
+function acceptLayoutImageFile(file: File | undefined): boolean {
+  if (!file) return false
+  if (!/\.png$/i.test(file.name) && file.type !== "image/png") {
+    layoutImageError.textContent = "只支持 PNG 图片。"
+    layoutImageError.hidden = false
+    return false
   }
+  const reader = new FileReader()
+  reader.onload = () => setLayoutImageBytes(new Uint8Array(reader.result as ArrayBuffer))
+  reader.readAsArrayBuffer(file)
+  return true
+}
+layoutImageOpen.addEventListener("change", () => {
+  acceptLayoutImageFile(layoutImageOpen.files?.[0])
   layoutImageOpen.value = ""
+})
+// 投放区：拖入 PNG 与点击选择等价；同时拦掉浏览器直接打开文件的默认行为。
+let layoutImageDragDepth = 0
+layoutImageFile.addEventListener("dragenter", (event) => {
+  if (!event.dataTransfer?.types.includes("Files")) return
+  event.preventDefault()
+  layoutImageDragDepth += 1
+  layoutImageFile.classList.add("drop-target")
+})
+layoutImageFile.addEventListener("dragover", (event) => {
+  if (!event.dataTransfer?.types.includes("Files")) return
+  event.preventDefault()
+  event.dataTransfer.dropEffect = "copy"
+})
+layoutImageFile.addEventListener("dragleave", () => {
+  layoutImageDragDepth = Math.max(0, layoutImageDragDepth - 1)
+  if (!layoutImageDragDepth) layoutImageFile.classList.remove("drop-target")
+})
+layoutImageFile.addEventListener("drop", (event) => {
+  if (!event.dataTransfer?.types.includes("Files")) return
+  event.preventDefault()
+  layoutImageDragDepth = 0
+  layoutImageFile.classList.remove("drop-target")
+  acceptLayoutImageFile(event.dataTransfer.files[0])
+})
+layoutImageDialog.addEventListener("dragover", (event) => {
+  if (event.dataTransfer?.types.includes("Files")) event.preventDefault()
+})
+layoutImageDialog.addEventListener("drop", (event) => {
+  if (event.dataTransfer?.types.includes("Files")) event.preventDefault()
 })
 for (const input of layoutImageTargetInputs) {
   input.addEventListener("change", () => {
@@ -11083,6 +11602,8 @@ for (const input of layoutImageTargetInputs) {
         : selectedKeySections.length
         ? `已选中 ${selectedKeySections.length} 个按键，将只替换这些按键。`
         : "未选中按键，将替换当前布局的全部按键。"
+    layoutImageError.hidden = true
+    layoutImageError.textContent = ""
     syncLayoutImageConfig()
     updateLayoutImageForm()
   })
@@ -11211,7 +11732,9 @@ if (isTauri()) {
     const name = pickerPath.split("/").pop()?.replace(/\.png$/i, "") ?? pickerPath
     updateSelectedImageReference(pickerTarget, `${name},${selected.index}`)
   })
-  void listen("resource-picker-open", openResourcePickerWindow)
+  void listen("image-picker-resources-request", () => {
+    void emitTo("image-picker", "image-picker-resources-data", resourcePickerPayload())
+  })
   void listen<{ path: string }>("resource-picker-select", (event) => {
     selectImageResource(event.payload.path)
   })
@@ -11323,7 +11846,9 @@ let selectedResourceGalleryPath = ""
 
 atlasWorkspace = createAtlasWorkspace({
   back: () => selectFile(layoutPath || currentConfigPath(layout.value)),
+  autoSlice: () => { void autoSliceSelectedImage() },
   guides: () => setGuidesVisible(!guidesVisible),
+  redraw: () => drawAtlas(),
   stretch: enabled => {
     const slice = slices.find(item => item.index === selectedTileIndex)
     if (!slice || !isEditing() || archive?.format === "bda") return
@@ -11654,7 +12179,7 @@ if (isTauri()) {
           await runFileOperation("上传文件", async () => commitSourceUploads(
             await Promise.all(payload.paths.map(async (path) => ({
               name: path,
-              bytes: new Uint8Array(await invoke<number[]>("read_file", { path })),
+              bytes: new Uint8Array(await invoke<ArrayBuffer>("read_file", { path })),
             }))),
             folder,
           ))
@@ -11663,7 +12188,7 @@ if (isTauri()) {
         const pngPath = payload.paths.find((path) => /\.png$/i.test(path))
         if (pngPath) {
           if (!archive || archive.format === "bda") return
-          const bytes = new Uint8Array(await invoke<number[]>("read_file", { path: pngPath }))
+          const bytes = new Uint8Array(await invoke<ArrayBuffer>("read_file", { path: pngPath }))
           setLayoutImageBytes(bytes)
           openLayoutImageDialog()
           return

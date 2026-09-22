@@ -37,6 +37,21 @@ export function setCanvasSize(
   return true
 }
 
+export function constrainedCanvasSize(
+  width: number,
+  height: number,
+  maxWidth = Number.POSITIVE_INFINITY,
+  maxHeight = Number.POSITIVE_INFINITY,
+): { width: number; height: number } {
+  const safeWidth = Math.max(1, Math.round(width))
+  const safeHeight = Math.max(1, Math.round(height))
+  const scale = Math.min(1, maxWidth / safeWidth, maxHeight / safeHeight)
+  return {
+    width: Math.max(1, Math.round(safeWidth * scale)),
+    height: Math.max(1, Math.round(safeHeight * scale)),
+  }
+}
+
 function sharedNineSliceBuffer(): HTMLCanvasElement {
   nineSliceBuffer ??= document.createElement("canvas")
   return nineSliceBuffer
@@ -2167,8 +2182,14 @@ export class Preview {
     this.canvas.dataset.logicalHeight = String(height)
     this.canvas.style.aspectRatio = `${width} / ${height}`
     if (changed) {
-      this.canvas.width = width
-      this.canvas.height = height
+      const size = constrainedCanvasSize(
+        width,
+        height,
+        Number(this.canvas.dataset.maxBackingWidth) || Number.POSITIVE_INFINITY,
+        Number(this.canvas.dataset.maxBackingHeight) || Number.POSITIVE_INFINITY,
+      )
+      this.canvas.width = size.width
+      this.canvas.height = size.height
     }
     requestAnimationFrame(() => this.resize())
   }
@@ -2185,13 +2206,13 @@ export class Preview {
     // stable and is only recreated when the logical panel or DPR changes.
     const logicalWidth = Number(this.canvas.dataset.logicalWidth)
     const logicalHeight = Number(this.canvas.dataset.logicalHeight)
-    const width = Number.isFinite(logicalWidth) && logicalWidth > 0
-      ? Math.max(1, Math.round(logicalWidth * ratio))
-      : Math.max(1, Math.round(bounds.width * ratio))
-    const height = Number.isFinite(logicalHeight) && logicalHeight > 0
-      ? Math.max(1, Math.round(logicalHeight * ratio))
-      : Math.max(1, Math.round(bounds.height * ratio))
-    if (!setCanvasSize(this.canvas, width, height)) return
+    const size = constrainedCanvasSize(
+      Number.isFinite(logicalWidth) && logicalWidth > 0 ? logicalWidth * ratio : bounds.width * ratio,
+      Number.isFinite(logicalHeight) && logicalHeight > 0 ? logicalHeight * ratio : bounds.height * ratio,
+      Number(this.canvas.dataset.maxBackingWidth) || Number.POSITIVE_INFINITY,
+      Number(this.canvas.dataset.maxBackingHeight) || Number.POSITIVE_INFINITY,
+    )
+    if (!setCanvasSize(this.canvas, size.width, size.height)) return
     void this.draw()
   }
 

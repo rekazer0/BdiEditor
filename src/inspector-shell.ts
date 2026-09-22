@@ -64,77 +64,70 @@ function sectionLabel(section: HTMLElement): string {
 }
 
 /* ------------------------------------------------------------------ *
- * Chrome injection: sticky action bar
+ * Key tool row: the 布局 panel owns the tools, the counter holds its right edge
  * ------------------------------------------------------------------ */
-function buildActions(): HTMLElement {
-  const actions = document.createElement("div")
-  actions.className = "pin-actions"
-  actions.innerHTML = [
-    '<span class="pin-actions-slot"></span>',
-    '<span class="pin-actions-meta" data-count="0" role="status">已改 0</span>',
-    '<button class="pin-reset-all" type="button" title="恢复本次选择后的所有修改" hidden>重置</button>',
-  ].join("")
-  return actions
+function keyToolbar(): HTMLElement | null {
+  return document.querySelector<HTMLElement>("#quick-inspector .key-layout-fields > .key-toolbar")
 }
 
-function ensureChrome(): { actions: HTMLElement } | null {
-  const root = inspector()
-  if (!root) return null
-  let actions = root.querySelector<HTMLElement>(":scope > .pin-actions")
-  if (!actions) {
-    actions = buildActions()
-    root.prepend(actions)
+const TOOL_ICONS: Record<string, [string, number]> = {
+  "mode:select": ["mouse-pointer-2", 13],
+  "mode:move": ["move", 13],
+  "action:copy": ["copy", 14],
+  "action:swap": ["arrow-left-right", 14],
+  "action:delete": ["trash-2", 14],
+}
+
+/** Draw the tool row with the panel's own icon set instead of mixed platform symbols. */
+function decorateKeyToolbar(toolbar: HTMLElement): void {
+  for (const button of toolbar.querySelectorAll<HTMLButtonElement>("button[data-key-mode], button[data-key-action]")) {
+    const key = button.dataset.keyMode ? `mode:${button.dataset.keyMode}` : `action:${button.dataset.keyAction}`
+    const [name, size] = TOOL_ICONS[key] ?? ["move", 14]
+    const icon = inspectorIcon(name, size)
+    const system = button.querySelector(":scope > .system-symbol")
+    if (system) system.replaceWith(icon)
+    else if (!button.querySelector(".inspector-icon")) button.prepend(icon)
   }
-  return { actions }
+  // Keep the destructive action visually apart from the safe tools.
+  const remove = toolbar.querySelector(":scope > button[data-key-action='delete']")
+  if (remove && !toolbar.querySelector(":scope > .pin-tool-separator")) {
+    const separator = document.createElement("span")
+    separator.className = "pin-tool-separator"
+    separator.setAttribute("aria-hidden", "true")
+    remove.before(separator)
+  }
 }
 
 /**
- * Mirror the app's key action toolbar (复制 / 交换 / 删除) into the sticky action bar.
- * The original toolbar stays in place; clicks are forwarded so the app handlers run.
+ * One status chip and one reset button, reused and always last, so they keep the
+ * right edge of the tool row exactly like the rows below keep the value edge.
  */
-function mountKeyToolbar(actions: HTMLElement): void {
-  const slot = actions.querySelector<HTMLElement>(".pin-actions-slot")
-  const toolbar = document.querySelector<HTMLElement>(".key-toolbar")
-  if (!slot || !toolbar) return
-  const source = Array.from(toolbar.querySelectorAll<HTMLButtonElement>("button"))
-  if (!source.length) return
-  const buttons = source.map((original) => {
-    const button = document.createElement("button")
-    button.type = "button"
-    button.className = "pin-action"
-    const icon = original.dataset.keyMode === "select" ? "mouse-pointer-2"
-      : original.dataset.keyMode === "move" ? "move"
-      : original.dataset.keyAction === "copy" ? "copy"
-      : original.dataset.keyAction === "swap" ? "arrow-left-right" : "trash-2"
-    button.append(inspectorIcon(icon, original.dataset.keyMode ? 13 : 14))
-    button.title = original.title
-    button.setAttribute("aria-label", original.getAttribute("aria-label") ?? original.title)
-    if (original.dataset.keyAction === "delete") button.classList.add("is-danger")
-    button.addEventListener("click", () => original.click())
-    return button
-  })
-  const modes = document.createElement("div")
-  modes.className = "inspector-mode-segment"
-  modes.setAttribute("role", "group")
-  modes.setAttribute("aria-label", "按键操作模式")
-  modes.append(...buttons.slice(0, 2))
-  slot.replaceChildren(modes, ...buttons.slice(2))
-  const mirror = (): void => {
-    source.forEach((original, index) => {
-      if (buttons[index].disabled !== original.disabled) buttons[index].disabled = original.disabled
-      buttons[index].classList.toggle("active", original.classList.contains("active"))
-      if (original.dataset.keyMode) {
-        buttons[index].dataset.keyModeMirror = original.dataset.keyMode
-        buttons[index].setAttribute("aria-pressed", String(original.classList.contains("active")))
-      }
-    })
+function ensureToolbarStatus(toolbar: HTMLElement): void {
+  let meta = toolbar.querySelector<HTMLElement>(":scope > .pin-actions-meta")
+  if (!meta) {
+    meta = document.createElement("span")
+    meta.className = "pin-actions-meta"
+    meta.setAttribute("role", "status")
+    meta.textContent = "未修改"
   }
-  mirror()
-  new MutationObserver(mirror).observe(toolbar, {
-    attributes: true,
-    attributeFilter: ["disabled", "class"],
-    subtree: true,
-  })
+  meta.dataset.count ??= "0"
+  let reset = toolbar.querySelector<HTMLButtonElement>(":scope > .pin-reset-all")
+  if (!reset) {
+    reset = document.createElement("button")
+    reset.type = "button"
+    reset.className = "pin-reset-all"
+    reset.title = "恢复本次选择后的所有修改"
+    reset.textContent = "重置"
+    reset.hidden = true
+  }
+  if (toolbar.lastElementChild !== reset) toolbar.append(meta, reset)
+}
+
+function refreshKeyToolbar(): void {
+  const toolbar = keyToolbar()
+  if (!toolbar) return
+  decorateKeyToolbar(toolbar)
+  ensureToolbarStatus(toolbar)
 }
 
 /* ------------------------------------------------------------------ *
@@ -204,16 +197,15 @@ function modifiedRows(): Row[] {
 }
 
 function updateMeta(): void {
-  const root = inspector()
-  const meta = root?.querySelector<HTMLElement>(":scope > .pin-actions .pin-actions-meta")
-  const resetAll = root?.querySelector<HTMLElement>(":scope > .pin-actions .pin-reset-all")
+  const toolbar = keyToolbar()
+  const meta = toolbar?.querySelector<HTMLElement>(":scope > .pin-actions-meta")
+  const resetAll = toolbar?.querySelector<HTMLElement>(":scope > .pin-reset-all")
   const count = modifiedRows().length
   if (meta) {
     meta.dataset.count = String(count)
     meta.textContent = count ? `已改 ${count}` : "未修改"
   }
   if (resetAll) resetAll.hidden = count === 0
-
 }
 
 function resetAll(): void {
@@ -277,9 +269,11 @@ function decorateSections(): void {
 /* ------------------------------------------------------------------ *
  * Wiring
  * ------------------------------------------------------------------ */
-function bindChrome(chrome: { actions: HTMLElement }): void {
-  const resetAllButton = chrome.actions.querySelector<HTMLElement>(".pin-reset-all")
-  resetAllButton?.addEventListener("click", resetAll)
+function bindInspector(): void {
+  // Delegated so the reset button can be re-created without rebinding.
+  keyToolbar()?.addEventListener("click", (event) => {
+    if ((event.target as Element | null)?.closest?.(".pin-reset-all")) resetAll()
+  })
 
   const root = inspector()
   root?.addEventListener("pointerdown", collectRows, true)
@@ -294,25 +288,13 @@ function bindChrome(chrome: { actions: HTMLElement }): void {
   })
 }
 
-/** Keep the sticky action bar's key actions in sync with the app's own visibility. */
-function syncActionBar(source: HTMLElement): void {
-  const slot = source.querySelector<HTMLElement>(".pin-actions-slot")
-  const group = document.querySelector<HTMLElement>(".key-layout-fields")
-  if (!slot || !group) return
-  const visible = !group.hidden && !group.closest("[hidden]")
-  // This attribute is observed below; rewriting it would schedule another frame forever.
-  if (slot.hidden !== !visible) slot.hidden = !visible
-}
-
 export function initInspectorShell(): void {
   decorateInspectorDetails()
-  const chrome = ensureChrome()
-  if (!chrome) return
+  refreshKeyToolbar()
   collectRows()
   for (const row of rows) baselines.set(row.el, rowValue(row))
   decorateSections()
-  mountKeyToolbar(chrome.actions)
-  bindChrome(chrome)
+  bindInspector()
   updateMeta()
 
   const root = inspector()
@@ -324,14 +306,11 @@ export function initInspectorShell(): void {
       window.requestAnimationFrame(() => {
         scheduled = false
         decorateSections()
-        syncActionBar(chrome.actions)
+        refreshKeyToolbar()
       })
     })
     observer.observe(root, { attributes: true, attributeFilter: ["hidden", "class", "data-inspector-group-display"], subtree: true })
-    syncActionBar(chrome.actions)
   }
-
-
 }
 
 export function setInspectorKind(kind: "bds" | "bda" | ""): void {

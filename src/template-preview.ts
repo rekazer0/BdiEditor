@@ -1,148 +1,95 @@
-import { AtlasResolver } from "./atlas.ts"
-import {
-  BdaResolver,
-  bdaAppearancePath,
-  bdaLayoutDocument,
-  bdaStyleID,
-  decodeBdaAppearance,
-} from "./bda.ts"
-import { IniDocument } from "./ini.ts"
-import {
-  DEFAULT_BDA_PANEL_HEIGHT,
-  DEFAULT_BDA_PANEL_WIDTH,
-  resolvePanelConfig,
-} from "./keyboard.ts"
-import { loadBuiltInProjectTemplate } from "./operations.ts"
-import { scaleIniDocument } from "./panel-tools.ts"
-import { Preview } from "./preview.ts"
-import { SkinArchive } from "./skin.ts"
+import { builtInProjectTemplatePreviewURL, loadBuiltInProjectTemplate } from "./operations.ts"
+import { readArchiveEntry, SkinArchive } from "./skin.ts"
 
-const LAYOUT_FILES = ["py_9.ini", "py_26.ini"] as const
-
-let bdaBasePromise: Promise<SkinArchive> | undefined
-
-function loadBdaBase(): Promise<SkinArchive> {
-  bdaBasePromise ??= (async () => {
-    const response = await fetch(new URL("bda-base.bds", document.baseURI))
-    if (!response.ok) throw new Error("无法加载 BDA 官方基础布局")
-    return SkinArchive.open(new Uint8Array(await response.arrayBuffer()))
-  })()
-  return bdaBasePromise
+/**
+ * 皮肤包里的效果预览图。各平台位置不同（`demo.png` / `skin/demo.png` /
+ * `dark/skin/demo.png`），所以只按文件名匹配，跳过 macOS 资源分叉。
+ */
+function isDemoImagePath(name: string): boolean {
+  const segments = name.split("/")
+  if (segments.some((segment) => segment === "__MACOSX" || segment.startsWith("._"))) return false
+  return segments[segments.length - 1]?.toLowerCase() === "demo.png"
 }
 
-function pickTheme(names: readonly string[]): "light" | "dark" {
-  return names.some((name) => name.startsWith("light/skin/")) ? "light" : "dark"
+function demoImageType(bytes: Uint8Array): string {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return "image/jpeg"
+  if (bytes[0] === 0x47 && bytes[1] === 0x49) return "image/gif"
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[8] === 0x57) return "image/webp"
+  return "image/png"
 }
 
-function pickLayoutPath(names: readonly string[], theme: "light" | "dark"): string | undefined {
-  const prefix = `${theme}/skin/port/`
-  for (const layout of LAYOUT_FILES) {
-    if (names.includes(`${prefix}${layout}`)) return `${prefix}${layout}`
-  }
-  return names.find((name) =>
-    name.startsWith(prefix) &&
-    name.toLowerCase().endsWith(".ini") &&
-    !name.endsWith("/gen.ini")
-  )
+function yieldPreviewTask(): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, 0))
 }
 
-function stylePath(names: readonly string[], theme: "light" | "dark"): string | undefined {
-  return [
-    `${theme}/skin/port/res/default.css`,
-    `${theme}/skin/res/default.css`,
-  ].find((path) => names.includes(path))
+/**
+ * 只抽 demo 图：先按本地文件头就地取（不解整包），大小写在数据描述符里的包
+ * 才退回整包解压。
+ */
+async function demoImageBytes(bytes: Uint8Array): Promise<Uint8Array | undefined> {
+  const entry = readArchiveEntry(bytes, isDemoImagePath)
+  if (entry) return entry.data
+  const archive = await SkinArchive.openAsync(bytes)
+  const path = archive.names()
+    .filter(isDemoImagePath)
+    .sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b))[0]
+  return path ? archive.getBytes(path) : undefined
 }
 
-async function paintPreview(
-  canvas: HTMLCanvasElement,
-  setup: (preview: Preview) => void,
-): Promise<void> {
-  const preview = new Preview(canvas, () => {}, () => {})
+/** 包内没有 demo 预览图。这是稳定结果，调用方不必重试。 */
+export class MissingPreviewImageError extends Error {
+  override name = "MissingPreviewImageError"
+}
+
+function previewImageElement(src: string, objectUrl?: string): HTMLImageElement {
+  const image = document.createElement("img")
+  image.alt = ""
+  image.decoding = "async"
+  if (objectUrl) image.dataset.objectUrl = objectUrl
+  image.src = src
+  return image
+}
+
+async function showPreviewImage(host: HTMLElement, image: HTMLImageElement): Promise<HTMLImageElement> {
   try {
-    preview.setMode("preview")
-    preview.setTransparent(false)
-    setup(preview)
-    await preview.whenDrawn()
-  } finally {
-    preview.destroy()
+    await image.decode()
+  } catch (error) {
+    releaseArchivePreview(image)
+    throw error
   }
+  host.replaceChildren(image)
+  host.classList.add("is-rendered")
+  return image
 }
 
-async function renderLegacyPreview(archive: SkinArchive, canvas: HTMLCanvasElement): Promise<void> {
-  const names = archive.names()
-  const theme = pickTheme(names)
-  const layoutPath = pickLayoutPath(names, theme)
-  const genPath = `${theme}/skin/port/gen.ini`
-  const cssPath = stylePath(names, theme)
-  if (!layoutPath || !archive.isText(layoutPath) || !archive.isText(genPath) || !cssPath) {
-    throw new Error("皮肤缺少竖屏布局或样式")
-  }
-  const layout = IniDocument.parse(archive.getText(layoutPath))
-  const gen = IniDocument.parse(archive.getText(genPath))
-  const styles = IniDocument.parse(archive.getText(cssPath))
-  const config = resolvePanelConfig(layout, gen, styles)
-  await paintPreview(canvas, (preview) => {
-    preview.setTheme(theme)
-    preview.setResolver(new AtlasResolver(archive, theme, "port"))
-    preview.setDefaults(gen)
-    preview.setOffsets(gen)
-    preview.setPanel(config.styleID, config.width, config.height)
-    preview.setDocument(layout)
-  })
+export async function renderArchivePreview(bytes: Uint8Array, host: HTMLElement): Promise<HTMLImageElement> {
+  const demo = await demoImageBytes(bytes)
+  if (!demo) throw new MissingPreviewImageError("皮肤包内没有 demo 预览图")
+  const objectURL = URL.createObjectURL(new Blob([demo.slice() as BlobPart], { type: demoImageType(demo) }))
+  return showPreviewImage(host, previewImageElement(objectURL, objectURL))
 }
 
-async function renderBdaPreview(archive: SkinArchive, canvas: HTMLCanvasElement): Promise<void> {
-  const base = await loadBdaBase()
-  const theme = pickTheme(archive.names())
-  const appearancePath = bdaAppearancePath(archive, theme, "port")
-  const bytes = appearancePath && archive.getBytes(appearancePath)
-  if (!bytes) throw new Error("皮肤缺少 appearanceConfig")
-  const appearance = decodeBdaAppearance(bytes)
-  const layoutName = LAYOUT_FILES
-    .map((name) => name.replace(/\.ini$/i, ""))
-    .find((name) => appearance.panels.has(name))
-    ?? [...appearance.panels.keys()][0]
-  if (!layoutName) throw new Error("皮肤缺少面板")
-  const layoutFile = `${layoutName}.ini`
-  const basePath = `light/skin/port/${layoutFile}`
-  if (!base.isText(basePath)) throw new Error("缺少 BDA 基础布局")
-  let layout = IniDocument.parse(base.getText(basePath))
-  const width = Number(layout.get("PANEL", "SIZE")?.split(",")[0])
-  if (appearance.designWidth && width) {
-    layout = scaleIniDocument(layout, appearance.designWidth / width, appearance.designWidth / width)
-  }
-  layout = bdaLayoutDocument(layout, appearance, layoutFile)
-  const genPath = "light/skin/port/gen.ini"
-  const gen = base.isText(genPath) ? IniDocument.parse(base.getText(genPath)) : undefined
-  const generalSize = gen?.get("PANEL", "SIZE")?.split(",").map(Number)
-  const layoutSize = layout.get("PANEL", "SIZE")?.split(",").map(Number)
-  const panel = appearance.panels.get(layoutName)
-  await paintPreview(canvas, (preview) => {
-    preview.setTheme(theme)
-    preview.setResolver(new BdaResolver(archive, bytes, base, theme, "port"))
-    if (gen) {
-      preview.setDefaults(gen)
-      preview.setOffsets(gen)
-    }
-    preview.setPanel(
-      bdaStyleID(panel?.wholeBackStyle ?? panel?.backStyle),
-      layoutSize?.[0] || generalSize?.[0] || DEFAULT_BDA_PANEL_WIDTH,
-      layoutSize?.[1] || generalSize?.[1] || DEFAULT_BDA_PANEL_HEIGHT,
-    )
-    preview.setDocument(layout)
-  })
+/** 释放预览图的 blob URL：预览元素被替换或缓存淘汰时必须调用。 */
+export function releaseArchivePreview(image: HTMLImageElement): void {
+  const url = image.dataset.objectUrl
+  if (!url) return
+  URL.revokeObjectURL(url)
+  delete image.dataset.objectUrl
+}
+
+/** 内置模板包内没有 demo 图时的兜底：随应用发布的静态预览图。 */
+async function renderStaticTemplatePreview(id: string, host: HTMLElement): Promise<void> {
+  const url = builtInProjectTemplatePreviewURL(id)
+  if (!url) throw new MissingPreviewImageError("该模板没有静态预览图")
+  await showPreviewImage(host, previewImageElement(url))
 }
 
 async function renderTemplatePreview(id: string, host: HTMLElement): Promise<void> {
-  const bytes = await loadBuiltInProjectTemplate(id)
-  const archive = await SkinArchive.openAsync(bytes)
-  const canvas = document.createElement("canvas")
-  canvas.setAttribute("aria-hidden", "true")
-  if (archive.format === "bda") await renderBdaPreview(archive, canvas)
-  else await renderLegacyPreview(archive, canvas)
-  if (!canvas.width || !canvas.height) throw new Error("预览为空")
-  host.replaceChildren(canvas)
-  host.classList.add("is-rendered")
+  try {
+    await renderArchivePreview(await loadBuiltInProjectTemplate(id), host)
+  } catch {
+    await renderStaticTemplatePreview(id, host)
+  }
 }
 
 export async function hydrateTemplateCardPreviews(root: ParentNode = document): Promise<void> {
@@ -150,11 +97,21 @@ export async function hydrateTemplateCardPreviews(root: ParentNode = document): 
   for (const card of cards) {
     const id = card.dataset.template
     const host = card.querySelector<HTMLElement>(".template-preview")
-    if (!id || !host) continue
+    if (!id || !host || host.classList.contains("is-rendered")) continue
+    await yieldPreviewTask()
     try {
       await renderTemplatePreview(id, host)
-    } catch {
-      host.textContent = "预览暂不可用"
+    } catch (error) {
+      if (error instanceof MissingPreviewImageError) {
+        host.textContent = "暂无预览图"
+        continue
+      }
+      await yieldPreviewTask()
+      try {
+        await renderTemplatePreview(id, host)
+      } catch {
+        host.textContent = "暂无预览图"
+      }
     }
   }
 }

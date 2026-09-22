@@ -25,13 +25,20 @@ class Element {
 }
 const drawn = []
 let pickerTarget
+const sliceCalls = []
 const context = vm.createContext({
   document: { createElement: tag => new Element(tag) },
   retinaThumbnail: canvas => canvas,
   styleReferenceDrawIDs: new WeakMap(),
+  styleStateVisuals: new WeakMap(),
+  styleStateCanvasObserver: { observe() {}, unobserve() {} },
+  sizeStyleStateCanvas: () => false,
   visualResolver: () => ({ resolve: async (id, highlighted) => ({ id, highlighted }) }),
   drawVisualPreview: (canvas, layers) => drawn.push(layers),
   openStylePicker: target => { pickerTarget = target },
+  openStyleReferenceStateImage: async (target, styleKey, highlighted) => {
+    sliceCalls.push({ styleID: target.value, key: styleKey, highlighted })
+  },
   Event,
 })
 vm.runInContext(ts.transpile(code, { target: ts.ScriptTarget.ES2022 }), context)
@@ -44,7 +51,12 @@ for (const key of ['FORE_STYLE', 'BACK_STYLE']) {
   assert.equal(button.children.length, 3)
   assert.deepEqual(drawn.map(layers => layers.map(visual => visual.id).join(',')), ['11', '11', '22', '22', '11', '11'])
   assert.deepEqual(Array.from(button.children, row => row.children[0].value), ['11', '22', '11'])
-  button.children[1].children[1].children[0].listeners.click({})
+  const stateCard = button.children[1].children[1].children[0]
+  // 预览图点击打开该状态图片的切片选择器，而不是样式选择器。
+  stateCard.listeners.click({})
+  assert.deepEqual(sliceCalls.at(-1), { styleID: '22', key, highlighted: false })
+  // 样式选择器保留在 Alt 点击上。
+  stateCard.listeners.click({ altKey: true })
   assert.equal(pickerTarget.value, '22')
   pickerTarget.value = '33'
   pickerTarget.dispatchEvent(new Event('change'))
@@ -57,4 +69,4 @@ for (const key of ['FORE_STYLE', 'BACK_STYLE']) {
   await context.refreshStyleReferenceThumbnail(button, input, key)
   assert.equal(button.children.length, 1)
 }
-console.log('Style reference rows: foreground/background, duplicate refs, independent replacement and row refresh passed')
+console.log('Style reference rows: foreground/background, duplicate refs, independent replacement, slice picker on preview click and row refresh passed')
