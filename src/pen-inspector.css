@@ -692,8 +692,8 @@
 :root body .source #quick-inspector#quick-inspector .style-reference-input:not(.sound-style-reference) {
   display: flex !important;
   width: 100% !important;
-  height: 96px !important;
-  min-height: 96px !important;
+  height: 84px !important;
+  min-height: 84px !important;
   gap: 0 !important;
   border: 1px solid var(--pin-line) !important;
   border-radius: 8px !important;
@@ -911,7 +911,7 @@
   display: flex;
   flex: none;
   width: 100%;
-  height: 96px;
+  height: 84px;
   box-sizing: border-box;
   border: 1px solid var(--pin-line);
   border-radius: 8px;

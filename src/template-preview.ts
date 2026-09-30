@@ -22,6 +22,10 @@ function yieldPreviewTask(): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, 0))
 }
 
+function previewCards(root: ParentNode): HTMLButtonElement[] {
+  return [...root.querySelectorAll<HTMLButtonElement>(".template-card[data-template]")]
+}
+
 /**
  * 只抽 demo 图：先按本地文件头就地取（不解整包），大小写在数据描述符里的包
  * 才退回整包解压。
@@ -85,6 +89,12 @@ async function renderStaticTemplatePreview(id: string, host: HTMLElement): Promi
 }
 
 async function renderTemplatePreview(id: string, host: HTMLElement): Promise<void> {
+  // Static previews are already shipped with the app; do not unzip the matching template first.
+  const staticURL = builtInProjectTemplatePreviewURL(id)
+  if (staticURL) {
+    await showPreviewImage(host, previewImageElement(staticURL))
+    return
+  }
   try {
     await renderArchivePreview(await loadBuiltInProjectTemplate(id), host)
   } catch {
@@ -92,26 +102,48 @@ async function renderTemplatePreview(id: string, host: HTMLElement): Promise<voi
   }
 }
 
-export async function hydrateTemplateCardPreviews(root: ParentNode = document): Promise<void> {
-  const cards = [...root.querySelectorAll<HTMLButtonElement>(".template-card[data-template]")]
+export async function hydrateTemplateCardPreviews(
+  root: ParentNode = document,
+  options: { lazy?: boolean } = {},
+): Promise<void> {
+  const cards = previewCards(root)
+  if (options.lazy && cards.length && "IntersectionObserver" in window) {
+    const scrollRoot = root instanceof Element ? root.closest<HTMLElement>(".welcome-main") : null
+    const pending = new Set(cards)
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue
+        const card = entry.target as HTMLButtonElement
+        if (!pending.delete(card)) continue
+        observer.unobserve(card)
+        void hydrateTemplateCard(card)
+      }
+    }, { root: scrollRoot, rootMargin: "240px 0px" })
+    for (const card of cards) observer.observe(card)
+    return
+  }
   for (const card of cards) {
-    const id = card.dataset.template
-    const host = card.querySelector<HTMLElement>(".template-preview")
-    if (!id || !host || host.classList.contains("is-rendered")) continue
+    await hydrateTemplateCard(card)
+  }
+}
+
+async function hydrateTemplateCard(card: HTMLButtonElement): Promise<void> {
+  const id = card.dataset.template
+  const host = card.querySelector<HTMLElement>(".template-preview")
+  if (!id || !host || host.classList.contains("is-rendered")) return
+  await yieldPreviewTask()
+  try {
+    await renderTemplatePreview(id, host)
+  } catch (error) {
+    if (error instanceof MissingPreviewImageError) {
+      host.textContent = "暂无预览图"
+      return
+    }
     await yieldPreviewTask()
     try {
       await renderTemplatePreview(id, host)
-    } catch (error) {
-      if (error instanceof MissingPreviewImageError) {
-        host.textContent = "暂无预览图"
-        continue
-      }
-      await yieldPreviewTask()
-      try {
-        await renderTemplatePreview(id, host)
-      } catch {
-        host.textContent = "暂无预览图"
-      }
+    } catch {
+      host.textContent = "暂无预览图"
     }
   }
 }

@@ -85,23 +85,26 @@ function runMarkup(id: string, bodyId: string): string {
 }
 
 function configureAppearance(chat: DeepChat): void {
-  // The Pen design tokens stay symbolic: deep-chat's styles are inline, so a
-  // `var()` keeps the conversation following the app theme after a theme switch
-  // instead of freezing the light palette at connect time.
-  const text = "var(--pen-text, #14161b)"
-  const muted = "var(--pen-tertiary, #8c93a1)"
-  const secondary = "var(--pen-secondary, #5a6070)"
-  const control = "var(--pen-surface, #ffffff)"
-  const sunken = "var(--pen-surface-subtle, #f4f5f8)"
-  const line = "var(--pen-line, #e6e8ee)"
-  const lineStrong = "var(--pen-line-strong, #d2d6df)"
-  const accent = "var(--pen-accent, #2f6bff)"
-  const onAccent = "var(--pen-on-brand, #ffffff)"
-  const ok = "var(--pen-state-ok, #10a15a)"
-  const danger = "var(--pen-state-danger, #e5484d)"
+  // The inspector tokens stay symbolic: deep-chat's styles are inline, so a
+  // `var()` keeps the conversation on the same palette as the panel around it
+  // and following the app theme after a theme switch, instead of freezing the
+  // palette at connect time.
+  const text = "var(--pin-ink, #14161b)"
+  const muted = "var(--pin-ink-faint, #8c93a1)"
+  const secondary = "var(--pin-ink-muted, #5a6070)"
+  const control = "var(--pin-surface, #ffffff)"
+  const sunken = "var(--pin-sunken, #f4f5f8)"
+  const line = "var(--pin-line, #e6e8ee)"
+  const lineStrong = "var(--pin-line-strong, #d2d6df)"
+  const accent = "var(--pin-accent, #2f6bff)"
+  const onAccent = "var(--pin-on-brand, #ffffff)"
+  const ok = "var(--pin-ok, #10a15a)"
+  const danger = "var(--pin-danger, #e5484d)"
   const mono = "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)"
-  const radiusMd = "var(--pen-radius-md, 10px)"
-  const radiusSm = "var(--pen-radius-sm, 8px)"
+  const radiusLg = "var(--pin-radius-lg, 12px)"
+  const radiusMd = "var(--pin-radius-md, 8px)"
+  const radiusSm = "var(--pin-radius-sm, 6px)"
+  const ctrlH = "var(--pin-ctrl-h, 30px)"
   const radiusPill = "var(--pen-radius-pill, 999px)"
 
   chat.chatStyle = {
@@ -115,7 +118,7 @@ function configureAppearance(chat: DeepChat): void {
   chat.inputAreaStyle = {
     width: "auto",
     alignSelf: "end",
-    margin: "0 14px 32px",
+    margin: "0 14px 24px",
     border: "0",
     backgroundColor: "transparent",
     boxShadow: "none",
@@ -124,15 +127,15 @@ function configureAppearance(chat: DeepChat): void {
     placeholder: { text: "描述你想要的皮肤效果…", style: { color: muted } },
     characterLimit: 8_000,
     styles: {
-      text: { color: text, fontSize: "12.5px", lineHeight: "1.7", padding: "12px 12px 0",
+      text: { color: text, fontSize: "12.5px", lineHeight: "1.7", padding: "13px 13px 0",
         boxSizing: "border-box", height: "calc(100% - 46px)", overflowY: "auto" },
       container: {
         width: "100%", boxSizing: "border-box", margin: "0",
         height: "var(--ai-input-height, 148px)", minHeight: "128px", maxHeight: "none", overflow: "hidden",
-        border: `1px solid ${line}`, borderRadius: radiusMd,
-        backgroundColor: sunken, boxShadow: "none",
+        border: `1px solid ${line}`, borderRadius: radiusLg,
+        backgroundColor: sunken, boxShadow: `0 8px 24px color-mix(in srgb, ${text} 6%, transparent)`,
       },
-      focus: { borderColor: accent, boxShadow: `0 0 0 3px color-mix(in srgb, ${accent} 16%, transparent)`, outline: "none" },
+      focus: { borderColor: accent, boxShadow: "none", outline: `2px solid ${accent}`, outlineOffset: "1px" },
     },
   }
 
@@ -249,7 +252,7 @@ function configureAppearance(chat: DeepChat): void {
           color: text,
           backgroundColor: sunken,
           border: "0",
-          borderRadius: radiusMd,
+          borderRadius: radiusLg,
           boxShadow: "none",
           padding: "8px 11px",
           maxWidth: "86%",
@@ -273,19 +276,19 @@ function configureAppearance(chat: DeepChat): void {
     tooltip: { text: "发送；生成时点击可停止" },
     submit: {
       container: {
-        default: { backgroundColor: accent, color: onAccent, borderRadius: radiusSm,
-          width: "28px", height: "28px", bottom: "9px", right: "9px", boxShadow: "none" },
+        default: { backgroundColor: accent, color: onAccent, borderRadius: radiusMd, boxSizing: "border-box",
+          width: ctrlH, height: ctrlH, bottom: "18px", right: "9px", boxShadow: "none" },
         hover: { filter: "brightness(1.06)", transform: "none" },
       },
     },
     disabled: {
       container: { default: { backgroundColor: mix(text, 5, sunken), border: `1px solid ${line}`, color: muted,
-        borderRadius: radiusSm, width: "28px", height: "28px", bottom: "9px", right: "9px",
+        borderRadius: radiusMd, boxSizing: "border-box", width: ctrlH, height: ctrlH, bottom: "18px", right: "9px",
         cursor: "not-allowed", boxShadow: "none" } },
     },
     stop: {
       container: { default: { border: `1px solid ${lineStrong}`, backgroundColor: sunken, color: secondary,
-        borderRadius: radiusSm, width: "28px", height: "28px", bottom: "9px", right: "9px", boxShadow: "none" } },
+        borderRadius: radiusMd, boxSizing: "border-box", width: ctrlH, height: ctrlH, bottom: "18px", right: "9px", boxShadow: "none" } },
     },
   }
   chat.focusMode = { smoothScroll: true, streamAutoScroll: true, fade: false }

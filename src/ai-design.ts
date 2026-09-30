@@ -33,6 +33,8 @@ export type AiDesignProject = {
   orientation: string
   layout: string
   keyboard: string
+  panelPath: string
+  panelScope: "panel" | "project"
   selectedKey: {
     label: string
     sections: string[]
@@ -47,6 +49,16 @@ export type AiDesignResult = {
   response: string
   toolCalls: number
   conversation: AiDesignConversation
+  variants?: AiDesignVariant[]
+}
+
+export type AiDesignVariant = {
+  id: string
+  title: string
+  changes: AiSkinDraftChange[]
+  response: string
+  toolCalls: number
+  conversation: AiDesignConversation
 }
 
 export type AiDesignConversation = AgentMessage[]
@@ -54,8 +66,8 @@ export type AiDesignConversation = AgentMessage[]
 type StatusKind = "thinking" | "reading" | "editing" | "done"
 type ModelHttpEvent = { type: "headers"; status: number; headers: Array<[string, string]> } | { type: "chunk"; body: number[] }
 
-const MAX_TOOL_CALLS = 80
-const MAX_TURNS = 12
+const MAX_TOOL_CALLS = 24
+const MAX_TURNS = 6
 
 function jsonResult(details: unknown) {
   return {
@@ -113,90 +125,39 @@ function systemPrompt(project: AiDesignProject): string {
   return `你是百度输入法皮肤编辑器中的受限修复代理。你只能通过下列工具查询和修改当前打开的皮肤项目，不能访问磁盘、网络、命令行或项目外文件。
 
 当前项目：皮肤“${contextText(project.skinName, 120)}”（${contextText(project.skinPath, 120)}），格式 ${contextText(project.format, 20).toUpperCase()}，当前预览主题 ${contextText(project.theme, 20)}，方向 ${contextText(project.orientation, 20)}，布局 ${contextText(project.layout, 80)}，键盘设备 ${contextText(project.keyboard, 80)}。
-当前选择：${selected}${selectedValues ? `；已暴露字段：${selectedValues}` : ""}。这些信息只描述编辑器当前视图；除非用户明确要求，否则设计要求仍作用于整个皮肤项目。
-${project.preview ? "本轮请求附带当前画布预览图（候选栏与面板），请结合图像判断颜色、层次和可读性；图像仅供观察，不能据此猜测不存在的配置字段。" : "当前没有可用的画布预览图，请仅依据配置文件进行判断。"}
+当前选择：${selected}${selectedValues ? `；已暴露字段：${selectedValues}` : ""}。
+当前打开面板：${contextText(project.panelPath, 160)}。本轮范围：${project.panelScope === "project" ? "整个皮肤项目（用户明确要求了全局范围）" : "当前打开的面板"}。除非用户明确说“整个皮肤”“全局”或“所有面板”，不要修改其他面板。
+${project.preview ? "本轮请求附带当前画布预览图（候选栏与面板），你可以直接观察现有图片资源的实际颜色、纹理、层次和可读性；图像仅供观察，不能据此猜测不存在的配置字段。" : "当前没有可用的画布预览图。"}
+
+已授权的配置文件（无需先枚举）：${project.files.map((file) => `${file.path} [${file.syntax}]`).join("、") || "无"}。
 
 视觉修改指南（请先阅读配置，再用最少的精确修改实现）：
 - 配色：优先沿用现有颜色字段和明暗语义，保证普通/高亮/禁用状态有足够对比度；不要凭空创建新的配置节。
 - 字体：只调整已有 FONT_NAME、FONT_SIZE、NM_COLOR、HL_COLOR 等字段，保持按键动作、数量和几何不变。
 - 质感：通过已有背景样式、边框、圆角、阴影或样式引用统一风格；除非用户明确要求，不要替换资源文件。
+- 图片资源：画布预览已经提供现有图片的实际视觉结果；不能创建或替换二进制图片时，不要因此拒绝整轮设计，先用已有样式、颜色、字体和引用完成可行调整，并明确说明未改动图片资源。
 - 布局：用户说“保留布局”时禁止修改位置、尺寸、间距、按键数量、动作和配置节结构；只改视觉属性。
-- 范围：用户点名当前按键时可缩小到该按键；用户说“整个皮肤/全局”时检查所有相关主题和方向的配置。
+- 范围：默认只修改当前打开面板；用户说“整个皮肤/全局/所有面板”时才检查全部相关配置。
 - 验证：每次写入前必须 read_project_file；修改完成后复读关键片段并在总结中说明影响范围。
 
-用户的设计要求默认作用于整个皮肤项目（所有可编辑配置），不受编辑器当前文件、按键或配置节选择状态限制。只有用户在当前要求中明确指定更小范围时，才缩小修改范围。
-
 可用修复接口：
-1. inspect_project：查看项目上下文、权限和硬限制。编辑或分析项目时先调用它；普通问候和聊天直接回答。
-2. list_project_files：列出允许读取或修改的配置文件，可按相对路径前缀筛选。
-3. read_project_file：分页读取一个明确列出的文件。修改前必须先读取目标片段。
-4. set_ini_value：在已有 INI 配置节中新增配置键，或修改已有键。适用于 BDI/BDS 的 .ini/.css 配置。
-5. remove_ini_value：删除已有 INI 配置键。只有用户需求明确要求删除时才使用。
-6. replace_project_text：在 BDA JSON 中做唯一、精确的小片段替换；必须提供预期出现次数。不要用它重写整个文件。
+1. read_project_file：分页读取一个已授权配置文件。修改前必须先读取目标片段。
+2. set_ini_value：在已有 INI 配置节中新增配置键，或修改已有键。适用于 BDI/BDS 的 .ini/.css 配置。
+3. remove_ini_value：删除已有 INI 配置键。只有用户需求明确要求删除时才使用。
+4. replace_project_text：在 BDA JSON 中做唯一、精确的小片段替换；必须提供预期出现次数。不要用它重写整个文件。
 
 安全要求：
 - 不存在创建或删除文件、图片、二进制资源、配置节以及执行 shell 的接口，不要尝试这些操作。
-- 所有路径必须来自 list_project_files，禁止猜测路径、绝对路径和 ..。
+- 只能使用上面已授权的相对路径，禁止绝对路径和 ..。
 - 保持当前按键布局时，不得改几何、按键数量、动作或配置节结构。
 - 优先修改少量颜色、字号、字体、样式引用和已有属性；保留未知字段及现有命名。
 - 工具修改只进入草稿，编辑器会在结束后统一校验并作为一次可撤销操作提交。
 - 完成后用简短中文总结修改了哪些文件和视觉效果；如果无法安全完成，说明原因且不要做近似破坏性修改。`
 }
 
-function toolsFor(workspace: AiSkinWorkspace, project: AiDesignProject): AgentTool[] {
-  let inspected = false
-  const requireInspection = (): void => {
-    if (!inspected) throw new Error("必须先调用 inspect_project 检查项目权限")
-  }
-  const inspectProjectSchema = Type.Object({})
-  const inspectProject: AgentTool<typeof inspectProjectSchema> = {
-    name: "inspect_project",
-    label: "检查皮肤项目",
-    description: "返回当前皮肤格式、选择状态、可用修复接口和修改限制。开始修复时必须先调用。",
-    parameters: inspectProjectSchema,
-    executionMode: "sequential",
-    execute: async () => {
-      inspected = true
-      return jsonResult({
-        format: project.format,
-        skinName: contextText(project.skinName, 120),
-        skinPath: contextText(project.skinPath, 120),
-        theme: contextText(project.theme, 20),
-        orientation: contextText(project.orientation, 20),
-        layout: contextText(project.layout, 80),
-        keyboard: contextText(project.keyboard, 80),
-        selectedKey: project.selectedKey,
-        preview: project.preview ? { attached: true, mimeType: project.preview.mimeType } : { attached: false },
-        permissions: {
-          filesystem: false,
-          shell: false,
-          createFile: false,
-          deleteFile: false,
-          editExistingTextOnly: true,
-          maxChangedFiles: 8,
-          maxMutations: 64,
-        },
-      })
-    },
-  }
-
-  const listFilesSchema = Type.Object({
-    prefix: Type.Optional(Type.String({ description: "可选的项目相对路径前缀" })),
-  })
-  const listFiles: AgentTool<typeof listFilesSchema> = {
-    name: "list_project_files",
-    label: "列出皮肤配置",
-    description: "列出模型获准访问的现有文本配置。返回的精确相对路径才能用于其他工具。",
-    parameters: listFilesSchema,
-    executionMode: "sequential",
-    execute: async (_id, { prefix }) => {
-      requireInspection()
-      return jsonResult(workspace.listFiles(prefix ?? ""))
-    },
-  }
-
+function toolsFor(workspace: AiSkinWorkspace): AgentTool[] {
   const readFileSchema = Type.Object({
-    path: Type.String({ description: "list_project_files 返回的精确相对路径" }),
+    path: Type.String({ description: "系统提示中已授权的项目相对路径" }),
     offset: Type.Optional(Type.Integer({ minimum: 0 })),
     limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 40_000 })),
   })
@@ -207,7 +168,6 @@ function toolsFor(workspace: AiSkinWorkspace, project: AiDesignProject): AgentTo
     parameters: readFileSchema,
     executionMode: "sequential",
     execute: async (_id, { path, offset, limit }) => {
-      requireInspection()
       return jsonResult(workspace.readFile(path, offset, limit))
     },
   }
@@ -225,7 +185,6 @@ function toolsFor(workspace: AiSkinWorkspace, project: AiDesignProject): AgentTo
     parameters: setIniValueSchema,
     executionMode: "sequential",
     execute: async (_id, { path, section, key, value }) => {
-      requireInspection()
       return jsonResult({ status: workspace.setIniValue(path, section, key, value), path, section, key })
     },
   }
@@ -242,7 +201,6 @@ function toolsFor(workspace: AiSkinWorkspace, project: AiDesignProject): AgentTo
     parameters: removeIniValueSchema,
     executionMode: "sequential",
     execute: async (_id, { path, section, key }) => {
-      requireInspection()
       return jsonResult({ removed: workspace.removeIniValue(path, section, key), path, section, key })
     },
   }
@@ -260,7 +218,6 @@ function toolsFor(workspace: AiSkinWorkspace, project: AiDesignProject): AgentTo
     parameters: replaceProjectTextSchema,
     executionMode: "sequential",
     execute: async (_id, { path, oldText, newText, expectedOccurrences }) => {
-      requireInspection()
       const file = workspace.listFiles().find((entry) => entry.path === path)
       if (file?.syntax !== "json") throw new Error("精确文本替换只允许用于 BDA JSON 配置")
       return jsonResult({
@@ -270,7 +227,7 @@ function toolsFor(workspace: AiSkinWorkspace, project: AiDesignProject): AgentTo
     },
   }
 
-  return [inspectProject, listFiles, readFile, setIniValue, removeIniValue, replaceProjectText]
+  return [readFile, setIniValue, removeIniValue, replaceProjectText]
 }
 
 function eventStatus(event: AgentEvent): { kind: StatusKind; text: string } | undefined {
@@ -278,9 +235,7 @@ function eventStatus(event: AgentEvent): { kind: StatusKind; text: string } | un
   if (event.type === "tool_execution_start") {
     const editing = ["set_ini_value", "remove_ini_value", "replace_project_text"].includes(event.toolName)
     const labels: Record<string, string> = {
-      inspect_project: "检查当前皮肤与编辑权限",
-      list_project_files: "读取皮肤文件列表",
-      read_project_file: "读取皮肤配置片段",
+      read_project_file: "读取当前面板配置",
       set_ini_value: "写入 INI 样式草稿",
       remove_ini_value: "写入删除属性草稿",
       replace_project_text: "写入 BDA 精确替换草稿",
@@ -356,6 +311,7 @@ export async function runAiSkinDesign(
   prompt: string,
   options: {
     history?: readonly AgentMessage[]
+    variantCount?: number
     signal?: AbortSignal
     onStatus?: (kind: StatusKind, text: string) => void
     onTextDelta?: (delta: string) => void | Promise<void>
@@ -367,6 +323,28 @@ export async function runAiSkinDesign(
   if (!config.model.trim()) throw new Error("请先配置模型名称")
   if (!config.apiKey.trim()) throw new Error("请先配置模型 API 密钥")
   if (!project.files.length) throw new Error("当前皮肤没有可供 AI 编辑的配置文件")
+
+  const variantCount = Math.max(1, Math.min(3, Math.trunc(options.variantCount ?? 1)))
+  if (variantCount > 1) {
+    const directions = [
+      ["bright", "明快高对比"],
+      ["quiet", "低饱和沉浸"],
+      ["bold", "大胆材质层次"],
+    ] as const
+    const variants: AiDesignVariant[] = []
+    for (const [index, [id, title]] of directions.slice(0, variantCount).entries()) {
+      const result = await runAiSkinDesign(config, project, `${prompt.trim()}\n\n请制作第 ${index + 1} 个独立方案「${title}」。只修改当前授权范围，保留用户明确要求保留的布局和动作。`, {
+        ...options,
+        history: [],
+        variantCount: 1,
+        onTextDelta: undefined,
+        onThinking: undefined,
+        onStatus: async (kind, text) => options.onStatus?.(kind, `方案 ${index + 1} · ${text}`),
+      })
+      variants.push({ id, title, changes: result.changes, response: result.response, toolCalls: result.toolCalls, conversation: result.conversation })
+    }
+    return { changes: [], response: "", toolCalls: variants.reduce((sum, variant) => sum + variant.toolCalls, 0), conversation: [], variants }
+  }
 
   const workspace = new AiSkinWorkspace(project.files)
   const model = configuredModel(config)
@@ -382,8 +360,6 @@ export async function runAiSkinDesign(
   }))
 
   const allowedTools = new Set([
-    "inspect_project",
-    "list_project_files",
     "read_project_file",
     "set_ini_value",
     "remove_ini_value",
@@ -395,8 +371,8 @@ export async function runAiSkinDesign(
     initialState: {
       systemPrompt: systemPrompt(project),
       model,
-      thinkingLevel: model.reasoning ? "medium" : "off",
-      tools: toolsFor(workspace, project),
+      thinkingLevel: "off",
+      tools: toolsFor(workspace),
       messages: [...(options.history ?? [])],
     },
     streamFn: models.streamSimple.bind(models),

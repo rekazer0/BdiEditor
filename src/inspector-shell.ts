@@ -9,7 +9,7 @@
  * restores a value the user changed in this session back to its session baseline.
  */
 
-import { inspectorIcon } from "./inspector-icons"
+import { inspectorIcon, inspectorSymbolIcon } from "./inspector-icons"
 
 type InspectorInput = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
 
@@ -95,6 +95,34 @@ function decorateKeyToolbar(toolbar: HTMLElement): void {
     separator.className = "pin-tool-separator"
     separator.setAttribute("aria-hidden", "true")
     remove.before(separator)
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Panel icons: one icon family for every tool row in the panel
+ * ------------------------------------------------------------------ */
+/** Views that belong to the inspector panel; the source editor and AI panel keep their own set. */
+const PANEL_ICON_VIEWS = "#quick-inspector, #resource-inspector"
+
+/**
+ * The image, document and BDA panels still ship their tools as platform symbols (20-unit box at
+ * weight 1.7), which sit next to the panel set (24-unit box at 1.5) as a visibly bolder family.
+ * Redraw them with the panel set so one panel reads as one icon language. The wrapper span and its
+ * `data-system-symbol` stay in place, so the code that looks symbols up by name keeps working, and
+ * the panel chevron/radius rules keep matching the element they were written for.
+ */
+function decoratePanelIcons(): void {
+  for (const view of Array.from(document.querySelectorAll<HTMLElement>(PANEL_ICON_VIEWS))) {
+    for (const symbol of Array.from(view.querySelectorAll<HTMLElement>(".system-symbol[data-system-symbol]"))) {
+      if (symbol.dataset.inspectorGlyph === "true") continue
+      const icon = inspectorSymbolIcon(symbol.dataset.systemSymbol ?? "")
+      if (!icon) continue
+      // Keep the fallback class: main.ts clones an existing symbol out of the document when it
+      // builds a new one, and a panel glyph is a better source than the platform default.
+      icon.classList.add("system-symbol-fallback")
+      symbol.dataset.inspectorGlyph = "true"
+      symbol.replaceChildren(icon)
+    }
   }
 }
 
@@ -291,25 +319,31 @@ function bindInspector(): void {
 export function initInspectorShell(): void {
   decorateInspectorDetails()
   refreshKeyToolbar()
+  decoratePanelIcons()
   collectRows()
   for (const row of rows) baselines.set(row.el, rowValue(row))
   decorateSections()
   bindInspector()
   updateMeta()
 
-  const root = inspector()
-  if (root) {
-    let scheduled = false
-    const observer = new MutationObserver(() => {
-      if (scheduled) return
-      scheduled = true
-      window.requestAnimationFrame(() => {
-        scheduled = false
-        decorateSections()
-        refreshKeyToolbar()
-      })
+  let scheduled = false
+  const observer = new MutationObserver(() => {
+    if (scheduled) return
+    scheduled = true
+    window.requestAnimationFrame(() => {
+      scheduled = false
+      decorateSections()
+      decoratePanelIcons()
+      refreshKeyToolbar()
     })
-    observer.observe(root, { attributes: true, attributeFilter: ["hidden", "class", "data-inspector-group-display"], subtree: true })
+  })
+  for (const view of Array.from(document.querySelectorAll(PANEL_ICON_VIEWS))) {
+    observer.observe(view, {
+      attributes: true,
+      attributeFilter: ["hidden", "class", "data-inspector-group-display"],
+      childList: true,
+      subtree: true,
+    })
   }
 }
 

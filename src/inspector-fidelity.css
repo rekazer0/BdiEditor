@@ -28,6 +28,11 @@
   --pin-ctrl-h: 30px;
   --pin-value-h: 28px;
   --pin-ctrl-radius: 6px;
+  /* Control radius scale (the tile/card radius stays --pin-radius in pen-inspector.css):
+     6px segment inside a track, 8px tool button / chip / overflow menu, 12px preview card. */
+  --pin-radius-sm: 6px;
+  --pin-radius-md: 8px;
+  --pin-radius-lg: 12px;
   --inspector-row-height: 30px;
   --inspector-field-height: 30px;
   --inspector-hint-size: 9.5px;
@@ -88,7 +93,7 @@
   place-items: center;
   width: 26px;
   height: 26px;
-  border-radius: 6px;
+  border-radius: var(--pin-radius-md);
   list-style: none;
   cursor: pointer;
   color: var(--pin-ink-muted);
@@ -161,13 +166,16 @@
   align-self: stretch !important;
   justify-content: flex-start !important;
   box-sizing: border-box !important;
-  width: 60px !important;
+  /* A floating track: the rail is the same sunken surface as the tool wells, so it is inset from
+     the panel edge and rounded like them instead of running edge to edge as a square strip.
+     52px = the 60px column minus the 8px inset. */
+  width: 52px !important;
   min-height: 0 !important;
-  margin: 0 !important;
+  margin: 8px 8px 8px 0 !important;
   padding: 10px 5px !important;
   gap: 4px !important;
   border: 0 !important;
-  border-radius: 0 !important;
+  border-radius: var(--pin-radius-lg) !important;
   background: var(--pin-sunken) !important;
   overflow: hidden auto !important;
 }
@@ -182,7 +190,7 @@
   height: auto !important;
   padding: 7px 2px !important;
   border: 0 !important;
-  border-radius: 6px !important;
+  border-radius: var(--pin-radius-md) !important;
   color: var(--pin-ink-faint) !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -226,7 +234,7 @@
   min-height: 28px !important;
   padding: 0 !important;
   border: 0 !important;
-  border-radius: 7px !important;
+  border-radius: var(--pin-radius-md) !important;
   background: transparent !important;
   box-shadow: none !important;
   color: var(--pin-ink-muted) !important;
@@ -263,12 +271,41 @@
   min-width: 22px !important;
   height: 22px !important;
   min-height: 22px !important;
-  border-radius: 6px !important;
+  border-radius: var(--pin-radius-sm) !important;
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .key-mode-control .toolbar-button:hover:not(:disabled) {
   background: var(--pin-sunken) !important;
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector .key-layout-fields > .key-toolbar .key-mode-control .toolbar-button.active {
+  color: var(--pin-accent) !important;
+  background: var(--pin-accent-soft) !important;
+}
+/* The image tool row is the key tool row's twin: the same raised mode segment, the same accent
+   while a mode is on, so slicing an image and moving a key read as one control. */
+:root body .source #resource-inspector .tile-toolbar .tile-mode-control {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  gap: 2px !important;
+  box-sizing: border-box !important;
+  height: 26px !important;
+  margin: 0 2px 0 0 !important;
+  padding: 2px !important;
+  border: 0 !important;
+  border-radius: var(--pin-radius-md) !important;
+  background: var(--pin-surface) !important;
+}
+:root body .source #resource-inspector .tile-toolbar .tile-mode-control .toolbar-button {
+  flex: 0 0 22px !important;
+  width: 22px !important;
+  min-width: 22px !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  border-radius: var(--pin-radius-sm) !important;
+}
+:root body .source #resource-inspector .tile-toolbar .tile-mode-control .toolbar-button:hover:not(:disabled) {
+  background: var(--pin-sunken) !important;
+}
+:root body .source #resource-inspector .tile-toolbar .tile-mode-control .toolbar-button.active {
   color: var(--pin-accent) !important;
   background: var(--pin-accent-soft) !important;
 }
@@ -375,13 +412,26 @@
   display: grid;
   place-items: center;
   margin-left: auto;
-  width: 12px !important;
-  height: 12px !important;
-  flex: 0 0 12px;
+  width: 18px !important;
+  height: 18px !important;
+  flex: 0 0 18px;
   mask: none !important;
   -webkit-mask: none !important;
+  border-radius: var(--pin-radius-sm);
   background: none !important;
   color: var(--pin-ink-faint);
+  /* Keeps the collapse rotation that pen-inspector-sections.css animates. */
+  transition: transform 160ms ease, background-color 120ms ease, color 140ms ease;
+}
+/* The disclosure affordance reads as a control once its row is hovered, like the tool rows. */
+:root body .source #quick-inspector#quick-inspector#quick-inspector
+  :is(.inspector-card-heading, .appearance-section-heading, .inspector-padding-section > h4, details.inspector-advanced > summary):hover
+  .pin-chevron {
+  color: var(--pin-ink-muted);
+  background: var(--pin-sunken);
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .inspector-group > h3:hover .pin-chevron {
+  background: var(--pin-accent-soft);
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector .pin-chevron .inspector-icon { width: 12px; height: 12px; }
 :root body .source #quick-inspector#quick-inspector#quick-inspector :is(.inspector-card-heading, .appearance-section-heading, .inspector-padding-section > h4, details.inspector-advanced > summary) {
@@ -782,7 +832,8 @@
 }
 :root[data-app-theme="dark"] body .source #quick-inspector#quick-inspector#quick-inspector .inspector-group :is(input, select, textarea) {
   color: #f2f4f8 !important;
-  background: #1b1e24 !important;
+  /* 与 --pin-sunken 同值，走令牌才能跟随窗口玻璃（见 pen-design-application.css 的材质段）。 */
+  background: var(--pin-sunken) !important;
   caret-color: #f2f4f8;
 }
 
@@ -795,7 +846,9 @@
   border: 0 !important;
   box-shadow: none !important;
 }
-:root body .source #quick-inspector#quick-inspector#quick-inspector :is(.document-property-section, .bda-inspector-section) + :is(.document-property-section, .bda-inspector-section) {
+/* 分类轨一次只显示一个分区，上一个分区被收起时（display: none）相邻兄弟选择器仍然成立，
+   20px 的间距会凭空插在可见分区上方，切换分类时属性内容整体下移。 */
+:root body .source #quick-inspector#quick-inspector#quick-inspector :is(.document-property-section, .bda-inspector-section):not(.mobile-inspector-managed:not(.mobile-inspector-active)) + :is(.document-property-section, .bda-inspector-section) {
   margin-top: 20px !important;
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector :is(.document-property-section, .bda-inspector-section) > :is(h3, h4, .document-section-heading, .bda-card-heading) {
@@ -837,21 +890,29 @@
   & .style-ref-row > span:first-child,
   & #document-fields .document-property-field.style-reference-field > .document-field-caption { flex: none !important; font-size: 12px !important; color: var(--pin-ink-faint) !important; }
   & .style-ref-row small { font: 10px var(--font-mono); }
-  & .style-reference-row { height: 110px !important; border-radius: 12px !important; }
+  & .style-reference-row { height: 84px !important; border-radius: var(--pin-radius-lg) !important; }
   & .style-reference-row > .style-reference-number { flex-basis: 28% !important; width: 28% !important; font: 600 19px var(--font-mono) !important; }
+  /* 马赛克只做底，铺满整张卡：预览图自己撑满容器高度，不再留 8px 内边距的相框。 */
   & .style-reference-row > .style-picker-states {
-    padding: 8px !important;
+    padding: 0 !important;
     gap: 8px !important;
     background-color: var(--pin-surface) !important;
     background-image: conic-gradient(var(--pin-line) 25%, transparent 0 50%, var(--pin-line) 0 75%, transparent 0) !important;
     background-size: 28px 28px !important;
   }
-  & .style-reference-row .style-picker-state { gap: 5px !important; border-radius: 8px !important; }
+  & .style-reference-row .style-picker-state { gap: 5px !important; }
   & .style-reference-row .style-picker-state:hover { background: var(--pin-accent-soft) !important; }
-  & .style-reference-row .style-picker-state canvas { height: 100% !important; min-height: 0 !important; }
+  /* 画布本身就是切片预览：去掉通用预览卡的边框与圆角，避免切片四周多一圈线。 */
+  & .style-reference-row .style-picker-state canvas {
+    height: 100% !important;
+    min-height: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-sizing: border-box !important;
+  }
   & .appearance-property-grid { gap: 12px !important; }
   & .appearance-sound-field { padding: 0 !important; }
-  & .sound-style-reference { height: 56px !important; border-radius: 11px !important; background: var(--pin-sunken) !important; }
+  & .sound-style-reference { height: 56px !important; border-radius: var(--pin-radius-lg) !important; background: var(--pin-sunken) !important; }
   & :is(.key-typography-fields, .appearance-layout-fields) label { font-size: 13px !important; }
   & :is(.key-typography-fields, .appearance-layout-fields) input:not([type="color"]) {
     height: 34px !important;
@@ -876,4 +937,22 @@
   & .typography-property-grid > label:has([data-style-field="FONT_WEIGHT"]) { grid-row: 2; grid-column: 2; }
   & .typography-property-grid > label:has(input[type="number"]) { flex-direction: column !important; align-items: stretch !important; gap: 6px !important; }
   & .typography-property-grid > label > input[type="number"] { flex: none !important; width: 100% !important; text-align: left !important; }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Icon family
+ *
+ * The panel draws the panel set (24-unit box, stroke 1.5) in the rail, the key tool row, every
+ * chevron and — after the shell's icon pass — in the image/document/BDA panels. A platform fallback
+ * is authored in a 20-unit box at stroke 1.7, which renders about one step bolder than the panel set
+ * at the same size; inside the panel both boxes are brought to the same optical weight (1.25 × 20 =
+ * 1.5 × 24), so a row that mixes a rebuilt glyph with a symbol the shell has no equivalent for still
+ * reads as one set. Sizes stay with the rules that own each row (14px tools, 13px search/section
+ * glyphs); only the weight is corrected here.
+ * ------------------------------------------------------------------------------------------------- */
+:root body .source .system-symbol-fallback[viewBox="0 0 20 20"] {
+  stroke-width: 1.25;
+}
+:root body .source .system-symbol-fallback[viewBox="0 0 24 24"] {
+  stroke-width: 1.5;
 }

@@ -27,9 +27,7 @@ const canvas = $("#picker-canvas") as HTMLCanvasElement
 const meta = $("#picker-meta")
 const grid = $("#resource-picker-grid")
 const empty = $("#resource-empty")
-const mode = new URLSearchParams(location.search).get("mode") === "resource" ? "resource" : "image"
 const isTauri = "__TAURI_INTERNALS__" in window
-document.body.dataset.pickerMode = mode
 
 let imagePayload: ImagePayload | undefined
 let image: HTMLImageElement | undefined
@@ -37,7 +35,7 @@ let scale = 1
 let offset: TilePoint = { x: 0, y: 0 }
 let resources: ResourcePayload = []
 let resourcesLoaded = false
-let view: "image" | "resources" = "image"
+let view: "empty" | "image" | "resources" = "empty"
 
 function setWindowTitle(text: string): void {
   if (isTauri) void getCurrentWindow().setTitle(text)
@@ -96,17 +94,16 @@ function renderResources(): void {
     button.type = "button"
     button.dataset.path = resource.path
     button.title = resource.path
-    button.classList.toggle("active", mode === "image" && resource.path === imagePayload?.path)
+    button.classList.toggle("active", resource.path === imagePayload?.path)
     const preview = document.createElement("img")
     preview.src = resource.dataURL
     preview.alt = ""
     const name = document.createElement("span")
     name.textContent = resource.path.split("/").pop() ?? resource.path
     button.append(preview, name)
+    // 同一个窗口既显示切片也显示全部样式列表，由主窗口决定选完之后是切图还是关窗。
     button.addEventListener("click", () => {
       if (isTauri) void emitTo("main", "resource-picker-select", { path: resource.path })
-      // 资源窗口是独立入口，选中即结束；切片窗口里的全部样式列表留在原地等新的切片数据。
-      if (isTauri && mode === "resource") void getCurrentWindow().close()
     })
     grid.append(button)
   }
@@ -114,12 +111,14 @@ function renderResources(): void {
   filterResources()
 }
 
-function showResources(payload: ResourcePayload): void {
-  resources = payload
-  resourcesLoaded = true
-  title.textContent = "选择图片资源"
-  subtitle.hidden = false
-  renderResources()
+function showEmptyView(): void {
+  view = "empty"
+  imageView.hidden = true
+  resourceView.hidden = true
+  search.hidden = true
+  back.hidden = true
+  styleName.hidden = true
+  subtitle.hidden = true
 }
 
 function showSliceView(): void {
@@ -140,9 +139,9 @@ function showResourceList(): void {
   imageView.hidden = true
   resourceView.hidden = false
   search.hidden = false
-  back.hidden = false
-  backLabel.textContent = imagePayload ? "图片切片" : "全部样式"
-  back.setAttribute("aria-label", imagePayload ? "返回图片切片" : "切换至全部样式")
+  back.hidden = !imagePayload
+  backLabel.textContent = "图片切片"
+  back.setAttribute("aria-label", "返回图片切片")
   styleName.hidden = true
   subtitle.hidden = false
   title.textContent = "全部样式"
@@ -172,41 +171,34 @@ function showImage(payload: ImagePayload): void {
   image.src = payload.dataURL
 }
 
-if (mode === "resource") {
-  document.title = "选择图片资源"
-  imageView.hidden = true
-  resourceView.hidden = false
-  search.hidden = false
-  search.addEventListener("input", filterResources)
-  if (isTauri) await listen<ResourcePayload>("resource-picker-data", (event) => showResources(event.payload))
-} else {
-  document.title = "图片切片"
-  back.addEventListener("click", () => {
-    if (view === "image") showResourceList()
-    else if (imagePayload) showSliceView()
-  })
-  search.addEventListener("input", filterResources)
-  canvas.addEventListener("click", (event) => {
-    if (!imagePayload?.editable || !image || !imagePayload.slices.length) return
-    const bounds = canvas.getBoundingClientRect()
-    const point = {
-      x: ((event.clientX - bounds.left) / bounds.width * canvas.width - offset.x) / scale,
-      y: ((event.clientY - bounds.top) / bounds.height * canvas.height - offset.y) / scale,
-    }
-    const selected = tileSliceAt(imagePayload.slices, point)
-    if (!selected) return
-    imagePayload.selectedIndex = selected.index
-    drawImage()
-    if (isTauri) void emitTo("main", "image-picker-select", { index: selected.index })
-  })
-  if (isTauri) {
-    await listen<ImagePayload>("image-picker-data", (event) => showImage(event.payload))
-    await listen<ResourcePayload>("image-picker-resources-data", (event) => {
-      resources = event.payload
-      resourcesLoaded = true
-      renderResources()
-    })
+document.title = "图片切片"
+showEmptyView()
+back.addEventListener("click", () => {
+  if (view === "image") showResourceList()
+  else if (imagePayload) showSliceView()
+})
+search.addEventListener("input", filterResources)
+canvas.addEventListener("click", (event) => {
+  if (!imagePayload?.editable || !image || !imagePayload.slices.length) return
+  const bounds = canvas.getBoundingClientRect()
+  const point = {
+    x: ((event.clientX - bounds.left) / bounds.width * canvas.width - offset.x) / scale,
+    y: ((event.clientY - bounds.top) / bounds.height * canvas.height - offset.y) / scale,
   }
-}
+  const selected = tileSliceAt(imagePayload.slices, point)
+  if (!selected) return
+  imagePayload.selectedIndex = selected.index
+  drawImage()
+  if (isTauri) void emitTo("main", "image-picker-select", { index: selected.index })
+})
 
-if (isTauri) void emitTo("main", "picker-window-ready", { mode })
+if (isTauri) {
+  await listen<ImagePayload>("image-picker-data", (event) => showImage(event.payload))
+  await listen("image-picker-show-list", () => showResourceList())
+  await listen<ResourcePayload>("image-picker-resources-data", (event) => {
+    resources = event.payload
+    resourcesLoaded = true
+    renderResources()
+  })
+  void emitTo("main", "picker-window-ready")
+}

@@ -394,10 +394,19 @@ main {
   background: transparent;
 }
 
-.source-file-toolbar .toolbar-button:hover:not(:disabled) {
+/* The rail itself is --pen-surface-subtle, so the shared hover token disappears on it:
+   hovering instead lifts the button onto the raised surface (same read as the key toolbar). */
+.source-file-toolbar .toolbar-button:hover:not(:disabled):not(.active) {
   color: var(--pen-text);
-  background: var(--pen-surface-subtle);
+  background: var(--pen-surface);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--pen-line) 80%, transparent),
+    0 1px 3px color-mix(in srgb, var(--pen-text) 16%, transparent);
   transform: none;
+}
+
+.source-file-toolbar .toolbar-button:active:not(:disabled):not(.active) {
+  background: color-mix(in srgb, var(--pen-surface) 78%, var(--pen-line));
+  box-shadow: none;
 }
 
 #source-file-toolbar .toolbar-button.active {
@@ -1387,4 +1396,105 @@ main {
   .pen-file-menu .toolbar-menu {
     max-width: calc(100vw - 16px);
   }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Window material
+ *
+ * This layer paints flat, fully opaque surfaces, which hides the native macOS sidebar / Windows Mica
+ * material behind the window. While the window material is on, drop the window-level Pen tokens to
+ * translucent fills so the system material stays visible; the opacity slider is the fill strength and
+ * reaches fully opaque at 100%.
+ *
+ * 填充按层角色取自 style.css 的 --window-material-layer / -sunken / -floating（数值由材质滑杆换算）：
+ * 大块区域（工作区/画布/内容）用下沉系数 1-√(1-f)，浮层用 1-(1-f)²，这样它们会随滑杆一起走到完全
+ * 不透明，不会再出现「100% 仍然透」的情况。
+ *
+ * 控件块面（按钮、分段控件、输入框、列表行）和分隔线不参与这套系数：设计稿里它们是「比容器暗一档」
+ * 的绝对色，乘上下沉系数后色差只剩 1/255，滑杆一拉低控件就消失在玻璃里。玻璃下改成同一色差的半透明
+ * 中性色，100% 时合成结果与设计稿一致，20% 时也仍然保留同样的块面对比。
+ * ------------------------------------------------------------------------------------------------- */
+
+:root[data-window-material-kind="glass"][data-window-material="on"] {
+  /* 系统材质本身就是窗口背景，所以外壳保持全透明，各区域只画自己那一层淡填充。 */
+  --pen-window: transparent;
+  --pen-canvas: rgb(244 245 248 / var(--window-material-sunken));
+  --pen-surface: rgb(255 255 255 / var(--window-material-layer));
+  --pen-raised: rgb(255 255 255 / var(--window-material-floating));
+  /* 控件色差：+4.4% / +8.6% 的中性色等于 #f4f5f8 / #ebebeb 叠在白底上的暗度，
+     11% / 19.8% 等于 #e3e6eb / #cdd2db。色差固定，滑杆只影响玻璃本身的通透度。 */
+  --pen-surface-subtle: rgb(19 24 38 / 4.4%);
+  --pen-tertiary-bg: rgb(19 24 38 / 8.6%);
+  --pen-line: rgb(19 24 38 / 11%);
+  --pen-line-strong: rgb(19 24 38 / 19.8%);
+}
+
+/* Dark material is dimmer, so text and icons sit on the same layer roles with darker colors.
+   深色下控件是「比容器亮一档」，同样用固定色差的白：+2.5% 等于 #1a1d21 叠在 #15171b 上的亮度，
+   10% / 9.2% / 17.1% 分别等于 --pen-tertiary-bg / --pen-line / --pen-line-strong。 */
+:root[data-app-theme="dark"][data-window-material-kind="glass"][data-window-material="on"] {
+  --pen-window: transparent;
+  --pen-canvas: rgb(12 13 16 / var(--window-material-sunken));
+  --pen-surface: rgb(21 23 27 / var(--window-material-layer));
+  --pen-raised: rgb(30 33 38 / var(--window-material-floating));
+  --pen-surface-subtle: rgb(255 255 255 / 2.5%);
+  --pen-tertiary-bg: rgb(255 255 255 / 10%);
+  --pen-line: rgb(255 255 255 / 9.2%);
+  --pen-line-strong: rgb(255 255 255 / 17.1%);
+}
+
+/* 属性检查器
+ *
+ * inspector-fidelity.css 是最后加载的 1:1 锁定层，把 --pin-surface / --pin-sunken 写成固定的
+ * 不透明色，检查器于是整块盖住窗口材质。这里按层角色覆盖这两个令牌；材质关闭时那一层继续用它的
+ * 锁定值，观感不变。
+ *
+ * 用 !important 是因为该层用了 `#quick-inspector` 重复 ID 这类抬高权重的写法，普通声明压不过；
+ * 同时必须显式写上 #quick-inspector，因为它自己也声明了这两个令牌，光靠从 .source 继承不够。
+ * 卡片用单层系数；输入框等控件用和上面同一套固定色差，控件叠在卡片上时合成后的色差仍然存在，
+ * 滑杆拉低也不会糊在玻璃上。 */
+:root[data-window-material-kind="glass"][data-window-material="on"] body .source,
+:root[data-window-material-kind="glass"][data-window-material="on"] body .source #quick-inspector {
+  --pin-surface: rgb(255 255 255 / var(--window-material-layer)) !important;
+  --pin-sunken: rgb(19 24 38 / 4.4%) !important;
+}
+
+:root[data-app-theme="dark"][data-window-material-kind="glass"][data-window-material="on"] body .source,
+:root[data-app-theme="dark"][data-window-material-kind="glass"][data-window-material="on"] body .source #quick-inspector {
+  --pin-surface: rgb(21 23 27 / var(--window-material-layer)) !important;
+  --pin-sunken: rgb(255 255 255 / 2.5%) !important;
+}
+
+/* 未打开皮肤时画布承载的是应用级欢迎页，而不是文档画布；此时不能沿用「画布背景」那张
+   不透明的纸，否则欢迎页整片盖住系统材质，看起来和没有玻璃一样。 */
+:root[data-window-material-kind="glass"][data-window-material="on"] .canvas-wrap.empty {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* 浮层（设置/项目对话框、下拉菜单）压在内容之上，底下是内容而不是桌面材质，填充太低会让
+   底层文字和画布透过来，所以单独给它们浮层系数，滑杆还没拉满时就已经接近不透明。
+   用 !important 是因为 settings.css 里 `:root body #settings-dialog` 这类 ID 选择器权重更高，
+   普通声明压不过它。 */
+:root[data-window-material-kind="glass"][data-window-material="on"] :is(
+  .app-dialog,
+  .project-dialog,
+  .toolbar-menu,
+  .file-actions,
+  .app-actions,
+  .mobile-command-actions
+) {
+  background: rgb(255 255 255 / var(--window-material-floating)) !important;
+}
+
+:root[data-app-theme="dark"][data-window-material-kind="glass"][data-window-material="on"] :is(
+  .app-dialog,
+  .project-dialog,
+  .toolbar-menu,
+  .file-actions,
+  .app-actions,
+  .mobile-command-actions
+) {
+  background: rgb(21 23 27 / var(--window-material-floating)) !important;
 }
