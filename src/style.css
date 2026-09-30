@@ -78,6 +78,11 @@
   --material-control: #ffffff;
   --hover: rgb(18 20 25 / 5%);
   --material-glass-surface: #ffffff;
+  /* 窗口材质填充系数（0 – 1，1 即完全不透明）：由设置里的材质滑杆写入，见 applyWindowMaterialOpacity。
+     单层表面用 --window-material-layer，叠在已填充表面上的下沉层用 -sunken，浮层用 -floating。 */
+  --window-material-layer: 1;
+  --window-material-sunken: 1;
+  --window-material-floating: 1;
   --glass-border: #e3e6eb;
   --glass-highlight: rgb(255 255 255 / 70%);
   --glass-shadow: 0 8px 28px rgb(18 24 40 / 10%), inset 0 1px rgb(255 255 255 / 78%);
@@ -165,43 +170,39 @@
   --material-glass-surface: #1e2126;
 }
 
+/* 玻璃材质：滑杆值就是材质填充强度，100% 时每个表面都合成到完全不透明，所以拖动滑杆既能得到
+   薄玻璃，也能得到实心窗口。各表面不再按固定系数缩放，而是按层角色取值，避免外壳/工作区/内容区
+   层层叠加后比滑杆更实（旧写法把系数乘在滑杆上，100% 也只有半透明）。
+   单层：直接压在系统材质上的表面（外壳、工具栏、侧栏、检查器、面板）取滑杆值。
+   下沉层：总叠在已填充表面之上的大块区域（内容区、画布）取 1-√(1-f)，两层合成后正好等于滑杆值。
+   浮层：压在编辑器内容之上的对话框取 1-(1-f)²，保证正文始终落在接近实心的底上。
+   控件块面和分隔线不走这套系数，它们在 pen-design-application.css 的材质段里换成固定色差，
+   否则滑杆一拉低，按钮/输入框的底色就会和玻璃融成一片。 */
 :root[data-window-material-kind="glass"][data-window-material="on"] {
-  --window: rgb(233 235 239 / var(--window-material-opacity));
-  --toolbar: rgb(255 255 255 / var(--window-material-opacity));
-  --sidebar: rgb(255 255 255 / var(--window-material-opacity));
-  --inspector: rgb(255 255 255 / var(--window-material-opacity));
-  --panel: rgb(255 255 255 / var(--window-material-opacity));
+  --window: rgb(233 235 239 / var(--window-material-layer));
+  --toolbar: rgb(255 255 255 / var(--window-material-layer));
+  --sidebar: rgb(255 255 255 / var(--window-material-layer));
+  --inspector: rgb(255 255 255 / var(--window-material-layer));
+  --panel: rgb(255 255 255 / var(--window-material-layer));
   --menu: var(--material-menu);
-  --content: rgb(244 245 248 / var(--window-material-opacity));
-  --control: rgb(255 255 255 / var(--window-material-opacity));
-  --glass-surface: rgb(255 255 255 / var(--window-material-opacity));
+  --canvas: rgb(233 235 239 / var(--window-material-sunken));
+  --content: rgb(244 245 248 / var(--window-material-sunken));
+  --control: rgb(255 255 255 / var(--window-material-sunken));
+  --glass-surface: rgb(255 255 255 / var(--window-material-layer));
 }
 
+/* 深色模式沿用同一套层系数，只是底色更深，浅色文字压在深色玻璃上仍然够清晰。 */
 :root[data-app-theme="dark"][data-window-material-kind="glass"][data-window-material="on"] {
-  --window: rgb(12 13 16 / var(--window-material-opacity));
-  --toolbar: rgb(21 23 27 / var(--window-material-opacity));
-  --sidebar: rgb(21 23 27 / var(--window-material-opacity));
-  --inspector: rgb(21 23 27 / var(--window-material-opacity));
-  --panel: rgb(21 23 27 / var(--window-material-opacity));
+  --window: rgb(12 13 16 / var(--window-material-layer));
+  --toolbar: rgb(21 23 27 / var(--window-material-layer));
+  --sidebar: rgb(21 23 27 / var(--window-material-layer));
+  --inspector: rgb(21 23 27 / var(--window-material-layer));
+  --panel: rgb(21 23 27 / var(--window-material-layer));
   --menu: var(--material-menu);
-  --content: rgb(26 29 33 / var(--window-material-opacity));
-  --control: rgb(30 33 38 / var(--window-material-opacity));
-  --glass-surface: rgb(30 33 38 / var(--window-material-opacity));
-}
-
-:root[data-window-material-kind="glass"][data-window-material="on"][data-window-material-opaque="true"] :is(
-  .titlebar,
-  aside,
-  .source,
-  .preview-toolbar,
-  .workspace-status,
-  .toolbar-menu,
-  .glass-module,
-  .app-dialog,
-  .project-dialog
-) {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  --canvas: rgb(12 13 16 / var(--window-material-sunken));
+  --content: rgb(26 29 33 / var(--window-material-sunken));
+  --control: rgb(30 33 38 / var(--window-material-sunken));
+  --glass-surface: rgb(30 33 38 / var(--window-material-layer));
 }
 
 :root[data-window-material="off"] {
@@ -5805,7 +5806,7 @@ body:has(.canvas-wrap.empty) .workspace {
 .ai-design-resize:focus-visible { outline: 2px solid var(--muted); outline-offset: 2px; }
 .ai-design-toolbar {
   position: absolute;
-  left: 26px;
+  left: 16px;
   right: 66px;
   bottom: 43px;
   z-index: 1;
@@ -5815,16 +5816,11 @@ body:has(.canvas-wrap.empty) .workspace {
   padding: 0;
   flex-shrink: 0;
 }
-.ai-composer-hint {
-  position: absolute; bottom: 9px; left: 16px; right: 16px; margin: 0;
-  color: var(--muted); font-size: 11px; line-height: 14px; text-align: center;
-  pointer-events: none;
-}
 .ai-design-heading { display: none; flex-direction: column; gap: 4px; min-width: 0; }
 .ai-design-heading strong { font-size: 14px; color: var(--text); }
 .ai-design-heading span { color: var(--muted); font-size: 12px; line-height: 1.5; }
 .ai-design-toolbar label {
-  flex: 1;
+  flex: 0 1 230px;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -5832,9 +5828,9 @@ body:has(.canvas-wrap.empty) .workspace {
   color: var(--muted);
   font-size: 12px;
 }
-.ai-design-toolbar label > span { display: none; }
+.ai-model-picker > span { flex: 0 0 auto; color: var(--muted); font-size: 11px; }
 .ai-design-toolbar select {
-  width: 100%;
+  width: auto;
   flex: 1;
   min-width: 0;
   height: 28px;
@@ -5844,34 +5840,20 @@ body:has(.canvas-wrap.empty) .workspace {
   padding: 0 8px;
   text-overflow: ellipsis;
   color: var(--text);
-  font-size: 12px;
+  font-size: 11.5px;
 }
 .ai-design-toolbar select:focus-visible,
-.ai-design-settings:focus-visible {
+.ai-design-toolbar select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 @container (max-width: 340px) {
-  .ai-design-toolbar { left: 24px; gap: 4px; }
-  .ai-design-settings { padding-inline: 5px; font-size: 11px; }
+  .ai-design-toolbar { left: 14px; gap: 4px; }
+  .ai-model-picker { flex-basis: min(230px, calc(100% - 8px)); }
 }
 .ai-design-toolbar select:hover:not(:disabled) { border-color: var(--muted); }
 .ai-design-toolbar select:focus { box-shadow: none; }
 .ai-design-toolbar select:disabled { color: var(--muted); cursor: not-allowed; }
-.ai-design-settings {
-  flex-shrink: 0;
-  margin-left: 0;
-  color: var(--secondary);
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  padding: 5px 8px;
-  font-size: 12px;
-  line-height: 16px;
-  white-space: nowrap;
-}
-.ai-design-settings:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
-.ai-design-settings[hidden] { display: none; }
 #ai-design-chat { width: 100%; min-height: 0; flex: 1; border: 0; background: transparent; }
 .ai-design-status { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .ai-design-status:empty { display: none; }
@@ -13217,11 +13199,6 @@ dialog[open]::backdrop {
 }
 
 .ai-design-heading span {
-  font-size: 11px;
-  color: var(--tertiary);
-}
-
-.ai-composer-hint {
   font-size: 11px;
   color: var(--tertiary);
 }

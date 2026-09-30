@@ -51,8 +51,6 @@ document.querySelector("#ai-context-key")!.textContent = "按键"
 const model = document.querySelector<HTMLSelectElement>("#ai-design-model")!
 model.replaceChildren(new Option("gpt-5.6-terra", "0"))
 model.disabled = false
-const settings = document.querySelector<HTMLElement>(".ai-design-settings")
-if (settings) settings.textContent = "模型设置"
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 

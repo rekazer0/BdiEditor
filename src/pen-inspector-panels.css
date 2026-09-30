@@ -27,8 +27,9 @@
   --pin-sel: var(--pen-selection, #ff6b2c);
   --pin-sel-soft: var(--pen-selection-soft, #ffefe7);
   --pin-ok: var(--pen-state-ok, #10a15a);
-  --pin-toolbar-radius: 9px;
-  --pin-toolbar-btn: 7px;
+  /* Concentric with the 2px padding of the tool tracks: an 8px button sits in a 10px track. */
+  --pin-toolbar-radius: 10px;
+  --pin-toolbar-btn: 8px;
 }
 
 /* ================================================================== *
@@ -676,7 +677,7 @@
   margin: 0 !important;
   padding: 0 12px !important;
   border: 1px solid transparent !important;
-  border-radius: 5px !important;
+  border-radius: 6px !important;
   background: transparent !important;
   color: var(--pin-ink-muted) !important;
   font-family: var(--font-ui, inherit) !important;
@@ -754,10 +755,10 @@
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 26px !important;
-  min-width: 26px !important;
-  height: 24px !important;
-  min-height: 24px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
   margin: 0 !important;
   padding: 0 !important;
   border: 1px solid transparent !important;
@@ -1043,8 +1044,8 @@
   justify-content: center !important;
   width: 28px !important;
   min-width: 28px !important;
-  height: 24px !important;
-  min-height: 24px !important;
+  height: 28px !important;
+  min-height: 28px !important;
   padding: 0 !important;
   border: 1px solid transparent !important;
   border-radius: var(--pin-toolbar-btn) !important;
@@ -1406,8 +1407,11 @@
   background: transparent !important;
   color: var(--pin-ink-faint) !important;
   box-shadow: none !important;
+  cursor: pointer !important;
   font-family: var(--font-mono, ui-monospace, monospace) !important;
   font-size: 10px !important;
+  line-height: 1.4 !important;
+  transition: color 0.15s ease !important;
 }
 
 :root body .source #resource-inspector .style-detail-previews > button:hover {
@@ -1423,6 +1427,17 @@
   background-color: transparent !important;
   background-image: none !important;
   object-fit: contain !important;
+  transition: border-color 0.15s ease, background-color 0.15s ease !important;
+}
+
+:root body .source #resource-inspector .style-detail-previews > button:hover > canvas {
+  border-color: var(--pin-line-strong) !important;
+  background-color: var(--pin-hover) !important;
+}
+
+:root body .source #resource-inspector .style-detail-previews > button:focus-visible {
+  outline: 2px solid var(--pin-accent) !important;
+  outline-offset: 2px !important;
 }
 
 :root body .source #resource-inspector #image-resource-detail:not([hidden]),
@@ -1431,7 +1446,8 @@
   flex-direction: column !important;
   gap: 12px !important;
   min-height: 0 !important;
-  padding: 0 !important;
+  /* 按标题栏的 12px 缩进铺开，预览与字段不再贴着面板边缘。 */
+  padding: 12px 12px 20px !important;
 }
 
 :root body .source #resource-inspector #image-resource-detail > .tile-toolbar,
@@ -1444,24 +1460,43 @@
   display: flex !important;
   flex-direction: column !important;
   gap: 0 !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 12px 0 6px !important;
+  border: 0 !important;
+  border-top: 1px solid var(--pin-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 首个分组紧贴预览图，不需要分隔线。 */
+:root body .source #resource-inspector .style-detail-group:first-child {
+  padding-top: 0 !important;
+  border-top: 0 !important;
+}
+
+/* 分组纵向排列，分组内部再按宽度铺两列字段。 */
+:root body .source #resource-inspector #style-detail-fields {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
-  border: 0 !important;
-  background: transparent !important;
 }
 
 :root body .source #resource-inspector .style-detail-group > legend {
-  margin: 0 0 2px !important;
+  margin: 0 0 4px !important;
   padding: 0 !important;
   color: var(--pin-ink) !important;
   font-size: 12px !important;
   font-weight: 600 !important;
+  line-height: 1.4 !important;
 }
 
 :root body .source #resource-inspector .style-detail-group-fields {
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) !important;
-  gap: 0 !important;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+  gap: 0 16px !important;
   margin: 0 !important;
   padding: 0 !important;
 }
@@ -1471,13 +1506,13 @@
   flex-direction: row !important;
   align-items: center !important;
   justify-content: space-between !important;
-  gap: 10px !important;
-  min-height: 32px !important;
+  gap: 12px !important;
+  min-height: var(--pin-row-h) !important;
   min-width: 0 !important;
   margin: 0 !important;
-  padding: 0 8px !important;
+  padding: 0 !important;
   color: var(--pin-ink-muted) !important;
-  font-size: 12.5px !important;
+  font-size: 12px !important;
 }
 
 :root body .source #resource-inspector .style-detail-field-row {
@@ -1488,7 +1523,15 @@
   min-width: 0 !important;
 }
 
+:root body .source #resource-inspector .style-detail-field > .style-detail-key-raw {
+  color: var(--pin-ink-faint) !important;
+  font-family: var(--font-mono, ui-monospace, monospace) !important;
+  font-size: 10.5px !important;
+  letter-spacing: 0.02em !important;
+}
+
 :root body .source #resource-inspector .style-detail-field-row > input {
+  box-sizing: border-box !important;
   width: var(--pin-ctrl-wide) !important;
   min-width: 0 !important;
   height: var(--pin-ctrl-h) !important;
@@ -1500,13 +1543,60 @@
   color: var(--pin-ink) !important;
   box-shadow: none !important;
   font-family: var(--font-mono, ui-monospace, monospace) !important;
-  font-size: 12px !important;
+  font-size: 11.5px !important;
 }
 
+/* 只读态按纯文本呈现，和属性检查器里的取值一致。 */
+:root body .source #resource-inspector .style-detail-field-row > input:not([type="color"]):disabled {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--pin-ink-faint) !important;
+  opacity: 1 !important;
+}
+
+:root body .source #resource-inspector .style-detail-field-row > input:focus-visible {
+  outline: 2px solid var(--pin-accent) !important;
+  outline-offset: 1px !important;
+}
+
+/* 颜色行：十六进制 + 色块 + 透明度，和属性检查器同款。 */
 :root body .source #resource-inspector .style-detail-field .color-control {
   display: flex !important;
+  flex: 0 1 auto !important;
   align-items: center !important;
   gap: 6px !important;
+  min-width: 0 !important;
+}
+
+:root body .source #resource-inspector .style-detail-field .color-control > input:first-child {
+  width: var(--pin-ctrl-min) !important;
+  text-transform: uppercase !important;
+}
+
+:root body .source #resource-inspector .style-detail-field .color-control > input[type="color"] {
+  flex: 0 0 auto !important;
+  width: var(--pin-ctrl-h) !important;
+  min-width: var(--pin-ctrl-h) !important;
+  height: var(--pin-ctrl-h) !important;
+  min-height: var(--pin-ctrl-h) !important;
+  padding: 2px !important;
+}
+
+/* 色块是数据本身，只读时也保留真实颜色，不跟着禁用态一起变灰。 */
+:root body .source #resource-inspector .style-detail-field .color-control > input[type="color"]:disabled {
+  opacity: 1 !important;
+}
+
+:root body .source #resource-inspector .style-detail-field .color-control > input[type="number"] {
+  display: block !important;
+  flex: 0 0 auto !important;
+  width: 28px !important;
+  padding: 0 !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--pin-ink-faint) !important;
+  font-size: 10px !important;
+  text-align: right !important;
 }
 
 :root body .source #resource-inspector .style-detail-sound-card {
@@ -1514,6 +1604,29 @@
   align-items: center !important;
   gap: 6px !important;
   min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+:root body .source #resource-inspector .style-detail-sound-card > select {
+  flex: 0 1 auto !important;
+  width: auto !important;
+  min-width: var(--pin-ctrl-min) !important;
+  max-width: 220px !important;
+  height: var(--pin-ctrl-h) !important;
+  min-height: var(--pin-ctrl-h) !important;
+  padding: 0 6px !important;
+  border: 1px solid var(--pin-line) !important;
+  border-radius: var(--pin-ctrl-radius) !important;
+  background: var(--pin-sunken) !important;
+  color: var(--pin-ink) !important;
+  box-shadow: none !important;
+  font-size: 11.5px !important;
 }
 
 :root body .source #resource-inspector .style-detail-sound-play {
@@ -1884,11 +1997,11 @@
   align-items: center !important;
   justify-content: center !important;
   gap: 6px !important;
-  height: 30px !important;
-  min-height: 30px !important;
+  height: var(--pin-ctrl-h, 30px) !important;
+  min-height: var(--pin-ctrl-h, 30px) !important;
   padding: 0 14px !important;
   border: 1px solid transparent !important;
-  border-radius: 8px !important;
+  border-radius: var(--pin-radius-md, 8px) !important;
   box-shadow: none !important;
   font-size: 12px !important;
   font-weight: 500 !important;
@@ -1927,12 +2040,6 @@
 
 :root body .source #ai-design-chat { min-height: 0 !important; }
 
-:root body .source .ai-composer-hint {
-  color: var(--pin-ink-faint) !important;
-  font-size: 10px !important;
-  line-height: 1.4 !important;
-}
-
 /* 抓取条只在悬停、聚焦或拖动时现身，避免成为空白对话里的噪点。 */
 :root body .source .ai-design-resize > span {
   width: 34px !important;
@@ -1954,22 +2061,20 @@
 
 :root body .source .ai-design-toolbar { gap: 6px !important; }
 
-:root body .source .ai-design-toolbar > label {
+:root body .source .ai-model-picker > span {
   color: var(--pin-ink-faint) !important;
   font-size: 10.5px !important;
 }
 
-:root body .source .ai-design-toolbar > label > span { display: none !important; }
-
 :root body .source .ai-design-toolbar select {
-  height: 26px !important;
-  min-height: 26px !important;
-  padding: 0 6px !important;
+  height: var(--pin-ctrl-h, 30px) !important;
+  min-height: var(--pin-ctrl-h, 30px) !important;
+  padding: 0 8px !important;
   border: 1px solid var(--pin-line) !important;
-  border-radius: 7px !important;
+  border-radius: var(--pin-ctrl-radius, 6px) !important;
   background: var(--pin-surface) !important;
   color: var(--pin-ink) !important;
-  font-size: 11px !important;
+  font-size: 11.5px !important;
 }
 
 :root body .source .ai-design-toolbar select:hover:not(:disabled) {
@@ -1977,28 +2082,6 @@
 }
 
 :root body .source .ai-design-toolbar select:disabled { color: var(--pin-ink-faint) !important; }
-
-:root body .source .ai-design-settings {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  height: 26px !important;
-  min-height: 26px !important;
-  padding: 0 9px !important;
-  border: 1px solid var(--pin-line) !important;
-  border-radius: 7px !important;
-  background: transparent !important;
-  color: var(--pin-ink-muted) !important;
-  box-shadow: none !important;
-  font-size: 11px !important;
-  font-weight: 500 !important;
-}
-
-:root body .source .ai-design-settings:hover {
-  border-color: var(--pin-line-strong) !important;
-  background: var(--pin-surface) !important;
-  color: var(--pin-ink) !important;
-}
 
 /* AI pane header copy — the shell keeps it hidden while the properties tabs are on top. */
 :root body .source .ai-design-heading > strong {

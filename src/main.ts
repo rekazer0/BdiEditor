@@ -363,7 +363,6 @@ const appTheme = $("#app-theme") as HTMLSelectElement
 const sourceFontSize = $("#source-font-size") as HTMLInputElement
 const windowMaterial = $("#window-material") as HTMLInputElement
 const windowMaterialOpacitySetting = $("#window-material-opacity-setting")
-const windowMaterialOpacityLabel = $("#window-material-opacity-label")
 const windowMaterialOpacity = $("#window-material-opacity") as HTMLInputElement
 const windowMaterialOpacityValue = $("#window-material-opacity-value") as HTMLOutputElement
 const sidebarViewVisible = $("#sidebar-view-visible") as HTMLInputElement
@@ -541,7 +540,6 @@ const aiDesignPanel = $("#ai-design-panel")
 const aiDesignStatus = $("#ai-design-status")
 const aiDesignChat = $("#ai-design-chat")
 const aiDesignModel = $("#ai-design-model") as HTMLSelectElement
-const aiDesignSettings = $(".ai-design-settings") as HTMLButtonElement
 const aiContextKey = $("#ai-context-key")
 const aiContextPreview = $("#ai-context-preview")
 const aiDraftPanel = $("#ai-draft-panel") as HTMLElement
@@ -728,10 +726,19 @@ type AiDraft = {
   sections: string[]
   conversation: AiDesignConversation
   response: string
+  variants?: AiDraftVariant[]
+}
+type AiDraftVariant = {
+  id: string
+  title: string
+  changes: Change[]
+  drafts: AiSkinDraftChange[]
+  sections: string[]
+  conversation: AiDesignConversation
+  response: string
 }
 let aiDesignDraft: AiDraft | undefined
 let aiDesignBusy = false
-let aiLastPrompt = ""
 let savedModels: ModelConfiguration[] = []
 // ponytail: keep three exchanges in memory; persist sessions only if cross-restart chat is needed.
 let aiDesignConversation: AiDesignConversation = []
@@ -779,7 +786,8 @@ type NativeImagePickerPayload = {
 }
 type NativeResourcePickerPayload = { path: string; dataURL: string }[]
 let nativeImagePickerPayload: NativeImagePickerPayload | undefined
-let nativeResourcePickerPayload: NativeResourcePickerPayload = []
+// 切片窗口下次创建时的起始视图（列表优先用于「样式还没有图片」等入口）。
+let pickerRequestedView: "image" | "list" = "image"
 let selectedFileButton: HTMLElement | undefined
 type SourceTransfer = {
   mode: "copy" | "move"
@@ -3526,6 +3534,10 @@ async function runFileOperation(
       updateFileOperationProgress(completed ? 100 : fileOperationProgress.value, completed ? "处理完成" : "未进行更改")
       fileOperationResult.textContent = result
       fileOperationResult.hidden = false
+      if (completed && action === "打开") {
+        fileOperationDialog.close()
+        fileOperationProgressVisible = false
+      }
     }
   } catch (error) {
     clientLog.info("operation.finish", {
@@ -3832,14 +3844,14 @@ function loadTiles(path: string): void {
 function openStyleImageResourceChooser(target: StyleImagePickerTarget): void {
   resourcePickerSelect = undefined
   pickerTarget = target
-  if (isTauri()) openResourcePickerWindow()
+  if (isTauri()) openImagePickerList()
   else openStyleImageResourcePicker()
 }
 
 function openBdaAnimationResourceChooser(onSelect: (resourceID: string) => void): void {
   pickerTarget = undefined
   resourcePickerSelect = onSelect
-  if (isTauri()) openResourcePickerWindow()
+  if (isTauri()) openImagePickerList()
   else openStyleImageResourcePicker()
 }
 
@@ -3849,7 +3861,7 @@ function openBdaStyleImageResourceChooser(ref: BdaStyleRef, highlighted: boolean
     const property = highlighted ? "HL_IMG" : "NM_IMG"
     if (updateBdaRefs([ref], property, resourceID)) void renderStyleResourceDetail()
   }
-  if (isTauri()) openResourcePickerWindow()
+  if (isTauri()) openImagePickerList()
   else openStyleImageResourcePicker()
 }
 
@@ -3995,6 +4007,8 @@ async function renderStyleResourceDetail(): Promise<void> {
     const caption = document.createElement("span")
     caption.textContent = translatedConfigLabel(key)
     caption.title = key
+    // 没有中文译名的键（FONT_CLEARTYPE 等）按技术名排版，避免看起来像缺了一半的标签。
+    caption.classList.toggle("style-detail-key-raw", caption.textContent === key)
     const row = document.createElement("span")
     row.className = "style-detail-field-row"
     const updateField = (value: string) => {
@@ -4021,6 +4035,7 @@ async function renderStyleResourceDetail(): Promise<void> {
       alpha.max = "1"
       alpha.step = "0.01"
       alpha.setAttribute("aria-label", `${key} 透明度`)
+      alpha.disabled = !isEditing()
       const colorControl = document.createElement("span")
       colorControl.className = "color-control"
       colorControl.append(textInput, picker, alpha)
@@ -7304,25 +7319,27 @@ function imageDataURL(bytes: Uint8Array): string {
   return `data:image/png;base64,${btoa(binary)}`
 }
 
+// 图片切片与「全部样式」列表共用一个窗口，不再另开资源窗口。
 async function showPickerWindow(
-  label: "image-picker" | "resource-picker",
-  mode: "image" | "resource",
+  view: "image" | "list",
   title: string,
   width: number,
   height: number,
 ): Promise<void> {
-  const existing = await WebviewWindow.getByLabel(label)
+  const existing = await WebviewWindow.getByLabel("image-picker")
   if (existing) {
-    await emitTo(label, `${label}-data`, mode === "image" ? nativeImagePickerPayload : nativeResourcePickerPayload)
+    if (view === "list") await emitTo("image-picker", "image-picker-show-list")
+    else if (nativeImagePickerPayload) await emitTo("image-picker", "image-picker-data", nativeImagePickerPayload)
     await existing.setFocus()
     return
   }
-  new WebviewWindow(label, {
-    url: `picker.html?mode=${mode}`,
+  pickerRequestedView = view
+  new WebviewWindow("image-picker", {
+    url: "picker.html",
     title,
     width,
     height,
-    minWidth: mode === "image" ? 720 : 560,
+    minWidth: 720,
     minHeight: 480,
     center: true,
     decorations: true,
@@ -7330,10 +7347,9 @@ async function showPickerWindow(
   })
 }
 
-function openResourcePickerWindow(): void {
+function openImagePickerList(): void {
   if (!archive || (!pickerTarget && !resourcePickerSelect)) return
-  nativeResourcePickerPayload = resourcePickerPayload()
-  void showPickerWindow("resource-picker", "resource", "选择图片资源", 860, 640)
+  void showPickerWindow("list", "全部样式", 960, 680)
 }
 
 function resourcePickerPayload(): NativeResourcePickerPayload {
@@ -7443,11 +7459,9 @@ function clearImageSlicePicker(): void {
   styleImageResourceEmpty.hidden = true
   if (styleImageDialog.open) styleImageDialog.close()
   nativeImagePickerPayload = undefined
-  nativeResourcePickerPayload = []
   if (isTauri()) {
-    for (const label of ["image-picker", "resource-picker"]) {
-      void WebviewWindow.getByLabel(label).then((pickerWindow) => pickerWindow?.close())
-    }
+    pickerRequestedView = "image"
+    void WebviewWindow.getByLabel("image-picker").then((pickerWindow) => pickerWindow?.close())
   }
 }
 
@@ -7504,7 +7518,7 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
   }
   if ("__TAURI_INTERNALS__" in window) {
     if (styleImageDialog.open) styleImageDialog.close()
-    void showPickerWindow("image-picker", "image", "图片切片", 1100, 760)
+    void showPickerWindow("image", "图片切片", 1100, 760)
     return
   }
   closeStyleImageResourcePicker()
@@ -8796,7 +8810,6 @@ async function loadArchive(
   archive = nextArchive
   aiDesignConversationTarget = nextArchive
   aiDesignConversation = []
-  aiLastPrompt = ""
   aiDesignStatus.textContent = ""
   aiDesignPanel.dataset.state = "idle"
   setAiDesignDraft(undefined)
@@ -9339,7 +9352,7 @@ openButton.addEventListener("click", () => {
 emptyOpenButton.addEventListener("click", () => openButton.click())
 
 const recentFilesKey = "recent-files"
-const recentFilesLimit = 9
+const recentFilesLimit = 6
 
 interface RecentFile {
   path: string
@@ -9357,7 +9370,7 @@ function readRecentFiles(): RecentFile[] {
         && typeof item.path === "string"
         && typeof item.name === "string"
         && typeof item.at === "number",
-    )
+    ).slice(0, recentFilesLimit)
   } catch {
     return []
   }
@@ -9484,7 +9497,11 @@ function welcomeVisible(): boolean {
   return canvasWrap.classList.contains("empty")
 }
 
-// 最近皮肤最多 9 张，逐个串行取图，避免同时读多份皮肤阻塞 UI。
+function waitForPreviewFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()))
+}
+
+// 最近皮肤最多 6 张，逐个串行取图，避免同时读多份皮肤阻塞 UI。
 const recentPreviewQueue: HTMLButtonElement[] = []
 const recentPreviewQueued = new Set<HTMLButtonElement>()
 let recentPreviewRunning = false
@@ -9509,6 +9526,8 @@ async function drainRecentPreviews(): Promise<void> {
   recentPreviewRunning = true
   try {
     for (;;) {
+      // Let the welcome page paint between archive reads so the first interaction is immediate.
+      await waitForPreviewFrame()
       const card = recentPreviewQueue.shift()
       if (!card) return
       recentPreviewQueued.delete(card)
@@ -9549,7 +9568,7 @@ function queueRecentPreview(card: HTMLButtonElement): void {
   void drainRecentPreviews()
 }
 
-// 只渲染真正滚进视野的卡片：9 张十几 MB 的皮肤不该在启动时全部读一遍。
+// 只渲染真正滚进视野的卡片：6 张十几 MB 的皮肤不该在启动时全部读一遍。
 const welcomeScroller = document.querySelector<HTMLElement>(".welcome-main")
 const recentPreviewObserver = welcomeScroller && "IntersectionObserver" in window
   ? new IntersectionObserver((entries) => {
@@ -9615,7 +9634,7 @@ for (const trigger of [$("#welcome-recent-open"), $("#welcome-recent-empty-open"
 }
 renderRecentFiles()
 
-void hydrateTemplateCardPreviews(document.querySelector(".template-grid")!)
+void hydrateTemplateCardPreviews(document.querySelector(".template-grid")!, { lazy: true })
 
 // 欢迎页模板卡：直接以该模板新建，不再弹选择器
 for (const card of document.querySelectorAll<HTMLButtonElement>(".template-card[data-template]")) {
@@ -9738,15 +9757,18 @@ for (const button of settingsNavItems) {
 
 const nativeSettings = isTauri() || location.hostname === "127.0.0.1" && ["1420", "4173"].includes(location.port)
 settingsStorageNav.hidden = !nativeSettings
-aiDesignSettings.hidden = !nativeSettings
 settingsModelNav.hidden = !nativeSettings
 settingsStorageSection.toggleAttribute("data-platform-hidden", !nativeSettings)
 settingsModelSection.toggleAttribute("data-platform-hidden", !nativeSettings)
 showSettingsPage("appearance")
 
 
-function aiEditableProjectFiles(target: SkinArchive): AiSkinEditableFile[] {
+function aiEditableProjectFiles(target: SkinArchive, scope: "panel" | "project" = "project"): AiSkinEditableFile[] {
+  const panelConfig = target.format === "bda"
+    ? bdaConfigPath(target, theme.value, orientation.value, "appearance")
+    : layoutPath || selectedPath || preferredPath()
   return target.names().flatMap((path) => {
+    if (scope === "panel" && path !== panelConfig) return []
     if (target.format === "bda") {
       if (!target.isBdaConfig(path) || !bdaDecodedSourceEditable(path)) return []
       const bytes = target.getBytes(path)
@@ -9760,6 +9782,14 @@ function aiEditableProjectFiles(target: SkinArchive): AiSkinEditableFile[] {
     if (!target.isText(path) || !/\.(?:ini|css|json)$/i.test(path)) return []
     return [{ path, syntax: /\.json$/i.test(path) ? "json" as const : "ini" as const, text: target.getText(path) }]
   })
+}
+
+function aiWantsWholeProject(prompt: string): boolean {
+  return /整个皮肤|全局|所有面板|全部面板|所有主题|全部主题|全项目|整个项目|全局修改/i.test(prompt)
+}
+
+function aiWantsVariants(prompt: string): boolean {
+  return /开创性|创新|创作|灵感|大胆|全新风格|多版|几版|几个方案|不同方向|方案选择/i.test(prompt)
 }
 
 function aiPreviewImage(): { type: "image"; data: string; mimeType: string } | undefined {
@@ -9811,8 +9841,8 @@ function syncAiDesignContext(): void {
     : "未选择"
   const available = Boolean(archive && previewCanvas.width && previewCanvas.height)
   aiContextPreview.hidden = false
-  aiContextPreview.textContent = available ? "附加预览" : "暂无预览"
-  ;($("#ai-attach-preview") as HTMLInputElement).disabled = aiDesignBusy || !available
+  aiContextPreview.textContent = available ? "画布已提供" : "暂无画布"
+  aiContextPreview.hidden = false
   syncAiDesignControls()
 }
 
@@ -9878,12 +9908,15 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
     aiDesignConversationTarget = target
     aiDesignConversation = []
   }
-  aiLastPrompt = prompt
   aiDesignBusy = true
   aiDesignPanel.dataset.state = "running"
   aiDesignStatus.textContent = "正在准备设计…"
   syncAiDesignControls()
   try {
+    const panelScope = aiWantsWholeProject(prompt) ? "project" as const : "panel" as const
+    const panelPath = target.format === "bda"
+      ? bdaConfigPath(target, theme.value, orientation.value, "appearance") ?? layoutPath
+      : layoutPath || selectedPath || preferredPath()
     const project = {
       format: target.format,
       skinName: documentName.textContent?.trim() ?? "",
@@ -9892,13 +9925,16 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
       orientation: orientation.value,
       layout: layout.value,
       keyboard: device.options[device.selectedIndex]?.textContent?.trim() || currentDeviceValue(),
+      panelPath,
+      panelScope,
       selectedKey: aiSelectedKeyContext(),
-      preview: ($("#ai-attach-preview") as HTMLInputElement).checked ? aiPreviewImage() : undefined,
-      files: aiEditableProjectFiles(target),
+      preview: aiPreviewImage(),
+      files: aiEditableProjectFiles(target, panelScope),
     }
     const { runAiSkinDesign } = await import("./ai-design.ts")
     const result = await runAiSkinDesign(configuration, project, prompt, {
       history: aiDesignConversation,
+      variantCount: aiWantsVariants(prompt) ? 3 : 1,
       signal: hooks.signal,
       onStatus: async (kind, text) => {
         if (hooks.signal.aborted || archive !== target) return
@@ -9911,6 +9947,37 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
     if (hooks.signal.aborted) throw new DOMException("AI 设计已取消", "AbortError")
     if (archive !== target) throw new Error("AI 运行期间已切换皮肤项目，本轮草稿未应用")
     if (!isEditing()) throw new Error("已退出编辑模式，本轮草稿未应用")
+    if (result.variants?.length) {
+      const variants = result.variants.flatMap<AiDraftVariant>((variant) => {
+        try {
+          const changes = validatedAiChanges(target, variant.changes)
+          return [{
+            id: variant.id,
+            title: variant.title,
+            changes,
+            drafts: variant.changes,
+            sections: aiDraftSections(variant.changes),
+            conversation: variant.conversation,
+            response: variant.response,
+          }]
+        } catch (error) {
+          throw new Error(`${variant.title}：${aiDesignErrorMessage(error)}`)
+        }
+      })
+      setAiDesignDraft({
+        target,
+        changes: [],
+        drafts: [],
+        sections: [],
+        conversation: [],
+        response: "",
+        variants,
+      })
+      return {
+        fallback: "已生成多个设计方向，请选择一个方案预览并应用。",
+        summary: "方案已就绪 · 选择后才会写入皮肤",
+      }
+    }
     const changes = validatedAiChanges(target, result.changes)
     if (!changes.length) {
       aiDesignConversation = result.conversation
@@ -9973,6 +10040,40 @@ function iniSectionTexts(source: string): Array<[string, string]> {
   ])
 }
 
+function createAiVariantReview(variant: AiDraftVariant, index: number): HTMLLIElement {
+  const item = document.createElement("li")
+  item.className = "ai-variant-card"
+  const button = document.createElement("button")
+  button.type = "button"
+  button.className = "ai-variant-select"
+  button.dataset.variantId = variant.id
+  button.innerHTML = `<span class="ai-variant-index">${index + 1}</span><span class="ai-variant-copy"><strong></strong><small></small></span><span class="system-symbol" data-system-symbol="chevron.right" aria-hidden="true"></span>`
+  button.querySelector("strong")!.textContent = variant.title
+  button.querySelector("small")!.textContent = `${variant.changes.length} 个文件 · ${variant.sections.length} 个配置块`
+  button.addEventListener("click", () => chooseAiVariant(variant.id))
+  item.append(button)
+  if (variant.response.trim()) {
+    const note = document.createElement("p")
+    note.className = "ai-variant-note"
+    note.textContent = variant.response.trim().slice(0, 180)
+    item.append(note)
+  }
+  return item
+}
+
+function chooseAiVariant(id: string): void {
+  const draft = aiDesignDraft
+  const variant = draft?.variants?.find((item) => item.id === id)
+  if (!draft || !variant) return
+  draft.changes = variant.changes
+  draft.drafts = variant.drafts
+  draft.sections = variant.sections
+  draft.conversation = variant.conversation
+  draft.response = variant.response
+  draft.variants = undefined
+  setAiDesignDraft(draft)
+  aiDesignStatus.textContent = `已选择「${variant.title}」· 请核对修改后应用`
+}
 
 function setAiDesignDraft(draft: AiDraft | undefined): void {
   aiDesignDraft = draft
@@ -9985,6 +10086,11 @@ function setAiDesignDraft(draft: AiDraft | undefined): void {
   }
   if (!draft) {
     aiDraftFiles.replaceChildren()
+    return
+  }
+  if (draft.variants?.length) {
+    aiDraftSummary.textContent = `${draft.variants.length} 个设计方向 · 选择一个继续`
+    aiDraftFiles.replaceChildren(...draft.variants.map((variant, index) => createAiVariantReview(variant, index)))
     return
   }
   aiDraftSummary.textContent = `涉及 ${draft.changes.length} 个文件` +
@@ -10002,6 +10108,10 @@ function applyAiDesignDraft(): void {
   }
   if (!isEditing() || aiDesignBusy) {
     aiDesignStatus.textContent = "请在编辑模式下应用草稿，并等待生成结束。"
+    return
+  }
+  if (!draft.changes.length || !draft.drafts.length) {
+    aiDesignStatus.textContent = "请先选择一个设计方案。"
     return
   }
   try {
@@ -10038,40 +10148,21 @@ function ensureAiChat(): Promise<AiChatController> {
 }
 
 function syncAiDesignControls(): void {
-  $("#ai-retry-prompt").hidden = !aiLastPrompt
   aiDesignModel.disabled = aiDesignBusy || savedModels.length === 0
-  aiDesignSettings.disabled = aiDesignBusy
   ;($("#ai-new-session") as HTMLButtonElement).disabled = aiDesignBusy || Boolean(aiDesignDraft)
-  ;($("#ai-retry-prompt") as HTMLButtonElement).disabled = aiDesignBusy || Boolean(aiDesignDraft) || !aiLastPrompt
-  ;($("#ai-attach-preview") as HTMLInputElement).disabled = aiDesignBusy || !archive || !previewCanvas.width || !previewCanvas.height
-  aiDraftApply.disabled = aiDesignBusy || !isEditing()
+  aiDraftApply.disabled = aiDesignBusy || !isEditing() || Boolean(aiDesignDraft?.variants?.length)
   aiDraftCancel.disabled = aiDesignBusy
-  const hint = aiDesignPanel.querySelector<HTMLElement>(".ai-composer-hint")
-  if (hint) hint.textContent = !isTauri() ? "AI 设计需在桌面应用中使用"
-    : !archive ? "先打开皮肤项目，再开始设计"
-    : !isEditing() ? "切换到编辑模式后即可开始设计"
-    : !savedModels.length ? "先配置模型，再描述你的设计要求"
-    : aiDesignDraft ? "请先审阅并应用或丢弃上方草稿"
-    : aiDesignBusy ? "正在生成 · 点击输入框中的停止按钮可取消"
-    : "Enter 发送 · Shift + Enter 换行 · 修改需确认"
 }
 
 $("#ai-new-session").addEventListener("click", () => {
   if (aiDesignBusy || aiDesignDraft) return
   aiChatController?.clear()
   aiDesignConversation = []
-  aiLastPrompt = ""
   aiDesignStatus.textContent = "已开始新对话 · 已应用的修改不受影响"
   aiDesignPanel.dataset.state = "idle"
   syncAiDesignControls()
   aiChatController?.focus()
 })
-$("#ai-retry-prompt").addEventListener("click", () => {
-  if (aiDesignBusy || aiDesignDraft || !aiLastPrompt) return
-  void ensureAiChat().then((controller) => controller.setInput(aiLastPrompt))
-    .catch((error) => { aiDesignStatus.textContent = aiDesignErrorMessage(error) })
-})
-
 aiDraftApply.addEventListener("click", () => applyAiDesignDraft())
 aiDraftCancel.addEventListener("click", () => {
   if (!aiDesignDraft) return
@@ -10164,8 +10255,6 @@ function syncModelProfiles(): void {
   aiDesignModel.value = selected !== "" && savedModels[Number(selected)] ? selected : "0"
   if (!savedModels.length) aiDesignModel.replaceChildren(new Option("请先配置模型", ""))
   aiDesignModel.disabled = savedModels.length === 0
-  aiDesignSettings.hidden = !nativeSettings
-  aiDesignSettings.textContent = savedModels.length ? "模型设置" : "配置 AI 模型"
   syncAiDesignControls()
 }
 
@@ -10572,8 +10661,13 @@ function applyWindowMaterialOpacity(): void {
   windowMaterialOpacityValue.value = `${opacity}%`
   windowMaterialOpacity.disabled = !windowMaterial.checked
   document.documentElement.dataset.windowMaterialKind = windowMaterialKind
-  document.documentElement.dataset.windowMaterialOpaque = opacity >= 100 ? "true" : "false"
-  document.documentElement.style.setProperty("--window-material-opacity", `${opacity}%`)
+  // 滑杆值就是材质填充强度：100% 时每个表面都合成到完全不透明，因此不再像旧版那样乘一个小系数
+  // （那样 100% 也只有半透明）。各表面按层角色取系数：单层直接用 f，下沉层用 1-√(1-f) 让两层叠加后
+  // 正好等于 f，浮层用 1-(1-f)² 让对话框正文始终落在接近实心的底上。模糊无需再关闭。
+  const fill = opacity / 100
+  document.documentElement.style.setProperty("--window-material-layer", String(fill))
+  document.documentElement.style.setProperty("--window-material-sunken", String(1 - Math.sqrt(1 - fill)))
+  document.documentElement.style.setProperty("--window-material-floating", String(1 - (1 - fill) ** 2))
 }
 async function applyWindowMaterial(): Promise<void> {
   const enabled = windowMaterial.checked
@@ -10604,9 +10698,9 @@ async function initializeWindowMaterial(): Promise<void> {
     ? windowMaterialKind !== "acrylic"
     : savedWindowMaterial !== "off"
   windowMaterialOpacitySetting.hidden = windowMaterialKind === "none"
-  windowMaterialOpacityLabel.textContent = windowMaterialKind === "acrylic" ? "亚克力不透明度" : "玻璃不透明度"
   const storageKey = windowMaterialKind === "acrylic" ? "window-acrylic-opacity" : "window-glass-opacity"
-  windowMaterialOpacity.value = localStorage.getItem(storageKey) ?? (windowMaterialKind === "acrylic" ? "92" : "100")
+  // 玻璃默认值取 50%：滑杆现在代表填充强度，100% 等同于实心窗口，默认值要留出材质本身。
+  windowMaterialOpacity.value = localStorage.getItem(storageKey) ?? (windowMaterialKind === "acrylic" ? "92" : "50")
   await applyWindowMaterialWithRetry()
 }
 void initializeWindowMaterial().catch((error) => handleWindowMaterialError(error, "读取窗口材质"))
@@ -11719,10 +11813,9 @@ if (isTauri()) {
     finishNativeProjectChoice(event.payload.templateID)
   })
   void listen("new-project-cancel", () => finishNativeProjectChoice())
-  void listen<{ mode: "image" | "resource" }>("picker-window-ready", (event) => {
-    const label = event.payload.mode === "image" ? "image-picker" : "resource-picker"
-    const payload = event.payload.mode === "image" ? nativeImagePickerPayload : nativeResourcePickerPayload
-    if (payload) void emitTo(label, `${label}-data`, payload)
+  void listen("picker-window-ready", () => {
+    if (pickerRequestedView === "list") void emitTo("image-picker", "image-picker-show-list")
+    else if (nativeImagePickerPayload) void emitTo("image-picker", "image-picker-data", nativeImagePickerPayload)
   })
   void listen<{ index: number }>("image-picker-select", (event) => {
     if (!isEditing() || !pickerTarget) return

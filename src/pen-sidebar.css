@@ -1202,14 +1202,13 @@
   line-height: 1.55;
 }
 
-.source .ai-composer-hint {
-  color: var(--pen-tertiary);
-  font-size: 10px;
-  line-height: 14px;
-}
-
 .source .ai-design-toolbar {
   gap: 8px;
+}
+
+.source .ai-model-picker > span {
+  color: var(--pen-tertiary);
+  font-size: 10.5px;
 }
 
 .source .ai-design-toolbar select {
@@ -1224,22 +1223,6 @@
 
 .source .ai-design-toolbar select:hover:not(:disabled) {
   border-color: var(--pen-line-strong);
-}
-
-.source .ai-design-settings {
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-secondary);
-  font-size: 11.5px;
-  line-height: 1;
-}
-
-.source .ai-design-settings:hover {
-  color: var(--pen-text);
-  background: var(--pen-surface-subtle);
 }
 
 .source .ai-design-resize span {

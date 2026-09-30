@@ -719,10 +719,7 @@
         </div>
         <div id="ai-design-panel" hidden>
           <div class="ai-session-bar">
-            <label class="ai-preview-toggle" title="发送时附加当前画布截图；关闭后仅发送项目配置">
-              <input id="ai-attach-preview" type="checkbox" checked />
-              <span id="ai-context-preview" class="ai-context-preview">附加预览</span>
-            </label>
+            <span id="ai-context-preview" class="ai-context-preview" title="当前画布会随每次设计请求提供给视觉模型">画布已提供</span>
             <span id="ai-context-key" hidden></span>
             <button id="ai-new-session" type="button" title="清空当前对话，不影响已应用的修改">新对话</button>
           </div>
@@ -751,11 +748,11 @@
               </section>
             </deep-chat>
             <div class="ai-design-resize" role="separator" tabindex="0" aria-label="调整输入框高度" aria-orientation="horizontal" aria-controls="ai-design-chat" aria-valuemin="128" aria-valuemax="360" aria-valuenow="148" title="上下拖动调整高度，双击恢复默认；也可使用上下方向键"><span></span></div>
-            <p class="ai-composer-hint">Enter 发送 · Shift + Enter 换行</p>
             <footer class="ai-design-toolbar">
-              <label><span>模型</span><select id="ai-design-model" aria-label="对话模型" disabled><option value="">请先配置模型</option></select></label>
-              <button id="ai-retry-prompt" type="button" title="恢复上次要求到输入框，修改后手动发送" hidden disabled>重试</button>
-              <button class="ai-design-settings" type="button" data-app-dialog="settings">配置 AI 模型</button>
+              <label class="ai-model-picker">
+                <span>模型</span>
+                <select id="ai-design-model" aria-label="选择对话模型" disabled><option value="">请先配置模型</option></select>
+              </label>
             </footer>
           </div>
         </div>
@@ -1007,7 +1004,7 @@
           <section class="settings-section settings-page" data-settings-panel="appearance" role="tabpanel" id="settings-panel-appearance" aria-labelledby="settings-appearance-title">
             <div class="settings-section-heading">
               <h3 id="settings-appearance-title">外观</h3>
-              <p>主题、强调色与界面密度即时生效，并同步到预览画布。</p>
+              <p>主题、强调色、界面密度与窗口材质即时生效，并同步到预览画布。</p>
             </div>
             <div class="settings-list">
               <h4 class="settings-subheading">主题 <small>theme</small></h4>
@@ -1019,6 +1016,9 @@
               <h4 class="settings-subheading">深色模式 <small>dark</small></h4>
               <label class="settings-row settings-switch"><span>系统外观联动</span><span class="settings-inline-control"><input id="theme-system-linked" type="checkbox" role="switch" disabled><small id="theme-system-hint">由系统决定</small></span></label>
               <label class="settings-row settings-switch"><span>深色画布降低对比</span><input id="dark-canvas-soften" type="checkbox" role="switch" checked></label>
+              <h4 class="settings-subheading">窗口材质 <small>material</small></h4>
+              <label class="settings-row settings-switch"><span>使用窗口材质</span><input id="window-material" type="checkbox" role="switch" checked></label>
+              <label id="window-material-opacity-setting" class="settings-row settings-range"><span id="window-material-opacity-label">材质不透明度</span><span class="settings-range-control"><input id="window-material-opacity" type="range" min="20" max="100" step="1" value="100" aria-labelledby="window-material-opacity-label window-material-opacity-value"><output id="window-material-opacity-value" for="window-material-opacity">100%</output></span></label>
               <p class="settings-storage-note">设置保存在此设备的应用本地存储中</p>
             </div>
           </section>
@@ -1029,8 +1029,6 @@
               <p>编辑器界面与源代码功能</p>
             </div>
             <div class="settings-list">
-                            <label class="settings-row settings-switch"><span>窗口材质</span><input id="window-material" type="checkbox" role="switch" checked></label>
-              <label id="window-material-opacity-setting" class="settings-row settings-range"><span id="window-material-opacity-label">玻璃不透明度</span><span class="settings-range-control"><input id="window-material-opacity" type="range" min="20" max="100" step="1" value="100" aria-labelledby="window-material-opacity-label window-material-opacity-value"><output id="window-material-opacity-value" for="window-material-opacity">100%</output></span></label>
               <label class="settings-row settings-switch"><span>检查器使用侧边分类</span><input id="inspector-grouped-display" type="checkbox" role="switch"></label>
               <label class="settings-row"><span>源代码字号</span><span class="settings-inline-control"><input id="source-font-size" type="number" min="8" max="32" step="1" value="11" inputmode="numeric" aria-describedby="source-font-size-hint"><small id="source-font-size-hint">px</small></span></label>
               <label class="settings-row settings-switch"><span>分节定位滚动条<small>按 [节标题] 显示短线，点击跳转</small></span><input id="source-section-scrollbar" type="checkbox" role="switch" checked></label>

@@ -12,27 +12,22 @@
 }
 #ai-context-key { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--pin-ink-muted); font-size: 10px; font-weight: 400; }
 #ai-new-session { margin-left: auto; }
-:root body .source #ai-design-panel :is(#ai-new-session, #ai-retry-prompt) {
-  flex: none; height: 28px; min-height: 28px; padding: 0 9px; border: 1px solid var(--pin-line);
-  border-radius: 7px; background: var(--pin-surface); color: var(--pin-ink-muted);
-  font: 500 11px var(--font-ui); box-shadow: none; cursor: pointer;
+:root body .source #ai-design-panel #ai-new-session {
+  flex: none; height: var(--pin-ctrl-h, 30px); min-height: var(--pin-ctrl-h, 30px); padding: 0 10px;
+  border: 1px solid var(--pin-line);
+  border-radius: var(--pin-radius-md, 8px); background: var(--pin-surface); color: var(--pin-ink-muted);
+  font: 500 11.5px var(--font-ui); box-shadow: none; cursor: pointer;
 }
-:root body .source #ai-design-panel :is(#ai-new-session, #ai-retry-prompt):hover:not(:disabled) {
+:root body .source #ai-design-panel #ai-new-session:hover:not(:disabled) {
   background: var(--pin-accent-soft); color: var(--pin-accent); border-color: var(--pin-accent);
 }
 :root body .source #ai-design-panel button:disabled { opacity: .48; cursor: not-allowed; }
 :root body .source #ai-design-panel :is(button, select, summary, input):focus-visible {
   outline: 2px solid var(--pin-accent) !important; outline-offset: 2px;
 }
-:root body .source #ai-design-panel .ai-preview-toggle {
-  display: inline-flex; flex-direction: row; align-items: center; gap: 5px;
-  width: auto; min-height: 24px; cursor: pointer; font-size: 10px; color: var(--pin-ink-muted);
-}
-:root body .source #ai-design-panel #ai-attach-preview {
-  appearance: auto; width: 13px; height: 13px; min-height: 0; margin: 0; accent-color: var(--pin-accent);
-}
-:root body .source #ai-design-panel .ai-preview-toggle .ai-context-preview {
-  padding: 0 !important; border: 0 !important; background: transparent !important; color: inherit !important;
+:root body .source #ai-design-panel #ai-context-preview {
+  flex: 0 0 auto; padding: 4px 8px; border-radius: 999px;
+  background: var(--pin-accent-soft); color: var(--pin-accent); font-size: 10px; font-weight: 500;
 }
 :root body .source #ai-design-panel[data-state="error"] .ai-design-status:not(:empty) {
   color: var(--pin-danger) !important; background: color-mix(in srgb, var(--pin-danger) 9%, var(--pin-surface)) !important;
@@ -47,11 +42,25 @@
 :root body .source #ai-design-panel #ai-draft-panel:not([hidden]) {
   flex: 0 1 auto !important; min-height: 0 !important; max-height: 44%; overflow: auto !important;
   margin: 10px 14px !important; padding: 12px !important; border: 1px solid var(--pin-line) !important;
-  border-radius: 10px !important; background: var(--pin-sunken) !important; scrollbar-width: thin;
+  border-radius: var(--pin-radius-lg, 12px) !important; background: var(--pin-sunken) !important; scrollbar-width: thin;
 }
 :root body .source #ai-design-panel #ai-draft-files { max-height: none; }
 :root body .source #ai-design-panel .ai-draft-head { align-items: flex-start !important; flex-wrap: wrap; gap: 4px; }
-:root body .source #ai-design-panel #ai-draft-files > li { padding: 8px !important; background: var(--pin-surface); border-radius: 7px; }
+:root body .source #ai-design-panel #ai-draft-files > li { padding: 8px !important; background: var(--pin-surface); border-radius: var(--pin-radius-md, 8px); }
+:root body .source #ai-design-panel .ai-variant-card { padding: 0 !important; overflow: hidden; border: 1px solid var(--pin-line); background: var(--pin-surface); }
+:root body .source #ai-design-panel .ai-variant-select {
+  display: flex; width: 100%; align-items: center; gap: 9px; min-height: 52px; padding: 9px 10px;
+  border: 0; background: transparent; color: var(--pin-ink); text-align: left; cursor: pointer;
+}
+:root body .source #ai-design-panel .ai-variant-select:hover { background: var(--pin-accent-soft); }
+:root body .source #ai-design-panel .ai-variant-index {
+  display: grid; place-items: center; flex: 0 0 24px; width: 24px; height: 24px;
+  border-radius: 50%; background: var(--pin-accent); color: var(--pin-on-brand); font: 600 11px var(--font-mono);
+}
+:root body .source #ai-design-panel .ai-variant-copy { display: grid; min-width: 0; gap: 2px; flex: 1; }
+:root body .source #ai-design-panel .ai-variant-copy strong { font-size: 12px; font-weight: 600; }
+:root body .source #ai-design-panel .ai-variant-copy small { color: var(--pin-ink-muted); font-size: 10px; }
+:root body .source #ai-design-panel .ai-variant-note { margin: 0; padding: 0 10px 10px 43px; color: var(--pin-ink-muted); font-size: 10.5px; line-height: 1.45; }
 :root body .source #ai-design-panel .ai-draft-file-head { cursor: pointer; gap: 8px; }
 :root body .source #ai-design-panel .ai-draft-file-head > span { min-width: 0; flex: 1; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 11px; }
 :root body .source #ai-design-panel .ai-draft-file-head > em { flex: none; }
@@ -74,9 +83,6 @@
 }
 :root body .source #ai-design-panel .ai-draft-apply { color: #fff !important; }
 :root body .source #ai-design-panel .ai-design-toolbar { flex-wrap: wrap; padding-bottom: 10px; background: transparent !important; }
-:root body .source #ai-design-panel .ai-design-toolbar > label { min-width: 0; flex: 1 1 110px; }
-:root body .source #ai-design-panel #ai-design-model { width: 100%; min-width: 0; text-overflow: ellipsis; }
-:root body .source #ai-design-panel .ai-composer-hint { color: var(--pin-ink-muted) !important; }
 /* Short viewports retain access to both the draft actions and composer. */
 @media (max-height: 680px) {
   :root body .source #ai-design-panel:not([hidden]) { overflow-y: auto !important; }
