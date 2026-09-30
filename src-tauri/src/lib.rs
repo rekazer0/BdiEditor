@@ -90,8 +90,13 @@ struct ModelHttpRequest {
 #[derive(Clone, serde::Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 enum ModelHttpEvent {
-    Headers { status: u16, headers: Vec<(String, String)> },
-    Chunk { body: Vec<u8> },
+    Headers {
+        status: u16,
+        headers: Vec<(String, String)>,
+    },
+    Chunk {
+        body: Vec<u8>,
+    },
 }
 
 #[derive(serde::Serialize)]
@@ -733,9 +738,7 @@ fn valid_share_filename(name: &str) -> bool {
 }
 
 fn read_file_bytes(path: &str) -> Result<Vec<u8>, String> {
-    let size = fs::metadata(path)
-        .map_err(|error| error.to_string())?
-        .len();
+    let size = fs::metadata(path).map_err(|error| error.to_string())?.len();
     if size > MAX_ARCHIVE_BYTES {
         return Err("skin file exceeds 64 MB".into());
     }
@@ -1232,14 +1235,20 @@ async fn model_http_request(
                 .map(|value| (name.to_string(), value.to_string()))
         })
         .collect();
-    events.send(ModelHttpEvent::Headers { status, headers }).map_err(|error| error.to_string())?;
+    events
+        .send(ModelHttpEvent::Headers { status, headers })
+        .map_err(|error| error.to_string())?;
     let mut received = 0usize;
     while let Some(chunk) = response.chunk().await.map_err(|error| error.to_string())? {
         received += chunk.len();
         if received > MAX_MODEL_CHAT_BYTES {
             return Err("模型响应过大".into());
         }
-        events.send(ModelHttpEvent::Chunk { body: chunk.to_vec() }).map_err(|error| error.to_string())?;
+        events
+            .send(ModelHttpEvent::Chunk {
+                body: chunk.to_vec(),
+            })
+            .map_err(|error| error.to_string())?;
     }
     Ok(())
 }
@@ -1250,10 +1259,10 @@ mod tests {
     use super::{
         acrylic_alpha, append_client_log_path, apply_source_changes_path, model_list_url,
         parse_model_list, prune_source_workspaces, read_client_log_path, read_file,
-        read_file_bytes, read_model_configuration_path, read_source_changes_path, read_source_files,
-        safe_source_path, valid_share_filename, windows_material_kind, write_file,
-        write_model_configuration_path, write_source_files, ModelConfiguration, MAX_ARCHIVE_BYTES,
-        SOURCE_MARKER,
+        read_file_bytes, read_model_configuration_path, read_source_changes_path,
+        read_source_files, safe_source_path, valid_share_filename, windows_material_kind,
+        write_file, write_model_configuration_path, write_source_files, ModelConfiguration,
+        MAX_ARCHIVE_BYTES, SOURCE_MARKER,
     };
     use std::fs;
     use std::thread;
