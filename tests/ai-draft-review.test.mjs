@@ -33,30 +33,46 @@ test('large and long-line diffs explicitly disclose truncation', () => {
 })
 
 const main = ts.createSourceFile('main.ts', readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true)
-const functions = main.statements.filter(node => ts.isFunctionDeclaration(node) && ['applyAiDesignDraft', 'validatedAiChanges'].includes(node.name?.text)).map(node => node.getText(main)).join('\n')
+const draftFunctions = ['applyAiDesignDraft', 'validatedAiChanges', 'writeAiDraftChanges', 'previewAiDraft', 'revertAiDraftPreview', 'acceptAiDraftPreview', 'sameBytes']
+const functions = main.statements.filter(node => ts.isFunctionDeclaration(node) && draftFunctions.includes(node.name?.text)).map(node => node.getText(main)).join('\n')
 function setup(editing = true, stale = false) {
-  const target = { format: 'bdi', getBytes: () => undefined }
+  const files = new Map([['keys.ini', stale ? 'manual edit' : 'old']])
+  const target = { format: 'bdi', getBytes: () => undefined, getText: path => files.get(path), setText: (path, text) => files.set(path, text) }
   const draft = { target, changes: [{}], drafts: [{ path: 'keys.ini', syntax: 'ini', before: 'old', after: 'new' }], conversation: ['accepted'] }
   let commits = 0
   const context = vm.createContext({
-    archive: target, aiDesignDraft: draft, aiDesignBusy: false, aiDesignConversation: [],
+    archive: target, aiDesignDraft: undefined, aiDraftPreview: undefined, aiDesignBusy: false, aiDesignConversation: [],
     aiDesignStatus: { textContent: '' }, aiDesignPanel: { dataset: {} },
     isEditing: () => editing, source: { commit() {} },
-    aiEditableProjectFiles: () => [{ path: 'keys.ini', syntax: 'ini', text: stale ? 'manual edit' : 'old' }],
+    aiEditableProjectFiles: () => [{ path: 'keys.ini', syntax: 'ini', text: files.get('keys.ini') }],
+    aiEditableProjectImages: () => [{ path: 'keys.png' }],
     commitBatch: () => { commits++ },
-    setAiDesignDraft: value => { context.aiDesignDraft = value },
     aiDesignErrorMessage: error => error.message,
-    selectedPath: '', layoutPath: '', renderFiles() {}, refreshPreview() {}, populateKeyInspector() {}, updateDirty() {},
+    refreshAfterAiDraft() {},
   })
   vm.runInContext(ts.transpile(functions, { target: ts.ScriptTarget.ES2022 }), context)
-  return { context, draft, commits: () => commits }
+  vm.runInContext('function setAiDesignDraft(value) { revertAiDraftPreview(); aiDesignDraft = value; if (value) previewAiDraft(value) }', context)
+  context.setAiDesignDraft(draft)
+  return { context, draft, text: () => files.get('keys.ini'), commits: () => commits }
 }
-test('applying stale draft preserves manual edits and retains review', () => {
+test('draft is previewed on the canvas before it is applied', () => {
+  const s = setup()
+  assert.equal(s.text(), 'new')
+  assert.equal(s.commits(), 0)
+})
+test('discarding a draft restores the previewed files', () => {
+  const s = setup()
+  s.context.setAiDesignDraft(undefined)
+  assert.equal(s.text(), 'old')
+  assert.equal(s.commits(), 0)
+})
+test('stale draft is not previewed or applied and keeps manual edits', () => {
   const s = setup(true, true)
+  assert.equal(s.text(), 'manual edit')
+  assert.match(s.context.aiDesignStatus.textContent, /文件已变化/)
   s.context.applyAiDesignDraft()
   assert.equal(s.commits(), 0)
   assert.equal(s.context.aiDesignDraft, s.draft)
-  assert.match(s.context.aiDesignStatus.textContent, /文件已变化/)
   assert.equal(s.context.aiDesignConversation.length, 0)
 })
 test('read-only mode cannot apply a draft', () => {
@@ -70,6 +86,7 @@ test('accepted draft commits once and advances the conversation', () => {
   s.context.applyAiDesignDraft()
   s.context.applyAiDesignDraft()
   assert.equal(s.commits(), 1)
+  assert.equal(s.text(), 'new')
   assert.equal(s.context.aiDesignDraft, undefined)
   assert.equal(s.context.aiDesignConversation[0], 'accepted')
 })
@@ -78,5 +95,16 @@ test('project switch drops old draft without writing to new project', () => {
   s.context.archive = {}
   s.context.applyAiDesignDraft()
   assert.equal(s.commits(), 0)
+  assert.equal(s.text(), 'old')
   assert.equal(s.context.aiDesignDraft, undefined)
+})
+
+test('image drafts become byte changes and are rejected once the PNG changed', () => {
+  const { context } = setup()
+  const png = new Uint8Array([1, 2, 3])
+  const target = { format: 'bdi', getBytes: () => png }
+  const draft = { path: 'keys.png', syntax: 'png', before: new Uint8Array([1, 2, 3]), after: new Uint8Array([9]) }
+  assert.deepEqual([...context.validatedAiChanges(target, [draft])[0].after], [9])
+  assert.throws(() => context.validatedAiChanges(target, [{ ...draft, before: new Uint8Array([1]) }]), /图片已变化/)
+  assert.throws(() => context.validatedAiChanges(target, [{ ...draft, path: 'other.png' }]), /未授权图片/)
 })

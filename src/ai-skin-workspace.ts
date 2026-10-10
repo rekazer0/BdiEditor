@@ -1,3 +1,4 @@
+import type { AiSkinImageDraft } from "./ai-skin-images.ts"
 import { IniDocument } from "./ini.ts"
 
 export type AiSkinFileSyntax = "ini" | "json"
@@ -15,7 +16,9 @@ export type AiSkinWorkspaceLimits = {
   maxTotalChars: number
 }
 
-export type AiSkinDraftChange = AiSkinEditableFile & { before: string; after: string }
+export type AiSkinTextDraft = AiSkinEditableFile & { before: string; after: string }
+
+export type AiSkinDraftChange = AiSkinTextDraft | AiSkinImageDraft
 
 const defaultLimits: AiSkinWorkspaceLimits = {
   maxChangedFiles: 8,
@@ -79,6 +82,24 @@ export class AiSkinWorkspace {
     return { text, truncated: start + text.length < file.text.length, totalChars: file.text.length }
   }
 
+  readIniSections(path: string, sections: readonly string[]): { sections: Record<string, Record<string, string>>; missing: string[] } {
+    const file = this.requireFile(path)
+    if (file.syntax !== "ini") throw new Error("该工具只能读取 INI 配置")
+    const document = IniDocument.parse(file.text)
+    const existing = new Set(document.sections())
+    const result: Record<string, Record<string, string>> = {}
+    const missing: string[] = []
+    for (const section of new Set(sections)) {
+      if (!existing.has(section)) {
+        missing.push(section)
+        continue
+      }
+      result[section] = Object.fromEntries(document.entries(section).map((entry) => [entry.key, entry.value]))
+    }
+    this.readPaths.add(path)
+    return { sections: result, missing }
+  }
+
   setIniValue(path: string, section: string, key: string, value: string): "created" | "updated" | "unchanged" {
     const file = this.requireFile(path)
     if (file.syntax !== "ini") throw new Error("该工具只能修改 INI 配置")
@@ -130,7 +151,7 @@ export class AiSkinWorkspace {
     return occurrences
   }
 
-  changes(): AiSkinDraftChange[] {
+  changes(): AiSkinTextDraft[] {
     return [...this.files.values()].flatMap((file) => {
       const before = this.original.get(file.path)!
       return before === file.text ? [] : [{ ...file, before, after: file.text }]

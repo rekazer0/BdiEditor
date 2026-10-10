@@ -247,7 +247,10 @@ export class SourceCodeEditor extends EventTarget {
   private completionIndex = 0
   private completionFrom = 0
   private readonly sectionScrollbar = document.createElement("nav")
-  private sectionMarkers: { from: number; button: HTMLButtonElement }[] = []
+  private readonly sectionLabel = document.createElement("div")
+  private sectionMarkers: { from: number; name: string; button: HTMLButtonElement }[] = []
+  // Sections near either end can't scroll to the middle, so a jump pins its marker until the user scrolls again.
+  private pinnedSection?: number
 
   constructor(parent: HTMLElement) {
     super()
@@ -306,7 +309,30 @@ export class SourceCodeEditor extends EventTarget {
     })
     this.sectionScrollbar.className = "source-section-scrollbar"
     this.sectionScrollbar.setAttribute("aria-label", "按节定位")
-    this.view.dom.append(this.sectionScrollbar)
+    this.sectionLabel.className = "source-section-label"
+    this.sectionLabel.setAttribute("aria-hidden", "true")
+    this.view.dom.append(this.sectionScrollbar, this.sectionLabel)
+    this.sectionScrollbar.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || !this.sectionMarkers.length) return
+      event.preventDefault()
+      this.sectionScrollbar.setPointerCapture(event.pointerId)
+      this.view.dom.dataset.sectionDragging = "true"
+      this.jumpToSectionAt(event.clientY)
+    })
+    this.sectionScrollbar.addEventListener("pointermove", (event) => {
+      if (this.sectionScrollbar.hasPointerCapture(event.pointerId)) this.jumpToSectionAt(event.clientY)
+    })
+    const endDrag = () => delete this.view.dom.dataset.sectionDragging
+    const unpin = () => {
+      if (this.pinnedSection === undefined) return
+      this.pinnedSection = undefined
+      this.measureSectionScrollbar()
+    }
+    this.view.scrollDOM.addEventListener("wheel", unpin, { passive: true })
+    this.view.scrollDOM.addEventListener("touchstart", unpin, { passive: true })
+    this.view.scrollDOM.addEventListener("keydown", unpin)
+    this.sectionScrollbar.addEventListener("pointerup", endDrag)
+    this.sectionScrollbar.addEventListener("pointercancel", endDrag)
     this.view.scrollDOM.addEventListener("scroll", () => this.measureSectionScrollbar())
     this.rebuildSectionScrollbar()
     this.refreshExplanation()
@@ -314,6 +340,7 @@ export class SourceCodeEditor extends EventTarget {
 
   private rebuildSectionScrollbar(): void {
     this.sectionMarkers = []
+    this.pinnedSection = undefined
     if (this.language === "ini") {
       const doc = this.view.state.doc
       for (let number = 1; number <= doc.lines; number++) {
@@ -325,13 +352,14 @@ export class SourceCodeEditor extends EventTarget {
         button.title = `[${match[1]}] · 第 ${number} 行`
         button.setAttribute("aria-label", button.title)
         button.addEventListener("click", () => {
+          this.pinnedSection = this.sectionMarkers.findIndex(marker => marker.button === button)
           this.view.dispatch({
             selection: { anchor: line.from },
-            effects: EditorView.scrollIntoView(line.from, { y: "start", yMargin: 0 }),
+            effects: EditorView.scrollIntoView(line.from, { y: "center" }),
           })
           this.view.focus()
         })
-        this.sectionMarkers.push({ from: line.from, button })
+        this.sectionMarkers.push({ from: line.from, name: match[1], button })
       }
     }
     this.sectionScrollbar.replaceChildren(...this.sectionMarkers.map(marker => marker.button))
@@ -343,16 +371,37 @@ export class SourceCodeEditor extends EventTarget {
   private measureSectionScrollbar(): void {
     this.view.requestMeasure({
       key: this.sectionScrollbar,
-      read: view => view.lineBlockAtHeight(Math.max(0, view.scrollDOM.scrollTop + 1)).from,
+      read: view => view.lineBlockAtHeight(Math.max(0, view.scrollDOM.scrollTop + view.scrollDOM.clientHeight / 2)).from,
       write: from => {
         let active = 0
         for (let index = 0; index < this.sectionMarkers.length; index++) {
           if (this.sectionMarkers[index].from <= from) active = index
         }
+        if (this.pinnedSection !== undefined && this.pinnedSection < this.sectionMarkers.length) active = this.pinnedSection
         this.sectionMarkers.forEach(({ button }, index) => {
           button.setAttribute("aria-current", String(index === active))
         })
+        const marker = this.sectionMarkers[active]
+        if (!marker) return
+        this.sectionLabel.textContent = `[${marker.name}]`
+        const bounds = marker.button.getBoundingClientRect()
+        this.sectionLabel.style.top = `${bounds.top + bounds.height / 2 - this.view.dom.getBoundingClientRect().top}px`
       },
+    })
+  }
+
+  private jumpToSectionAt(clientY: number): void {
+    let index = 0
+    this.sectionMarkers.forEach((marker, i) => {
+      if (marker.button.getBoundingClientRect().top <= clientY) index = i
+    })
+    const target = this.sectionMarkers[index]
+    this.pinnedSection = index
+    this.measureSectionScrollbar()
+    target.button.scrollIntoView({ block: "nearest" })
+    this.view.dispatch({
+      selection: { anchor: target.from },
+      effects: EditorView.scrollIntoView(target.from, { y: "center" }),
     })
   }
 

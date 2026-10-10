@@ -1,4 +1,4 @@
-import { Agent, type AgentEvent, type AgentMessage, type AgentTool } from "@earendil-works/pi-agent-core"
+import { Agent, type AgentEvent, type AgentMessage, type AgentTool, type ThinkingLevel } from "@earendil-works/pi-agent-core"
 import {
   Type,
   createModels,
@@ -14,6 +14,8 @@ import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generati
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy"
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy"
 import { Channel, invoke } from "@tauri-apps/api/core"
+import { AiSkinImages, type AiSkinImageFile } from "./ai-skin-images.ts"
+import { aiSkinSkill } from "./ai-skin-skill.ts"
 import { AiSkinWorkspace, type AiSkinDraftChange, type AiSkinEditableFile } from "./ai-skin-workspace.ts"
 import type { ModelProtocol } from "./model-providers.ts"
 
@@ -42,6 +44,8 @@ export type AiDesignProject = {
   }
   preview?: ImageContent
   files: readonly AiSkinEditableFile[]
+  /** PNG assets (BDI/BDS) the AI may view, recolour or regenerate. */
+  images?: readonly AiSkinImageFile[]
 }
 
 export type AiDesignResult = {
@@ -64,10 +68,10 @@ export type AiDesignVariant = {
 export type AiDesignConversation = AgentMessage[]
 
 type StatusKind = "thinking" | "reading" | "editing" | "done"
-type ModelHttpEvent = { type: "headers"; status: number; headers: Array<[string, string]> } | { type: "chunk"; body: number[] }
-
-const MAX_TOOL_CALLS = 24
-const MAX_TURNS = 6
+type ModelHttpEvent =
+  | { type: "headers"; status: number; headers: Array<[string, string]> }
+  | { type: "chunk"; body: number[] }
+  | { type: "end" }
 
 function jsonResult(details: unknown) {
   return {
@@ -98,7 +102,7 @@ function apiStreams(protocol: ModelProtocol): ProviderStreams {
   return openAICompletionsApi()
 }
 
-function configuredModel(config: AiDesignConfiguration): Model<Api> {
+function configuredModel(config: AiDesignConfiguration, thinkingLevel: ThinkingLevel): Model<Api> {
   const api = modelApi(config.protocol)
   return {
     id: config.model.trim(),
@@ -106,15 +110,22 @@ function configuredModel(config: AiDesignConfiguration): Model<Api> {
     api,
     provider: "bdi-editor",
     baseUrl: normalizedUrl(config.apiUrl),
-    reasoning: /^(?:o\d|gpt-5|claude-(?:3-7|4)|gemini-2\.5)/i.test(config.model.trim()),
+    // The user picks the effort; "off" sends no reasoning parameters at all.
+    reasoning: thinkingLevel !== "off",
     input: ["text", "image"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 128_000,
-    maxTokens: 8_192,
+    // DeepSeek-style APIs count reasoning inside max_tokens; 8K truncates a long think before any tool call.
+    maxTokens: thinkingLevel === "off" ? 8_192 : 32_768,
   }
 }
 
-function systemPrompt(project: AiDesignProject): string {
+function imageGuide(project: AiDesignProject, canGenerate: boolean): string {
+  if (!project.images?.length) return "当前格式不支持修改图片像素；不要因此拒绝整轮设计，先用已有样式、颜色、字体和引用完成可行调整，并说明未改动图片。"
+  return `按键背景、图标的颜色常常直接画在 PNG 里，样式表没有颜色字段可改。此时先用 NM_IMG/HL_IMG 找到 \`图片名,切片序号\`，对应 res/图片名.png 的 IMG切片序号，用 view_image 确认（只查看目标按键实际引用的图片，不要逐张浏览全部资源），再用 recolor_image 改色${canGenerate ? "；需要新图案、新风格或质感重绘时用 generate_image 生成" : "。当前未配置生图模型：纯改色仍可用 recolor_image 完成；用户明确要求生成、重绘或编辑图片的图案/风格时，不要用改色或叠加色凑合，直接告诉用户“未配置生图模型，请在 设置 > 大模型 > 生图模型 中配置”"}。同一张图片的切片可能被多个样式共享，改前在样式表里确认引用范围；常态与按下态（NM_IMG/HL_IMG）通常要一起改。可授权图片：${project.images.map((image) => image.path).join("、")}。`
+}
+
+function systemPrompt(project: AiDesignProject, canGenerate: boolean): string {
   const selected = project.selectedKey.sections.length
     ? `${contextText(project.selectedKey.label, 80)}（配置节：${project.selectedKey.sections.map((section) => contextText(section, 80)).join("、")}）`
     : "当前没有选中的按键"
@@ -126,7 +137,7 @@ function systemPrompt(project: AiDesignProject): string {
 
 当前项目：皮肤“${contextText(project.skinName, 120)}”（${contextText(project.skinPath, 120)}），格式 ${contextText(project.format, 20).toUpperCase()}，当前预览主题 ${contextText(project.theme, 20)}，方向 ${contextText(project.orientation, 20)}，布局 ${contextText(project.layout, 80)}，键盘设备 ${contextText(project.keyboard, 80)}。
 当前选择：${selected}${selectedValues ? `；已暴露字段：${selectedValues}` : ""}。
-当前打开面板：${contextText(project.panelPath, 160)}。本轮范围：${project.panelScope === "project" ? "整个皮肤项目（用户明确要求了全局范围）" : "当前打开的面板"}。除非用户明确说“整个皮肤”“全局”或“所有面板”，不要修改其他面板。
+当前打开面板：${contextText(project.panelPath, 160)}。本轮范围：${project.panelScope === "project" ? "整个皮肤项目（用户明确要求了全局范围）" : "当前打开的面板及其引用的全局配置与样式表"}。除非用户明确说“整个皮肤”“全局”或“所有面板”，不要修改其他面板的布局文件。
 ${project.preview ? "本轮请求附带当前画布预览图（候选栏与面板），你可以直接观察现有图片资源的实际颜色、纹理、层次和可读性；图像仅供观察，不能据此猜测不存在的配置字段。" : "当前没有可用的画布预览图。"}
 
 已授权的配置文件（无需先枚举）：${project.files.map((file) => `${file.path} [${file.syntax}]`).join("、") || "无"}。
@@ -134,28 +145,41 @@ ${project.preview ? "本轮请求附带当前画布预览图（候选栏与面�
 视觉修改指南（请先阅读配置，再用最少的精确修改实现）：
 - 配色：优先沿用现有颜色字段和明暗语义，保证普通/高亮/禁用状态有足够对比度；不要凭空创建新的配置节。
 - 字体：只调整已有 FONT_NAME、FONT_SIZE、NM_COLOR、HL_COLOR 等字段，保持按键动作、数量和几何不变。
-- 质感：通过已有背景样式、边框、圆角、阴影或样式引用统一风格；除非用户明确要求，不要替换资源文件。
-- 图片资源：画布预览已经提供现有图片的实际视觉结果；不能创建或替换二进制图片时，不要因此拒绝整轮设计，先用已有样式、颜色、字体和引用完成可行调整，并明确说明未改动图片资源。
+- 质感：通过已有背景样式、边框、圆角、阴影或样式引用统一风格。
+- 图片资源：${imageGuide(project, canGenerate)}
 - 布局：用户说“保留布局”时禁止修改位置、尺寸、间距、按键数量、动作和配置节结构；只改视觉属性。
-- 范围：默认只修改当前打开面板；用户说“整个皮肤/全局/所有面板”时才检查全部相关配置。
+- 范围：默认只修改当前打开面板及其引用的样式；用户说“整个皮肤/全局/所有面板”时才检查全部相关配置。
+- 不要因为某个字段不在当前布局文件里就放弃：先按下面的格式技能追踪样式引用，到样式表中找到真正的来源。
 - 验证：每次写入前必须 read_project_file；修改完成后复读关键片段并在总结中说明影响范围。
+
+${aiSkinSkill(project.format)}
 
 可用修复接口：
 1. read_project_file：分页读取一个已授权配置文件。修改前必须先读取目标片段。
-2. set_ini_value：在已有 INI 配置节中新增配置键，或修改已有键。适用于 BDI/BDS 的 .ini/.css 配置。
-3. remove_ini_value：删除已有 INI 配置键。只有用户需求明确要求删除时才使用。
-4. replace_project_text：在 BDA JSON 中做唯一、精确的小片段替换；必须提供预期出现次数。不要用它重写整个文件。
-
+2. read_ini_sections：按配置节名直接读取 INI/CSS 中的若干节，适合在大样式表中定位 [STYLEN]。读取后即可修改该文件。
+3. set_ini_value：在已有 INI 配置节中新增配置键，或修改已有键。适用于 BDI/BDS 的 .ini/.css 配置。
+4. remove_ini_value：删除已有 INI 配置键。只有用户需求明确要求删除时才使用。
+5. replace_project_text：在 BDA JSON 中做唯一、精确的小片段替换；必须提供预期出现次数。不要用它重写整个文件。
+${project.images?.length ? `6. view_image：查看一张已授权 PNG 或其中一个切片，返回尺寸、切片列表、平均色和缩略图。
+7. recolor_image：把整张图或某个切片重新着色为目标颜色，保留明暗、光泽和透明度；默认不改灰白黑像素（如白色图标）。
+${canGenerate ? "8. generate_image：用图片生成模型按描述画一张新图，填入整张图或某个切片；默认按原切片的透明轮廓裁剪，保持按键形状。\n" : ""}` : ""}
 安全要求：
-- 不存在创建或删除文件、图片、二进制资源、配置节以及执行 shell 的接口，不要尝试这些操作。
+- 不存在创建或删除文件、新建图片文件、配置节以及执行 shell 的接口，不要尝试这些操作；已有图片只能通过图片工具修改像素。
 - 只能使用上面已授权的相对路径，禁止绝对路径和 ..。
 - 保持当前按键布局时，不得改几何、按键数量、动作或配置节结构。
 - 优先修改少量颜色、字号、字体、样式引用和已有属性；保留未知字段及现有命名。
 - 工具修改只进入草稿，编辑器会在结束后统一校验并作为一次可撤销操作提交。
-- 完成后用简短中文总结修改了哪些文件和视觉效果；如果无法安全完成，说明原因且不要做近似破坏性修改。`
+- 如果无法安全完成，说明原因且不要做近似破坏性修改。
+- 需求中工具做不到的部分（例如按键动画、未配置生图模型时的新图案）用一句话说明，然后直接完成可行部分，不要反复权衡。
+- 用户要求整体换风格时，改动共享的样式或图片切片是预期行为，在总结中点明影响即可，不必为此犹豫。
+
+最终回复（给普通用户看）：
+- 用 1–3 句简短中文说明看得到的效果，例如“回车键已改为橙色，按下态同步调整”。
+- 只有当修改会影响其他按键或面板时，用一句话点明。
+- 不要列出文件路径、配置节、字段名、工具步骤、思考过程，不要写“说明与限制”之类的标题或长列表；编辑器会单独展示草稿明细。`
 }
 
-function toolsFor(workspace: AiSkinWorkspace): AgentTool[] {
+function toolsFor(workspace: AiSkinWorkspace, images: AiSkinImages, imageModel?: AiDesignConfiguration): AgentTool[] {
   const readFileSchema = Type.Object({
     path: Type.String({ description: "系统提示中已授权的项目相对路径" }),
     offset: Type.Optional(Type.Integer({ minimum: 0 })),
@@ -169,6 +193,21 @@ function toolsFor(workspace: AiSkinWorkspace): AgentTool[] {
     executionMode: "sequential",
     execute: async (_id, { path, offset, limit }) => {
       return jsonResult(workspace.readFile(path, offset, limit))
+    },
+  }
+
+  const readIniSectionsSchema = Type.Object({
+    path: Type.String({ description: "已授权的 INI/CSS 配置路径" }),
+    sections: Type.Array(Type.String(), { minItems: 1, maxItems: 40, description: "配置节名称，例如 STYLE72" }),
+  })
+  const readIniSections: AgentTool<typeof readIniSectionsSchema> = {
+    name: "read_ini_sections",
+    label: "读取配置节",
+    description: "按名称读取 INI/CSS 配置节的全部键值，返回不存在的节名列表。",
+    parameters: readIniSectionsSchema,
+    executionMode: "sequential",
+    execute: async (_id, { path, sections }) => {
+      return jsonResult({ path, ...workspace.readIniSections(path, sections) })
     },
   }
 
@@ -227,16 +266,129 @@ function toolsFor(workspace: AiSkinWorkspace): AgentTool[] {
     },
   }
 
-  return [readFile, setIniValue, removeIniValue, replaceProjectText]
+  const tools: AgentTool[] = [readFile, readIniSections, setIniValue, removeIniValue, replaceProjectText]
+  if (!images.paths().length) return tools
+
+  const imagePath = Type.String({ description: "已授权的 PNG 路径" })
+  const slice = Type.Optional(Type.Integer({ minimum: 0, description: "切片序号（.til 中 IMGn 的 n）；省略表示整张图" }))
+  const viewImageSchema = Type.Object({ path: imagePath, slice })
+  const viewImage: AgentTool<typeof viewImageSchema> = {
+    name: "view_image",
+    label: "查看图片",
+    description: "查看 PNG 或其中一个切片：返回尺寸、切片列表、平均色和缩略图。",
+    parameters: viewImageSchema,
+    executionMode: "sequential",
+    execute: async (_id, { path, slice }) => {
+      const { info, png } = await images.view(path, slice)
+      return { content: [{ type: "text" as const, text: JSON.stringify(info) }, { type: "image" as const, data: png, mimeType: "image/png" }], details: info }
+    },
+  }
+
+  const recolorImageSchema = Type.Object({
+    path: imagePath,
+    slice,
+    color: Type.String({ description: "目标颜色 RRGGBB" }),
+    preserveNeutral: Type.Optional(Type.Boolean({ description: "默认 true：保留灰、白、黑像素（图标、文字、阴影）" })),
+  })
+  const recolorImage: AgentTool<typeof recolorImageSchema> = {
+    name: "recolor_image",
+    label: "图片改色",
+    description: "把整张 PNG 或一个切片改成目标颜色，保留明暗、光泽和透明度。",
+    parameters: recolorImageSchema,
+    executionMode: "sequential",
+    execute: async (_id, { path, slice, color, preserveNeutral }) => {
+      const pixels = await images.recolor(path, color, slice, preserveNeutral ?? true)
+      return jsonResult({ path, slice, color, recoloredPixels: pixels, note: pixels ? undefined : "没有可着色的彩色像素；如需改灰白图请设 preserveNeutral=false" })
+    },
+  }
+  if (!imageModel) return [...tools, viewImage, recolorImage]
+
+  const generateImageSchema = Type.Object({
+    path: imagePath,
+    slice,
+    prompt: Type.String({ minLength: 1, maxLength: 2_000, description: "画面描述（英文效果更好），说明主体、配色、质感，以及纯色或透明背景" }),
+    keepShape: Type.Optional(Type.Boolean({ description: "默认 true：按原图透明轮廓裁剪（保持圆角按键形状）" })),
+  })
+  const generateImage: AgentTool<typeof generateImageSchema> = {
+    name: "generate_image",
+    label: "生成图片",
+    description: "调用图片生成模型绘制新图，缩放填入整张 PNG 或一个切片。",
+    parameters: generateImageSchema,
+    executionMode: "sequential",
+    execute: async (_id, { path, slice, prompt, keepShape }, signal) => {
+      const reference = imageModel.protocol === "google" ? (await images.view(path, slice)).png : undefined
+      const picture = await requestImage(imageModel, prompt, reference, signal)
+      await images.paint(path, picture, slice, keepShape ?? true)
+      return jsonResult({ path, slice, painted: true })
+    },
+  }
+  return [...tools, viewImage, recolorImage, generateImage]
+}
+
+function decodeBase64(data: string): Uint8Array {
+  return Uint8Array.from(atob(data), (char) => char.charCodeAt(0))
+}
+
+async function responseJson(response: Response): Promise<any> {
+  const text = await response.text()
+  if (!response.ok) throw new Error(`图片模型返回 ${response.status}：${text.slice(0, 300)}`)
+  return JSON.parse(text)
+}
+
+/** Calls an OpenAI-compatible images endpoint or Gemini generateContent; runs under nativeModelFetch. */
+async function requestImage(config: AiDesignConfiguration, prompt: string, reference: string | undefined, signal?: AbortSignal): Promise<Uint8Array> {
+  const base = normalizedUrl(config.apiUrl)
+  if (config.provider === "minimax-image") {
+    const body = await responseJson(await fetch(`${base}/image_generation`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${config.apiKey.trim()}` },
+      body: JSON.stringify({ model: config.model.trim(), prompt, aspect_ratio: "1:1", response_format: "base64", n: 1 }),
+      signal,
+    }))
+    if (body?.base_resp?.status_code) throw new Error(`图片模型返回错误：${body.base_resp.status_msg ?? body.base_resp.status_code}`)
+    const data = body?.data?.image_base64?.[0]
+    if (typeof data !== "string") throw new Error("图片模型没有返回图片")
+    return decodeBase64(data)
+  }
+  if (config.protocol === "google") {
+    const parts: unknown[] = [{ text: prompt }]
+    if (reference) parts.push({ inlineData: { mimeType: "image/png", data: reference } })
+    const body = await responseJson(await fetch(`${base}/models/${encodeURIComponent(config.model.trim())}:generateContent`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-goog-api-key": config.apiKey.trim() },
+      body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { responseModalities: ["TEXT", "IMAGE"] } }),
+      signal,
+    }))
+    const data = body?.candidates?.[0]?.content?.parts?.find((part: any) => part?.inlineData?.data)?.inlineData?.data
+    if (typeof data !== "string") throw new Error("图片模型没有返回图片")
+    return decodeBase64(data)
+  }
+  const model = config.model.trim()
+  const body = await responseJson(await fetch(`${base}/images/generations`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${config.apiKey.trim()}` },
+    // gpt-image models always return base64 and reject response_format.
+    body: JSON.stringify({ model, prompt, n: 1, size: "1024x1024", ...(/gpt-image/i.test(model) ? {} : { response_format: "b64_json" }) }),
+    signal,
+  }))
+  const item = body?.data?.[0]
+  if (typeof item?.b64_json === "string") return decodeBase64(item.b64_json)
+  // The native proxy only reaches saved API hosts, so CDN links (e.g. CogView) cannot be downloaded.
+  if (typeof item?.url === "string") throw new Error("该图片模型只返回图片链接，暂不支持；请换用能返回 b64_json 的模型")
+  throw new Error("图片模型没有返回图片")
 }
 
 const TOOL_LABELS: Record<string, string> = {
   read_project_file: "读取当前面板配置",
+  read_ini_sections: "读取样式配置节",
   set_ini_value: "写入 INI 样式草稿",
   remove_ini_value: "写入删除属性草稿",
   replace_project_text: "写入 BDA 精确替换草稿",
+  view_image: "查看图片",
+  recolor_image: "图片改色草稿",
+  generate_image: "生成图片草稿",
 }
-const EDIT_TOOLS = new Set(["set_ini_value", "remove_ini_value", "replace_project_text"])
+const EDIT_TOOLS = new Set(["set_ini_value", "remove_ini_value", "replace_project_text", "recolor_image", "generate_image"])
 
 function eventStatus(event: AgentEvent): { kind: StatusKind; text: string } | undefined {
   if (event.type === "agent_start") return { kind: "thinking", text: "AI 正在分析当前皮肤…" }
@@ -255,7 +407,9 @@ function eventStatus(event: AgentEvent): { kind: StatusKind; text: string } | un
 function finalResponse(agent: Agent): string {
   const message = [...agent.state.messages].reverse().find((entry) => entry.role === "assistant")
   if (!message || message.role !== "assistant") return ""
-  return message.content.flatMap((content) => content.type === "text" ? [content.text] : []).join("\n").trim()
+  const text = message.content.flatMap((content) => content.type === "text" ? [content.text] : []).join("\n").trim()
+  if (text || message.stopReason !== "length") return text
+  return "模型输出达到长度上限（多半是思考过长），本轮没有完成修改。请调低思考强度或拆小需求后重试。"
 }
 
 function recentConversation(messages: readonly AgentMessage[]): AgentMessage[] {
@@ -295,14 +449,15 @@ async function nativeModelFetch(input: RequestInfo | URL, init: RequestInit = {}
       if (finished) return
       if (event.type === "headers") {
         resolve(new Response([204, 205, 304].includes(event.status) ? null : body, { status: event.status, headers: event.headers }))
-      } else stream.enqueue(new Uint8Array(event.body))
+      } else if (event.type === "chunk") stream.enqueue(new Uint8Array(event.body))
+      else finish()
     }
     signal?.addEventListener("abort", abort, { once: true })
     if (signal?.aborted) { abort(); return }
     void invoke("model_http_request", {
       request: { url, method: init.method ?? (input instanceof Request ? input.method : "POST"), headers: [...headers], body: init.body ?? null },
       events,
-    }).then(() => finish(), (error) => finish(new Error(String(error))))
+    }).catch((error) => finish(new Error(String(error))))
   })
 }
 
@@ -313,6 +468,9 @@ export async function runAiSkinDesign(
   options: {
     history?: readonly AgentMessage[]
     variantCount?: number
+    thinkingLevel?: ThinkingLevel
+    /** Saved image-generation model; without it the AI can only view and recolour images. */
+    imageModel?: AiDesignConfiguration
     signal?: AbortSignal
     onStatus?: (kind: StatusKind, text: string) => void
     onTextDelta?: (delta: string) => void | Promise<void>
@@ -348,7 +506,8 @@ export async function runAiSkinDesign(
   }
 
   const workspace = new AiSkinWorkspace(project.files)
-  const model = configuredModel(config)
+  const thinkingLevel = options.thinkingLevel ?? "off"
+  const model = configuredModel(config, thinkingLevel)
   const api = apiStreams(config.protocol)
   const models = createModels()
   models.setProvider(createProvider({
@@ -360,15 +519,15 @@ export async function runAiSkinDesign(
     api,
   }))
 
-  const tools = toolsFor(workspace)
+  const imageAssets = new AiSkinImages(project.images ?? [])
+  const tools = toolsFor(workspace, imageAssets, options.imageModel)
   const allowedTools = new Set(tools.map((tool) => tool.name))
   let toolCalls = 0
-  let turns = 0
   const agent = new Agent({
     initialState: {
-      systemPrompt: systemPrompt(project),
+      systemPrompt: systemPrompt(project, Boolean(options.imageModel)),
       model,
-      thinkingLevel: "off",
+      thinkingLevel,
       tools,
       messages: [...(options.history ?? [])],
     },
@@ -378,12 +537,7 @@ export async function runAiSkinDesign(
     beforeToolCall: async ({ toolCall }) => {
       toolCalls += 1
       if (!allowedTools.has(toolCall.name)) return { block: true, reason: "该工具未获皮肤编辑器授权", terminate: true }
-      if (toolCalls > MAX_TOOL_CALLS) return { block: true, reason: "已达到本轮工具调用上限", terminate: true }
       return undefined
-    },
-    shouldStopAfterTurn: async () => {
-      turns += 1
-      return turns >= MAX_TURNS
     },
     maxRetryDelayMs: 10_000,
   })
@@ -411,7 +565,7 @@ export async function runAiSkinDesign(
     if (options.signal?.aborted) throw new DOMException("AI 设计已取消", "AbortError")
     if (agent.state.errorMessage) throw new Error(agent.state.errorMessage)
     return {
-      changes: workspace.changes(),
+      changes: [...workspace.changes(), ...imageAssets.changes()],
       response: finalResponse(agent),
       toolCalls,
       conversation: recentConversation(agent.state.messages),

@@ -7,8 +7,11 @@ import { readFileSync } from 'node:fs'
 const source = readFileSync(new URL('../src/ai-chat.ts', import.meta.url), 'utf8')
   .replace(/^import .*$/gm, '').replace('export async function connectAiChat', 'async function connectAiChat')
 const code = ts.transpile(source, { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None })
+const frames = []
+const runFrames = () => frames.splice(0).forEach(callback => callback())
 async function setup(run) {
   const context = vm.createContext({
+    requestAnimationFrame: callback => frames.push(callback), cancelAnimationFrame: () => {},
     exports: {}, AbortController, DOMException,
     customElements: { whenDefined: async () => {} },
     getComputedStyle: () => ({ getPropertyValue: () => '' }),
@@ -74,9 +77,13 @@ test('thinking updates preserve expanded state and render untrusted text literal
   s.chat.shadowRoot = { querySelector: sel => (sel === '#messages' ? messages : sel === '#ai-run-1' ? section : null) }
   s.chat.connect.handler({ messages: [{ text: 'hello' }] }, s.signals)
   await hooks.onThinking('First')
+  runFrames()
   assert.equal(think.hidden, false)
   think.open = true
+  await hooks.onThinking('First <script>')
   await hooks.onThinking('First <script>alert(1)</script>')
+  assert.equal(frames.length, 1, 'token bursts coalesce into one repaint')
+  runFrames()
   assert.equal(think.open, true)
   assert.equal(thinkText.textContent, 'First <script>alert(1)</script>')
   finish({ fallback: 'Answer' })

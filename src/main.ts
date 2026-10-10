@@ -147,6 +147,7 @@ import { adaptIos26KeyboardLayout, adaptIos26Variant } from "./ios26.ts"
 import { findTextMatches, iniSectionAtOffset, iniSectionRanges, insertedTextRange, jsonPropertyAtOffset, jsonPropertyRanges, replaceTextMatches } from "./highlight.ts"
 import type { Change } from "./history.ts"
 import { createGestureHistory } from "./gesture-history"
+import type { AiSkinImageFile } from "./ai-skin-images.ts"
 import type { AiSkinDraftChange, AiSkinEditableFile } from "./ai-skin-workspace.ts"
 import { releaseImagePreviewURL, replaceImagePreviewURL } from "./image-preview.ts"
 import {
@@ -182,7 +183,8 @@ import {
   type LayoutRect,
 } from "./layout.ts"
 import { mixedCoordinateDelta, shouldClearMixedInput } from "./mixed-input.ts"
-import { initializeModelSettings, modelConfigurationKey, type ModelConfiguration } from "./model-settings.ts"
+import { groupModelConfigurations, initializeModelSettings, modelConfigurationKey, modelHost, type ModelConfiguration } from "./model-settings.ts"
+import { modelProviderPreset } from "./model-providers.ts"
 import { installNumberInputWheel, numberInputGesture, flushNumberInputWheel, deferNumberInputRefresh } from "./number-input-wheel.ts"
 import { loadBuiltInProjectTemplate, operationError } from "./operations.ts"
 import {
@@ -529,6 +531,10 @@ const aiDesignPanel = $("#ai-design-panel")
 const aiDesignStatus = $("#ai-design-status")
 const aiDesignChat = $("#ai-design-chat")
 const aiDesignModel = $("#ai-design-model") as HTMLSelectElement
+const aiDesignThinking = $("#ai-design-thinking") as HTMLSelectElement
+aiDesignThinking.value = localStorage.getItem("ai-thinking-level") || "off"
+if (!aiDesignThinking.value) aiDesignThinking.value = "off"
+aiDesignThinking.addEventListener("change", () => localStorage.setItem("ai-thinking-level", aiDesignThinking.value))
 const aiContextKey = $("#ai-context-key")
 const aiContextPreview = $("#ai-context-preview")
 const aiDraftPanel = $("#ai-draft-panel") as HTMLElement
@@ -728,8 +734,11 @@ type AiDraftVariant = {
   response: string
 }
 let aiDesignDraft: AiDraft | undefined
+/** Draft changes written into the archive so the canvas shows them; kept out of undo history until accepted. */
+let aiDraftPreview: { target: SkinArchive; changes: Change[] } | undefined
 let aiDesignBusy = false
 let savedModels: ModelConfiguration[] = []
+let savedImageModel: ModelConfiguration | undefined
 // ponytail: keep three exchanges in memory; persist sessions only if cross-restart chat is needed.
 let aiDesignConversation: AiDesignConversation = []
 let aiChatController: AiChatController | undefined
@@ -2072,6 +2081,7 @@ function sourceArchiveFromFiles(files: Array<{ path: string; data: Uint8Array }>
 }
 
 async function flushSourceAutosave(): Promise<void> {
+  if (aiDraftPreview) discardAiDesignDraft("保存源码前已丢弃未应用的 AI 草稿。")
   if (sourceAutosaveTimer !== undefined) {
     clearTimeout(sourceAutosaveTimer)
     sourceAutosaveTimer = undefined
@@ -2101,6 +2111,11 @@ function scheduleSourceAutosave(paths: string[]): void {
   for (const path of paths) pendingSourcePaths.add(sourcePathForWorkspace(archive.sourcePath(path)))
   if (!sourceWorkspacePath || sourceAutosaveTimer !== undefined) return
   sourceAutosaveTimer = window.setTimeout(() => {
+    // Never write a previewed draft to disk; retry once the draft is resolved.
+    if (aiDraftPreview) {
+      sourceAutosaveTimer = undefined
+      return scheduleSourceAutosave([])
+    }
     void flushSourceAutosave().catch((error) => showError(error, "自动保存源码"))
   }, 3 * 60_000)
 }
@@ -2118,6 +2133,9 @@ async function refreshExternalSourceFiles(workspace: string, paths: string[]): P
     const data = change.data ? new Uint8Array(change.data) : null
     return consumeSourceWriteSnapshot(sourceWriteSnapshots, sourceWriteKey(change.path), data)
   }))
+  if (aiDraftPreview && changes.some((change) => !ignoredChanges.has(change))) {
+    discardAiDesignDraft("源码文件在外部被修改，AI 草稿已丢弃。")
+  }
   const directorySnapshots = changes.filter((change) => change.directory && !ignoredChanges.has(change))
   const presentPaths = new Set(changes.filter((change) => !change.directory && change.data).map((change) => sourcePathForArchive(change.path)))
   for (const snapshot of directorySnapshots) {
@@ -2278,6 +2296,7 @@ function updateHistoryButtons(): void {
 
 function commitText(path: string, before: string, after: string, coalesce = false): void {
   if (!archive || before === after) return
+  acceptAiDraftPreview()
   sourceHistoryHighlight = undefined
   archive.setText(path, after)
   recordChange(undoStack, { kind: "text", path, before, after }, numberInputGesture(), coalesce)
@@ -2288,6 +2307,7 @@ function commitText(path: string, before: string, after: string, coalesce = fals
 
 function commitBytes(path: string, before: Uint8Array | undefined, after: Uint8Array): void {
   if (!archive || before && before.length === after.length && before.every((byte, index) => byte === after[index])) return
+  acceptAiDraftPreview()
   archive.setBytes(path, after)
   recordChange(undoStack, { kind: "bytes", path, before, after }, numberInputGesture())
   redoStack = []
@@ -2297,6 +2317,7 @@ function commitBytes(path: string, before: Uint8Array | undefined, after: Uint8A
 
 function commitBatch(changes: Change[]): void {
   if (!archive || !changes.length) return
+  acceptAiDraftPreview()
   for (const change of changes) {
     if (change.kind === "text") archive.setText(change.path, change.after)
     else if (change.kind === "bytes") {
@@ -2354,6 +2375,7 @@ function refreshHistorySelection(): void {
 
 function undo(): void {
   flushNumberInputWheel()
+  if (aiDraftPreview) return discardAiDesignDraft("已撤销 AI 草稿预览 · 未修改皮肤。")
   const change = undoStack.pop()
   if (!change) return
   sourceHistoryHighlight = undefined
@@ -2364,6 +2386,7 @@ function undo(): void {
 
 function redo(): void {
   flushNumberInputWheel()
+  if (aiDraftPreview) discardAiDesignDraft("AI 草稿预览已丢弃。")
   const change = redoStack.pop()
   if (!change) return
   sourceHistoryHighlight = undefined
@@ -9010,6 +9033,7 @@ async function exportArchive(format: ExportFormat, targetBdaPlatform?: Exclude<B
   warnings: string[]
 } | undefined> {
   if (!archive) throw new Error("当前没有可保存的皮肤")
+  if (aiDraftPreview) throw new Error("请先应用或丢弃 AI 修改草稿")
   updateFileOperationProgress(22, `正在生成 ${format.toUpperCase()} 皮肤包…`)
   if (archive.format === "bda" && format === "bda" && targetBdaPlatform) {
     const result = convertBdaPlatform(archive, targetBdaPlatform)
@@ -9760,8 +9784,10 @@ function aiEditableProjectFiles(target: SkinArchive, scope: "panel" | "project" 
   const panelConfig = target.format === "bda"
     ? bdaConfigPath(target, theme.value, orientation.value, "appearance")
     : layoutPath || selectedPath || preferredPath()
+  // 面板范围同时授权它引用的全局配置与样式表：按键文字、字体、颜色都定义在样式表里。
+  const panelFiles = new Set([panelConfig, ...target.format === "bda" ? [] : [genConfigPath(), styleConfigPath()]])
   return target.names().flatMap((path) => {
-    if (scope === "panel" && path !== panelConfig) return []
+    if (scope === "panel" && !panelFiles.has(path)) return []
     if (target.format === "bda") {
       if (!target.isBdaConfig(path) || !bdaDecodedSourceEditable(path)) return []
       const bytes = target.getBytes(path)
@@ -9774,6 +9800,17 @@ function aiEditableProjectFiles(target: SkinArchive, scope: "panel" | "project" 
     }
     if (!target.isText(path) || !/\.(?:ini|css|json)$/i.test(path)) return []
     return [{ path, syntax: /\.json$/i.test(path) ? "json" as const : "ini" as const, text: target.getText(path) }]
+  })
+}
+
+/** PNGs beside the panel's style sheet (or every PNG for project scope), with their .til slices. */
+function aiEditableProjectImages(target: SkinArchive, scope: "panel" | "project" = "project"): AiSkinImageFile[] {
+  if (target.format === "bda") return []
+  const folders = [styleConfigPath().replace(/[^/]*$/, ""), `${theme.value}/skin/res/`]
+  return target.names().flatMap((path) => {
+    if (!target.isImage(path) || scope === "panel" && !folders.some((folder) => path.startsWith(folder) && !path.slice(folder.length).includes("/"))) return []
+    const tilPath = path.replace(/\.png$/i, ".til")
+    return [{ path, bytes: target.getBytes(path)!, tiles: target.isText(tilPath) ? target.getText(tilPath) : undefined }]
   })
 }
 
@@ -9840,10 +9877,17 @@ function syncAiDesignContext(): void {
 
 function validatedAiChanges(target: SkinArchive, drafts: readonly AiSkinDraftChange[]): Change[] {
   const allowed = new Map(aiEditableProjectFiles(target).map((file) => [file.path, file]))
+  const images = new Set(aiEditableProjectImages(target).map((image) => image.path))
   const seen = new Set<string>()
   return drafts.flatMap<Change>((draft): Change[] => {
     if (seen.has(draft.path)) throw new Error(`AI 返回了重复修改：${draft.path}`)
     seen.add(draft.path)
+    if (draft.syntax === "png") {
+      if (!images.has(draft.path)) throw new Error(`AI 修改了未授权图片：${draft.path}`)
+      const before = target.getBytes(draft.path)!
+      if (!sameBytes(before, draft.before)) throw new Error(`AI 运行期间图片已变化：${draft.path}`)
+      return [{ kind: "bytes" as const, path: draft.path, before: before.slice(), after: draft.after.slice() }]
+    }
     const editable = allowed.get(draft.path)
     if (!editable || editable.syntax !== draft.syntax) throw new Error(`AI 修改了未授权文件：${draft.path}`)
     if (editable.text !== draft.before) throw new Error(`AI 运行期间文件已变化：${draft.path}`)
@@ -9856,6 +9900,10 @@ function validatedAiChanges(target: SkinArchive, drafts: readonly AiSkinDraftCha
     const after = applyDecodedBdaSource(draft.path, before, draft.after)
     return [{ kind: "bytes" as const, path: draft.path, before: before.slice(), after }]
   })
+}
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+  return left.length === right.length && left.every((byte, index) => byte === right[index])
 }
 
 function aiDesignErrorMessage(error: unknown): string {
@@ -9923,11 +9971,14 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
       selectedKey: aiSelectedKeyContext(),
       preview: aiPreviewImage(),
       files: aiEditableProjectFiles(target, panelScope),
+      images: aiEditableProjectImages(target, panelScope),
     }
     const { runAiSkinDesign } = await import("./ai-design.ts")
     const result = await runAiSkinDesign(configuration, project, prompt, {
+      imageModel: savedImageModel,
       history: aiDesignConversation,
       variantCount: aiWantsVariants(prompt) ? 3 : 1,
+      thinkingLevel: aiDesignThinking.value as "off" | "low" | "medium" | "high",
       signal: hooks.signal,
       onStatus: async (kind, text) => {
         if (hooks.signal.aborted || archive !== target) return
@@ -9988,12 +10039,13 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
     })
     return {
       fallback: result.response,
-      summary: `已生成 ${changes.length} 个文件的修改草稿。请在下方审阅；确认前不会写入皮肤。`,
+      summary: `已生成 ${changes.length} 个文件的草稿，审阅后应用。`,
     }
   } catch (error) {
     if (archive === target) {
       aiDesignPanel.dataset.state = hooks.signal.aborted ? "stopped" : "error"
-      aiDesignStatus.textContent = hooks.signal.aborted ? "已停止 · 未应用任何修改" : aiDesignErrorMessage(error)
+      // The conversation already shows the error; repeating it above reads as a second failure.
+      aiDesignStatus.textContent = hooks.signal.aborted ? "已停止 · 未应用任何修改" : ""
     }
     if (hooks.signal.aborted) throw error
     throw new Error(aiDesignErrorMessage(error))
@@ -10010,6 +10062,7 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
 function aiDraftSections(changes: readonly AiSkinDraftChange[]): string[] {
   const sections = new Set<string>()
   for (const change of changes) {
+    if (change.syntax === "png") continue
     if (change.syntax === "json") {
       for (const key of changedJsonSections(change.before, change.after)) sections.add(key)
       continue
@@ -10068,6 +10121,7 @@ function chooseAiVariant(id: string): void {
 }
 
 function setAiDesignDraft(draft: AiDraft | undefined): void {
+  revertAiDraftPreview()
   aiDesignDraft = draft
   aiDraftPanel.hidden = !draft
   // The draft card takes the composer's place until it is applied or discarded.
@@ -10090,6 +10144,71 @@ function setAiDesignDraft(draft: AiDraft | undefined): void {
   aiDraftSummary.textContent = `涉及 ${draft.changes.length} 个文件` +
     (draft.sections.length ? ` · ${draft.sections.length} 个配置块` : "")
   aiDraftFiles.replaceChildren(...draft.drafts.map(createDraftReview))
+  previewAiDraft(draft)
+}
+
+function writeAiDraftChanges(target: SkinArchive, changes: readonly Change[], side: "before" | "after"): void {
+  for (const change of side === "before" ? [...changes].reverse() : changes) {
+    if (change.kind === "text") target.setText(change.path, change[side])
+    else if (change.kind === "bytes") {
+      const bytes = change[side]
+      if (bytes) target.setBytes(change.path, bytes)
+      else target.delete(change.path)
+    }
+  }
+}
+
+/** Shows a draft on the canvas by writing it into the archive without recording history. */
+function previewAiDraft(draft: AiDraft): void {
+  if (archive !== draft.target) return
+  try {
+    source.commit()
+    // Revalidate before writing: never overwrite edits made since generation.
+    draft.changes = validatedAiChanges(draft.target, draft.drafts)
+  } catch (error) {
+    aiDesignStatus.textContent = `${aiDesignErrorMessage(error)}。无法在画布预览，请丢弃后重新生成。`
+    return
+  }
+  writeAiDraftChanges(draft.target, draft.changes, "after")
+  aiDraftPreview = { target: draft.target, changes: draft.changes }
+  refreshAfterAiDraft(draft.target)
+}
+
+function revertAiDraftPreview(): void {
+  const current = aiDraftPreview
+  if (!current) return
+  aiDraftPreview = undefined
+  writeAiDraftChanges(current.target, current.changes, "before")
+  if (archive === current.target) refreshAfterAiDraft(current.target)
+}
+
+/** Turns the previewed draft into a normal undoable edit; the archive already holds its content. */
+function acceptAiDraftPreview(): void {
+  const current = aiDraftPreview
+  if (!current) return
+  aiDraftPreview = undefined
+  commitBatch(current.changes)
+  if (aiDesignDraft) aiDesignConversation = aiDesignDraft.conversation
+  setAiDesignDraft(undefined)
+  aiDesignPanel.dataset.state = "done"
+  aiDesignStatus.textContent = `已应用 ${current.changes.length} 个文件的修改，可使用撤销恢复。`
+}
+
+function discardAiDesignDraft(message: string): void {
+  if (!aiDesignDraft) return
+  setAiDesignDraft(undefined)
+  aiDesignPanel.dataset.state = "idle"
+  aiDesignStatus.textContent = message
+}
+
+function refreshAfterAiDraft(target: SkinArchive): void {
+  if (target.format === "bda") refreshBdaLayout(layoutPath)
+  else if (target.isText(layoutPath)) layoutDocument = IniDocument.parse(target.getText(layoutPath))
+  renderFiles()
+  if (selectedPath && target.getBytes(selectedPath)) selectFile(selectedPath, sidebarView, "document", true)
+  refreshPreview()
+  populateKeyInspector()
+  updateDirty()
 }
 
 function applyAiDesignDraft(): void {
@@ -10108,27 +10227,14 @@ function applyAiDesignDraft(): void {
     aiDesignStatus.textContent = "请先选择一个设计方案。"
     return
   }
-  try {
-    source.commit()
-    // Revalidate at acceptance, not only at generation: never overwrite manual edits.
-    const changes = validatedAiChanges(draft.target, draft.drafts)
-    commitBatch(changes)
-  } catch (error) {
+  if (!aiDraftPreview) {
     aiDesignPanel.dataset.state = "error"
-    aiDesignStatus.textContent = `${aiDesignErrorMessage(error)}。草稿已保留，请丢弃后重新生成。`
+    aiDesignStatus.textContent = "草稿无法在画布预览，请丢弃后重新生成。"
     return
   }
-  aiDesignConversation = draft.conversation
-  setAiDesignDraft(undefined)
-  aiDesignPanel.dataset.state = "done"
-  const target = draft.target
-  if (target.format === "bda") refreshBdaLayout(layoutPath)
-  renderFiles()
-  if (selectedPath && target.getBytes(selectedPath)) selectFile(selectedPath, sidebarView, "document", true)
-  refreshPreview()
-  populateKeyInspector()
-  updateDirty()
-  aiDesignStatus.textContent = `已应用 ${draft.changes.length} 个配置文件的修改，可使用撤销恢复。`
+  // A pending source edit is committed first and accepts the preview on its own.
+  source.commit()
+  acceptAiDraftPreview()
 }
 
 function ensureAiChat(): Promise<AiChatController> {
@@ -10144,6 +10250,7 @@ function ensureAiChat(): Promise<AiChatController> {
 
 function syncAiDesignControls(): void {
   aiDesignModel.disabled = aiDesignBusy || savedModels.length === 0
+  aiDesignThinking.disabled = aiDesignModel.disabled
   aiNewSession.disabled = aiDesignBusy || Boolean(aiDesignDraft)
   // A pending draft must be applied or discarded first; deep-chat keeps its stop
   // button during a run, so only the idle submit state is affected.
@@ -10163,10 +10270,7 @@ aiNewSession.addEventListener("click", () => {
 })
 aiDraftApply.addEventListener("click", () => applyAiDesignDraft())
 aiDraftCancel.addEventListener("click", () => {
-  if (!aiDesignDraft) return
-  setAiDesignDraft(undefined)
-  aiDesignPanel.dataset.state = "idle"
-  aiDesignStatus.textContent = "草稿已丢弃 · 本轮未修改皮肤，可调整要求后重试。"
+  discardAiDesignDraft("草稿已丢弃 · 本轮未修改皮肤，可调整要求后重试。")
 })
 
 function setSourceDirectoryState(path: string, custom: boolean, error = ""): void {
@@ -10227,15 +10331,29 @@ async function initializeSourceDirectory(): Promise<void> {
   await applySourceDirectory(configured)
 }
 
-function syncModelProfiles(models: ModelConfiguration[]): void {
+function syncModelProfiles(all: ModelConfiguration[]): void {
   const selected = savedModels[Number(aiDesignModel.value)]
+  const models = all.filter((model) => model.kind !== "image")
+  savedImageModel = all.find((model) => model.kind === "image")
   savedModels = models
-  aiDesignModel.replaceChildren(...models.map((configuration, index) => new Option(configuration.model, String(index))))
+  // One optgroup per provider account; option values stay indexes into the flat saved list.
+  const groups = groupModelConfigurations(models)
+  const labels = groups.map((group) => modelProviderPreset(group.provider).label)
+  aiDesignModel.replaceChildren(...groups.map((group, index) => {
+    const optgroup = document.createElement("optgroup")
+    optgroup.label = labels.indexOf(labels[index]) === labels.lastIndexOf(labels[index]) ? labels[index] : `${labels[index]} · ${modelHost(group.apiUrl)}`
+    optgroup.append(...group.models.map((model) => {
+      const flat = models.findIndex((item) => item.provider === group.provider && item.apiUrl === group.apiUrl && item.apiKey === group.apiKey && item.model === model)
+      return new Option(model, String(flat))
+    }))
+    return optgroup
+  }))
   if (!models.length) aiDesignModel.replaceChildren(new Option("请先配置模型", ""))
   // Keep the chat on the same model when the list is reordered or shortened.
   const index = selected ? models.findIndex((model) => modelConfigurationKey(model) === modelConfigurationKey(selected)) : -1
   if (models.length) aiDesignModel.value = String(Math.max(index, 0))
   aiDesignModel.hidden = models.length === 0
+  aiDesignThinking.hidden = aiDesignModel.hidden
   aiModelSettings.hidden = models.length > 0
   syncAiDesignControls()
 }
@@ -10467,7 +10585,7 @@ async function initializeWindowMaterial(): Promise<void> {
   windowMaterialOpacitySetting.hidden = windowMaterialKind === "none"
   const storageKey = windowMaterialKind === "acrylic" ? "window-acrylic-opacity" : "window-glass-opacity"
   // 玻璃默认值取 50%：滑杆现在代表填充强度，100% 等同于实心窗口，默认值要留出材质本身。
-  windowMaterialOpacity.value = localStorage.getItem(storageKey) ?? (windowMaterialKind === "acrylic" ? "92" : "50")
+  windowMaterialOpacity.value = localStorage.getItem(storageKey) ?? "87"
   await applyWindowMaterialWithRetry()
 }
 void initializeWindowMaterial().catch((error) => handleWindowMaterialError(error, "读取窗口材质"))

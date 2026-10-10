@@ -6545,6 +6545,15 @@ body:has(.canvas-wrap.empty) .workspace {
   color: #b77708;
 }
 
+:root[data-app-theme="dark"] .token-section { color: #7a9bff; }
+:root[data-app-theme="dark"] .token-key { color: #c792ff; }
+:root[data-app-theme="dark"] .token-operator { color: #a1a8b3; }
+:root[data-app-theme="dark"] .token-action { color: #3dd68c; }
+:root[data-app-theme="dark"] .token-number { color: #f5c445; }
+:root[data-app-theme="dark"] #source .cm-source-value-action { color: #ff9a5c; }
+:root[data-app-theme="dark"] #source .cm-source-value-style { color: #7aa7ff; }
+:root[data-app-theme="dark"] #source .cm-source-value-color { color: #4fd1db; }
+
 .cm-source-selected {
   background: rgb(10 127 245 / 16%);
   box-shadow: inset 3px 0 var(--accent);
@@ -12768,20 +12777,23 @@ dialog[open]::backdrop {
 }
 
 :root:not([data-source-section-scrollbar="false"]) #source [data-section-scrollbar="true"] .cm-scroller {
+  /* Engines ignore ::-webkit-scrollbar once scrollbar-color/width is set, which left a second thumb beside the markers. */
   scrollbar-width: auto;
-  margin-right: 38px;
+  scrollbar-color: auto;
+  margin-right: 24px;
 }
 
 :root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"] > .source-section-scrollbar {
   position: absolute;
   z-index: 5;
-  right: 4px;
+  right: 2px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  width: 30px;
-  max-height: calc(100% - 100px);
+  width: 20px;
+  /* Stay clear of the find button and the find bar below it. */
+  max-height: calc(100% - 2 * (48px + var(--source-find-bar-height, 0px)));
   overflow-y: auto;
   scrollbar-width: none;
   opacity: 0;
@@ -12790,34 +12802,102 @@ dialog[open]::backdrop {
 }
 
 :root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"]:has(.cm-scroller.scrollbar-active) > .source-section-scrollbar,
+:root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"]:hover > .source-section-scrollbar,
+:root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"][data-section-dragging] > .source-section-scrollbar,
+:root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"] > .source-section-scrollbar:hover,
 :root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"] > .source-section-scrollbar:focus-within {
   opacity: 1;
   pointer-events: auto;
 }
 
+.source-section-scrollbar {
+  touch-action: none;
+  cursor: grab;
+}
+
+[data-section-dragging] > .source-section-scrollbar,
+[data-section-dragging] > .source-section-scrollbar > button {
+  cursor: grabbing;
+}
+
+.source-section-label {
+  display: none;
+}
+
+:root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"] > .source-section-label {
+  position: absolute;
+  z-index: 6;
+  right: 28px;
+  display: block;
+  transform: translateY(-50%);
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+:root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"]:has(.cm-scroller.scrollbar-active) > .source-section-label,
+:root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"][data-section-dragging] > .source-section-label {
+  opacity: 1;
+}
+
 .source-section-scrollbar > button {
   flex: 1 0 8px;
   min-height: 8px;
-  width: 30px;
+  width: 20px;
   border: 0;
-  padding: 0 2px;
+  padding: 0 3px;
   background: transparent;
   cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
 }
 
 .source-section-scrollbar > button::before {
   content: "";
-  width: 26px;
-  height: 4px;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--text) 20%, transparent);
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+  transform: scaleX(0.4);
+  transform-origin: right center;
+  transition: width 160ms ease, height 160ms ease, transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), background-color 120ms ease;
+}
+
+/* Grow in when the rail appears, then magnify around the active marker while hovering or dragging. */
+:root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"]:is(:hover, [data-section-dragging], :has(.cm-scroller.scrollbar-active)) > .source-section-scrollbar > button::before {
+  transform: scaleX(1);
+}
+
+.source-section-scrollbar:is(:hover, [data-section-dragging] > *) > button::before {
+  width: 12px;
+}
+
+.source-section-scrollbar:is(:hover, [data-section-dragging] > *) > button:is(:has(+ [aria-current="true"]), [aria-current="true"] + button)::before {
+  width: 15px;
+}
+
+.source-section-scrollbar > button:hover::before {
+  width: 14px;
+  background: color-mix(in srgb, var(--text) 45%, transparent);
 }
 
 .source-section-scrollbar > button[aria-current="true"]::before {
-  width: 16px;
-  background: var(--text);
+  width: 14px;
+  height: 3px;
+  background: var(--accent);
+}
+
+.source-section-scrollbar:is(:hover, [data-section-dragging] > *) > button[aria-current="true"]::before {
+  width: 17px;
+  height: 4px;
 }
 
 .source-section-scrollbar > button:focus-visible {

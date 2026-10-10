@@ -1691,9 +1691,10 @@
   gap: 8px !important;
   padding: 8px 12px !important;
   border: 0 !important;
-  border-bottom: 1px solid var(--pin-line) !important;
-  background: var(--pin-surface) !important;
-  box-shadow: none !important;
+  border-top: 1px solid var(--pin-line) !important;
+  /* The bar floats over the code; --pin-surface turns translucent under window material. */
+  background: #fafbff !important;
+  box-shadow: 0 -6px 16px -10px rgb(18 20 25 / 22%) !important;
 }
 
 :root body .source .source-toolbar .search-control {

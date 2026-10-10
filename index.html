@@ -741,6 +741,7 @@
             </deep-chat>
             <footer class="ai-design-toolbar">
               <select id="ai-design-model" aria-label="选择对话模型" title="对话模型" disabled hidden><option value="">请先配置模型</option></select>
+              <select id="ai-design-thinking" aria-label="思考强度" title="思考强度：越高越慢，模型不支持时会被忽略或报错" disabled hidden><option value="off">不思考</option><option value="low">思考 · 低</option><option value="medium">思考 · 中</option><option value="high">思考 · 高</option></select>
               <button class="ai-design-settings" type="button" data-app-dialog="settings">配置模型…</button>
             </footer>
           </div>
@@ -1019,7 +1020,7 @@
               <label class="settings-row settings-switch"><span>深色画布降低对比</span><input id="dark-canvas-soften" type="checkbox" role="switch" checked></label>
               <h4 class="settings-subheading">窗口材质 <small>material</small></h4>
               <label class="settings-row settings-switch"><span>使用窗口材质</span><input id="window-material" type="checkbox" role="switch" checked></label>
-              <label id="window-material-opacity-setting" class="settings-row settings-range"><span id="window-material-opacity-label">材质不透明度</span><span class="settings-range-control"><input id="window-material-opacity" type="range" min="20" max="100" step="1" value="100" aria-labelledby="window-material-opacity-label window-material-opacity-value"><output id="window-material-opacity-value" for="window-material-opacity">100%</output></span></label>
+              <label id="window-material-opacity-setting" class="settings-row settings-range"><span id="window-material-opacity-label">材质不透明度</span><span class="settings-range-control"><input id="window-material-opacity" type="range" min="20" max="100" step="1" value="87" aria-labelledby="window-material-opacity-label window-material-opacity-value"><output id="window-material-opacity-value" for="window-material-opacity">87%</output></span></label>
               <p class="settings-storage-note">设置保存在此设备的应用本地存储中</p>
             </div>
           </section>
@@ -1063,16 +1064,32 @@
           <section id="settings-model-section" class="settings-section settings-page settings-model" data-settings-panel="model" role="tabpanel" aria-labelledby="settings-model-title" hidden>
             <div class="settings-section-heading">
               <h3 id="settings-model-title">大模型</h3>
-              <p>配置 AI 设计使用的模型服务。列表第一项为默认模型，密钥仅保存在本机。</p>
+              <p>添加模型服务商并勾选要使用的模型。列表第一个服务商的第一个模型为默认模型，密钥仅保存在本机。</p>
             </div>
-            <h4 class="settings-subheading">已保存模型<button id="model-profile-add" class="settings-model-add" type="button"><span class="system-symbol" data-system-symbol="plus" aria-hidden="true"></span>新增</button></h4>
-            <ul id="model-profiles" class="model-profiles" aria-label="已保存模型"></ul>
+            <h4 class="settings-subheading">服务商<button id="model-profile-add" class="settings-model-add" type="button"><span class="system-symbol" data-system-symbol="plus" aria-hidden="true"></span>新增</button></h4>
+            <ul id="model-profiles" class="model-profiles" aria-label="已配置服务商"></ul>
             <div id="model-editor" class="settings-list model-editor" hidden>
               <label class="settings-row"><span>服务商</span><select id="model-provider"></select></label>
               <label class="settings-row settings-text-row"><span>API 地址</span><input id="model-api-url" type="url" autocomplete="url" spellcheck="false" placeholder="https://api.openai.com/v1"></label>
-              <label class="settings-row settings-text-row"><span>模型名称</span><span class="settings-model-control"><input id="model-name" type="text" autocomplete="off" spellcheck="false" placeholder="gpt-5"><select id="model-list" aria-label="选择已获取的模型" title="选择已获取的模型" hidden></select><button id="refresh-model-list" type="button" title="从 API 获取模型" aria-label="从 API 获取模型"><span class="system-symbol" data-system-symbol="arrow.clockwise" aria-hidden="true"></span></button></span></label>
               <label class="settings-row settings-text-row"><span>API 密钥</span><span class="settings-secret-control"><input id="model-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…"><button id="toggle-model-api-key" type="button" title="显示 API 密钥" aria-label="显示 API 密钥"><span class="system-symbol" data-system-symbol="eye" aria-hidden="true"></span></button></span></label>
+              <div class="settings-row model-choices-row">
+                <span>模型</span>
+                <div class="model-choices-panel">
+                  <ul id="model-choices" class="model-choices" aria-label="可用模型"></ul>
+                  <span class="settings-model-control"><input id="model-name" type="text" autocomplete="off" spellcheck="false" placeholder="手动添加模型 ID" aria-label="手动添加模型 ID"><button id="model-name-add" type="button" title="添加模型" aria-label="添加模型"><span class="system-symbol" data-system-symbol="plus" aria-hidden="true"></span></button><button id="refresh-model-list" type="button" title="从服务商获取模型列表" aria-label="从服务商获取模型列表"><span class="system-symbol" data-system-symbol="arrow.clockwise" aria-hidden="true"></span></button></span>
+                </div>
+              </div>
             </div>
+            <h4 class="settings-subheading">生图模型</h4>
+            <div class="settings-list model-editor">
+              <label class="settings-row"><span>服务商</span><select id="image-model-provider" aria-describedby="image-model-hint"></select></label>
+              <div id="image-model-fields" hidden>
+                <label class="settings-row settings-text-row"><span>API 地址</span><input id="image-model-api-url" type="url" autocomplete="url" spellcheck="false"></label>
+                <label class="settings-row settings-text-row"><span>API 密钥</span><input id="image-model-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…"></label>
+                <label class="settings-row settings-text-row"><span>模型</span><input id="image-model-name" type="text" autocomplete="off" spellcheck="false"></label>
+              </div>
+            </div>
+            <p id="image-model-hint" class="settings-model-hint">AI 设计需要重绘或生成皮肤图片时调用；简单改色无需配置。</p>
             <div class="settings-model-footer">
               <div><p id="model-configuration-status" aria-live="polite"></p><small id="model-configuration-path"></small></div>
               <button id="test-model-connection" type="button">测试连接</button>

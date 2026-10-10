@@ -35,6 +35,9 @@ struct ModelConfiguration {
     api_url: String,
     model: String,
     api_key: String,
+    /// "image" marks the image-generation model; empty for chat models.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    kind: String,
 }
 
 #[derive(serde::Serialize)]
@@ -97,6 +100,8 @@ enum ModelHttpEvent {
     Chunk {
         body: Vec<u8>,
     },
+    // Channel messages are ordered among themselves but not against the command's return.
+    End,
 }
 
 #[derive(serde::Serialize)]
@@ -981,6 +986,9 @@ fn validate_model_configuration(configuration: &ModelConfiguration) -> Result<()
     if configuration.api_key.len() > 16 * 1024 {
         return Err("API 密钥过长".into());
     }
+    if !matches!(configuration.kind.as_str(), "" | "image") {
+        return Err("模型类型无效".into());
+    }
     Ok(())
 }
 
@@ -1216,8 +1224,10 @@ async fn model_http_request(
     }) {
         return Err("模型请求地址与已保存的 API 地址不一致".into());
     }
+    // Long reasoning streams can run for minutes; only a stalled connection should fail.
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(180))
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .read_timeout(std::time::Duration::from_secs(120))
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|error| error.to_string())?;
@@ -1259,6 +1269,9 @@ async fn model_http_request(
             })
             .map_err(|error| error.to_string())?;
     }
+    events
+        .send(ModelHttpEvent::End)
+        .map_err(|error| error.to_string())?;
     Ok(())
 }
 
@@ -1284,6 +1297,7 @@ mod tests {
             api_url: "https://example.com/v1/".into(),
             model: "model-a".into(),
             api_key: "secret".into(),
+            kind: String::new(),
         }
     }
 

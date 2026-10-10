@@ -39,6 +39,24 @@ export function createDraftReview(change: AiSkinDraftChange): HTMLLIElement {
   const meta = document.createElement("em")
   meta.textContent = change.syntax.toUpperCase()
   head.append(name, meta)
+  if (change.syntax === "png") {
+    const pair = document.createElement("div")
+    pair.className = "ai-draft-images"
+    for (const [title, bytes] of [["修改前", change.before], ["修改后", change.after]] as const) {
+      const figure = document.createElement("figure")
+      const image = document.createElement("img")
+      // shortcut: object URLs live until reload; revoke them if drafts with many images get common.
+      image.src = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "image/png" }))
+      image.alt = `${change.path} ${title}`
+      const caption = document.createElement("figcaption")
+      caption.textContent = title
+      figure.append(image, caption)
+      pair.append(figure)
+    }
+    details.append(head, pair)
+    item.append(details)
+    return item
+  }
   const diff = document.createElement("pre")
   diff.className = "ai-draft-diff"
   const excerpt = draftExcerpt(change.before, change.after)

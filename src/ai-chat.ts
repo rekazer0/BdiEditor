@@ -36,6 +36,7 @@ type RunState = {
   status: "running" | "done" | "stopped" | "error"
   finishedAt?: number
   timer?: ReturnType<typeof setInterval>
+  frame?: number
 }
 
 function stepRow(step: RunStep): HTMLLIElement {
@@ -125,21 +126,22 @@ function configureAppearance(chat: DeepChat): void {
     backgroundColor: "transparent",
     boxShadow: "none",
   }
-  // The box grows with its text; the bottom band holds the model picker
+  // The box grows with its text and its top edge drags it taller; the bottom band holds the model picker
   // (overlaid from the panel) and the send button.
   chat.textInput = {
     placeholder: { text: "描述你想要的皮肤效果…", style: { color: muted } },
     characterLimit: 8_000,
     styles: {
       text: { color: text, fontSize: "12.5px", lineHeight: "1.6", padding: "11px 12px 0",
-        boxSizing: "border-box", minHeight: "44px", maxHeight: "200px", overflowY: "auto" },
+        boxSizing: "border-box", minHeight: "120px", maxHeight: "60vh", overflowY: "auto" },
       container: {
         width: "100%", boxSizing: "border-box", margin: "0", paddingBottom: "40px",
         height: "auto", maxHeight: "none", overflow: "hidden",
         border: `1px solid ${lineStrong}`, borderRadius: radiusLg, backgroundColor: control,
         boxShadow: `0 1px 2px color-mix(in srgb, ${text} 5%, transparent)`,
       },
-      focus: { borderColor: accent, boxShadow: `0 0 0 3px color-mix(in srgb, ${accent} 16%, transparent)` },
+      // A quiet border shift only; the accent ring read as a selection highlight.
+      focus: { borderColor: `color-mix(in srgb, ${text} 30%, ${lineStrong})` },
     },
   }
 
@@ -240,6 +242,18 @@ function configureAppearance(chat: DeepChat): void {
     #submit-icon { width: 15px !important; height: 15px !important; filter: none !important;
       fill: none !important; stroke: currentColor; stroke-width: 1.6; }
     #text-input:focus-visible { outline: none; }
+    /* Top-edge grip: the composer is anchored to the bottom, so it grows upward. */
+    .ai-resize { position: absolute; top: 0; left: 0; right: 0; z-index: 2; height: 10px;
+      cursor: ns-resize; touch-action: none; }
+    .ai-resize::after { content: ""; position: absolute; top: 4px; left: 50%; width: 32px; height: 3px;
+      margin-left: -16px; border-radius: ${radiusPill}; background: ${lineStrong}; opacity: .55;
+      transition: opacity .15s; }
+    #text-input-container:hover .ai-resize::after, .ai-resize:focus-visible::after,
+    .ai-resize[data-dragging]::after { opacity: 1; }
+    .ai-resize:focus-visible { outline: none; }
+    .input-button { display: grid !important; place-items: center; padding: 0 !important; margin: 0 !important; }
+    .input-button > svg { width: 15px !important; height: 15px !important; fill: none !important;
+      stroke: currentColor !important; filter: none !important; }
     #text-input:empty::before { font-weight: 400; }
     #scroll-button { padding: 7px; border: 1px solid ${line}; border-radius: ${radiusPill};
       background: ${control}; box-shadow: 0 2px 8px color-mix(in srgb, ${text} 12%, transparent); }
@@ -280,6 +294,8 @@ function configureAppearance(chat: DeepChat): void {
     position: "inside-end",
     tooltip: { text: "发送；生成时点击可停止" },
     submit: {
+      // A symmetric arrow sits optically centred, unlike the default paper plane.
+      svg: { content: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg>' },
       container: {
         default: { backgroundColor: accent, color: onAccent, borderRadius: radiusMd, boxSizing: "border-box",
           width: "28px", height: "28px", bottom: "6px", right: "6px", boxShadow: "none" },
@@ -302,6 +318,32 @@ function configureAppearance(chat: DeepChat): void {
   chat.remarkable = { linkTarget: "_blank", breaks: true, html: false }
 }
 
+// min/max-height on the input clamp whatever height the drag asks for.
+function resizeGrip(input: HTMLElement): HTMLElement {
+  const grip = document.createElement("div")
+  grip.className = "ai-resize"
+  grip.tabIndex = 0
+  grip.setAttribute("role", "separator")
+  grip.setAttribute("aria-orientation", "horizontal")
+  grip.setAttribute("aria-label", "拖动调整输入框高度")
+  grip.onpointerdown = (event) => {
+    event.preventDefault()
+    const startY = event.clientY
+    const startHeight = input.offsetHeight
+    grip.setPointerCapture(event.pointerId)
+    grip.dataset.dragging = ""
+    grip.onpointermove = (move) => { input.style.height = `${startHeight + startY - move.clientY}px` }
+    grip.onpointerup = grip.onpointercancel = () => { grip.onpointermove = null; delete grip.dataset.dragging }
+  }
+  grip.onkeydown = (event) => {
+    const step = event.key === "ArrowUp" ? 24 : event.key === "ArrowDown" ? -24 : 0
+    if (!step) return
+    event.preventDefault()
+    input.style.height = `${input.offsetHeight + step}px`
+  }
+  return grip
+}
+
 export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promise<AiChatController> {
   await customElements.whenDefined("deep-chat")
   const chat = element as DeepChat
@@ -310,6 +352,8 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
   chat.onComponentRender = () => {
     const input = chat.shadowRoot?.querySelector<HTMLElement>("#text-input")
     input?.setAttribute("aria-label", "描述你想要的皮肤效果")
+    const box = chat.shadowRoot?.querySelector<HTMLElement>("#text-input-container")
+    if (input && box && !box.querySelector(".ai-resize")) box.prepend(resizeGrip(input))
     chat.shadowRoot?.querySelector(".input-button[role=button]")?.setAttribute("aria-label", "发送消息；生成时点击停止")
     chat.shadowRoot?.querySelectorAll<HTMLButtonElement>("[data-ai-prompt]").forEach((button) => {
       button.onclick = () => {
@@ -480,7 +524,11 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
           const state = openRun()
           if (!state) return
           state.reasoning = text
-          paintRun(state)
+          // Reasoning streams per token; repainting the whole text each time freezes the window.
+          state.frame ??= requestAnimationFrame(() => {
+            state.frame = undefined
+            paintRun(state)
+          })
         },
         onTextDelta: async (delta) => {
           if (controller.signal.aborted || !isCurrent()) return
@@ -513,6 +561,7 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
       activeController = undefined
       closeActive?.()
       if (timeline?.timer !== undefined) clearInterval(timeline.timer)
+      if (timeline?.frame !== undefined) cancelAnimationFrame(timeline.frame)
       timeline = undefined
       // 时间线是自建节点，deep-chat 不认识它，清空时要自己带走。
       chat.shadowRoot?.querySelectorAll(".ai-run-holder").forEach((holder) => holder.remove())

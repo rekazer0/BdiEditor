@@ -33,3 +33,19 @@ export const MODEL_PROVIDER_PRESETS: readonly ModelProviderPreset[] = [
 export function modelProviderPreset(id: string): ModelProviderPreset {
   return MODEL_PROVIDER_PRESETS.find((provider) => provider.id === id) ?? MODEL_PROVIDER_PRESETS[2]
 }
+
+/**
+ * Image-generation services. "openai-chat" here means the OpenAI-compatible /images/generations
+ * endpoint; MiniMax and Google use their own endpoints, chosen by preset id in ai-design.ts.
+ */
+export const IMAGE_MODEL_PRESETS: readonly ModelProviderPreset[] = [
+  { id: "openai-image", label: "OpenAI", protocol: "openai-chat", apiUrl: "https://api.openai.com/v1", model: "gpt-image-1" },
+  { id: "volcengine-image", label: "火山方舟 Seedream", protocol: "openai-chat", apiUrl: "https://ark.cn-beijing.volces.com/api/v3", model: "doubao-seedream-4-0-250828" },
+  { id: "google-image", label: "Google Gemini", protocol: "google", apiUrl: "https://generativelanguage.googleapis.com/v1beta", model: "gemini-2.5-flash-image" },
+  { id: "minimax-image", label: "MiniMax", protocol: "openai-chat", apiUrl: "https://api.minimaxi.com/v1", model: "image-01" },
+  { id: "openai-compatible-image", label: "OpenAI 兼容格式", protocol: "openai-chat", apiUrl: "", model: "" },
+]
+
+export function imageModelPreset(id: string): ModelProviderPreset | undefined {
+  return IMAGE_MODEL_PRESETS.find((provider) => provider.id === id)
+}

@@ -1006,17 +1006,21 @@
 .source #source-editor,
 .source #source .cm-editor,
 .source #source .cm-gutters {
-  background: #fafbff;
+  background: var(--pen-surface);
 }
 
 .source #source .cm-gutters {
   border-right: 0;
-  color: #8b93a3;
+  color: var(--pen-tertiary);
 }
 
 .source #source .cm-scroller {
   font-size: var(--source-font-size, 13px);
   line-height: 1.7;
+}
+
+.source #source .cm-scroller::-webkit-scrollbar:horizontal {
+  height: 0;
 }
 
 .source #source .cm-content {
@@ -1025,18 +1029,18 @@
 
 .source #source .cm-line {
   padding: 0 16px 0 12px;
-  color: #606575;
+  color: var(--pen-secondary);
 }
 
 .source #source .cm-lineNumbers .cm-gutterElement {
   min-width: 42px;
   padding: 0 10px 0 12px;
-  color: #8b93a3;
+  color: var(--pen-tertiary);
 }
 
 .source #source .cm-activeLine,
 .source #source .cm-activeLineGutter {
-  background: #eaf0ff;
+  background: var(--pen-accent-soft);
   box-shadow: none;
 }
 

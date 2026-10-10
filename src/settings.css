@@ -1,7 +1,7 @@
 /* bdi.pen · 设置窗口 P6Oksd: 920 × 640, 232px navigation, 52/56px chrome. */
 :root body #settings-dialog { width: min(920px, calc(100vw - 32px)); height: min(640px, calc(100dvh - 32px)); padding: 0; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--pen-surface); color: var(--text); box-shadow: 0 24px 80px #0003; }
 :root body #settings-dialog form { display: grid; grid-template-rows: 52px minmax(0, 1fr) 56px; height: 100%; gap: 0; }
-:root body #settings-dialog header { padding: 0 20px; border-bottom: 1px solid var(--line); }
+:root body #settings-dialog header { min-height: 0; padding: 0 20px; border-bottom: 1px solid var(--line); }
 :root body #settings-dialog .settings-title-cluster { display: flex; align-items: center; gap: 8px; min-width: 0; }
 :root body #settings-dialog h2 { margin: 0; font-size: 15px; font-weight: 600; }
 :root body #settings-dialog .settings-title-cluster > .system-symbol { width: 15px; height: 15px; }
@@ -19,6 +19,8 @@
 :root body #settings-dialog .settings-nav-item small { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tertiary); font-size: 10.5px; }
 :root body #settings-dialog .settings-nav-item[aria-selected="true"] { background: var(--selection-soft); color: var(--text); }
 :root body #settings-dialog .settings-nav-item[aria-selected="true"]::after { content: ''; margin-left: auto; width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--selection); }
+/* 有摘要时摘要已靠右，圆点紧随其后，不再平分剩余空间。 */
+:root body #settings-dialog .settings-nav-item[aria-selected="true"]:has(small:not(:empty))::after { margin-left: 0; }
 :root body #settings-dialog .settings-content { padding: 24px; overflow: auto; }
 :root body #settings-dialog .settings-section { padding: 0; }
 :root body #settings-dialog .settings-section-heading { gap: 4px; margin-bottom: 18px; }
@@ -63,7 +65,26 @@
 :root body #settings-dialog .model-editor .settings-row > span:first-child { flex: none; white-space: nowrap; }
 :root body #settings-dialog .model-editor .settings-row > :last-child { flex: none; width: min(400px, 68%); }
 :root body #settings-dialog .model-editor select { width: 100%; font-size: 12.5px; }
-:root body #settings-dialog .settings-model-footer { border-top: 0; }
+:root body #settings-dialog .settings-model-footer { align-items: center; border-top: 0; }
+:root body #settings-dialog #image-model-fields:not([hidden]) { display: contents; }
+:root body #settings-dialog .settings-model-hint { margin: 6px 0 0; color: var(--tertiary); font-size: 11.5px; }
+:root body #settings-dialog .settings-model-footer > div:first-child { flex: 1; }
+:root body #settings-dialog #model-configuration-path { max-width: none; }
+#model-configuration-status:empty { display: none; }
+/* 全局按钮的 min-height/padding 会让图标按钮比输入框高、图标被挤偏。 */
+:root body #settings-dialog .model-editor button, :root body #settings-dialog .model-profile-remove { min-height: 0; height: 30px; padding: 0; }
+:root body #settings-dialog #test-model-connection { height: 30px; padding: 0 12px; border-radius: 8px; }
+:root body #settings-dialog .model-editor input, :root body #settings-dialog .model-editor button { border-radius: 8px; }
+:root body #settings-dialog .model-choices-row { align-items: flex-start; }
+:root body #settings-dialog .model-choices-row > span:first-child { padding-top: 6px; }
+.model-choices-panel { display: grid; gap: 6px; }
+:root body #settings-dialog .model-choices-panel .settings-model-control { width: 100%; grid-template-columns: minmax(0, 1fr) 30px 30px; }
+.model-choices { display: grid; max-height: 184px; margin: 0; padding: 4px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--content); list-style: none; }
+.model-choices label { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: 6px; font: 12px var(--font-mono); cursor: pointer; }
+.model-choices label:hover { background: var(--hover); }
+.model-choices label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root body #settings-dialog .model-choices input[type="checkbox"] { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
+.model-choices-empty { padding: 10px 8px; color: var(--secondary); font-size: 11.5px; }
 :root[data-interface-density="compact"] #files .raw-files .source-tree-row { height: 26px; min-height: 26px; }
 :root[data-interface-density="compact"] .inspector-grid { gap: 4px; }
 :root[data-interface-density="compact"] .inspector-grid input, :root[data-interface-density="compact"] .inspector-grid select { height: 26px; min-height: 26px; }

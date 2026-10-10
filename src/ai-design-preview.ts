@@ -12,6 +12,7 @@ import "./pen-inspector-panels.css"
 import "./pen-inspector.css"
 import "./inspector-fidelity.css"
 import "./design-workbench.css"
+import "./ai-design-panel.css"
 import { connectAiChat, type AiChatRun, type AiChatController } from "./ai-chat"
 
 type StepKind = "thinking" | "reading" | "editing" | "done"
@@ -51,6 +52,10 @@ document.querySelector("#ai-context-key")!.textContent = "按键"
 const model = document.querySelector<HTMLSelectElement>("#ai-design-model")!
 model.replaceChildren(new Option("gpt-5.6-terra", "0"))
 model.disabled = false
+model.hidden = false
+const thinking = document.querySelector<HTMLSelectElement>("#ai-design-thinking")!
+thinking.disabled = false
+thinking.hidden = false
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
