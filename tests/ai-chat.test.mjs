@@ -69,7 +69,7 @@ test('thinking updates preserve expanded state and render untrusted text literal
   const steps = { childElementCount: 0, replaceChildren() {} }
   const think = { hidden: true, open: false }
   const thinkText = { textContent: '', scrollHeight: 100, scrollTop: 100, clientHeight: 100 }
-  const section = { querySelector: sel => ({ '.ai-run-head': head, '.ai-run-label': label, '.ai-run-steps': steps, '.ai-run-think': think, '.ai-run-think-text': thinkText })[sel] ?? null }
+  const section = { dataset: {}, querySelector: sel => ({ '.ai-run-head': head, '.ai-run-label': label, '.ai-run-steps': steps, '.ai-run-think': think, '.ai-run-think-text': thinkText })[sel] ?? null }
   const messages = { children: [], append() {}, querySelector: sel => (sel === '#ai-run-1' ? section : null) }
   s.chat.shadowRoot = { querySelector: sel => (sel === '#messages' ? messages : sel === '#ai-run-1' ? section : null) }
   s.chat.connect.handler({ messages: [{ text: 'hello' }] }, s.signals)

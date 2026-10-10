@@ -96,16 +96,6 @@ textarea {
   backdrop-filter: none;
 }
 
-.toolbar-group {
-  gap: 4px;
-}
-
-.toolbar-divider {
-  height: 20px;
-  margin: 0 6px;
-  background: var(--pen-line);
-}
-
 .toolbar-button,
 .toolbar-more > summary {
   width: 28px;
@@ -886,8 +876,7 @@ main {
  * ------------------------------------------------------------------------------------------------- */
 
 .preview-tool-toggle,
-.preview-choice,
-#canvas-background-choice {
+.preview-choice {
   gap: 2px;
   padding: 2px;
   border: 1px solid transparent;
@@ -912,8 +901,7 @@ main {
   height: 15px;
 }
 
-.preview-choice button,
-#canvas-background-choice button {
+.preview-choice button {
   width: 26px;
   height: 26px;
   padding: 0;
@@ -923,13 +911,11 @@ main {
   box-shadow: none;
 }
 
-.preview-choice button:hover:not(:disabled),
-#canvas-background-choice button:hover:not(:disabled) {
+.preview-choice button:hover:not(:disabled) {
   color: var(--pen-text);
 }
 
 .preview-choice button.active,
-#canvas-background-choice button.active,
 .preview-tool-toggle.active {
   color: var(--pen-accent);
   background: var(--pen-surface);
@@ -968,14 +954,6 @@ main {
 #device:focus {
   outline: 0;
   box-shadow: none;
-}
-
-.toolbar-divider,
-.preview-toolbar-divider {
-  width: 1px;
-  height: 16px;
-  margin: 0 2px;
-  background: var(--pen-line);
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -1187,59 +1165,8 @@ main {
  * directly pickable instead of living only in a dropdown.
  * ------------------------------------------------------------------------------------------------- */
 
-.preview-gestures {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.preview-gestures[hidden] {
-  display: none;
-}
-
-.preview-gesture-zone {
-  pointer-events: auto;
-  cursor: pointer;
-}
-
 /* Zones are revealed by the canvas hit test, not by CSS hover, because the
  * overlay itself is click-through until a zone is live. */
-.preview-gestures[data-live="false"] .preview-gesture-zone {
-  pointer-events: none;
-  opacity: 0;
-}
-
-.preview-gestures[data-live="true"] .preview-gesture-zone {
-  opacity: 1;
-}
-
-.preview-gesture-zone rect {
-  fill: color-mix(in srgb, var(--pen-surface) 82%, transparent);
-  stroke: var(--pen-selection);
-  stroke-width: 2;
-  stroke-dasharray: 6 4;
-}
-
-.preview-gesture-zone:hover rect {
-  fill: var(--pen-selection-soft);
-}
-
-.preview-gesture-zone text {
-  fill: var(--pen-text);
-  font-size: var(--preview-gesture-font-size, 12px);
-  font-weight: 600;
-  pointer-events: none;
-}
-
-.preview-gesture-zone .preview-gesture-caption {
-  fill: var(--pen-secondary);
-  font-size: calc(var(--preview-gesture-font-size, 12px) * 0.72);
-  font-weight: 400;
-}
 
 /* -------------------------------------------------------------------------------------------------
  * Dialogs / overlays
@@ -1476,7 +1403,9 @@ main {
 /* 浮层（设置/项目对话框、下拉菜单）压在内容之上，底下是内容而不是桌面材质，填充太低会让
    底层文字和画布透过来，所以单独给它们浮层系数，滑杆还没拉满时就已经接近不透明。
    用 !important 是因为 settings.css 里 `:root body #settings-dialog` 这类 ID 选择器权重更高，
-   普通声明压不过它。 */
+   普通声明压不过它。
+   菜单在 .titlebar 里，titlebar 自身有 backdrop-filter，嵌套的模糊取不到下面的内容，只能靠填充遮住，
+   所以给浮层透明度设一个下限。 */
 :root[data-window-material-kind="glass"][data-window-material="on"] :is(
   .app-dialog,
   .project-dialog,
@@ -1485,7 +1414,7 @@ main {
   .app-actions,
   .mobile-command-actions
 ) {
-  background: rgb(255 255 255 / var(--window-material-floating)) !important;
+  background: rgb(255 255 255 / max(var(--window-material-floating), 0.96)) !important;
 }
 
 :root[data-app-theme="dark"][data-window-material-kind="glass"][data-window-material="on"] :is(
@@ -1496,5 +1425,5 @@ main {
   .app-actions,
   .mobile-command-actions
 ) {
-  background: rgb(21 23 27 / var(--window-material-floating)) !important;
+  background: rgb(21 23 27 / max(var(--window-material-floating), 0.96)) !important;
 }

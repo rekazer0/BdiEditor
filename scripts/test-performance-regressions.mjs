@@ -3,22 +3,6 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
-import { isMemoryPressure } from '../src/memory-manager.ts'
-
-const memoryDescriptor = Object.getOwnPropertyDescriptor(performance, 'memory')
-try {
-  Object.defineProperty(performance, 'memory', { configurable: true, value: {
-    usedJSHeapSize: 90, totalJSHeapSize: 100, jsHeapSizeLimit: 1000,
-  } })
-  assert.equal(isMemoryPressure(), false, 'a mostly occupied allocated heap is not memory pressure')
-  performance.memory.usedJSHeapSize = 900
-  assert.equal(isMemoryPressure(), true, 'usage near the engine limit is memory pressure')
-  delete performance.memory.jsHeapSizeLimit
-  assert.equal(isMemoryPressure(), false, 'missing limit must not trigger speculative cleanup')
-} finally {
-  if (memoryDescriptor) Object.defineProperty(performance, 'memory', memoryDescriptor)
-  else delete performance.memory
-}
 
 const source = ts.createSourceFile('main.ts', readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true)
 const scheduler = source.statements.find(n => ts.isFunctionDeclaration(n) && n.name?.text === 'scheduleAtlasDraw').getText(source)

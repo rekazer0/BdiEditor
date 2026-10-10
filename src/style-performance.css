@@ -1,24 +1,5 @@
 /* CSS 性能优化 */
 
-/* 使用 will-change 提示浏览器优化 */
-.canvas-wrap,
-.workspace,
-.preview-toolbar,
-#preview,
-#candidate-background,
-#toolbar-preview {
-  will-change: transform;
-}
-
-/* 使用 GPU 加速 */
-.device-shell,
-.keyboard-dock,
-.preview-zoom-control,
-.mobile-workspace-tabs {
-  transform: translateZ(0);
-  backface-visibility: hidden;
-}
-
 /* 优化滚动性能（侧栏自身不滚动，由 #files 承担滚动） */
 .source,
 .resource-gallery,
@@ -76,10 +57,4 @@ canvas {
 .toolbar-menu,
 .style-picker-dialog {
   contain: layout style;
-}
-
-/* 硬件加速的过渡效果 */
-.inspector-resize-handle,
-.mobile-split-handle {
-  transform: translate3d(0, 0, 0);
 }

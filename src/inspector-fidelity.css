@@ -87,61 +87,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-:root body .source .inspector-more { flex: none; position: relative; }
-:root body .source .inspector-more summary {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--pin-radius-md);
-  list-style: none;
-  cursor: pointer;
-  color: var(--pin-ink-muted);
-  background: var(--pin-sunken);
-}
-:root body .source .inspector-more summary::-webkit-details-marker { display: none; }
-:root body .source .inspector-more > div {
-  position: absolute;
-  z-index: 20;
-  right: 0;
-  top: 32px;
-  width: 148px;
-  padding: 5px;
-  border: 1px solid var(--pin-line);
-  border-radius: 8px;
-  background: var(--pin-surface);
-  box-shadow: 0 8px 24px #0002;
-}
-:root body .source .inspector-more button {
-  display: block;
-  width: 100%;
-  border: 0;
-  padding: 8px;
-  text-align: left;
-  color: var(--pin-ink);
-  background: transparent;
-  font: 11.5px var(--font-ui);
-}
-:root body .source .inspector-more button:hover { background: var(--pin-sunken); }
 :root body .source #inspector-back { display: none !important; }
-:root body .source .pin-mode-chip {
-  flex: 0 0 auto;
-  margin-left: auto;
-  height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
-  font: 500 10.5px/20px var(--font-ui);
-  white-space: nowrap;
-}
-:root body .source .pin-mode-chip[hidden] { display: none; }
-:root body .source:has(#quick-inspector[data-inspector-kind="bds"]) .pin-mode-chip {
-  color: var(--pin-sel);
-  background: var(--pin-sel-soft);
-}
-:root body .source:has(#quick-inspector[data-inspector-kind="bda"]) .pin-mode-chip {
-  color: var(--pin-accent);
-  background: var(--pin-accent-soft);
-}
 
 :root body .source #quick-inspector#quick-inspector#quick-inspector {
   min-width: 0 !important;
@@ -787,9 +733,6 @@
   font: 11px var(--font-mono);
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector [hidden] { display: none !important; }
-:root body .source #inspector-search,
-:root body .source .pin-search-controls,
-:root body .source #quick-inspector > .pin-toolbar { display: none !important; }
 .source :is(.inspector-more summary, .pin-action, .inspector-sound-play, .pin-reset, .pin-reset-all):focus-visible {
   outline: 2px solid var(--pin-accent);
   outline-offset: 2px;

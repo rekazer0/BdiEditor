@@ -62,9 +62,9 @@ function stepIcon(kind: StepKind): string {
   return `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[kind]}</svg>`
 }
 
-/** Steps arrive as “AI 读取 project.bds…” — the panel already says who is acting. */
+/** Steps arrive as “AI 读取 project.bds…” (or “方案 1 · AI …”) — the panel already says who is acting. */
 function stepText(text: string): string {
-  return text.replace(/^AI\s*/, "").trim()
+  return text.replace(/^((?:方案 \d+ · )?)AI\s*/, "$1").trim()
 }
 
 function duration(seconds: number): string {
@@ -114,6 +114,9 @@ function configureAppearance(chat: DeepChat): void {
     borderRadius: "0",
     backgroundColor: "transparent",
     color: text,
+    // An explicit family also stops deep-chat from injecting its Google Fonts
+    // stylesheet, which the CSP blocks and the offline desktop app cannot load.
+    fontFamily: "var(--font-ui, system-ui, sans-serif)",
   }
   chat.inputAreaStyle = {
     width: "auto",
@@ -161,15 +164,15 @@ function configureAppearance(chat: DeepChat): void {
       text-align: left; color: ${text}; }
     .ai-welcome h2 { margin: 0 0 16px; font-size: 14px; font-weight: 500; letter-spacing: -.01em; }
     .ai-suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
-    .ai-suggestions button { min-height: 30px; justify-content: flex-start; text-align: left; }
-    .ai-suggestions button:focus-visible, .ai-run-head:focus-visible { outline: 2px solid ${accent}; outline-offset: 2px; }
-    .ai-suggestions button { display: inline-flex; align-items: center; gap: 0; width: auto;
+    .ai-suggestions button { display: inline-flex; align-items: center; justify-content: flex-start;
+      min-height: 30px; width: auto; text-align: left;
       max-width: 100%; padding: 5px 10px; font: inherit; font-size: 11.5px; color: ${secondary};
       background: ${sunken}; border: 1px solid transparent; border-radius: ${radiusPill};
       cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
     .ai-suggestions button:hover { border-color: color-mix(in srgb, ${accent} 32%, transparent);
       background: color-mix(in srgb, ${accent} 7%, ${sunken}); color: ${text}; }
     .ai-suggestions button:focus-visible { outline: 2px solid ${accent}; outline-offset: 2px; }
+    .ai-suggestions button:active { transform: scale(.98); }
 
     /* --- run timeline: “✦ 思考中 · 12s · 6 个步骤” -------------------------- */
     .ai-run { margin: 2px 0 6px; }
@@ -191,11 +194,11 @@ function configureAppearance(chat: DeepChat): void {
     .ai-run-step-icon { display: grid; place-items: center; width: 16px; height: 16px;
       margin-top: 1px; color: ${muted}; }
     .ai-run-step-icon svg { display: block; width: 14px; height: 14px; }
-    .ai-run-step[data-kind="editing"] { color: ${accent}; }
-    .ai-run-step[data-kind="editing"] .ai-run-step-icon { color: ${accent}; }
+    .ai-run-step[data-kind="editing"], .ai-run-step[data-kind="editing"] .ai-run-step-icon { color: ${accent}; }
     .ai-run-step[data-kind="done"] .ai-run-step-icon { color: ${ok}; }
-    .ai-run-step[data-kind="error"] { color: ${danger}; }
-    .ai-run-step[data-kind="error"] .ai-run-step-icon { color: ${danger}; }
+    .ai-run-step[data-kind="error"], .ai-run-step[data-kind="error"] .ai-run-step-icon { color: ${danger}; }
+    .ai-run[data-state="running"] .ai-run-spark { animation: ai-run-pulse 1.4s ease-in-out infinite; }
+    @keyframes ai-run-pulse { 50% { opacity: .35; } }
     .ai-run-step-text { min-width: 0; overflow-wrap: anywhere; }
     .ai-run-think { margin: 4px 0 0; }
     .ai-run-think > summary { padding: 2px 0; color: ${muted}; font-size: 11px;
@@ -234,9 +237,6 @@ function configureAppearance(chat: DeepChat): void {
       background: ${control}; box-shadow: 0 2px 8px color-mix(in srgb, ${text} 12%, transparent); }
     #scroll-button svg { width: 12px; height: 12px; color: ${secondary}; }
 
-    @media (max-height: 650px) {
-      .ai-welcome { padding-top: 14px; }
-    }
     @container (max-width: 300px) {
       .ai-suggestions button { padding: 4px 8px; }
     }
@@ -282,7 +282,7 @@ function configureAppearance(chat: DeepChat): void {
       },
     },
     disabled: {
-      container: { default: { backgroundColor: mix(text, 5, sunken), border: `1px solid ${line}`, color: muted,
+      container: { default: { backgroundColor: `color-mix(in srgb, ${text} 5%, ${sunken})`, border: `1px solid ${line}`, color: muted,
         borderRadius: radiusMd, boxSizing: "border-box", width: ctrlH, height: ctrlH, bottom: "18px", right: "9px",
         cursor: "not-allowed", boxShadow: "none" } },
     },
@@ -295,10 +295,6 @@ function configureAppearance(chat: DeepChat): void {
   chat.scrollButton = { smoothScroll: true }
   chat.errorMessages = { displayServiceErrorMessages: false }
   chat.remarkable = { linkTarget: "_blank", breaks: true, html: false }
-}
-
-function mix(base: string, percent: number, over: string): string {
-  return `color-mix(in srgb, ${base} ${percent}%, ${over})`
 }
 
 function enableInputResize(chat: HTMLElement): void {
@@ -378,6 +374,7 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
   chat.validateInput = (text) => Boolean(text?.trim()) && (text?.length ?? 0) <= 8_000
 
   let activeController: AbortController | undefined
+  let submitEnabled = true
   let closeActive: (() => void) | undefined
   let generation = 0
 
@@ -437,9 +434,10 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
         head.setAttribute("aria-expanded", head.getAttribute("aria-expanded") === "true" ? "false" : "true")
       })
     }
-    if (nodes.steps.childElementCount !== state.steps.length) {
-      nodes.steps.replaceChildren(...state.steps.map(stepRow))
-    }
+    // Steps only ever grow; append the new rows instead of rebuilding the list.
+    const painted = nodes.steps.childElementCount
+    if (painted > state.steps.length) nodes.steps.replaceChildren(...state.steps.map(stepRow))
+    else if (painted < state.steps.length) nodes.steps.append(...state.steps.slice(painted).map(stepRow))
     nodes.label.textContent = runLabel(state)
     if (nodes.think && nodes.thinkText) {
       nodes.think.hidden = state.reasoning === ""
@@ -449,6 +447,7 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
         if (nodes.think.open && atBottom) nodes.thinkText.scrollTop = nodes.thinkText.scrollHeight
       }
     }
+    nodes.section.dataset.state = state.status
     if (state.status !== "running") nodes.head.setAttribute("aria-expanded", "false")
   }
 
@@ -518,9 +517,7 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
 
       void run(prompt, {
         signal: controller.signal,
-        onStatus: async (text, kind = "thinking") => {
-          appendStep((kind === "editing" ? "editing" : kind) as StepKind, text)
-        },
+        onStatus: async (text, kind = "thinking") => appendStep(kind, text),
         onThinking: async (text) => {
           if (controller.signal.aborted || !isCurrent() || !text.trim()) return
           const state = openRun()
@@ -581,6 +578,11 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
       chat.focusInput()
     },
     focus: () => chat.focusInput(),
-    setEnabled: (enabled) => chat.disableSubmitButton(!enabled),
+    setEnabled: (enabled) => {
+      // Called on every inspector refresh; only touch deep-chat when the state flips.
+      if (enabled === submitEnabled) return
+      submitEnabled = enabled
+      chat.disableSubmitButton(!enabled)
+    },
   }
 }

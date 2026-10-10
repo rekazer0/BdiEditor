@@ -19,7 +19,6 @@ test('inspector shell maps Pen spec kinds and section hints', () => {
   assert.match(shell, /if \(hint\) head\.title = hint/)
   assert.match(shell, /chevron-down/)
   assert.doesNotMatch(shell, /document.createElement\("details"\)/)
-  assert.match(fidelity, /pin-mode-chip.*display: none/)
 })
 
 test('main wires BDS/BDA kind onto the inspector', () => {
@@ -35,7 +34,6 @@ test('CSS locks 30px rows and BDS/BDA chips from 属性检查器.pen', () => {
   assert.match(css, /--pin-sel: #ff6b2c/)
   assert.match(css, /--pin-accent: #2f6bff/)
   assert.match(css, /\.pin-hint/)
-  assert.match(css, /\.pin-mode-chip/)
   assert.match(css, /height: 30px !important/)
   assert.match(css, /font: 400 9\.5px\/1 var\(--font-mono\)/)
   assert.doesNotMatch(fidelity, /geometry-fields[\s\S]{0,400}height: 34px/)

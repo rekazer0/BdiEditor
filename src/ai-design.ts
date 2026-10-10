@@ -230,22 +230,23 @@ function toolsFor(workspace: AiSkinWorkspace): AgentTool[] {
   return [readFile, setIniValue, removeIniValue, replaceProjectText]
 }
 
+const TOOL_LABELS: Record<string, string> = {
+  read_project_file: "读取当前面板配置",
+  set_ini_value: "写入 INI 样式草稿",
+  remove_ini_value: "写入删除属性草稿",
+  replace_project_text: "写入 BDA 精确替换草稿",
+}
+const EDIT_TOOLS = new Set(["set_ini_value", "remove_ini_value", "replace_project_text"])
+
 function eventStatus(event: AgentEvent): { kind: StatusKind; text: string } | undefined {
   if (event.type === "agent_start") return { kind: "thinking", text: "AI 正在分析当前皮肤…" }
   if (event.type === "tool_execution_start") {
-    const editing = ["set_ini_value", "remove_ini_value", "replace_project_text"].includes(event.toolName)
-    const labels: Record<string, string> = {
-      read_project_file: "读取当前面板配置",
-      set_ini_value: "写入 INI 样式草稿",
-      remove_ini_value: "写入删除属性草稿",
-      replace_project_text: "写入 BDA 精确替换草稿",
-    }
     const path = typeof event.args?.path === "string" ? ` · ${event.args.path}` : ""
-    return { kind: editing ? "editing" : "reading", text: `AI ${labels[event.toolName] ?? "处理项目"}${path}…` }
+    return { kind: EDIT_TOOLS.has(event.toolName) ? "editing" : "reading", text: `AI ${TOOL_LABELS[event.toolName] ?? "处理项目"}${path}…` }
   }
-  if (event.type === "tool_execution_end") {
-    const editing = ["set_ini_value", "remove_ini_value", "replace_project_text"].includes(event.toolName)
-    return { kind: editing ? "editing" : "reading", text: event.isError ? `AI 操作失败：${event.toolName}` : `AI ${editing ? "草稿写入" : "读取"}完成` }
+  // A successful tool end only repeats its start step; failures are worth a row.
+  if (event.type === "tool_execution_end" && event.isError) {
+    return { kind: EDIT_TOOLS.has(event.toolName) ? "editing" : "reading", text: `AI 操作失败：${TOOL_LABELS[event.toolName] ?? event.toolName}` }
   }
   if (event.type === "agent_end") return { kind: "done", text: "AI 已完成分析，正在校验修改…" }
   return undefined
@@ -359,12 +360,8 @@ export async function runAiSkinDesign(
     api,
   }))
 
-  const allowedTools = new Set([
-    "read_project_file",
-    "set_ini_value",
-    "remove_ini_value",
-    "replace_project_text",
-  ])
+  const tools = toolsFor(workspace)
+  const allowedTools = new Set(tools.map((tool) => tool.name))
   let toolCalls = 0
   let turns = 0
   const agent = new Agent({
@@ -372,7 +369,7 @@ export async function runAiSkinDesign(
       systemPrompt: systemPrompt(project),
       model,
       thinkingLevel: "off",
-      tools: toolsFor(workspace),
+      tools,
       messages: [...(options.history ?? [])],
     },
     streamFn: models.streamSimple.bind(models),

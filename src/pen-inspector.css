@@ -313,8 +313,7 @@
 /* ------------------------------------------------------------------ *
  * Visibility guards must outrank row and nested-panel display rules.
  * ------------------------------------------------------------------ */
-:root body .source #quick-inspector#quick-inspector [hidden],
-:root body .source #quick-inspector#quick-inspector .inspector-group.pin-collapsed > :not(h3) {
+:root body .source #quick-inspector#quick-inspector [hidden] {
   display: none !important;
 }
 
@@ -518,29 +517,14 @@
  * Pen spec lock — /Users/kaze/Downloads/属性检查器.pen
  * 30px rows, 9.5px section hints, BDS $sel / BDA $brand chips.
  * ------------------------------------------------------------------ */
-:root body .source .pin-mode-chip {
-  flex: 0 0 auto;
-  margin-left: auto;
-  height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
-  font-family: var(--font-ui, inherit);
-  font-size: 10.5px;
-  font-weight: 500;
-  line-height: 20px;
-  white-space: nowrap;
-}
-:root body .source[data-inspector-kind="bds"] .pin-mode-chip,
 :root body .source #quick-inspector[data-inspector-kind="bds"] .pin-actions-meta:not([data-count="0"]) {
   color: var(--selection, #ff6b2c);
   background: var(--selection-soft, #ffefe7);
 }
-:root body .source[data-inspector-kind="bda"] .pin-mode-chip,
 :root body .source #quick-inspector[data-inspector-kind="bda"] .pin-actions-meta:not([data-count="0"]) {
   color: var(--accent, #2f6bff);
   background: var(--accent-soft, #ebf1ff);
 }
-:root body .source .pin-mode-chip[hidden] { display: none; }
 
 :root body .source #quick-inspector[data-inspector-kind="bds"] {
   --pin-mark: var(--selection, #ff6b2c);
@@ -570,9 +554,6 @@
 }
 :root body .source #quick-inspector#quick-inspector .inspector-group > h3 .pin-hint {
   display: inline-flex !important;
-}
-:root body .source #quick-inspector#quick-inspector .inspector-group.pin-collapsed > h3 .pin-hint {
-  display: none !important;
 }
 :root body .source #quick-inspector#quick-inspector .inspector-group:not(.pin-collapsed) > h3 .pin-summary {
   display: none !important;
@@ -749,34 +730,6 @@
 :root body .source #quick-inspector#quick-inspector:has(> #mobile-inspector-groups[hidden]) {
   grid-template-columns: minmax(0, 1fr) !important;
 }
-:root body .source .pin-search-controls {
-  order: 3;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--pin-line);
-}
-:root body .source .pin-search-controls input {
-  width: 100%;
-  min-width: 0;
-  height: 30px;
-  padding: 0 9px;
-  border: 1px solid var(--pin-line);
-  border-radius: 6px;
-  background: var(--pin-sunken);
-  color: var(--pin-ink);
-  font: 11.5px var(--font-ui);
-}
-:root body .source .pin-search-controls input:focus-visible { outline: 2px solid var(--pin-accent); outline-offset: 1px; }
-:root body .source .pin-search-controls [role=status] {
-  flex: 0 0 auto;
-  color: var(--pin-ink-faint);
-  font-size: 10.5px;
-}
-:root body .source:has([data-inspector-tab="source"].active, [data-inspector-tab="ai"].active) .pin-search-controls { display: none; }
-:root body .source #quick-inspector#quick-inspector.pin-searching .inspector-group.pin-collapsed > :not(h3):not([hidden]) { display: block !important; }
-:root body .source #quick-inspector#quick-inspector :is(label, .document-property-field).pin-search-miss { display: none !important; }
 /* Override legacy field grids only for the preview-card rows. */
 :root body .source #quick-inspector#quick-inspector#quick-inspector :is(label.style-ref-row, .style-reference-field:not(.fore-styles-reference-field), .appearance-sound-field > label) {
   display: flex !important;

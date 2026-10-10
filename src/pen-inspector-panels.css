@@ -1844,21 +1844,7 @@
 }
 
 /* —— 上下文条：模型能看见什么，一行 chips —— */
-:root body .source .ai-design-context {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  align-items: center !important;
-  gap: 5px !important;
-  min-width: 0 !important;
-  margin: 0 !important;
-  padding: 11px 14px !important;
-  border: 0 !important;
-  border-bottom: 1px solid var(--pin-line) !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-}
 
-:root body .source .ai-context-chip,
 :root body .source .ai-context-preview {
   display: inline-flex !important;
   align-items: center !important;
@@ -1872,18 +1858,6 @@
   color: var(--pin-ink-muted) !important;
   font-size: 10.5px !important;
   line-height: 1.3 !important;
-}
-
-:root body .source .ai-context-chip > b {
-  color: var(--pin-ink-faint) !important;
-  font-weight: 500 !important;
-}
-
-:root body .source .ai-context-chip > span {
-  overflow: hidden !important;
-  color: var(--pin-ink) !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
 }
 
 :root body .source .ai-context-preview {

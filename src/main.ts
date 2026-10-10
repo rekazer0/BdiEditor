@@ -52,7 +52,6 @@ import "./project-chooser.css"
 import { initializeSettings } from "./settings"
 import { createAtlasWorkspace } from "./atlas-workspace"
 import { resizeTileSlice } from "./tiles"
-import { initPerformanceOptimization } from "./performance-init"
 import type { AiChatController, AiChatRunHooks, AiChatRunResult } from "./ai-chat.ts"
 import type { AiDesignConversation } from "./ai-design.ts"
 import {
@@ -547,6 +546,7 @@ const aiDraftSummary = $("#ai-draft-summary") as HTMLElement
 const aiDraftFiles = $("#ai-draft-files") as HTMLElement
 const aiDraftApply = $("#ai-draft-apply") as HTMLButtonElement
 const aiDraftCancel = $("#ai-draft-cancel") as HTMLButtonElement
+const aiNewSession = $("#ai-new-session") as HTMLButtonElement
 const modelProfile = $("#model-profile") as HTMLSelectElement
 const browserOpen = $("#browser-open") as HTMLInputElement
 const imageOpen = $("#image-open") as HTMLInputElement
@@ -3053,6 +3053,7 @@ canvasWrap.addEventListener("pointermove", (event) => {
     if (Math.hypot(dx, dy) < 3) return
     previewPanStart = previewPanCandidate
     preview.setPointerInteractionLocked(true)
+    toolbarPreview.setPointerInteractionLocked(true)
     // Cache layout before the first transform write. Every subsequent frame
     // can derive the transformed canvas bounds from this snapshot and the pan
     // delta, avoiding forced reflow in the crosshair update path.
@@ -3097,13 +3098,15 @@ function finishPreviewPan(): void {
   previewPanStart = undefined
   previewPanGeometry = undefined
   preview.setPointerInteractionLocked(false)
+  toolbarPreview.setPointerInteractionLocked(false)
   canvasWrap.classList.remove("preview-pan-ready", "preview-panning")
   if (pointerId !== undefined && canvasWrap.hasPointerCapture(pointerId)) canvasWrap.releasePointerCapture(pointerId)
 }
 
 canvasWrap.addEventListener("pointerup", finishPreviewPan)
 canvasWrap.addEventListener("pointercancel", finishPreviewPan)
-canvasWrap.addEventListener("lostpointercapture", finishPreviewPan)
+// Ignore capture lost by child canvases (it bubbles here when the pan takes capture over).
+canvasWrap.addEventListener("lostpointercapture", (event) => { if (event.target === canvasWrap) finishPreviewPan() })
 
 function updateCanvasCandidateGeometry(candidateHeight: number): void {
   if (!canvasLogicalSize) return
@@ -6774,7 +6777,9 @@ function populateKeyInspector(): void {
     const availableForBda = group === keyTypographyFieldsGroup
     group.hidden = skinSelected || bdaConfigSelected || !hasSelection || bdaSelected && !availableForBda
   }
-  selectedKeyName.textContent = skinSelected
+  selectedKeyName.textContent = hasSelection
+    ? sections.length > 1 ? `已选 ${sections.length} 个按键` : "按键"
+    : skinSelected
     ? "皮肤信息"
     : bdaConfigSelected
       ? selectedPath.split("/").pop() ?? "BDA 专属配置"
@@ -6784,18 +6789,9 @@ function populateKeyInspector(): void {
       ? `${toolbarSection} · ${selectedDocument?.get(effectiveToolbarSection, "KEY") || selectedDocument?.get(toolbarSection, "KEY") || "未配置点击动作"}`
     : toolbarSelected
       ? "候选栏与工具栏"
-    : selectedPath !== layoutPath && !toolbarSelected
+    : selectedPath !== layoutPath
       ? selectedPath.split("/").pop() ?? "文档配置"
-    : !hasSelection
-      ? `${selectedPath.split("/").pop() ?? "键盘"} · 整体布局`
-    : bdaSelected
-      ? selectedBdaKeyNames().join("、") || `已选择 ${sections.length} 个 BDA 按键`
-    : sections.length === 1
-      ? isListCell(sections[0])
-        ? "LIST · 候选栏"
-        : `${effectiveKeySection(sections[0])} · ${effectiveKeyValue(sections[0], "CENTER") || "未配置点击动作"}`
-      : `已选 ${sections.length} 个按键`
-  if (hasSelection) selectedKeyName.textContent = sections.length > 1 ? `已选 ${sections.length} 个按键` : "按键"
+      : `${selectedPath.split("/").pop() ?? "键盘"} · 整体布局`
   selectedKeyPreview.replaceChildren(inspectorIcon(hasSelection ? bdaSelected ? "component" : sections.length > 1 ? "layers" : "key-round" : "panel-top"))
   selectedKeyPreview.hidden = false
   selectedKeyName.title = selectedKeyName.textContent ?? ""
@@ -6816,9 +6812,10 @@ function populateKeyInspector(): void {
     field.value = skinSelected ? selectedDocument?.get("", field.dataset.skinField ?? "") ?? "" : ""
     field.disabled = !skinSelected
   }
-  const toolbarGen = toolbarSelected && archive?.isText(genConfigPath())
+  const general = archive?.isText(genConfigPath())
     ? IniDocument.parse(archive.getText(genConfigPath()))
     : undefined
+  const toolbarGen = toolbarSelected ? general : undefined
   for (const field of toolbarFields) {
     const [section, key] = (field.dataset.toolbarField ?? "").split(".")
     field.value = toolbarSelected
@@ -6845,9 +6842,7 @@ function populateKeyInspector(): void {
                 : config?.pressedColor ?? ""
     if (field.dataset.keyboardField?.endsWith("COLOR")) syncColorControl(field)
   }
-  const soundGeneral = archive?.isText(genConfigPath())
-    ? IniDocument.parse(archive.getText(genConfigPath()))
-    : undefined
+  const soundGeneral = general
   for (const field of keyFields) {
     const name = field.dataset.keyField ?? ""
     // BDA 样式引用由源码结构控件编辑，旧格式按键字段只负责非 BDA 皮肤。
@@ -6902,11 +6897,15 @@ function populateKeyInspector(): void {
     ))
   }
   const bdaTextPropertyAvailability = new Map<string, boolean>()
+  // Decoding the appearance file is the expensive part: do it once per refresh, not per field.
+  const bdaTextInfo = bdaSelected ? currentBdaAppearance() : undefined
+  const bdaTextRefs = bdaSelected ? selectedBdaRefs("FORE_STYLE", "text") : []
+  let hasTextStyle = bdaTextRefs.length > 0
   for (const field of styleFields) {
     const property = field.dataset.styleField ?? ""
-    if (archive?.format === "bda") {
-      const info = currentBdaAppearance()
-      const refs = selectedBdaRefs("FORE_STYLE", "text")
+    if (bdaSelected) {
+      const info = bdaTextInfo
+      const refs = bdaTextRefs
       const values = info ? refs.map((ref) => bdaStyleValue(info.appearance, ref, property)) : []
       const available = Boolean(info && refs.some((ref) => bdaStyleHasProperty(info.appearance, ref, property)))
       bdaTextPropertyAvailability.set(property, available)
@@ -6918,6 +6917,7 @@ function populateKeyInspector(): void {
       continue
     }
     const context = selectedStylePropertyContext(property, keyboard?.styles)
+    hasTextStyle ||= Boolean(context)
     const values = context?.sources.map((source) => source.value)
     const common = values?.every((value) => value === values[0]) ? values[0] : ""
     field.disabled = !context
@@ -6931,9 +6931,6 @@ function populateKeyInspector(): void {
     field.value = common ?? ""
     if (property.endsWith("COLOR")) syncColorControl(field)
   }
-  const hasTextStyle = archive?.format === "bda"
-    ? selectedBdaRefs("FORE_STYLE", "text").length > 0
-    : styleFields.some((field) => Boolean(selectedStylePropertyContext(field.dataset.styleField ?? "", keyboard?.styles)))
   for (const label of textStyleLabels) {
     if (!hasSelection || !hasTextStyle) {
       label.hidden = true
@@ -9840,9 +9837,7 @@ function syncAiDesignContext(): void {
     ? selectedKeyName.textContent?.trim() || `${selectedKeySections.length} 个按键`
     : "未选择"
   const available = Boolean(archive && previewCanvas.width && previewCanvas.height)
-  aiContextPreview.hidden = false
   aiContextPreview.textContent = available ? "画布已提供" : "暂无画布"
-  aiContextPreview.hidden = false
   syncAiDesignControls()
 }
 
@@ -10143,18 +10138,22 @@ function ensureAiChat(): Promise<AiChatController> {
     .catch((error) => { aiChatInitialization = undefined; throw error })
   return aiChatInitialization.then((controller) => {
     aiChatController = controller
+    syncAiDesignControls()
     return controller
   })
 }
 
 function syncAiDesignControls(): void {
   aiDesignModel.disabled = aiDesignBusy || savedModels.length === 0
-  ;($("#ai-new-session") as HTMLButtonElement).disabled = aiDesignBusy || Boolean(aiDesignDraft)
+  aiNewSession.disabled = aiDesignBusy || Boolean(aiDesignDraft)
+  // A pending draft must be applied or discarded first; deep-chat keeps its stop
+  // button during a run, so only the idle submit state is affected.
+  aiChatController?.setEnabled(!aiDesignDraft && savedModels.length > 0)
   aiDraftApply.disabled = aiDesignBusy || !isEditing() || Boolean(aiDesignDraft?.variants?.length)
   aiDraftCancel.disabled = aiDesignBusy
 }
 
-$("#ai-new-session").addEventListener("click", () => {
+aiNewSession.addEventListener("click", () => {
   if (aiDesignBusy || aiDesignDraft) return
   aiChatController?.clear()
   aiDesignConversation = []
@@ -12310,7 +12309,6 @@ if (isTauri()) {
 }
 
 // 初始化性能优化
-initPerformanceOptimization()
 
 mode.value = "preview"
 applyModeState()

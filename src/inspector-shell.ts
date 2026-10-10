@@ -15,9 +15,7 @@ type InspectorInput = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
 
 type Row = {
   el: HTMLElement
-  input: InspectorInput | null
   inputs: InspectorInput[]
-  label: string
   baseline: string
 }
 
@@ -46,16 +44,9 @@ function inspector(): HTMLElement | null {
   return document.getElementById("quick-inspector")
 }
 
-function valueOf(input: InspectorInput | null): string {
-  if (!input) return ""
+function valueOf(input: InspectorInput): string {
   if (input instanceof HTMLInputElement && input.type === "checkbox") return String(input.checked)
   return input.value
-}
-
-function rowLabel(row: HTMLElement): string {
-  const clone = row.cloneNode(true) as HTMLElement
-  clone.querySelectorAll("input, select, textarea, button, small, svg, .style-picker-trigger, .sound-style-main-meta, .pin-reset, .pin-dot").forEach((node) => node.remove())
-  return (clone.textContent ?? "").replace(/\s+/g, " ").trim()
 }
 
 function sectionLabel(section: HTMLElement): string {
@@ -184,7 +175,7 @@ function collectRows(): void {
   rows = Array.from(root.querySelectorAll<HTMLElement>("label")).flatMap((el) => {
     const inputs = Array.from(el.querySelectorAll<InspectorInput>("input, select, textarea"))
     if (!inputs.length) return []
-    const row = { el, input: inputs[0], inputs, label: rowLabel(el), baseline: JSON.stringify(inputs.map(valueOf)) }
+    const row = { el, inputs, baseline: JSON.stringify(inputs.map(valueOf)) }
     if (!baselines.has(el)) baselines.set(el, row.baseline)
     return [row]
   })
@@ -195,28 +186,21 @@ function refreshBaselines(): void {
   collectRows()
   for (const row of rows) {
     baselines.set(row.el, rowValue(row))
-    row.el.classList.remove("pin-modified")
-    row.el.querySelector(".pin-dot")?.remove()
-    row.el.querySelector(".pin-reset")?.remove()
+    markRow(row, false)
   }
   updateMeta()
 }
 
+/** Modified rows get a dot; resetting goes through the toolbar's 重置 or global undo. */
 function markRow(row: Row, modified: boolean): void {
-  if (modified) {
-    row.el.classList.add("pin-modified")
-    if (!row.el.querySelector(".pin-dot")) {
-      const dot = document.createElement("span")
-      dot.className = "pin-dot"
-      dot.setAttribute("aria-hidden", "true")
-      row.el.prepend(dot)
-    }
-    // Keep the modified marker, but use global undo rather than per-field buttons.
-    row.el.querySelector(".pin-reset")?.remove()
-  } else {
-    row.el.classList.remove("pin-modified")
-    row.el.querySelector(".pin-dot")?.remove()
-    row.el.querySelector(".pin-reset")?.remove()
+  row.el.classList.toggle("pin-modified", modified)
+  const dot = row.el.querySelector(":scope > .pin-dot")
+  if (!modified) dot?.remove()
+  else if (!dot) {
+    const marker = document.createElement("span")
+    marker.className = "pin-dot"
+    marker.setAttribute("aria-hidden", "true")
+    row.el.prepend(marker)
   }
 }
 
@@ -308,12 +292,13 @@ function bindInspector(): void {
   root?.addEventListener("focusin", collectRows)
   root?.addEventListener("input", onInspectorInput, true)
   root?.addEventListener("change", onInspectorInput, true)
-  root?.addEventListener("focusout", () => {
-    window.setTimeout(() => {
-      decorateSections()
-      updateMeta()
-    }, 60)
-  })
+}
+
+/** Our own row markers (pin-modified, pin-dot) must not re-run the panel decoration. */
+function isOwnRowMarker(record: MutationRecord): boolean {
+  if (record.type === "attributes") return record.attributeName === "class" && (record.target as Element).tagName === "LABEL"
+  const nodes = [...record.addedNodes, ...record.removedNodes]
+  return nodes.length > 0 && nodes.every((node) => node instanceof HTMLElement && node.classList.contains("pin-dot"))
 }
 
 export function initInspectorShell(): void {
@@ -327,8 +312,8 @@ export function initInspectorShell(): void {
   updateMeta()
 
   let scheduled = false
-  const observer = new MutationObserver(() => {
-    if (scheduled) return
+  const observer = new MutationObserver((records) => {
+    if (scheduled || records.every(isOwnRowMarker)) return
     scheduled = true
     window.requestAnimationFrame(() => {
       scheduled = false
@@ -444,7 +429,7 @@ function decorateInspectorDetails(): void {
   const gestureHint = gestures?.querySelector(".inspector-group-subtitle")
   if (gestureHint) gestureHint.textContent = "方向格即输入区，留空表示未配置。"
   decorateSections()
-  root.addEventListener("input", syncInspectorDetails)
+  root.addEventListener("input", syncGestureCells)
   syncInspectorDetails()
 }
 
@@ -462,11 +447,16 @@ function syncInspectorDetails(): void {
       return chip
     }))
   }
+  syncGestureCells()
+}
+
+function syncGestureCells(): void {
+  const root = inspector()
+  if (!root) return
   for (const [field] of gestureDirections) {
     const cell = root.querySelector<HTMLElement>(`[data-gesture="${field}"]`)
-    const input = root.querySelector<HTMLInputElement>(`[data-key-field="${field}"]`)
     if (!cell) continue
-    const code = input?.value ?? ""
+    const code = root.querySelector<HTMLInputElement>(`[data-key-field="${field}"]`)?.value ?? ""
     cell.classList.toggle("configured", Boolean(code && code !== "None"))
   }
 }

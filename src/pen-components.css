@@ -100,13 +100,6 @@
   height: 14px;
 }
 
-:root body .titlebar .toolbar-divider {
-  width: 1px;
-  height: 16px;
-  margin: 0 4px;
-  background: var(--pen-line);
-}
-
 /* =================================================================================================
  * 2 · Segmented control  (设计系统: gap 2 · padding 3 · r8 · $bg-sunken;
  *     selected segment r5 · $bg-surface · 1px $line · 12/500 $ink)
@@ -267,9 +260,7 @@
  * ================================================================================================= */
 
 :root body #quick-inspector .inspector-grid label,
-:root body #quick-inspector .inspector-grid > label > span:first-child,
-:root body #quick-inspector .inspector-field-label,
-:root body #quick-inspector .field-label {
+:root body #quick-inspector .inspector-grid > label > span:first-child {
   color: var(--pen-tertiary);
   font-size: 11px;
   font-weight: 400;
@@ -354,33 +345,6 @@
 }
 
 /* Stepper (设计系统: 28px sunken capsule, 12px glyphs, 11.5px mono value) */
-:root body #quick-inspector .stepper,
-:root body #quick-inspector .number-stepper {
-  height: 28px;
-  padding: 0 3px;
-  gap: 2px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-}
-
-:root body #quick-inspector .stepper button,
-:root body #quick-inspector .number-stepper button {
-  width: 20px;
-  height: 22px;
-  border: 0;
-  border-radius: var(--pen-radius-xs);
-  background: transparent;
-  color: var(--pen-secondary);
-}
-
-:root body #quick-inspector .stepper button .system-symbol,
-:root body #quick-inspector .stepper button .system-symbol svg,
-:root body #quick-inspector .number-stepper button .system-symbol,
-:root body #quick-inspector .number-stepper button .system-symbol svg {
-  width: 12px;
-  height: 12px;
-}
 
 /* =================================================================================================
  * 5 · Switch  (组件 / 开关: 36×20 · padding 2 · $radius-pill · 16px thumb $on-brand)
@@ -624,7 +588,6 @@
   font-size: 11px;
 }
 
-:root body .settings-group-title,
 :root body .settings-list > h4 {
   color: var(--pen-secondary);
   font-size: 11px;
@@ -766,17 +729,6 @@
   .desktop-quick-actions { display: none; }
 }
 
-:root body .preview-heading strong {
-  color: var(--pen-text);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-:root body .preview-heading span {
-  color: var(--pen-tertiary);
-  font-size: 11px;
-}
-
 :root body .preview-tool-toggle {
   width: 30px;
   height: 30px;
@@ -841,14 +793,6 @@
   font-size: 11.5px;
   font-weight: 500;
   line-height: 26px;
-}
-
-:root body .preview-toolbar-divider,
-:root body .preview-toolbar .toolbar-divider {
-  width: 1px;
-  height: 16px;
-  margin: 0 2px;
-  background: var(--pen-line);
 }
 
 /* =================================================================================================
@@ -1248,37 +1192,6 @@
   color: currentColor;
   font-size: 14px;
   line-height: 1;
-}
-
-:root body .titlebar .titlebar-action-primary,
-:root body .titlebar .titlebar-export > summary.titlebar-action-primary {
-  padding: 6px 12px;
-  background: var(--pen-accent);
-  color: var(--pen-on-brand);
-  font-weight: 600;
-}
-
-:root body .titlebar .titlebar-action-primary:hover:not(:disabled),
-:root body .titlebar .titlebar-export > summary.titlebar-action-primary:hover {
-  background: color-mix(in srgb, var(--pen-accent) 86%, #000000);
-  color: var(--pen-on-brand);
-}
-
-:root body .titlebar .titlebar-export.toolbar-more {
-  position: relative;
-  width: auto;
-  height: auto;
-  min-width: 0;
-  display: block;
-  background: transparent;
-}
-
-:root body .titlebar .titlebar-export > summary {
-  list-style: none;
-}
-
-:root body .titlebar .titlebar-export > summary::-webkit-details-marker {
-  display: none;
 }
 
 :root body .titlebar-icon-button,
