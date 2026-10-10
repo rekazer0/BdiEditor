@@ -1351,6 +1351,7 @@ export class Preview {
   private mode: "edit" | "preview" = "edit"
   private editTool: "select" | "move" = "select"
   private pointerInteractionLocked = false
+  private renderDeferred = false
   private editDrag?: {
     pointerId: number
     startX: number
@@ -1525,6 +1526,10 @@ export class Preview {
   setPointerInteractionLocked(locked: boolean): void {
     this.pointerInteractionLocked = locked
     if (locked) this.cancelPointerInteraction()
+    else if (this.renderDeferred) {
+      this.renderDeferred = false
+      this.draw()
+    }
   }
 
   setEditTool(tool: "select" | "move"): void {
@@ -2391,6 +2396,11 @@ export class Preview {
   }
 
   private startRender(): void {
+    // A full canvas repaint during a canvas pan drops frames; paint once when the pan ends.
+    if (this.pointerInteractionLocked) {
+      this.renderDeferred = true
+      return
+    }
     this.renderPending = true
     void this.render().finally(() => {
       this.renderPending = false
