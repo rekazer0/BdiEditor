@@ -5533,109 +5533,9 @@ body:has(.canvas-wrap.empty) .workspace {
   line-height: 1.2;
 }
 
-#ai-design-panel {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: 0;
-  overflow: hidden;
-  /* background: var(--card-canvas, var(--panel)); */ /* 使用玻璃背景效果 */
-}
-
-#ai-design-panel[hidden] {
-  display: none;
-}
-
-.ai-design-composer {
-  --ai-input-height: 148px;
-  position: relative;
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  container-type: inline-size;
-}
-.ai-design-resize {
-  position: absolute;
-  z-index: 2;
-  left: 14px;
-  right: 14px;
-  bottom: calc(var(--ai-input-height) + 22px);
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: ns-resize;
-  touch-action: none;
-  user-select: none;
-  border-radius: 8px;
-}
-.ai-design-resize span {
-  width: 36px;
-  height: 4px;
-  border-radius: 4px;
-  background: var(--muted);
-  opacity: .4;
-  box-shadow: 0 0 0 4px var(--control);
-  transition: width .15s, opacity .15s;
-}
-.ai-design-resize:hover span,
-.ai-design-resize.is-resizing span,
-.ai-design-resize:focus-visible span { width: 48px; opacity: .85; }
-.ai-design-resize:focus-visible { outline: 2px solid var(--muted); outline-offset: 2px; }
-.ai-design-toolbar {
-  position: absolute;
-  left: 16px;
-  right: 66px;
-  bottom: 43px;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  flex-shrink: 0;
-}
 .ai-design-heading { display: none; flex-direction: column; gap: 4px; min-width: 0; }
 .ai-design-heading strong { font-size: 14px; color: var(--text); }
 .ai-design-heading span { color: var(--muted); font-size: 12px; line-height: 1.5; }
-.ai-design-toolbar label {
-  flex: 0 1 230px;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.ai-model-picker > span { flex: 0 0 auto; color: var(--muted); font-size: 11px; }
-.ai-design-toolbar select {
-  width: auto;
-  flex: 1;
-  min-width: 0;
-  height: 28px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background-color: color-mix(in srgb, var(--text) 3%, var(--control));
-  padding: 0 8px;
-  text-overflow: ellipsis;
-  color: var(--text);
-  font-size: 11.5px;
-}
-.ai-design-toolbar select:focus-visible,
-.ai-design-toolbar select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-@container (max-width: 340px) {
-  .ai-design-toolbar { left: 14px; gap: 4px; }
-  .ai-model-picker { flex-basis: min(230px, calc(100% - 8px)); }
-}
-.ai-design-toolbar select:hover:not(:disabled) { border-color: var(--muted); }
-.ai-design-toolbar select:focus { box-shadow: none; }
-.ai-design-toolbar select:disabled { color: var(--muted); cursor: not-allowed; }
-#ai-design-chat { width: 100%; min-height: 0; flex: 1; border: 0; background: transparent; }
-.ai-design-status { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
-.ai-design-status:empty { display: none; }
-#ai-design-status:not(:empty) { margin: 8px 12px 0; padding: 8px 10px; border-radius: 7px; color: var(--secondary); background: color-mix(in srgb, var(--accent) 7%, var(--control)); }
 
 .app-dialog label {
   display: grid;
@@ -8963,11 +8863,6 @@ input[type="search"]:focus {
 .source .source-toolbar .search-control > input:focus-visible { outline: none; }
 .source .inspector-tabs button:disabled { opacity: .4; cursor: not-allowed; }
 .source .source-toolbar :is(button, .search-control) { height: 32px; }
-@media (max-width: 760px) {
-  .ai-design-toolbar { padding: 0; }
-  #ai-design-status:not(:empty) { margin-inline: 10px; }
-}
-
 /* One object summary and category navigation for both layout and key editing. */
 #quick-inspector:not([hidden]) .key-inspector-title {
   height: auto;
@@ -12544,7 +12439,6 @@ dialog[open]::backdrop {
   animation: ui-fade 200ms ease-out;
 }
 
-.ai-design-panel .ai-design-status[data-state="editing"],
 [data-ai-draft="pending"] {
   animation: ui-draft-pulse 320ms ease-in-out;
 }
@@ -12733,20 +12627,6 @@ dialog[open]::backdrop {
 .ai-design-heading span {
   font-size: 11px;
   color: var(--tertiary);
-}
-
-.ai-design-toolbar {
-  border-top: 1px solid var(--line);
-  background: var(--toolbar);
-}
-
-.ai-design-toolbar select {
-  border-radius: var(--radius-sm);
-}
-
-.ai-suggestions button,
-.ai-welcome {
-  border-radius: var(--radius-md);
 }
 
 /* ── 弹层：设置 / 关于 / 新建 / 未保存 ── */

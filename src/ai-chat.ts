@@ -104,7 +104,6 @@ function configureAppearance(chat: DeepChat): void {
   const radiusLg = "var(--pin-radius-lg, 12px)"
   const radiusMd = "var(--pin-radius-md, 8px)"
   const radiusSm = "var(--pin-radius-sm, 6px)"
-  const ctrlH = "var(--pin-ctrl-h, 30px)"
   const radiusPill = "var(--pen-radius-pill, 999px)"
 
   chat.chatStyle = {
@@ -121,24 +120,26 @@ function configureAppearance(chat: DeepChat): void {
   chat.inputAreaStyle = {
     width: "auto",
     alignSelf: "end",
-    margin: "0 14px 24px",
+    margin: "0 14px 14px",
     border: "0",
     backgroundColor: "transparent",
     boxShadow: "none",
   }
+  // The box grows with its text; the bottom band holds the model picker
+  // (overlaid from the panel) and the send button.
   chat.textInput = {
     placeholder: { text: "描述你想要的皮肤效果…", style: { color: muted } },
     characterLimit: 8_000,
     styles: {
-      text: { color: text, fontSize: "12.5px", lineHeight: "1.7", padding: "13px 13px 0",
-        boxSizing: "border-box", height: "calc(100% - 46px)", overflowY: "auto" },
+      text: { color: text, fontSize: "12.5px", lineHeight: "1.6", padding: "11px 12px 0",
+        boxSizing: "border-box", minHeight: "44px", maxHeight: "200px", overflowY: "auto" },
       container: {
-        width: "100%", boxSizing: "border-box", margin: "0",
-        height: "var(--ai-input-height, 148px)", minHeight: "128px", maxHeight: "none", overflow: "hidden",
-        border: `1px solid ${line}`, borderRadius: radiusLg,
-        backgroundColor: sunken, boxShadow: `0 8px 24px color-mix(in srgb, ${text} 6%, transparent)`,
+        width: "100%", boxSizing: "border-box", margin: "0", paddingBottom: "40px",
+        height: "auto", maxHeight: "none", overflow: "hidden",
+        border: `1px solid ${lineStrong}`, borderRadius: radiusLg, backgroundColor: control,
+        boxShadow: `0 1px 2px color-mix(in srgb, ${text} 5%, transparent)`,
       },
-      focus: { borderColor: accent, boxShadow: "none", outline: `2px solid ${accent}`, outlineOffset: "1px" },
+      focus: { borderColor: accent, boxShadow: `0 0 0 3px color-mix(in srgb, ${accent} 16%, transparent)` },
     },
   }
 
@@ -156,23 +157,30 @@ function configureAppearance(chat: DeepChat): void {
     .ai-run-holder .message-bubble { max-width: 100%; padding: 0; border: 0;
       border-radius: 0; background: transparent; box-shadow: none; color: ${text}; }
 
-    /* --- empty state ------------------------------------------------------- */
-    .intro-panel { display: flex; flex-direction: column; width: 100%; box-sizing: border-box; top: 0;
-      bottom: calc(var(--ai-input-height, 148px) + 42px); height: auto; margin: 0;
-      overflow-y: auto; align-items: stretch; justify-content: safe center; }
-    .ai-welcome { width: 100%; box-sizing: border-box; margin: 0; padding: 16px 14px;
+    /* --- empty state: sits on the composer, not in the middle of nowhere -- */
+    .intro-panel { position: static; flex-direction: column; justify-content: flex-end;
+      box-sizing: border-box; width: 100%; height: auto; min-height: 100%; margin: 0; }
+    .ai-welcome { display: grid; gap: 6px; box-sizing: border-box; padding: 16px 14px 14px;
       text-align: left; color: ${text}; }
-    .ai-welcome h2 { margin: 0 0 16px; font-size: 14px; font-weight: 500; letter-spacing: -.01em; }
-    .ai-suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
-    .ai-suggestions button { display: inline-flex; align-items: center; justify-content: flex-start;
-      min-height: 30px; width: auto; text-align: left;
-      max-width: 100%; padding: 5px 10px; font: inherit; font-size: 11.5px; color: ${secondary};
-      background: ${sunken}; border: 1px solid transparent; border-radius: ${radiusPill};
-      cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
-    .ai-suggestions button:hover { border-color: color-mix(in srgb, ${accent} 32%, transparent);
-      background: color-mix(in srgb, ${accent} 7%, ${sunken}); color: ${text}; }
+    .ai-welcome-mark { display: grid; place-items: center; width: 28px; height: 28px;
+      border-radius: ${radiusMd}; background: color-mix(in srgb, ${accent} 10%, transparent);
+      color: ${accent}; font-size: 13px; }
+    .ai-welcome h2 { margin: 6px 0 0; font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+    .ai-welcome p { margin: 0 0 8px; color: ${secondary}; font-size: 11.5px; line-height: 1.6; }
+    .ai-suggestions { display: grid; gap: 6px; }
+    .ai-suggestions button { display: grid; gap: 2px; width: 100%; padding: 8px 11px;
+      font: inherit; text-align: left; color: ${text}; background: ${control};
+      border: 1px solid ${line}; border-radius: ${radiusMd}; cursor: pointer;
+      transition: background .15s, border-color .15s; }
+    .ai-suggestions strong { font-size: 12px; font-weight: 500; }
+    .ai-suggestions span { color: ${muted}; font-size: 11px; }
+    .ai-suggestions button:hover { border-color: color-mix(in srgb, ${accent} 40%, ${line});
+      background: color-mix(in srgb, ${accent} 5%, ${control}); }
     .ai-suggestions button:focus-visible { outline: 2px solid ${accent}; outline-offset: 2px; }
-    .ai-suggestions button:active { transform: scale(.98); }
+    .ai-suggestions button:active { transform: scale(.99); }
+
+    /* A pending draft replaces the composer until it is applied or discarded. */
+    :host([data-draft]) #input { display: none; }
 
     /* --- run timeline: “✦ 思考中 · 12s · 6 个步骤” -------------------------- */
     .ai-run { margin: 2px 0 6px; }
@@ -237,9 +245,6 @@ function configureAppearance(chat: DeepChat): void {
       background: ${control}; box-shadow: 0 2px 8px color-mix(in srgb, ${text} 12%, transparent); }
     #scroll-button svg { width: 12px; height: 12px; color: ${secondary}; }
 
-    @container (max-width: 300px) {
-      .ai-suggestions button { padding: 4px 8px; }
-    }
     @media (prefers-reduced-motion: reduce) {
       * { scroll-behavior: auto !important; animation: none !important; }
     }
@@ -277,18 +282,18 @@ function configureAppearance(chat: DeepChat): void {
     submit: {
       container: {
         default: { backgroundColor: accent, color: onAccent, borderRadius: radiusMd, boxSizing: "border-box",
-          width: ctrlH, height: ctrlH, bottom: "18px", right: "9px", boxShadow: "none" },
+          width: "28px", height: "28px", bottom: "6px", right: "6px", boxShadow: "none" },
         hover: { filter: "brightness(1.06)", transform: "none" },
       },
     },
     disabled: {
       container: { default: { backgroundColor: `color-mix(in srgb, ${text} 5%, ${sunken})`, border: `1px solid ${line}`, color: muted,
-        borderRadius: radiusMd, boxSizing: "border-box", width: ctrlH, height: ctrlH, bottom: "18px", right: "9px",
+        borderRadius: radiusMd, boxSizing: "border-box", width: "28px", height: "28px", bottom: "6px", right: "6px",
         cursor: "not-allowed", boxShadow: "none" } },
     },
     stop: {
       container: { default: { border: `1px solid ${lineStrong}`, backgroundColor: sunken, color: secondary,
-        borderRadius: radiusMd, boxSizing: "border-box", width: ctrlH, height: ctrlH, bottom: "18px", right: "9px", boxShadow: "none" } },
+        borderRadius: radiusMd, boxSizing: "border-box", width: "28px", height: "28px", bottom: "6px", right: "6px", boxShadow: "none" } },
     },
   }
   chat.focusMode = { smoothScroll: true, streamAutoScroll: true, fade: false }
@@ -297,58 +302,10 @@ function configureAppearance(chat: DeepChat): void {
   chat.remarkable = { linkTarget: "_blank", breaks: true, html: false }
 }
 
-function enableInputResize(chat: HTMLElement): void {
-  const composer = chat.closest<HTMLElement>(".ai-design-composer")
-  const handle = composer?.querySelector<HTMLElement>(".ai-design-resize")
-  if (!composer || !handle) return
-  let height = 148
-  let drag: { pointerId: number; y: number; height: number } | undefined
-  const updateHeight = (next: number) => {
-    const available = composer.clientHeight
-    if (!available) return
-    const max = Math.max(128, Math.min(360, available - 160))
-    height = Math.round(Math.max(128, Math.min(max, next)))
-    composer.style.setProperty("--ai-input-height", `${height}px`)
-    handle.setAttribute("aria-valuenow", String(height))
-    handle.setAttribute("aria-valuemax", String(max))
-    handle.setAttribute("aria-valuetext", `输入框高度 ${height} 像素`)
-  }
-  handle.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0) return
-    event.preventDefault()
-    handle.focus()
-    drag = { pointerId: event.pointerId, y: event.clientY, height }
-    handle.setPointerCapture(event.pointerId)
-    handle.classList.add("is-resizing")
-  })
-  handle.addEventListener("pointermove", (event) => {
-    if (drag?.pointerId === event.pointerId) updateHeight(drag.height + drag.y - event.clientY)
-  })
-  const endDrag = () => {
-    drag = undefined
-    handle.classList.remove("is-resizing")
-  }
-  handle.addEventListener("lostpointercapture", endDrag)
-  handle.addEventListener("pointercancel", endDrag)
-  handle.addEventListener("pointerup", (event) => {
-    if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId)
-    endDrag()
-  })
-  handle.addEventListener("keydown", (event) => {
-    if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return
-    event.preventDefault()
-    updateHeight(event.key === "Home" ? 128 : event.key === "End" ? 360 : height + (event.key === "ArrowUp" ? 16 : -16))
-  })
-  handle.addEventListener("dblclick", () => updateHeight(148))
-  new ResizeObserver(() => updateHeight(height)).observe(composer)
-  updateHeight(height)
-}
-
 export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promise<AiChatController> {
   await customElements.whenDefined("deep-chat")
   const chat = element as DeepChat
   configureAppearance(chat)
-  enableInputResize(chat)
 
   chat.onComponentRender = () => {
     const input = chat.shadowRoot?.querySelector<HTMLElement>("#text-input")

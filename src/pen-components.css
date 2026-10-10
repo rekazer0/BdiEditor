@@ -421,8 +421,7 @@
  * close button below can still outrank this default. */
 :root body .app-dialog button:where(:not([data-settings-page])),
 :root body .project-dialog button,
-:root body .toolbar-menu button,
-:root body .ai-draft-actions button {
+:root body .toolbar-menu button {
   min-height: 32px;
   height: 32px;
   padding: 0 14px;
@@ -450,8 +449,7 @@
 }
 
 :root body .app-dialog button.primary,
-:root body .project-dialog button.primary,
-:root body .ai-draft-apply {
+:root body .project-dialog button.primary {
   border-color: transparent;
   background: var(--pen-accent);
   color: var(--pen-on-brand);

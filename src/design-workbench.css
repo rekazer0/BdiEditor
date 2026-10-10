@@ -6,89 +6,6 @@
   --preview-check-size: var(--checker-size);
   --preview-checker: var(--checker-image);
 }
-:root body .source #ai-design-panel .ai-session-bar {
-  display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between;
-  gap: 8px; padding: 10px 14px; color: var(--pin-ink); font-size: 12px; font-weight: 600;
-}
-#ai-context-key { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--pin-ink-muted); font-size: 10px; font-weight: 400; }
-#ai-new-session { margin-left: auto; }
-:root body .source #ai-design-panel #ai-new-session {
-  flex: none; height: var(--pin-ctrl-h, 30px); min-height: var(--pin-ctrl-h, 30px); padding: 0 10px;
-  border: 1px solid var(--pin-line);
-  border-radius: var(--pin-radius-md, 8px); background: var(--pin-surface); color: var(--pin-ink-muted);
-  font: 500 11.5px var(--font-ui); box-shadow: none; cursor: pointer;
-}
-:root body .source #ai-design-panel #ai-new-session:hover:not(:disabled) {
-  background: var(--pin-accent-soft); color: var(--pin-accent); border-color: var(--pin-accent);
-}
-:root body .source #ai-design-panel button:disabled { opacity: .48; cursor: not-allowed; }
-:root body .source #ai-design-panel :is(button, select, summary, input):focus-visible {
-  outline: 2px solid var(--pin-accent) !important; outline-offset: 2px;
-}
-:root body .source #ai-design-panel #ai-context-preview {
-  flex: 0 0 auto; padding: 4px 8px; border-radius: 999px;
-  background: var(--pin-accent-soft); color: var(--pin-accent); font-size: 10px; font-weight: 500;
-}
-:root body .source #ai-design-panel[data-state="error"] .ai-design-status:not(:empty) {
-  color: var(--pin-danger) !important; background: color-mix(in srgb, var(--pin-danger) 9%, var(--pin-surface)) !important;
-}
-:root body .source #ai-design-panel[data-state="review"] .ai-design-status:not(:empty) {
-  color: var(--pin-sel) !important; background: var(--pin-sel-soft) !important;
-}
-:root body .source #ai-design-panel[data-state="done"] .ai-design-status:not(:empty) {
-  color: var(--pin-ok) !important; background: color-mix(in srgb, var(--pin-ok) 9%, var(--pin-surface)) !important;
-}
-:root body .source #ai-design-panel .ai-design-status:not(:empty) { flex-shrink: 0; overflow-wrap: anywhere; }
-:root body .source #ai-design-panel #ai-draft-panel:not([hidden]) {
-  flex: 0 1 auto !important; min-height: 0 !important; max-height: 44%; overflow: auto !important;
-  margin: 10px 14px !important; padding: 12px !important; border: 1px solid var(--pin-line) !important;
-  border-radius: var(--pin-radius-lg, 12px) !important; background: var(--pin-sunken) !important; scrollbar-width: thin;
-}
-:root body .source #ai-design-panel #ai-draft-files { max-height: none; }
-:root body .source #ai-design-panel .ai-draft-head { align-items: flex-start !important; flex-wrap: wrap; gap: 4px; }
-:root body .source #ai-design-panel #ai-draft-files > li { padding: 8px !important; background: var(--pin-surface); border-radius: var(--pin-radius-md, 8px); }
-:root body .source #ai-design-panel .ai-variant-card { padding: 0 !important; overflow: hidden; border: 1px solid var(--pin-line); background: var(--pin-surface); }
-:root body .source #ai-design-panel .ai-variant-select {
-  display: flex; width: 100%; align-items: center; gap: 9px; min-height: 52px; padding: 9px 10px;
-  border: 0; background: transparent; color: var(--pin-ink); text-align: left; cursor: pointer;
-}
-:root body .source #ai-design-panel .ai-variant-select:hover { background: var(--pin-accent-soft); }
-:root body .source #ai-design-panel .ai-variant-index {
-  display: grid; place-items: center; flex: 0 0 24px; width: 24px; height: 24px;
-  border-radius: 50%; background: var(--pin-accent); color: var(--pin-on-brand); font: 600 11px var(--font-mono);
-}
-:root body .source #ai-design-panel .ai-variant-copy { display: grid; min-width: 0; gap: 2px; flex: 1; }
-:root body .source #ai-design-panel .ai-variant-copy strong { font-size: 12px; font-weight: 600; }
-:root body .source #ai-design-panel .ai-variant-copy small { color: var(--pin-ink-muted); font-size: 10px; }
-:root body .source #ai-design-panel .ai-variant-note { margin: 0; padding: 0 10px 10px 43px; color: var(--pin-ink-muted); font-size: 10.5px; line-height: 1.45; }
-:root body .source #ai-design-panel .ai-draft-file-head { cursor: pointer; gap: 8px; }
-:root body .source #ai-design-panel .ai-draft-file-head > span { min-width: 0; flex: 1; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 11px; }
-:root body .source #ai-design-panel .ai-draft-file-head > em { flex: none; }
-:root body .source #ai-design-panel .ai-draft-diff {
-  max-height: 200px; overflow: auto !important; margin-top: 8px; padding: 8px !important;
-  border-radius: 5px; background: var(--pin-sunken) !important; white-space: pre; font-size: 10px !important;
-}
-:root body .source #ai-design-panel .ai-draft-diff > ins {
-  text-decoration: none; color: var(--pin-ok) !important; background: color-mix(in srgb, var(--pin-ok) 7%, transparent);
-}
-:root body .source #ai-design-panel .ai-draft-diff > del {
-  text-decoration: none; color: var(--pin-danger) !important; background: color-mix(in srgb, var(--pin-danger) 7%, transparent);
-}
-.ai-draft-full { margin-top: 8px; font-size: 11px; color: var(--pin-ink-muted); }
-.ai-draft-full > summary { cursor: pointer; color: var(--pin-accent); }
-.ai-draft-full h4 { margin: 10px 0 4px; font-size: 10px; }
-.ai-draft-full pre { max-height: 240px; overflow: auto; padding: 8px; background: var(--pin-sunken); border-radius: 5px; font: 10px/1.7 var(--font-mono); }
-:root body .source #ai-design-panel .ai-draft-actions {
-  position: sticky; bottom: -12px; z-index: 1; flex-wrap: wrap; padding: 8px 0; background: var(--pin-sunken);
-}
-:root body .source #ai-design-panel .ai-draft-apply { color: #fff !important; }
-:root body .source #ai-design-panel .ai-design-toolbar { flex-wrap: wrap; padding-bottom: 10px; background: transparent !important; }
-/* Short viewports retain access to both the draft actions and composer. */
-@media (max-height: 680px) {
-  :root body .source #ai-design-panel:not([hidden]) { overflow-y: auto !important; }
-  :root body .source #ai-design-panel #ai-draft-panel:not([hidden]) { flex-shrink: 0 !important; max-height: 230px; }
-  :root body .source #ai-design-panel .ai-design-composer { flex-shrink: 0 !important; min-height: 300px !important; }
-}
 /* Transparency is UI-only: CSS never paints checker pixels into exported artwork. */
 :root body :is(#style-picker-grid .style-picker-previews, #style-library-preview-image,
   .resource-style-previews, .style-image-gallery-item, #style-image-picker-canvas) {
@@ -119,6 +36,4 @@
 :root body .source #quick-inspector#quick-inspector#quick-inspector .pin-hint {
   color: var(--pin-ink-muted) !important;
 }
-@media (prefers-reduced-motion: reduce) {
-  :root body .source #ai-design-panel * { scroll-behavior: auto !important; transition: none !important; }
-}
+

@@ -47,6 +47,7 @@ import { inspectorIcon, inspectorGroupIcon } from "./inspector-icons"
 import { sourceKeyLabels } from "./config-labels.ts"
 import "./style-library.css"
 import "./design-workbench.css"
+import "./ai-design-panel.css"
 import { createDraftReview, changedJsonSections } from "./ai-draft-review"
 import "./project-chooser.css"
 import { initializeSettings } from "./settings"
@@ -547,6 +548,7 @@ const aiDraftFiles = $("#ai-draft-files") as HTMLElement
 const aiDraftApply = $("#ai-draft-apply") as HTMLButtonElement
 const aiDraftCancel = $("#ai-draft-cancel") as HTMLButtonElement
 const aiNewSession = $("#ai-new-session") as HTMLButtonElement
+const aiModelSettings = $(".ai-design-settings") as HTMLButtonElement
 const modelProfile = $("#model-profile") as HTMLSelectElement
 const browserOpen = $("#browser-open") as HTMLInputElement
 const imageOpen = $("#image-open") as HTMLInputElement
@@ -6107,9 +6109,9 @@ const documentPairFieldLabels: Record<string, [string, string]> = {
 
 const documentQuadFieldLabels: Record<string, [string, string, string, string]> = {
   VIEW_RECT: ["横向", "纵向", "宽度", "高度"],
+  NON_SPLIT_PANEL_REGION: ["横向", "纵向", "宽度", "高度"],
   PADDING: ["左", "上", "右", "下"],
 }
-  NON_SPLIT_PANEL_REGION: ["横向", "纵向", "宽度", "高度"],
 
 const documentSwitchFields = new Set(["NO_BLUR"])
 const documentNumericFields = new Set([
@@ -9834,11 +9836,12 @@ function aiSelectedKeyContext(): { label: string; sections: string[]; values: Re
 
 function syncAiDesignContext(): void {
   aiContextKey.hidden = selectedKeySections.length === 0
-  aiContextKey.textContent = selectedKeySections.length
-    ? selectedKeyName.textContent?.trim() || `${selectedKeySections.length} 个按键`
-    : "未选择"
+  aiContextKey.textContent = selectedKeySections.length > 1
+    ? `${selectedKeySections.length} 个按键`
+    : `${selectedKeyName.textContent?.trim() || "按键"} · ${selectedKeySections[0] ?? ""}`
   const available = Boolean(archive && previewCanvas.width && previewCanvas.height)
-  aiContextPreview.textContent = available ? "画布已提供" : "暂无画布"
+  aiContextPreview.textContent = available ? "画布" : "暂无画布"
+  aiContextPreview.dataset.off = String(!available)
   syncAiDesignControls()
 }
 
@@ -9905,8 +9908,9 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
     aiDesignConversation = []
   }
   aiDesignBusy = true
+  // Progress lives in the conversation timeline; the status line only reports outcomes.
   aiDesignPanel.dataset.state = "running"
-  aiDesignStatus.textContent = "正在准备设计…"
+  aiDesignStatus.textContent = ""
   syncAiDesignControls()
   try {
     const panelScope = aiWantsWholeProject(prompt) ? "project" as const : "panel" as const
@@ -9934,7 +9938,6 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
       signal: hooks.signal,
       onStatus: async (kind, text) => {
         if (hooks.signal.aborted || archive !== target) return
-        aiDesignStatus.textContent = text
         await hooks.onStatus?.(text, kind)
       },
       onTextDelta: hooks.onTextDelta,
@@ -9992,7 +9995,7 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
     })
     return {
       fallback: result.response,
-      summary: `已生成 ${changes.length} 个文件的修改草稿。请在上方审阅；确认前不会写入皮肤。`,
+      summary: `已生成 ${changes.length} 个文件的修改草稿。请在下方审阅；确认前不会写入皮肤。`,
     }
   } catch (error) {
     if (archive === target) {
@@ -10074,11 +10077,13 @@ function chooseAiVariant(id: string): void {
 function setAiDesignDraft(draft: AiDraft | undefined): void {
   aiDesignDraft = draft
   aiDraftPanel.hidden = !draft
+  // The draft card takes the composer's place until it is applied or discarded.
+  aiDesignChat.toggleAttribute("data-draft", Boolean(draft))
   preview.setDraftSections(draft?.sections ?? [])
   syncAiDesignControls()
   if (draft) {
     aiDesignPanel.dataset.state = "review"
-    aiDesignStatus.textContent = "草稿已就绪 · 尚未写入皮肤"
+    aiDesignStatus.textContent = ""
   }
   if (!draft) {
     aiDraftFiles.replaceChildren()
@@ -10255,6 +10260,8 @@ function syncModelProfiles(): void {
   aiDesignModel.value = selected !== "" && savedModels[Number(selected)] ? selected : "0"
   if (!savedModels.length) aiDesignModel.replaceChildren(new Option("请先配置模型", ""))
   aiDesignModel.disabled = savedModels.length === 0
+  aiDesignModel.hidden = savedModels.length === 0
+  aiModelSettings.hidden = savedModels.length > 0
   syncAiDesignControls()
 }
 

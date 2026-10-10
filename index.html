@@ -718,43 +718,44 @@
           </div>
         </div>
         <div id="ai-design-panel" hidden>
-          <div class="ai-session-bar">
-            <span id="ai-context-preview" class="ai-context-preview" title="当前画布会随每次设计请求提供给视觉模型">画布已提供</span>
-            <span id="ai-context-key" hidden></span>
-            <button id="ai-new-session" type="button" title="清空当前对话，不影响已应用的修改">新对话</button>
-          </div>
-          <p id="ai-design-status" class="ai-design-status" role="status" aria-live="polite"></p>
-          <section id="ai-draft-panel" class="ai-draft-panel" aria-label="AI 修改草稿" hidden>
-            <header class="ai-draft-head">
-              <h3>待确认的修改草稿</h3>
-              <span id="ai-draft-summary" role="status">涉及 0 个文件</span>
-            </header>
-            <ul id="ai-draft-files" class="ai-draft-files"></ul>
-            <p class="ai-draft-note">请核对每个文件的修改。确认后一次性写入，可整体撤销；应用或丢弃草稿后再继续对话。</p>
-            <div class="ai-draft-actions">
-              <button id="ai-draft-apply" type="button" class="ai-draft-apply">应用到皮肤</button>
-              <button id="ai-draft-cancel" type="button" class="ai-draft-cancel">取消草稿</button>
+          <header class="ai-bar">
+            <div class="ai-context" title="每次请求都会把这些内容提供给模型">
+              <span id="ai-context-preview" class="ai-chip">画布</span>
+              <span id="ai-context-key" class="ai-chip" hidden></span>
             </div>
-          </section>
+            <button id="ai-new-session" class="ai-new-session" type="button" title="清空当前对话，不影响已应用的修改"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9"/></svg>新对话</button>
+          </header>
+          <p id="ai-design-status" class="ai-design-status" role="status" aria-live="polite"></p>
           <div class="ai-design-composer">
             <deep-chat id="ai-design-chat" aria-label="AI 设计对话">
               <section class="ai-welcome" aria-label="开始设计">
+                <span class="ai-welcome-mark" aria-hidden="true">✦</span>
                 <h2>想怎样调整皮肤？</h2>
+                <p>AI 会参考当前画布和选中的按键生成修改草稿，确认后才写入皮肤。</p>
                 <div class="ai-suggestions">
-                  <button type="button" data-ai-prompt="将整个皮肤改为低饱和蓝色，保留现有按键布局。" title="低饱和蓝色，清爽又耐看">换一套配色</button>
-                  <button type="button" data-ai-prompt="适当增大按键文字，提高文字与背景的对比度，保留现有按键布局。" title="调整字号与对比度">让文字更清晰</button>
-                  <button type="button" data-ai-prompt="只优化当前选中的按键视觉样式，参考画布预览调整背景、文字颜色和字号；不要修改其他按键、动作或布局。" title="仅修改选中对象">优化当前按键</button>
+                  <button type="button" data-ai-prompt="将整个皮肤改为低饱和蓝色，保留现有按键布局。"><strong>换一套配色</strong><span>低饱和蓝色，保留布局</span></button>
+                  <button type="button" data-ai-prompt="适当增大按键文字，提高文字与背景的对比度，保留现有按键布局。"><strong>让文字更清晰</strong><span>调整字号与对比度</span></button>
+                  <button type="button" data-ai-prompt="只优化当前选中的按键视觉样式，参考画布预览调整背景、文字颜色和字号；不要修改其他按键、动作或布局。"><strong>优化当前按键</strong><span>只修改选中的按键</span></button>
                 </div>
               </section>
             </deep-chat>
-            <div class="ai-design-resize" role="separator" tabindex="0" aria-label="调整输入框高度" aria-orientation="horizontal" aria-controls="ai-design-chat" aria-valuemin="128" aria-valuemax="360" aria-valuenow="148" title="上下拖动调整高度，双击恢复默认；也可使用上下方向键"><span></span></div>
             <footer class="ai-design-toolbar">
-              <label class="ai-model-picker">
-                <span>模型</span>
-                <select id="ai-design-model" aria-label="选择对话模型" disabled><option value="">请先配置模型</option></select>
-              </label>
+              <select id="ai-design-model" aria-label="选择对话模型" title="对话模型" disabled hidden><option value="">请先配置模型</option></select>
+              <button class="ai-design-settings" type="button" data-app-dialog="settings">配置模型…</button>
             </footer>
           </div>
+          <section id="ai-draft-panel" class="ai-draft-panel" aria-label="AI 修改草稿" hidden>
+            <header class="ai-draft-head">
+              <h3>修改草稿</h3>
+              <span id="ai-draft-summary" role="status">涉及 0 个文件</span>
+            </header>
+            <ul id="ai-draft-files" class="ai-draft-files"></ul>
+            <footer class="ai-draft-actions">
+              <p class="ai-draft-note">确认前不会写入皮肤，应用后可撤销。</p>
+              <button id="ai-draft-cancel" type="button" class="ai-draft-cancel">丢弃</button>
+              <button id="ai-draft-apply" type="button" class="ai-draft-apply">应用到皮肤</button>
+            </footer>
+          </section>
         </div>
         <div id="asset" hidden>
           <div class="asset-toolbar">
