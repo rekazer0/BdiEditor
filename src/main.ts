@@ -2905,8 +2905,12 @@ function skinStateDocuments(): IniDocument[] {
 function fitCanvasPreview(): void {
   if (!canvasLogicalSize) return
   const canvasStyle = getComputedStyle(canvasWrap)
-  const availableWidth = canvasWrap.clientWidth - parseFloat(canvasStyle.paddingLeft) - parseFloat(canvasStyle.paddingRight)
-  const availableHeight = canvasWrap.clientHeight - parseFloat(canvasStyle.paddingTop) - parseFloat(canvasStyle.paddingBottom)
+  // offsetWidth/Height ignore scrollbars: a panned shell that overflows briefly
+  // shows scrollbars, and fitting to clientWidth would shrink then regrow the keyboard.
+  const availableWidth = canvasWrap.offsetWidth - parseFloat(canvasStyle.borderLeftWidth) - parseFloat(canvasStyle.borderRightWidth) -
+    parseFloat(canvasStyle.paddingLeft) - parseFloat(canvasStyle.paddingRight)
+  const availableHeight = canvasWrap.offsetHeight - parseFloat(canvasStyle.borderTopWidth) - parseFloat(canvasStyle.borderBottomWidth) -
+    parseFloat(canvasStyle.paddingTop) - parseFloat(canvasStyle.paddingBottom)
   if (availableWidth <= 0 || availableHeight <= 0) return
   const width = canvasFitWidth(
     availableWidth,
