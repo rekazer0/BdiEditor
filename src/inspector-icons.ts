@@ -6,7 +6,7 @@ import {
   AlignStartVertical, AlignEndVertical, AlignStartHorizontal, AlignEndHorizontal,
   ArrowUpDown, FoldHorizontal, FoldVertical, Layers, SquareStack, Ruler,
   Search, Plus, X, Upload, Download, ImageDown, ChevronLeft, ChevronUp,
-  SquarePlus, CopyPlus, FileText,
+  SquarePlus, CopyPlus, FileText, List,
 } from "lucide"
 
 // Exact Lucide names from 属性检查器.pen, read through Pen MCP.
@@ -25,7 +25,7 @@ const icons: Record<string, IconNode> = {
   "fold-horizontal": FoldHorizontal, "fold-vertical": FoldVertical, layers: Layers,
   "square-stack": SquareStack, ruler: Ruler, search: Search, plus: Plus, x: X,
   upload: Upload, download: Download, "image-down": ImageDown,
-  "square-plus": SquarePlus, "copy-plus": CopyPlus, "file-text": FileText,
+  "square-plus": SquarePlus, "copy-plus": CopyPlus, "file-text": FileText, list: List,
 }
 
 export function inspectorIcon(name: string, size = 14): SVGElement {
@@ -40,8 +40,10 @@ export function inspectorGroupIcon(label: string): SVGElement {
   const name = /资源|图片/.test(label) ? "images"
     : /动画|动效|粒子/.test(label) ? "clapperboard"
     : /声音|音效/.test(label) ? "volume-2"
-    : /面板|候选栏|提示栏/.test(label) ? "panel-top"
-    : /布局|输入区|扩展区域/.test(label) ? "layout-grid"
+    : /候选栏|提示栏/.test(label) ? "panel-top"
+    : /面板|布局|输入区|扩展区域/.test(label) ? "layout-grid"
+    : /列表/.test(label) ? "list"
+    : /基本信息|全局/.test(label) ? "info"
     : /样式|外观|颜色|皮肤/.test(label) ? "palette"
     : /文字|字体|内容/.test(label) ? "type"
     : /动作|手势|按键/.test(label) ? "zap" : "panel-top"
@@ -77,7 +79,7 @@ const symbolIcons: Record<string, [string, number]> = {
   paintbrush: ["palette", 14], paintpalette: ["palette", 14],
   "rectangle.and.hand.point": ["zap", 14], "text.bubble": ["panel-top", 14],
   sparkles: ["clapperboard", 14], "info.circle": ["info", 14], photo: ["images", 14],
-  "list.bullet": ["layers", 14], "speaker.wave.2": ["volume-2", 14], "music.note": ["music", 14],
+  "list.bullet": ["list", 14], "speaker.wave.2": ["volume-2", 14], "music.note": ["music", 14],
   play: ["play", 14], "play.fill": ["play", 14],
 }
 

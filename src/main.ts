@@ -6109,6 +6109,7 @@ const documentQuadFieldLabels: Record<string, [string, string, string, string]> 
   VIEW_RECT: ["横向", "纵向", "宽度", "高度"],
   PADDING: ["左", "上", "右", "下"],
 }
+  NON_SPLIT_PANEL_REGION: ["横向", "纵向", "宽度", "高度"],
 
 const documentSwitchFields = new Set(["NO_BLUR"])
 const documentNumericFields = new Set([

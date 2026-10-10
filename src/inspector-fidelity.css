@@ -899,3 +899,25 @@
 :root body .source .system-symbol-fallback[viewBox="0 0 24 24"] {
   stroke-width: 1.5;
 }
+
+/* 分类轨只包住按钮，不再拉成一整列灰底；分组多时仍可在面板高度内滚动。 */
+:root body .source #quick-inspector#quick-inspector#quick-inspector > #mobile-inspector-groups:not([hidden]) {
+  align-self: start !important;
+  max-height: calc(100% - 16px) !important;
+}
+/* 文本值（区域、名称等）占满行内剩余宽度，避免长值被 112px 输入框截断；数值仍保持固定列宽。 */
+:root body .source #quick-inspector#quick-inspector#quick-inspector #document-fields .document-property-field:not(.style-reference-field) > input.document-property-input:not([type="number"]) {
+  flex: 1 1 112px !important;
+  width: auto !important;
+  min-width: 112px !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector #document-fields .document-property-field:has(> input, > .document-switch-control) > .document-field-caption {
+  /* 固定标签列，文本值左缘对齐成一条线，不随标签长短参差。 */
+  flex: 0 0 38% !important;
+  min-width: 0 !important;
+  text-overflow: ellipsis !important;
+}
+/* 「3 项」用界面字体：等宽字体没有汉字字形，回退后数字与汉字间距不一致。 */
+:root body .source #quick-inspector#quick-inspector#quick-inspector .document-section-meta {
+  font-family: var(--font-ui) !important;
+}
