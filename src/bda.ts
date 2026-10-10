@@ -783,7 +783,16 @@ function numericMap<T>(root: ProtoField[], number: number, decode: (field: Proto
   ]))
 }
 
+// SkinArchive 未修改的文件返回同一个 Uint8Array，按实例缓存；结果是共享对象，调用方不得修改。
+const decodedAppearances = new WeakMap<Uint8Array, BdaAppearance>()
+
 export function decodeBdaAppearance(bytes: Uint8Array): BdaAppearance {
+  let appearance = decodedAppearances.get(bytes)
+  if (!appearance) decodedAppearances.set(bytes, appearance = decodeBdaAppearanceUncached(bytes))
+  return appearance
+}
+
+function decodeBdaAppearanceUncached(bytes: Uint8Array): BdaAppearance {
   const root = fields(bytes)
   return {
     designWidth: first(root, 6)?.varint,
