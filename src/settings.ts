@@ -4,7 +4,7 @@ import { createSettingsDraft } from './settings-draft'
 type Control = HTMLInputElement | HTMLSelectElement
 
 /** Live preferences reuse the editor's existing change handlers; cancel replays the opening values. */
-export function initializeSettings(dialog: HTMLDialogElement, saveModel: () => Promise<void>, setGuides: (enabled: boolean) => void, modelEditing: { begin(): void; cancel(): void }) {
+export function initializeSettings(dialog: HTMLDialogElement, setGuides: (enabled: boolean) => void, modelEditing: { begin(): void; cancel(): void; dirty(): boolean; save(): Promise<void> }) {
   const input = (id: string) => dialog.querySelector<Control>(`#${id}`)!
   const root = document.documentElement
   const density = input('interface-density')
@@ -62,15 +62,15 @@ export function initializeSettings(dialog: HTMLDialogElement, saveModel: () => P
     control.value = button.dataset.value!
     control.dispatchEvent(new Event('change', { bubbles: true }))
   })
-  // Directory actions retain their explicit, immediate semantics; model credentials use the native save API.
-  const controls = [...dialog.querySelectorAll<Control>('input[id], select[id]')].filter(control => control.id !== 'theme-system-linked' && !control.id.startsWith('source-directory') && control.id !== 'model-list')
-  const storageKeys = [...controls.filter(control => !control.id.startsWith('model-')).map(control => control.id), 'window-glass-opacity', 'window-acrylic-opacity']
+  // Directory actions retain their explicit, immediate semantics; the model page keeps its own draft.
+  const controls = [...dialog.querySelectorAll<Control>('input[id], select[id]')].filter(control => control.id !== 'theme-system-linked' && !control.id.startsWith('source-directory') && !control.id.startsWith('model-'))
+  const storageKeys = [...controls.map(control => control.id), 'window-glass-opacity', 'window-acrylic-opacity']
   let values = new Map<Control, string>()
   const draft = createSettingsDraft(localStorage, storageKeys)
   let reverting = false
   let saving = false
   const state = dialog.querySelector<HTMLElement>('#settings-save-state')!
-  const dirty = () => controls.some(control => values.has(control) && read(control) !== values.get(control))
+  const dirty = () => modelEditing.dirty() || controls.some(control => values.has(control) && read(control) !== values.get(control))
   const status = () => {
     state.dataset.dirty = String(dirty())
     dialog.querySelector('#settings-dirty-label')!.textContent = dirty() ? '有未保存的更改' : '所有更改已保存'
@@ -90,10 +90,8 @@ export function initializeSettings(dialog: HTMLDialogElement, saveModel: () => P
     for (const [control, value] of values) {
       if (read(control) === value) continue
       write(control, value)
-      if (!control.id.startsWith('model-')) {
-        control.dispatchEvent(new Event('input', { bubbles: true }))
-        control.dispatchEvent(new Event('change', { bubbles: true }))
-      }
+      control.dispatchEvent(new Event('input', { bubbles: true }))
+      control.dispatchEvent(new Event('change', { bubbles: true }))
     }
     draft.cancel()
     modelEditing.cancel()
@@ -126,10 +124,10 @@ export function initializeSettings(dialog: HTMLDialogElement, saveModel: () => P
     const button = dialog.querySelector<HTMLButtonElement>('#settings-save')!
     button.disabled = true
     try {
-      if (controls.some(control => control.id.startsWith('model-') && values.has(control) && read(control) !== values.get(control))) await saveModel()
+      if (modelEditing.dirty()) await modelEditing.save()
       draft.commit()
       // Flush inputs such as a color picker or number field before committing.
-      for (const control of controls) if (!control.id.startsWith('model-') && read(control) !== values.get(control)) control.dispatchEvent(new Event('change', { bubbles: true }))
+      for (const control of controls) if (read(control) !== values.get(control)) control.dispatchEvent(new Event('change', { bubbles: true }))
       localStorage.setItem('settings-saved-at', new Date().toISOString())
       begin()
       dialog.close()

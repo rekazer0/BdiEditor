@@ -182,7 +182,7 @@ import {
   type LayoutRect,
 } from "./layout.ts"
 import { mixedCoordinateDelta, shouldClearMixedInput } from "./mixed-input.ts"
-import { MODEL_PROVIDER_PRESETS, modelProviderPreset, type ModelProtocol } from "./model-providers.ts"
+import { initializeModelSettings, modelConfigurationKey, type ModelConfiguration } from "./model-settings.ts"
 import { installNumberInputWheel, numberInputGesture, flushNumberInputWheel, deferNumberInputRefresh } from "./number-input-wheel.ts"
 import { loadBuiltInProjectTemplate, operationError } from "./operations.ts"
 import {
@@ -382,17 +382,6 @@ const sourceDirectory = $("#source-directory") as HTMLInputElement
 const chooseSourceDirectory = $("#choose-source-directory") as HTMLButtonElement
 const resetSourceDirectory = $("#reset-source-directory") as HTMLButtonElement
 const sourceDirectoryStatus = $("#source-directory-status")
-const modelProvider = $("#model-provider") as HTMLSelectElement
-const modelApiUrl = $("#model-api-url") as HTMLInputElement
-const modelName = $("#model-name") as HTMLInputElement
-const modelList = $("#model-list") as HTMLSelectElement
-const modelApiKey = $("#model-api-key") as HTMLInputElement
-const toggleModelApiKey = $("#toggle-model-api-key") as HTMLButtonElement
-const refreshModelList = $("#refresh-model-list") as HTMLButtonElement
-const testModelConnection = $("#test-model-connection") as HTMLButtonElement
-const saveModelConfiguration = $("#save-model-configuration") as HTMLButtonElement
-const modelConfigurationStatus = $("#model-configuration-status")
-const modelConfigurationPath = $("#model-configuration-path")
 const mobilePaneButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mobile-pane]"))
 const mobileSplitHandle = $("#mobile-split-handle") as HTMLButtonElement
 const mobilePortraitQuery = matchMedia("(max-width: 760px) and (orientation: portrait)")
@@ -549,7 +538,6 @@ const aiDraftApply = $("#ai-draft-apply") as HTMLButtonElement
 const aiDraftCancel = $("#ai-draft-cancel") as HTMLButtonElement
 const aiNewSession = $("#ai-new-session") as HTMLButtonElement
 const aiModelSettings = $(".ai-design-settings") as HTMLButtonElement
-const modelProfile = $("#model-profile") as HTMLSelectElement
 const browserOpen = $("#browser-open") as HTMLInputElement
 const imageOpen = $("#image-open") as HTMLInputElement
 const theme = $("#theme") as HTMLSelectElement
@@ -1516,6 +1504,7 @@ const fallbackSymbolPaths: Record<string, string[]> = {
   moon: ["M20 15.5A8 8 0 0 1 8.5 4 8 8 0 1 0 20 15.5z"],
   magnifyingglass: ["M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14", "m16 16 5 5"],
   trash: ["M5 7h14M9 7V4h6v3m2 0-1 14H8L7 7m4 4v6m2-6v6"],
+  plus: ["M12 5v14M5 12h14"],
   photo: ["M4 4h16v16H4z", "m6 16 4-5 3 3 2-2 3 4M9 9h.01"],
   doc: ["M6 3h8l4 4v14H6z", "M14 3v5h5"],
 }
@@ -10238,256 +10227,23 @@ async function initializeSourceDirectory(): Promise<void> {
   await applySourceDirectory(configured)
 }
 
-interface ModelConfiguration {
-  provider: string
-  protocol: ModelProtocol
-  apiUrl: string
-  model: string
-  apiKey: string
-}
-
-interface ModelConfigurationState {
-  configuration?: ModelConfiguration
-  configurations?: ModelConfiguration[]
-  path: string
-}
-
-let editingModelIndex = -1
-
-function syncModelProfiles(): void {
-  const selected = aiDesignModel.value
-  for (const select of [modelProfile, aiDesignModel]) {
-    select.replaceChildren(...savedModels.map((configuration, index) =>
-      new Option(select === aiDesignModel ? configuration.model : `${configuration.model} · ${modelProviderPreset(configuration.provider).label}`, String(index))))
-  }
-  modelProfile.value = String(editingModelIndex)
-  aiDesignModel.value = selected !== "" && savedModels[Number(selected)] ? selected : "0"
-  if (!savedModels.length) aiDesignModel.replaceChildren(new Option("请先配置模型", ""))
-  aiDesignModel.disabled = savedModels.length === 0
-  aiDesignModel.hidden = savedModels.length === 0
-  aiModelSettings.hidden = savedModels.length > 0
+function syncModelProfiles(models: ModelConfiguration[]): void {
+  const selected = savedModels[Number(aiDesignModel.value)]
+  savedModels = models
+  aiDesignModel.replaceChildren(...models.map((configuration, index) => new Option(configuration.model, String(index))))
+  if (!models.length) aiDesignModel.replaceChildren(new Option("请先配置模型", ""))
+  // Keep the chat on the same model when the list is reordered or shortened.
+  const index = selected ? models.findIndex((model) => modelConfigurationKey(model) === modelConfigurationKey(selected)) : -1
+  if (models.length) aiDesignModel.value = String(Math.max(index, 0))
+  aiDesignModel.hidden = models.length === 0
+  aiModelSettings.hidden = models.length > 0
   syncAiDesignControls()
 }
 
-modelProfile.addEventListener("change", () => {
-  editingModelIndex = Number(modelProfile.value)
-  applyModelConfiguration(savedModels[editingModelIndex])
-  populateModelList([])
-})
-$("#model-profile-add").addEventListener("click", () => {
-  editingModelIndex = -1
-  modelProfile.selectedIndex = -1
-  applyModelConfiguration({ ...currentModelConfiguration(), model: "", apiKey: "" })
-  modelName.value = ""
-  populateModelList([])
-  setModelConfigurationStatus("填写新模型后保存")
-})
-
-interface ModelConnectionResult {
-  message: string
-  modelCount: number
-}
-
-for (const preset of MODEL_PROVIDER_PRESETS) {
-  const option = document.createElement("option")
-  option.value = preset.id
-  option.textContent = preset.label
-  modelProvider.append(option)
-}
-
-function currentModelConfiguration(): ModelConfiguration {
-  const preset = modelProviderPreset(modelProvider.value)
-  return {
-    provider: preset.id,
-    protocol: preset.protocol,
-    apiUrl: modelApiUrl.value.trim(),
-    model: modelName.value.trim(),
-    apiKey: modelApiKey.value.trim(),
-  }
-}
-
-function applyModelConfiguration(configuration: ModelConfiguration): void {
-  const preset = modelProviderPreset(configuration.provider)
-  modelProvider.value = preset.id
-  previousModelProvider = preset.id
-  modelApiUrl.value = configuration.apiUrl || preset.apiUrl
-  modelName.value = configuration.model || preset.model
-  modelApiKey.value = configuration.apiKey
-}
-
-function setModelConfigurationStatus(message: string, state: "idle" | "busy" | "success" | "error" = "idle"): void {
-  modelConfigurationStatus.textContent = message
-  modelConfigurationStatus.dataset.state = state
-}
-
-function setModelConfigurationBusy(busy: boolean): void {
-  refreshModelList.disabled = busy
-  testModelConnection.disabled = busy
-  saveModelConfiguration.disabled = busy
-}
-
-function populateModelList(models: string[]): void {
-  const placeholder = document.createElement("option")
-  placeholder.value = ""
-  placeholder.textContent = "选择模型…"
-  const custom = document.createElement("option")
-  custom.value = "__custom__"
-  custom.textContent = "手动输入…"
-  const available = modelName.value && !models.includes(modelName.value) ? [modelName.value, ...models] : models
-  modelList.replaceChildren(placeholder, ...available.map((model) => {
-    const option = document.createElement("option")
-    option.value = model
-    option.textContent = model
-    return option
-  }), custom)
-  modelName.hidden = models.length > 0
-  modelList.hidden = models.length === 0
-  if (!modelName.value && models[0]) modelName.value = models[0]
-  modelList.value = modelName.value || ""
-}
-
-async function persistModelConfiguration(showFeedback = true): Promise<void> {
-  if (!isTauri()) {
-    setModelConfigurationStatus("请在桌面应用中保存配置", "idle")
-    return
-  }
-  setModelConfigurationBusy(true)
-  if (showFeedback) setModelConfigurationStatus("正在保存配置…", "busy")
-  try {
-    const configuration = currentModelConfiguration()
-    if (!configuration.model || !configuration.apiKey || !configuration.apiUrl) throw new Error("请填写 API 地址、模型名称和密钥")
-    const configurations = [...savedModels]
-    const index = editingModelIndex < 0 ? configurations.length : editingModelIndex
-    configurations[index] = configuration
-    const state = await invoke<ModelConfigurationState>("save_model_configuration", {
-      configuration,
-      configurations,
-    })
-    for (const key of ["model-provider", "model-api-url", "model-name", "model-api-key"]) localStorage.removeItem(key)
-    savedModels = configurations
-    editingModelIndex = index
-    syncModelProfiles()
-    modelConfigurationPath.textContent = state.path
-    if (showFeedback) setModelConfigurationStatus("配置已保存到本机", "success")
-  } catch (error) {
-    setModelConfigurationStatus(`保存失败：${String(error)}`, "error")
-    throw error
-  } finally {
-    setModelConfigurationBusy(false)
-  }
-}
-
-async function initializeModelConfiguration(): Promise<void> {
-  const defaultPreset = modelProviderPreset("openai")
-  applyModelConfiguration({
-    provider: defaultPreset.id,
-    protocol: defaultPreset.protocol,
-    apiUrl: defaultPreset.apiUrl,
-    model: defaultPreset.model,
-    apiKey: "",
-  })
-  if (!isTauri()) return
-  try {
-    const state = await invoke<ModelConfigurationState>("load_model_configuration")
-    modelConfigurationPath.textContent = state.path
-    if (state.configuration) {
-      savedModels = (state.configurations ?? [state.configuration]).filter(item => item.apiKey && item.model && item.apiUrl)
-      editingModelIndex = savedModels.length ? 0 : -1
-      applyModelConfiguration(savedModels[0] ?? state.configuration)
-      syncModelProfiles()
-      setModelConfigurationStatus("已载入本机配置")
-      return
-    }
-    const legacyProvider = localStorage.getItem("model-provider")
-    const legacyApiUrl = localStorage.getItem("model-api-url")
-    const legacyModel = localStorage.getItem("model-name")
-    const legacyApiKey = localStorage.getItem("model-api-key")
-    if (legacyProvider || legacyApiUrl || legacyModel || legacyApiKey) {
-      const legacyPreset = modelProviderPreset(legacyProvider ?? "openai")
-      applyModelConfiguration({
-        provider: legacyPreset.id,
-        protocol: legacyPreset.protocol,
-        apiUrl: legacyApiUrl || legacyPreset.apiUrl,
-        model: legacyModel || legacyPreset.model,
-        apiKey: legacyApiKey ?? "",
-      })
-      await persistModelConfiguration(false)
-      setModelConfigurationStatus("旧配置已迁移到本机配置文件", "success")
-    }
-  } catch (error) {
-    setModelConfigurationStatus(`读取配置失败：${String(error)}`, "error")
-  }
-}
-
-let previousModelProvider = "openai"
-modelProvider.addEventListener("change", () => {
-  const previous = modelProviderPreset(previousModelProvider)
-  const next = modelProviderPreset(modelProvider.value)
-  if (!modelApiUrl.value || modelApiUrl.value === previous.apiUrl) modelApiUrl.value = next.apiUrl
-  if (!modelName.value || modelName.value === previous.model) modelName.value = next.model
-  previousModelProvider = next.id
-  populateModelList([])
-  setModelConfigurationStatus("配置已更改，保存后生效")
-})
-
-modelList.addEventListener("change", () => {
-  if (modelList.value === "__custom__") {
-    modelList.hidden = true
-    modelName.hidden = false
-    modelName.focus()
-    modelName.select()
-    return
-  }
-  if (!modelList.value) return
-  modelName.value = modelList.value
-  setModelConfigurationStatus("已选择模型，请保存配置")
-})
-
-refreshModelList.addEventListener("click", () => void (async () => {
-  if (!isTauri()) {
-    setModelConfigurationStatus("请在桌面应用中从 API 获取模型", "idle")
-    return
-  }
-  setModelConfigurationBusy(true)
-  setModelConfigurationStatus("正在从 API 获取模型…", "busy")
-  try {
-    const models = await invoke<string[]>("fetch_model_list", { configuration: currentModelConfiguration() })
-    populateModelList(models)
-    setModelConfigurationStatus(`已获取 ${models.length} 个模型`, "success")
-  } catch (error) {
-    setModelConfigurationStatus(`获取模型失败：${String(error)}`, "error")
-  } finally {
-    setModelConfigurationBusy(false)
-  }
-})())
-
-testModelConnection.addEventListener("click", () => void (async () => {
-  if (!isTauri()) {
-    setModelConfigurationStatus("请在桌面应用中测试连接", "idle")
-    return
-  }
-  setModelConfigurationBusy(true)
-  setModelConfigurationStatus("正在测试连接…", "busy")
-  try {
-    const result = await invoke<ModelConnectionResult>("test_model_connection", {
-      configuration: currentModelConfiguration(),
-    })
-    setModelConfigurationStatus(result.message, "success")
-  } catch (error) {
-    setModelConfigurationStatus(`连接失败：${String(error)}`, "error")
-  } finally {
-    setModelConfigurationBusy(false)
-  }
-})())
-
-saveModelConfiguration.addEventListener("click", () => void persistModelConfiguration())
-void initializeModelConfiguration()
-toggleModelApiKey.addEventListener("click", () => {
-  const revealing = modelApiKey.type === "password"
-  modelApiKey.type = revealing ? "text" : "password"
-  toggleModelApiKey.title = revealing ? "隐藏 API 密钥" : "显示 API 密钥"
-  toggleModelApiKey.setAttribute("aria-label", toggleModelApiKey.title)
-  toggleModelApiKey.querySelector<HTMLElement>(".system-symbol")?.replaceWith(createSystemSymbol(revealing ? "eye.slash" : "eye"))
+const modelSettings = initializeModelSettings($("#settings-model-section"), {
+  desktop: isTauri(),
+  icon: createSystemSymbol,
+  onSaved: syncModelProfiles,
 })
 
 async function chooseAndroidSourceDirectory(): Promise<boolean> {
@@ -12335,17 +12091,4 @@ void refreshUpdateStatus()
 initInspectorShell()
 
 
-let settingsModelSnapshot: { index: number; configuration: ModelConfiguration }
-const settingsController = initializeSettings(settingsDialog, async () => {
-  if (!isTauri()) throw new Error("请在桌面应用中保存模型配置")
-  await persistModelConfiguration()
-}, setGuidesVisible, {
-  begin() { settingsModelSnapshot = { index: editingModelIndex, configuration: currentModelConfiguration() } },
-  cancel() {
-    editingModelIndex = settingsModelSnapshot.index
-    previousModelProvider = settingsModelSnapshot.configuration.provider
-    applyModelConfiguration(settingsModelSnapshot.configuration)
-    populateModelList([])
-    syncModelProfiles()
-  },
-})
+const settingsController = initializeSettings(settingsDialog, setGuidesVisible, modelSettings)

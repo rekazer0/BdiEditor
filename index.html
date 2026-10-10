@@ -997,7 +997,7 @@
             <button class="settings-nav-item" type="button" data-settings-page="guides" role="tab" id="settings-tab-guides" aria-controls="settings-panel-guides" aria-selected="false"><span class="system-symbol" data-system-symbol="ruler" aria-hidden="true"></span><span>安全区与辅助线</span><small data-settings-summary="guides">已启用</small></button>
             <div class="settings-group-label">服务</div>
             <button id="settings-storage-nav" class="settings-nav-item" type="button" data-settings-page="storage" role="tab" aria-controls="settings-storage-section" aria-selected="false" hidden><span class="system-symbol" data-system-symbol="internaldrive" aria-hidden="true"></span><span>源码存储</span></button>
-            <button id="settings-model-nav" class="settings-nav-item" type="button" data-settings-page="model" role="tab" aria-controls="settings-model-section" aria-selected="false" hidden><span class="system-symbol" data-system-symbol="sparkles" aria-hidden="true"></span><span>大模型</span></button>
+            <button id="settings-model-nav" class="settings-nav-item" type="button" data-settings-page="model" role="tab" aria-controls="settings-model-section" aria-selected="false" hidden><span class="system-symbol" data-system-symbol="sparkles" aria-hidden="true"></span><span>大模型</span><small data-settings-summary="model"></small></button>
             <div class="settings-group-label">应用</div>
             <button class="settings-nav-item" type="button" data-settings-page="about" role="tab" id="settings-tab-about" aria-controls="settings-panel-about" aria-selected="false"><span class="system-symbol" data-system-symbol="info.circle" aria-hidden="true"></span><span>关于</span></button>
           </nav>
@@ -1063,19 +1063,19 @@
           <section id="settings-model-section" class="settings-section settings-page settings-model" data-settings-panel="model" role="tabpanel" aria-labelledby="settings-model-title" hidden>
             <div class="settings-section-heading">
               <h3 id="settings-model-title">大模型</h3>
-              <p>配置桌面应用使用的模型服务</p>
+              <p>配置 AI 设计使用的模型服务。列表第一项为默认模型，密钥仅保存在本机。</p>
             </div>
-            <div class="settings-list">
-              <label class="settings-row"><span>已保存模型</span><select id="model-profile" aria-label="已保存模型"></select></label>
-              <button id="model-profile-add" type="button">新增模型</button>
+            <h4 class="settings-subheading">已保存模型<button id="model-profile-add" class="settings-model-add" type="button"><span class="system-symbol" data-system-symbol="plus" aria-hidden="true"></span>新增</button></h4>
+            <ul id="model-profiles" class="model-profiles" aria-label="已保存模型"></ul>
+            <div id="model-editor" class="settings-list model-editor" hidden>
               <label class="settings-row"><span>服务商</span><select id="model-provider"></select></label>
               <label class="settings-row settings-text-row"><span>API 地址</span><input id="model-api-url" type="url" autocomplete="url" spellcheck="false" placeholder="https://api.openai.com/v1"></label>
               <label class="settings-row settings-text-row"><span>模型名称</span><span class="settings-model-control"><input id="model-name" type="text" autocomplete="off" spellcheck="false" placeholder="gpt-5"><select id="model-list" aria-label="选择已获取的模型" title="选择已获取的模型" hidden></select><button id="refresh-model-list" type="button" title="从 API 获取模型" aria-label="从 API 获取模型"><span class="system-symbol" data-system-symbol="arrow.clockwise" aria-hidden="true"></span></button></span></label>
               <label class="settings-row settings-text-row"><span>API 密钥</span><span class="settings-secret-control"><input id="model-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…"><button id="toggle-model-api-key" type="button" title="显示 API 密钥" aria-label="显示 API 密钥"><span class="system-symbol" data-system-symbol="eye" aria-hidden="true"></span></button></span></label>
             </div>
             <div class="settings-model-footer">
-              <div><p id="model-configuration-status" aria-live="polite">配置保存在本机应用配置目录</p><small id="model-configuration-path"></small></div>
-              <div class="settings-model-actions"><button id="test-model-connection" type="button">测试连接</button><button id="save-model-configuration" hidden class="primary" type="button">保存配置</button></div>
+              <div><p id="model-configuration-status" aria-live="polite"></p><small id="model-configuration-path"></small></div>
+              <button id="test-model-connection" type="button">测试连接</button>
             </div>
           </section>
           <section class="settings-section settings-page settings-about" data-settings-panel="about" role="tabpanel" id="settings-panel-about" aria-labelledby="about-title" hidden>

@@ -1053,27 +1053,36 @@ fn load_model_configuration(app: tauri::AppHandle) -> Result<ModelConfigurationS
 #[tauri::command]
 fn save_model_configuration(
     app: tauri::AppHandle,
-    configuration: ModelConfiguration,
-    configurations: Option<Vec<ModelConfiguration>>,
+    configurations: Vec<ModelConfiguration>,
 ) -> Result<ModelConfigurationState, String> {
     let path = model_configuration_path(&app)?;
-    let configurations = configurations.unwrap_or_else(|| vec![configuration.clone()]);
-    if configurations.is_empty() || configurations.len() > 100 {
-        return Err("模型配置数量必须在 1 到 100 之间".into());
+    save_model_profiles_path(&path, configurations)
+}
+
+fn save_model_profiles_path(
+    path: &Path,
+    configurations: Vec<ModelConfiguration>,
+) -> Result<ModelConfigurationState, String> {
+    if configurations.len() > 100 {
+        return Err("模型配置最多 100 个".into());
     }
-    validate_model_configuration(&configuration)?;
     for profile in &configurations {
         validate_model_configuration(profile)?;
     }
-    write_model_store_path(
-        &path,
-        &ModelConfigurationStore {
-            configuration: configuration.clone(),
-            configurations: configurations.clone(),
-        },
-    )?;
+    // The first profile stays at the top level so older builds still read it.
+    match configurations.first() {
+        Some(first) => write_model_store_path(
+            path,
+            &ModelConfigurationStore {
+                configuration: first.clone(),
+                configurations: configurations.clone(),
+            },
+        )?,
+        None if path.exists() => fs::remove_file(path).map_err(|error| error.to_string())?,
+        None => {}
+    }
     Ok(ModelConfigurationState {
-        configuration: Some(configuration),
+        configuration: configurations.first().cloned(),
         configurations,
         path: path.to_string_lossy().into_owned(),
     })
@@ -1293,14 +1302,7 @@ mod tests {
         let mut second = configuration.clone();
         second.model = "model-b".into();
         let profiles = vec![configuration.clone(), second];
-        super::write_model_store_path(
-            &path,
-            &super::ModelConfigurationStore {
-                configuration: configuration.clone(),
-                configurations: profiles.clone(),
-            },
-        )
-        .unwrap();
+        super::save_model_profiles_path(&path, profiles.clone()).unwrap();
         assert_eq!(super::read_model_profiles(&path).unwrap(), profiles);
         assert_eq!(
             read_model_configuration_path(&path).expect("read model config"),
@@ -1314,6 +1316,8 @@ mod tests {
                 0o600
             );
         }
+        super::save_model_profiles_path(&path, Vec::new()).unwrap();
+        assert!(!path.exists());
         fs::remove_dir_all(root).expect("cleanup model config");
     }
 

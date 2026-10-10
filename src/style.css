@@ -5818,13 +5818,8 @@ body:has(.canvas-wrap.empty) .workspace {
   white-space: nowrap;
 }
 
-.settings-model-actions {
-  display: flex;
+#test-model-connection {
   flex: 0 0 auto;
-  gap: 7px;
-}
-
-.settings-model-actions button {
   min-height: 30px;
   padding: 0 11px;
   border: 1px solid var(--line);
@@ -5834,13 +5829,7 @@ body:has(.canvas-wrap.empty) .workspace {
   font-size: 12px;
 }
 
-.settings-model-actions .primary {
-  border-color: var(--accent);
-  color: #fff;
-  background: var(--accent);
-}
-
-.settings-model-actions button:disabled,
+#test-model-connection:disabled,
 .settings-model-control button:disabled {
   opacity: 0.5;
 }
@@ -5851,7 +5840,6 @@ body:has(.canvas-wrap.empty) .workspace {
   .settings-secret-control,
   .settings-model-control { width: min(220px, 50vw); }
   .settings-model-footer { align-items: stretch; flex-direction: column; }
-  .settings-model-actions { justify-content: flex-end; }
 }
 
 .settings-inline-control {
