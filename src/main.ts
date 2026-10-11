@@ -9147,11 +9147,22 @@ async function writeToChosenFile(
     link.href = URL.createObjectURL(new Blob([bytes.slice().buffer], { type: "application/octet-stream" }))
     link.download = filename
     link.hidden = true
-    document.body.append(link)
-    link.click()
-    link.remove()
     // Mobile browsers hand blob downloads to a download manager that reads the URL later.
-    setTimeout(() => URL.revokeObjectURL(link.href), 60_000)
+    const revoke = () => setTimeout(() => URL.revokeObjectURL(link.href), 60_000)
+    const download = () => {
+      document.body.append(link)
+      link.click()
+      link.remove()
+    }
+    // Chrome on Android silently drops a scripted download once the click's user activation has
+    // expired, which packaging the skin usually outlasts; ask for one more tap in that case.
+    if (navigator.userActivation && !navigator.userActivation.isActive) {
+      const confirmed = await waitForTap(`${filename} 已生成，轻点“下载”继续`, "下载", download)
+      revoke()
+      return confirmed ? filename : undefined
+    }
+    download()
+    revoke()
     return filename
   }
   let file: BrowserSaveFileHandle
@@ -9239,7 +9250,7 @@ async function shareArchiveToMobile(): Promise<boolean> {
     throw new Error("当前设备不支持系统文件分享")
   }
   // navigator.share needs a live user activation, which packaging the skin may have used up.
-  if (navigator.userActivation && !navigator.userActivation.isActive && !(await waitForShareTap(name))) return false
+  if (navigator.userActivation && !navigator.userActivation.isActive && !(await waitForTap(`${name} 已生成，轻点“分享”继续`, "分享"))) return false
   try {
     await navigator.share({ title: name, files: [file] })
     return true
@@ -9249,15 +9260,19 @@ async function shareArchiveToMobile(): Promise<boolean> {
   }
 }
 
-function waitForShareTap(name: string): Promise<boolean> {
+/**
+ * Shows a button in the progress dialog and resolves once it is tapped (true) or the dialog is dismissed
+ * (false). `onTap` runs inside the tap's click handler, while its user activation is still live.
+ */
+function waitForTap(detail: string, label: string, onTap?: () => void): Promise<boolean> {
   return new Promise((resolve) => {
     fileOperationProgressVisible = true
     if (!fileOperationDialog.open) fileOperationDialog.showModal()
-    updateFileOperationProgress(90, `${name} 已生成，轻点“分享”继续`)
+    updateFileOperationProgress(90, detail)
     const share = document.createElement("button")
     share.type = "button"
     share.className = "primary"
-    share.textContent = "分享"
+    share.textContent = label
     fileOperationClose.before(share)
     fileOperationClose.disabled = false
     const finish = (confirmed: boolean) => {
@@ -9268,7 +9283,10 @@ function waitForShareTap(name: string): Promise<boolean> {
       resolve(confirmed)
     }
     const cancel = () => finish(false)
-    share.addEventListener("click", () => finish(true), { once: true })
+    share.addEventListener("click", () => {
+      onTap?.()
+      finish(true)
+    }, { once: true })
     fileOperationClose.addEventListener("click", cancel, { once: true })
     fileOperationDialog.addEventListener("close", cancel, { once: true })
     share.focus()
