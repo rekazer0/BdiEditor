@@ -259,6 +259,23 @@ function configureAppearance(chat: DeepChat): void {
       background: ${control}; box-shadow: 0 2px 8px color-mix(in srgb, ${text} 12%, transparent); }
     #scroll-button svg { width: 12px; height: 12px; color: ${secondary}; }
 
+    /* Phones get half a screen at best: a two-line composer, suggestions as one
+       scrolling row of chips, and no drag grip. */
+    @media (max-width: 760px) {
+      #text-input { min-height: 44px !important; max-height: 30vh !important; padding-top: 10px !important; }
+      #text-input-container { padding-bottom: 36px !important; }
+      .ai-resize { display: none; }
+      .ai-welcome { gap: 8px; padding: 8px 14px 10px; }
+      .ai-welcome-mark, .ai-welcome p { display: none; }
+      .ai-welcome h2 { margin: 0; font-size: 13px; }
+      .ai-suggestions { display: flex; gap: 6px; margin: 0 -14px; padding: 0 14px;
+        overflow-x: auto; scrollbar-width: none; scroll-padding: 0 14px; }
+      .ai-suggestions::-webkit-scrollbar { display: none; }
+      .ai-suggestions button { flex: none; width: auto; padding: 6px 12px;
+        border-radius: ${radiusPill}; white-space: nowrap; }
+      .ai-suggestions span { display: none; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       * { scroll-behavior: auto !important; animation: none !important; }
     }

@@ -309,3 +309,14 @@
 @media (prefers-reduced-motion: reduce) {
   #ai-design-panel * { scroll-behavior: auto !important; transition: none !important; }
 }
+
+/* Phones: the panel shares half the screen with the canvas, so the frame gives
+   every spare pixel to the conversation. */
+@media (max-width: 760px) {
+  .source:has(> #ai-design-panel:not([hidden])) > .pane-heading { min-height: 0; }
+  #ai-design-panel .ai-bar { padding: 8px 14px 2px; }
+  #ai-design-panel .ai-design-composer { min-height: 0; }
+  #ai-design-panel .ai-design-toolbar { bottom: 18px; }
+  #ai-design-panel .ai-draft-panel:not([hidden]) { max-height: 72%; margin: 0 10px 10px; }
+  #ai-design-panel .ai-draft-note { display: none; }
+}

@@ -50,8 +50,8 @@
             <span class="toolbar-menu-separator" role="separator"></span>
             <button id="mobile-share" type="button" role="menuitem" disabled title="分享皮肤" aria-label="分享皮肤"><span class="system-symbol" data-system-symbol="square.and.arrow.up" aria-hidden="true"></span><span>分享皮肤</span></button>
             <span class="toolbar-menu-separator" role="separator"></span>
-            <button id="undo" type="button" role="menuitem" disabled title="撤销" aria-label="撤销"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"></span><span>撤销</span></button>
-            <button id="redo" type="button" role="menuitem" disabled title="重做" aria-label="重做"><span class="system-symbol" data-system-symbol="arrow.uturn.forward" aria-hidden="true"></span><span>重做</span></button>
+            <button id="undo" type="button" role="menuitem" disabled title="撤销" aria-label="撤销"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12"/><path d="M4 8.5h7.2a5 5 0 0 1 5 5"/></svg></span><span>撤销</span></button>
+            <button id="redo" type="button" role="menuitem" disabled title="重做" aria-label="重做"><span class="system-symbol" data-system-symbol="arrow.uturn.forward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m13 5 4 3.5-4 3.5"/><path d="M16 8.5H8.8a5 5 0 0 0-5 5"/></svg></span><span>重做</span></button>
             <span class="toolbar-menu-separator" role="separator"></span>
             <button type="button" role="menuitem" data-app-dialog="settings"><span class="system-symbol" data-system-symbol="gearshape" aria-hidden="true"></span><span>设置</span></button>
           </div>
@@ -78,8 +78,8 @@
           </button>
         </div>
         <div class="mobile-quick-actions" aria-label="常用操作">
-          <button id="mobile-undo" class="titlebar-icon-button" type="button" title="撤销" aria-label="撤销"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"></span></button>
-          <button id="mobile-redo" class="titlebar-icon-button" type="button" title="重做" aria-label="重做"><span class="system-symbol" data-system-symbol="arrow.uturn.forward" aria-hidden="true"></span></button>
+          <button id="mobile-undo" class="titlebar-icon-button" type="button" title="撤销" aria-label="撤销"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12"/><path d="M4 8.5h7.2a5 5 0 0 1 5 5"/></svg></span></button>
+          <button id="mobile-redo" class="titlebar-icon-button" type="button" title="重做" aria-label="重做"><span class="system-symbol" data-system-symbol="arrow.uturn.forward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m13 5 4 3.5-4 3.5"/><path d="M16 8.5H8.8a5 5 0 0 0-5 5"/></svg></span></button>
         </div>
         <div class="mode-control" aria-label="工作模式">
           <button data-mode-choice="edit">编辑模式</button>
@@ -139,8 +139,8 @@
 
     <main>
       <nav class="mobile-workspace-tabs" aria-label="手机编辑区域">
-        <button class="active" type="button" data-mobile-pane="layout" aria-pressed="true">文件与布局</button>
-        <button type="button" data-mobile-pane="inspector" aria-pressed="false">属性检查器</button>
+        <button class="active" type="button" data-mobile-pane="layout" aria-pressed="true" title="文件与布局（左右滑动切换）" aria-label="文件与布局">文件与布局</button>
+        <button type="button" data-mobile-pane="inspector" aria-pressed="false" title="属性检查器（左右滑动切换）" aria-label="属性检查器">属性检查器</button>
         <button id="mobile-split-handle" class="mobile-split-handle" type="button" role="slider" aria-orientation="vertical" aria-valuemin="28" aria-valuemax="72" aria-valuenow="50" aria-expanded="true" title="拖动调整画布与配置区域比例；点击收起或展开预览" aria-label="拖动调整画布与配置区域比例；点击收起或展开预览">
           <span class="system-symbol mobile-split-icon" data-system-symbol="chevron.up.chevron.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m5 8 5-5 5 5M5 12l5 5 5-5"/></svg></span>
         </button>
@@ -1057,7 +1057,7 @@
               <span class="settings-path-control">
                 <input id="source-directory" type="text" autocomplete="off" spellcheck="false" aria-label="皮肤源码保存目录">
                 <button id="choose-source-directory" type="button" title="选择目录" aria-label="选择皮肤源码保存目录"><span class="system-symbol" data-system-symbol="folder" aria-hidden="true"></span></button>
-                <button id="reset-source-directory" type="button" title="恢复内置目录" aria-label="恢复内置皮肤源码保存目录"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"></span></button>
+                <button id="reset-source-directory" type="button" title="恢复内置目录" aria-label="恢复内置皮肤源码保存目录"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12"/><path d="M4 8.5h7.2a5 5 0 0 1 5 5"/></svg></span></button>
               </span>
               <small id="source-directory-status"></small>
             </label>
