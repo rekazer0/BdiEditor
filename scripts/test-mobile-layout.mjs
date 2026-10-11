@@ -1,0 +1,288 @@
+// Mobile layout regression test.
+// Run: node scripts/test-mobile-layout.mjs
+// Starts a Vite dev server and drives Chromium through Playwright (a local or global
+// `playwright` install; set PLAYWRIGHT_MODULE to its path if it cannot be found).
+import assert from "node:assert/strict"
+import { execSync } from "node:child_process"
+import { join } from "node:path"
+import { pathToFileURL } from "node:url"
+import { createServer } from "vite"
+
+async function loadPlaywright() {
+  const candidates = [process.env.PLAYWRIGHT_MODULE, "playwright"]
+  try {
+    candidates.push(join(execSync("npm root -g", { encoding: "utf8" }).trim(), "playwright", "index.mjs"))
+  } catch {}
+  for (const candidate of candidates.filter(Boolean)) {
+    try {
+      return await import(candidate.startsWith("/") ? pathToFileURL(candidate).href : candidate)
+    } catch {}
+  }
+  throw new Error("Playwright is not installed; install it or set PLAYWRIGHT_MODULE")
+}
+
+const { chromium } = await loadPlaywright()
+const root = new URL("..", import.meta.url).pathname
+const server = await createServer({ root, logLevel: "error", server: { port: 41730, strictPort: false, host: "127.0.0.1" } })
+await server.listen()
+const address = server.httpServer.address()
+const baseURL = `http://127.0.0.1:${address.port}/`
+const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {})
+
+const phoneUA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+const results = []
+
+async function withPage(viewport, run, { mobile = true, storage = {}, colorScheme = "light" } = {}) {
+  const context = await browser.newContext({
+    viewport,
+    colorScheme,
+    deviceScaleFactor: 2,
+    isMobile: mobile,
+    hasTouch: mobile,
+    userAgent: mobile ? phoneUA : undefined,
+  })
+  const page = await context.newPage()
+  const errors = []
+  page.on("pageerror", (error) => errors.push(error.message))
+  page.on("dialog", (dialog) => dialog.accept())
+  await page.addInitScript((entries) => {
+    for (const [key, value] of Object.entries(entries)) localStorage.setItem(key, value)
+  }, storage)
+  await page.goto(baseURL)
+  await page.waitForSelector(".template-card")
+  try {
+    await run(page)
+    assert.deepEqual(errors, [], "page errors")
+  } finally {
+    await context.close()
+  }
+}
+
+const rect = (page, selector) =>
+  page.$eval(selector, (element) => {
+    const box = element.getBoundingClientRect()
+    const style = getComputedStyle(element)
+    return {
+      x: box.x, y: box.y, width: box.width, height: box.height, right: box.right, bottom: box.bottom,
+      visible: style.display !== "none" && style.visibility !== "hidden" && box.width > 0 && box.height > 0,
+    }
+  })
+
+async function assertNoPageOverflow(page, label) {
+  const { scrollWidth, width } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    width: innerWidth,
+  }))
+  assert.ok(scrollWidth <= width + 1, `${label}: page scrolls horizontally (${scrollWidth} > ${width})`)
+}
+
+// Visible titlebar controls must not overlap each other or leave the bar.
+async function assertTitlebarClean(page, label) {
+  const boxes = await page.evaluate(() => {
+    const bar = document.querySelector(".titlebar").getBoundingClientRect()
+    const items = Array.from(document.querySelectorAll(
+      ".titlebar summary, .titlebar button, .titlebar .document-title",
+    )).filter((element) => {
+      if (element.closest(".toolbar-menu, template")) return false
+      if (element.closest(".document-title") && element !== element.closest(".document-title")) return false
+      const style = getComputedStyle(element)
+      const box = element.getBoundingClientRect()
+      return style.display !== "none" && style.visibility !== "hidden" && box.width > 0 && box.height > 0
+    })
+    return {
+      bar: { left: bar.left, right: bar.right },
+      items: items.map((element) => {
+        const box = element.getBoundingClientRect()
+        return { name: element.id || element.className || element.tagName, left: box.left, right: box.right, top: box.top, bottom: box.bottom }
+      }),
+    }
+  })
+  for (const item of boxes.items) {
+    assert.ok(item.left >= boxes.bar.left - 1 && item.right <= boxes.bar.right + 1, `${label}: ${item.name} leaves the title bar`)
+  }
+  for (let i = 0; i < boxes.items.length; i += 1) {
+    for (let j = i + 1; j < boxes.items.length; j += 1) {
+      const a = boxes.items[i]
+      const b = boxes.items[j]
+      const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left)
+      const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+      assert.ok(overlapX <= 1 || overlapY <= 1, `${label}: ${a.name} overlaps ${b.name}`)
+    }
+  }
+}
+
+async function openTemplate(page, template = "default-android") {
+  await page.locator(`.template-card[data-template="${template}"]`).first().click()
+  await page.waitForSelector(".canvas-wrap:not(.empty)")
+  await page.waitForFunction(() => document.querySelector("#preview")?.getBoundingClientRect().height > 60)
+}
+
+async function check(name, run) {
+  try {
+    await run()
+    results.push({ name, ok: true })
+  } catch (error) {
+    results.push({ name, ok: false, error })
+  }
+}
+
+const portraitPhones = [
+  { width: 390, height: 844 },
+  { width: 320, height: 568 },
+  { width: 360, height: 740 },
+  { width: 430, height: 932 },
+]
+
+for (const viewport of portraitPhones) {
+  const tag = `${viewport.width}×${viewport.height}`
+
+  await check(`${tag} welcome page fills the window`, () => withPage(viewport, async (page) => {
+    await assertTitlebarClean(page, "welcome")
+    await assertNoPageOverflow(page, "welcome")
+    assert.equal((await rect(page, ".mobile-workspace-tabs")).visible, false, "pane dock is hidden without a skin")
+    const main = await rect(page, "main")
+    const workspace = await rect(page, "main > .workspace")
+    assert.ok(Math.abs(workspace.y - main.y) <= 1 && Math.abs(workspace.height - main.height) <= 1, "welcome page covers main")
+    assert.equal((await rect(page, ".welcome-aside")).visible, false, "duplicate recent list is hidden")
+    const recent = await rect(page, ".welcome-recent")
+    const hero = await rect(page, ".welcome-hero")
+    assert.ok(recent.bottom <= hero.y, "recent section sits above the hero")
+    const cards = await page.$$eval(".template-card", (nodes) => nodes.map((node) => {
+      const box = node.getBoundingClientRect()
+      return { left: box.left, right: box.right }
+    }))
+    assert.ok(cards.every((card) => card.left >= 0 && card.right <= viewport.width), "template cards stay on screen")
+  }))
+
+  await check(`${tag} split editor layout`, () => withPage(viewport, async (page) => {
+    await openTemplate(page)
+    await assertTitlebarClean(page, "editor")
+    await assertNoPageOverflow(page, "editor")
+    const main = await rect(page, "main")
+    const sidebar = await rect(page, "main > aside")
+    const dock = await rect(page, ".mobile-workspace-tabs")
+    const workspace = await rect(page, "main > .workspace")
+    assert.ok(Math.abs(sidebar.y - main.y) <= 1, `panes start at the top of main (gap ${sidebar.y - main.y}px)`)
+    assert.ok(Math.abs(sidebar.bottom - dock.y) <= 1, "panes end at the dock")
+    assert.ok(Math.abs(dock.bottom - workspace.y) <= 1, "canvas starts below the dock")
+    assert.ok(Math.abs(workspace.bottom - main.bottom) <= 1, "canvas reaches the bottom")
+    const canvasWrap = await rect(page, "main > .workspace > .canvas-wrap")
+    assert.ok(canvasWrap.height > workspace.height * 0.6, `canvas gets the workspace (${canvasWrap.height}/${workspace.height})`)
+    assert.equal((await rect(page, ".workspace-status")).visible, false, "status strip is hidden on phones")
+    const toolbar = await rect(page, ".preview-toolbar")
+    assert.ok(toolbar.visible && toolbar.y >= workspace.y && toolbar.bottom <= canvasWrap.y + 1, "preview toolbar sits above the canvas")
+    const items = await page.$$eval(".sidebar-overview .mobile-overview-active .nav-item", (nodes) =>
+      nodes.filter((node) => node.getBoundingClientRect().height > 0 && node.checkVisibility()).length)
+    assert.ok(items > 0, "the active overview group lists its items")
+  }))
+
+  await check(`${tag} pane switching and collapse`, () => withPage(viewport, async (page) => {
+    await openTemplate(page)
+    await page.locator('button[data-mobile-pane="inspector"]').click()
+    await page.waitForTimeout(350)
+    const source = await rect(page, "main > .source")
+    assert.ok(source.x >= -1 && source.right <= viewport.width + 1, "inspector slides in")
+    await page.locator("#mobile-split-handle").click()
+    await page.waitForTimeout(250)
+    assert.equal((await rect(page, "main > .workspace")).visible, false, "collapsing hides the canvas")
+    const main = await rect(page, "main")
+    const expanded = await rect(page, "main > .source")
+    assert.ok(Math.abs(expanded.bottom - main.bottom) <= 1, "panes use the freed space")
+  }))
+
+  await check(`${tag} mode switch keeps the title readable`, () => withPage(viewport, async (page) => {
+    await openTemplate(page)
+    await page.locator(".mode-control .mobile-choice-toggle").click()
+    await page.waitForFunction(() => document.querySelector("#mode").value === "edit")
+    await assertTitlebarClean(page, "edit mode")
+    const title = await rect(page, "#document-name")
+    assert.ok(title.width >= 40, `document name keeps room (${title.width}px)`)
+  }))
+
+  await check(`${tag} settings sheet`, () => withPage(viewport, async (page) => {
+    await page.locator(".titlebar-preferences").click()
+    await page.waitForSelector("#settings-dialog[open]")
+    const dialog = await rect(page, "#settings-dialog")
+    assert.ok(dialog.x >= -1 && dialog.right <= viewport.width + 1 && dialog.bottom <= viewport.height + 1, "sheet fits the screen")
+    const tabs = await page.$$eval("#settings-dialog .settings-nav-item", (nodes) => nodes
+      .filter((node) => node.checkVisibility())
+      .map((node) => ({ page: node.dataset.settingsPage, top: Math.round(node.getBoundingClientRect().top), scrollW: node.scrollWidth, clientW: node.clientWidth })))
+    assert.equal(new Set(tabs.map((tab) => tab.top)).size, 1, "category chips stay on one row")
+    assert.ok(tabs.every((tab) => tab.scrollW <= tab.clientW + 1), "category labels are not clipped")
+    for (const tab of tabs) {
+      await page.locator(`#settings-dialog [data-settings-page="${tab.page}"]`).click()
+      const overflow = await page.$eval("#settings-dialog", (sheet) => {
+        const bounds = sheet.getBoundingClientRect()
+        const panel = sheet.querySelector(".settings-page:not([hidden])")
+        return Array.from(panel.querySelectorAll("*"))
+          .filter((element) => element.checkVisibility() && element.getBoundingClientRect().width > 0)
+          .filter((element) => {
+            const box = element.getBoundingClientRect()
+            return box.left < bounds.left - 1 || box.right > bounds.right + 1
+          })
+          .map((element) => element.id || element.className || element.tagName)
+      })
+      assert.deepEqual(overflow, [], `${tab.page} page stays inside the sheet`)
+      const labelOverlaps = await page.$eval("#settings-dialog .settings-page:not([hidden])", (panel) =>
+        Array.from(panel.querySelectorAll(".settings-row")).filter((row) => {
+          const children = Array.from(row.children).filter((child) => child.checkVisibility())
+          for (let i = 0; i < children.length; i += 1) {
+            for (let j = i + 1; j < children.length; j += 1) {
+              const a = children[i].getBoundingClientRect()
+              const b = children[j].getBoundingClientRect()
+              if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) return true
+            }
+          }
+          return false
+        }).length)
+      assert.equal(labelOverlaps, 0, `${tab.page} rows do not overlap their controls`)
+    }
+    const save = await rect(page, "#settings-save")
+    assert.ok(save.visible && save.bottom <= viewport.height + 1, "save button is reachable")
+  }))
+
+  await check(`${tag} new skin sheet keeps its buttons on screen`, () => withPage(viewport, async (page) => {
+    await page.evaluate(() => document.getElementById("new-project-dialog").showModal())
+    const create = await rect(page, '#new-project-form button[value="create"]')
+    assert.ok(create.visible && create.bottom <= viewport.height + 1, "create button is visible without scrolling the sheet")
+  }))
+}
+
+await check("390×844 preview above the panes", () => withPage({ width: 390, height: 844 }, async (page) => {
+  await openTemplate(page)
+  const main = await rect(page, "main")
+  const workspace = await rect(page, "main > .workspace")
+  const dock = await rect(page, ".mobile-workspace-tabs")
+  const sidebar = await rect(page, "main > aside")
+  assert.ok(Math.abs(workspace.y - main.y) <= 1, "canvas on top")
+  assert.ok(Math.abs(workspace.bottom - dock.y) <= 1, "dock under the canvas")
+  assert.ok(Math.abs(dock.bottom - sidebar.y) <= 1 && Math.abs(sidebar.bottom - main.bottom) <= 1, "panes below the dock")
+}, { storage: { "mobile-preview-position": "top" } }))
+
+await check("844×390 landscape phone keeps the canvas", () => withPage({ width: 844, height: 390 }, async (page) => {
+  await assertNoPageOverflow(page, "landscape welcome")
+  await openTemplate(page)
+  await assertTitlebarClean(page, "landscape")
+  const workspace = await rect(page, "main > .workspace")
+  const canvasWrap = await rect(page, "main > .workspace > .canvas-wrap")
+  assert.ok(canvasWrap.height > workspace.height * 0.6, `canvas gets the workspace (${canvasWrap.height}/${workspace.height})`)
+}))
+
+await check("1280×800 desktop title bar is unchanged", () => withPage({ width: 1280, height: 800 }, async (page) => {
+  await openTemplate(page)
+  await assertTitlebarClean(page, "desktop")
+  assert.equal((await rect(page, ".pen-file-menu")).visible, true, "desktop file menu")
+  assert.equal((await rect(page, ".mobile-command-menu")).visible, false, "phone menu hidden")
+  assert.equal((await rect(page, ".mobile-workspace-tabs")).visible, false, "phone dock hidden")
+  assert.equal((await rect(page, "main > aside")).visible, true, "sidebar column")
+}, { mobile: false }))
+
+await browser.close()
+await server.close()
+
+for (const result of results) {
+  console.log(`${result.ok ? "ok  " : "FAIL"} ${result.name}${result.ok ? "" : `\n     ${result.error.message.split("\n")[0]}`}`)
+}
+const failed = results.filter((result) => !result.ok).length
+console.log(`\n${results.length - failed}/${results.length} passed`)
+process.exit(failed ? 1 : 0)

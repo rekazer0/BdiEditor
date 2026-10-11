@@ -1,0 +1,936 @@
+/* =================================================================================================
+ * Mobile adaptation layer
+ *
+ * The Pen redesign layers (pen-*.css, inspector-fidelity.css, settings.css …) restate many
+ * desktop rules without a media query. Because they load after style.css, they silently
+ * override its phone rules: the title pill sits on top of the mode switch, the canvas row
+ * collapses to 48px, the welcome page renders inside half of the split view, and the
+ * settings sheet clips its navigation. This file is imported last and restates the phone
+ * layout on top of the Pen visual language.
+ *
+ *  - (max-width: 760px)                         every narrow viewport
+ *  - (max-width: 760px) and (orientation: portrait)  the split editor (mirrors
+ *                                               `mobilePortraitQuery` in main.ts)
+ * ================================================================================================= */
+
+/* -------------------------------------------------------------------------------------------------
+ * 1 · Title bar
+ *     ☰ actions · undo/redo · document name (truncates) · mode pill · more
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  :root,
+  :root.macos {
+    --titlebar-height: calc(52px + var(--safe-area-top));
+  }
+
+  :root body .titlebar {
+    height: var(--titlebar-height);
+    min-height: var(--titlebar-height);
+    gap: 6px;
+    padding: var(--safe-area-top) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));
+  }
+
+  :root body .titlebar-left,
+  :root body .titlebar-right {
+    flex: none;
+    gap: 4px;
+  }
+
+  :root body .titlebar-center {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+
+  /* The phone menu mirrors the desktop file menu and also carries the panel tools,
+     so the desktop-only buttons leave the bar. */
+  :root body .titlebar .pen-file-menu,
+  :root body .titlebar-left > .titlebar-icon-button,
+  :root body .titlebar-left > .spacer,
+  :root body .titlebar .desktop-quick-actions,
+  :root body .titlebar .mobile-title-choices,
+  :root body .titlebar .mode-control > button:not(.mobile-choice-toggle) {
+    display: none !important;
+  }
+
+  :root body .titlebar .mobile-command-menu {
+    display: block;
+    position: static;
+    flex: none;
+  }
+
+  :root body .titlebar .mobile-quick-actions {
+    display: flex;
+    flex: none;
+    gap: 2px;
+  }
+
+  :root body .titlebar .titlebar-icon-button,
+  :root body .titlebar .toolbar-more > summary.titlebar-icon-button,
+  :root body .titlebar .mobile-command-menu > summary {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--pen-text);
+    box-shadow: none;
+    font-size: 0;
+  }
+
+  :root body .titlebar .mobile-command-menu > summary {
+    background: var(--pen-surface-subtle);
+  }
+
+  :root body .titlebar .titlebar-icon-button:disabled {
+    opacity: 0.32;
+  }
+
+  :root body .titlebar .titlebar-icon-button .system-symbol,
+  :root body .titlebar .titlebar-icon-button .system-symbol svg,
+  :root body .titlebar .toolbar-more > summary .system-symbol,
+  :root body .titlebar .toolbar-more > summary .system-symbol svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Document name: an inline, truncating pill instead of an absolutely centred label. */
+  :root body .titlebar .document-title {
+    position: static;
+    min-width: 0;
+    max-width: 100%;
+    display: inline-flex;
+    gap: 6px;
+    padding: 7px 10px;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  :root body .titlebar .document-title .document-icon {
+    display: none;
+  }
+
+  :root body .titlebar .document-title strong {
+    min-width: 0;
+    max-width: none;
+    overflow: hidden;
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :root body .titlebar .document-title input {
+    width: 100%;
+    min-width: 0;
+    font-size: 16px; /* ≥16px keeps iOS Safari from zooming on focus */
+  }
+
+  /* Mode switch: a labelled pill that turns accent while editing. */
+  :root body .titlebar .mode-control {
+    width: auto;
+    min-width: 0;
+    position: static;
+    flex: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+  }
+
+  :root body .titlebar .mode-control > .mobile-choice-toggle {
+    width: auto;
+    min-width: 0;
+    height: 34px;
+    padding: 0 12px;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--pen-surface-subtle);
+    color: var(--pen-text);
+    box-shadow: none;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  :root body .titlebar .mode-control > .mobile-choice-toggle .mode-toggle-icon {
+    display: none;
+  }
+
+  :root:has(#mode option[value="edit"]:checked) body .titlebar .mode-control > .mobile-choice-toggle {
+    background: var(--pen-accent-soft);
+    color: var(--pen-accent);
+  }
+
+  /* With no skin open there is nothing to undo or switch; give the name the room. */
+  body:has(.canvas-wrap.empty) .titlebar .mobile-quick-actions,
+  body:has(.canvas-wrap.empty) .titlebar .mode-control {
+    display: none !important;
+  }
+
+  /* Menus anchor to the bar edges instead of the summary so they never leave the screen. */
+  :root body .titlebar .mobile-command-actions {
+    width: auto;
+    max-height: calc(100dvh - var(--titlebar-height) - 16px - env(safe-area-inset-bottom));
+    position: fixed;
+    top: calc(var(--titlebar-height) + 6px);
+    right: auto;
+    left: max(10px, env(safe-area-inset-left));
+    min-width: 248px;
+    max-width: calc(100vw - 20px);
+    display: grid;
+    gap: 2px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  :root body .titlebar .mobile-command-actions button {
+    min-height: 44px;
+    padding: 0 12px;
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    border-radius: 8px;
+    font-size: 15px;
+    text-align: left;
+  }
+
+  :root body .titlebar .mobile-command-actions button .system-symbol,
+  :root body .titlebar .mobile-command-actions button .system-symbol svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  :root body .titlebar .mobile-menu-separator:last-child {
+    display: none;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 2 · Welcome screen (no skin open)
+ *     Older phone rules target the bare `aside` element, which also matches the welcome
+ *     page's `aside.welcome-aside` and pinned it over the recent list. Without a skin the
+ *     split dock has nothing to switch between, so the welcome page takes the whole window.
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  body:has(.canvas-wrap.empty) .mobile-workspace-tabs {
+    display: none !important;
+  }
+
+  :root body:has(.canvas-wrap.empty) main > .workspace {
+    top: 0 !important;
+    height: 100% !important;
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr);
+    border-top: 0;
+  }
+
+  :root body:has(.canvas-wrap.empty) .preview-zoom-control {
+    display: none;
+  }
+
+  :root body .canvas-wrap.empty .empty-state {
+    display: block;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Recent files are already listed in the main column. */
+  :root body .canvas-wrap.empty .welcome-aside {
+    display: none;
+  }
+
+  :root body .welcome-main {
+    gap: 22px;
+    padding: 20px max(16px, env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    overflow: visible;
+  }
+
+  :root body .welcome-section-head {
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 6px;
+  }
+
+  :root body .welcome-recent .welcome-section-head h2,
+  :root body .welcome-hero h1 {
+    font-size: 22px;
+    line-height: 1.25;
+  }
+
+  :root body .welcome-head-action {
+    margin-left: auto;
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  :root body .recent-grid-empty,
+  :root body .welcome-open {
+    flex-wrap: wrap;
+  }
+
+  :root body .recent-grid-empty-copy,
+  :root body .welcome-open-copy {
+    flex: 1 1 180px;
+  }
+
+  :root body .recent-grid-empty-copy strong,
+  :root body .welcome-open-copy strong {
+    font-size: 14px;
+  }
+
+  :root body .recent-grid-empty-copy span,
+  :root body .welcome-open-copy span {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  :root body .recent-grid-empty button,
+  :root body .welcome-open button {
+    min-height: 40px;
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  :root body .welcome-hero p {
+    font-size: 13px;
+  }
+
+  :root body .template-grid,
+  :root body .recent-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  :root body .template-card {
+    min-width: 0;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  :root body .template-grid .template-preview,
+  :root body .recent-grid .template-preview {
+    height: 128px;
+  }
+
+  :root body .template-name-row,
+  :root body .template-meta {
+    min-width: 0;
+  }
+
+  :root body .template-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :root body .template-meta {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 3 · Split editor (portrait phones)
+ *     Panes above, dock (pane switch + grab handle) in between, canvas below — or mirrored
+ *     when 「预览位置」 is set to top. The Pen dock is 56px tall; the older budget reserved a
+ *     dock-sized gap above the panes even when the dock sits at the split.
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 760px) and (orientation: portrait) {
+  :root:not([data-mobile-preview-position="top"]) body main > :is(aside, .source) {
+    top: 0;
+    height: calc(100% - var(--mobile-workspace-split, 50%));
+  }
+
+  :root[data-mobile-preview-position="top"] body main > :is(aside, .source) {
+    top: calc(var(--mobile-workspace-split, 50%) + var(--mobile-dock-h));
+    height: calc(100% - var(--mobile-workspace-split, 50%) - var(--mobile-dock-h));
+  }
+
+  :root[data-mobile-preview-position="top"] body main > .workspace {
+    top: 0;
+    height: var(--mobile-workspace-split, 50%);
+  }
+
+  :root[data-mobile-preview-collapsed="true"] body main > :is(aside, .source) {
+    top: var(--mobile-dock-h) !important;
+    height: calc(100% - var(--mobile-dock-h)) !important;
+  }
+
+  :root[data-mobile-preview-collapsed="true"] body .mobile-workspace-tabs {
+    top: 0 !important;
+  }
+
+  :root body main > :is(aside, .source) {
+    border-top: 0;
+    border-bottom: 0;
+    background: var(--pen-surface);
+  }
+
+  /* Dock: two equal pane tabs with the grab handle on the lower edge. */
+  :root body .mobile-workspace-tabs {
+    padding: 8px max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left));
+    border-top: 1px solid var(--pen-line);
+  }
+
+  :root body .mobile-workspace-tabs button[data-mobile-pane] {
+    height: 36px;
+    font-size: 13px;
+  }
+
+  :root body .mobile-split-handle {
+    height: 10px;
+    bottom: 0;
+  }
+
+  :root body .mobile-split-handle .mobile-split-icon {
+    display: none;
+  }
+
+  /* Canvas: compact preview toolbar on top, canvas fills the rest. The desktop grid
+     (48px · 1fr · 30px) used to squeeze the canvas into the 48px toolbar row. */
+  :root body:not(:has(.canvas-wrap.empty)) main > .workspace {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    border-top: 0;
+  }
+
+  :root[data-mobile-preview-collapsed="true"] body main > .workspace {
+    display: none !important;
+  }
+
+  :root body main > .workspace > .workspace-status {
+    display: none;
+  }
+
+  :root body:not(:has(.canvas-wrap.empty)) .preview-toolbar {
+    height: auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 6px max(10px, env(safe-area-inset-right)) 6px max(10px, env(safe-area-inset-left));
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--pen-line);
+    background: var(--pen-surface);
+  }
+
+  :root body .preview-toolbar-start,
+  :root body .preview-toolbar-end {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: static;
+  }
+
+  :root body .preview-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  :root body .preview-toolbar #device-control {
+    width: auto;
+    flex: 1 1 auto;
+    min-width: 116px;
+    position: static;
+    transform: none;
+  }
+
+  :root body .preview-toolbar #skin-state-control {
+    width: auto;
+    flex: none;
+  }
+
+  :root body .preview-toolbar #device-control select,
+  :root body .preview-toolbar #device {
+    width: 100%;
+    min-width: 0;
+    height: 30px;
+    padding: 0 16px 0 0;
+    font-size: 13px;
+  }
+
+  :root body .preview-toolbar #device-control .device-control-icon {
+    display: none;
+  }
+
+  :root body .preview-toolbar #device-control,
+  :root body .preview-toolbar #skin-state-control {
+    height: 32px;
+    padding: 0 8px;
+  }
+
+  :root body .preview-toolbar #skin-state-control {
+    max-width: 72px;
+    align-items: center;
+  }
+
+  :root body .preview-toolbar #skin-state-control .skin-state-value {
+    line-height: 30px;
+  }
+
+  :root body .preview-toolbar .preview-choice {
+    padding: 2px;
+    gap: 2px;
+  }
+
+  :root body .preview-toolbar .preview-choice > button,
+  :root body .preview-toolbar .preview-tool-toggle {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    padding: 0;
+  }
+
+  :root body .canvas-wrap {
+    min-height: 0;
+    padding: 8px;
+  }
+
+  :root body .preview-zoom-control {
+    right: max(10px, env(safe-area-inset-right));
+    bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+
+  :root body .preview-zoom-control button {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 4 · Panes: overview rail and inspector group rail
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 760px) and (orientation: portrait) {
+  :root body .preview-toolbar #skin-state-control {
+    width: 58px !important;
+    max-width: 58px;
+  }
+
+  /* The rail already names the group; a collapsible summary would only hide its items. */
+  :root body #files .sidebar-overview > .nav-group > .nav-section {
+    display: none;
+  }
+
+  :root body .sidebar-overview > .nav-group.mobile-overview-active > .nav-group-body {
+    padding-top: 6px;
+  }
+
+  :root body #mobile-inspector-groups {
+    width: 60px;
+  }
+
+  :root body #mobile-inspector-groups button {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 2px;
+  }
+
+  :root body #mobile-inspector-groups .inspector-group-label {
+    max-width: 100%;
+    font-size: 11px;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* Narrow phones (iPhone SE, 360dp Android): the mode pill drops its label for the icon. */
+@media (max-width: 374px) {
+  :root body .titlebar .mode-control > .mobile-choice-toggle {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  :root body .titlebar .mode-control > .mobile-choice-toggle .mode-toggle-icon {
+    display: block;
+  }
+
+  :root body .titlebar .mode-control > .mobile-choice-toggle .mode-toggle-icon svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+  }
+
+  :root body .titlebar .mode-control > .mobile-choice-toggle .mobile-choice-label {
+    display: none;
+  }
+
+  :root body .titlebar .mobile-quick-actions .titlebar-icon-button {
+    width: 32px;
+    min-width: 32px;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 5 · Landscape phones
+ *     The three-column desktop frame stays, but the canvas row had collapsed to the 48px
+ *     toolbar slot and the 30px status row grew to fill the column.
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 950px) and (max-height: 600px) and (orientation: landscape) {
+  :root body:not(:has(.canvas-wrap.empty)) main > .workspace {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  :root body main > .workspace > .workspace-status {
+    display: none;
+  }
+
+  :root body:not(:has(.canvas-wrap.empty)) .preview-toolbar {
+    height: auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 5px 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  :root body .preview-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  :root body .preview-toolbar-start,
+  :root body .preview-toolbar-end {
+    flex: none;
+    position: static;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  :root body .preview-toolbar #device-control {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 116px;
+    position: static;
+    transform: none;
+  }
+
+  :root body .preview-toolbar #device-control .device-control-icon {
+    display: none;
+  }
+
+  :root body .preview-toolbar .preview-choice > button,
+  :root body .preview-toolbar .preview-tool-toggle {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    padding: 0;
+  }
+
+  :root body .preview-zoom-control {
+    right: max(8px, env(safe-area-inset-right));
+    bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+
+  :root body .sidebar-view-control button {
+    min-width: 0;
+    padding-inline: 4px;
+    white-space: nowrap;
+  }
+
+  :root body .sidebar-view-control button .system-symbol {
+    display: none;
+  }
+
+  :root body .canvas-wrap.empty .empty-state {
+    overflow-y: auto;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 6 · Settings sheet
+ *     Full-screen on phones: one scrolling row of category chips (a 3-column grid from an
+ *     older rule clipped 「安全区与辅助线」), rows that stack long labels, and a footer that
+ *     clears the home indicator.
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  :root body #settings-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: #ffffff; /* full-screen sheet: nothing behind it should show through */
+  }
+
+  :root[data-app-theme="dark"] body #settings-dialog {
+    background: #15171b;
+  }
+
+  :root body #settings-dialog form {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  :root body #settings-dialog header {
+    min-height: 52px;
+    padding: var(--safe-area-top, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+  }
+
+  :root body #settings-dialog .settings-title-cluster {
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  :root body #settings-dialog #settings-crumb {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  :root body #settings-dialog #settings-close {
+    width: 40px;
+    height: 40px;
+    flex: none;
+  }
+
+  :root body #settings-dialog .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  :root body #settings-dialog .settings-sidebar {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  :root body #settings-dialog .settings-sidebar::-webkit-scrollbar {
+    display: none;
+  }
+
+  :root body #settings-dialog .settings-group-label,
+  :root body #settings-dialog .settings-nav-item small,
+  :root body #settings-dialog .settings-nav-item::after {
+    display: none !important;
+  }
+
+  :root body #settings-dialog .settings-nav-item {
+    width: auto;
+    min-width: 0;
+    height: 36px;
+    flex: none;
+    padding: 0 12px;
+    scroll-snap-align: start;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  :root body #settings-dialog .settings-content {
+    padding: 18px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  :root body #settings-dialog .settings-section-heading h3 {
+    font-size: 20px;
+    overflow-wrap: anywhere;
+  }
+
+  :root body #settings-dialog .settings-row {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    min-height: 52px;
+    font-size: 14px;
+  }
+
+  /* Labels with a hint stack the hint underneath instead of running into it. */
+  :root body #settings-dialog .settings-row > span:first-child {
+    flex: 1 1 140px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  :root body #settings-dialog .settings-row > span:first-child small {
+    margin: 0;
+    color: var(--tertiary);
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+
+  :root body #settings-dialog .settings-row > select,
+  :root body #settings-dialog .settings-row > input:not([type="checkbox"]),
+  :root body #settings-dialog .settings-text-row > :last-child,
+  :root body #settings-dialog .settings-row > .settings-secret-control,
+  :root body #settings-dialog .settings-row.settings-range > .settings-range-control {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: none;
+  }
+
+  :root body #settings-dialog select,
+  :root body #settings-dialog input:not([type="checkbox"]):not([type="range"]):not([type="color"]) {
+    min-height: 40px;
+    font-size: 16px; /* ≥16px stops iOS Safari from zooming the sheet on focus */
+  }
+
+  :root body #settings-dialog .settings-segmented {
+    height: 36px;
+  }
+
+  :root body #settings-dialog .settings-segmented button {
+    height: 28px;
+    min-height: 0;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
+  :root body #settings-dialog .settings-switch input[type="checkbox"] {
+    flex: none;
+  }
+
+  :root body #settings-dialog .about-update > div,
+  :root body #settings-dialog .about-contact {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
+
+  :root body #settings-dialog .about-contact {
+    margin-top: 18px;
+  }
+
+  :root body #settings-dialog .about-contact strong {
+    flex: 1 1 100%;
+  }
+
+  :root body #settings-dialog .about-contact .qq-group-copy,
+  :root body #settings-dialog .about-contact a {
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--content);
+    box-shadow: none;
+    font-size: 13px;
+    text-decoration: none;
+  }
+
+  :root body #settings-dialog .model-editor .settings-row > :last-child,
+  :root body #settings-dialog .model-choices-panel {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  :root body #settings-dialog .settings-footer {
+    min-height: 60px;
+    padding: 8px max(12px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+
+  :root body #settings-dialog .settings-footer-actions button {
+    height: 40px;
+    min-width: 72px;
+    padding: 0 16px;
+    font-size: 14px;
+  }
+
+  :root body #settings-dialog #settings-save-state {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  :root body #settings-dialog #settings-dirty-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 7 · Other sheets on phones
+ *     The new-skin list scrolled inside a dialog that also scrolled (its buttons were below
+ *     the fold), and the layout-image form overlapped its own footer. Both become a column
+ *     with a scrolling middle and a footer that stays reachable and opaque.
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  :root body #new-project-dialog[open] {
+    height: auto;
+    max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  :root body #new-project-form {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :root body #new-project-form > header,
+  :root body #new-project-form > footer {
+    flex: none;
+  }
+
+  :root body #new-project-form > fieldset {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* The form already scrolls under a sticky footer; the footer only needs to be opaque
+     so the options scrolling beneath it stay hidden. */
+  :root body #layout-image-dialog > form > footer {
+    z-index: 1;
+    background: #ffffff;
+  }
+
+  :root[data-app-theme="dark"] body #layout-image-dialog > form > footer {
+    background: #15171b;
+  }
+
+  :root body .project-dialog footer button,
+  :root body .app-dialog footer button {
+    min-height: 40px;
+  }
+}

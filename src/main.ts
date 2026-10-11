@@ -52,6 +52,7 @@ import { createDraftReview, changedJsonSections } from "./ai-draft-review"
 import "./project-chooser.css"
 import { initializeSettings } from "./settings"
 import { createAtlasWorkspace } from "./atlas-workspace"
+import "./mobile.css"
 import { resizeTileSlice } from "./tiles"
 import type { AiChatController, AiChatRunHooks, AiChatRunResult } from "./ai-chat.ts"
 import type { AiDesignConversation } from "./ai-design.ts"
@@ -1882,6 +1883,10 @@ for (const button of mobilePaneButtons) {
 }
 mobilePortraitQuery.addEventListener("change", () => {
   if (!mobilePortraitQuery.matches) setMobilePreviewCollapsed(false)
+  else {
+    const activeGroup = files.querySelector<HTMLDetailsElement>(".nav-group.mobile-overview-active")
+    if (activeGroup) activeGroup.open = true
+  }
   setMobilePane(document.documentElement.dataset.mobilePane === "inspector" ? "inspector" : "layout")
   syncMobileInspectorHeader()
   updateSourceFindVisibility()
@@ -8233,8 +8238,11 @@ function renderFiles(): void {
       button.classList.toggle("active", active)
       button.setAttribute("aria-pressed", String(active))
     }
-    for (const group of Array.from(overview.querySelectorAll<HTMLElement>(".nav-group"))) {
-      group.classList.toggle("mobile-overview-active", group.dataset.overviewGroup === title)
+    for (const group of Array.from(overview.querySelectorAll<HTMLDetailsElement>(".nav-group"))) {
+      const active = group.dataset.overviewGroup === title
+      group.classList.toggle("mobile-overview-active", active)
+      // The phone rail replaces the disclosure summary, so a closed group would render empty.
+      if (active && mobilePortraitQuery.matches) group.open = true
     }
   }
 
