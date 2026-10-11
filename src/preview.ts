@@ -1324,6 +1324,24 @@ export function previewContentVerticalBounds(
   return { top, height: Math.max(1, bottom - top) }
 }
 
+/**
+ * Height of the drawable preview surface. Some Android IMEs (e.g. the Xiaomi
+ * default skin) place extra keys below PANEL.SIZE — the keyboard-switch and
+ * clipboard buttons in the navigation bar area. Those keys are real, so the
+ * surface grows to include them instead of clipping them off.
+ */
+export function previewSurfaceHeight(
+  items: readonly Pick<PreviewItem, "section" | "rect">[],
+  panelHeight: number,
+): number {
+  let bottom = panelHeight
+  for (const { section, rect } of items) {
+    if (!/^KEY\d+$/i.test(section) || rect.width <= 0 || rect.height <= 0) continue
+    bottom = Math.max(bottom, rect.y + rect.height)
+  }
+  return Math.ceil(bottom)
+}
+
 export class Preview {
   private readonly canvas: HTMLCanvasElement
   private readonly onEvent: (event: PreviewEvent) => void
@@ -1345,6 +1363,8 @@ export class Preview {
   private panelStyle = ""
   private panelWidth = DEFAULT_PANEL_WIDTH
   private panelHeight = DEFAULT_PANEL_HEIGHT
+  private surfaceKeys?: PreviewItem[]
+  private surfaceHeightValue = DEFAULT_PANEL_HEIGHT
   private theme: "light" | "dark" = "light"
   private transparent = false
   private keys: PreviewItem[] = []
@@ -1764,19 +1784,32 @@ export class Preview {
     const bounds = this.canvas.getBoundingClientRect()
     return {
       x: ((event.clientX - bounds.left) / bounds.width) * this.panelWidth,
-      y: ((event.clientY - bounds.top) / bounds.height) * this.panelHeight,
+      y: ((event.clientY - bounds.top) / bounds.height) * this.surfaceHeight,
     }
   }
 
   private snapThreshold(bounds: Pick<DOMRect, "width" | "height"> = this.canvas.getBoundingClientRect()): { x: number; y: number } {
     return {
       x: bounds.width ? 8 * this.panelWidth / bounds.width : 0,
-      y: bounds.height ? 8 * this.panelHeight / bounds.height : 0,
+      y: bounds.height ? 8 * this.surfaceHeight / bounds.height : 0,
     }
   }
 
+  private get surfaceHeight(): number {
+    if (this.surfaceKeys !== this.keys) {
+      this.surfaceKeys = this.keys
+      // Measure every layout key, not only the persistent subset, so the canvas
+      // keeps the same aspect as the viewport the editor sizes around it.
+      this.surfaceHeightValue = previewSurfaceHeight(
+        this.document ? previewItems(this.document, this.panelWidth, this.panelHeight) : this.keys,
+        this.panelHeight,
+      )
+    }
+    return this.surfaceHeightValue
+  }
+
   logicalSize(): { width: number; height: number } {
-    return { width: this.panelWidth, height: this.panelHeight }
+    return { width: this.panelWidth, height: this.surfaceHeight }
   }
 
   snapPoint(point: { x: number; y: number }, bounds?: Pick<DOMRect, "width" | "height">): { x: number; y: number } {
@@ -2180,7 +2213,7 @@ export class Preview {
 
   private fitCanvas(): void {
     const width = Math.ceil(this.panelWidth)
-    const height = Math.ceil(this.panelHeight)
+    const height = Math.ceil(this.surfaceHeight)
     const changed = this.canvas.dataset.logicalWidth !== String(width) ||
       this.canvas.dataset.logicalHeight !== String(height)
     this.canvas.dataset.logicalWidth = String(width)
@@ -2234,7 +2267,7 @@ export class Preview {
       this.guidesOverlay = overlay
     }
     overlay.toggleAttribute("hidden", false)
-    overlay.setAttribute("viewBox", `0 0 ${this.panelWidth} ${this.panelHeight}`)
+    overlay.setAttribute("viewBox", `0 0 ${this.panelWidth} ${this.surfaceHeight}`)
     overlay.style.setProperty("--preview-guide-font-size", `${15 * this.panelWidth / DEFAULT_PANEL_WIDTH}px`)
     overlay.replaceChildren(...keys.map((key) => {
       const group = document.createElementNS("http://www.w3.org/2000/svg", "g")
@@ -2549,18 +2582,18 @@ export class Preview {
     if (!context) return
     context.setTransform(1, 0, 0, 1, 0, 0)
     context.clearRect(0, 0, this.canvas.width, this.canvas.height)
-    context.setTransform(this.canvas.width / this.panelWidth, 0, 0, this.canvas.height / this.panelHeight, 0, 0)
+    context.setTransform(this.canvas.width / this.panelWidth, 0, 0, this.canvas.height / this.surfaceHeight, 0, 0)
     context.imageSmoothingEnabled = true
     context.imageSmoothingQuality = "high"
     const surfaceColor = previewSurfaceColor(this.theme, this.transparent)
     if (surfaceColor) {
       context.fillStyle = surfaceColor
-      context.fillRect(0, 0, this.panelWidth, this.panelHeight)
+      context.fillRect(0, 0, this.panelWidth, this.surfaceHeight)
     }
     this.drawVisual(
       context,
       panel,
-      { x: 0, y: 0, width: this.panelWidth, height: this.panelHeight },
+      { x: 0, y: 0, width: this.panelWidth, height: this.surfaceHeight },
       true,
     )
 
@@ -2713,7 +2746,7 @@ export class Preview {
         overlayContext.setTransform(scale, 0, 0, scale, 0, 0)
         overlayContext.clearRect(0, 0, overlayBounds.width, overlayBounds.height)
         overlayContext.translate(previewBounds.left - overlayBounds.left, previewBounds.top - overlayBounds.top)
-        overlayContext.scale(previewBounds.width / this.panelWidth, previewBounds.height / this.panelHeight)
+        overlayContext.scale(previewBounds.width / this.panelWidth, previewBounds.height / this.surfaceHeight)
         overlayContext.imageSmoothingEnabled = true
         overlayContext.imageSmoothingQuality = "high"
         hintContext = overlayContext
