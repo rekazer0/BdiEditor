@@ -204,6 +204,7 @@ import {
   parseLegacyHint,
   parseLegacyParticleEmitter,
   previewContentVerticalBounds,
+  previewSurfaceHeight,
   previewItems,
   previewStateImpact,
   type PreviewEvent,
@@ -759,6 +760,8 @@ let canvasLogicalSize: {
   width: number
   height: number
   panelHeight: number
+  /** PANEL.SIZE height; panelHeight also covers keys placed below it. */
+  layoutPanelHeight: number
   panelVisibleHeight: number
 } | undefined
 let pickerURL = ""
@@ -2805,16 +2808,16 @@ function refreshPreview(): void {
     )
     const candidateHeight = symbolPanel ? 0 : (toolbarSize?.height ?? 0)
     const candidateInputHeight = symbolPanel ? 0 : (toolbarSize?.inputHeight ?? 0)
-    updatePanelTools(config.width, config.height, candidateHeight)
+    const surfaceHeight = updatePanelTools(config.width, config.height, candidateHeight)
     activeKeyboardGeometry = {
       panelWidth: config.width,
-      panelHeight: config.height,
+      panelHeight: surfaceHeight,
       candidateHeight,
       candidateInputHeight,
     }
     applyDeviceKeyboardGeometry(
       config.width,
-      config.height,
+      surfaceHeight,
       candidateHeight,
       candidateInputHeight,
     )
@@ -2853,16 +2856,16 @@ function refreshPreview(): void {
     const bdaSymbolPanel = candidateArea.hidden
     const candidateHeight = bdaSymbolPanel ? 0 : (toolbarSize?.height ?? 0)
     const candidateInputHeight = bdaSymbolPanel ? 0 : (toolbarSize?.inputHeight ?? 0)
-    updatePanelTools(panelWidth, panelHeight, candidateHeight)
+    const surfaceHeight = updatePanelTools(panelWidth, panelHeight, candidateHeight)
     activeKeyboardGeometry = {
       panelWidth,
-      panelHeight,
+      panelHeight: surfaceHeight,
       candidateHeight,
       candidateInputHeight,
     }
     applyDeviceKeyboardGeometry(
       panelWidth,
-      panelHeight,
+      surfaceHeight,
       candidateHeight,
       candidateInputHeight,
     )
@@ -2957,7 +2960,7 @@ function fitCanvasPreview(): void {
 
 function updateCanvasPanelStatus(renderedWidth: number): void {
   if (!canvasLogicalSize) return
-  panelStatus.textContent = `面板：${Math.round(canvasLogicalSize.width)} × ${Math.round(canvasLogicalSize.panelHeight)} · 预览缩放：${Math.round(renderedWidth / canvasLogicalSize.width * 100)}%`
+  panelStatus.textContent = `面板：${Math.round(canvasLogicalSize.width)} × ${Math.round(canvasLogicalSize.layoutPanelHeight)} · 预览缩放：${Math.round(renderedWidth / canvasLogicalSize.width * 100)}%`
 }
 
 let fitCanvasDebounce: ReturnType<typeof setTimeout> | undefined
@@ -3005,7 +3008,7 @@ function applyPreviewZoom(value: number, anchor?: { x: number; y: number }): voi
   if (currentDeviceValue() !== "canvas" && canvasLogicalSize) {
     requestAnimationFrame(() => {
       const bounds = ($("#preview") as HTMLCanvasElement).getBoundingClientRect()
-      panelStatus.textContent = `面板：${Math.round(canvasLogicalSize!.width)} × ${Math.round(canvasLogicalSize!.panelHeight)} · 预览缩放：${previewScalePercent(bounds.width, bounds.height, canvasLogicalSize!.width, canvasLogicalSize!.panelHeight)}%`
+      panelStatus.textContent = `面板：${Math.round(canvasLogicalSize!.width)} × ${Math.round(canvasLogicalSize!.layoutPanelHeight)} · 预览缩放：${previewScalePercent(bounds.width, bounds.height, canvasLogicalSize!.width, canvasLogicalSize!.panelHeight)}%`
     })
   }
   requestAnimationFrame(resizeKeyboardPreviews)
@@ -3141,20 +3144,19 @@ function updatePanelTools(
   width: number,
   height: number,
   candidateHeight = 0,
-): void {
-  const content = previewContentVerticalBounds(
-    layoutDocument ? previewItems(layoutDocument, width, height) : [],
-    width,
-    height,
-  )
+): number {
+  const items = layoutDocument ? previewItems(layoutDocument, width, height) : []
+  const surfaceHeight = previewSurfaceHeight(items, height)
+  const content = previewContentVerticalBounds(items, width, surfaceHeight)
   deviceShell.style.setProperty("--canvas-width", `${width}px`)
   deviceShell.style.setProperty("--canvas-ratio-width", String(width))
   deviceShell.style.setProperty("--panel-visible-height", String(content.height))
   deviceShell.style.removeProperty("--panel-crop-offset")
   canvasLogicalSize = {
     width,
-    height: height + candidateHeight,
-    panelHeight: height,
+    height: surfaceHeight + candidateHeight,
+    panelHeight: surfaceHeight,
+    layoutPanelHeight: height,
     panelVisibleHeight: content.height,
   }
   fitCanvasPreview()
@@ -3176,8 +3178,9 @@ function updatePanelTools(
   requestAnimationFrame(() => {
     if (currentDeviceValue() === "canvas") return
     const bounds = ($("#preview") as HTMLCanvasElement).getBoundingClientRect()
-    panelStatus.textContent = `面板：${Math.round(width)} × ${Math.round(height)} · 预览缩放：${previewScalePercent(bounds.width, bounds.height, width, height)}%`
+    panelStatus.textContent = `面板：${Math.round(width)} × ${Math.round(height)} · 预览缩放：${previewScalePercent(bounds.width, bounds.height, width, surfaceHeight)}%`
   })
+  return surfaceHeight
 }
 
 function updateDevicePreview(): void {
