@@ -383,24 +383,76 @@
     background: var(--pen-surface);
   }
 
-  /* Dock: two equal pane tabs with the grab handle on the lower edge. */
+  /* Dock: a thin strip with two page indicators. Panes switch by swiping sideways (or tapping
+     an indicator); the rest of the strip is the grab handle that resizes the split. */
+  :root {
+    --mobile-dock-h: 22px;
+  }
+
   :root body .mobile-workspace-tabs {
-    padding: 8px max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left));
+    height: var(--mobile-dock-h);
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    padding: 0;
     border-top: 1px solid var(--pen-line);
   }
 
   :root body .mobile-workspace-tabs button[data-mobile-pane] {
-    height: 36px;
-    font-size: 13px;
+    position: relative;
+    z-index: 3;
+    flex: none;
+    width: 30px;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: transparent;
+    font-size: 0;
+  }
+
+  :root body .mobile-workspace-tabs button[data-mobile-pane]::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 14px;
+    height: 4px;
+    margin: -2px 0 0 -7px;
+    border-radius: var(--pen-radius-pill, 999px);
+    background: color-mix(in srgb, var(--pen-secondary) 35%, transparent);
+    transition: width 180ms ease, margin 180ms ease, background-color 180ms ease;
+  }
+
+  :root body .mobile-workspace-tabs button[data-mobile-pane].active {
+    background: transparent;
+  }
+
+  :root body .mobile-workspace-tabs button[data-mobile-pane].active::after {
+    width: 24px;
+    margin-left: -12px;
+    background: var(--pen-accent);
   }
 
   :root body .mobile-split-handle {
-    height: 10px;
-    bottom: 0;
+    z-index: 2;
+    inset: 0;
+    width: auto;
+    height: auto;
+    border-radius: 0;
+    transform: none;
   }
 
+  :root body .mobile-split-handle::before,
   :root body .mobile-split-handle .mobile-split-icon {
     display: none;
+  }
+
+  :root body .mobile-split-handle.dragging,
+  :root body .mobile-split-handle:focus-visible {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--pen-accent) 45%, transparent);
   }
 
   /* Canvas: compact preview toolbar on top, canvas fills the rest. The desktop grid
