@@ -64,6 +64,51 @@ test('BDI → BDS reuses a bundled Ogg sibling instead of transcoding', async ()
   assert.match(strFromU8(files['res/default.css']), /^PRESS_SOUND_PATH=tap\.ogg$/m)
 })
 
+test('light and dark css are adapted separately: same-named file reused, otherwise converted', async () => {
+  const css = '[STYLE1]\r\nPRESS_SOUND_PATH=tap.aiff\r\n\r\n[STYLE2]\r\nPRESS_SOUND_PATH=del.aiff\r\n'
+  const archive = SkinArchive.open(zipSync({
+    'skin/light/skin/port/py_9.ini': strToU8('[PANEL]\n'),
+    'skin/dark/skin/port/py_9.ini': strToU8('[PANEL]\n'),
+    'skin/light/skin/res/default.css': strToU8(css),
+    'skin/dark/skin/res/default.css': strToU8(css),
+    'skin/light/skin/res/tap.aiff': aiff(),
+    'skin/light/skin/res/tap.ogg': ogg,
+    'skin/light/skin/res/del.aiff': aiff(),
+    'skin/dark/skin/res/tap.aiff': aiff(),
+    'skin/dark/skin/res/del.aiff': aiff(),
+    'skin/dark/skin/res/unused.aiff': aiff(),
+  }), 'bdi')
+  const files = unzipSync(await archive.toBytesAsync('bds'))
+  const expected = '[STYLE1]\r\nPRESS_SOUND_PATH=tap.ogg\r\n\r\n[STYLE2]\r\nPRESS_SOUND_PATH=del.ogg\r\n'
+  assert.equal(strFromU8(files['light/res/default.css']), expected)
+  assert.equal(strFromU8(files['dark/res/default.css']), expected)
+  assert.deepEqual(files['light/res/tap.ogg'], ogg)
+  for (const path of ['light/res/del.ogg', 'dark/res/tap.ogg', 'dark/res/del.ogg']) assert.ok(isOgg(files[path]), path)
+  assert.equal(files['dark/res/unused.ogg'], undefined)
+})
+
+test('BDI export keeps css that already names AIFF', async () => {
+  const archive = SkinArchive.open(zipSync({
+    'port/py_9.ini': strToU8('[PANEL]\n'),
+    'res/default.css': strToU8('[STYLE1]\nPRESS_SOUND_PATH=tap.aiff\n'),
+    'res/tap.aiff': aiff(),
+    'res/tap.ogg': ogg,
+  }))
+  const files = unzipSync(await archive.toBytesAsync('bdi'))
+  assert.equal(strFromU8(files['skin/res/default.css']), '[STYLE1]\nPRESS_SOUND_PATH=tap.aiff\n')
+})
+
+test('missing referenced sound is reported, css left unchanged', async () => {
+  const warnings = []
+  const archive = SkinArchive.open(zipSync({
+    'port/py_9.ini': strToU8('[PANEL]\n'),
+    'res/default.css': strToU8('[STYLE1]\nPRESS_SOUND_PATH=gone.ogg\n'),
+  }))
+  const files = unzipSync(await archive.toBytesAsync('bdi', warnings))
+  assert.equal(strFromU8(files['skin/res/default.css']), '[STYLE1]\nPRESS_SOUND_PATH=gone.ogg\n')
+  assert.equal(warnings.length, 1)
+})
+
 test('same-format save leaves sounds untouched', async () => {
   const source = zipSync({
     'port/py_9.ini': strToU8('[PANEL]\n'),

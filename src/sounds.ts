@@ -256,9 +256,10 @@ export function soundNeedsTranscode(path: string, format: "bdi" | "bds"): boolea
 }
 
 /**
- * Points PRESS_SOUND_PATH at a sound the target platform plays: a same-named sibling in the
- * native format when the package already has one, otherwise a transcoded copy. Original files
- * are kept, matching official packages that bundle both formats.
+ * Rewrites every PRESS_SOUND_PATH in each theme's default.css (light and dark each have their own)
+ * that names a format the target platform does not play: Ogg → AIFF for BDI, AIFF/CAF → Ogg for BDS.
+ * A same-named file in the target format next to that css is used as is; otherwise the referenced
+ * file is transcoded. Original files are kept, matching official packages that bundle both formats.
  */
 export async function adaptPackageSounds(
   files: Map<string, Uint8Array>,
@@ -266,45 +267,65 @@ export async function adaptPackageSounds(
 ): Promise<{ converted: number; warnings: string[] }> {
   const extension = NATIVE_SOUND_EXTENSION[format]
   const warnings: string[] = []
-  const renamed = new Map<string, string>()
+  const transcoded = new Map<string, string | undefined>()
+  const lowerNames = new Map([...files.keys()].map((path) => [path.toLowerCase(), path]))
+  const find = (path: string) => lowerNames.get(path.toLowerCase())
   let converted = 0
-  for (const [path, bytes] of [...files]) {
-    if (path.endsWith("/") || !soundNeedsTranscode(path, format)) continue
-    const stem = path.replace(/\.[^./]+$/, "")
-    const sibling = [...files.keys()].find((candidate) =>
-      candidate.toLowerCase() === `${stem}.${extension}`.toLowerCase()
-      || (format === "bdi" && /\.(?:aif|caf)$/i.test(candidate) && candidate.replace(/\.[^./]+$/, "").toLowerCase() === stem.toLowerCase()))
-    let target = sibling
-    if (!target) {
+
+  const nativeFile = async (directories: string[], filename: string): Promise<string | undefined> => {
+    const stem = filename.replace(/\.[^.]+$/, "")
+    const alternatives = format === "bdi" ? [`${stem}.aiff`, `${stem}.aif`] : [`${stem}.ogg`]
+    for (const directory of directories) {
+      for (const name of alternatives) {
+        const existing = find(`${directory}${name}`)
+        if (existing) return existing
+      }
+    }
+    const source = directories.map((directory) => find(`${directory}${filename}`)).find(Boolean)
+    if (!source) {
+      warnings.push(`${directories[0]}${filename} 不存在，无法生成 ${extension.toUpperCase()}`)
+      return
+    }
+    if (!transcoded.has(source)) {
+      const target = source.replace(/\.[^./]+$/, `.${extension}`)
       try {
-        const decoded = await decodeSound(bytes)
-        target = `${stem}.${extension}`
+        const decoded = await decodeSound(files.get(source)!)
         files.set(target, format === "bdi" ? encodeAiffPcm16(decoded) : await encodeOggVorbis(decoded))
+        lowerNames.set(target.toLowerCase(), target)
         converted++
+        transcoded.set(source, target)
       } catch (error) {
-        warnings.push(`${path} 无法转换为 ${extension.toUpperCase()}：${error instanceof Error ? error.message : String(error)}`)
-        continue
+        warnings.push(`${source} 无法转换为 ${extension.toUpperCase()}：${error instanceof Error ? error.message : String(error)}`)
+        transcoded.set(source, undefined)
       }
     }
-    renamed.set(path.split("/").pop()!.toLowerCase(), target.split("/").pop()!)
+    return transcoded.get(source)
   }
-  if (renamed.size) {
-    for (const [path, bytes] of files) {
-      if (!/\.(?:css|ini)$/i.test(path)) continue
-      let text: string
-      try {
-        // Keep the BOM and leave non-UTF-8 (e.g. GBK) files untouched rather than re-encoding them.
-        text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes)
-      } catch {
-        continue
-      }
-      const next = text.replace(/^(\s*PRESS_SOUND_PATH\s*=\s*)(.*?)(\s*)$/gim, (line, prefix: string, value: string, tail: string) => {
-        const name = value.trim().split(/[\\/]/).pop()?.toLowerCase() ?? ""
-        const replacement = renamed.get(name)
-        return replacement ? `${prefix}${value.trim().slice(0, value.trim().length - name.length)}${replacement}${tail}` : line
-      })
-      if (next !== text) files.set(path, new TextEncoder().encode(next))
+
+  for (const [path, bytes] of [...files]) {
+    if (!/\.css$/i.test(path)) continue
+    let text: string
+    try {
+      // Keep the BOM and leave non-UTF-8 (e.g. GBK) files untouched rather than re-encoding them.
+      text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes)
+    } catch {
+      continue
     }
+    // Sounds sit next to the css (light/res/) or, for an orientation css (light/port/res/), in the theme's res/.
+    const directory = path.slice(0, path.lastIndexOf("/") + 1)
+    const directories = [...new Set([directory, directory.replace(/(?:land|port)\/res\/$/, "res/")])]
+    let next = ""
+    let last = 0
+    for (const match of text.matchAll(/^(\s*PRESS_SOUND_PATH\s*=\s*)(.*?)(\s*)$/gim)) {
+      const value = match[2].trim()
+      const filename = value.split(/[\\/]/).pop() ?? ""
+      if (!soundNeedsTranscode(filename, format)) continue
+      const target = await nativeFile(directories, filename)
+      if (!target) continue
+      next += text.slice(last, match.index) + match[1] + value.slice(0, value.length - filename.length) + target.split("/").pop() + match[3]
+      last = match.index! + match[0].length
+    }
+    if (last) files.set(path, new TextEncoder().encode(next + text.slice(last)))
   }
   return { converted, warnings }
 }
