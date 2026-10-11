@@ -162,33 +162,37 @@ export function setIniSoundStyle(styles: IniDocument, styleID: string, filename:
   if (!Number.isFinite(maximum) || numeric > maximum) styles.set("GLOBAL", "STYLE_NUM", styleID)
 }
 
-export function encodeWavPcm16(sound: DecodedSound): Uint8Array {
+export function encodeAiffPcm16(sound: DecodedSound): Uint8Array {
   const channels = sound.channelData.length
   const frames = sound.samplesDecoded
   const dataLength = frames * channels * 2
-  const bytes = new Uint8Array(44 + dataLength)
+  const bytes = new Uint8Array(54 + dataLength)
   const view = new DataView(bytes.buffer)
   const ascii = (offset: number, value: string) => {
     for (let index = 0; index < value.length; index++) bytes[offset + index] = value.charCodeAt(index)
   }
-  ascii(0, "RIFF")
-  view.setUint32(4, 36 + dataLength, true)
-  ascii(8, "WAVE")
-  ascii(12, "fmt ")
-  view.setUint32(16, 16, true)
-  view.setUint16(20, 1, true)
-  view.setUint16(22, channels, true)
-  view.setUint32(24, sound.sampleRate, true)
-  view.setUint32(28, sound.sampleRate * channels * 2, true)
-  view.setUint16(32, channels * 2, true)
-  view.setUint16(34, 16, true)
-  ascii(36, "data")
-  view.setUint32(40, dataLength, true)
-  let offset = 44
+  ascii(0, "FORM")
+  view.setUint32(4, bytes.length - 8)
+  ascii(8, "AIFF")
+  ascii(12, "COMM")
+  view.setUint32(16, 18)
+  view.setUint16(20, channels)
+  view.setUint32(22, frames)
+  view.setUint16(26, 16)
+  // Sample rate as an 80-bit IEEE 754 extended float.
+  const rate = Math.round(sound.sampleRate)
+  const exponent = Math.floor(Math.log2(rate))
+  view.setUint16(28, 16383 + exponent)
+  const mantissa = rate * 2 ** (63 - exponent)
+  view.setUint32(30, Math.floor(mantissa / 2 ** 32))
+  view.setUint32(34, mantissa % 2 ** 32)
+  ascii(38, "SSND")
+  view.setUint32(42, 8 + dataLength)
+  let offset = 54
   for (let frame = 0; frame < frames; frame++) {
     for (let channel = 0; channel < channels; channel++) {
       const sample = Math.max(-1, Math.min(1, sound.channelData[channel][frame] ?? 0))
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff)
       offset += 2
     }
   }
@@ -208,39 +212,92 @@ async function decodeOggVorbis(bytes: Uint8Array): Promise<DecodedSound> {
   }
 }
 
-/** Formats the target platform's input method cannot play: Android has no AIFF/CAF, iOS has no Ogg Vorbis. */
+async function encodeOggVorbis(sound: DecodedSound): Promise<Uint8Array> {
+  const { createEncoder, createOggEncoder } = await import("wasm-media-encoders")
+  // In the page, load the bundled .wasm file: the library's embedded data: URL is blocked by the CSP (connect-src).
+  const encoder = typeof document === "undefined"
+    ? await createOggEncoder()
+    : await createEncoder("audio/ogg", (await import("wasm-media-encoders/wasm/ogg?url")).default)
+  const channels = sound.channelData.slice(0, 2)
+  encoder.configure({ channels: channels.length as 1 | 2, sampleRate: sound.sampleRate, vbrQuality: 5 })
+  const chunks: Uint8Array[] = []
+  const block = 4096
+  for (let start = 0; start < sound.samplesDecoded; start += block) {
+    const end = Math.min(sound.samplesDecoded, start + block)
+    // encode() returns a view into WASM memory that the next call overwrites.
+    chunks.push(encoder.encode(channels.map((channel) => channel.subarray(start, end))).slice())
+  }
+  chunks.push(encoder.finalize().slice())
+  const output = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0))
+  let offset = 0
+  for (const chunk of chunks) {
+    output.set(chunk, offset)
+    offset += chunk.length
+  }
+  return output
+}
+
+async function decodeSound(bytes: Uint8Array): Promise<DecodedSound> {
+  const head = new TextDecoder("ascii").decode(bytes.subarray(0, 4))
+  if (head === "FORM") return decodeAiffPcm(bytes)
+  if (head === "OggS") return decodeOggVorbis(bytes)
+  throw new Error("不支持的音频编码")
+}
+
+/**
+ * Baidu skins ship key sounds as AIFF for iOS (BDI) and Ogg Vorbis for Android (BDS); official
+ * BDI packages often carry both under the same name. WAV is left alone: whether either platform
+ * plays it is unverified, so it is never introduced and never removed.
+ */
+const NATIVE_SOUND_EXTENSION = { bdi: "aiff", bds: "ogg" } as const
+
 export function soundNeedsTranscode(path: string, format: "bdi" | "bds"): boolean {
   return format === "bdi" ? /\.ogg$/i.test(path) : /\.(?:aiff?|caf)$/i.test(path)
 }
 
 /**
- * Rewrites key sounds a converted BDI/BDS package cannot play on its platform as 16-bit WAV,
- * and points PRESS_SOUND_PATH at the new file names.
+ * Points PRESS_SOUND_PATH at a sound the target platform plays: a same-named sibling in the
+ * native format when the package already has one, otherwise a transcoded copy. Original files
+ * are kept, matching official packages that bundle both formats.
  */
 export async function adaptPackageSounds(
   files: Map<string, Uint8Array>,
   format: "bdi" | "bds",
 ): Promise<{ converted: number; warnings: string[] }> {
+  const extension = NATIVE_SOUND_EXTENSION[format]
   const warnings: string[] = []
   const renamed = new Map<string, string>()
+  let converted = 0
   for (const [path, bytes] of [...files]) {
     if (path.endsWith("/") || !soundNeedsTranscode(path, format)) continue
-    const target = path.replace(/\.[^./]+$/, ".wav")
-    try {
-      const head = new TextDecoder("ascii").decode(bytes.subarray(0, 4))
-      const decoded = head === "FORM" ? decodeAiffPcm(bytes) : head === "OggS" ? await decodeOggVorbis(bytes) : undefined
-      if (!decoded) throw new Error("不支持的音频编码")
-      if (!files.has(target)) files.set(target, encodeWavPcm16(decoded))
-      files.delete(path)
-      renamed.set(path.split("/").pop()!.toLowerCase(), target.split("/").pop()!)
-    } catch (error) {
-      warnings.push(`${path} 无法转换为 WAV：${error instanceof Error ? error.message : String(error)}`)
+    const stem = path.replace(/\.[^./]+$/, "")
+    const sibling = [...files.keys()].find((candidate) =>
+      candidate.toLowerCase() === `${stem}.${extension}`.toLowerCase()
+      || (format === "bdi" && /\.(?:aif|caf)$/i.test(candidate) && candidate.replace(/\.[^./]+$/, "").toLowerCase() === stem.toLowerCase()))
+    let target = sibling
+    if (!target) {
+      try {
+        const decoded = await decodeSound(bytes)
+        target = `${stem}.${extension}`
+        files.set(target, format === "bdi" ? encodeAiffPcm16(decoded) : await encodeOggVorbis(decoded))
+        converted++
+      } catch (error) {
+        warnings.push(`${path} 无法转换为 ${extension.toUpperCase()}：${error instanceof Error ? error.message : String(error)}`)
+        continue
+      }
     }
+    renamed.set(path.split("/").pop()!.toLowerCase(), target.split("/").pop()!)
   }
   if (renamed.size) {
     for (const [path, bytes] of files) {
       if (!/\.(?:css|ini)$/i.test(path)) continue
-      const text = new TextDecoder().decode(bytes)
+      let text: string
+      try {
+        // Keep the BOM and leave non-UTF-8 (e.g. GBK) files untouched rather than re-encoding them.
+        text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes)
+      } catch {
+        continue
+      }
       const next = text.replace(/^(\s*PRESS_SOUND_PATH\s*=\s*)(.*?)(\s*)$/gim, (line, prefix: string, value: string, tail: string) => {
         const name = value.trim().split(/[\\/]/).pop()?.toLowerCase() ?? ""
         const replacement = renamed.get(name)
@@ -249,5 +306,5 @@ export async function adaptPackageSounds(
       if (next !== text) files.set(path, new TextEncoder().encode(next))
     }
   }
-  return { converted: renamed.size, warnings }
+  return { converted, warnings }
 }

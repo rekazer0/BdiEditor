@@ -9040,7 +9040,10 @@ async function exportArchive(format: ExportFormat, targetBdaPlatform?: Exclude<B
     return { bytes: await result.toBytesAsync(), converted: true, warnings: bdaCompatibilityWarnings(archive) }
   }
   if (archive.format !== "bda" || format === "bda") {
-    return { bytes: await archive.toBytesAsync(format), converted: false, warnings: [] }
+    const soundWarnings: string[] = []
+    const bytes = await archive.toBytesAsync(format, soundWarnings)
+    reportSoundWarnings(soundWarnings)
+    return { bytes, converted: false, warnings: soundWarnings }
   }
   if (!bdaBase) throw new Error("无法加载 BDA 官方基础布局")
   await waitForInterfacePaint()
@@ -9050,7 +9053,16 @@ async function exportArchive(format: ExportFormat, targetBdaPlatform?: Exclude<B
     `BDA 转换为 ${format.toUpperCase()} 时将降级以下内容：\n\n${result.warnings.join("\n")}\n\n继续导出吗？`,
   )) return
   updateFileOperationProgress(48, `正在压缩 ${format.toUpperCase()} 皮肤包…`)
-  return { bytes: await result.archive.platformBytesAsync(format), converted: true, warnings: result.warnings }
+  const soundWarnings: string[] = []
+  const bytes = await result.archive.platformBytesAsync(format, soundWarnings)
+  reportSoundWarnings(soundWarnings)
+  return { bytes, converted: true, warnings: [...result.warnings, ...soundWarnings] }
+}
+
+function reportSoundWarnings(warnings: string[]): void {
+  if (!warnings.length) return
+  clientLog.info("export.sound-warnings", { count: warnings.length, detail: warnings.join("; ") })
+  window.alert(`以下按键音未能转换为目标平台格式，导出包中仍引用原文件，目标平台可能没有声音：\n\n${warnings.join("\n")}`)
 }
 
 async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: string): Promise<boolean> {

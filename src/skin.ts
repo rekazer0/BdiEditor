@@ -695,6 +695,16 @@ export class SkinArchive {
       add(destination, data)
     }
 
+    // iOS packages repeat Info.txt inside each theme folder; BDS sources only have the root copy.
+    const rootInfo = format === "bdi" ? output.get("skin/Info.txt") : undefined
+    if (rootInfo && !single) {
+      for (const theme of ["light", "dark"]) {
+        if (output.has(`skin/${theme}/skin/`) && !output.has(`skin/${theme}/skin/Info.txt`)) {
+          output.set(`skin/${theme}/skin/Info.txt`, rootInfo)
+        }
+      }
+    }
+
     return Object.fromEntries(output)
   }
 
@@ -702,7 +712,7 @@ export class SkinArchive {
     return zipSync(this.packagedFiles(format), { level: 6 })
   }
 
-  async toBytesAsync(format?: ExportFormat): Promise<Uint8Array> {
+  async toBytesAsync(format?: ExportFormat, warnings?: string[]): Promise<Uint8Array> {
     if (format && (format === "bda" || this.format === "bda") && format !== this.format) {
       throw new Error("BDA 与 BDI/BDS 使用不同配置格式，不能转换")
     }
@@ -712,16 +722,17 @@ export class SkinArchive {
     // Avoid fflate's one-worker-per-large-file async ZIP path, which can exhaust WebView workers.
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
     if (format && format !== "bda" && (format !== this.format || this.layout === "legacy-ios")) {
-      return this.platformBytesAsync(format)
+      return this.platformBytesAsync(format, warnings)
     }
     return this.toBytes(format)
   }
 
-  /** Packages for a BDI/BDS platform, rewriting key sounds that platform cannot play as WAV. */
-  async platformBytesAsync(format: "bdi" | "bds"): Promise<Uint8Array> {
+  /** Packages for a BDI/BDS platform, pointing key sounds at a format that platform plays (AIFF / OGG). */
+  async platformBytesAsync(format: "bdi" | "bds", warnings?: string[]): Promise<Uint8Array> {
     if (this.format === "bda") throw new Error("BDA 与 BDI/BDS 使用不同配置格式，不能转换")
     const files = new Map(Object.entries(this.packagedFiles(format)))
-    await adaptPackageSounds(files, format)
+    const adapted = await adaptPackageSounds(files, format)
+    warnings?.push(...adapted.warnings)
     return zipSync(Object.fromEntries(files), { level: 6 })
   }
 

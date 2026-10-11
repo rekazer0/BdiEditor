@@ -22,11 +22,10 @@ function aiff(frames = 32) {
   return bytes
 }
 
-function isWav(bytes) {
-  return strFromU8(bytes.subarray(0, 4)) === 'RIFF' && strFromU8(bytes.subarray(8, 12)) === 'WAVE'
-}
+const isAiff = (bytes) => strFromU8(bytes.subarray(0, 4)) === 'FORM' && strFromU8(bytes.subarray(8, 12)) === 'AIFF'
+const isOgg = (bytes) => strFromU8(bytes.subarray(0, 4)) === 'OggS'
 
-test('BDS → BDI rewrites Ogg key sounds as WAV and updates PRESS_SOUND_PATH', async () => {
+test('BDS → BDI adds an AIFF copy of Ogg key sounds and points PRESS_SOUND_PATH at it', async () => {
   const archive = SkinArchive.open(zipSync({
     'Info.txt': strToU8('AtomSkinName=test'),
     'port/py_9.ini': strToU8('[PANEL]\nSOUND_STYLE=7\n'),
@@ -34,22 +33,35 @@ test('BDS → BDI rewrites Ogg key sounds as WAV and updates PRESS_SOUND_PATH', 
     'res/click.ogg': ogg,
   }))
   const files = unzipSync(await archive.toBytesAsync('bdi'))
-  assert.equal(files['skin/res/click.ogg'], undefined)
-  assert.ok(isWav(files['skin/res/click.wav']))
-  assert.match(strFromU8(files['skin/res/default.css']), /^PRESS_SOUND_PATH=click\.wav$/m)
+  assert.ok(isOgg(files['skin/res/click.ogg']))
+  assert.ok(isAiff(files['skin/res/click.aiff']))
+  assert.match(strFromU8(files['skin/res/default.css']), /^PRESS_SOUND_PATH=click\.aiff$/m)
 })
 
-test('BDI → BDS rewrites AIFF key sounds as WAV', async () => {
+test('BDI → BDS encodes AIFF key sounds as Ogg Vorbis and keeps the BOM', async () => {
   const archive = SkinArchive.open(zipSync({
     'skin/Info.txt': strToU8('AtomSkinName=test'),
     'skin/port/py_9.ini': strToU8('[PANEL]\nSOUND_STYLE=1\n'),
-    'skin/res/default.css': strToU8('[STYLE1]\r\nPRESS_SOUND_PATH=tap.aiff\r\n'),
+    'skin/res/default.css': strToU8('\ufeff[STYLE1]\r\nPRESS_SOUND_PATH=tap.aiff\r\n'),
     'skin/res/tap.aiff': aiff(),
   }), 'bdi')
   const files = unzipSync(await archive.toBytesAsync('bds'))
-  assert.equal(files['res/tap.aiff'], undefined)
-  assert.ok(isWav(files['res/tap.wav']))
-  assert.equal(strFromU8(files['res/default.css']), '[STYLE1]\r\nPRESS_SOUND_PATH=tap.wav\r\n')
+  assert.ok(isAiff(files['res/tap.aiff']))
+  assert.ok(isOgg(files['res/tap.ogg']))
+  assert.deepEqual([...files['res/default.css'].subarray(0, 3)], [0xef, 0xbb, 0xbf])
+  assert.equal(strFromU8(files['res/default.css']).replace(/^\ufeff/, ''), '[STYLE1]\r\nPRESS_SOUND_PATH=tap.ogg\r\n')
+})
+
+test('BDI → BDS reuses a bundled Ogg sibling instead of transcoding', async () => {
+  const archive = SkinArchive.open(zipSync({
+    'skin/port/py_9.ini': strToU8('[PANEL]\nSOUND_STYLE=1\n'),
+    'skin/res/default.css': strToU8('[STYLE1]\nPRESS_SOUND_PATH=tap.aiff\n'),
+    'skin/res/tap.aiff': aiff(),
+    'skin/res/tap.ogg': ogg,
+  }), 'bdi')
+  const files = unzipSync(await archive.toBytesAsync('bds'))
+  assert.deepEqual(files['res/tap.ogg'], ogg)
+  assert.match(strFromU8(files['res/default.css']), /^PRESS_SOUND_PATH=tap\.ogg$/m)
 })
 
 test('same-format save leaves sounds untouched', async () => {
@@ -60,6 +72,19 @@ test('same-format save leaves sounds untouched', async () => {
   })
   const files = unzipSync(await SkinArchive.open(source).toBytesAsync('bds'))
   assert.ok(files['res/tap.aiff'])
+  assert.equal(files['res/tap.ogg'], undefined)
+})
+
+test('BDS → BDI repeats Info.txt in each theme folder', async () => {
+  const archive = SkinArchive.open(zipSync({
+    'Info.txt': strToU8('Name=x\r\nStyle=default\r\nSupportPlatform=A\r\n'),
+    'light/port/py_9.ini': strToU8('[PANEL]\n'),
+    'dark/port/py_9.ini': strToU8('[PANEL]\n'),
+  }))
+  const files = unzipSync(await archive.toBytesAsync('bdi'))
+  for (const path of ['skin/Info.txt', 'skin/light/skin/Info.txt', 'skin/dark/skin/Info.txt']) {
+    assert.equal(strFromU8(files[path]), 'Name=x\r\nSupportPlatform=I\r\n', path)
+  }
 })
 
 test('BDA → BDS keeps key sounds', async () => {
@@ -83,7 +108,6 @@ test('BDA → BDS keeps key sounds', async () => {
   const delStyle = css.match(/\[STYLE(\d+)\]\r?\nPRESS_SOUND_PATH=del\.ogg/)?.[1]
   assert.ok(tapStyle && delStyle, css.slice(-200))
   assert.ok(files[`${prefix}res/tap.ogg`] && files[`${prefix}res/del.ogg`])
-  assert.equal(files[`${prefix}res/tap.aiff`], undefined)
   const layout = strFromU8(files[`${prefix}port/py_9.ini`] ?? files[`${prefix}port/py_26.ini`])
   assert.match(layout, new RegExp(`^SOUND_STYLE=${tapStyle}$`, 'm'))
 })
@@ -98,6 +122,6 @@ test('BDA → BDI prefers iOS key sounds', async () => {
   const base = SkinArchive.open(new Uint8Array(readFileSync(new URL('../public/bda-base.bds', import.meta.url))))
   const files = unzipSync(await convertBdaArchive(source, base, 'bdi').archive.platformBytesAsync('bdi'))
   const names = Object.keys(files).filter((name) => /\.(ogg|aiff|wav)$/.test(name))
-  assert.deepEqual(names, names.filter((name) => name.endsWith('tap.aiff')))
   assert.ok(names.length)
+  assert.ok(names.every((name) => name.endsWith('tap.aiff')), names.join())
 })
