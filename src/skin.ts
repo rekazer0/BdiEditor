@@ -1,5 +1,6 @@
 import { inflateSync, strFromU8, strToU8, Unzip, UnzipInflate, unzip, unzipSync, zipSync } from "fflate"
 import type { ExportFormat } from "./export.ts"
+import { adaptPackageSounds } from "./sounds.ts"
 
 const TEXT_EXTENSIONS = new Set(["ini", "css", "til", "cnd", "pop", "txt", "plist"])
 const MAX_FILES = 5_000
@@ -710,7 +711,18 @@ export class SkinArchive {
     }
     // Avoid fflate's one-worker-per-large-file async ZIP path, which can exhaust WebView workers.
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    if (format && format !== "bda" && (format !== this.format || this.layout === "legacy-ios")) {
+      return this.platformBytesAsync(format)
+    }
     return this.toBytes(format)
+  }
+
+  /** Packages for a BDI/BDS platform, rewriting key sounds that platform cannot play as WAV. */
+  async platformBytesAsync(format: "bdi" | "bds"): Promise<Uint8Array> {
+    if (this.format === "bda") throw new Error("BDA 与 BDI/BDS 使用不同配置格式，不能转换")
+    const files = new Map(Object.entries(this.packagedFiles(format)))
+    await adaptPackageSounds(files, format)
+    return zipSync(Object.fromEntries(files), { level: 6 })
   }
 
   toBytes(format?: ExportFormat): Uint8Array {

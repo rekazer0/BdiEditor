@@ -9045,24 +9045,28 @@ async function exportArchive(format: ExportFormat, targetBdaPlatform?: Exclude<B
   if (!bdaBase) throw new Error("无法加载 BDA 官方基础布局")
   await waitForInterfacePaint()
   updateFileOperationProgress(34, "正在转换 BDA 配置…")
-  const result = convertBdaArchive(archive, bdaBase)
+  const result = convertBdaArchive(archive, bdaBase, format)
   if (result.warnings.length && !window.confirm(
     `BDA 转换为 ${format.toUpperCase()} 时将降级以下内容：\n\n${result.warnings.join("\n")}\n\n继续导出吗？`,
   )) return
   updateFileOperationProgress(48, `正在压缩 ${format.toUpperCase()} 皮肤包…`)
-  return { bytes: await result.archive.toBytesAsync(format), converted: true, warnings: result.warnings }
+  return { bytes: await result.archive.platformBytesAsync(format), converted: true, warnings: result.warnings }
 }
 
 async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: string): Promise<boolean> {
   if (!archive) throw new Error("当前没有可保存的皮肤")
-  const exported = await exportArchive(format)
-  if (!exported) return false
+  let exported: Awaited<ReturnType<typeof exportArchive>>
   let path = currentPath
   if (saveAs || !path || (!path.startsWith("content://") && exportFormatFromPath(path) !== format)) {
-    const written = await writeToChosenFile(suggestedName, exported.bytes, `${format.toUpperCase()} 皮肤`)
-    if (!written) return false
+    const written = await writeToChosenFile(suggestedName, async () => {
+      exported = await exportArchive(format)
+      return exported?.bytes
+    }, `${format.toUpperCase()} 皮肤`)
+    if (!written || !exported) return false
     path = written
   } else {
+    exported = await exportArchive(format)
+    if (!exported) return false
     await writeNativePath(path, exported.bytes)
   }
   if (!exported.converted) {
@@ -9089,19 +9093,36 @@ async function writeNativePath(path: string, bytes: Uint8Array): Promise<void> {
   await invoke("write_file", { path, data: bytes })
 }
 
+type ChosenFileData = Uint8Array | (() => Promise<Uint8Array | undefined>)
+
+/**
+ * Asks for the destination before producing the bytes: browsers only open the save picker while the
+ * click's user activation is still live (about 5 s), and packaging or converting a skin can outlast it.
+ * A producer that resolves to undefined cancels the save.
+ */
 async function writeToChosenFile(
   filename: string,
-  bytes: Uint8Array,
+  data: ChosenFileData,
   description = "文件",
 ): Promise<string | undefined> {
+  const produce = () => data instanceof Uint8Array ? Promise.resolve(data) : data()
   const extension = filename.match(/\.([^.\\/]+)$/)?.[1]
   if (isTauri()) {
-    const path = await save({
-      title: "保存文件",
-      defaultPath: filename,
-      filters: extension ? [{ name: description, extensions: [extension] }] : undefined,
-    })
+    let path: string | null
+    try {
+      path = await save({
+        title: "保存文件",
+        defaultPath: filename,
+        filters: extension ? [{ name: description, extensions: [extension] }] : undefined,
+      })
+    } catch (error) {
+      // The Android picker rejects instead of resolving null when it is dismissed.
+      if (/cancel/i.test(String(error))) return
+      throw error
+    }
     if (!path) return
+    const bytes = await produce()
+    if (!bytes) return
     await writeNativePath(path, bytes)
     return path
   }
@@ -9112,11 +9133,17 @@ async function writeToChosenFile(
     }) => Promise<BrowserSaveFileHandle>
   }).showSaveFilePicker
   if (!picker) {
+    const bytes = await produce()
+    if (!bytes) return
     const link = document.createElement("a")
     link.href = URL.createObjectURL(new Blob([bytes.slice().buffer], { type: "application/octet-stream" }))
     link.download = filename
+    link.hidden = true
+    document.body.append(link)
     link.click()
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000)
+    link.remove()
+    // Mobile browsers hand blob downloads to a download manager that reads the URL later.
+    setTimeout(() => URL.revokeObjectURL(link.href), 60_000)
     return filename
   }
   let file: BrowserSaveFileHandle
@@ -9132,6 +9159,17 @@ async function writeToChosenFile(
     if (error instanceof DOMException && error.name === "AbortError") return
     throw error
   }
+  let bytes: Uint8Array | undefined
+  try {
+    bytes = await produce()
+  } catch (error) {
+    await (file as BrowserSaveFileHandle & { remove?: () => Promise<void> }).remove?.().catch(() => undefined)
+    throw error
+  }
+  if (!bytes) {
+    await (file as BrowserSaveFileHandle & { remove?: () => Promise<void> }).remove?.().catch(() => undefined)
+    return
+  }
   const writable = await file.createWritable()
   await writable.write(bytes)
   await writable.close()
@@ -9140,10 +9178,12 @@ async function writeToChosenFile(
 
 async function downloadArchive(format: ExportFormat, suggestedName: string): Promise<boolean> {
   if (!archive) throw new Error("当前没有可保存的皮肤")
-  const exported = await exportArchive(format)
-  if (!exported) return false
-  const path = await writeToChosenFile(suggestedName, exported.bytes, `${format.toUpperCase()} 皮肤`)
-  if (!path) return false
+  let exported: Awaited<ReturnType<typeof exportArchive>>
+  const path = await writeToChosenFile(suggestedName, async () => {
+    exported = await exportArchive(format)
+    return exported?.bytes
+  }, `${format.toUpperCase()} 皮肤`)
+  if (!path || !exported) return false
   if (!exported.converted) {
     currentPath = path
     documentName.textContent = suggestedName
@@ -9163,11 +9203,9 @@ async function saveArchive(
   const currentName = documentName.textContent?.trim() ?? ""
   const suggestedName = exportName(currentName, format)
   if (targetBdaPlatform) {
-    const exported = await exportArchive(format, targetBdaPlatform)
-    if (!exported) return false
     return Boolean(await writeToChosenFile(
       suggestedName,
-      exported.bytes,
+      async () => (await exportArchive(format, targetBdaPlatform))?.bytes,
       `${targetBdaPlatform === "ios" ? "iOS" : "Android"} BDA 皮肤`,
     ))
   }
@@ -9192,6 +9230,8 @@ async function shareArchiveToMobile(): Promise<boolean> {
   if (!navigator.share || navigator.canShare && !navigator.canShare({ files: [file] })) {
     throw new Error("当前设备不支持系统文件分享")
   }
+  // navigator.share needs a live user activation, which packaging the skin may have used up.
+  if (navigator.userActivation && !navigator.userActivation.isActive && !(await waitForShareTap(name))) return false
   try {
     await navigator.share({ title: name, files: [file] })
     return true
@@ -9199,6 +9239,32 @@ async function shareArchiveToMobile(): Promise<boolean> {
     if (error instanceof DOMException && error.name === "AbortError") return false
     throw error
   }
+}
+
+function waitForShareTap(name: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    fileOperationProgressVisible = true
+    if (!fileOperationDialog.open) fileOperationDialog.showModal()
+    updateFileOperationProgress(90, `${name} 已生成，轻点“分享”继续`)
+    const share = document.createElement("button")
+    share.type = "button"
+    share.className = "primary"
+    share.textContent = "分享"
+    fileOperationClose.before(share)
+    fileOperationClose.disabled = false
+    const finish = (confirmed: boolean) => {
+      share.remove()
+      fileOperationClose.disabled = true
+      fileOperationClose.removeEventListener("click", cancel)
+      fileOperationDialog.removeEventListener("close", cancel)
+      resolve(confirmed)
+    }
+    const cancel = () => finish(false)
+    share.addEventListener("click", () => finish(true), { once: true })
+    fileOperationClose.addEventListener("click", cancel, { once: true })
+    fileOperationDialog.addEventListener("close", cancel, { once: true })
+    share.focus()
+  })
 }
 
 async function chooseProjectTemplate(): Promise<string | undefined> {

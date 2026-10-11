@@ -7,11 +7,17 @@ import {
   bdaStyleID,
   decodeBdaAnimation,
   decodeBdaAppearance,
+  decodeBdaSoundConfig,
+  bdaPanelKeyName,
   type BdaAnimation,
   type BdaImageAtom,
 } from "./bda.ts"
 import { IniDocument } from "./ini.ts"
 import { SkinArchive } from "./skin.ts"
+import { soundPathForFilename } from "./sounds.ts"
+
+/** Sound styles sit above the image/color/text ranges used by bdaStyleID. */
+const SOUND_STYLE_BASE = 4_000_000
 
 export type BdaConversion = { archive: SkinArchive; warnings: string[] }
 
@@ -57,7 +63,18 @@ function tile(width: number, height: number, inner?: BdaImageAtom["innerRect"]):
   ].join("\n"))
 }
 
-export function convertBdaArchive(source: SkinArchive, base: SkinArchive): BdaConversion {
+function applyKeySounds(document: IniDocument, sounds: Map<string, string>, fallback: string | undefined): void {
+  if (fallback) document.set("PANEL", "SOUND_STYLE", fallback)
+  for (const section of document.sections().filter((name) => /^KEY\d+$/.test(name))) {
+    const style = [document.get(section, "CENTER"), document.get(section, "DOWN")]
+      .filter((value): value is string => Boolean(value))
+      .map((action) => sounds.get(bdaPanelKeyName(action)))
+      .find(Boolean)
+    if (style && style !== fallback) document.set(section, "SOUND_STYLE", style)
+  }
+}
+
+export function convertBdaArchive(source: SkinArchive, base: SkinArchive, format: "bdi" | "bds" = "bds"): BdaConversion {
   if (source.format !== "bda") throw new Error("只能转换 BDA 皮肤")
   const output = new Map<string, Uint8Array>()
   const warnings: string[] = []
@@ -67,6 +84,7 @@ export function convertBdaArchive(source: SkinArchive, base: SkinArchive): BdaCo
   }
 
   for (const theme of ["light", "dark"] as const) {
+    const soundStyles = new Map<string, string>()
     for (const name of ["Info.txt", "demo.png"] as const) {
       const bytes = source.getBytes(`${theme}/skin/${name}`) ?? source.getBytes(name)
       if (bytes) output.set(`${theme}/skin/${name}`, bytes)
@@ -81,6 +99,36 @@ export function convertBdaArchive(source: SkinArchive, base: SkinArchive): BdaCo
       const animation = animationBytes
         ? decodeBdaAnimation(animationBytes)
         : { targets: [], sequences: new Map(), bindings: new Map(), targetBindings: new Map(), effects: new Map() }
+
+      // Key name -> sound style ID; the target platform's own sound map wins, the other is a fallback.
+      const keySounds = new Map<string, string>()
+      const soundConfigPath = bdaConfigPath(source, theme, orientation, "sound")
+        ?? bdaConfigPath(source, theme, orientation === "port" ? "land" : "port", "sound")
+      const soundBytes = soundConfigPath && source.getBytes(soundConfigPath)
+      if (soundBytes) {
+        const config = decodeBdaSoundConfig(soundBytes)
+        const sounds = (format === "bdi" ? [config.iosKeySounds, config.keySounds] : [config.keySounds, config.iosKeySounds])
+          .find((map) => map.size) ?? new Map()
+        for (const [key, resource] of sounds) {
+          const path = resource.resourceID
+            ? soundPathForFilename(source.names(), theme, orientation, resource.resourceID)
+            : undefined
+          const bytes = path && source.getBytes(path)
+          if (!path || !bytes) {
+            warnings.push(`${theme}/${orientation} 的按键音 ${resource.resourceID || key} 缺少音频文件，已跳过`)
+            continue
+          }
+          const filename = path.split("/").pop()!
+          let styleID = soundStyles.get(filename)
+          if (!styleID) {
+            styleID = String(SOUND_STYLE_BASE + soundStyles.size)
+            soundStyles.set(filename, styleID)
+          }
+          output.set(`${theme}/skin/res/${filename}`, bytes)
+          keySounds.set(key, styleID)
+        }
+      }
+      const defaultSound = keySounds.get("default") ?? keySounds.values().next().value
 
       const basePrefix = `light/skin/${orientation}/`
       const targetPrefix = `${theme}/skin/${orientation}/`
@@ -97,10 +145,9 @@ export function convertBdaArchive(source: SkinArchive, base: SkinArchive): BdaCo
           warnings.push(`${theme}/${orientation} 的 ${layout} 面板没有 BDS/BDI 基础布局，已跳过`)
           continue
         }
-        output.set(
-          `${targetPrefix}${layout}.ini`,
-          strToU8(bdaLayoutDocument(IniDocument.parse(base.getText(path)), appearance, layout).toString()),
-        )
+        const document = bdaLayoutDocument(IniDocument.parse(base.getText(path)), appearance, layout)
+        if (keySounds.size) applyKeySounds(document, keySounds, defaultSound)
+        output.set(`${targetPrefix}${layout}.ini`, strToU8(document.toString()))
       }
 
       const styles: string[] = []
@@ -147,9 +194,11 @@ export function convertBdaArchive(source: SkinArchive, base: SkinArchive): BdaCo
           "",
         )
       }
+      // default.css is shared by both orientations, so it carries every sound style of the theme.
+      const soundSections = [...soundStyles].flatMap(([filename, styleID]) => [`[STYLE${styleID}]`, `PRESS_SOUND_PATH=${filename}`, ""])
       output.set(
         `${theme}/skin/res/default.css`,
-        strToU8(`[GLOBAL]\nSTYLE_NUM=${appearance.imageStyles.size + appearance.colorStyles.size + appearance.textStyles.size}\n\n${styles.join("\n")}`),
+        strToU8(`[GLOBAL]\nSTYLE_NUM=${appearance.imageStyles.size + appearance.colorStyles.size + appearance.textStyles.size + soundStyles.size}\n\n${[...styles, ...soundSections].join("\n")}`),
       )
       if (animation.sequences.size) {
         warnings.push(`${theme}/${orientation} 的 ${animation.sequences.size} 个序列帧动画已降级为首帧静态图`)

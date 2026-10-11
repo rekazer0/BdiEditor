@@ -110,12 +110,11 @@ export function soundPathForFilename(
 ): string | undefined {
   const clean = filename.trim().split(/[\\/]/).pop()
   if (!clean) return
-  const stem = clean.replace(/\.(?:ogg|wav|aiff?|caf)$/i, "")
-  return soundResourcePaths(names, theme, orientation).find((path) => {
-    const name = path.split("/").pop() ?? path
-    return name.toLowerCase() === clean.toLowerCase()
-      || name.replace(/\.(?:ogg|wav|aiff?|caf)$/i, "").toLowerCase() === stem.toLowerCase()
-  })
+  const stem = clean.replace(/\.(?:ogg|wav|aiff?|caf)$/i, "").toLowerCase()
+  const paths = soundResourcePaths(names, theme, orientation)
+  const name = (path: string) => (path.split("/").pop() ?? path).toLowerCase()
+  return paths.find((path) => name(path) === clean.toLowerCase())
+    ?? paths.find((path) => name(path).replace(/\.(?:ogg|wav|aiff?|caf)$/i, "") === stem)
 }
 
 export function iniSoundStyles(styles: IniDocument): IniSoundStyle[] {
@@ -161,4 +160,94 @@ export function setIniSoundStyle(styles: IniDocument, styleID: string, filename:
   const maximum = Number(styles.get("GLOBAL", "STYLE_NUM") ?? -1)
   const numeric = Number(styleID)
   if (!Number.isFinite(maximum) || numeric > maximum) styles.set("GLOBAL", "STYLE_NUM", styleID)
+}
+
+export function encodeWavPcm16(sound: DecodedSound): Uint8Array {
+  const channels = sound.channelData.length
+  const frames = sound.samplesDecoded
+  const dataLength = frames * channels * 2
+  const bytes = new Uint8Array(44 + dataLength)
+  const view = new DataView(bytes.buffer)
+  const ascii = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index++) bytes[offset + index] = value.charCodeAt(index)
+  }
+  ascii(0, "RIFF")
+  view.setUint32(4, 36 + dataLength, true)
+  ascii(8, "WAVE")
+  ascii(12, "fmt ")
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, channels, true)
+  view.setUint32(24, sound.sampleRate, true)
+  view.setUint32(28, sound.sampleRate * channels * 2, true)
+  view.setUint16(32, channels * 2, true)
+  view.setUint16(34, 16, true)
+  ascii(36, "data")
+  view.setUint32(40, dataLength, true)
+  let offset = 44
+  for (let frame = 0; frame < frames; frame++) {
+    for (let channel = 0; channel < channels; channel++) {
+      const sample = Math.max(-1, Math.min(1, sound.channelData[channel][frame] ?? 0))
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
+      offset += 2
+    }
+  }
+  return bytes
+}
+
+async function decodeOggVorbis(bytes: Uint8Array): Promise<DecodedSound> {
+  const { OggVorbisDecoder } = await import("@wasm-audio-decoders/ogg-vorbis")
+  const decoder = new OggVorbisDecoder()
+  await decoder.ready
+  try {
+    const decoded = await decoder.decodeFile(bytes)
+    if (!decoded.samplesDecoded || !decoded.channelData.length) throw new Error("OGG 文件没有可播放的音频")
+    return decoded
+  } finally {
+    decoder.free()
+  }
+}
+
+/** Formats the target platform's input method cannot play: Android has no AIFF/CAF, iOS has no Ogg Vorbis. */
+export function soundNeedsTranscode(path: string, format: "bdi" | "bds"): boolean {
+  return format === "bdi" ? /\.ogg$/i.test(path) : /\.(?:aiff?|caf)$/i.test(path)
+}
+
+/**
+ * Rewrites key sounds a converted BDI/BDS package cannot play on its platform as 16-bit WAV,
+ * and points PRESS_SOUND_PATH at the new file names.
+ */
+export async function adaptPackageSounds(
+  files: Map<string, Uint8Array>,
+  format: "bdi" | "bds",
+): Promise<{ converted: number; warnings: string[] }> {
+  const warnings: string[] = []
+  const renamed = new Map<string, string>()
+  for (const [path, bytes] of [...files]) {
+    if (path.endsWith("/") || !soundNeedsTranscode(path, format)) continue
+    const target = path.replace(/\.[^./]+$/, ".wav")
+    try {
+      const head = new TextDecoder("ascii").decode(bytes.subarray(0, 4))
+      const decoded = head === "FORM" ? decodeAiffPcm(bytes) : head === "OggS" ? await decodeOggVorbis(bytes) : undefined
+      if (!decoded) throw new Error("不支持的音频编码")
+      if (!files.has(target)) files.set(target, encodeWavPcm16(decoded))
+      files.delete(path)
+      renamed.set(path.split("/").pop()!.toLowerCase(), target.split("/").pop()!)
+    } catch (error) {
+      warnings.push(`${path} 无法转换为 WAV：${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  if (renamed.size) {
+    for (const [path, bytes] of files) {
+      if (!/\.(?:css|ini)$/i.test(path)) continue
+      const text = new TextDecoder().decode(bytes)
+      const next = text.replace(/^(\s*PRESS_SOUND_PATH\s*=\s*)(.*?)(\s*)$/gim, (line, prefix: string, value: string, tail: string) => {
+        const name = value.trim().split(/[\\/]/).pop()?.toLowerCase() ?? ""
+        const replacement = renamed.get(name)
+        return replacement ? `${prefix}${value.trim().slice(0, value.trim().length - name.length)}${replacement}${tail}` : line
+      })
+      if (next !== text) files.set(path, new TextEncoder().encode(next))
+    }
+  }
+  return { converted: renamed.size, warnings }
 }
