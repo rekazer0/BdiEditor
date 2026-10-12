@@ -47,3 +47,12 @@
   :root body #style-library-preview-image { flex-basis: 100px; height: 80px; }
   :root body .style-library-preview { gap: 10px; padding: 10px 12px; }
 }
+
+/* 样式类型徽标：样式库卡片、检查器样式引用、样式配置列表共用。 */
+:root body :is(.style-picker-states, .style-picker-previews, .resource-style-previews) { position: relative !important; }
+:root body .style-kind-badge { position: absolute; left: 4px; bottom: 4px; z-index: 1; display: inline-flex; align-items: center; gap: 3px; height: 16px; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--pen-raised) 90%, transparent); color: var(--pen-secondary); font-size: 9.5px; font-weight: 500; line-height: 1; pointer-events: none; box-shadow: 0 0 0 1px var(--pen-line); }
+:root body .style-kind-badge :is(svg) { width: 11px; height: 11px; flex: none; }
+:root body .style-kind-badge:is([data-style-kind=color],[data-style-kind=anim]) { color: var(--pen-accent); }
+:root body .style-library-kinds { padding-right: 10px; border-right: 1px solid var(--pen-line); }
+:root body .style-library-kinds[hidden] { display: none; }
+:root body .style-library-toolbar .style-library-filters + .style-library-filters { flex: 1 1 auto; }

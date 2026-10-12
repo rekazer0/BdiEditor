@@ -64,3 +64,4 @@
 .atlas-workspace #tile-inspector label { font-size: 11px; min-width: 0; }
 .atlas-workspace #tile-inspector input[type=number] { width: 100%; min-width: 0; height: 30px; box-sizing: border-box; font: 11px var(--font-mono); }
 @media (max-width: 1199px) { .atlas-workspace main { grid-template-columns: 224px minmax(0, 1fr) 4px 300px; } .atlas-selection { display: none; } }
+.atlas-workspace .canvas-wrap.atlas-panning, .atlas-workspace .canvas-wrap.atlas-panning #atlas-canvas { cursor: grabbing; }

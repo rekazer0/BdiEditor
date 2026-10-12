@@ -67,11 +67,22 @@ export function updateTileSlice(document: IniDocument, slice: TileSlice): void {
       { key: "SOURCE_RECT", value: slice.source.join(",") },
       ...(slice.inner ? [{ key: "INNER_RECT", value: slice.inner.join(",") }] : []),
     ])
+    syncTileCount(document)
     return
   }
   document.set(section, "SOURCE_RECT", slice.source.join(","))
   if (slice.inner) document.set(section, "INNER_RECT", slice.inner.join(","))
-  else document.remove(section, "INNER_RECT")
+  else {
+    document.remove(section, "INNER_RECT")
+    // 工具书 V6 p44：有 SCALE 无 INNER_RECT 属于错误写法。
+    document.remove(section, "SCALE")
+  }
+}
+
+// 工具书 V6 p43：[GLOBAL] TILE_NUM 必须与切片数量一致。
+export function syncTileCount(document: IniDocument): void {
+  if (document.get("GLOBAL", "TILE_NUM") === undefined) return
+  document.set("GLOBAL", "TILE_NUM", String(document.sections().filter((name) => tileSectionIndex(name) !== undefined).length))
 }
 
 export function boundedTileRect(
@@ -94,7 +105,9 @@ export function tileSliceAt(slices: readonly TileSlice[], point: TilePoint): Til
 }
 
 export function removeTileSlice(document: IniDocument, index: number): boolean {
-  return document.removeSections(document.sections().filter((name) => tileSectionIndex(name) === index))
+  const removed = document.removeSections(document.sections().filter((name) => tileSectionIndex(name) === index))
+  if (removed) syncTileCount(document)
+  return removed
 }
 
 function tileSectionIndex(section: string): number | undefined {

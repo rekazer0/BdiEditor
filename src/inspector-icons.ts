@@ -40,7 +40,7 @@ export function inspectorGroupIcon(label: string): SVGElement {
   const name = /资源|图片/.test(label) ? "images"
     : /动画|动效|粒子/.test(label) ? "clapperboard"
     : /声音|音效/.test(label) ? "volume-2"
-    : /候选栏|提示栏/.test(label) ? "panel-top"
+    : /候选栏|提示栏|气泡/.test(label) ? "panel-top"
     : /面板|布局|输入区|扩展区域/.test(label) ? "layout-grid"
     : /列表/.test(label) ? "list"
     : /基本信息|全局/.test(label) ? "info"

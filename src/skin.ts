@@ -471,6 +471,8 @@ export class SkinArchive {
   private cachedNames?: string[]
   private changedRaw = new Set<string>()
   readonly changed = new Set<string>()
+  /** Bumped whenever file contents or paths change, so callers can skip redundant redraws. */
+  revision = 0
 
   private constructor(files: Map<string, Uint8Array>, sourceBytes: Uint8Array, formatHint?: ExportFormat) {
     this.files = files
@@ -616,6 +618,7 @@ export class SkinArchive {
     }
     const isNewPath = !this.canonicalToRaw.has(path)
     this.files.set(raw, bytes)
+    this.revision++
     this.canonicalToRaw.set(path, raw)
     if (isNewPath) this.cachedNames = undefined
     const original = this.originals.get(raw)
@@ -632,6 +635,7 @@ export class SkinArchive {
     const raw = this.canonicalToRaw.get(path)
     if (!raw) return
     this.files.delete(raw)
+    this.revision++
     this.canonicalToRaw.delete(path)
     this.cachedNames = undefined
     if (this.originals.has(raw)) {
@@ -654,6 +658,7 @@ export class SkinArchive {
         this.bdaRoots = reopened.bdaRoots
         this.canonicalToRaw = reopened.canonicalToRaw
         this.cachedNames = undefined
+        this.revision++
       } else {
         // The decoded files and paths do not change when saving in place.
         this.originals = new Map(this.files)

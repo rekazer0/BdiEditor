@@ -1,6 +1,7 @@
 import { emitTo, listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { LogicalSize } from "@tauri-apps/api/dpi"
+import { bindSlicePickerZoom, drawSlicePicker, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM } from "./slice-picker-canvas.ts"
 import { tileSliceAt, type TilePoint, type TileSlice } from "./tiles.ts"
 
 type ImagePayload = {
@@ -32,6 +33,8 @@ const isTauri = "__TAURI_INTERNALS__" in window
 let imagePayload: ImagePayload | undefined
 let image: HTMLImageElement | undefined
 let scale = 1
+let fit = 1
+let zoom = 1
 let offset: TilePoint = { x: 0, y: 0 }
 let resources: ResourcePayload = []
 let resourcesLoaded = false
@@ -48,33 +51,17 @@ async function fitWindowHeight(): Promise<void> {
   const [inner, outer] = await Promise.all([appWindow.innerSize(), appWindow.outerSize()])
   const scaleFactor = inner.height / window.innerHeight
   const chrome = (outer.height - inner.height) / scaleFactor
-  const content = document.documentElement.scrollHeight
-  void appWindow.setSize(new LogicalSize(outer.width / scaleFactor, Math.max(480, Math.ceil(content + chrome))))
+  // documentElement.scrollHeight 不小于视口高度，窗口只会变大不会缩小，所以量 body
+  // 画布区域限高后内部滚动，加回它被截掉的部分才是完整内容高度
+  const stage = $(".picker-canvas-stage")
+  const content = document.body.scrollHeight - stage.clientHeight + stage.scrollHeight
+  void appWindow.setSize(new LogicalSize(outer.width / scaleFactor, Math.ceil(content + chrome)))
 }
 
 function drawImage(): void {
-  const context = canvas.getContext("2d")
-  if (!context || !image?.naturalWidth || !imagePayload) return
-  scale = Math.min(canvas.width / image.naturalWidth, canvas.height / image.naturalHeight)
-  const width = image.naturalWidth * scale
-  const height = image.naturalHeight * scale
-  offset = { x: (canvas.width - width) / 2, y: (canvas.height - height) / 2 }
-  context.clearRect(0, 0, canvas.width, canvas.height)
-  context.drawImage(image, offset.x, offset.y, width, height)
-  const lineWidth = Math.max(1, Math.round(Math.min(width, height) / 350))
-  context.font = `${Math.max(11, lineWidth * 7)}px ui-monospace, monospace`
-  context.textBaseline = "top"
-  for (const slice of imagePayload.slices) {
-    const [x, y, sliceWidth, sliceHeight] = slice.source
-    const selected = slice.index === imagePayload.selectedIndex
-    context.lineWidth = selected ? lineWidth * 2 : lineWidth
-    context.strokeStyle = selected ? "#ff453a" : "#0a84ff"
-    context.strokeRect(offset.x + x * scale, offset.y + y * scale, sliceWidth * scale, sliceHeight * scale)
-    context.fillStyle = context.strokeStyle
-    context.fillRect(offset.x + x * scale, offset.y + y * scale, context.measureText(`IMG${slice.index}`).width + 6, 15)
-    context.fillStyle = "#fff"
-    context.fillText(`IMG${slice.index}`, offset.x + x * scale + 3, offset.y + y * scale + 2)
-  }
+  if (!image?.naturalWidth || !imagePayload) return
+  scale = drawSlicePicker(canvas, image, imagePayload.slices, imagePayload.selectedIndex, fit * zoom, { normal: "#0a84ff", selected: "#ff453a" })
+  offset = { x: 0, y: 0 }
 }
 
 function filterResources(): void {
@@ -101,7 +88,7 @@ function renderResources(): void {
     const name = document.createElement("span")
     name.textContent = resource.path.split("/").pop() ?? resource.path
     button.append(preview, name)
-    // 同一个窗口既显示切片也显示全部样式列表，由主窗口决定选完之后是切图还是关窗。
+    // 同一个窗口既显示切片也显示全部图片列表，由主窗口决定选完之后是切图还是关窗。
     button.addEventListener("click", () => {
       if (isTauri) void emitTo("main", "resource-picker-select", { path: resource.path })
     })
@@ -127,8 +114,8 @@ function showSliceView(): void {
   resourceView.hidden = true
   search.hidden = true
   back.hidden = !imagePayload
-  backLabel.textContent = "全部样式"
-  back.setAttribute("aria-label", "切换至全部样式")
+  backLabel.textContent = "全部图片"
+  back.setAttribute("aria-label", "切换至全部图片")
   styleName.hidden = !styleName.textContent
   subtitle.hidden = true
   setWindowTitle("图片切片")
@@ -144,10 +131,10 @@ function showResourceList(): void {
   back.setAttribute("aria-label", "返回图片切片")
   styleName.hidden = true
   subtitle.hidden = false
-  title.textContent = "全部样式"
+  title.textContent = "全部图片"
   search.value = ""
   renderResources()
-  setWindowTitle("全部样式")
+  setWindowTitle("全部图片")
   // 资源列表按需拉取，避免每次打开切片窗口都编码全部图片。
   if (isTauri && !resources.length) void emitTo("main", "image-picker-resources-request")
 }
@@ -157,14 +144,13 @@ function showImage(payload: ImagePayload): void {
   title.textContent = payload.path.split("/").pop() ?? payload.path
   styleName.textContent = payload.styleName ?? ""
   showSliceView()
-  meta.textContent = payload.slices.length ? "点击图片中的切片以修改引用" : "此图片没有可用的 TIL 切片"
+  meta.textContent = `${payload.slices.length ? "点击图片中的切片以修改引用" : "此图片没有可用的 TIL 切片"} · ⌘/Ctrl + 滚轮或双指捏合缩放`
   canvas.style.cursor = payload.editable && payload.slices.length ? "crosshair" : "default"
   image = new Image()
   image.onload = () => {
     if (!image) return
-    const fit = Math.min(1200 / image.naturalWidth, 760 / image.naturalHeight, 1)
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * fit))
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * fit))
+    fit = Math.min(1200 / image.naturalWidth, 760 / image.naturalHeight, 1)
+    zoom = 1
     drawImage()
     void fitWindowHeight()
   }
@@ -178,6 +164,13 @@ back.addEventListener("click", () => {
   else if (imagePayload) showSliceView()
 })
 search.addEventListener("input", filterResources)
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !event.isComposing && isTauri) void getCurrentWindow().close()
+})
+bindSlicePickerZoom($(".picker-canvas-stage"), canvas, (factor) => {
+  zoom = Math.min(MAX_SLICE_ZOOM, Math.max(MIN_SLICE_ZOOM, zoom * factor))
+  drawImage()
+})
 canvas.addEventListener("click", (event) => {
   if (!imagePayload?.editable || !image || !imagePayload.slices.length) return
   const bounds = canvas.getBoundingClientRect()

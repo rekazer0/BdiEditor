@@ -15,15 +15,15 @@ test("图片切片窗口把图片名居中，并在其上显示样式名", () =>
   assert.match(main, /styleName: imagePickerStyleName\(target\)/)
 })
 
-test("左侧返回项在切片窗口与全部样式列表之间切换", () => {
-  assert.match(html, /<button id="picker-back"[\s\S]{0,400}全部样式/)
+test("左侧返回项在切片窗口与全部图片列表之间切换", () => {
+  assert.match(html, /<button id="picker-back"[\s\S]{0,400}全部图片/)
   assert.match(script, /if \(view === "image"\) showResourceList\(\)/)
   assert.match(script, /backLabel\.textContent = "图片切片"/)
   assert.match(script, /emitTo\("main", "image-picker-resources-request"\)/)
   assert.match(main, /listen\("image-picker-resources-request"/)
 })
 
-test("全部样式列表复用现有窗口，不再新建资源窗口", () => {
+test("全部图片列表复用现有窗口，不再新建资源窗口", () => {
   assert.doesNotMatch(main, /"resource-picker"/)
   assert.doesNotMatch(main, /picker\.html\?mode=/)
   assert.match(main, /function openImagePickerList\(\): void \{[\s\S]{0,220}showPickerWindow\("list"/)
@@ -31,7 +31,7 @@ test("全部样式列表复用现有窗口，不再新建资源窗口", () => {
   assert.match(main, /emitTo\("image-picker", "image-picker-show-list"\)/)
   assert.match(script, /listen\("image-picker-show-list", \(\) => showResourceList\(\)\)/)
   // 列表项只上报选择，选完由主窗口决定是切图还是关窗。
-  assert.doesNotMatch(script, /getCurrentWindow\(\)\.close\(\)/)
+  assert.doesNotMatch(script.replace(/.*event\.key === "Escape".*getCurrentWindow\(\)\.close\(\).*/, ""), /getCurrentWindow\(\)\.close\(\)/)
 })
 
 test("切片窗口不再提供右侧的选择图片资源按钮", () => {

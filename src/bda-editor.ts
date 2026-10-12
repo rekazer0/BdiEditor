@@ -204,9 +204,26 @@ function heading(title: string, detail?: string): HTMLElement {
   return header
 }
 
+// 每个缩略图在各自的 Promise 回调里“读尺寸→改画布尺寸”会逐个强制整页重排；
+// 合并到下一帧统一先读全部尺寸再绘制，只重排一次。
+const pendingVisuals = new Map<HTMLCanvasElement, Visual | undefined>()
+let visualFrame = 0
+
 function drawVisual(canvas: HTMLCanvasElement, visual: Visual | undefined): void {
+  pendingVisuals.set(canvas, visual)
+  visualFrame ||= requestAnimationFrame(flushVisuals)
+}
+
+function flushVisuals(): void {
+  visualFrame = 0
+  const batch = [...pendingVisuals].filter(([canvas]) => canvas.isConnected)
+  pendingVisuals.clear()
+  const bounds = batch.map(([canvas]) => canvas.getBoundingClientRect())
+  batch.forEach(([canvas, visual], index) => paintVisual(canvas, visual, bounds[index]))
+}
+
+function paintVisual(canvas: HTMLCanvasElement, visual: Visual | undefined, bounds: DOMRect): void {
   const scale = Math.max(1, window.devicePixelRatio || 1)
-  const bounds = canvas.getBoundingClientRect()
   const width = Math.max(1, Math.round(bounds.width || 128))
   const height = Math.max(1, Math.round(bounds.height || 76))
   canvas.width = width * scale

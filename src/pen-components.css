@@ -837,7 +837,7 @@
   font-size: 12px;
 }
 
-/* 概览条目的名字是行内文字，比树行的 12.5px 再收半档。 */
+/* 概览条目以中文名为主，原始文件名退为小号注脚。 */
 :root body #files .sidebar-overview button.nav-item > .nav-label {
   font-size: 12px;
 }
@@ -850,6 +850,40 @@
 :root body #files .sidebar-overview .nav-section {
   border-radius: var(--pen-radius-sm);
   font-size: 12.5px;
+}
+
+/* 分组标题比条目小一档、字距放开，层级靠字号而不是颜色；展开的箭头不再用品牌色抢选中行的注意力。 */
+:root body #files .sidebar-overview > .nav-group > .nav-section {
+  min-height: 24px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+:root body #files .sidebar-overview > .nav-group[open] > .nav-section > .source-disclosure {
+  color: var(--pen-tertiary);
+}
+
+/* 两行条目：名字在上、文件名在下，图标跨两行居中；窄栏里两行各自截断，完整内容见行的 title。 */
+:root body #files .sidebar-overview button.nav-item {
+  height: auto;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 2px;
+  align-content: center;
+  padding: 6px 8px;
+}
+
+:root body #files .sidebar-overview button.nav-item > .system-symbol {
+  grid-row: 1 / 3;
+}
+
+:root body #files .sidebar-overview button.nav-item > .nav-meta {
+  grid-column: 2;
+  max-width: none;
+  margin-left: 0;
+  font-size: 9.5px;
 }
 
 :root body #files .raw-files .source-folder-row {

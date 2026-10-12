@@ -182,8 +182,8 @@
               <option value="pixel-10-pro">Pixel 10 Pro · 1280×2856</option>
               <option value="galaxy-s25-ultra">Galaxy S25 Ultra · 1440×3120</option>
               <option value="canvas-glass">画布 · 玻璃</option>
-              <option value="canvas-checkerboard">画布 · 马赛克</option>
-              <option value="canvas-white" selected>画布 · 浅色</option>
+              <option value="canvas-checkerboard" selected>画布 · 马赛克</option>
+              <option value="canvas-white">画布 · 浅色</option>
               <option value="canvas-gray">画布 · 灰色</option>
               <option value="canvas-dark">画布 · 深色</option>
             </select>
@@ -388,7 +388,7 @@
             <canvas id="atlas-canvas" aria-label="皮肤图集切片画布"></canvas>
             <figcaption id="workspace-image-error" hidden>无法预览此 PNG</figcaption>
           </figure>
-          <output id="preview-coordinates" aria-label="鼠标坐标" hidden><span class="preview-crosshair" aria-hidden="true"></span><span class="preview-coordinate-label">x: <span id="preview-coordinate-x">—</span>  y: <span id="preview-coordinate-y">—</span></span></output>
+          <output id="preview-coordinates" aria-label="鼠标坐标" hidden><span class="preview-snap-guides" aria-hidden="true"></span><span class="preview-crosshair" aria-hidden="true"></span><span class="preview-coordinate-label">x: <span id="preview-coordinate-x">—</span>  y: <span id="preview-coordinate-y">—</span></span></output>
           <div id="canvas-multi-toolbar" class="canvas-multi-toolbar" role="toolbar" aria-label="多选批量布局" data-available="false">
             <span class="canvas-multi-count" id="canvas-multi-count" role="status">选择 2 个或更多按键</span>
             <span class="canvas-multi-divider" aria-hidden="true"></span>
@@ -956,6 +956,7 @@
           <span class="style-picker-hint">单击预览 · 双击应用 · Command/Ctrl 单击编辑</span>
         </div>
         <div class="style-picker-tools">
+          <button id="style-picker-add" class="toolbar-button" type="button" title="新增样式" aria-label="新增样式"><span class="icon system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14"/></svg></span></button>
           <div class="style-library-tabs" role="group" aria-label="内容类型">
             <button type="button" data-style-library-mode="styles" aria-pressed="true">全部样式</button>
             <button type="button" data-style-library-mode="images" aria-pressed="false">全部图片</button>
@@ -964,6 +965,13 @@
         </div>
       </header>
       <div class="style-library-toolbar">
+        <div class="style-library-filters style-library-kinds" role="group" aria-label="按样式类型筛选">
+          <button type="button" data-style-library-kind="all" aria-pressed="true">全部类型</button>
+          <button type="button" data-style-library-kind="image" aria-pressed="false">图片</button>
+          <button type="button" data-style-library-kind="color" aria-pressed="false">颜色</button>
+          <button type="button" data-style-library-kind="anim" aria-pressed="false">动画</button>
+          <button type="button" data-style-library-kind="text" aria-pressed="false">文字</button>
+        </div>
         <div class="style-library-filters" role="group" aria-label="按当前布局用途筛选">
           <button type="button" data-style-library-filter="all" aria-pressed="true">全部</button>
           <button type="button" data-style-library-filter="panel" aria-pressed="false">键盘背景</button>
@@ -1044,7 +1052,7 @@
           </section>
 
           <section class="settings-section settings-page" data-settings-panel="device" role="tabpanel" id="settings-panel-device" aria-labelledby="settings-device-title" hidden><div class="settings-section-heading"><h3 id="settings-device-title">默认预览设备</h3><p>选择打开皮肤时使用的设备与移动端布局。</p></div><div class="settings-list"><label class="settings-row"><span>默认设备</span><select id="default-device"><option value="canvas">画布</option><option value="iphone-17-pro">iPhone 17 Pro</option><option value="iphone-17-pro-max">iPhone 17 Pro Max</option><option value="xiaomi-17">Xiaomi 17</option><option value="pixel-10-pro">Pixel 10 Pro</option><option value="galaxy-s25-ultra">Galaxy S25 Ultra</option></select></label><label class="settings-row"><span>移动端预览面板</span><select id="mobile-preview-position"><option value="bottom" selected>底部</option><option value="top">顶部</option></select></label><label class="settings-row settings-switch"><span>气泡预览（实验功能）</span><input id="hint-preview-enabled" type="checkbox" role="switch" checked></label></div></section>
-          <section class="settings-section settings-page" data-settings-panel="background" role="tabpanel" id="settings-panel-background" aria-labelledby="settings-background-title" hidden><div class="settings-section-heading"><h3 id="settings-background-title">画布背景</h3><p>设置编辑画布的背景，修改即时生效。</p></div><div class="settings-list"><label class="settings-row"><span>画布背景</span><select id="canvas-background"><option value="glass">玻璃</option><option value="checkerboard">马赛克</option><option value="white" selected>浅色</option><option value="gray">灰色</option><option value="dark">深色</option></select></label></div></section>
+          <section class="settings-section settings-page" data-settings-panel="background" role="tabpanel" id="settings-panel-background" aria-labelledby="settings-background-title" hidden><div class="settings-section-heading"><h3 id="settings-background-title">画布背景</h3><p>设置编辑画布的背景，修改即时生效。</p></div><div class="settings-list"><label class="settings-row"><span>画布背景</span><select id="canvas-background"><option value="glass">玻璃</option><option value="checkerboard" selected>马赛克</option><option value="white">浅色</option><option value="gray">灰色</option><option value="dark">深色</option></select></label></div></section>
           <section class="settings-section settings-page" data-settings-panel="guides" role="tabpanel" id="settings-panel-guides" aria-labelledby="settings-guides-title" hidden><div class="settings-section-heading"><h3 id="settings-guides-title">安全区与辅助线</h3><p>显示设备安全区边界和编辑辅助线，不改变皮肤布局。</p></div><div class="settings-list"><label class="settings-row settings-switch"><span>安全区边界</span><input id="safe-area-guides" type="checkbox" role="switch"></label><label class="settings-row settings-switch"><span>布局辅助线</span><input id="settings-layout-guides" type="checkbox" role="switch"></label><label class="settings-row settings-switch"><span>编辑十字光标</span><input id="editor-crosshair" type="checkbox" role="switch" checked></label><label id="editor-coordinate-snap-setting" class="settings-row settings-switch"><span>坐标轴吸附</span><input id="editor-coordinate-snap" type="checkbox" role="switch" checked></label></div></section>
 
           <section id="settings-storage-section" class="settings-section settings-page settings-storage" data-settings-panel="storage" role="tabpanel" aria-labelledby="settings-storage-title" hidden>

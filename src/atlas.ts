@@ -342,7 +342,7 @@ export class AtlasResolver {
   sourceSize(styleID: string, highlighted: boolean): { width: number; height: number } | undefined {
     if (!this.styles) return
     const spec = resolveVisualSpec(this.styles, styleID, highlighted)
-    if (!spec?.imageName || !spec.tile) return
+    if (!spec?.imageName || !Number.isInteger(spec.tile)) return
     const tilePath = this.resourceRoots
       .map((root) => `${root}/${spec.imageName}.til`)
       .find((candidate) => this.archive.names().includes(candidate))
@@ -360,7 +360,7 @@ export class AtlasResolver {
     if (!this.styles) return
     const spec = resolveVisualSpec(this.styles, styleID, highlighted)
     if (!spec) return
-    if (!spec.imageName || !spec.tile) {
+    if (!spec.imageName || !Number.isInteger(spec.tile)) {
       return { color: spec.color, borderColor: spec.borderColor }
     }
 
@@ -386,7 +386,8 @@ export class AtlasResolver {
     const source = numbers(tiles.get(`IMG${spec.tile}`, "SOURCE_RECT"))
     if (!source) return { color: spec.color, borderColor: spec.borderColor }
     const absoluteInner = numbers(tiles.get(`IMG${spec.tile}`, "INNER_RECT"))
-    const inner = absoluteInner
+    // 工具书 V6 p162：无 INNER_RECT 或宽高为 0 时不拉伸。
+    const inner = absoluteInner && absoluteInner[2] > 0 && absoluteInner[3] > 0
       ? ([
           absoluteInner[0] - source[0],
           absoluteInner[1] - source[1],

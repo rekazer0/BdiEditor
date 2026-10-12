@@ -13,7 +13,7 @@ export type AiChatRunResult = {
   summary?: string
 }
 
-export type AiChatRun = (prompt: string, hooks: AiChatRunHooks) => Promise<AiChatRunResult>
+export type AiChatRun = (prompt: string, hooks: AiChatRunHooks, files: readonly File[]) => Promise<AiChatRunResult>
 
 export type AiChatController = {
   clear: () => void
@@ -242,6 +242,21 @@ function configureAppearance(chat: DeepChat): void {
     #submit-icon { width: 15px !important; height: 15px !important; filter: none !important;
       fill: none !important; stroke: currentColor; stroke-width: 1.6; }
     #text-input:focus-visible { outline: none; }
+    /* Pasted / dropped attachments sit above the text, inside the composer. */
+    #text-input-container { flex-wrap: wrap; }
+    .ai-attachments { display: flex; flex: 0 0 100%; flex-wrap: wrap; gap: 6px; box-sizing: border-box; padding: 10px 12px 0; }
+    .ai-attachments:empty { display: none; }
+    .ai-attachment { display: inline-flex; align-items: center; gap: 6px; max-width: 180px; height: 28px;
+      padding: 0 4px 0 4px; border: 1px solid ${line}; border-radius: ${radiusSm}; background: ${sunken};
+      color: ${secondary}; font-size: 11px; }
+    .ai-attachment img { width: 20px; height: 20px; border-radius: 4px; object-fit: cover; }
+    .ai-attachment-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ai-attachment button { display: grid; place-items: center; width: 18px; height: 18px; padding: 0;
+      border: 0; border-radius: 4px; background: none; color: ${muted}; font: inherit; cursor: pointer; }
+    .ai-attachment button:hover { color: ${text}; background: color-mix(in srgb, ${text} 8%, transparent); }
+    .ai-attachment button:focus-visible { outline: 2px solid ${accent}; outline-offset: 1px; }
+    #text-input-container[data-dropping] { border-color: ${accent} !important; }
+
     /* Top-edge grip: the composer is anchored to the bottom, so it grows upward. */
     .ai-resize { position: absolute; top: 0; left: 0; right: 0; z-index: 2; height: 10px;
       cursor: ns-resize; touch-action: none; }
@@ -366,11 +381,75 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
   const chat = element as DeepChat
   configureAppearance(chat)
 
+  let attachments: File[] = []
+  let attachmentStrip: HTMLElement | undefined
+  const paintAttachments = () => {
+    if (!attachmentStrip) return
+    attachmentStrip.querySelectorAll("img").forEach((image) => URL.revokeObjectURL(image.src))
+    attachmentStrip.replaceChildren(...attachments.map((file, index) => {
+      const chip = document.createElement("span")
+      chip.className = "ai-attachment"
+      if (file.type.startsWith("image/")) {
+        const image = document.createElement("img")
+        image.src = URL.createObjectURL(file)
+        image.alt = ""
+        chip.append(image)
+      }
+      const name = document.createElement("span")
+      name.className = "ai-attachment-name"
+      name.textContent = file.name || "粘贴的图片"
+      name.title = name.textContent
+      const remove = document.createElement("button")
+      remove.type = "button"
+      remove.textContent = "×"
+      remove.setAttribute("aria-label", `移除附件 ${name.textContent}`)
+      remove.onclick = () => {
+        attachments = attachments.filter((_, other) => other !== index)
+        paintAttachments()
+      }
+      chip.append(name, remove)
+      return chip
+    }))
+  }
+  const addAttachments = (files: readonly File[]) => {
+    // shortcut: 8 files per message keeps prompts bounded; raise if users need more.
+    attachments = [...attachments, ...files].slice(0, 8)
+    paintAttachments()
+  }
+
   chat.onComponentRender = () => {
     const input = chat.shadowRoot?.querySelector<HTMLElement>("#text-input")
     input?.setAttribute("aria-label", "描述你想要的皮肤效果")
     const box = chat.shadowRoot?.querySelector<HTMLElement>("#text-input-container")
     if (input && box && !box.querySelector(".ai-resize")) box.prepend(resizeGrip(input))
+    if (input && box && !attachmentStrip?.isConnected) {
+      attachmentStrip = document.createElement("div")
+      attachmentStrip.className = "ai-attachments"
+      attachmentStrip.setAttribute("aria-label", "附件")
+      input.before(attachmentStrip)
+      paintAttachments()
+      // Capture phase: deep-chat's own paste handler only keeps plain text.
+      input.addEventListener("paste", (event) => {
+        const files = [...event.clipboardData?.files ?? []]
+        if (!files.length) return
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        addAttachments(files)
+      }, true)
+      box.addEventListener("dragover", (event) => {
+        if (!event.dataTransfer?.types.includes("Files")) return
+        event.preventDefault()
+        box.dataset.dropping = ""
+      })
+      box.addEventListener("dragleave", () => delete box.dataset.dropping)
+      box.addEventListener("drop", (event) => {
+        delete box.dataset.dropping
+        const files = [...event.dataTransfer?.files ?? []]
+        if (!files.length) return
+        event.preventDefault()
+        addAttachments(files)
+      })
+    }
     chat.shadowRoot?.querySelector(".input-button[role=button]")?.setAttribute("aria-label", "发送消息；生成时点击停止")
     chat.shadowRoot?.querySelectorAll<HTMLButtonElement>("[data-ai-prompt]").forEach((button) => {
       button.onclick = () => {
@@ -492,6 +571,9 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
     stream: { partialRender: true },
     handler: (body, signals) => {
       const prompt = String(body?.messages?.at(-1)?.text ?? "").trim()
+      const files = attachments
+      attachments = []
+      paintAttachments()
       const controller = new AbortController()
       activeController?.abort()
       closeActive?.()
@@ -532,6 +614,7 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
 
       signals.stopClicked.listener = () => controller.abort()
       signals.onOpen()
+      if (files.length) appendStep("reading", `附带 ${files.length} 个附件：${files.map((file) => file.name || "粘贴的图片").join("、")}`)
 
       void run(prompt, {
         signal: controller.signal,
@@ -552,7 +635,7 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
           streamed = true
           await signals.onResponse({ text: delta })
         },
-      }).then(async ({ fallback, summary }) => {
+      }, files).then(async ({ fallback, summary }) => {
         if (currentGeneration !== generation) return
         if (controller.signal.aborted) throw new DOMException("已停止生成", "AbortError")
         if (!streamed && fallback) await signals.onResponse({ text: fallback })
@@ -580,6 +663,8 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
       if (timeline?.timer !== undefined) clearInterval(timeline.timer)
       if (timeline?.frame !== undefined) cancelAnimationFrame(timeline.frame)
       timeline = undefined
+      attachments = []
+      paintAttachments()
       // 时间线是自建节点，deep-chat 不认识它，清空时要自己带走。
       chat.shadowRoot?.querySelectorAll(".ai-run-holder").forEach((holder) => holder.remove())
       // `true` is deep-chat's "reset": it restores the intro panel through its own

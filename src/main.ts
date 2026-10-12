@@ -143,7 +143,7 @@ import {
 } from "./bda-editor.ts"
 import { convertBdaArchive } from "./bda-convert.ts"
 import { bdaCompatibilityWarnings, bdaPlatform, convertBdaPlatform, type BdaPlatform } from "./bda-platform.ts"
-import { IniDocument } from "./ini.ts"
+import { IniDocument, normalizeKeySections } from "./ini.ts"
 import { adaptIos26KeyboardLayout, adaptIos26Variant } from "./ios26.ts"
 import { findTextMatches, iniSectionAtOffset, iniSectionRanges, insertedTextRange, jsonPropertyAtOffset, jsonPropertyRanges, replaceTextMatches } from "./highlight.ts"
 import type { Change } from "./history.ts"
@@ -264,6 +264,7 @@ import { unsavedDecision, type UnsavedDecision } from "./unsaved.ts"
 import { checkForUpdate } from "./update.ts"
 import { clientLog, clientLogZip, flushClientLogs, installClientLogging } from "./client-log.ts"
 import { installSafeAreaLock } from "./safe-area.ts"
+import { bindSlicePickerZoom, drawSlicePicker, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM } from "./slice-picker-canvas.ts"
 
 installClientLogging(document.querySelector<HTMLElement>("#about-update")?.dataset.currentVersion ?? "unknown")
 installSafeAreaLock()
@@ -293,6 +294,8 @@ window.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 || event.pointerType !== "mouse") return
   for (const target of event.composedPath()) {
     if (!(target instanceof HTMLElement)) continue
+    // 绝大多数祖先不可滚动，先用廉价判断跳过，避免每次点击对整条路径取计算样式。
+    if (target.scrollHeight <= target.clientHeight && target.scrollWidth <= target.clientWidth) continue
     const style = getComputedStyle(target)
     if (style.getPropertyValue("scrollbar-width") === "none") continue
     const size = Number.parseFloat(style.getPropertyValue("--scrollbar-size"))
@@ -770,6 +773,8 @@ let pickerPath = ""
 let pickerSlices: TileSlice[] = []
 let pickerScale = 1
 let pickerOffset: TilePoint = { x: 0, y: 0 }
+let pickerFit = 1
+let pickerZoom = 1
 type StyleImagePickerTarget = {
   source: "BACK_STYLE" | "FORE_STYLE"
   property: "NM_IMG" | "HL_IMG"
@@ -875,9 +880,7 @@ const preview = new Preview(
     selectedKeySections = sections
     if (!sections.length) source.collapseSelection()
     if (sections.length && mobilePortraitQuery.matches) setMobilePane("inspector")
-    populateKeyInspector()
-    updateSourceHighlight()
-    scrollSelectedSource()
+    scheduleSelectionInspectorSync(preview)
   },
   false,
   (sections, deltaX, deltaY) => moveSelectedKeys(deltaX, deltaY, sections),
@@ -904,33 +907,35 @@ function updatePointerCoordinates(
   const wrapWidth = geometry?.wrapWidth ?? canvasWrap.clientWidth
   const wrapHeight = geometry?.wrapHeight ?? canvasWrap.clientHeight
   const overlayGeometry = { left: canvasWrap.scrollLeft, top: canvasWrap.scrollTop, width: wrapWidth, height: wrapHeight }
-  let x = Math.min(bounds.width - 1, Math.max(0, event.clientX - bounds.left))
-  let y = Math.min(bounds.height - 1, Math.max(0, event.clientY - bounds.top))
+  const x = Math.min(bounds.width - 1, Math.max(0, event.clientX - bounds.left))
+  const y = Math.min(bounds.height - 1, Math.max(0, event.clientY - bounds.top))
   const snapPreview = canvas === previewCanvas ? preview : canvas === toolbarCanvas ? toolbarPreview : undefined
   const logicalSize = snapPreview?.logicalSize() ?? { width: canvas.width, height: canvas.height }
+  const raw = { x: x / bounds.width * logicalSize.width, y: y / bounds.height * logicalSize.height }
   const point = !previewPanStart && editorCrosshair.checked && editorCoordinateSnap.checked && snapPreview
-    ? snapPreview.snapPoint(
-      { x: x / bounds.width * logicalSize.width, y: y / bounds.height * logicalSize.height },
-      bounds,
-    )
-    : { x: x / bounds.width * logicalSize.width, y: y / bounds.height * logicalSize.height }
+    ? snapPreview.snapPoint(raw, bounds)
+    : raw
   const snappedX = Math.min(logicalSize.width - 1, Math.max(0, point.x))
   const snappedY = Math.min(logicalSize.height - 1, Math.max(0, point.y))
   const logicalX = Math.floor(snappedX)
   const logicalY = Math.floor(snappedY)
-  x = snappedX / logicalSize.width * bounds.width
-  y = snappedY / logicalSize.height * bounds.height
   if (previewCoordinateX.textContent !== String(logicalX)) previewCoordinateX.textContent = String(logicalX)
   if (previewCoordinateY.textContent !== String(logicalY)) previewCoordinateY.textContent = String(logicalY)
   if (!editorCrosshair.checked) {
     previewCoordinates.hidden = false
     return
   }
-  // While panning, the crosshair follows the actual pointer, not a snapped/clamped
-  // artwork coordinate (which can lag behind the pointer or stick to an edge).
+  // The lines always follow the pointer exactly, like the system cursor. Snapping
+  // only changes the readout; a dashed guide marks the edge it snapped to.
+  const crosshairX = event.clientX - wrapBounds.left
+  const crosshairY = event.clientY - wrapBounds.top
   const outsideCanvas = event.clientX < bounds.left || event.clientX >= bounds.right || event.clientY < bounds.top || event.clientY >= bounds.bottom
-  const crosshairX = previewPanStart || outsideCanvas ? event.clientX - wrapBounds.left : bounds.left - wrapBounds.left + x
-  const crosshairY = previewPanStart || outsideCanvas ? event.clientY - wrapBounds.top : bounds.top - wrapBounds.top + y
+  const snapX = String(!outsideCanvas && point.x !== raw.x)
+  const snapY = String(!outsideCanvas && point.y !== raw.y)
+  if (previewCoordinates.dataset.snapX !== snapX) previewCoordinates.dataset.snapX = snapX
+  if (previewCoordinates.dataset.snapY !== snapY) previewCoordinates.dataset.snapY = snapY
+  if (snapX === "true") previewCoordinates.style.setProperty("--snap-x", `${bounds.left - wrapBounds.left + snappedX / logicalSize.width * bounds.width}px`)
+  if (snapY === "true") previewCoordinates.style.setProperty("--snap-y", `${bounds.top - wrapBounds.top + snappedY / logicalSize.height * bounds.height}px`)
   if (
     !pointerOverlayGeometry ||
     pointerOverlayGeometry.left !== overlayGeometry.left ||
@@ -999,6 +1004,25 @@ function schedulePreviewInteractionFrame(): void {
   if (!pointerCoordinatesFrame) pointerCoordinatesFrame = requestAnimationFrame(paintPreviewInteraction)
 }
 
+// Runs callback in its own task right after the next frame is painted.
+function afterNextPaint(callback: () => void): void {
+  requestAnimationFrame(() => window.setTimeout(callback))
+}
+
+// Rebuilding the inspector costs 10–30ms in WebKit; run it after the canvas has
+// painted the new selection so a key click shows up on the very next frame.
+let selectionInspectorSyncPending = false
+function scheduleSelectionInspectorSync(canvasPreview: Preview): void {
+  if (selectionInspectorSyncPending) return
+  selectionInspectorSyncPending = true
+  afterNextPaint(() => void canvasPreview.rendered().then(() => {
+    selectionInspectorSyncPending = false
+    populateKeyInspector()
+    updateSourceHighlight()
+    scrollSelectedSource()
+  }))
+}
+
 canvasWrap.addEventListener("pointermove", (event) => {
   if (previewPanStart || deviceShell.hidden) return
   const onToolbar = toolbarStrip.contains(event.target as Node)
@@ -1028,9 +1052,7 @@ const toolbarPreview = new Preview(toolbarCanvas, handlePreviewEvent, (sections)
   selectedToolbarSections = sections
   toolbarPreview.setSelected(sections)
   syncCandidateSelection()
-  populateKeyInspector()
-  updateSourceHighlight()
-  scrollSelectedSource()
+  scheduleSelectionInspectorSync(toolbarPreview)
 }, true)
 const candidateBackgroundPreview = new Preview(candidateBackgroundCanvas, () => {}, () => {})
 
@@ -1370,15 +1392,16 @@ function copySelectedKeys(): void {
     copies.push(target)
     copyBySource.set(section, target)
   }
+  const renamed = normalizeKeySections(layoutDocument)
   const text = layoutDocument.toString()
   commitText(layoutPath, before, text)
   if (selectedPath === layoutPath) setSourceValue(text)
   selectedKeySections = selectedKeySections.flatMap((section) => {
     const copy = copyBySource.get(section)
-    return copy ? [copy] : []
+    return copy ? [renamed.get(copy) ?? copy] : []
   })
   preview.setDocument(layoutDocument)
-  preview.setSelected(copies)
+  preview.setSelected(copies.map((copy) => renamed.get(copy) ?? copy))
   populateKeyInspector()
   updateSourceHighlight()
   updateDirty()
@@ -1388,6 +1411,7 @@ function deleteSelectedKeys(): void {
   if (!archive || !layoutDocument || !selectedKeySections.length) return
   const before = layoutDocument.toString()
   if (!layoutDocument.removeSections(preview.expandSections(selectedKeySections))) return
+  normalizeKeySections(layoutDocument)
   const text = layoutDocument.toString()
   commitText(layoutPath, before, text)
   if (selectedPath === layoutPath) setSourceValue(text)
@@ -1674,7 +1698,7 @@ function mobileInspectorGroupLabel(group: HTMLElement): string {
 }
 
 function mobileInspectorGroupSymbol(label: string): string {
-  if (/提示栏|候选栏/.test(label)) return "text.bubble"
+  if (/提示栏|气泡|候选栏/.test(label)) return "text.bubble"
   if (/粒子|动画|动效/.test(label)) return "sparkles"
   if (/扩展区域/.test(label)) return "square.2.layers.3d"
   if (/基本信息|全局/.test(label)) return "info.circle"
@@ -2618,12 +2642,20 @@ function refreshBdaLayout(path = preferredPath()): boolean {
   return true
 }
 
+let cachedVisualResolver: { key: readonly unknown[]; resolver: VisualResolver } | undefined
+
 function visualResolver(): VisualResolver | undefined {
   if (!archive) return
-  const info = currentBdaAppearance()
-  return info
-    ? new BdaResolver(archive, info.bytes, bdaBase, theme.value, orientation.value)
+  const appearancePath = archive.format === "bda" ? bdaAppearancePath(archive, theme.value, orientation.value) : undefined
+  const appearanceBytes = appearancePath ? archive.getBytes(appearancePath) : undefined
+  // 新建解析器会重新解析样式、重新解码全部 PNG；归档内容（revision）与主题方向不变时复用，保留位图缓存。
+  const key = [archive, archive.revision, bdaBase, bdaBase?.revision, appearanceBytes, theme.value, orientation.value]
+  if (cachedVisualResolver?.key.every((value, index) => value === key[index])) return cachedVisualResolver.resolver
+  const resolver = appearanceBytes
+    ? new BdaResolver(archive, appearanceBytes, bdaBase, theme.value, orientation.value)
     : new AtlasResolver(archive, theme.value, orientation.value)
+  cachedVisualResolver = { key, resolver }
+  return resolver
 }
 
 function simulationLanguage(): "zh" | "en" {
@@ -2756,8 +2788,11 @@ function refreshPreview(): void {
     const document = IniDocument.parse(hintSource.getText(path))
     return bdaInfo ? bdaLayoutDocument(document, bdaInfo.appearance, layout.value) : document
   }
-  const shortHint = hintDocument("hint1.pop") ?? hintDocument("hint.pop")
-  const longHint = hintDocument("hint2.pop") ?? shortHint
+  // 每个面板用 [HINT] LAYOUT_NAME 指定一个 pop（未写时取 gen.ini），pop 内同时含普通气泡与长按 [BAR]。
+  const hintName = (layoutDocument?.get("HINT", "LAYOUT_NAME") ?? context?.gen?.get("HINT", "LAYOUT_NAME"))?.trim()
+  const namedHint = hintName ? hintDocument(`${hintName.replace(/\.pop$/i, "")}.pop`) : undefined
+  const shortHint = namedHint ?? hintDocument("hint1.pop") ?? hintDocument("hint.pop")
+  const longHint = namedHint ?? hintDocument("hint2.pop") ?? shortHint
   preview.setLegacyHints(
     hintPreviewEnabled.checked ? parseLegacyHint(shortHint) : undefined,
     hintPreviewEnabled.checked ? parseLegacyHint(longHint) : undefined,
@@ -2910,6 +2945,17 @@ function refreshSimulationPreview(): void {
   }
 }
 
+let cachedSkinStates: { key: readonly unknown[]; byLayout: Map<string, number[]> } | undefined
+
+// 每次切换布局都会把全部布局文件重新解析（BDA 还要按当前布局逐个合成）来统计皮肤状态；内容不变时复用结果。
+function currentSkinStates(): number[] {
+  const key = [archive, archive?.revision, bdaBase, bdaBase?.revision, theme.value, orientation.value]
+  if (!cachedSkinStates?.key.every((value, index) => value === key[index])) cachedSkinStates = { key, byLayout: new Map() }
+  let states = cachedSkinStates.byLayout.get(layout.value)
+  if (!states) cachedSkinStates.byLayout.set(layout.value, states = availableSkinStates(...skinStateDocuments()))
+  return [...states]
+}
+
 function skinStateDocuments(): IniDocument[] {
   if (!archive) return []
   const prefix = `${theme.value}/skin/${orientation.value}/`
@@ -2922,15 +2968,25 @@ function skinStateDocuments(): IniDocument[] {
   })
 }
 
-function fitCanvasPreview(): void {
-  if (!canvasLogicalSize) return
+// 切换布局时在点击处理中途读取尺寸会强制整页重排；改由 ResizeObserver 回调（布局已就绪）缓存。
+// canvas-wrap 的 padding 只随媒体查询变化，而媒体查询变化必然伴随尺寸变化，缓存不会过期。
+let canvasWrapInnerSize: { width: number; height: number } | undefined
+
+function measureCanvasWrapInnerSize(): { width: number; height: number } {
   const canvasStyle = getComputedStyle(canvasWrap)
   // offsetWidth/Height ignore scrollbars: a panned shell that overflows briefly
   // shows scrollbars, and fitting to clientWidth would shrink then regrow the keyboard.
-  const availableWidth = canvasWrap.offsetWidth - parseFloat(canvasStyle.borderLeftWidth) - parseFloat(canvasStyle.borderRightWidth) -
-    parseFloat(canvasStyle.paddingLeft) - parseFloat(canvasStyle.paddingRight)
-  const availableHeight = canvasWrap.offsetHeight - parseFloat(canvasStyle.borderTopWidth) - parseFloat(canvasStyle.borderBottomWidth) -
-    parseFloat(canvasStyle.paddingTop) - parseFloat(canvasStyle.paddingBottom)
+  return {
+    width: canvasWrap.offsetWidth - parseFloat(canvasStyle.borderLeftWidth) - parseFloat(canvasStyle.borderRightWidth) -
+      parseFloat(canvasStyle.paddingLeft) - parseFloat(canvasStyle.paddingRight),
+    height: canvasWrap.offsetHeight - parseFloat(canvasStyle.borderTopWidth) - parseFloat(canvasStyle.borderBottomWidth) -
+      parseFloat(canvasStyle.paddingTop) - parseFloat(canvasStyle.paddingBottom),
+  }
+}
+
+function fitCanvasPreview(): void {
+  if (!canvasLogicalSize) return
+  const { width: availableWidth, height: availableHeight } = canvasWrapInnerSize ?? measureCanvasWrapInnerSize()
   if (availableWidth <= 0 || availableHeight <= 0) return
   const width = canvasFitWidth(
     availableWidth,
@@ -3022,7 +3078,10 @@ function scheduleFitCanvasPreview(): void {
   }, 50)
 }
 
-new ResizeObserver(scheduleFitCanvasPreview).observe(canvasWrap)
+new ResizeObserver(() => {
+  canvasWrapInnerSize = measureCanvasWrapInnerSize()
+  scheduleFitCanvasPreview()
+}).observe(canvasWrap)
 
 previewZoomOut.addEventListener("click", () => applyPreviewZoom(previewZoom - 0.1))
 previewZoomFit.addEventListener("click", () => {
@@ -3129,6 +3188,22 @@ function finishPreviewPan(): void {
   if (pointerId !== undefined && canvasWrap.hasPointerCapture(pointerId)) canvasWrap.releasePointerCapture(pointerId)
 }
 
+// 点击画布外的空白区域（棋盘格背景）同样取消选中，回到面板配置；拖动平移不算点击。
+let canvasWrapClickStart: { x: number; y: number } | undefined
+canvasWrap.addEventListener("pointerdown", (event) => { canvasWrapClickStart = { x: event.clientX, y: event.clientY } })
+canvasWrap.addEventListener("click", (event) => {
+  const target = event.target as Element
+  const start = canvasWrapClickStart
+  canvasWrapClickStart = undefined
+  if (
+    !isEditing() ||
+    !start || Math.hypot(event.clientX - start.x, event.clientY - start.y) >= 3 ||
+    candidateArea.contains(target) ||
+    target.closest("canvas, button, input, select, label, [role=button]")
+  ) return
+  if (selectedKeySections.length || selectedToolbarSections.length || selectedCandidate) inspectorBackButton.click()
+})
+
 canvasWrap.addEventListener("pointerup", finishPreviewPan)
 canvasWrap.addEventListener("pointercancel", finishPreviewPan)
 // Ignore capture lost by child canvases (it bubbles here when the pan takes capture over).
@@ -3160,7 +3235,7 @@ function updatePanelTools(
     panelVisibleHeight: content.height,
   }
   fitCanvasPreview()
-  const states = availableSkinStates(...skinStateDocuments())
+  const states = currentSkinStates()
   const selected = skinState.value
   const selectedState = selected ? Number(selected) : undefined
   if (selectedState !== undefined && selectedState <= 122 && !states.includes(selectedState)) {
@@ -4179,8 +4254,7 @@ async function renderStyleResourceGallery(): Promise<void> {
   if (resourceCategory.dataset.styleCategories !== "bdi") {
     resourceCategory.replaceChildren(
       new Option("全部样式", "all"),
-      new Option("声音样式", "sound"),
-      new Option("视觉样式", "visual"),
+      ...(["image", "color", "anim", "text", "sound"] as const).map((kind) => new Option(`${styleKinds[kind].label}样式`, kind)),
     )
     resourceCategory.dataset.styleCategories = "bdi"
   }
@@ -4190,7 +4264,8 @@ async function renderStyleResourceGallery(): Promise<void> {
   const styleIDs = availableStyleIDs().filter((styleID) => {
     const entries = stylesDocument.entries(`STYLE${styleID}`)
     const hasSound = Boolean(stylesDocument.get(`STYLE${styleID}`, "PRESS_SOUND_PATH")?.trim())
-    if (category === "sound" && !hasSound || category === "visual" && hasSound) return false
+    // 声音可与视觉属性共存，按是否带音效筛；其余按样式类型筛。
+    if (category === "sound" ? !hasSound : category !== "all" && styleKind(styleID, stylesDocument) !== category) return false
     return !query || styleID.includes(query) || entries.some((entry) =>
       (entry.key === "INFO" || entry.key === "SHOW") && entry.value.toLowerCase().includes(query),
     )
@@ -4232,6 +4307,7 @@ async function renderStyleResourceGallery(): Promise<void> {
       drawVisualPreview(canvas, [await resolver.resolve(styleID, highlighted).catch(() => undefined)], false)
       previews.append(canvas)
     }
+    previews.append(styleKindBadge(styleKind(styleID, stylesDocument)))
     const name = document.createElement("strong")
     name.textContent = `STYLE${styleID}`
     const entries = stylesDocument.entries(`STYLE${styleID}`)
@@ -5297,6 +5373,7 @@ function renderStyleReferenceRows(button: HTMLElement, input: HTMLInputElement, 
   const styleIDs = input.value.split(",").map((value) => value.trim()).filter(Boolean)
   for (const canvas of Array.from(button.querySelectorAll("canvas"))) styleStateCanvasObserver.unobserve(canvas)
   button.replaceChildren()
+  const styles = styleConfigDocument()
   for (const [styleIndex, styleID] of (styleIDs.length ? styleIDs : [""]).entries()) {
     const rowInput = () => {
       const target = input.cloneNode(false) as HTMLInputElement
@@ -5338,6 +5415,7 @@ function renderStyleReferenceRows(button: HTMLElement, input: HTMLInputElement, 
       })
       previews.append(item)
     }
+    if (styleID) previews.append(styleKindBadge(styleKind(styleID, styles)))
     wrapper.append(numberInput, previews)
     button.append(wrapper)
   }
@@ -5386,6 +5464,8 @@ async function refreshStyleReferenceThumbnail(
     [false, true].map((highlighted) => resolver.resolve(styleID, highlighted).catch(() => undefined)),
   ))
   if (drawID !== styleReferenceDrawIDs.get(button)) return
+  // Unresolved visuals may resolve later; let the next refresh retry them.
+  if (visuals.some((visual) => !visual)) styleReferenceThumbnailInputs.delete(button)
   const foreground = styleReferenceForeground(key)
   visuals.forEach((visual, index) => {
     const canvas = canvases[index]
@@ -5482,6 +5562,8 @@ async function openStyleReferenceStateImage(
   let targetSource = source
   let visual = (await Promise.all(styleIDs.map((styleID) => resolver.resolve(styleID, highlighted).catch(() => undefined))))
     .find((item) => item?.imagePath)
+  // 颜色 / 动画样式没有图片可切，改为在样式库里更换引用的样式；不能回退去改背景图片。
+  if (!visual && styleIDs.some((styleID) => ["color", "anim"].includes(styleKind(styleID)))) return openStylePicker(input, highlighted)
   if (!visual && foreground) {
     const backgroundID = pairedBackgroundStyleID(input, key)
     if (backgroundID) {
@@ -5560,8 +5642,53 @@ function availableStyleIDs(): string[] {
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
 }
 
+type StyleKind = "image" | "color" | "anim" | "text" | "sound" | "empty"
+const styleKinds: Record<StyleKind, { label: string; icon: string }> = {
+  image: { label: "图片", icon: "images" },
+  color: { label: "颜色", icon: "palette" },
+  anim: { label: "动画", icon: "clapperboard" },
+  text: { label: "文字", icon: "type" },
+  sound: { label: "声音", icon: "volume-2" },
+  empty: { label: "空", icon: "square-dashed" },
+}
+
+/** 按样式内容判定类型：有图即图片样式，其次动画、颜色、声音，只剩文字属性的归为文字样式。 */
+function styleKind(styleID: string, styles = styleConfigDocument()): StyleKind {
+  if (archive?.format === "bda") return bdaStyleRef(styleID)?.type ?? "empty"
+  const keys = new Set(styles?.entries(`STYLE${styleID}`).filter((entry) => entry.value.trim()).map((entry) => entry.key) ?? [])
+  const has = (pattern: RegExp) => [...keys].some((key) => pattern.test(key))
+  if (has(/^(?:NM|HL)_IMG$/)) return "image"
+  if (has(/ANIM|^EVENT\d+$/)) return "anim"
+  if (has(/^(?:NM|HL)_COLOR$/)) return "color"
+  if (keys.has("PRESS_SOUND_PATH")) return "sound"
+  return keys.size ? "text" : "empty"
+}
+
+function styleConfigDocument(): IniDocument | undefined {
+  const path = styleConfigPath()
+  return archive?.isText(path) ? IniDocument.parse(archive.getText(path)) : undefined
+}
+
+/** 样式类型徽标：样式库、检查器缩略图、样式配置列表共用，保证同一类型处处同一图标与文字。 */
+function styleKindBadge(kind: StyleKind): HTMLElement {
+  const badge = document.createElement("span")
+  badge.className = "style-kind-badge"
+  badge.dataset.styleKind = kind
+  badge.title = `${styleKinds[kind].label}样式`
+  badge.append(inspectorIcon(styleKinds[kind].icon, 11), styleKinds[kind].label)
+  return badge
+}
+
+/** 由引用字段推断应优先展示的样式类型，打开样式库时据此预选筛选。 */
+function styleKindForKey(key: string): StyleKind | "all" {
+  if (/ANIM_STYLE$/.test(key)) return "anim"
+  if (key === "HW_FORE_STYLE") return "color"
+  return "all"
+}
+
 let styleLibraryMode: "styles" | "images" = "styles"
 let styleLibraryFilter = "all"
+let styleLibraryKind: StyleKind | "all" = "all"
 let styleLibraryHighlighted = false
 let styleLibrarySelected: { styleID?: string; imagePath?: string } | undefined
 const styleLibraryPreview = $("#style-library-preview")
@@ -5659,6 +5786,13 @@ for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[dat
     void renderStylePicker()
   })
 }
+for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-kind]")) {
+  button.addEventListener("click", () => {
+    styleLibraryKind = button.dataset.styleLibraryKind as StyleKind | "all"
+    styleLibraryPreview.hidden = true
+    void renderStylePicker()
+  })
+}
 for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-filter]")) {
   button.addEventListener("click", () => {
     styleLibraryFilter = button.dataset.styleLibraryFilter!
@@ -5674,6 +5808,7 @@ async function renderStyleLibraryItems(renderID: number, styleIDs: string[], res
     visuals: await Promise.all([resolver.resolve(styleID, false).catch(() => undefined), resolver.resolve(styleID, true).catch(() => undefined)]),
   })))
   if (renderID !== stylePickerRenderID || !stylePickerDialog.open) return
+  const styles = styleConfigDocument()
   const paths = resourceImagePaths(archive?.names() ?? [], theme.value, orientation.value)
   const currentID = stylePickerTarget?.value.split(",")[0]?.trim()
   const currentImages = allItems.find((item) => item.styleID === currentID)?.visuals.map((visual) => visual?.imagePath) ?? []
@@ -5692,7 +5827,13 @@ async function renderStyleLibraryItems(renderID: number, styleIDs: string[], res
     : allItems.filter(({ styleID, visuals }) => {
       const searchText = [styleID, stylePickerLabel(styleID), ...visuals.map((visual) => visual?.imagePath ?? "")].join(" ").toLowerCase()
       return searchText.includes(query) && (styleLibraryFilter === "all" || styleLibraryCategories(styleID).has(styleLibraryFilter))
+        && (styleLibraryKind === "all" || styleKind(styleID, styles) === styleLibraryKind)
     }).map((item) => ({ ...item, imagePath: "" }))
+  // 当前皮肤没有的类型不显示筛选项，避免点出空列表。
+  const kinds = new Set(allItems.map(({ styleID }) => styleKind(styleID, styles)))
+  for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-kind]")) {
+    button.hidden = button.dataset.styleLibraryKind !== "all" && !kinds.has(button.dataset.styleLibraryKind as StyleKind)
+  }
   stylePickerGrid.replaceChildren()
   stylePickerCount.textContent = `${allItems.length} 个样式 · ${paths.length} 张图片`
   stylePickerEmpty.hidden = items.length > 0
@@ -5722,6 +5863,7 @@ async function renderStyleLibraryItems(renderID: number, styleIDs: string[], res
         drawVisualPreview(canvas, [visual], styleReferenceForeground(styleReferenceKey(stylePickerTarget!)))
         previews.append(canvas)
       }
+      previews.append(styleKindBadge(styleKind(styleID, styles)))
     }
     const label = document.createElement("strong")
     label.textContent = imagePath ? imagePath.split("/").pop()! : `样式 ${stylePickerLabel(styleID)}`
@@ -5748,6 +5890,13 @@ async function renderStylePicker(): Promise<void> {
     button.setAttribute("aria-pressed", String(button.dataset.styleLibraryFilter === styleLibraryFilter))
     button.disabled = styleReferenceKey(stylePickerTarget!) === "SOUND_STYLE"
   }
+  for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-kind]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.styleLibraryKind === styleLibraryKind))
+  }
+  stylePickerDialog.querySelector<HTMLElement>(".style-library-kinds")!.hidden =
+    styleLibraryMode === "images" || styleReferenceKey(stylePickerTarget!) === "SOUND_STYLE"
+  stylePickerAdd.hidden = !archive?.isText(styleConfigPath()) || archive.format === "bda"
+  stylePickerAdd.disabled = !isEditing()
   stylePickerSearch.placeholder = styleLibraryMode === "images" ? "搜索图片名称" : "搜索样式名称或编号"
   const query = stylePickerSearch.value.trim().toLowerCase()
   const soundOnly = styleReferenceKey(stylePickerTarget!) === "SOUND_STYLE"
@@ -5830,6 +5979,7 @@ function openStylePicker(input: HTMLInputElement, highlighted = false): void {
   stylePickerTarget = input
   styleLibraryMode = "styles"
   styleLibraryFilter = "all"
+  styleLibraryKind = styleKindForKey(styleReferenceKey(input))
   styleLibrarySelected = undefined
   styleLibraryPreview.hidden = true
   stylePickerSearch.value = ""
@@ -5842,22 +5992,49 @@ for (const input of [...keyboardFields, ...toolbarFields, ...keyFields]) decorat
 stylePickerSearch.addEventListener("input", () => { styleLibraryPreview.hidden = true; void renderStylePicker() })
 stylePickerDialog.addEventListener("close", () => { ++stylePickerRenderID; styleLibrarySelected = undefined })
 stylePickerClose.addEventListener("click", () => stylePickerDialog.close())
+// 样式库内新增：复用「新增样式」对话框，创建后直接应用到当前引用并进入编辑。
+let newStyleApplyTarget: HTMLInputElement | undefined
+const stylePickerAdd = $("#style-picker-add") as HTMLButtonElement
+newStyleDialog.addEventListener("close", () => { newStyleApplyTarget = undefined })
+stylePickerAdd.addEventListener("click", () => {
+  newStyleApplyTarget = stylePickerTarget
+  stylePickerDialog.close()
+  styleAddButton.click()
+})
 stylePickerDialog.addEventListener("click", (event) => {
   const rect = stylePickerDialog.getBoundingClientRect()
   if (event.target === stylePickerDialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) stylePickerDialog.close()
 })
 
+// Thumbnails redraw a frame later so they don't share a task with the inspector rebuild.
+let stylePreviewsPending = false
 async function updateStylePreviews(): Promise<void> {
-  refreshStyleReferenceThumbnails()
+  if (stylePreviewsPending) return
+  stylePreviewsPending = true
+  afterNextPaint(() => {
+    stylePreviewsPending = false
+    refreshStyleReferenceThumbnails()
+  })
 }
 
+// What each thumbnail was last drawn from; selecting a key re-runs this for every
+// trigger, and rebuilding unchanged ones dominated the click cost.
+const styleReferenceThumbnailInputs = new WeakMap<HTMLElement, { archive: SkinArchive; signature: string }>()
+
 function refreshStyleReferenceThumbnails(): void {
-  const resolver = visualResolver()
+  let resolver: VisualResolver | undefined
   for (const button of Array.from(document.querySelectorAll<HTMLElement>(".style-picker-trigger"))) {
     const input = button.previousElementSibling
-    if (input instanceof HTMLInputElement) {
-      void refreshStyleReferenceThumbnail(button, input, styleReferenceKey(input), resolver)
-    }
+    if (!(input instanceof HTMLInputElement)) continue
+    const key = styleReferenceKey(input)
+    if (archive) {
+      const signature = `${archive.revision}|${theme.value}|${orientation.value}|${key}|${input.value}`
+      const previous = styleReferenceThumbnailInputs.get(button)
+      if (previous?.archive === archive && previous.signature === signature) continue
+      styleReferenceThumbnailInputs.set(button, { archive, signature })
+    } else styleReferenceThumbnailInputs.delete(button)
+    resolver ??= visualResolver()
+    void refreshStyleReferenceThumbnail(button, input, key, resolver)
   }
 }
 
@@ -6080,17 +6257,17 @@ const documentFieldLabels: Record<string, string> = {
   FORE_ANIM_STYLE: "前景动画样式",
   HW_FORE_STYLE: "手写前景样式",
   ANIM_LEVEL: "动画层级",
-  ICON_NUM: "工具按钮数量",
+  ICON_NUM: "图标数量",
   ICON_INDEX: "图标序号",
   BACK_ICON: "背景图标",
   ARROW_ICON: "箭头图标",
-  ICON_UP: "上箭头图标",
-  ICON_DN: "下箭头图标",
-  ICON_LT: "左箭头图标",
-  ICON_RT: "右箭头图标",
+  ICON_UP: "上划气泡图标",
+  ICON_DN: "下划气泡图标",
+  ICON_LT: "左划气泡图标",
+  ICON_RT: "右划气泡图标",
   ANCHOR_TYPE: "锚点类型",
-  PERSIST: "保持状态",
-  CELL_W: "单元格宽度",
+  PERSIST: "显示时机",
+  CELL_W: "候选字间距",
   FIRST_GAP: "首项间距",
   NML_BACK_STYLE: "普通背景样式",
   SEL_BACK_STYLE: "选中背景样式",
@@ -6098,7 +6275,7 @@ const documentFieldLabels: Record<string, string> = {
   SEL_FONT_STYLE: "选中文字样式",
   HLINE_STYLE: "横线样式",
   VLINE_STYLE: "竖线样式",
-  SCROLL_SIDE: "滚动方向",
+  SCROLL_SIDE: "滚动条位置",
   SYM_LAYOUT: "符号面板布局",
   EVENT_NUM: "事件数量",
   IDLE_TIME: "空闲时间",
@@ -6109,18 +6286,18 @@ const documentSectionLabels: Record<string, string> = {
   PANEL: "面板",
   INPUT: "输入区",
   CAND: "候选栏",
-  SCAND: "次选区",
-  HINT: "提示栏",
-  MORE: "更多按钮",
-  LOGO: "输入法标识",
+  SCAND: "云输入栏",
+  HINT: "气泡",
+  MORE: "更多面板",
+  LOGO: "Logo 菜单",
   EMOJI: "表情面板",
   GLOBAL: "全局设置",
   // SWITCH / BAR / LIST 等文档分区此前会显示为英文原名。
   LIST: "列表",
-  BAR: "提示条",
-  SWITCH: "开关",
+  BAR: "长按气泡",
+  SWITCH: "工具栏",
   TAB: "标签",
-  DRAW: "绘制",
+  DRAW: "拖拉气泡",
   VIEWSTATE: "视图状态",
 }
 
@@ -6436,6 +6613,7 @@ function populateDocumentInspector(): void {
     if (!specialized && documentSwitchFields.has(entry.key)) {
       const input = document.createElement("input")
       input.type = "checkbox"
+      input.setAttribute("role", "switch")
       input.checked = !["0", "false", "off", ""].includes(entry.value.trim().toLowerCase())
       input.disabled = !isEditing()
       input.setAttribute("aria-label", translatedConfigLabel(entry.key))
@@ -6714,6 +6892,7 @@ function addNavButton(
   metaNode.className = "nav-meta"
   metaNode.textContent = meta || path.split("/").pop() || ""
   button.append(metaNode)
+  button.title = `${label} · ${metaNode.textContent}`
   button.addEventListener("click", () => {
     if (path.endsWith("py_9.ini") || path.endsWith("py_26.ini")) {
       layout.value = path.endsWith("_9.ini") ? "py_9.ini" : "py_26.ini"
@@ -7343,7 +7522,7 @@ function imageDataURL(bytes: Uint8Array): string {
   return `data:image/png;base64,${btoa(binary)}`
 }
 
-// 图片切片与「全部样式」列表共用一个窗口，不再另开资源窗口。
+// 图片切片与「全部图片」列表共用一个窗口，不再另开资源窗口。
 async function showPickerWindow(
   view: "image" | "list",
   title: string,
@@ -7373,7 +7552,7 @@ async function showPickerWindow(
 
 function openImagePickerList(): void {
   if (!archive || (!pickerTarget && !resourcePickerSelect)) return
-  void showPickerWindow("list", "全部样式", 960, 680)
+  void showPickerWindow("list", "全部图片", 960, 680)
 }
 
 function resourcePickerPayload(): NativeResourcePickerPayload {
@@ -7490,35 +7669,9 @@ function clearImageSlicePicker(): void {
 }
 
 function drawImageSlicePicker(): void {
-  const context = styleImagePickerCanvas.getContext("2d")
-  if (!context || !pickerImage?.naturalWidth) return
-  const width = pickerImage.naturalWidth
-  const height = pickerImage.naturalHeight
-  pickerScale = Math.min(styleImagePickerCanvas.width / width, styleImagePickerCanvas.height / height)
-  const targetWidth = width * pickerScale
-  const targetHeight = height * pickerScale
-  pickerOffset = { x: (styleImagePickerCanvas.width - targetWidth) / 2, y: (styleImagePickerCanvas.height - targetHeight) / 2 }
-  context.clearRect(0, 0, styleImagePickerCanvas.width, styleImagePickerCanvas.height)
-  context.drawImage(pickerImage, pickerOffset.x, pickerOffset.y, targetWidth, targetHeight)
-  const lineWidth = Math.max(1, Math.round(Math.min(targetWidth, targetHeight) / 350))
-  context.font = `${Math.max(11, lineWidth * 7)}px ui-monospace, monospace`
-  context.textBaseline = "top"
-  for (const slice of pickerSlices) {
-    const [x, y, sliceWidth, sliceHeight] = slice.source
-    const selected = slice.index === pickerSelectedIndex
-    context.lineWidth = selected ? lineWidth * 2 : lineWidth
-    context.strokeStyle = selected ? "#ff6b2c" : "#3a6df0"
-    context.strokeRect(
-      pickerOffset.x + x * pickerScale,
-      pickerOffset.y + y * pickerScale,
-      sliceWidth * pickerScale,
-      sliceHeight * pickerScale,
-    )
-    context.fillStyle = selected ? "#ff6b2c" : "#3a6df0"
-    context.fillRect(pickerOffset.x + x * pickerScale, pickerOffset.y + y * pickerScale, context.measureText(`IMG${slice.index}`).width + 6, 15)
-    context.fillStyle = "#fff"
-    context.fillText(`IMG${slice.index}`, pickerOffset.x + x * pickerScale + 3, pickerOffset.y + y * pickerScale + 2)
-  }
+  if (!pickerImage?.naturalWidth) return
+  pickerScale = drawSlicePicker(styleImagePickerCanvas, pickerImage, pickerSlices, pickerSelectedIndex, pickerFit * pickerZoom, { normal: "#3a6df0", selected: "#ff6b2c" })
+  pickerOffset = { x: 0, y: 0 }
 }
 
 function openImageSlicePicker(path: string, target: StyleImagePickerTarget, selectedSource?: TileRect): void {
@@ -7549,9 +7702,11 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
   pickerImage = new Image()
   pickerImage.onload = () => {
     if (!pickerImage) return
-    const scale = Math.min(960 / pickerImage.naturalWidth, 640 / pickerImage.naturalHeight)
-    styleImagePickerCanvas.width = Math.max(1, Math.round(pickerImage.naturalWidth * scale))
-    styleImagePickerCanvas.height = Math.max(1, Math.round(pickerImage.naturalHeight * scale))
+    // 初始大小铺满可视区域（减去内边距与底部说明），之后由缩放倍率调整
+    const width = styleImagePicker.clientWidth - 38
+    const height = styleImagePicker.clientHeight - 38 - styleImagePickerMeta.offsetHeight - 7
+    pickerFit = Math.min((width > 0 ? width : 960) / pickerImage.naturalWidth, (height > 0 ? height : 640) / pickerImage.naturalHeight)
+    pickerZoom = 1
     drawImageSlicePicker()
   }
   pickerImage.src = pickerURL
@@ -7565,7 +7720,7 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
   styleImageResourceOpen.hidden = false
   styleImageTitle.textContent = path.split("/").pop() ?? path
   styleImageSubtitle.textContent = " · 选择切片"
-  styleImagePickerMeta.textContent = pickerSlices.length ? "点击图片中的切片以修改引用" : "此图片没有可用的 TIL 切片"
+  styleImagePickerMeta.textContent = `${pickerSlices.length ? "点击图片中的切片以修改引用" : "此图片没有可用的 TIL 切片"} · ⌘/Ctrl + 滚轮或双指捏合缩放`
   showStyleImageDialog()
 }
 
@@ -7617,10 +7772,11 @@ function mergeSelectedKeys(): void {
   const merged = mergeLayoutRects(rects[0], rects[1])
   layoutDocument.set(merged.section, "VIEW_RECT", [merged.x, merged.y, merged.width, merged.height].map(Math.round).join(","))
   if (!layoutDocument.removeSections([rects[1].section])) return
+  const renamed = normalizeKeySections(layoutDocument)
   const text = layoutDocument.toString()
   commitText(layoutPath, before, text)
   if (selectedPath === layoutPath) setSourceValue(text)
-  selectedKeySections = [merged.section]
+  selectedKeySections = [renamed.get(merged.section) ?? merged.section]
   preview.setDocument(layoutDocument)
   preview.setSelected(selectedKeySections)
   populateKeyInspector()
@@ -7806,7 +7962,19 @@ function deleteSelectedTile(): void {
   if (!archive || archive.format === "bda" || !selectedResourcePath || !isEditing() || selectedTileIndex === undefined) return
   const before = tileDocument.toString()
   if (!removeTileSlice(tileDocument, selectedTileIndex)) return
-  commitText(tilePath, before, tileDocument.toString())
+  // 工具书 V6 p43：切片序号禁止跳号；删中间切片后顺延重排，并同步同目录 css 中 *_IMG=素材名,序号 的引用。
+  const shifted = new Map([...tileDocument.renumberSections("IMG")].map(([from, to]) => [from.slice(3), to.slice(3)]))
+  const changes: Change[] = [{ kind: "text", path: tilePath, before, after: tileDocument.toString() }]
+  const directory = selectedResourcePath.slice(0, selectedResourcePath.lastIndexOf("/") + 1)
+  const stem = selectedResourcePath.slice(directory.length).replace(/\.png$/i, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const reference = new RegExp(`^(\\s*[A-Z_]*IMG\\s*=\\s*${stem}\\s*,\\s*)(\\d+)`, "gim")
+  for (const path of shifted.size ? archive.names() : []) {
+    if (!path.startsWith(directory) || path.slice(directory.length).includes("/") || !/\.css$/i.test(path) || !archive.isText(path)) continue
+    const text = archive.getText(path)
+    const next = text.replace(reference, (_, prefix: string, index: string) => prefix + (shifted.get(index) ?? index))
+    if (next !== text) changes.push({ kind: "text", path, before: text, after: next })
+  }
+  commitBatch(changes)
   setSourceValue(tileDocument.toString())
   slices = tileSlices(tileDocument)
   selectedTileIndex = undefined
@@ -8253,7 +8421,7 @@ function renderFiles(): void {
     const disclosure = document.createElement("details")
     disclosure.className = "nav-group"
     disclosure.dataset.overviewGroup = title
-    disclosure.open = overviewGroupState.get(title) ?? title === "键盘布局"
+    disclosure.open = overviewGroupState.get(title) ?? ["皮肤", "资源配置", "键盘布局"].includes(title)
     disclosure.addEventListener("toggle", () => overviewGroupState.set(title, disclosure.open))
     const summary = document.createElement("summary")
     summary.className = "nav-section"
@@ -8307,9 +8475,9 @@ function renderFiles(): void {
     className: "nav-overview",
     icon: "info.circle",
   })
-  if (archive.format === "bda") {
-    entries.push({ group: "皮肤信息", label: "效果预览", path: `${theme.value}/skin/demo.png`, className: "nav-overview", icon: "photo" })
-  }
+  // BDA 的 demo 在主题目录下，其他格式放在包根；条目只在文件存在时才显示。
+  const demoPath = archive.names().includes(`${theme.value}/skin/demo.png`) ? `${theme.value}/skin/demo.png` : "demo.png"
+  entries.push({ group: archive.format === "bda" ? "皮肤信息" : "皮肤", label: "效果预览", path: demoPath, className: "nav-overview", icon: "photo" })
 
   const iniTypes: Record<string, Omit<NavEntry, "path">> = {
     "bh.ini": { group: "键盘布局", label: "笔画键盘", className: "nav-layout", icon: "pencil" },
@@ -9462,6 +9630,10 @@ for (const menu of toolbarMenus) {
     if ((event.target as Element).closest("button")) menu.open = false
   })
 }
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || event.isComposing) return
+  for (const menu of toolbarMenus) menu.open = false
+})
 newButton.addEventListener("click", () => void startNewDocument())
 openButton.addEventListener("click", () => {
   if (isTauri()) void runFileOperation("打开", openNative)
@@ -10032,7 +10204,7 @@ function aiDesignErrorMessage(error: unknown): string {
   return `AI 设计失败：${raw}`
 }
 
-async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promise<AiChatRunResult> {
+async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks, files: readonly File[]): Promise<AiChatRunResult> {
   if (!isTauri()) {
     throw new Error("AI 设计当前仅在桌面应用中可用。")
   }
@@ -10080,9 +10252,11 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks): Promis
       files: aiEditableProjectFiles(target, panelScope),
       images: aiEditableProjectImages(target, panelScope),
     }
-    const { runAiSkinDesign } = await import("./ai-design.ts")
+    const { aiDesignAttachments, runAiSkinDesign } = await import("./ai-design.ts")
+    const attachments = files.length ? await aiDesignAttachments(files) : undefined
     const result = await runAiSkinDesign(configuration, project, prompt, {
       imageModel: savedImageModel,
+      attachments,
       history: aiDesignConversation,
       variantCount: aiWantsVariants(prompt) ? 3 : 1,
       thinkingLevel: aiDesignThinking.value as "off" | "low" | "medium" | "high",
@@ -10560,7 +10734,7 @@ const initialCanvasBackground = savedCanvasBackground === "default"
   ? "glass"
   : canvasBackgroundValues.includes(savedCanvasBackground as CanvasBackground)
     ? savedCanvasBackground as CanvasBackground
-    : "white"
+    : "checkerboard"
 applyCanvasBackground(initialCanvasBackground)
 if (currentDeviceValue() === "canvas") device.value = canvasDeviceValue(initialCanvasBackground)
 canvasBackground.addEventListener("change", () => {
@@ -11606,6 +11780,7 @@ async function runLayoutImageReplace(): Promise<void> {
     applyLayoutImageRects(layoutDoc, plan.keys, plan.slices.map((slice) => slice.source), sourceWidth, sourceHeight)
   }
   applyLayoutImageStyles(layoutImageTarget, layoutDoc, stylesDoc, plan, base.split("/").pop()!)
+  normalizeKeySections(layoutDoc)
   const pngPath = `${base}.png`
   const tilPath = `${base}.til`
   const targetPath = layoutPath
@@ -11758,6 +11933,10 @@ candidateArea.addEventListener("click", (event) => {
   }
   const path = toolbarStrip.dataset.path
   if (path) selectFile(path)
+})
+bindSlicePickerZoom(styleImagePicker, styleImagePickerCanvas, (factor) => {
+  pickerZoom = Math.min(MAX_SLICE_ZOOM, Math.max(MIN_SLICE_ZOOM, pickerZoom * factor))
+  drawImageSlicePicker()
 })
 styleImagePickerCanvas.addEventListener("click", (event) => {
   if (!isEditing()) return
@@ -11919,7 +12098,18 @@ newStyleForm.addEventListener("submit", (event) => {
   if (!Number.isFinite(currentMax) || numericID > currentMax) stylesDocument.set("GLOBAL", "STYLE_NUM", styleID)
   commitText(path, before, stylesDocument.toString())
   setSourceValue(stylesDocument.toString())
+  const applyTarget = newStyleApplyTarget
   newStyleDialog.close()
+  // 检查器缩略图传入的是行内克隆输入框（未挂载），只看是否可编辑。
+  if (applyTarget && !applyTarget.disabled) {
+    applyTarget.value = styleID
+    applyTarget.dispatchEvent(new Event("input", { bubbles: true }))
+    applyTarget.dispatchEvent(new Event("change", { bubbles: true }))
+    openStyleReferenceEditor(styleID)
+    refreshPreview()
+    updateDirty()
+    return
+  }
   selectedResourceGalleryPath = `STYLE${styleID}`
   selectStyleResource(styleID)
   refreshPreview()

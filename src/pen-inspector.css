@@ -469,7 +469,7 @@
   border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0003;
   transition: transform 150ms ease;
 }
-:root body .source #quick-inspector#quick-inspector label input[type="checkbox"]:checked { background: var(--accent, #526dff) !important; }
+:root body .source #quick-inspector#quick-inspector label input[type="checkbox"]:checked { border-color: transparent !important; background: var(--accent, #526dff) !important; }
 :root body .source #quick-inspector#quick-inspector label input[type="checkbox"]:checked::after { transform: translateX(14px); }
 :root body .source #quick-inspector#quick-inspector #bda-config-fields .style-reference-field:not(.fore-styles-reference-field) {
   display: grid !important; grid-template-columns: minmax(80px, 1fr) minmax(0, 1.4fr) !important;

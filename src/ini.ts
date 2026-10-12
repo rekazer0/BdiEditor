@@ -17,14 +17,42 @@ function splitLines(source: string): string[] {
   return source.match(/[^\r\n]*(?:\r\n|\n|\r|$)/g)?.filter(Boolean) ?? []
 }
 
+// 同一文本在一次交互中会被反复解析；缓存解析结果，返回时深拷贝行对象，保证各文档互不影响。
+const parseCache = new Map<string, Line[]>()
+const PARSE_CACHE_LIMIT = 64
+const cloneLines = (lines: Line[]): Line[] => lines.map((line) => ({ ...line }))
+const entryId = (section: string, key: string): string => `${section}\0${key}`
+
 export class IniDocument {
   private lines: Line[]
+  // get/set 每次交互调用数千次，按 段+键 建索引代替线性查找；结构变化时置空重建。
+  private index?: Map<string, Line>
+  private sectionList?: string[]
 
   private constructor(lines: Line[]) {
     this.lines = lines
   }
 
+  private invalidate(): void {
+    this.index = undefined
+    this.sectionList = undefined
+  }
+
+  private lookup(section: string, key: string): Line | undefined {
+    if (!this.index) {
+      this.index = new Map()
+      for (const line of this.lines) {
+        if (line.key === undefined || line.section === undefined) continue
+        const id = entryId(line.section, line.key)
+        if (!this.index.has(id)) this.index.set(id, line)
+      }
+    }
+    return this.index.get(entryId(section, key))
+  }
+
   static parse(source: string): IniDocument {
+    const cached = parseCache.get(source)
+    if (cached) return new IniDocument(cloneLines(cached))
     let section = ""
     const lines = splitLines(source).map((raw): Line => {
       const ending = raw.match(/(\r\n|\n|\r)$/)?.[1] ?? ""
@@ -50,15 +78,17 @@ export class IniDocument {
       }
       return { raw, ending }
     })
+    if (parseCache.size >= PARSE_CACHE_LIMIT) parseCache.delete(parseCache.keys().next().value!)
+    parseCache.set(source, cloneLines(lines))
     return new IniDocument(lines)
   }
 
   get(section: string, key: string): string | undefined {
-    return this.lines.find((line) => line.section === section && line.key === key)?.value
+    return this.lookup(section, key)?.value
   }
 
   set(section: string, key: string, value: string): boolean {
-    const line = this.lines.find((candidate) => candidate.section === section && candidate.key === key)
+    const line = this.lookup(section, key)
     if (line) {
       if (line.value === value) return false
       line.value = value
@@ -85,6 +115,7 @@ export class IniDocument {
       previous.raw += ending
     }
     const prefix = `${key}=`
+    this.invalidate()
     this.lines.splice(insertAt, 0, {
       raw: `${prefix}${value}${ending}`,
       ending,
@@ -99,6 +130,7 @@ export class IniDocument {
   remove(section: string, key: string): boolean {
     const index = this.lines.findIndex((line) => line.section === section && line.key === key)
     if (index < 0) return false
+    this.invalidate()
     this.lines.splice(index, 1)
     return true
   }
@@ -112,16 +144,18 @@ export class IniDocument {
   }
 
   sections(): string[] {
-    return [
+    this.sectionList ??= [
       ...new Set(
         this.lines
           .filter((line) => line.key === undefined && line.section !== undefined)
           .map((line) => line.section as string),
       ),
     ]
+    return [...this.sectionList]
   }
 
   appendSection(section: string, entries: readonly { key: string; value: string }[]): void {
+    this.invalidate()
     const ending = this.lines.find((line) => line.ending)?.ending ?? "\n"
     if (this.lines.length && this.lines.at(-1)?.ending === "") {
       const previous = this.lines.at(-1)!
@@ -144,6 +178,7 @@ export class IniDocument {
   removeSections(sections: readonly string[]): boolean {
     const selected = new Set(sections)
     const before = this.lines.length
+    this.invalidate()
     let section = ""
     this.lines = this.lines.filter((line) => {
       if (line.section !== undefined && line.key === undefined) section = line.section
@@ -152,7 +187,43 @@ export class IniDocument {
     return this.lines.length !== before
   }
 
+  /**
+   * 把 [PREFIX数字] 段按原序号顺序重排为连续序号（工具书 V6：KEY/IMG 等序号段禁止跳号），
+   * 起始序号保持 0 或 1。返回 旧段名→新段名 的映射（仅含改名的段）。
+   */
+  renumberSections(prefix: string): Map<string, string> {
+    const pattern = new RegExp(`^${prefix}(\\d+)$`)
+    const numbered = this.sections().flatMap((section) => {
+      const match = section.match(pattern)
+      return match ? [{ section, index: Number(match[1]) }] : []
+    }).sort((a, b) => a.index - b.index)
+    const start = Math.min(1, numbered[0]?.index ?? 1)
+    const renamed = new Map<string, string>()
+    numbered.forEach(({ section }, offset) => {
+      const next = `${prefix}${start + offset}`
+      if (next !== section) renamed.set(section, next)
+    })
+    if (!renamed.size) return renamed
+    this.invalidate()
+    for (const line of this.lines) {
+      const next = line.section !== undefined ? renamed.get(line.section) : undefined
+      if (!next) continue
+      if (line.key === undefined) line.raw = line.raw.replace(`[${line.section}]`, `[${next}]`)
+      line.section = next
+    }
+    return renamed
+  }
+
   toString(): string {
     return this.lines.map((line) => line.raw).join("")
   }
+}
+
+// 工具书 V6「皮肤制作规范」：KEY 段按序号连续排列，并回到 [PANEL] 修正 KEY_NUM。
+export function normalizeKeySections(document: IniDocument): Map<string, string> {
+  const renamed = document.renumberSections("KEY")
+  if (document.get("PANEL", "KEY_NUM") !== undefined) {
+    document.set("PANEL", "KEY_NUM", String(document.sections().filter((section) => /^KEY\d+$/.test(section)).length))
+  }
+  return renamed
 }

@@ -250,8 +250,6 @@
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
 }
 
 .scrollbar-active {
@@ -1250,7 +1248,8 @@ h2 {
   height: auto;
 }
 
-#preview-coordinates[data-crosshair="off"] .preview-crosshair {
+#preview-coordinates[data-crosshair="off"] .preview-crosshair,
+#preview-coordinates[data-crosshair="off"] .preview-snap-guides {
   display: none;
 }
 
@@ -1286,6 +1285,39 @@ h2 {
   width: 2px;
   height: 100%;
   transform: translate3d(calc(var(--crosshair-x) - 1px), 0, 0);
+}
+
+.preview-snap-guides {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.preview-snap-guides::before,
+.preview-snap-guides::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: none;
+  will-change: transform;
+}
+
+.preview-snap-guides::before {
+  width: 100%;
+  border-top: 1px dashed #ff9500;
+  transform: translate3d(0, var(--snap-y), 0);
+}
+
+.preview-snap-guides::after {
+  height: 100%;
+  border-left: 1px dashed #ff9500;
+  transform: translate3d(var(--snap-x), 0, 0);
+}
+
+#preview-coordinates[data-snap-y="true"] .preview-snap-guides::before,
+#preview-coordinates[data-snap-x="true"] .preview-snap-guides::after {
+  display: block;
 }
 
 #panel-viewport {
@@ -5162,20 +5194,18 @@ body:has(.canvas-wrap.empty) .workspace {
   min-width: 0;
 }
 
+/* 放大后可滚动：用 auto margin 居中，溢出时不会把左上角裁到滚动区外 */
 #style-image-picker {
   min-height: 0;
-  display: grid;
-  align-content: center;
-  justify-items: center;
+  display: flex;
+  flex-direction: column;
   overflow: auto;
   padding: 18px;
 }
 
 #style-image-picker-canvas {
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: calc(100dvh - 154px);
+  flex: none;
+  margin: auto auto 0;
   display: block;
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -5190,7 +5220,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 #style-image-picker-meta {
   display: block;
-  margin-top: 7px;
+  margin: 7px auto auto;
   color: var(--secondary);
   font-size: 11px;
 }
@@ -5200,6 +5230,8 @@ body:has(.canvas-wrap.empty) .workspace {
   inset: 0;
   width: min(960px, calc(100vw - 24px));
   max-width: none;
+  /* inset: 0 would otherwise stretch an auto height to max-height */
+  height: fit-content;
   max-height: calc(100dvh - 24px);
   margin: auto;
   padding: 0;

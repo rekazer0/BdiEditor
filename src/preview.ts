@@ -275,8 +275,7 @@ export function legacyHintText(
   direction: "center" | "up" | "down" | "left" | "right" | "hold",
 ): string {
   if (direction === "hold") {
-    return key.holdSymbols.split(/[,|]/).map((value) => value.trim()).join("") ||
-      (/^F\d+$/i.test(key.hold) ? "" : key.hold)
+    return key.holdSymbols || (/^F\d+$/i.test(key.hold) ? "" : key.hold)
   }
   return !/^F\d+$/i.test(key[direction]) ? key[direction] : ""
 }
@@ -299,9 +298,8 @@ export function legacyHintCandidates(
   }
   const values = direction === "up"
     ? [key.up, key.left, key.center, key.right, key.down]
-    : key.holdSymbols.includes(",") || key.holdSymbols.includes("|")
-      ? key.holdSymbols.split(/[,|]/).map((value) => value.trim())
-      : [...key.holdSymbols || key.hold]
+    // HOLDSYM 是无分隔符的字符集（工具书 V6 p154），"," 和 "|" 本身也是候选字符。
+    : [...key.holdSymbols || key.hold]
   return [...new Set(values.filter((value) => value && !/^F\d+$/i.test(value)))]
 }
 
@@ -1210,6 +1208,14 @@ export function dynamicToolbarRect(
   }
 }
 
+// PERSIST（工具书 V6 p158）：0 都不显示，1 无候选字时，2 有候选字时，3 都显示；未写按 1。
+export function persistVisible(persist: string | undefined, composing: boolean): boolean {
+  const value = persist?.trim()
+  if (value === "0") return false
+  if (value === "3") return true
+  return composing === (value === "2")
+}
+
 export function previewItems(
   document: IniDocument,
   panelWidth = DEFAULT_PANEL_WIDTH,
@@ -1222,7 +1228,7 @@ export function previewItems(
     : listItems(document, defaults)
   const real = document.sections().flatMap((section) => {
     if (/^TIP\d+$/i.test(section)) return []
-    if (persistentOnly !== (document.get(section, "PERSIST") === "2")) return []
+    if (!persistVisible(document.get(section, "PERSIST"), persistentOnly)) return []
     const item = itemFromSection(document, section)
     return item ? [item] : []
   })
@@ -1235,7 +1241,7 @@ export function previewItems(
   return [...sections.flatMap((section) => {
     if (
       /^TIP\d+$/.test(section) ||
-      persistentOnly !== (document.get(section, "PERSIST") === "2")
+      !persistVisible(document.get(section, "PERSIST"), persistentOnly)
     ) return []
     const backStyle = document.get(section, "BACK_STYLE")?.split(",")[0] ?? ""
     // CAND.FORE_STYLE styles runtime candidate words; it is not a static
@@ -1434,6 +1440,7 @@ export class Preview {
   private lastDrawnID = 0
   private drawQueued = 0
   private renderPending = false
+  private renderInFlight: Promise<void> = Promise.resolve()
   private renderAgain = false
   private hintVisible = false
   private dragDrawFrame = 0
@@ -1592,6 +1599,11 @@ export class Preview {
     this.selected = new Set(sections)
     if (!sections.length) this.mobileMultiSelect = false
     void this.draw()
+  }
+
+  /** Settles once the render already in flight (if any) has drawn the canvas. */
+  rendered(): Promise<void> {
+    return this.renderInFlight.catch(() => undefined)
   }
 
   /** Marks (or clears) the keys a pending AI draft would change. */
@@ -2435,7 +2447,7 @@ export class Preview {
       return
     }
     this.renderPending = true
-    void this.render().finally(() => {
+    this.renderInFlight = this.render().finally(() => {
       this.renderPending = false
       if (this.renderAgain) {
         this.renderAgain = false
@@ -2823,12 +2835,15 @@ export class Preview {
     if (toolbarRect && toolbarImages.length) {
       const slotWidth = toolbarRect.width / toolbarImages.length
       toolbarImages.forEach((visual, index) => {
+        // 工具栏图标常是 @3x 大图（如 121px），按槽位等比缩小，只缩不放。
+        const [, , sw, sh] = visual.source ?? [0, 0, slotWidth, toolbarRect.height]
+        const scale = Math.min(1, slotWidth / sw, toolbarRect.height / sh)
         this.drawVisual(context, visual, {
-          x: toolbarRect.x + index * slotWidth,
-          y: toolbarRect.y,
-          width: slotWidth,
-          height: toolbarRect.height,
-        }, false)
+          x: toolbarRect.x + index * slotWidth + (slotWidth - sw * scale) / 2,
+          y: toolbarRect.y + (toolbarRect.height - sh * scale) / 2,
+          width: sw * scale,
+          height: sh * scale,
+        }, true)
       })
     }
 

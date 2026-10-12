@@ -493,3 +493,8 @@
   color: var(--pin-ink-faint) !important;
 }
 
+
+/* Document cards have no left gutter, so the marker would sit on the label text. */
+:root body .source #quick-inspector#quick-inspector #document-fields .pin-dot {
+  display: none !important;
+}

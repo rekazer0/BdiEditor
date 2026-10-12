@@ -1,5 +1,5 @@
 import type { AiSkinImageDraft } from "./ai-skin-images.ts"
-import { IniDocument } from "./ini.ts"
+import { IniDocument, normalizeKeySections } from "./ini.ts"
 
 export type AiSkinFileSyntax = "ini" | "json"
 
@@ -11,7 +11,6 @@ export type AiSkinEditableFile = {
 
 export type AiSkinWorkspaceLimits = {
   maxChangedFiles: number
-  maxMutations: number
   maxReadChars: number
   maxTotalChars: number
 }
@@ -22,7 +21,6 @@ export type AiSkinDraftChange = AiSkinTextDraft | AiSkinImageDraft
 
 const defaultLimits: AiSkinWorkspaceLimits = {
   maxChangedFiles: 8,
-  maxMutations: 64,
   maxReadChars: 40_000,
   maxTotalChars: 2_000_000,
 }
@@ -41,12 +39,10 @@ export class AiSkinWorkspace {
   private readonly original = new Map<string, string>()
   private readonly readPaths = new Set<string>()
   private readonly limits: AiSkinWorkspaceLimits
-  private mutationCount = 0
 
   constructor(files: readonly AiSkinEditableFile[], limits: Partial<AiSkinWorkspaceLimits> = {}) {
     this.limits = {
       maxChangedFiles: positiveInteger(limits.maxChangedFiles, defaultLimits.maxChangedFiles),
-      maxMutations: positiveInteger(limits.maxMutations, defaultLimits.maxMutations),
       maxReadChars: positiveInteger(limits.maxReadChars, defaultLimits.maxReadChars),
       maxTotalChars: positiveInteger(limits.maxTotalChars, defaultLimits.maxTotalChars),
     }
@@ -126,6 +122,39 @@ export class AiSkinWorkspace {
     return true
   }
 
+  addIniSection(path: string, section: string, entries: readonly { key: string; value: string }[]): string {
+    const file = this.requireFile(path)
+    if (file.syntax !== "ini") throw new Error("该工具只能修改 INI 配置")
+    this.requireRead(path)
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(section)) throw new Error("配置节名称无效")
+    for (const entry of entries) {
+      singleLine("配置键", entry.key, 512)
+      singleLine("配置值", entry.value)
+    }
+    const document = IniDocument.parse(file.text)
+    if (document.sections().includes(section)) throw new Error(`配置节已存在：${section}`)
+    document.appendSection(section, entries)
+    const renamed = normalizeKeySections(document)
+    const style = Number(section.match(/^STYLE(\d+)$/)?.[1])
+    const styleCount = Number(document.get("GLOBAL", "STYLE_NUM"))
+    if (style > styleCount) document.set("GLOBAL", "STYLE_NUM", String(style))
+    this.applyMutation(file, document.toString())
+    return renamed.get(section) ?? section
+  }
+
+  removeIniSections(path: string, sections: readonly string[]): Record<string, string> {
+    const file = this.requireFile(path)
+    if (file.syntax !== "ini") throw new Error("该工具只能修改 INI 配置")
+    this.requireRead(path)
+    const document = IniDocument.parse(file.text)
+    const missing = sections.filter((section) => !document.sections().includes(section))
+    if (missing.length) throw new Error(`配置节不存在：${missing.join("、")}`)
+    document.removeSections(sections)
+    const renamed = normalizeKeySections(document)
+    this.applyMutation(file, document.toString())
+    return Object.fromEntries(renamed)
+  }
+
   replaceText(path: string, oldText: string, newText: string, expectedOccurrences = 1): number {
     const file = this.requireFile(path)
     this.requireRead(path)
@@ -170,7 +199,6 @@ export class AiSkinWorkspace {
 
   private applyMutation(file: AiSkinEditableFile, next: string): void {
     if (next === file.text) return
-    if (this.mutationCount >= this.limits.maxMutations) throw new Error("已达到本轮修改次数上限")
     const changed = new Set(this.changes().map((change) => change.path))
     if (next === this.original.get(file.path)) changed.delete(file.path)
     else changed.add(file.path)
@@ -181,6 +209,5 @@ export class AiSkinWorkspace {
     )
     if (total > this.limits.maxTotalChars) throw new Error("修改后的项目超过文本大小上限")
     file.text = next
-    this.mutationCount += 1
   }
 }

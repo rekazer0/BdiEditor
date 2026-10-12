@@ -133,6 +133,31 @@ export function createAtlasWorkspace(actions: {
     event.preventDefault()
     zoomBy(event.deltaY < 0 ? 1.1 : 1 / 1.1)
   }, { passive: false })
+  // 拖动空白处、中键拖动或按住空格拖动可平移图集；捕获阶段拦截，避免触发切片选择
+  let spaceHeld = false
+  let pan: { x: number; y: number; left: number; top: number } | undefined
+  addEventListener("keydown", event => {
+    if (event.code === "Space" && !(event.target as Element).closest?.("input, textarea, select, [contenteditable]")) spaceHeld = true
+  })
+  addEventListener("keyup", event => { if (event.code === "Space") spaceHeld = false })
+  addEventListener("blur", () => { spaceHeld = false })
+  wrap.addEventListener("pointerdown", event => {
+    const background = event.target === wrap || (event.target as Element).id === "workspace-image-figure"
+    if (!desktopActive || !(event.button === 1 || event.button === 0 && (spaceHeld || background))) return
+    event.preventDefault()
+    event.stopPropagation()
+    pan = { x: event.clientX, y: event.clientY, left: wrap.scrollLeft, top: wrap.scrollTop }
+    wrap.setPointerCapture(event.pointerId)
+    wrap.classList.add("atlas-panning")
+  }, { capture: true })
+  wrap.addEventListener("pointermove", event => {
+    if (!pan) return
+    wrap.scrollLeft = pan.left - (event.clientX - pan.x)
+    wrap.scrollTop = pan.top - (event.clientY - pan.y)
+  })
+  const endPan = () => { pan = undefined; wrap.classList.remove("atlas-panning") }
+  wrap.addEventListener("pointerup", endPan)
+  wrap.addEventListener("pointercancel", endPan)
   new ResizeObserver(resize).observe(wrap)
   const media = matchMedia("(min-width: 1000px)")
   const update = (next: AtlasState) => {

@@ -1874,4 +1874,4 @@
 :root body .source #quick-inspector #document-fields .document-property-field > :is(span:first-child,.document-property-label) { font-size:11px !important; color:var(--pin-ink) !important; }
 /* 26px 的通用控件高度只描述普通字段的单行控件；样式引用的两个状态预览是卡片，
    必须跟着行高撑开，否则预览图会被压成顶部的一条细条。 */
-:root body .source #quick-inspector #document-fields .document-property-field :is(input,select,textarea,button):not(.style-picker-state) { height:26px !important; min-height:26px !important; font-size:11px !important; }
+:root body .source #quick-inspector #document-fields .document-property-field :is(input:not([type="checkbox"]),select,textarea,button):not(.style-picker-state) { height:26px !important; min-height:26px !important; font-size:11px !important; }

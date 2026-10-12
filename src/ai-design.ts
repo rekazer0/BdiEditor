@@ -14,7 +14,7 @@ import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generati
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy"
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy"
 import { Channel, invoke } from "@tauri-apps/api/core"
-import { AiSkinImages, type AiSkinImageFile } from "./ai-skin-images.ts"
+import { AiSkinImages, base64, type AiSkinImageFile } from "./ai-skin-images.ts"
 import { aiSkinSkill } from "./ai-skin-skill.ts"
 import { AiSkinWorkspace, type AiSkinDraftChange, type AiSkinEditableFile } from "./ai-skin-workspace.ts"
 import type { ModelProtocol } from "./model-providers.ts"
@@ -66,6 +66,36 @@ export type AiDesignVariant = {
 }
 
 export type AiDesignConversation = AgentMessage[]
+
+export type AiDesignAttachments = { images: ImageContent[]; text: string }
+
+const ATTACHMENT_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"])
+const ATTACHMENT_IMAGE_BYTES = 8 * 1024 * 1024
+const ATTACHMENT_TEXT_CHARS = 60_000
+
+/** Turns pasted/dropped files into model input: images as image parts, UTF-8 text files inlined into the prompt. */
+export async function aiDesignAttachments(files: readonly File[]): Promise<AiDesignAttachments> {
+  const images: ImageContent[] = []
+  const texts: string[] = []
+  for (const file of files) {
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    if (ATTACHMENT_IMAGE_TYPES.has(file.type)) {
+      if (bytes.length > ATTACHMENT_IMAGE_BYTES) throw new Error(`图片过大（超过 8MB）：${file.name}`)
+      images.push({ type: "image", data: base64(bytes), mimeType: file.type })
+      continue
+    }
+    let text: string
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+    } catch {
+      throw new Error(`暂不支持该附件，请附加图片或文本文件：${file.name}`)
+    }
+    if (text.includes("\0")) throw new Error(`暂不支持该附件，请附加图片或文本文件：${file.name}`)
+    const clipped = text.length > ATTACHMENT_TEXT_CHARS ? `${text.slice(0, ATTACHMENT_TEXT_CHARS)}\n…（已截断）` : text
+    texts.push(`附件「${contextText(file.name, 120)}」：\n\`\`\`\n${clipped}\n\`\`\``)
+  }
+  return { images, text: texts.join("\n\n") }
+}
 
 type StatusKind = "thinking" | "reading" | "editing" | "done"
 type ModelHttpEvent =
@@ -143,11 +173,12 @@ ${project.preview ? "本轮请求附带当前画布预览图（候选栏与面�
 已授权的配置文件（无需先枚举）：${project.files.map((file) => `${file.path} [${file.syntax}]`).join("、") || "无"}。
 
 视觉修改指南（请先阅读配置，再用最少的精确修改实现）：
-- 配色：优先沿用现有颜色字段和明暗语义，保证普通/高亮/禁用状态有足够对比度；不要凭空创建新的配置节。
+- 配色：优先沿用现有颜色字段和明暗语义，保证普通/高亮/禁用状态有足够对比度；纯配色调整不要新建配置节。
 - 字体：只调整已有 FONT_NAME、FONT_SIZE、NM_COLOR、HL_COLOR 等字段，保持按键动作、数量和几何不变。
 - 质感：通过已有背景样式、边框、圆角、阴影或样式引用统一风格。
 - 图片资源：${imageGuide(project, canGenerate)}
 - 布局：用户说“保留布局”时禁止修改位置、尺寸、间距、按键数量、动作和配置节结构；只改视觉属性。
+- 重排布局（例如“改为14键”“加一个按键”“去掉某键”）：这是允许的。先读完当前布局所有 KEY 节，规划新网格；用 set_ini_value 改已有按键的 VIEW_RECT/TOUCH_RECT/动作，用 add_ini_section 新增按键（复制相邻同类按键的全部字段，只改几何、动作和样式引用），用 remove_ini_sections 删掉多余按键。新按键需要新文字时，复制一个现有文字样式节为新的 STYLEn 并改 SHOW，再让按键 FORE_STYLE 指向它。按键之间不得重叠，整体不超出 [PANEL] SIZE。
 - 范围：默认只修改当前打开面板及其引用的样式；用户说“整个皮肤/全局/所有面板”时才检查全部相关配置。
 - 不要因为某个字段不在当前布局文件里就放弃：先按下面的格式技能追踪样式引用，到样式表中找到真正的来源。
 - 验证：每次写入前必须 read_project_file；修改完成后复读关键片段并在总结中说明影响范围。
@@ -159,18 +190,19 @@ ${aiSkinSkill(project.format)}
 2. read_ini_sections：按配置节名直接读取 INI/CSS 中的若干节，适合在大样式表中定位 [STYLEN]。读取后即可修改该文件。
 3. set_ini_value：在已有 INI 配置节中新增配置键，或修改已有键。适用于 BDI/BDS 的 .ini/.css 配置。
 4. remove_ini_value：删除已有 INI 配置键。只有用户需求明确要求删除时才使用。
-5. replace_project_text：在 BDA JSON 中做唯一、精确的小片段替换；必须提供预期出现次数。不要用它重写整个文件。
-${project.images?.length ? `6. view_image：查看一张已授权 PNG 或其中一个切片，返回尺寸、切片列表、平均色和缩略图。
-7. recolor_image：把整张图或某个切片重新着色为目标颜色，保留明暗、光泽和透明度；默认不改灰白黑像素（如白色图标）。
-${canGenerate ? "8. generate_image：用图片生成模型按描述画一张新图，填入整张图或某个切片；默认按原切片的透明轮廓裁剪，保持按键形状。\n" : ""}` : ""}
+5. add_ini_section / remove_ini_sections：新增或删除整个 INI 配置节，仅用于用户要求增删按键、重排布局或需要新样式时。
+6. replace_project_text：在 BDA JSON 中做唯一、精确的小片段替换；必须提供预期出现次数。不要用它重写整个文件。
+${project.images?.length ? `7. view_image：查看一张已授权 PNG 或其中一个切片，返回尺寸、切片列表、平均色和缩略图。
+8. recolor_image：把整张图或某个切片重新着色为目标颜色，保留明暗、光泽和透明度；默认不改灰白黑像素（如白色图标）。
+${canGenerate ? "9. generate_image：用图片生成模型按描述画一张新图，填入整张图或某个切片；默认按原切片的透明轮廓裁剪，保持按键形状。\n" : ""}` : ""}
 安全要求：
-- 不存在创建或删除文件、新建图片文件、配置节以及执行 shell 的接口，不要尝试这些操作；已有图片只能通过图片工具修改像素。
+- 不存在创建或删除文件、新建图片文件以及执行 shell 的接口，不要尝试这些操作；已有图片只能通过图片工具修改像素。
 - 只能使用上面已授权的相对路径，禁止绝对路径和 ..。
-- 保持当前按键布局时，不得改几何、按键数量、动作或配置节结构。
+- 用户没有要求改布局时，不得改几何、按键数量、动作或配置节结构。
 - 优先修改少量颜色、字号、字体、样式引用和已有属性；保留未知字段及现有命名。
 - 工具修改只进入草稿，编辑器会在结束后统一校验并作为一次可撤销操作提交。
 - 如果无法安全完成，说明原因且不要做近似破坏性修改。
-- 需求中工具做不到的部分（例如按键动画、未配置生图模型时的新图案）用一句话说明，然后直接完成可行部分，不要反复权衡。
+- 需求中工具做不到的部分（例如 BDA 格式增删按键、按键动画、未配置生图模型时的新图案）用一句话说明，然后直接完成可行部分，不要反复权衡。
 - 用户要求整体换风格时，改动共享的样式或图片切片是预期行为，在总结中点明影响即可，不必为此犹豫。
 
 最终回复（给普通用户看）：
@@ -244,6 +276,37 @@ function toolsFor(workspace: AiSkinWorkspace, images: AiSkinImages, imageModel?:
     },
   }
 
+  const addIniSectionSchema = Type.Object({
+    path: Type.String({ description: "已授权的 INI/CSS 配置路径" }),
+    section: Type.String({ description: "新配置节名称，例如 KEY15 或 STYLE300" }),
+    entries: Type.Array(Type.Object({ key: Type.String(), value: Type.String() }), { maxItems: 80, description: "按顺序写入的键值" }),
+  })
+  const addIniSection: AgentTool<typeof addIniSectionSchema> = {
+    name: "add_ini_section",
+    label: "新增配置节",
+    description: "在 INI/CSS 末尾新增一个配置节（新按键 KEYn、新样式 STYLEn 等）。KEY 节会自动连续编号并同步 [PANEL] KEY_NUM，STYLE 节会同步 STYLE_NUM；返回实际节名。",
+    parameters: addIniSectionSchema,
+    executionMode: "sequential",
+    execute: async (_id, { path, section, entries }) => {
+      return jsonResult({ section: workspace.addIniSection(path, section, entries), path })
+    },
+  }
+
+  const removeIniSectionsSchema = Type.Object({
+    path: Type.String({ description: "已授权的 INI/CSS 配置路径" }),
+    sections: Type.Array(Type.String(), { minItems: 1, maxItems: 80 }),
+  })
+  const removeIniSections: AgentTool<typeof removeIniSectionsSchema> = {
+    name: "remove_ini_sections",
+    label: "删除配置节",
+    description: "删除已有配置节（例如重排布局时去掉多余按键）。KEY 节删除后会重新连续编号并同步 KEY_NUM，返回 旧节名→新节名 映射。",
+    parameters: removeIniSectionsSchema,
+    executionMode: "sequential",
+    execute: async (_id, { path, sections }) => {
+      return jsonResult({ renamed: workspace.removeIniSections(path, sections), path })
+    },
+  }
+
   const replaceProjectTextSchema = Type.Object({
     path: Type.String({ description: "已授权的 BDA JSON 配置路径" }),
     oldText: Type.String({ minLength: 1, maxLength: 50_000 }),
@@ -266,7 +329,7 @@ function toolsFor(workspace: AiSkinWorkspace, images: AiSkinImages, imageModel?:
     },
   }
 
-  const tools: AgentTool[] = [readFile, readIniSections, setIniValue, removeIniValue, replaceProjectText]
+  const tools: AgentTool[] = [readFile, readIniSections, setIniValue, removeIniValue, addIniSection, removeIniSections, replaceProjectText]
   if (!images.paths().length) return tools
 
   const imagePath = Type.String({ description: "已授权的 PNG 路径" })
@@ -383,12 +446,15 @@ const TOOL_LABELS: Record<string, string> = {
   read_ini_sections: "读取样式配置节",
   set_ini_value: "写入 INI 样式草稿",
   remove_ini_value: "写入删除属性草稿",
+  add_ini_section: "新增配置节草稿",
+  remove_ini_sections: "删除配置节草稿",
   replace_project_text: "写入 BDA 精确替换草稿",
+  dispatch_subagents: "派发子代理并行处理",
   view_image: "查看图片",
   recolor_image: "图片改色草稿",
   generate_image: "生成图片草稿",
 }
-const EDIT_TOOLS = new Set(["set_ini_value", "remove_ini_value", "replace_project_text", "recolor_image", "generate_image"])
+const EDIT_TOOLS = new Set(["set_ini_value", "remove_ini_value", "add_ini_section", "remove_ini_sections", "replace_project_text", "recolor_image", "generate_image"])
 
 function eventStatus(event: AgentEvent): { kind: StatusKind; text: string } | undefined {
   if (event.type === "agent_start") return { kind: "thinking", text: "AI 正在分析当前皮肤…" }
@@ -402,6 +468,34 @@ function eventStatus(event: AgentEvent): { kind: StatusKind; text: string } | un
   }
   if (event.type === "agent_end") return { kind: "done", text: "AI 已完成分析，正在校验修改…" }
   return undefined
+}
+
+const SUBAGENT_GUIDE = `子代理：
+- 任务复杂、可拆成互不重叠的部分时（例如重排整个布局并为多组按键新建样式、同时调整多块区域的配色与图片），用 dispatch_subagents 一次并行派发 2–4 个子任务以提速；简单任务直接自己完成，不要派发。
+- 子代理与你共享同一份草稿。派发前先读配置定好整体方案，在每个子任务说明里写清它负责的文件、配置节（或节号范围）、具体数值和目标效果；不同子任务不得修改同一个配置节或同一张图片的同一切片。
+- 新建配置节时给每个子任务分配不同的节号段（例如 STYLE300–319、STYLE320–339），避免撞号。
+- 子代理返回后复读关键配置节核对结果，必要时自己补齐，再给出最终回复。`
+
+const SUBAGENT_RULES = `你现在是主代理派发的子代理：只完成下面分配的子任务，只修改分配给你的配置节或图片，不要碰其他部分，不能再派发子代理。完成后用 1–3 句话汇报实际改了哪些配置节或图片及结果；无法完成时说明原因。`
+
+function subagentTool(
+  run: (tasks: Array<{ title: string; instructions: string }>, signal?: AbortSignal) => Promise<unknown>,
+): AgentTool {
+  const schema = Type.Object({
+    tasks: Type.Array(Type.Object({
+      title: Type.String({ description: "子任务的简短标题" }),
+      instructions: Type.String({ description: "完整、自包含的子任务说明：负责的文件与配置节、具体修改和目标效果" }),
+    }), { minItems: 1, maxItems: 4 }),
+  })
+  const tool: AgentTool<typeof schema> = {
+    name: "dispatch_subagents",
+    label: "派发子代理",
+    description: "把互不重叠的子任务并行派发给子代理，子代理拥有与你相同的读写工具并共享草稿；返回每个子任务的汇报。",
+    parameters: schema,
+    executionMode: "sequential",
+    execute: async (_id, { tasks }, signal) => jsonResult({ results: await run(tasks, signal) }),
+  }
+  return tool as unknown as AgentTool
 }
 
 function finalResponse(agent: Agent): string {
@@ -471,6 +565,8 @@ export async function runAiSkinDesign(
     thinkingLevel?: ThinkingLevel
     /** Saved image-generation model; without it the AI can only view and recolour images. */
     imageModel?: AiDesignConfiguration
+    /** Files the user pasted or dropped into the composer. */
+    attachments?: AiDesignAttachments
     signal?: AbortSignal
     onStatus?: (kind: StatusKind, text: string) => void
     onTextDelta?: (delta: string) => void | Promise<void>
@@ -521,26 +617,43 @@ export async function runAiSkinDesign(
 
   const imageAssets = new AiSkinImages(project.images ?? [])
   const tools = toolsFor(workspace, imageAssets, options.imageModel)
-  const allowedTools = new Set(tools.map((tool) => tool.name))
   let toolCalls = 0
-  const agent = new Agent({
-    initialState: {
-      systemPrompt: systemPrompt(project, Boolean(options.imageModel)),
-      model,
-      thinkingLevel,
-      tools,
-      messages: [...(options.history ?? [])],
-    },
-    streamFn: models.streamSimple.bind(models),
-    getApiKey: () => config.apiKey.trim(),
-    toolExecution: "sequential",
-    beforeToolCall: async ({ toolCall }) => {
-      toolCalls += 1
-      if (!allowedTools.has(toolCall.name)) return { block: true, reason: "该工具未获皮肤编辑器授权", terminate: true }
-      return undefined
-    },
-    maxRetryDelayMs: 10_000,
-  })
+  const createAgent = (systemPrompt: string, agentTools: AgentTool[], messages: AgentMessage[]) => {
+    const allowedTools = new Set(agentTools.map((tool) => tool.name))
+    return new Agent({
+      initialState: { systemPrompt, model, thinkingLevel, tools: agentTools, messages },
+      streamFn: models.streamSimple.bind(models),
+      getApiKey: () => config.apiKey.trim(),
+      toolExecution: "sequential",
+      beforeToolCall: async ({ toolCall }) => {
+        toolCalls += 1
+        if (!allowedTools.has(toolCall.name)) return { block: true, reason: "该工具未获皮肤编辑器授权", terminate: true }
+        return undefined
+      },
+      maxRetryDelayMs: 10_000,
+    })
+  }
+  const baseSystemPrompt = systemPrompt(project, Boolean(options.imageModel))
+  const images = [...(project.preview ? [project.preview] : []), ...(options.attachments?.images ?? [])]
+  const subagents = subagentTool(async (tasks, signal) => Promise.all(tasks.map(async (task, index) => {
+    // Subagents share this run's workspace, so their edits land in the same draft.
+    const child = createAgent(`${baseSystemPrompt}\n\n${SUBAGENT_RULES}`, tools, [])
+    const label = `子任务 ${index + 1}「${contextText(task.title, 24)}」`
+    const unsubscribeChild = child.subscribe((event) => {
+      const status = eventStatus(event)
+      if (status && status.kind !== "done") options.onStatus?.(status.kind, `${label} · ${status.text.replace(/^AI\s*/, "")}`)
+    })
+    const abortChild = () => child.abort()
+    signal?.addEventListener("abort", abortChild, { once: true })
+    try {
+      await child.prompt(`子任务：${task.title}\n\n${task.instructions}`, images.length ? images : undefined)
+      return { title: task.title, error: child.state.errorMessage || undefined, report: finalResponse(child) }
+    } finally {
+      signal?.removeEventListener("abort", abortChild)
+      unsubscribeChild()
+    }
+  })))
+  const agent = createAgent(`${baseSystemPrompt}\n\n${SUBAGENT_GUIDE}`, [...tools, subagents], [...(options.history ?? [])])
   let thinking = ""
   const unsubscribe = agent.subscribe(async (event) => {
     if (event.type === "message_update" && event.assistantMessageEvent.type === "thinking_delta") {
@@ -560,8 +673,10 @@ export async function runAiSkinDesign(
   // ponytail: one AI run is allowed at a time; replace fetch only for that run so every provider avoids WebView CORS.
   globalThis.fetch = nativeModelFetch
   try {
-    const images = project.preview ? [project.preview] : undefined
-    await agent.prompt(prompt.trim(), images)
+    const referenceCount = options.attachments?.images.length ?? 0
+    const referenceNote = referenceCount ? `用户附带了 ${referenceCount} 张参考图片${project.preview ? "（排在当前画布预览图之后）" : ""}。` : ""
+    const text = [prompt.trim(), referenceNote, options.attachments?.text].filter(Boolean).join("\n\n")
+    await agent.prompt(text, images.length ? images : undefined)
     if (options.signal?.aborted) throw new DOMException("AI 设计已取消", "AbortError")
     if (agent.state.errorMessage) throw new Error(agent.state.errorMessage)
     return {

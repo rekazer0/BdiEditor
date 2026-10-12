@@ -1,0 +1,32 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { IniDocument } from '../src/ini.ts'
+
+const SOURCE = '[PANEL]\nKEY_NUM=2\n[KEY1]\nVIEW_RECT=0,0,1,1\n[KEY1]\nVIEW_RECT=9,9,9,9\n[KEY3]\nX=1'
+
+test('indexed lookup keeps first-match semantics across mutations', () => {
+  const document = IniDocument.parse(SOURCE)
+  assert.equal(document.get('KEY1', 'VIEW_RECT'), '0,0,1,1')
+  assert.equal(document.set('KEY3', 'Y', '2'), true)
+  assert.equal(document.get('KEY3', 'Y'), '2')
+  assert.equal(document.remove('KEY1', 'VIEW_RECT'), true)
+  assert.equal(document.get('KEY1', 'VIEW_RECT'), '9,9,9,9')
+  document.appendSection('KEY4', [{ key: 'X', value: '4' }])
+  assert.equal(document.get('KEY4', 'X'), '4')
+  assert.deepEqual(document.renumberSections('KEY').get('KEY3'), 'KEY2')
+  assert.equal(document.get('KEY2', 'Y'), '2')
+  assert.equal(document.get('KEY3', 'X'), '4')
+  assert.deepEqual(document.sections(), ['PANEL', 'KEY1', 'KEY2', 'KEY3'])
+  assert.equal(document.removeSections(['KEY3']), true)
+  assert.equal(document.get('KEY3', 'X'), undefined)
+})
+
+test('cached parses are isolated from each other', () => {
+  const first = IniDocument.parse(SOURCE)
+  first.set('PANEL', 'KEY_NUM', '7')
+  first.sections().push('MUTATED')
+  const second = IniDocument.parse(SOURCE)
+  assert.equal(second.get('PANEL', 'KEY_NUM'), '2')
+  assert.equal(second.toString(), SOURCE)
+  assert.ok(!first.sections().includes('MUTATED'))
+})

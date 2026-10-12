@@ -14,3 +14,22 @@ test('read_ini_sections returns named style sections and unlocks writes', () => 
   assert.equal(workspace.setIniValue(path, 'STYLE72', 'SHOW', '你好'), 'updated')
   assert.match(workspace.changes()[0].after, /SHOW=你好/)
 })
+
+test('add_ini_section and remove_ini_sections keep KEY numbering and counters in sync', () => {
+  const ini = '[PANEL]\nKEY_NUM=2\n[KEY1]\nVIEW_RECT=0,0,10,10\n[KEY2]\nVIEW_RECT=10,0,10,10\n'
+  const css = '[GLOBAL]\nSTYLE_NUM=72\n[STYLE72]\nSHOW=ABC\n'
+  const workspace = new AiSkinWorkspace([
+    { path: 'p/py_9.ini', syntax: 'ini', text: ini },
+    { path: 'p/default.css', syntax: 'ini', text: css },
+  ])
+  assert.throws(() => workspace.addIniSection('p/py_9.ini', 'KEY9', []))
+  workspace.readFile('p/py_9.ini')
+  workspace.readFile('p/default.css')
+  assert.equal(workspace.addIniSection('p/py_9.ini', 'KEY9', [{ key: 'VIEW_RECT', value: '20,0,10,10' }]), 'KEY3')
+  assert.throws(() => workspace.addIniSection('p/py_9.ini', 'KEY3', []))
+  assert.deepEqual(workspace.removeIniSections('p/py_9.ini', ['KEY1']), { KEY2: 'KEY1', KEY3: 'KEY2' })
+  assert.equal(workspace.addIniSection('p/default.css', 'STYLE80', [{ key: 'SHOW', value: 'QW' }]), 'STYLE80')
+  const [layout, styles] = workspace.changes().sort((a, b) => b.path.localeCompare(a.path))
+  assert.equal(layout.after, '[PANEL]\nKEY_NUM=2\n[KEY1]\nVIEW_RECT=10,0,10,10\n[KEY2]\nVIEW_RECT=20,0,10,10\n')
+  assert.match(styles.after, /STYLE_NUM=80/)
+})

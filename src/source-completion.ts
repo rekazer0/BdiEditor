@@ -26,6 +26,12 @@ const iniValueOptions: Readonly<Record<string, readonly ValueOption[]>> = {
   NO_BLUR: [["0", "模糊输入"], ["1", "精确输入"]],
   LIST_ORDER: [["0", "纵向排列"], ["1", "横向排列"]],
   REMOVE: [["0", "动画结束后保留"], ["1", "动画结束后移除"]],
+  PERSIST: [["0", "都不显示"], ["1", "无候选字时显示"], ["2", "有候选字时显示"], ["3", "有无候选字都显示"]],
+  ANCHOR_TYPE: [["1", "左上"], ["2", "中上"], ["3", "右上"], ["4", "中左"], ["5", "正中"], ["6", "中右"], ["7", "左下"], ["8", "中下"], ["9", "右下"]],
+  USE_ALPHA: [["0", "不透明"], ["1", "半透明"], ["2", "全透明"]],
+  LIST_LEVEL: [["0", "主列表"], ["1", "副列表"]],
+  SCROLL_SIDE: [["0", "向内"], ["1", "向外"]],
+  ANIM_LEVEL: [["0", "置于按键下方"], ["1", "置于按键上方"]],
 }
 
 const jsonValueOptions: Readonly<Record<string, readonly ValueOption[]>> = {

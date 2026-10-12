@@ -101,7 +101,8 @@ export function bdaCompatibilityWarnings(archive: SkinArchive): string[] {
   const platform = bdaPlatform(archive)
   const declared = infoValue(archive, "SupportPlatform")
   const warnings: string[] = []
-  if (platform !== "unknown" && declared && declared !== (platform === "ios" ? "I" : "A")) {
+  // SupportPlatform 可组合（工具书 V6 p165：SWIA / IA），包含目标平台字母即可。
+  if (platform !== "unknown" && declared && !declared.toUpperCase().includes(platform === "ios" ? "I" : "A")) {
     warnings.push(`Info.txt 声明为 ${declared}，但配置属于 ${platform === "ios" ? "iOS" : "Android"} BDA`)
   }
   const encrypted = archive.zipEncryptedPaths().filter((path) => !path.endsWith("/"))
