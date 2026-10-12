@@ -791,6 +791,8 @@ type NativeImagePickerPayload = {
   selectedIndex?: number
   editable: boolean
   styleName?: string
+  // 有样式引用输入框时，切片窗口的返回回到样式库「全部样式」。
+  styleLibrary?: boolean
 }
 type NativeResourcePickerPayload = { path: string; dataURL: string }[]
 let nativeImagePickerPayload: NativeImagePickerPayload | undefined
@@ -4001,6 +4003,7 @@ function chooseStyleImageSlice(property: "NM_IMG" | "HL_IMG"): void {
   const current = stylesDocument?.get(`STYLE${selectedStyleID}`, property)?.split(",")[0]?.trim()
   const imagePath = resourceImagePaths(archive?.names() ?? [], theme.value, orientation.value)
     .find((candidate) => candidate.split("/").pop()?.replace(/\.png$/i, "") === current)
+  stylePickerTarget = undefined
   if (imagePath && target) openImageSlicePicker(imagePath, target)
   else if (target) openStyleImageResourceChooser(target)
 }
@@ -5573,6 +5576,8 @@ async function openStyleReferenceStateImage(
     }
   }
   const target = styleWriteTarget(targetSource, property, styleIDs)
+  stylePickerTarget = input
+  styleLibraryHighlighted = highlighted
   if (visual?.imagePath) openImageSlicePicker(visual.imagePath, target, visual.source)
   else openStyleImageResourceChooser(target)
 }
@@ -7692,6 +7697,7 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
     selectedIndex: pickerSelectedIndex,
     editable: isEditing(),
     styleName: imagePickerStyleName(target),
+    styleLibrary: Boolean(stylePickerTarget?.isConnected),
   }
   if ("__TAURI_INTERNALS__" in window) {
     if (styleImageDialog.open) styleImageDialog.close()
@@ -11995,6 +12001,11 @@ if (isTauri()) {
     pickerSelectedIndex = selected.index
     const name = pickerPath.split("/").pop()?.replace(/\.png$/i, "") ?? pickerPath
     updateSelectedImageReference(pickerTarget, `${name},${selected.index}`)
+  })
+  void listen("image-picker-back-styles", () => {
+    if (!stylePickerTarget?.isConnected) return
+    void WebviewWindow.getByLabel("image-picker").then((pickerWindow) => pickerWindow?.close())
+    openStylePicker(stylePickerTarget, styleLibraryHighlighted)
   })
   void listen("image-picker-resources-request", () => {
     void emitTo("image-picker", "image-picker-resources-data", resourcePickerPayload())

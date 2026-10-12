@@ -11,6 +11,7 @@ type ImagePayload = {
   selectedIndex?: number
   editable: boolean
   styleName?: string
+  styleLibrary?: boolean
 }
 
 type ResourcePayload = { path: string; dataURL: string }[]
@@ -114,8 +115,9 @@ function showSliceView(): void {
   resourceView.hidden = true
   search.hidden = true
   back.hidden = !imagePayload
-  backLabel.textContent = "全部图片"
-  back.setAttribute("aria-label", "切换至全部图片")
+  backLabel.textContent = imagePayload?.styleLibrary ? "全部样式" : "全部图片"
+  back.setAttribute("aria-label", `返回${backLabel.textContent}`)
+  if (imagePayload) title.textContent = imagePayload.path.split("/").pop() ?? imagePayload.path
   styleName.hidden = !styleName.textContent
   subtitle.hidden = true
   setWindowTitle("图片切片")
@@ -141,7 +143,6 @@ function showResourceList(): void {
 
 function showImage(payload: ImagePayload): void {
   imagePayload = payload
-  title.textContent = payload.path.split("/").pop() ?? payload.path
   styleName.textContent = payload.styleName ?? ""
   showSliceView()
   meta.textContent = `${payload.slices.length ? "点击图片中的切片以修改引用" : "此图片没有可用的 TIL 切片"} · ⌘/Ctrl + 滚轮或双指捏合缩放`
@@ -160,7 +161,8 @@ function showImage(payload: ImagePayload): void {
 document.title = "图片切片"
 showEmptyView()
 back.addEventListener("click", () => {
-  if (view === "image") showResourceList()
+  if (view === "image" && imagePayload?.styleLibrary && isTauri) void emitTo("main", "image-picker-back-styles")
+  else if (view === "image") showResourceList()
   else if (imagePayload) showSliceView()
 })
 search.addEventListener("input", filterResources)
