@@ -36,6 +36,7 @@ export function decodeAiffPcm(bytes: Uint8Array): DecodedSound {
   let bits = 0
   let sampleRate = 0
   let littleEndian = false
+  let float = false
   let soundOffset = -1
   let soundLength = 0
   for (let offset = 12; offset + 8 <= bytes.length;) {
@@ -51,7 +52,10 @@ export function decodeAiffPcm(bytes: Uint8Array): DecodedSound {
       const mantissa = view.getUint32(start + 10) * 2 ** 32 + view.getUint32(start + 14)
       sampleRate = mantissa * 2 ** (exponent - 16383 - 63)
       const compression = size >= 22 ? text(start + 18, 4) : "NONE"
-      if (compression !== "NONE" && compression !== "sowt") throw new Error(`不支持的 AIFC 编码：${compression}`)
+      // Float AIFC (fl32/fl64) is what macOS tools such as afconvert write by default.
+      float = /^fl(?:32|64)$/i.test(compression)
+      if (float) bits = compression.endsWith("32") ? 32 : 64
+      else if (compression !== "NONE" && compression !== "sowt") throw new Error(`不支持的 AIFC 编码：${compression}`)
       littleEndian = compression === "sowt"
     } else if (id === "SSND" && size >= 8) {
       const dataOffset = view.getUint32(start)
@@ -60,7 +64,7 @@ export function decodeAiffPcm(bytes: Uint8Array): DecodedSound {
     }
     offset = start + size + (size & 1)
   }
-  if (!channels || !frames || !sampleRate || soundOffset < 0 || ![8, 16, 24, 32].includes(bits)) {
+  if (!channels || !frames || !sampleRate || soundOffset < 0 || ![8, 16, 24, 32].includes(bits) && !(float && bits === 64)) {
     throw new Error("AIFF 缺少可播放的 PCM 数据")
   }
   const bytesPerSample = bits / 8
@@ -70,7 +74,8 @@ export function decodeAiffPcm(bytes: Uint8Array): DecodedSound {
     for (let channel = 0; channel < channels; channel++) {
       const offset = soundOffset + (frame * channels + channel) * bytesPerSample
       let sample: number
-      if (bits === 8) sample = view.getInt8(offset) / 128
+      if (float) sample = bits === 32 ? view.getFloat32(offset) : view.getFloat64(offset)
+      else if (bits === 8) sample = view.getInt8(offset) / 128
       else if (bits === 16) sample = view.getInt16(offset, littleEndian) / 32768
       else if (bits === 24) {
         const value = littleEndian

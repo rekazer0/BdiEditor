@@ -5,6 +5,7 @@ import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { SkinArchive } from '../src/skin.ts'
 import { convertBdaArchive } from '../src/bda-convert.ts'
 import { bdaSoundResourceType, updateBdaKeySound } from '../src/bda.ts'
+import { decodeAiffPcm } from '../src/sounds.ts'
 
 const ogg = new Uint8Array(readFileSync(new URL('./fixtures/click.ogg', import.meta.url)))
 
@@ -19,6 +20,21 @@ function aiff(frames = 32) {
   view.setUint16(28, 0x400d); view.setUint32(30, 0xac440000); view.setUint32(34, 0)
   ascii(38, 'SSND'); view.setUint32(42, ssndLength)
   for (let frame = 0; frame < frames; frame++) view.setInt16(54 + frame * 2, frame % 2 ? 8000 : -8000)
+  return bytes
+}
+
+// 32-bit float AIFC, as written by macOS afconvert (seen in real skins with .aif key sounds)
+function aifcFloat32(samples = [0.5, -0.25, 1, -1]) {
+  const ssndLength = 8 + samples.length * 4
+  const bytes = new Uint8Array(12 + 8 + 24 + 8 + ssndLength)
+  const view = new DataView(bytes.buffer)
+  const ascii = (offset, text) => [...text].forEach((char, index) => { bytes[offset + index] = char.charCodeAt(0) })
+  ascii(0, 'FORM'); view.setUint32(4, bytes.length - 8); ascii(8, 'AIFC')
+  ascii(12, 'COMM'); view.setUint32(16, 24); view.setUint16(20, 1); view.setUint32(22, samples.length); view.setUint16(26, 32)
+  view.setUint16(28, 0x400d); view.setUint32(30, 0xac440000); view.setUint32(34, 0)
+  ascii(38, 'fl32'); ascii(42, '\x00\x00')
+  ascii(44, 'SSND'); view.setUint32(48, ssndLength)
+  samples.forEach((sample, index) => view.setFloat32(60 + index * 4, sample))
   return bytes
 }
 
@@ -50,6 +66,22 @@ test('BDI → BDS encodes AIFF key sounds as Ogg Vorbis and keeps the BOM', asyn
   assert.ok(isOgg(files['res/tap.ogg']))
   assert.deepEqual([...files['res/default.css'].subarray(0, 3)], [0xef, 0xbb, 0xbf])
   assert.equal(strFromU8(files['res/default.css']).replace(/^\ufeff/, ''), '[STYLE1]\r\nPRESS_SOUND_PATH=tap.ogg\r\n')
+})
+
+test('float AIFC decodes and converts to Ogg for BDS', async () => {
+  const decoded = decodeAiffPcm(aifcFloat32())
+  assert.equal(decoded.sampleRate, 22050)
+  assert.deepEqual([...decoded.channelData[0]], [0.5, -0.25, 1, -1])
+  const archive = SkinArchive.open(zipSync({
+    'skin/port/py_9.ini': strToU8('[PANEL]\nSOUND_STYLE=1\n'),
+    'skin/res/default.css': strToU8('[STYLE1]\nPRESS_SOUND_PATH=tap.aif\n'),
+    'skin/res/tap.aif': aifcFloat32(Array.from({ length: 2048 }, (_, i) => Math.sin(i / 8) / 2)),
+  }), 'bdi')
+  const warnings = []
+  const files = unzipSync(await archive.toBytesAsync('bds', warnings))
+  assert.deepEqual(warnings, [])
+  assert.ok(isOgg(files['res/tap.ogg']))
+  assert.match(strFromU8(files['res/default.css']), /^PRESS_SOUND_PATH=tap\.ogg$/m)
 })
 
 test('BDI → BDS reuses a bundled Ogg sibling instead of transcoding', async () => {
