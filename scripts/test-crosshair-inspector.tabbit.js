@@ -34,7 +34,8 @@ for (const width of [1280, 390]) {
   if (width === 390) await page.locator('[data-mobile-pane="inspector"]').first().click();
   await expect(page.locator('[data-key-field="x"]')).toBeVisible();
   assert(await page.locator('#quick-inspector').evaluate(n => n.scrollWidth <= n.clientWidth), 'inspector must not overflow');
-  const buttons = await tabs.locator('button:visible').evaluateAll(nodes => nodes.map(n => n.getBoundingClientRect().top));
-  assert(buttons.every(top => Math.abs(top - buttons[0]) < 1), 'categories share one row');
+  // 分类在桌面端和手机端都是检查器右侧的一列竖排轨道。
+  const buttons = await tabs.locator('button:visible').evaluateAll(nodes => nodes.map(n => n.getBoundingClientRect().left));
+  assert(buttons.length > 1 && buttons.every(left => Math.abs(left - buttons[0]) < 1), 'categories share one column');
 }
-return { passed: true, checks: ['blank canvas tracking', 'captured pan tracking', 'tracking after release', 'category switching', 'compact headings', 'desktop and mobile overflow'] };
+return { passed: true, checks: ['blank canvas tracking', 'captured pan tracking', 'tracking after release', 'category switching', 'compact headings', 'categories in one rail', 'desktop and mobile overflow'] };

@@ -4,6 +4,12 @@ import type { TileSlice } from "./tiles.ts"
 const MAX_CANVAS_SIDE = 8192
 export const MIN_SLICE_ZOOM = 1
 export const MAX_SLICE_ZOOM = 8
+// 没有 TIL 切片时整张图作为唯一可选项，引用写成不带序号的图片名
+export const WHOLE_IMAGE_INDEX = -1
+
+export function pickableSlices(slices: TileSlice[], image: HTMLImageElement): TileSlice[] {
+  return slices.length ? slices : [{ index: WHOLE_IMAGE_INDEX, source: [0, 0, image.naturalWidth, image.naturalHeight] }]
+}
 
 // 画布像素按 devicePixelRatio 分配，切片线和文字在高分屏上不再被拉伸发虚。
 // cssScale 为每个原图像素对应的 CSS 像素；返回画布像素 / 原图像素，供点击换算。
@@ -44,7 +50,7 @@ export function drawSlicePicker(
     context.strokeStyle = selected ? colors.selected : colors.normal
     // 描边落在整像素内侧，线条锐利且相邻切片不互相覆盖
     context.strokeRect(left + lineWidth / 2, top + lineWidth / 2, Math.max(0, right - left - lineWidth), Math.max(0, bottom - top - lineWidth))
-    const label = `IMG${slice.index}`
+    const label = slice.index === WHOLE_IMAGE_INDEX ? "整张图" : `IMG${slice.index}`
     context.fillStyle = context.strokeStyle
     context.fillRect(left, top, context.measureText(label).width + 6 * dpr, Math.round(15 * dpr))
     context.fillStyle = "#fff"

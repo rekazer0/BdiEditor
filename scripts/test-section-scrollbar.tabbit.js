@@ -21,6 +21,8 @@ await expect(nav).toHaveCSS('opacity', '1');
 await nav.getByRole('button', {name: '[TIP3] · 第 99 行', exact: true}).click();
 await expect(nav.locator('[aria-current="true"]')).toHaveAttribute('title', '[TIP3] · 第 99 行');
 assert(await page.evaluate(() => window.sectionTestEditor.view.scrollDOM.scrollTop > 500));
+// 悬停时标记保持可见；指针离开后才淡出。
+await page.mouse.move(5, 5);
 await expect(nav).toHaveCSS('opacity', '0');
 await page.evaluate(() => {
   const control = document.querySelector('#source-section-scrollbar');

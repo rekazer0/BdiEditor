@@ -5,8 +5,6 @@
 :root body #settings-dialog .settings-title-cluster { display: flex; align-items: center; gap: 8px; min-width: 0; }
 :root body #settings-dialog h2 { margin: 0; font-size: 15px; font-weight: 600; }
 :root body #settings-dialog .settings-title-cluster > .system-symbol { width: 15px; height: 15px; }
-:root body #settings-dialog .settings-title-separator { color: var(--tertiary); font: 11.5px var(--font-mono); }
-#settings-crumb { color: var(--secondary); font-size: 12.5px; }
 :root body #settings-dialog #settings-close { width: 28px; height: 28px; padding: 0; border: 0; background: transparent; color: var(--secondary); font-size: 22px; }
 :root body #settings-dialog .settings-layout { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 0; overflow: hidden; }
 /* 侧栏与内部控件跟随 --content：材质打开时它是玻璃下沉层，材质关闭时仍是原来的 #f4f5f8，
@@ -17,10 +15,8 @@
 :root body #settings-dialog .settings-nav-item[hidden], :root body #settings-dialog [hidden] { display: none !important; }
 :root body #settings-dialog .settings-nav-item > span:nth-child(2) { white-space: nowrap; }
 :root body #settings-dialog .settings-nav-item small { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tertiary); font-size: 10.5px; }
-:root body #settings-dialog .settings-nav-item[aria-selected="true"] { background: var(--selection-soft); color: var(--text); }
-:root body #settings-dialog .settings-nav-item[aria-selected="true"]::after { content: ''; margin-left: auto; width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--selection); }
-/* 有摘要时摘要已靠右，圆点紧随其后，不再平分剩余空间。 */
-:root body #settings-dialog .settings-nav-item[aria-selected="true"]:has(small:not(:empty))::after { margin-left: 0; }
+:root body #settings-dialog .settings-nav-item[aria-selected="true"] { border-color: transparent; background: var(--pen-accent-soft); color: var(--pen-accent); font-weight: 500; }
+:root body #settings-dialog .settings-nav-item[aria-selected="true"] small { color: inherit; opacity: .75; }
 :root body #settings-dialog .settings-content { padding: 24px; overflow: auto; }
 :root body #settings-dialog .settings-section { padding: 0; }
 :root body #settings-dialog .settings-section-heading { gap: 4px; margin-bottom: 18px; }
@@ -31,6 +27,7 @@
 :root body #settings-dialog .settings-subheading small { color: var(--tertiary); font: 10.5px var(--font-mono); letter-spacing: .4px; }
 :root body #settings-dialog .settings-row { display: flex; justify-content: space-between; gap: 16px; min-height: 50px; padding: 10px 0; border: 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
 :root body #settings-dialog .settings-row > span:first-child { font-weight: 500; }
+:root body #settings-dialog .settings-row > span:first-child small { display: block; margin-top: 2px; color: var(--tertiary); font-size: 11px; font-weight: 400; }
 :root body #settings-dialog select { height: 30px; border: 1px solid var(--line); border-radius: 8px; background-color: var(--content); font-size: 11.5px; }
 :root body #settings-dialog .settings-segmented { display: flex; align-items: center; width: fit-content; height: 32px; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--content); }
 :root body #settings-dialog .settings-segmented button { height: 24px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: var(--secondary); font-size: 11.5px; white-space: nowrap; }
@@ -40,21 +37,21 @@
 :root body #settings-dialog .settings-storage-note { margin: 18px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--content); color: var(--secondary); font: 10.5px/1.6 var(--font-mono); }
 :root body #settings-dialog .settings-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px; border-top: 1px solid var(--line); }
 #settings-save-state { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--content); font-size: 11.5px; }
-#settings-save-state[data-dirty="true"] { background: var(--selection-soft); }
+#settings-save-state[data-dirty="true"] { background: var(--pen-accent-soft); color: var(--pen-accent); }
 #settings-save-state .settings-state-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--state-ok); }
-#settings-save-state[data-dirty="true"] .settings-state-dot { background: var(--selection); }
+#settings-save-state[data-dirty="true"] .settings-state-dot { background: var(--pen-accent); }
 #settings-saved-at { color: var(--secondary); font: 10.5px var(--font-mono); }
 :root body #settings-dialog .settings-footer-actions { display: flex; gap: 8px; }
 :root body #settings-dialog .settings-footer-actions button { height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; }
-:root body #settings-dialog .settings-footer-actions .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-:root body #settings-dialog :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:root body #settings-dialog .settings-footer-actions .primary { background: var(--pen-accent); color: var(--pen-on-brand); border-color: var(--pen-accent); }
+:root body #settings-dialog :focus-visible { outline: 2px solid var(--pen-accent); outline-offset: 2px; }
 /* 大模型：上方为模型列表，下方编辑选中项；所有输入控件同宽，标签不换行。 */
 :root body #settings-dialog .settings-model-add { display: inline-flex; align-items: center; gap: 4px; height: 26px; margin-left: auto; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--content); color: var(--text); font-size: 11.5px; font-weight: 500; }
 :root body #settings-dialog .settings-model-add .system-symbol { width: 13px; height: 13px; }
 .model-profiles { display: grid; gap: 6px; margin: 0 0 14px; padding: 0; list-style: none; }
 .model-profiles li { display: flex; align-items: center; gap: 4px; }
 :root body #settings-dialog .model-profile { flex: 1; min-width: 0; height: auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; row-gap: 2px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--content); color: var(--text); text-align: left; }
-:root body #settings-dialog .model-profile[aria-pressed="true"] { border-color: var(--selection); background: var(--selection-soft); }
+:root body #settings-dialog .model-profile[aria-pressed="true"] { border-color: var(--pen-accent); background: var(--pen-accent-soft); }
 .model-profile strong, .model-profile small { grid-column: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .model-profile strong { font: 600 12.5px var(--font-mono); }
 .model-profile small { color: var(--secondary); font-size: 11px; }

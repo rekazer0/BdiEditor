@@ -35,6 +35,10 @@ const context = vm.createContext({
   sizeStyleStateCanvas: () => false,
   visualResolver: () => ({ resolve: async (id, highlighted) => ({ id, highlighted }) }),
   drawVisualPreview: (canvas, layers) => drawn.push(layers),
+  styleConfigDocument: () => undefined,
+  styleKind: () => 'image',
+  styleKindBadge: () => new Element('span'),
+  openStyleReferenceEditor: () => {},
   openStylePicker: target => { pickerTarget = target },
   openStyleReferenceStateImage: async (target, styleKey, highlighted) => {
     sliceCalls.push({ styleID: target.value, key: styleKey, highlighted })

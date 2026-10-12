@@ -41,3 +41,10 @@ test('image model validation requires address, key and model only when one is co
   assert.match(validateImageModel({ ...image, apiUrl: 'ark' }), /http/)
   assert.equal(providers.imageModelPreset('minimax-image').model, 'image-01')
 })
+
+test('legacy credentials are removed only after the migrated configuration is saved', () => {
+  const text = readFileSync(new URL('../src/model-settings.ts', import.meta.url), 'utf8')
+  const persist = text.slice(text.indexOf('async function persist'), text.indexOf('async function load'))
+  assert.ok(persist.indexOf('save_model_configuration') < persist.indexOf('localStorage.removeItem'))
+  assert.match(text.slice(text.indexOf('async function load')), /catch \(error\)[\s\S]*?读取配置失败/)
+})

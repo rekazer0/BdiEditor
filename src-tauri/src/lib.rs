@@ -752,13 +752,14 @@ fn read_file_bytes(path: &str) -> Result<Vec<u8>, String> {
 
 /// 皮肤动辄十几 MB：必须走二进制 IPC，把 `Vec<u8>` 序列化成 JSON 数字数组会额外产生
 /// 数倍体积的字符串和上亿个数字对象，既慢又占内存。
+/// 读写大文件的命令都用 async：同步命令跑在主线程，会卡住窗口拖动与点击。
 #[tauri::command]
-fn read_file(path: String) -> Result<tauri::ipc::Response, String> {
+async fn read_file(path: String) -> Result<tauri::ipc::Response, String> {
     read_file_bytes(&path).map(tauri::ipc::Response::new)
 }
 
 #[tauri::command]
-fn skin_file_size(path: String) -> Result<u64, String> {
+async fn skin_file_size(path: String) -> Result<u64, String> {
     let size = fs::metadata(path).map_err(|error| error.to_string())?.len();
     if size > MAX_ARCHIVE_BYTES {
         return Err("skin file exceeds 64 MB".into());
@@ -766,8 +767,20 @@ fn skin_file_size(path: String) -> Result<u64, String> {
     Ok(size)
 }
 
+/// 最近打开缩略图的缓存戳：大小 + 修改时间(ms)，任一变化即视为文件已改。
 #[tauri::command]
-fn read_skin_file(
+async fn skin_file_stamp(path: String) -> Result<[u64; 2], String> {
+    let metadata = fs::metadata(path).map_err(|error| error.to_string())?;
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map_or(0, |duration| duration.as_millis() as u64);
+    Ok([metadata.len(), modified])
+}
+
+#[tauri::command]
+async fn read_skin_file(
     path: String,
     progress: tauri::ipc::Channel<[u64; 2]>,
 ) -> Result<tauri::ipc::Response, String> {
@@ -794,7 +807,7 @@ fn read_skin_file(
 }
 
 #[tauri::command]
-fn write_file(path: String, data: Vec<u8>) -> Result<(), String> {
+async fn write_file(path: String, data: Vec<u8>) -> Result<(), String> {
     fs::write(path, data).map_err(|error| error.to_string())
 }
 
@@ -1570,6 +1583,7 @@ pub fn run() {
     let builder = builder.invoke_handler(tauri::generate_handler![
         read_file,
         skin_file_size,
+        skin_file_stamp,
         read_skin_file,
         write_file,
         append_client_log,
@@ -1602,6 +1616,7 @@ pub fn run() {
     let builder = builder.invoke_handler(tauri::generate_handler![
         read_file,
         skin_file_size,
+        skin_file_stamp,
         read_skin_file,
         write_file,
         append_client_log,

@@ -8,7 +8,7 @@
 }
 /* Transparency is UI-only: CSS never paints checker pixels into exported artwork. */
 :root body :is(#style-picker-grid .style-picker-previews, #style-library-preview-image,
-  .resource-style-previews, .style-image-gallery-item, #style-image-picker-canvas) {
+  .resource-style-previews, #style-image-picker-canvas) {
   background-image: var(--preview-checker) !important;
   background-size: var(--preview-check-size) var(--preview-check-size) !important;
   background-color: var(--preview-check-light) !important;

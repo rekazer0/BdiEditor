@@ -59,7 +59,7 @@ export function createAtlasWorkspace(actions: {
   const createDialog = document.createElement("dialog")
   createDialog.id = "atlas-create-dialog"
   createDialog.className = "app-dialog"
-  createDialog.innerHTML = '<form method="dialog"><h2>新建图片</h2><label>名称<input name="name" aria-label="图片名称" value="image.png" required></label><div class="inspector-grid geometry-fields"><label>宽<input name="width" aria-label="图片宽度" type="number" min="1" max="8192" value="512" required></label><label>高<input name="height" aria-label="图片高度" type="number" min="1" max="8192" value="512" required></label></div><div class="dialog-actions"><button type="submit" value="cancel" formnovalidate>取消</button><button type="submit" value="create">创建</button></div></form>'
+  createDialog.innerHTML = '<form method="dialog"><header><h2>新建图片</h2><p>创建一张透明 PNG，之后可在画布中添加切片。</p></header><label>名称<input name="name" aria-label="图片名称" value="image.png" required></label><div class="atlas-create-size"><label>宽<input name="width" aria-label="图片宽度" type="number" min="1" max="8192" value="512" required></label><label>高<input name="height" aria-label="图片高度" type="number" min="1" max="8192" value="512" required></label></div><footer><button type="submit" value="cancel" formnovalidate>取消</button><button class="primary" type="submit" value="create">创建</button></footer></form>'
   createDialog.querySelector("form")!.addEventListener("submit", event => {
     if ((event as SubmitEvent).submitter?.getAttribute("value") !== "create") return
     const data = new FormData(createDialog.querySelector("form")!)
@@ -90,14 +90,15 @@ export function createAtlasWorkspace(actions: {
   get("#tile-preview-wrap").after(reference)
   const sourceHeading = document.createElement("h3")
   sourceHeading.className = "atlas-source-heading"
-  sourceHeading.textContent = "SOURCE"
+  sourceHeading.textContent = "切片区域"
   get("#tile-source-fields").before(sourceHeading)
   const stretch = document.createElement("label")
   stretch.className = "atlas-stretch"
   stretch.innerHTML = '<span>按九宫格拉伸</span><input type="checkbox" role="switch" aria-label="按九宫格拉伸">'
   const toggle = stretch.querySelector("input")!
   toggle.addEventListener("change", () => actions.stretch(toggle.checked))
-  get("#tile-inspector").append(stretch)
+  // 开关决定下方拉伸边距是否生效，放在边距字段之前
+  get("#tile-inner-title").before(stretch)
   const status = document.createElement("div")
   status.className = "atlas-status"
   status.setAttribute("role", "status")

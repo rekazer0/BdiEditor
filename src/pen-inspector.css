@@ -34,7 +34,7 @@
   --pin-ink: var(--pen-text, #14161b);
   --pin-ink-muted: var(--pen-secondary, #5a6070);
   --pin-ink-faint: var(--pen-tertiary, #8c93a1);
-  --pin-accent: var(--pen-accent, #2f6bff);
+  --pin-accent: var(--pen-accent, #3a6df0);
   --pin-accent-soft: var(--pen-accent-soft, #ebf1ff);
   --pin-surface: var(--pen-surface, #fff);
   --pin-sunken: var(--pen-surface-subtle, #f4f5f8);
@@ -522,7 +522,7 @@
   background: var(--selection-soft, #ffefe7);
 }
 :root body .source #quick-inspector[data-inspector-kind="bda"] .pin-actions-meta:not([data-count="0"]) {
-  color: var(--accent, #2f6bff);
+  color: var(--accent, #3a6df0);
   background: var(--accent-soft, #ebf1ff);
 }
 
@@ -530,7 +530,7 @@
   --pin-mark: var(--selection, #ff6b2c);
 }
 :root body .source #quick-inspector[data-inspector-kind="bda"] {
-  --pin-mark: var(--accent, #2f6bff);
+  --pin-mark: var(--accent, #3a6df0);
 }
 :root body .source #quick-inspector#quick-inspector .pin-dot {
   background: var(--pin-mark, var(--pin-accent)) !important;

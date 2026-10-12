@@ -39,3 +39,20 @@ test("切片窗口不再提供右侧的选择图片资源按钮", () => {
   assert.doesNotMatch(script, /choose-resource/)
   assert.doesNotMatch(main, /resource-picker-open/)
 })
+
+test("桌面端样式库在切片窗口内作为原生视图打开，切片返回直接切到全部样式", () => {
+  assert.match(main, /if \(isTauri\(\)\) \{\s*void showPickerWindow\("styles", "全部样式"/)
+  assert.match(main, /listen\("image-picker-back-styles", \(\) => void emitStyleLibrary\(true\)\)/)
+  assert.match(main, /styleLibrary: Boolean\(stylePickerTarget\),/)
+  assert.match(script, /listen<StyleLibraryPayload>\("style-library-data"/)
+  assert.match(html, /<section id="style-library-view"/)
+})
+
+test("没有 TIL 切片时整张图可像切片一样选中，引用写成不带序号的图片名", () => {
+  const canvas = readFileSync(new URL("../src/slice-picker-canvas.ts", import.meta.url), "utf8")
+  assert.match(canvas, /slices\.length \? slices : \[\{ index: WHOLE_IMAGE_INDEX, source: \[0, 0, image\.naturalWidth, image\.naturalHeight\] \}\]/)
+  assert.match(script, /tileSliceAt\(pickableSlices\(imagePayload\.slices, image\), point\)/)
+  assert.match(main, /return index === WHOLE_IMAGE_INDEX \? name : `\$\{name\},\$\{index\}`/)
+  // 底部说明栏已删除，画布区域铺满窗口。
+  assert.doesNotMatch(html, /picker-meta/)
+})

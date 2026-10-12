@@ -48,6 +48,11 @@
             <button type="button" role="menuitem" data-export-format="bda" data-bda-platform="ios" disabled><span class="system-symbol" data-system-symbol="square.and.arrow.down.badge.new" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/><circle class="fallback-dot" cx="16.2" cy="3.8" r="1.5"/></svg></span><span>导出新版 iOS 皮肤 (.bda)…</span></button>
             <button type="button" role="menuitem" data-export-format="bda" data-bda-platform="android" disabled><span class="system-symbol" data-system-symbol="square.and.arrow.down.badge.new" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/><circle class="fallback-dot" cx="16.2" cy="3.8" r="1.5"/></svg></span><span>导出新版 Android 皮肤 (.bda)…</span></button>
             <span class="toolbar-menu-separator" role="separator"></span>
+            <span class="toolbar-menu-label">工具 · 编辑模式可用</span>
+            <button id="panel-scale" type="button" role="menuitem" disabled><span class="system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"></span><span>面板复制…</span></button>
+            <button id="replace-layout-image" type="button" role="menuitem" disabled><span class="system-symbol" data-system-symbol="photo.badge.arrow.down" aria-hidden="true"></span><span>替换键盘样式…</span></button>
+            <button id="adapt-ios26" type="button" role="menuitem" disabled><span class="system-symbol" data-system-symbol="iphone.gen3.badge.checkmark" aria-hidden="true"></span><span>适配 iOS 26 透明背景…</span></button>
+            <span class="toolbar-menu-separator" role="separator"></span>
             <button id="mobile-share" type="button" role="menuitem" disabled title="分享皮肤" aria-label="分享皮肤"><span class="system-symbol" data-system-symbol="square.and.arrow.up" aria-hidden="true"></span><span>分享皮肤</span></button>
             <span class="toolbar-menu-separator" role="separator"></span>
             <button id="undo" type="button" role="menuitem" disabled title="撤销" aria-label="撤销"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12"/><path d="M4 8.5h7.2a5 5 0 0 1 5 5"/></svg></span><span>撤销</span></button>
@@ -56,9 +61,6 @@
             <button type="button" role="menuitem" data-app-dialog="settings"><span class="system-symbol" data-system-symbol="gearshape" aria-hidden="true"></span><span>设置</span></button>
           </div>
         </details>
-        <button id="panel-scale" type="button" class="titlebar-icon-button" disabled title="面板复制" aria-label="面板复制"><span class="system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"></span></button>
-        <button id="replace-layout-image" type="button" class="titlebar-icon-button" disabled title="替换键盘样式" aria-label="替换键盘样式"><span class="system-symbol" data-system-symbol="photo.badge.arrow.down" aria-hidden="true"></span></button>
-        <button id="adapt-ios26" type="button" class="titlebar-icon-button" disabled title="适配 iOS 26 透明背景" aria-label="适配 iOS 26 透明背景"><span class="system-symbol" data-system-symbol="iphone.gen3.badge.checkmark" aria-hidden="true"></span></button>
         <span class="spacer" data-tauri-drag-region></span>
       </div>
       <div class="titlebar-center">
@@ -107,33 +109,6 @@
             </span>
           </button>
         </div>
-        <template id="legacy-app-menu" hidden>
-        <details class="toolbar-more app-more">
-          <summary class="titlebar-icon-button" title="更多操作" aria-label="更多操作"><span class="system-symbol" data-system-symbol="line.3.horizontal" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" /></svg></span></summary>
-          <div class="toolbar-menu app-actions" role="menu" aria-label="更多操作">
-            <button id="new" type="button" role="menuitem" title="新建皮肤" aria-label="新建皮肤"><span class="system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14"/></svg></span><span>新建皮肤…</span></button>
-            <button id="open" type="button" role="menuitem" title="打开皮肤" aria-label="打开皮肤"><span class="system-symbol" data-system-symbol="folder" aria-hidden="true"></span><span>打开皮肤…</span></button>
-            <button id="save" type="button" role="menuitem" disabled title="保存皮肤" aria-label="保存皮肤"><span class="system-symbol" data-system-symbol="externaldrive" aria-hidden="true"></span><span>保存皮肤</span></button>
-            <span class="toolbar-menu-separator" role="separator"></span>
-            <span class="toolbar-menu-label">导出</span>
-            <button type="button" role="menuitem" data-export-format="bdi" disabled><span class="system-symbol" data-system-symbol="square.and.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/></svg></span><span>导出 iOS 皮肤 (.bdi)…</span></button>
-            <button type="button" role="menuitem" data-export-format="bds" disabled><span class="system-symbol" data-system-symbol="square.and.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/></svg></span><span>导出 Android 皮肤 (.bds)…</span></button>
-            <button type="button" role="menuitem" data-export-format="bda" data-bda-platform="ios" disabled><span class="system-symbol" data-system-symbol="square.and.arrow.down.badge.new" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/><circle class="fallback-dot" cx="16.2" cy="3.8" r="1.5"/></svg></span><span>导出新版 iOS 皮肤 (.bda)…</span></button>
-            <button type="button" role="menuitem" data-export-format="bda" data-bda-platform="android" disabled><span class="system-symbol" data-system-symbol="square.and.arrow.down.badge.new" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/><circle class="fallback-dot" cx="16.2" cy="3.8" r="1.5"/></svg></span><span>导出新版 Android 皮肤 (.bda)…</span></button>
-            <span class="toolbar-menu-separator" role="separator"></span>
-            <button id="mobile-share" type="button" role="menuitem" disabled title="分享皮肤" aria-label="分享皮肤"><span class="system-symbol" data-system-symbol="square.and.arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 13V3m-4 4 4-4 4 4M4 10v6h12v-6" /></svg></span><span>分享皮肤</span></button>
-            <span class="toolbar-menu-separator" role="separator"></span>
-            <button id="panel-scale" type="button" role="menuitem" disabled title="面板复制" aria-label="面板复制"><span class="system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 6h14M3 6l3-3M3 6l3 3M17 14H3m14 0-3-3m3 3-3 3"/></svg></span><span>面板复制</span></button>
-            <button id="replace-layout-image" type="button" role="menuitem" disabled title="替换键盘样式" aria-label="替换键盘样式"><span class="system-symbol" data-system-symbol="photo.badge.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="m4.5 14 4-4 3 3 2-2 2 2M10 2v6m-2-2 2 2 2-2"/></svg></span><span>替换键盘样式</span></button>
-            <button id="adapt-ios26" type="button" role="menuitem" disabled title="适配 iOS 26 透明背景" aria-label="适配 iOS 26 透明背景"><span class="system-symbol" data-system-symbol="iphone.gen3.badge.checkmark" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="5.5" y="2" width="9" height="16" rx="2.2"/><path d="m8 11 1.7 1.7L13 9.4M8.5 4h3"/></svg></span><span>适配 iOS 26 透明背景</span></button>
-            <span class="toolbar-menu-separator" role="separator"></span>
-            <button id="undo" type="button" role="menuitem" disabled title="撤销" aria-label="撤销"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12"/><path d="M4 8.5h7.2a5 5 0 0 1 5 5"/></svg></span><span>撤销</span></button>
-            <button id="redo" type="button" role="menuitem" disabled title="重做" aria-label="重做"><span class="system-symbol" data-system-symbol="arrow.uturn.forward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m13 5 4 3.5-4 3.5"/><path d="M16 8.5H8.8a5 5 0 0 0-5 5"/></svg></span><span>重做</span></button>
-            <span class="toolbar-menu-separator" role="separator"></span>
-            <button type="button" role="menuitem" data-app-dialog="settings"><span class="system-symbol" data-system-symbol="gearshape" aria-hidden="true"></span><span>设置</span></button>
-          </div>
-        </details>
-        </template>
       </div>
     </header>
 
@@ -212,13 +187,13 @@
                 <div class="welcome-section-head">
                   <h2>最近打开</h2>
                   <span id="welcome-recent-hint">还没有记录</span>
+                  <button id="recent-clear" class="welcome-head-action welcome-head-clear" type="button" hidden>清除记录</button>
                   <button id="welcome-recent-open" class="welcome-head-action" type="button"><span class="icon system-symbol" data-system-symbol="folder" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M2.8 15.3V6.7c0-.65.53-1.2 1.2-1.2h3.35l1.4 1.85h7.25c.67 0 1.2.55 1.2 1.2v6.75c0 .65-.53 1.2-1.2 1.2H4c-.67 0-1.2-.55-1.2-1.2z"/></svg></span>打开皮肤…</button>
                 </div>
                 <div id="welcome-recent-grid" class="recent-grid" hidden></div>
                 <div id="welcome-recent-empty" class="recent-grid-empty">
                   <span class="icon system-symbol" data-system-symbol="folder" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M2.8 15.3V6.7c0-.65.53-1.2 1.2-1.2h3.35l1.4 1.85h7.25c.67 0 1.2.55 1.2 1.2v6.75c0 .65-.53 1.2-1.2 1.2H4c-.67 0-1.2-.55-1.2-1.2z"/></svg></span>
                   <span class="recent-grid-empty-copy"><strong>还没有打开过皮肤</strong><span>拖入或选择 .bdi / .bds / .bda 文件，最近打开的皮肤会显示在这里。</span></span>
-                  <button id="welcome-recent-empty-open" type="button">打开皮肤…</button>
                 </div>
               </section>
               <header class="welcome-hero">
@@ -308,38 +283,12 @@
                 </div>
               </section>
 
-              <div class="welcome-open">
-                <span class="icon system-symbol welcome-open-icon" data-system-symbol="arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 13V4m-4 4 4-4 4 4M4 16h12"/></svg></span>
-                <div class="welcome-open-copy">
-                  <strong>拖入皮肤文件，或从磁盘选择</strong>
-                  <span>文件在本地处理，不上传；.bdi / .bds / .bda 自动识别平台与格式家族</span>
-                </div>
-                <button id="empty-open" type="button"><span class="icon system-symbol" data-system-symbol="folder" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M2.8 15.3V6.7c0-.65.53-1.2 1.2-1.2h3.35l1.4 1.85h7.25c.67 0 1.2.55 1.2 1.2v6.75c0 .65-.53 1.2-1.2 1.2H4c-.67 0-1.2-.55-1.2-1.2z"/></svg></span>打开皮肤…</button>
-              </div>
-
               <div class="welcome-note">
                 <span class="icon system-symbol" data-system-symbol="lightbulb" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 2.5a5 5 0 0 1 3 9.1V13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-1.4A5 5 0 0 1 10 2.5zM8 16.5h4"/></svg></span>
                 <p>新建后可在左侧切换 9 键 / 26 键布局；macOS 使用 ⌘ 单击多选按键，Windows 使用 Ctrl 单击。</p>
               </div>
             </div>
 
-            <aside class="welcome-aside">
-              <div class="welcome-aside-head">
-                <strong>最近打开</strong>
-                <button id="recent-clear" type="button" hidden>全部</button>
-              </div>
-              <div id="recent-list" class="recent-list"></div>
-              <p id="recent-empty" class="recent-empty">还没有打开过皮肤文件</p>
-
-              <div class="welcome-rule"></div>
-
-              <div class="welcome-spacer"></div>
-
-              <div class="device-tip">
-                <span>默认预览设备</span>
-                <strong>iPhone 17 Pro · 1206×2622</strong>
-              </div>
-            </aside>
           </div>
           <div id="device-shell" class="device-shell canvas-only" data-device="canvas" data-orientation="port">
             <div class="device-screen">
@@ -554,14 +503,14 @@
             <h3>样式</h3>
             <div class="inspector-grid appearance-fields">
               <div class="appearance-section appearance-visual-styles">
-                <div class="appearance-section-heading"><strong>样式引用</strong><span class="reference-hint">BACK_STYLE / FORE_STYLE</span></div>
+                <div class="appearance-section-heading"><strong>样式引用</strong></div>
                 <div class="appearance-reference-grid">
-                  <label class="style-ref-row" title="按键引用的共享背景样式编号"><span>背景样式 <small>（BACK_STYLE）</small></span>
+                  <label class="style-ref-row" title="按键引用的共享背景样式编号（BACK_STYLE）"><span>背景样式</span>
                     <span class="style-field">
                       <input data-key-field="BACK_STYLE" />
                     </span>
                   </label>
-                  <label class="style-ref-row" title="按键引用的共享前景样式编号"><span>前景样式 <small>（FORE_STYLE）</small></span>
+                  <label class="style-ref-row" title="按键引用的共享前景样式编号（FORE_STYLE）"><span>前景样式</span>
                     <span class="style-field">
                       <input data-key-field="FORE_STYLE" />
                     </span>
@@ -569,26 +518,26 @@
                 </div>
               </div>
               <div class="appearance-section appearance-sound-field">
-                <label title="按键引用的按键音效样式编号">按键音效
+                <label title="按键引用的按键音效样式编号（SOUND_STYLE）">按键音效
                   <span class="style-field">
                     <input data-key-field="SOUND_STYLE" />
                   </span>
                 </label>
               </div>
-              <details class="appearance-section appearance-layout-fields inspector-advanced" open>
-                <summary><strong>高级排布</strong><span class="reference-hint">STAT_STYLE / POS_TYPE</span><small class="reference-badge">进阶</small></summary>
+              <details class="appearance-section appearance-layout-fields inspector-advanced">
+                <summary><strong>高级排布</strong></summary>
                 <div class="appearance-property-grid">
-                  <label title="状态样式（S状态_样式，多组用 | 分隔；S0 表示无状态样式）">状态样式
+                  <label title="STAT_STYLE：S状态_样式，多组用 | 分隔；S0 表示无状态样式">状态样式
                     <span class="style-field">
                       <input data-key-field="STAT_STYLE" />
                     </span>
                   </label>
-                  <label title="每层前景偏移（x,y；多组用 ; 分隔）">前景偏移
+                  <label title="FORE_OFFSET：每层前景偏移 x,y，多组用 ; 分隔">前景偏移
                     <span class="style-field">
                       <input data-key-field="FORE_OFFSET" />
                     </span>
                   </label>
-                  <label title="每层前景位置类型（逗号分隔）">位置类型
+                  <label title="POS_TYPE：每层前景位置类型，逗号分隔">位置类型
                     <span class="style-field">
                       <input data-key-field="POS_TYPE" />
                     </span>
@@ -679,7 +628,7 @@
               <label>宽（SOURCE） <input data-tile-source="2" type="number" min="1" /></label>
               <label>高（SOURCE） <input data-tile-source="3" type="number" min="1" /></label>
             </div>
-            <h3 id="tile-inner-title">INNER_RECT（可选）</h3>
+            <h3 id="tile-inner-title">拉伸边距</h3>
             <div class="inspector-grid geometry-fields">
               <label>X（INNER_RECT） <input data-tile-inner="0" type="number" /></label>
               <label>Y（INNER_RECT） <input data-tile-inner="1" type="number" /></label>
@@ -781,19 +730,13 @@
         </header>
         <fieldset>
           <legend>默认模板</legend>
-          <label class="project-template-option">
-            <input type="radio" name="project-template" value="default-android" checked />
-            <span>
-              <strong>百度官方 Android BDA 默认皮肤</strong>
-              <small>官方 1080p 横竖屏样式与资源</small>
-            </span>
-          </label>
-          <label class="project-template-option"><input type="radio" name="project-template" value="official-android-bds" /><span><strong>百度官方 Android BDS 默认皮肤</strong><small>官方旧格式 480px 横竖屏布局</small></span></label>
-          <label class="project-template-option"><input type="radio" name="project-template" value="oppo-swipe-down" /><span><strong>OPPO皮肤加下滑功能</strong><small>互联网整理 BDS 皮肤</small></span></label>
-          <label class="project-template-option"><input type="radio" name="project-template" value="oppo-dual-color" /><span><strong>OPPO默认双色皮肤</strong><small>互联网整理 BDS 皮肤</small></span></label>
-          <label class="project-template-option"><input type="radio" name="project-template" value="iqoo-rounded-black" /><span><strong>IQOO提取圆角黑色</strong><small>互联网整理 BDS 皮肤</small></span></label>
-          <label class="project-template-option"><input type="radio" name="project-template" value="xiaomi-unified-rounded-blur" /><span><strong>小米默认皮肤(统一颜色键盘版3)_适配圆角模糊</strong><small>互联网整理 BDS 皮肤</small></span></label>
-          <label class="project-template-option"><input type="radio" name="project-template" value="huawei-swipe-symbols-1080" /><span><strong>华为提取上滑符号1080</strong><small>互联网整理 BDS 皮肤</small></span></label>
+          <label class="project-template-option"><input type="radio" name="project-template" value="default-android" checked /><span><strong>百度 BDA 默认</strong><small>官方 · 新版 .bda 格式</small></span></label>
+          <label class="project-template-option"><input type="radio" name="project-template" value="official-android-bds" /><span><strong>百度 BDS 旧版</strong><small>官方 · 经典 .bds 皮肤</small></span></label>
+          <label class="project-template-option"><input type="radio" name="project-template" value="xiaomi-unified-rounded-blur" /><span><strong>小米统一圆角</strong><small>互联网整理 · .bds</small></span></label>
+          <label class="project-template-option"><input type="radio" name="project-template" value="oppo-dual-color" /><span><strong>OPPO 双色</strong><small>互联网整理 · .bds</small></span></label>
+          <label class="project-template-option"><input type="radio" name="project-template" value="iqoo-rounded-black" /><span><strong>iQOO 圆角黑</strong><small>互联网整理 · .bds</small></span></label>
+          <label class="project-template-option"><input type="radio" name="project-template" value="huawei-swipe-symbols-1080" /><span><strong>华为滑动符号</strong><small>互联网整理 · .bds</small></span></label>
+          <label class="project-template-option"><input type="radio" name="project-template" value="oppo-swipe-down" /><span><strong>OPPO 皮肤加下滑</strong><small>互联网整理 · .bds</small></span></label>
         </fieldset>
         <footer>
           <button value="cancel">取消</button>
@@ -856,9 +799,7 @@
           <h2 id="ios26-title">适配 iOS 26</h2>
           <p>为全部浅色、深色及横竖屏键盘和符号面板添加透明背景。</p>
         </header>
-        <div class="project-template-option">
-          <span><strong>透明背景</strong><small>透明化键盘、候选栏和次选区，不修改颜文字、剪贴板等功能页。</small></span>
-        </div>
+        <p class="dialog-note">将透明化键盘、候选栏和次选区；颜文字、剪贴板等功能页保持不变。</p>
         <footer><button value="cancel">取消</button><button class="primary" value="apply">开始适配</button></footer>
       </form>
     </dialog>
@@ -874,19 +815,9 @@
         <div class="style-image-actions">
           <button id="style-image-resource-open" type="button">选择图片资源</button>
           <button id="style-image-source" class="toolbar-button" type="button" title="跳转至源代码" aria-label="跳转至样式源代码" hidden><span class="icon system-symbol" data-system-symbol="doc.text" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v5h5M9 12h6M9 16h6"/></svg></span></button>
-          <button id="style-image-more" class="toolbar-button" type="button" title="更多样式" aria-label="展示全部样式" aria-expanded="false" hidden><span class="icon system-symbol" data-system-symbol="square.grid.2x2" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></span></button>
           <button id="style-image-close" class="toolbar-button" type="button" title="关闭" aria-label="关闭图片预览"><span class="icon system-symbol" data-system-symbol="xmark" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></span></button>
         </div>
       </header>
-      <canvas id="style-image-preview" width="480" height="260"></canvas>
-      <section id="style-image-gallery" class="style-image-gallery" aria-label="全部样式" hidden>
-        <div class="style-image-gallery-toolbar">
-          <label class="search-control" aria-label="搜索全部样式"><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"></span><input id="style-image-gallery-search" type="search" results="0" placeholder="搜索样式编号"></label>
-          <output id="style-image-gallery-count"></output>
-        </div>
-        <div id="style-image-gallery-grid" class="style-picker-grid"></div>
-        <p id="style-image-gallery-empty" class="style-picker-empty" hidden>没有匹配的样式</p>
-      </section>
       <div id="style-image-picker" hidden>
         <canvas id="style-image-picker-canvas" width="720" height="420" aria-label="原始图片切片选择器"></canvas>
         <small id="style-image-picker-meta">点击图片中的切片以修改引用</small>
@@ -909,7 +840,7 @@
 
     <dialog id="layout-image-dialog" class="app-dialog layout-image-dialog" aria-labelledby="layout-image-title" aria-describedby="layout-image-scope">
       <form id="layout-image-form" method="dialog">
-        <header><div><h2 id="layout-image-title">替换键盘样式</h2><small id="layout-image-layout"></small></div><button value="cancel" aria-label="关闭">关闭</button></header>
+        <header><h2 id="layout-image-title">替换键盘样式</h2><small id="layout-image-layout"></small></header>
         <button id="layout-image-file" class="layout-image-file" type="button" autofocus>
           <img id="layout-image-preview" alt="待切片的键盘图片预览" hidden>
           <span class="system-symbol layout-image-file-icon" data-system-symbol="photo.badge.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="m4.5 14 4-4 3 3 2-2 2 2M10 2v6m-2-2 2 2 2-2"/></svg></span>
@@ -942,7 +873,7 @@
 
     <dialog id="new-style-dialog" class="app-dialog new-style-dialog" aria-labelledby="new-style-title">
       <form id="new-style-form" method="dialog">
-        <header><h2 id="new-style-title">新增样式</h2><button value="cancel" aria-label="关闭">关闭</button></header>
+        <header><h2 id="new-style-title">新增样式</h2><p>输入一个未使用的样式序号。</p></header>
         <label>样式序号 <input id="new-style-id" type="number" min="0" step="1" required></label>
         <p id="new-style-error" class="field-error" hidden></p>
         <footer><button class="secondary" value="cancel">取消</button><button id="new-style-submit" class="primary" value="create">创建</button></footer>
@@ -952,7 +883,7 @@
     <dialog id="style-picker-dialog" class="style-picker-dialog glass-module" aria-labelledby="style-picker-title">
       <header class="style-picker-header">
         <div>
-          <div class="style-library-title"><h2 id="style-picker-title">样式与图片</h2><small id="style-picker-count" aria-live="polite"></small></div>
+          <div class="style-library-title"><h2 id="style-picker-title">全部样式</h2><small id="style-picker-count" aria-live="polite"></small></div>
           <span class="style-picker-hint">单击预览 · 双击应用 · Command/Ctrl 单击编辑</span>
         </div>
         <div class="style-picker-tools">
@@ -996,7 +927,7 @@
 
     <dialog id="settings-dialog" class="app-dialog" aria-labelledby="settings-title">
       <form method="dialog">
-        <header><div class="settings-title-cluster"><span class="system-symbol" data-system-symbol="slider.horizontal.3" aria-hidden="true"></span><h2 id="settings-title">设置</h2><span class="settings-title-separator">/</span><span id="settings-crumb">外观</span></div><button id="settings-close" type="button" aria-label="关闭设置">×</button></header>
+        <header><div class="settings-title-cluster"><span class="system-symbol" data-system-symbol="slider.horizontal.3" aria-hidden="true"></span><h2 id="settings-title">设置</h2></div><button id="settings-close" type="button" aria-label="关闭设置">×</button></header>
         <div class="settings-layout">
           <nav class="settings-sidebar" role="tablist" aria-label="设置分类">
             <div class="settings-group-label">界面</div>
@@ -1015,19 +946,14 @@
           <section class="settings-section settings-page" data-settings-panel="appearance" role="tabpanel" id="settings-panel-appearance" aria-labelledby="settings-appearance-title">
             <div class="settings-section-heading">
               <h3 id="settings-appearance-title">外观</h3>
-              <p>主题、强调色、界面密度与窗口材质即时生效，并同步到预览画布。</p>
+              <p>修改即时生效，点击“保存”后保留。</p>
             </div>
             <div class="settings-list">
-              <h4 class="settings-subheading">主题 <small>theme</small></h4>
-              <div class="settings-segmented" role="group" aria-label="主题"><button type="button" data-setting-choice="app-theme" data-value="system">跟随系统</button><button type="button" data-setting-choice="app-theme" data-value="light">浅色</button><button type="button" data-setting-choice="app-theme" data-value="dark">深色</button></div>
-              <select id="app-theme" aria-label="外观模式" hidden><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select>
+              <div class="settings-row"><span>主题</span><div class="settings-segmented" role="group" aria-label="主题"><button type="button" data-setting-choice="app-theme" data-value="system">跟随系统</button><button type="button" data-setting-choice="app-theme" data-value="light">浅色</button><button type="button" data-setting-choice="app-theme" data-value="dark">深色</button></div><select id="app-theme" aria-label="外观模式" hidden><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></div>
               <div class="settings-row"><span>界面密度</span><div class="settings-segmented" role="group" aria-label="界面密度"><button type="button" data-setting-choice="interface-density" data-value="standard">标准</button><button type="button" data-setting-choice="interface-density" data-value="compact">紧凑</button></div><select id="interface-density" aria-label="界面密度" hidden><option value="standard">标准</option><option value="compact">紧凑</option></select></div>
-              <label class="settings-row"><span>强调色</span><span class="settings-color-field"><input id="interface-accent" type="color" value="#2f6bff" aria-label="强调色"><output id="interface-accent-value" for="interface-accent">#2F6BFF</output></span></label>
-              <label class="settings-row"><span>界面语言</span><select id="interface-language"><option value="zh-CN">简体中文</option></select></label>
-              <h4 class="settings-subheading">深色模式 <small>dark</small></h4>
-              <label class="settings-row settings-switch"><span>系统外观联动</span><span class="settings-inline-control"><input id="theme-system-linked" type="checkbox" role="switch" disabled><small id="theme-system-hint">由系统决定</small></span></label>
+              <label class="settings-row"><span>强调色</span><span class="settings-color-field"><input id="interface-accent" type="color" value="#3a6df0" aria-label="强调色"><output id="interface-accent-value" for="interface-accent">#3A6DF0</output></span></label>
               <label class="settings-row settings-switch"><span>深色画布降低对比</span><input id="dark-canvas-soften" type="checkbox" role="switch" checked></label>
-              <h4 class="settings-subheading">窗口材质 <small>material</small></h4>
+              <h4 class="settings-subheading">窗口材质</h4>
               <label class="settings-row settings-switch"><span>使用窗口材质</span><input id="window-material" type="checkbox" role="switch" checked></label>
               <label id="window-material-opacity-setting" class="settings-row settings-range"><span id="window-material-opacity-label">材质不透明度</span><span class="settings-range-control"><input id="window-material-opacity" type="range" min="20" max="100" step="1" value="87" aria-labelledby="window-material-opacity-label window-material-opacity-value"><output id="window-material-opacity-value" for="window-material-opacity">87%</output></span></label>
               <p class="settings-storage-note">设置保存在此设备的应用本地存储中</p>

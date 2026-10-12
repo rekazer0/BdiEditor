@@ -508,9 +508,118 @@
 
 :root body .app-dialog header h2,
 :root body .project-dialog header h2 {
+  margin: 0;
   color: var(--pen-text);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1.35;
+}
+
+/* 紧凑弹窗（面板复制、iOS 26、替换键盘样式、新增样式、未保存）：统一的
+ * 头部 / 内容 / 底部节奏——标题与正文左对齐 20px，头尾各有一条分隔线，按钮靠右。 */
+:root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) {
+  padding: 0;
+  border-radius: var(--pen-radius-lg);
+}
+
+:root body :is(#panel-scale-dialog, #ios26-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) {
+  width: min(460px, calc(100vw - 32px));
+}
+
+:root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) > form {
+  display: grid;
+  gap: 16px;
+  padding: 0 20px 20px;
+}
+
+:root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) > form > header {
+  display: grid;
+  justify-items: start;
+  align-content: center;
+  gap: 4px;
+  min-height: 0;
+  margin: 0 -20px;
+  padding: 16px 20px 14px;
+}
+
+:root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) > form > header :is(p, small) {
+  margin: 0;
+  color: var(--pen-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+:root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) > form > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 4px -20px -20px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--pen-line);
+}
+
+:root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) > form > footer button {
+  min-width: 72px;
+}
+
+:root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) label:not(.project-template-option) {
+  display: grid;
+  gap: 6px;
+  color: var(--pen-secondary);
+  font-size: 12px;
+}
+
+:root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) input:not([type="checkbox"]) {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--pen-line-strong);
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface);
+  color: var(--pen-text);
+  font-size: 12px;
+}
+
+:root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) input:not([type="checkbox"]):focus {
+  border-color: var(--pen-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--pen-accent-soft);
+}
+
+:root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) input:disabled {
+  background: var(--pen-surface-subtle);
+  color: var(--pen-tertiary);
+}
+
+:root body #panel-scale-summary {
+  margin: 0;
+  color: var(--pen-secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+:root body #panel-scale-summary:empty {
+  display: none;
+}
+
+:root body #atlas-create-dialog .atlas-create-size {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* 没有选中切片时只留标题提示，不显示一排空输入框 */
+:root body #tile-inspector[data-empty="true"] :is(.geometry-fields, #tile-inner-title, .atlas-source-heading, .atlas-stretch) {
+  display: none !important;
+}
+
+:root body .dialog-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--pen-radius-sm);
+  background: var(--pen-surface-subtle);
+  color: var(--pen-secondary);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 :root body .settings-sidebar {
@@ -1348,13 +1457,22 @@
 }
 
 /* =================================================================================================
- * 18 · Welcome screen  (桌面 · 新建皮肤: main padding 40/48 · gap 26 · 2-up template grid ·
- *      aside 340 · 28/24 · 18px gap · device tip pinned to the bottom)
+ * 18 · Welcome screen  (桌面 · 新建皮肤: single column, content capped at 1100px · gap 26 ·
+ *      280px template cards)
  * ================================================================================================= */
+
+:root body .welcome-head-action[hidden] {
+  display: none;
+}
+
+:root body .welcome-head-clear:not([hidden]) + .welcome-head-action {
+  margin-left: 8px;
+}
 
 :root body .welcome-main {
   gap: 26px;
-  padding: 40px 48px;
+  /* 内容限宽居中；滚动条仍贴窗口右缘 */
+  padding: 40px max(48px, calc((100% - 1100px) / 2));
   background: var(--pen-window);
 }
 
@@ -1512,7 +1630,7 @@
 
 :root body .template-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 280px);
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 16px;
 }
 
@@ -1579,46 +1697,6 @@
   color: var(--pen-secondary);
   font-size: 9px;
 }
-
-:root body .welcome-open {
-  gap: 12px;
-  padding: 14px;
-  border: 0;
-  border-radius: var(--pen-radius-md);
-  outline: 1px solid var(--pen-line);
-  outline-offset: -1px;
-  background: var(--pen-surface);
-}
-
-:root body .welcome-open-icon {
-  color: var(--pen-secondary);
-}
-
-:root body .welcome-open-copy strong {
-  color: var(--pen-text);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-:root body .welcome-open-copy span {
-  color: var(--pen-tertiary);
-  font-size: 11px;
-}
-
-:root body .welcome-open button {
-  padding: 9px 16px;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-accent);
-  color: var(--pen-on-brand);
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-:root body .welcome-open button:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--pen-accent) 86%, #000000);
-}
-
 :root body .welcome-note {
   gap: 8px;
   padding: 10px 12px;
@@ -1635,72 +1713,6 @@
 :root body .welcome-note .system-symbol {
   color: var(--pen-tertiary);
 }
-
-:root body .welcome-aside {
-  gap: 18px;
-  padding: 28px 24px;
-  border-left: 1px solid var(--pen-line);
-  background: var(--pen-surface);
-}
-
-:root body .welcome-aside-head strong {
-  color: var(--pen-text);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-:root body .welcome-aside-head button {
-  color: var(--pen-accent);
-  font-size: 11px;
-}
-
-:root body .recent-item {
-  border-radius: var(--pen-radius-sm);
-}
-
-:root body .recent-item:hover {
-  background: var(--pen-surface-subtle);
-}
-
-:root body .recent-icon {
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-secondary);
-}
-
-:root body .recent-name {
-  color: var(--pen-text);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-:root body .recent-path {
-  direction: ltr;
-  color: var(--pen-tertiary);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-align: left;
-}
-
-:root body .recent-time {
-  color: var(--pen-tertiary);
-  font-size: 11px;
-}
-
-:root body .recent-empty {
-  color: var(--pen-tertiary);
-  font-size: 11px;
-}
-
-:root body .welcome-rule {
-  background: var(--pen-line);
-}
-
-:root body .device-tip {
-  border-radius: var(--pen-radius-md);
-  background: var(--pen-surface-subtle);
-}
-
 /* File operation sheet: bounded icon and a compact, readable progress layout. */
 :root body #file-operation-dialog {
   width: min(400px, calc(100vw - 32px));

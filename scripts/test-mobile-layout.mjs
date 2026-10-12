@@ -143,7 +143,6 @@ for (const viewport of portraitPhones) {
     const main = await rect(page, "main")
     const workspace = await rect(page, "main > .workspace")
     assert.ok(Math.abs(workspace.y - main.y) <= 1 && Math.abs(workspace.height - main.height) <= 1, "welcome page covers main")
-    assert.equal((await rect(page, ".welcome-aside")).visible, false, "duplicate recent list is hidden")
     const recent = await rect(page, ".welcome-recent")
     const hero = await rect(page, ".welcome-hero")
     assert.ok(recent.bottom <= hero.y, "recent section sits above the hero")

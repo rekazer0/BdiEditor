@@ -97,7 +97,7 @@ function configureAppearance(chat: DeepChat): void {
   const sunken = "var(--pin-sunken, #f4f5f8)"
   const line = "var(--pin-line, #e6e8ee)"
   const lineStrong = "var(--pin-line-strong, #d2d6df)"
-  const accent = "var(--pin-accent, #2f6bff)"
+  const accent = "var(--pin-accent, #3a6df0)"
   const onAccent = "var(--pin-on-brand, #ffffff)"
   const ok = "var(--pin-ok, #10a15a)"
   const danger = "var(--pin-danger, #e5484d)"

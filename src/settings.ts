@@ -13,16 +13,16 @@ export function initializeSettings(dialog: HTMLDialogElement, setGuides: (enable
   const safe = input('safe-area-guides') as HTMLInputElement
   const guides = input('settings-layout-guides') as HTMLInputElement
   const sectionScrollbar = input('source-section-scrollbar') as HTMLInputElement
-  const theme = input('app-theme')
   const read = (control: Control) => control instanceof HTMLInputElement && control.type === 'checkbox' ? String(control.checked) : control.value
   const write = (control: Control, value: string) => {
     if (control instanceof HTMLInputElement && control.type === 'checkbox') control.checked = value === 'true'
     else control.value = value
   }
-  const preferences = [density, accent, soften, safe, guides, sectionScrollbar, input('interface-language')]
+  const preferences = [density, accent, soften, safe, guides, sectionScrollbar]
+  const defaultAccent = '#3a6df0'
   density.value = localStorage.getItem(density.id) === 'compact' ? 'compact' : 'standard'
   const savedAccent = localStorage.getItem(accent.id)
-  accent.value = savedAccent && /^#[0-9a-f]{6}$/i.test(savedAccent) ? savedAccent : '#2f6bff'
+  accent.value = savedAccent && /^#[0-9a-f]{6}$/i.test(savedAccent) ? savedAccent : defaultAccent
   sectionScrollbar.checked = localStorage.getItem(sectionScrollbar.id) !== 'false'
   soften.checked = localStorage.getItem(soften.id) !== 'false'
   safe.checked = localStorage.getItem(safe.id) === 'true'
@@ -30,11 +30,14 @@ export function initializeSettings(dialog: HTMLDialogElement, setGuides: (enable
   const apply = () => {
     root.dataset.sourceSectionScrollbar = String(sectionScrollbar.checked)
     root.dataset.interfaceDensity = density.value
-    root.style.setProperty('--accent', accent.value)
-    root.style.setProperty('--accent-soft', `color-mix(in srgb, ${accent.value} 12%, var(--panel))`)
+    // 默认强调色交还给主题，深色模式才能用它自己的提亮蓝
+    if (accent.value.toLowerCase() === defaultAccent) for (const name of ['--accent', '--accent-soft']) root.style.removeProperty(name)
+    else {
+      root.style.setProperty('--accent', accent.value)
+      root.style.setProperty('--accent-soft', `color-mix(in srgb, ${accent.value} 14%, var(--panel))`)
+    }
     root.dataset.darkCanvasSoften = String(soften.checked)
     root.dataset.safeAreaGuides = String(safe.checked)
-    root.lang = input('interface-language').value
     dialog.querySelector('output#interface-accent-value')!.textContent = accent.value.toUpperCase()
   }
   for (const control of preferences) control.addEventListener('change', () => {
@@ -49,8 +52,6 @@ export function initializeSettings(dialog: HTMLDialogElement, setGuides: (enable
     for (const button of dialog.querySelectorAll<HTMLButtonElement>('[data-setting-choice]')) {
       button.setAttribute('aria-pressed', String(input(button.dataset.settingChoice!).value === button.dataset.value))
     }
-    ;(input('theme-system-linked') as HTMLInputElement).checked = theme.value === 'system'
-    dialog.querySelector('#theme-system-hint')!.textContent = theme.value === 'system' ? '由系统决定' : '已手动选择主题'
     for (const [page, id] of [['device', 'default-device'], ['background', 'canvas-background']]) {
       const control = input(id) as HTMLSelectElement
       dialog.querySelector(`[data-settings-summary="${page}"]`)!.textContent = control.selectedOptions[0]?.textContent ?? ''
@@ -63,7 +64,7 @@ export function initializeSettings(dialog: HTMLDialogElement, setGuides: (enable
     control.dispatchEvent(new Event('change', { bubbles: true }))
   })
   // Directory actions retain their explicit, immediate semantics; the model page keeps its own draft.
-  const controls = [...dialog.querySelectorAll<Control>('input[id], select[id]')].filter(control => control.id !== 'theme-system-linked' && !control.id.startsWith('source-directory') && !control.id.startsWith('model-'))
+  const controls = [...dialog.querySelectorAll<Control>('input[id], select[id]')].filter(control => !control.id.startsWith('source-directory') && !control.id.startsWith('model-'))
   const storageKeys = [...controls.map(control => control.id), 'window-glass-opacity', 'window-acrylic-opacity']
   let values = new Map<Control, string>()
   const draft = createSettingsDraft(localStorage, storageKeys)

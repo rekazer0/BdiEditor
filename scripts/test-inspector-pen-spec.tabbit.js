@@ -74,11 +74,14 @@ const dark = await page.evaluate(() => {
   const [pr, pg, pb] = parse(panelStyle?.backgroundColor ?? '')
   return {
     pinInk: panelStyle?.getPropertyValue('--pin-ink').trim() ?? '',
+    penText: panelStyle?.getPropertyValue('--pen-text').trim() ?? '',
     panelBg: panelStyle?.backgroundColor ?? '',
     panelLuma: 0.2126 * pr + 0.7152 * pg + 0.0722 * pb,
   }
 })
-expect(dark.pinInk).toBe('#f2f4f8')
+// 检查器与全局共用 Pen 色板，深色文字跟随 --pen-text。
+expect(dark.pinInk).toBe(dark.penText)
+expect(dark.pinInk).toBe('#f3f5f8')
 expect(dark.panelLuma).toBeLessThan(80)
 await page.setViewportSize({ width: 390, height: 844 })
 expect(await page.locator('#quick-inspector').evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true)

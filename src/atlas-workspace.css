@@ -1,9 +1,5 @@
 .atlas-header, .atlas-zoom, .atlas-status, #atlas-back, .atlas-resource-extras { display: none; }
-#atlas-create-dialog { width: min(360px, calc(100vw - 32px)); }
-#atlas-create-dialog form { display: grid; gap: 16px; padding: 20px; }
-#atlas-create-dialog label { display: grid; gap: 6px; font-size: 12px; }
 #atlas-create-dialog input { width: 100%; min-width: 0; box-sizing: border-box; }
-#atlas-create-dialog .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .atlas-reference { display: flex; gap: 12px; align-items: start; padding: 8px 0 14px; font-size: 12px; }
 .atlas-reference output { min-width: 0; overflow-wrap: anywhere; color: var(--secondary); }
 .atlas-stretch { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; font-size: 12px; }

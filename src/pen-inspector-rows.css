@@ -129,7 +129,6 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, color 0.15s ease !important;
 }
 
-
 :root body .source #quick-inspector#quick-inspector label:not(.pin-search) > :is(input:not([type="color"]):not([type="checkbox"]), textarea) {
   appearance: none !important;
   -webkit-appearance: none !important;
@@ -492,7 +491,6 @@
 :root body .source #quick-inspector#quick-inspector label:not(.pin-search) :is(input, select, textarea)::placeholder {
   color: var(--pin-ink-faint) !important;
 }
-
 
 /* Document cards have no left gutter, so the marker would sit on the label text. */
 :root body .source #quick-inspector#quick-inspector #document-fields .pin-dot {

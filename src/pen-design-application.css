@@ -27,8 +27,9 @@
   --pen-secondary: #5b616e;
   --pen-tertiary: #8b919e;
   /* $brand / $brand-soft / $on-brand */
-  --pen-accent: #3a6df0;
-  --pen-accent-soft: #e9effe;
+  /* 跟随设置中的强调色（--accent），未自定义时即为品牌蓝 */
+  --pen-accent: var(--accent);
+  --pen-accent-soft: var(--accent-soft);
   --pen-on-brand: #ffffff;
   /* $key-sel / $key-sel-soft */
   --pen-selection: #ff6b2c;
@@ -58,8 +59,6 @@
   --pen-text: #f3f5f8;
   --pen-secondary: #a1a8b3;
   --pen-tertiary: #6c737e;
-  --pen-accent: #7a9bff;
-  --pen-accent-soft: #1d2740;
   --pen-on-brand: #ffffff;
   --pen-selection: #ff8a55;
   --pen-selection-soft: #3a2418;
@@ -1034,7 +1033,6 @@ main {
   display: block;
 }
 
-
 /* -------------------------------------------------------------------------------------------------
  * Gesture hot zones
  *
@@ -1173,6 +1171,10 @@ main {
   gap: 8px;
   white-space: nowrap;
   text-align: left;
+}
+
+.toolbar-menu button[hidden] {
+  display: none !important;
 }
 
 .pen-file-menu .file-actions button .system-symbol {

@@ -10,18 +10,19 @@
   color: inherit !important;
 }
 :root body .source {
-  --pin-ink: #14161b;
-  --pin-ink-muted: #5a6070;
-  --pin-ink-faint: #8c93a1;
-  --pin-accent: #2f6bff;
-  --pin-accent-soft: #ebf1ff;
-  --pin-sel: #ff6b2c;
-  --pin-sel-soft: #ffefe7;
-  --pin-ok: #10a15a;
-  --pin-danger: #e5484d;
-  --pin-surface: #fff;
-  --pin-sunken: #f4f5f8;
-  --pin-line: #e6e8ee;
+  /* 与全局 Pen 色板一致，深浅色由 --pen-* 自动切换 */
+  --pin-ink: var(--pen-text);
+  --pin-ink-muted: var(--pen-secondary);
+  --pin-ink-faint: var(--pen-tertiary);
+  --pin-accent: var(--pen-accent);
+  --pin-accent-soft: var(--pen-accent-soft);
+  --pin-sel: var(--pen-selection);
+  --pin-sel-soft: var(--pen-selection-soft);
+  --pin-ok: var(--pen-state-ok);
+  --pin-danger: var(--pen-state-danger);
+  --pin-surface: var(--pen-surface);
+  --pin-sunken: var(--pen-surface-subtle);
+  --pin-line: var(--pen-line);
   --pin-gutter: 14px;
   --pin-rail-w: 64px;
   --pin-row-h: 30px;
@@ -39,20 +40,6 @@
   --inspector-section-title-size: 12px;
   color: var(--pin-ink);
   background: var(--pin-surface);
-}
-:root[data-app-theme="dark"] body .source {
-  --pin-ink: #f2f4f8;
-  --pin-ink-muted: #a3aab6;
-  --pin-ink-faint: #6e7581;
-  --pin-accent: #4c82ff;
-  --pin-accent-soft: #17203a;
-  --pin-sel: #ff8a55;
-  --pin-sel-soft: #33200f;
-  --pin-ok: #3dd68c;
-  --pin-danger: #ff6b6b;
-  --pin-surface: #16181d;
-  --pin-sunken: #1b1e24;
-  --pin-line: #262a32;
 }
 :root body .source .inspector-title.key-inspector-title {
   position: relative;
@@ -478,7 +465,6 @@
   z-index: 6;
   top: 50%;
 
-
   right: 0;
   display: grid !important;
   place-items: center;
@@ -518,7 +504,7 @@
 :root body .source #quick-inspector#quick-inspector#quick-inspector .appearance-visual-styles { position: relative; z-index: 0; overflow: hidden; }
 :root body .source #quick-inspector#quick-inspector#quick-inspector .appearance-layout-fields { position: relative; z-index: 2; margin-top: 12px; }
 :root body .source #quick-inspector#quick-inspector#quick-inspector :is(.style-ref-row, .style-reference-field:not(.fore-styles-reference-field), .appearance-sound-field > label),
-:root body .source #quick-inspector#quick-inspector#quick-inspector #document-fields .document-property-field.style-reference-field:not(.fore-styles-reference-field) {
+:root body .source #quick-inspector#quick-inspector#quick-inspector :is(#document-fields, #bda-config-fields) .document-property-field.style-reference-field:not(.fore-styles-reference-field) {
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch !important;
@@ -739,16 +725,6 @@
 }
 
 :root[data-app-theme="dark"] body .source #quick-inspector#quick-inspector#quick-inspector {
-  --pin-ink: #f2f4f8;
-  --pin-ink-muted: #a3aab6;
-  --pin-ink-faint: #6e7581;
-  --pin-accent: #4c82ff;
-  --pin-accent-soft: #17203a;
-  --pin-sel: #ff8a55;
-  --pin-sel-soft: #33200f;
-  --pin-surface: #16181d;
-  --pin-sunken: #1b1e24;
-  --pin-line: #262a32;
   color: var(--pin-ink) !important;
   background: var(--pin-surface) !important;
 }
@@ -761,23 +737,11 @@
   border-color: var(--pin-line) !important;
 }
 
-:root[data-app-theme="dark"] body .source,
-:root[data-app-theme="dark"] body .source #quick-inspector#quick-inspector#quick-inspector {
-  --text: #f2f4f8;
-  --pen-text: #f2f4f8;
-  --card-text: #f2f4f8;
-  --pin-ink: #f2f4f8;
-  --pin-ink-muted: #a3aab6;
-  --pin-ink-faint: #6e7581;
-  --pin-sunken: #1b1e24;
-  --pin-surface: #16181d;
-  --pin-line: #262a32;
-}
 :root[data-app-theme="dark"] body .source #quick-inspector#quick-inspector#quick-inspector .inspector-group :is(input, select, textarea) {
-  color: #f2f4f8 !important;
+  color: var(--pin-ink) !important;
   /* 与 --pin-sunken 同值，走令牌才能跟随窗口玻璃（见 pen-design-application.css 的材质段）。 */
   background: var(--pin-sunken) !important;
-  caret-color: #f2f4f8;
+  caret-color: var(--pin-ink);
 }
 
 /* Hierarchy comes from spacing and surface tone, not nested table rules. */
@@ -831,7 +795,7 @@
   }
   & .reference-badge { margin-left: auto; padding: 3px 7px; border-radius: 12px; background: var(--pin-sunken); color: var(--pin-ink-faint); font: 10px var(--font-ui); }
   & .style-ref-row > span:first-child,
-  & #document-fields .document-property-field.style-reference-field > .document-field-caption { flex: none !important; font-size: 12px !important; color: var(--pin-ink-faint) !important; }
+  & :is(#document-fields, #bda-config-fields) .document-property-field.style-reference-field > .document-field-caption { flex: none !important; font-size: 12px !important; color: var(--pin-ink-faint) !important; }
   & .style-ref-row small { font: 10px var(--font-mono); }
   & .style-reference-row { height: 84px !important; border-radius: var(--pin-radius-lg) !important; }
   & .style-reference-row > .style-reference-number { flex-basis: 28% !important; width: 28% !important; font: 600 19px var(--font-mono) !important; }
@@ -906,12 +870,12 @@
   max-height: calc(100% - 16px) !important;
 }
 /* 文本值（区域、名称等）占满行内剩余宽度，避免长值被 112px 输入框截断；数值仍保持固定列宽。 */
-:root body .source #quick-inspector#quick-inspector#quick-inspector #document-fields .document-property-field:not(.style-reference-field) > input.document-property-input:not([type="number"]) {
+:root body .source #quick-inspector#quick-inspector#quick-inspector :is(#document-fields, #bda-config-fields) .document-property-field:not(.style-reference-field) > input.document-property-input:not([type="number"]) {
   flex: 1 1 112px !important;
   width: auto !important;
   min-width: 112px !important;
 }
-:root body .source #quick-inspector#quick-inspector#quick-inspector #document-fields .document-property-field:has(> input, > .document-switch-control) > .document-field-caption {
+:root body .source #quick-inspector#quick-inspector#quick-inspector :is(#document-fields, #bda-config-fields) .document-property-field:has(> input, > .document-switch-control) > .document-field-caption {
   /* 固定标签列，文本值左缘对齐成一条线，不随标签长短参差。 */
   flex: 0 0 38% !important;
   min-width: 0 !important;
@@ -920,4 +884,197 @@
 /* 「3 项」用界面字体：等宽字体没有汉字字形，回退后数字与汉字间距不一致。 */
 :root body .source #quick-inspector#quick-inspector#quick-inspector .document-section-meta {
   font-family: var(--font-ui) !important;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Unified property rows (最后一层，覆盖上面按分组逐个打的补丁)
+ *
+ * 检查器里只有两种行：
+ *   · 标量字段（文本、数字、下拉、开关）：标签固定在左列，控件占满右侧，高度统一 30px，左对齐；
+ *   · 可视卡片（样式引用、音效、方向格）：标签在上，卡片占满整行。
+ * 所有分组共用这一套，切换按键 / 面板 / 文档分区时字段不再忽左忽右、忽宽忽窄。
+ * ------------------------------------------------------------------------------------------------- */
+:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector#quick-inspector {
+  --row-label-w: 84px;
+  --row-ctrl-h: 30px;
+
+  & :is(.typography-content-fields, .typography-property-grid, .appearance-property-grid, .action-fields) > label:not([hidden]):not(:has(.style-reference-input)),
+  & .typography-property-grid .color-pair-field > label,
+  & :is(#document-fields, #bda-config-fields) .document-property-field:not(.style-reference-field):not([hidden]) {
+    display: grid !important;
+    grid-template-columns: var(--row-label-w) minmax(0, 1fr) !important;
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+    align-items: center !important;
+    column-gap: 10px !important;
+    min-height: var(--row-ctrl-h) !important;
+    margin: 0 !important;
+    color: var(--pin-ink-muted) !important;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+  }
+
+  & :is(#document-fields, #bda-config-fields) .document-property-field:not(.style-reference-field) > .document-field-caption {
+    flex: none !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    color: var(--pin-ink-muted) !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+  }
+
+  & :is(.typography-property-grid, .appearance-property-grid) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  & .typography-property-grid .color-pair-field {
+    display: grid !important;
+    grid-column: 1 / -1 !important;
+    gap: 8px !important;
+  }
+
+  /* 控件：占满右列、统一高度与字号、文本左对齐 */
+  & :is(.typography-content-fields, .typography-property-grid, .appearance-property-grid, .action-fields) > label > :is(input:not([type="color"]):not([type="checkbox"]), select),
+  & :is(.appearance-property-grid) > label > .style-field,
+  & :is(#document-fields, #bda-config-fields) .document-property-field:not(.style-reference-field) > :is(input.document-property-input, select) {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: var(--row-ctrl-h) !important;
+    min-height: var(--row-ctrl-h) !important;
+    flex: none !important;
+    box-sizing: border-box !important;
+    font-size: 12px !important;
+    text-align: left !important;
+  }
+
+  & :is(.typography-content-fields, .typography-property-grid, .appearance-property-grid, .action-fields) > label > :is(input:not([type="color"]):not([type="checkbox"]), select),
+  & .appearance-property-grid > label > .style-field > input,
+  & :is(#document-fields, #bda-config-fields) .document-property-field:not(.style-reference-field) > :is(input.document-property-input, select) {
+    padding: 0 10px !important;
+    border: 1px solid var(--pin-line) !important;
+    border-radius: var(--pin-radius-md) !important;
+    background: var(--pin-sunken) !important;
+  }
+
+  & .appearance-property-grid > label > .style-field > input {
+    width: 100% !important;
+    height: var(--row-ctrl-h) !important;
+    text-align: left !important;
+  }
+
+  /* Pen 规范：数值右对齐，文本左对齐 */
+  & :is(.typography-content-fields, .typography-property-grid, .appearance-property-grid, .action-fields) > label > input[type="number"],
+  & :is(#document-fields, #bda-config-fields) .document-property-field > input.document-property-input[type="number"] {
+    text-align: right !important;
+  }
+
+  & :is(.typography-content-fields, .typography-property-grid, .appearance-property-grid, .action-fields) > label > :is(input, select):focus,
+  & :is(#document-fields, #bda-config-fields) .document-property-field > :is(input.document-property-input, select):focus {
+    border-color: var(--pin-accent) !important;
+    background: var(--pin-surface) !important;
+    box-shadow: 0 0 0 3px var(--pin-accent-soft) !important;
+    outline: none !important;
+  }
+
+  /* 颜色控件与其他控件同宽，十六进制值占据剩余空间 */
+  & :is(.typography-property-grid .color-pair-field, .action-fields) > label > .color-control {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  & :is(.typography-property-grid .color-pair-field, .action-fields) > label > .color-control > input:not([type="color"]):not([type="number"]) {
+    flex: 1 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  /* 开关与其状态文字靠左，和其他控件的左缘对齐 */
+  & :is(#document-fields, #bda-config-fields) .document-property-field > :is(.document-switch-control, input[type="checkbox"], .bda-color-controls) {
+    justify-self: start !important;
+  }
+
+  /* 可视卡片：标签在上（含候选栏、工具栏里的样式引用） */
+  & :is(.style-ref-row, .appearance-sound-field > label, .action-fields > label:has(.style-reference-input)),
+  & :is(#document-fields, #bda-config-fields) .document-property-field.style-reference-field {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 6px !important;
+    color: var(--pin-ink-muted) !important;
+    font-size: 12px !important;
+  }
+
+  /* 样式卡片比普通控件高：外层字段随卡片撑开并占满整行，否则卡片会溢出压在下一行上 */
+  & label:has(.style-reference-input:not(.sound-style-reference)) > .style-field {
+    flex: none !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  & .appearance-section-heading,
+  & .appearance-layout-fields > summary {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    color: var(--pin-ink) !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+  }
+}
+
+/* 侧边分类已经写明分组名称，分区标题（「气泡 · 2 项」「面板」）不再重复显示 */
+:root body .source #quick-inspector#quick-inspector#quick-inspector[data-inspector-group-display="grouped"]:has(> #mobile-inspector-groups:not([hidden]):not(:empty)) :is(.document-property-section > .document-section-heading, #bda-config-fields:not([data-bda-scope="key"]) > .bda-inspector-section > h3:first-child) {
+  display: none !important;
+}
+
+/* 分类轨标签不在词中间折行（「更多面板」「按键提示」），也不截断 */
+:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector > #mobile-inspector-groups button .inspector-group-label {
+  /* 汉字之间不折行，只在空格处换行：「工具按钮 1」拆成两行而不是「工具按 / 钮 1」 */
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  font-size: 10.5px !important;
+  letter-spacing: -0.2px;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector > #mobile-inspector-groups button {
+  padding-inline: 2px !important;
+}
+
+/* 长按一行的输入框占满方向格宽度 */
+:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector .direction-editor > .direction-hold > input {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+}
+
+/* 没有动作释义时不为它预留宽度 */
+:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector .direction-editor > .direction-hold > small:empty {
+  display: none !important;
+}
+
+/* 成对数值（尺寸 宽 × 高）平分控件列，与其他行同宽 */
+:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector :is(.document-pair-inputs, .document-quad-inputs) {
+  display: flex !important;
+  width: 100% !important;
+  gap: 6px !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector :is(.document-pair-inputs, .document-quad-inputs) > input {
+  flex: 1 1 0 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: 30px !important;
+}
+
+/* 带 hidden 的行一律隐藏：上面的 label 规则用了更高优先级的 display:flex，
+ * 曾让按键没有文字样式时仍显示一排「未配置」的字体 / 字号 / 颜色字段。 */
+:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector#quick-inspector#quick-inspector [hidden] {
+  display: none !important;
 }

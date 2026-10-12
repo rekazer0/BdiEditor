@@ -69,7 +69,11 @@ async function showPreviewImage(host: HTMLElement, image: HTMLImageElement): Pro
 export async function renderArchivePreview(bytes: Uint8Array, host: HTMLElement): Promise<HTMLImageElement> {
   const demo = await demoImageBytes(bytes)
   if (!demo) throw new MissingPreviewImageError("皮肤包内没有 demo 预览图")
-  const objectURL = URL.createObjectURL(new Blob([demo.slice() as BlobPart], { type: demoImageType(demo) }))
+  return renderBlobPreview(new Blob([demo.slice() as BlobPart], { type: demoImageType(demo) }), host)
+}
+
+export function renderBlobPreview(blob: Blob, host: HTMLElement): Promise<HTMLImageElement> {
+  const objectURL = URL.createObjectURL(blob)
   return showPreviewImage(host, previewImageElement(objectURL, objectURL))
 }
 

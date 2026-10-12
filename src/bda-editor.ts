@@ -133,23 +133,23 @@ export function bdaLayoutStyleGroups(
       ...(panel.more?.cellBackStyle ? [{ ref: panel.more.cellBackStyle, label: "更多面板单元背景", field: "more.cellBackStyle", path: ["more", "cellBackStyle"] }] : []),
       ...(panel.more?.cellForeStyle ? [{ ref: panel.more.cellForeStyle, label: "更多面板单元前景", field: "more.cellForeStyle", path: ["more", "cellForeStyle"] }] : []),
     ]),
-    group("hints", "按键提示", [...panel.hints].flatMap(([name, hint]) => [
-      ...(hint.backStyle ? [{ ref: hint.backStyle, label: `${name} · 背景`, field: "backStyle", path: ["hints", name, "backStyle"] }] : []),
-      ...(hint.barStyle ? [{ ref: hint.barStyle, label: `${name} · 提示条`, field: "barStyle", path: ["hints", name, "barStyle"] }] : []),
-      ...(hint.foreStyle ? [{ ref: hint.foreStyle, label: `${name} · 前景`, field: "foreStyle", path: ["hints", name, "foreStyle"] }] : []),
-      ...(hint.cellStyle ? [{ ref: hint.cellStyle, label: `${name} · 单元背景`, field: "cellStyle", path: ["hints", name, "cellStyle"] }] : []),
-    ])),
-    group("lists", "列表", [...panel.lists].flatMap(([name, list]) => [
-      ...(list.backStyle ? [{ ref: list.backStyle, label: `${name} · 背景`, field: "backStyle", path: ["lists", name, "backStyle"] }] : []),
-      ...(list.cellBackStyle ? [{ ref: list.cellBackStyle, label: `${name} · 单元背景`, field: "cellBackStyle", path: ["lists", name, "cellBackStyle"] }] : []),
-      ...(list.cellForeStyle ? [{ ref: list.cellForeStyle, label: `${name} · 单元文字`, field: "cellForeStyle", path: ["lists", name, "cellForeStyle"] }] : []),
+    group("hints", "按键提示", [...panel.hints].flatMap(([key, hint]) => { const name = bdaEntryLabel(key); return [
+      ...(hint.backStyle ? [{ ref: hint.backStyle, label: `${name} · 背景`, field: "backStyle", path: ["hints", key, "backStyle"] }] : []),
+      ...(hint.barStyle ? [{ ref: hint.barStyle, label: `${name} · 提示条`, field: "barStyle", path: ["hints", key, "barStyle"] }] : []),
+      ...(hint.foreStyle ? [{ ref: hint.foreStyle, label: `${name} · 前景`, field: "foreStyle", path: ["hints", key, "foreStyle"] }] : []),
+      ...(hint.cellStyle ? [{ ref: hint.cellStyle, label: `${name} · 单元背景`, field: "cellStyle", path: ["hints", key, "cellStyle"] }] : []),
+    ] })),
+    group("lists", "列表", [...panel.lists].flatMap(([key, list]) => { const name = bdaEntryLabel(key); return [
+      ...(list.backStyle ? [{ ref: list.backStyle, label: `${name} · 背景`, field: "backStyle", path: ["lists", key, "backStyle"] }] : []),
+      ...(list.cellBackStyle ? [{ ref: list.cellBackStyle, label: `${name} · 单元背景`, field: "cellBackStyle", path: ["lists", key, "cellBackStyle"] }] : []),
+      ...(list.cellForeStyle ? [{ ref: list.cellForeStyle, label: `${name} · 单元文字`, field: "cellForeStyle", path: ["lists", key, "cellForeStyle"] }] : []),
       ...list.foreStyles.map((ref, index) => ({
         ref,
         label: `${name} · 前景 ${index + 1}`,
         field: `foreStyles[${index}]`,
-        path: ["lists", name, "foreStyles", String(index)],
+        path: ["lists", key, "foreStyles", String(index)],
       })),
-    ])),
+    ] })),
   ]
   return groups.filter((value): value is BdaLayoutStyleGroup => Boolean(value))
 }
@@ -177,6 +177,13 @@ type MetadataEditorOptions = {
   entries: Array<{ key: string; value: string }>
   editable: boolean
   onChange: (key: string, value: string) => void
+}
+
+const bdaEntryNames: Record<string, string> = { short: "短按", long: "长按", port: "竖屏", land: "横屏" }
+
+/** BDA 提示 / 列表条目用内部键名（short、port…），界面上显示对应的中文。 */
+function bdaEntryLabel(key: string): string {
+  return bdaEntryNames[key] ?? key
 }
 
 function element<K extends keyof HTMLElementTagNameMap>(name: K, className?: string): HTMLElementTagNameMap[K] {

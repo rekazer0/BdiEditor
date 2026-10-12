@@ -112,6 +112,62 @@ export function drawVisualSource(
   )
 }
 
+// 样式缩略图：主窗口检查器、样式库与原生样式库窗口共用。
+function previewDestination(
+  canvas: HTMLCanvasElement,
+  visual: Visual,
+  foreground: boolean,
+  layer: number,
+): { x: number; y: number; width: number; height: number } {
+  if (!visual.source) {
+    return { x: 0, y: 0, width: canvas.width, height: canvas.height }
+  }
+  const [, , sourceWidth, sourceHeight] = visual.source
+  if (!foreground) {
+    const scale = Math.min(canvas.width / sourceWidth, canvas.height / sourceHeight)
+    const width = sourceWidth * scale
+    const height = sourceHeight * scale
+    return { x: (canvas.width - width) / 2, y: (canvas.height - height) / 2, width, height }
+  }
+  const scale = Math.min(
+    (canvas.width * (layer === 0 ? 0.78 : 0.48)) / sourceWidth,
+    (canvas.height * (layer === 0 ? 0.78 : 0.55)) / sourceHeight,
+  )
+  const width = sourceWidth * scale
+  const height = sourceHeight * scale
+  return layer === 0
+    ? {
+        x: (canvas.width - width) / 2,
+        y: (canvas.height - height) / 2,
+        width,
+        height,
+      }
+    : { x: canvas.width - width - 2, y: 2, width, height }
+}
+
+export function retinaThumbnail(canvas: HTMLCanvasElement, cssWidth: number, cssHeight: number): HTMLCanvasElement {
+  const ratio = window.devicePixelRatio || 1
+  canvas.width = Math.max(1, Math.round(cssWidth * ratio))
+  canvas.height = Math.max(1, Math.round(cssHeight * ratio))
+  return canvas
+}
+
+export function drawVisualPreview(canvas: HTMLCanvasElement, visuals: Array<Visual | undefined>, foreground: boolean): void {
+  const context = canvas.getContext("2d")
+  if (!context) return
+  context.clearRect(0, 0, canvas.width, canvas.height)
+  visuals.forEach((visual, layer) => {
+    if (!visual) return
+    const destination = previewDestination(canvas, visual, foreground, layer)
+    if (visual.color && !isTransparentColor(visual.color)) {
+      context.fillStyle = visual.color
+      context.fillRect(destination.x, destination.y, destination.width, destination.height)
+    }
+    drawVisualSource(context, visual, destination)
+    drawVisualText(context, visual, destination)
+  })
+}
+
 export function resolveTextVisual(
   styles: IniDocument,
   foreground: string,

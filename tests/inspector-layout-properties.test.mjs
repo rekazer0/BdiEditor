@@ -64,13 +64,13 @@ test("document sections and category rail stay readable", () => {
   assert.match(main, /const event = section\.match\(\/\^EVENT\(\\d\+\)\$\/i\)/)
   // 分类轨上不再出现两个同名按钮；去重后的名称要写回分组自身，
   // 否则按标签找回 active 分组时会选中同名的另一个。
-  assert.match(main, /const usedRailLabels = new Set<string>\(\)/)
+  assert.match(main, /const usedRailLabels = new Map<string, number>\(\)/)
   // 面板重绘会重建分区元素，当前分组要用稳定键记住，否则高亮会跳回同名的第一个分组。
   assert.match(main, /let inspectorGroupKey = ""/)
   assert.match(main, /function mobileInspectorGroupKey\(group: HTMLElement\): string \{/)
   assert.match(main, /const active = groups\.find\(\(group\) => mobileInspectorGroupKey\(group\) === inspectorGroupKey\)/)
-  assert.match(main, /if \(usedRailLabels\.has\(label\)\) \{/)
-  assert.match(main, /label = `\$\{label\}（\$\{code\}）`\s*\n\s*group\.dataset\.inspectorGroupLabel = label/)
+  assert.match(main, /const seen = usedRailLabels\.get\(label\) \?\? 0/)
+  assert.match(main, /label = `\$\{label\} \$\{seen \+ 1\}`\s*\n\s*group\.dataset\.inspectorGroupLabel = label/)
 })
 
 test("numeric fields never hide a non-numeric value", () => {

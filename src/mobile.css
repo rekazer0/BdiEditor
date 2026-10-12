@@ -170,12 +170,6 @@
     color: var(--pen-accent);
   }
 
-  /* With no skin open there is nothing to undo or switch; give the name the room. */
-  body:has(.canvas-wrap.empty) .titlebar .mobile-quick-actions,
-  body:has(.canvas-wrap.empty) .titlebar .mode-control {
-    display: none !important;
-  }
-
   /* Menus anchor to the bar edges instead of the summary so they never leave the screen. */
   :root body .titlebar .mobile-command-actions {
     width: auto;
@@ -246,12 +240,6 @@
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }
-
-  /* Recent files are already listed in the main column. */
-  :root body .canvas-wrap.empty .welcome-aside {
-    display: none;
-  }
-
   :root body .welcome-main {
     gap: 22px;
     padding: 20px max(16px, env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
@@ -279,29 +267,24 @@
     white-space: nowrap;
   }
 
-  :root body .recent-grid-empty,
-  :root body .welcome-open {
+  :root body .recent-grid-empty {
     flex-wrap: wrap;
   }
 
-  :root body .recent-grid-empty-copy,
-  :root body .welcome-open-copy {
+  :root body .recent-grid-empty-copy {
     flex: 1 1 180px;
   }
 
-  :root body .recent-grid-empty-copy strong,
-  :root body .welcome-open-copy strong {
+  :root body .recent-grid-empty-copy strong {
     font-size: 14px;
   }
 
-  :root body .recent-grid-empty-copy span,
-  :root body .welcome-open-copy span {
+  :root body .recent-grid-empty-copy span {
     font-size: 12px;
     line-height: 1.5;
   }
 
-  :root body .recent-grid-empty button,
-  :root body .welcome-open button {
+  :root body .recent-grid-empty button {
     min-height: 40px;
     margin-left: auto;
     white-space: nowrap;
@@ -754,12 +737,6 @@
     overflow: hidden;
     white-space: nowrap;
   }
-
-  :root body #settings-dialog #settings-crumb {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
   :root body #settings-dialog #settings-close {
     width: 40px;
     height: 40px;
@@ -974,11 +951,7 @@
      so the options scrolling beneath it stay hidden. */
   :root body #layout-image-dialog > form > footer {
     z-index: 1;
-    background: #ffffff;
-  }
-
-  :root[data-app-theme="dark"] body #layout-image-dialog > form > footer {
-    background: #15171b;
+    background: var(--pen-surface);
   }
 
   :root body .project-dialog footer button,

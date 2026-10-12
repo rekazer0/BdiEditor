@@ -4,9 +4,11 @@
 const fs = await import('node:fs/promises');
 await page.goto('http://127.0.0.1:1420/', { waitUntil: 'networkidle' });
 await page.setViewportSize({ width: 1600, height: 1000 });
+// 真实皮肤路径可用 REAL_BDS 覆盖。
+const skin = process.env.REAL_BDS ?? '/Users/kaze/work/bd/孤岛记录_特别版智能深色-26+9键.bds';
 await page.locator('#browser-open').setInputFiles({
-  name: '好可爱蛙_智能深色-18键.bds', mimeType: 'application/octet-stream',
-  buffer: await fs.readFile('/Users/kaze/work/bd/好可爱蛙_智能深色-18键.bds'),
+  name: skin.split('/').pop(), mimeType: 'application/octet-stream',
+  buffer: await fs.readFile(skin),
 });
 await page.waitForTimeout(3500);
 const dialogClose = page.locator('#file-operation-dialog[open]').getByRole('button', { name: '关闭', exact: true });
@@ -46,28 +48,29 @@ for (let round = 0; round < 8; round += 1) {
   if (!opened) break;
   await page.waitForTimeout(300);
 }
-const sourceTargets = ['light/skin/port/gen.ini', 'light/skin/port/logo.ini', 'light/skin/port/hint1.pop', 'light/skin/port/cand1.cnd', 'light/skin/res/anim.ini'];
-for (const path of sourceTargets) {
-  await page.locator(`.raw-files button.source-file-row[data-path="${path}"]`).click();
+// 不同皮肤的目录前缀不同（light/skin/port、dark/port…），按文件名后缀定位。
+const sourceFile = (suffix) => page.locator(`.raw-files button.source-file-row[data-path$="${suffix}"]`).first();
+for (const suffix of ['port/gen.ini', 'port/logo.ini', 'port/hint1.pop', 'port/cand1.cnd']) {
+  await sourceFile(suffix).click();
   await expect(page.locator('#quick-inspector')).toBeVisible({ timeout: 5000 });
   await expect(page.locator('[data-inspector-tab=properties]')).toHaveClass(/active/);
   await expect(page.locator('[data-inspector-tab=properties]')).toBeEnabled();
 }
 
 // 3) 真实键名有中文标签，分区与分类轨也可读，且同一分类轨不出现两个同名按钮
-await page.locator('.raw-files button.source-file-row[data-path="light/skin/port/logo.ini"]').click();
+await sourceFile('port/logo.ini').click();
 await page.waitForTimeout(400);
-await expect(page.locator('[data-document-key=ICON_NUM] .document-field-name')).toHaveText('工具按钮数量');
+await expect(page.locator('[data-document-key=ICON_NUM] .document-field-name')).toHaveText('图标数量');
 await expect(page.locator('[data-document-key=ICON_INDEX] .document-field-name')).toHaveText('图标序号');
 await expect(page.locator('[data-document-key=TEXT_STYLE] .document-field-name')).toHaveText('文字样式');
 await expect(page.locator('#mobile-inspector-groups')).toContainText('全局设置');
-await page.locator('.raw-files button.source-file-row[data-path="light/skin/port/cand1.cnd"]').click();
+await sourceFile('port/cand1.cnd').click();
 await page.waitForTimeout(400);
-await expect(page.locator('[data-document-key=CELL_W] .document-field-name')).toHaveText('单元格宽度');
-await expect(page.locator('#mobile-inspector-groups')).toContainText('开关');
+await expect(page.locator('[data-document-key=CELL_W] .document-field-name')).toHaveText('候选字间距');
+await expect(page.locator('#mobile-inspector-groups')).toContainText('工具栏');
 const railLabels = await page.locator('#mobile-inspector-groups button').allInnerTexts();
 expect(new Set(railLabels.map((label) => label.trim())).size).toBe(railLabels.length);
-await page.locator('.raw-files button.source-file-row[data-path="light/skin/port/gen.ini"]').click();
+await sourceFile('port/gen.ini').click();
 await page.waitForTimeout(400);
 await expect(page.locator('#mobile-inspector-groups')).toContainText('列表');
 await expect(page.locator('[data-document-key=SYM_LAYOUT] .document-field-name')).toHaveText('符号面板布局');
@@ -78,7 +81,7 @@ return {
   checks: [
     `概览 ${overview.checked} 个布局文件全部打开属性栏`,
     '源文件树的 ini/cnd/pop 同样打开属性栏',
-    '真实键名显示中文标签（工具按钮数量 / 单元格宽度 / 符号面板布局 / 列表名称）',
+    '真实键名显示中文标签（图标数量 / 候选字间距 / 符号面板布局 / 列表名称）',
     '分区名称与分类轨不再显示 LIST / BAR / SWITCH 英文原名，且无重名按钮',
   ],
 };

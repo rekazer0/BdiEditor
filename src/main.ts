@@ -41,6 +41,7 @@ import {
   MissingPreviewImageError,
   releaseArchivePreview,
   renderArchivePreview,
+  renderBlobPreview,
 } from "./template-preview"
 import { initInspectorShell, setInspectorKind, syncInspectorRows } from "./inspector-shell.ts"
 import { inspectorIcon, inspectorGroupIcon } from "./inspector-icons"
@@ -55,6 +56,7 @@ import { createAtlasWorkspace } from "./atlas-workspace"
 import "./mobile.css"
 import { resizeTileSlice } from "./tiles"
 import type { AiChatController, AiChatRunHooks, AiChatRunResult } from "./ai-chat.ts"
+import type { StyleLibraryPayload, StyleLibraryVisual } from "./picker-window.ts"
 import type { AiDesignConversation } from "./ai-design.ts"
 import {
   DEFAULT_BDA_PANEL_HEIGHT,
@@ -75,9 +77,8 @@ import {
 import {
   AtlasResolver,
   canvasFontFamily,
-  drawVisualSource,
-  drawVisualText,
-  isTransparentColor,
+  drawVisualPreview,
+  retinaThumbnail,
   type TextVisual,
   type Visual,
   type VisualResolver,
@@ -264,7 +265,7 @@ import { unsavedDecision, type UnsavedDecision } from "./unsaved.ts"
 import { checkForUpdate } from "./update.ts"
 import { clientLog, clientLogZip, flushClientLogs, installClientLogging } from "./client-log.ts"
 import { installSafeAreaLock } from "./safe-area.ts"
-import { bindSlicePickerZoom, drawSlicePicker, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM } from "./slice-picker-canvas.ts"
+import { bindSlicePickerZoom, drawSlicePicker, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM, pickableSlices, WHOLE_IMAGE_INDEX } from "./slice-picker-canvas.ts"
 
 installClientLogging(document.querySelector<HTMLElement>("#about-update")?.dataset.currentVersion ?? "unknown")
 installSafeAreaLock()
@@ -418,7 +419,6 @@ const sidebarPane = $("aside.sidebar")
 const inspectorPane = $("section.source")
 const sourceHeading = $(".source-heading")
 const mobileInspectorSelection = $("#mobile-inspector-selection")
-const emptyOpenButton = $("#empty-open") as HTMLButtonElement
 const asset = $("#asset")
 const assetImage = $("#asset-image") as HTMLImageElement
 const replaceAssetButton = $("#replace-asset") as HTMLButtonElement
@@ -648,7 +648,6 @@ const mobileChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonEleme
 const styleImageDialog = $("#style-image-dialog") as HTMLDialogElement
 const styleImageClose = $("#style-image-close") as HTMLButtonElement
 const styleImageSource = $("#style-image-source") as HTMLButtonElement
-const styleImageMore = $("#style-image-more") as HTMLButtonElement
 const styleImageTitle = $("#style-image-title") as HTMLElement
 const styleImageSubtitle = $("#style-image-subtitle") as HTMLElement
 const styleImageResourceOpen = $("#style-image-resource-open") as HTMLButtonElement
@@ -658,12 +657,6 @@ const styleImageResourceSearch = $("#style-image-resource-search") as HTMLInputE
 const styleImageResourceCount = $("#style-image-resource-count") as HTMLElement
 const styleImageResourceEmpty = $("#style-image-resource-empty") as HTMLElement
 const styleImageImgList = $("#style-image-img-list") as HTMLDivElement
-const styleImagePreview = $("#style-image-preview") as HTMLCanvasElement
-const styleImageGallery = $("#style-image-gallery")
-const styleImageGallerySearch = $("#style-image-gallery-search") as HTMLInputElement
-const styleImageGalleryCount = $("#style-image-gallery-count")
-const styleImageGalleryGrid = $("#style-image-gallery-grid")
-const styleImageGalleryEmpty = $("#style-image-gallery-empty")
 const styleImagePicker = $("#style-image-picker")
 const styleImagePickerCanvas = $("#style-image-picker-canvas") as HTMLCanvasElement
 const styleImagePickerMeta = $("#style-image-picker-meta")
@@ -797,7 +790,7 @@ type NativeImagePickerPayload = {
 type NativeResourcePickerPayload = { path: string; dataURL: string }[]
 let nativeImagePickerPayload: NativeImagePickerPayload | undefined
 // 切片窗口下次创建时的起始视图（列表优先用于「样式还没有图片」等入口）。
-let pickerRequestedView: "image" | "list" = "image"
+let pickerRequestedView: "image" | "list" | "styles" = "image"
 let selectedFileButton: HTMLElement | undefined
 type SourceTransfer = {
   mode: "copy" | "move"
@@ -1604,7 +1597,9 @@ function mobileCommandTarget(button: HTMLButtonElement): HTMLButtonElement | und
 
 function syncMobileCommands(): void {
   for (const button of mobileCommandButtons) {
-    button.disabled = mobileCommandTarget(button)?.disabled ?? true
+    const target = mobileCommandTarget(button)
+    button.disabled = target?.disabled ?? true
+    button.hidden = target?.hidden ?? false
   }
   mobileUndoButton.disabled = undoButton.disabled
   mobileRedoButton.disabled = redoButton.disabled
@@ -1625,7 +1620,7 @@ for (const target of [document.querySelector(".titlebar-actions"), document.quer
   new MutationObserver(syncMobileCommands).observe(target, {
     subtree: true,
     attributes: true,
-    attributeFilter: ["disabled"],
+    attributeFilter: ["disabled", "hidden"],
   })
 }
 syncMobileCommands()
@@ -1768,7 +1763,7 @@ function syncMobileInspectorGroups(): void {
     })
   const managed = Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))
   if (archive?.format !== "bda" && groups.length === managed.length && groups.every((group, index) =>
-    group === managed[index] && mobileInspectorGroupLabel(group) === mobileInspectorGroups.children[index]?.getAttribute("title"),
+    group === managed[index] && mobileInspectorGroupLabel(group) === mobileInspectorGroups.children[index]?.querySelector(".inspector-group-label")?.textContent,
   )) return
   for (const group of Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))) {
     group.classList.remove("mobile-inspector-managed", "mobile-inspector-active")
@@ -1789,19 +1784,21 @@ function syncMobileInspectorGroups(): void {
   }
   // 两个分组可能落在同一个短标签上（例如静态候选栏组与 [CAND] 分区）：
   // 先算出一组唯一名称并写回分组，再按名称找回当前分组，避免选中同名的另一个。
+  // 重名时加序号（「候选栏 2」），分区代码放进提示，窄分类轨上不会被截断。
   const railLabels = new Map<HTMLElement, string>()
-  const usedRailLabels = new Set<string>()
+  const railCodes = new Map<HTMLElement, string>()
+  const usedRailLabels = new Map<string, number>()
   for (const group of groups) {
     let label = mobileInspectorGroupLabel(group)
-    if (usedRailLabels.has(label)) {
-      const code = group.querySelector(":scope > h3 .document-section-code")?.textContent?.trim()
-      if (code && !label.includes(code)) {
-        label = `${label}（${code}）`
-        group.dataset.inspectorGroupLabel = label
-      }
+    const code = group.querySelector(":scope > h3 .document-section-code")?.textContent?.trim() ?? ""
+    const seen = usedRailLabels.get(label) ?? 0
+    usedRailLabels.set(label, seen + 1)
+    if (seen) {
+      label = `${label} ${seen + 1}`
+      group.dataset.inspectorGroupLabel = label
     }
-    usedRailLabels.add(label)
     railLabels.set(group, label)
+    if (code) railCodes.set(group, code)
   }
   const active = groups.find((group) => mobileInspectorGroupKey(group) === inspectorGroupKey)
     ?? groups[0]
@@ -1819,7 +1816,7 @@ function syncMobileInspectorGroups(): void {
     text.className = "inspector-group-label"
     text.textContent = label
     button.append(inspectorGroupIcon(label), text)
-    button.title = label
+    button.title = railCodes.has(group) ? `${label}（${railCodes.get(group)}）` : label
     button.dataset.mobileInspectorGroup = group.dataset.mobileInspectorGroup
     button.addEventListener("click", () => setMobileInspectorGroup(group.dataset.mobileInspectorGroup ?? "0"))
     return button
@@ -3489,7 +3486,9 @@ function setFileOperationBusy(busy: boolean): void {
   updateSourceFileActions()
   for (const button of exportButtons) {
     const format = button.dataset.exportFormat as ExportFormat
-    button.disabled = busy || !archive || (archive.format !== "bda" && format === "bda")
+    // 只有 BDA 皮肤能导出 BDA；其他格式直接隐藏这两项，不留一排无法解释的灰色菜单。
+    button.hidden = Boolean(archive) && archive!.format !== "bda" && format === "bda"
+    button.disabled = busy || !archive || button.hidden
   }
 }
 
@@ -3878,7 +3877,8 @@ function populateTileInspector(): void {
   tileInspector.hidden = !selectedResourcePath
   bdaTileUsage.hidden = !bdaSelected || !bdaTileUsages.length
   tileSourceFieldsGroup.hidden = bdaSelected
-  tileInnerTitle.textContent = bdaSelected ? "切片区域（innerRect）" : "INNER_RECT（可选）"
+  tileInnerTitle.textContent = bdaSelected ? "切片区域" : "拉伸边距"
+  tileInspector.dataset.empty = String(!slice)
   bdaTileUsage.replaceChildren(...bdaTileUsages.map((item) => {
     const option = new Option(item.label, String(item.index))
     option.selected = item.index === selectedTileIndex
@@ -3891,7 +3891,7 @@ function populateTileInspector(): void {
   newTileButton.disabled = !selectedResourcePath || !isEditing() || bdaSelected
   duplicateTileButton.disabled = !slice || !isEditing() || bdaSelected
   deleteTileButton.disabled = !slice || !isEditing() || bdaSelected
-  tileTitle.textContent = usage ? "图片样式切片" : (slice ? `切片 #${slice.index}` : bdaSelected ? "未被当前 BDA 外观引用" : "未选择切片")
+  tileTitle.textContent = usage ? "图片样式切片" : (slice ? `切片 #${slice.index}` : bdaSelected ? "未被当前 BDA 外观引用" : "未选择切片 · 点击图片中的切片进行编辑")
   for (const field of tileSourceFields) {
     const index = Number(field.dataset.tileSource)
     if (field.parentElement?.firstChild?.nodeType === Node.TEXT_NODE) field.parentElement.firstChild.textContent = `${["X", "Y", "宽", "高"][index]} `
@@ -5041,61 +5041,6 @@ function refreshToolbarPreview(
   return { width, height, inputHeight }
 }
 
-function previewDestination(
-  canvas: HTMLCanvasElement,
-  visual: Visual,
-  foreground: boolean,
-  layer: number,
-): { x: number; y: number; width: number; height: number } {
-  if (!visual.source) {
-    return { x: 0, y: 0, width: canvas.width, height: canvas.height }
-  }
-  const [, , sourceWidth, sourceHeight] = visual.source
-  if (!foreground) {
-    const scale = Math.min(canvas.width / sourceWidth, canvas.height / sourceHeight)
-    const width = sourceWidth * scale
-    const height = sourceHeight * scale
-    return { x: (canvas.width - width) / 2, y: (canvas.height - height) / 2, width, height }
-  }
-  const scale = Math.min(
-    (canvas.width * (layer === 0 ? 0.78 : 0.48)) / sourceWidth,
-    (canvas.height * (layer === 0 ? 0.78 : 0.55)) / sourceHeight,
-  )
-  const width = sourceWidth * scale
-  const height = sourceHeight * scale
-  return layer === 0
-    ? {
-        x: (canvas.width - width) / 2,
-        y: (canvas.height - height) / 2,
-        width,
-        height,
-      }
-    : { x: canvas.width - width - 2, y: 2, width, height }
-}
-
-function retinaThumbnail(canvas: HTMLCanvasElement, cssWidth: number, cssHeight: number): HTMLCanvasElement {
-  const ratio = window.devicePixelRatio || 1
-  canvas.width = Math.max(1, Math.round(cssWidth * ratio))
-  canvas.height = Math.max(1, Math.round(cssHeight * ratio))
-  return canvas
-}
-
-function drawVisualPreview(canvas: HTMLCanvasElement, visuals: Array<Visual | undefined>, foreground: boolean): void {
-  const context = canvas.getContext("2d")
-  if (!context) return
-  context.clearRect(0, 0, canvas.width, canvas.height)
-  visuals.forEach((visual, layer) => {
-    if (!visual) return
-    const destination = previewDestination(canvas, visual, foreground, layer)
-    if (visual.color && !isTransparentColor(visual.color)) {
-      context.fillStyle = visual.color
-      context.fillRect(destination.x, destination.y, destination.width, destination.height)
-    }
-    drawVisualSource(context, visual, destination)
-    drawVisualText(context, visual, destination)
-  })
-}
-
 function renderSourceValueThumbnail(canvas: HTMLCanvasElement, range: SourceEditorValueRange): void {
   retinaThumbnail(canvas, 48, 30)
   const context = canvas.getContext("2d")
@@ -5114,11 +5059,7 @@ function renderSourceValueThumbnail(canvas: HTMLCanvasElement, range: SourceEdit
   }).catch(() => {})
 }
 
-let sourceValuePreviewRenderID = 0
 let sourceColorPickerTarget: SourceEditorValueRange | undefined
-let sourceStylePickerTarget: SourceEditorValueRange | undefined
-let sourceStylePreviewID = ""
-let styleImageGalleryRenderID = 0
 
 function openSourceColorPicker(range: SourceEditorValueClick): void {
   const clean = range.value.trim().replace(/^#/, "")
@@ -5150,112 +5091,9 @@ function showStyleImageDialog(): void {
   if (!styleImageDialog.open) styleImageDialog.showModal()
 }
 
-function showSourceStylePreview(styleID: string): void {
-  ++styleImageGalleryRenderID
-  sourceStylePreviewID = styleID
-  styleImageGallerySearch.value = ""
-  styleImageGallery.hidden = true
-  styleImagePreview.hidden = false
-  styleImageMore.setAttribute("aria-expanded", "false")
-  styleImageMore.title = "更多样式"
-  styleImageMore.setAttribute("aria-label", "展示全部样式")
-  styleImageTitle.textContent = `样式 ${stylePickerLabel(styleID)}`
-  styleImageSubtitle.textContent = "正常 / 按下"
-  const renderID = ++sourceValuePreviewRenderID
-  const canvas = retinaThumbnail(styleImagePreview, 960, 260)
-  const context = canvas.getContext("2d")
-  if (!context) return
-  context.clearRect(0, 0, canvas.width, canvas.height)
-  const resolver = visualResolver()
-  if (!resolver) return
-  void Promise.all([false, true].map((highlighted) => resolver.resolve(styleID, highlighted).catch(() => undefined)))
-    .then((visuals) => {
-      if (renderID !== sourceValuePreviewRenderID) return
-      visuals.forEach((visual, index) => {
-        const preview = retinaThumbnail(document.createElement("canvas"), 480, 260)
-        drawVisualPreview(preview, [visual], false)
-        context.drawImage(preview, index * canvas.width / 2, 0, canvas.width / 2, canvas.height)
-      })
-    })
-}
-
-async function renderStyleImageGallery(): Promise<void> {
-  const renderID = ++styleImageGalleryRenderID
-  const query = styleImageGallerySearch.value.trim().toLowerCase()
-  const styleIDs = availableStyleIDs().filter((styleID) => {
-    const displayID = stylePickerLabel(styleID).toLowerCase()
-    return !query || styleID.toLowerCase().includes(query) || displayID.includes(query)
-  })
-  styleImageGalleryGrid.replaceChildren()
-  styleImageGalleryCount.textContent = `${styleIDs.length} 个样式`
-  styleImageSubtitle.textContent = styleImageGalleryCount.textContent
-  styleImageGalleryEmpty.hidden = styleIDs.length > 0
-  const resolver = visualResolver()
-  if (!resolver) return
-  const items = await Promise.all(styleIDs.map(async (styleID) => ({
-    styleID,
-    visuals: await Promise.all([
-      resolver.resolve(styleID, false).catch(() => undefined),
-      resolver.resolve(styleID, true).catch(() => undefined),
-    ]),
-  })))
-  if (renderID !== styleImageGalleryRenderID || styleImageGallery.hidden) return
-  for (const { styleID, visuals } of items) {
-    const button = document.createElement("button")
-    button.type = "button"
-    button.className = "style-picker-item"
-    button.classList.toggle("selected", styleID === sourceStylePreviewID)
-    button.title = `预览样式 ${stylePickerLabel(styleID)}`
-    const label = document.createElement("strong")
-    label.textContent = stylePickerLabel(styleID)
-    const previews = document.createElement("span")
-    previews.className = "style-picker-previews"
-    for (const [index, visual] of visuals.entries()) {
-      const canvas = retinaThumbnail(document.createElement("canvas"), 128, 88)
-      canvas.setAttribute("aria-label", index === 0 ? "正常状态" : "按下状态")
-      drawVisualPreview(canvas, [visual], false)
-      previews.append(canvas)
-    }
-    button.append(label, previews)
-    button.addEventListener("click", () => {
-      applySourceStylePicker(styleID)
-      showSourceStylePreview(styleID)
-    })
-    styleImageGalleryGrid.append(button)
-  }
-}
-
-function toggleStyleImageGallery(): void {
-  if (!styleImageGallery.hidden) {
-    showSourceStylePreview(sourceStylePreviewID)
-    return
-  }
-  styleImagePreview.hidden = true
-  styleImageGallery.hidden = false
-  styleImageMore.setAttribute("aria-expanded", "true")
-  styleImageMore.title = "收起全部样式"
-  styleImageMore.setAttribute("aria-label", "收起全部样式")
-  styleImageTitle.textContent = "全部样式"
-  void renderStyleImageGallery()
-  styleImageGallerySearch.focus()
-}
-
-function openSourceStylePreview(range: SourceEditorValueRange): void {
-  if (range.kind !== "style") return
-  sourceStylePickerTarget = range
-  clearImageSlicePicker()
-  showStyleImageDialog()
-  styleImagePicker.hidden = true
-  styleImageResourceOpen.hidden = true
-  styleImageSource.hidden = false
-  styleImageMore.hidden = availableStyleIDs().length === 0
-  styleImageGallerySearch.value = ""
-  showSourceStylePreview(range.value.replace(/^STYLE/i, ""))
-}
-
-function openSourceStyleDefinition(): void {
-  const target = pickerTarget
-  const styleID = sourceStylePreviewID
+/** Jumps to a style's definition: the slice picker's target, or `styleID` when given (source Command/Ctrl click). */
+function openSourceStyleDefinition(styleID = ""): void {
+  const target = styleID ? undefined : pickerTarget
   if (!archive || !styleID && (!target?.path || !target.sections?.length)) return
   const ref = archive.format === "bda" ? bdaStyleRef(styleID) : undefined
   const path = target?.path ?? (ref ? bdaAppearanceStylePath(`${ref.type}Styles`) : styleConfigPath())
@@ -5272,15 +5110,36 @@ function openSourceStyleDefinition(): void {
   void source.load().then(() => source.focus())
 }
 
-function applySourceStylePicker(styleID: string): void {
-  const target = sourceStylePickerTarget
+// 源码里的样式引用借用一个隐藏输入框接入属性检查器的样式库，选择结果写回源码。
+const sourceStyleProxy = document.createElement("input")
+let sourceStyleProxyTarget: SourceEditorValueRange | undefined
+sourceStyleProxy.hidden = true
+document.body.append(sourceStyleProxy)
+sourceStyleProxy.addEventListener("change", () => {
+  const target = sourceStyleProxyTarget
   if (!target || source.disabled || source.readOnly) return
   if (source.value.slice(target.from, target.to) !== target.value) return
-  const next = replacedSourceStyle(target.value, styleID)
+  const next = replacedSourceStyle(target.value, sourceStyleProxy.value.split(",")[0]?.trim() ?? "")
   if (!next) return
   source.replaceRange(target.from, target.to, next)
-  sourceStylePickerTarget = { ...target, to: target.from + next.length, value: next }
+  sourceStyleProxyTarget = { ...target, to: target.from + next.length, value: next }
   source.commit()
+})
+
+function openSourceStylePicker(range: SourceEditorValueRange): void {
+  if (range.kind !== "style") return
+  const styleID = range.value.replace(/^STYLE/i, "")
+  sourceStyleProxyTarget = range
+  sourceStyleProxy.value = styleID
+  const key = (range.key ?? "STYLE").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase()
+  sourceStyleProxy.dataset.documentStyleKey = key
+  const type = archive?.format === "bda" ? bdaStyleRef(styleID)?.type : undefined
+  if (type) sourceStyleProxy.dataset.bdaStyleType = type
+  else delete sourceStyleProxy.dataset.bdaStyleType
+  sourceStyleProxy.disabled = source.disabled || source.readOnly || !isEditing()
+  // 与检查器缩略图一致：图片样式进切片选择器（可在其中切到全部样式），声音样式直接进样式库。
+  if (key === "SOUND_STYLE") openStylePicker(sourceStyleProxy)
+  else void openStyleReferenceStateImage(sourceStyleProxy, key, false)
 }
 
 let stylePickerTarget: HTMLInputElement | undefined
@@ -5723,14 +5582,14 @@ function applyStyleLibrarySelection(): void {
     target.value = selected.styleID
     target.dispatchEvent(new Event("input", { bubbles: true }))
     target.dispatchEvent(new Event("change", { bubbles: true }))
-    stylePickerDialog.close()
+    closeStylePicker()
   } else if (selected.imagePath) {
     const styleID = target.value.split(",")[0]?.trim() ?? ""
     if (archive?.format === "bda") {
       const ref = bdaStyleRef(styleID)
       if (ref?.type !== "image") return
       if (updateBdaRefs([ref], styleLibraryHighlighted ? "HL_IMG" : "NM_IMG", bdaImageResourceID(selected.imagePath))) {
-        stylePickerDialog.close()
+        closeStylePicker()
         void refreshStyleReferenceThumbnails()
       }
     } else {
@@ -5773,14 +5632,21 @@ function previewStyleLibraryItem(
   styleLibraryPreview.hidden = false
 }
 
-styleLibraryApply.addEventListener("click", applyStyleLibrarySelection)
-styleLibraryEdit.addEventListener("click", () => {
+function closeStylePicker(): void {
+  stylePickerDialog.close()
+  if (isTauri()) void WebviewWindow.getByLabel("image-picker").then((pickerWindow) => pickerWindow?.close())
+}
+
+function editStyleLibrarySelection(): void {
   const selected = styleLibrarySelected
   if (!selected) return
-  stylePickerDialog.close()
+  closeStylePicker()
   if (selected.styleID) openStyleReferenceEditor(selected.styleID)
   else if (selected.imagePath) selectFile(selected.imagePath, "overview")
-})
+}
+
+styleLibraryApply.addEventListener("click", applyStyleLibrarySelection)
+styleLibraryEdit.addEventListener("click", editStyleLibrarySelection)
 $("#style-library-preview-close").addEventListener("click", () => { styleLibraryPreview.hidden = true })
 for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-mode]")) {
   button.addEventListener("click", () => {
@@ -5988,9 +5854,114 @@ function openStylePicker(input: HTMLInputElement, highlighted = false): void {
   styleLibrarySelected = undefined
   styleLibraryPreview.hidden = true
   stylePickerSearch.value = ""
+  // 桌面端样式库与图片切片共用同一个原生窗口，避免页内弹窗叠加模糊背景导致点击卡顿。
+  if (isTauri()) {
+    void showPickerWindow("styles", "全部样式", 1100, 760)
+    return
+  }
   stylePickerDialog.showModal()
   void renderStylePicker()
   stylePickerSearch.focus()
+}
+
+function nativeStyleLibraryPayload(sliceBack: boolean): Promise<StyleLibraryPayload | undefined> {
+  const target = stylePickerTarget
+  if (!archive || !target) return Promise.resolve(undefined)
+  const source = archive
+  const key = styleReferenceKey(target)
+  const soundOnly = key === "SOUND_STYLE"
+  const styles = styleConfigDocument()
+  const currentID = target.value.split(",")[0]?.trim() ?? ""
+  const targetType = archive.format === "bda" ? target.dataset.bdaStyleType : undefined
+  const bitmaps: Record<string, string> = {}
+  const bitmapKeys = new Map<ImageBitmap, string>()
+  // 位图不能跨窗口传：有归档路径就直接编码原始 PNG，否则（如 BDA 基础皮肤里的图）画到画布再导出。
+  const wireVisual = (visual: Visual | undefined): StyleLibraryVisual | null => {
+    if (!visual) return null
+    const { image, ...rest } = visual
+    if (!image) return rest
+    const bytes = visual.imagePath ? source.getBytes(visual.imagePath) : undefined
+    const imageKey = bytes ? visual.imagePath! : bitmapKeys.get(image) ?? `bitmap:${bitmapKeys.size}`
+    bitmapKeys.set(image, imageKey)
+    if (!bitmaps[imageKey]) {
+      if (bytes) bitmaps[imageKey] = imageDataURL(bytes)
+      else {
+        const canvas = document.createElement("canvas")
+        canvas.width = image.width
+        canvas.height = image.height
+        canvas.getContext("2d")?.drawImage(image, 0, 0)
+        bitmaps[imageKey] = canvas.toDataURL()
+      }
+    }
+    return { ...rest, imageKey }
+  }
+  const payload = {
+    sliceBack,
+    editable: isEditing() && !target.disabled,
+    canAdd: Boolean(archive.isText(styleConfigPath()) && archive.format !== "bda"),
+    soundOnly,
+    foreground: styleReferenceForeground(key),
+    bda: archive.format === "bda",
+    kind: styleKindForKey(key),
+    currentID,
+    currentLabel: currentID ? stylePickerLabel(currentID) : "",
+    source: (soundOnly ? styleConfigPath() : layoutPath).split("/").pop() || "当前皮肤",
+    imagesCompatible: !targetType || bdaStyleRef(currentID)?.type === "image",
+    bitmaps,
+    styles: [] as StyleLibraryPayload["styles"],
+    images: [] as StyleLibraryPayload["images"],
+    sounds: [] as StyleLibraryPayload["sounds"],
+  }
+  if (soundOnly) {
+    payload.sounds = availableStyleIDs().flatMap((styleID) => {
+      const filename = styles?.get(`STYLE${styleID}`, "PRESS_SOUND_PATH")?.trim() ?? ""
+      if (!filename) return []
+      const playable = Boolean(soundPathForFilename(source.names(), theme.value, orientation.value, filename))
+      return [{ styleID, filename, playable }]
+    })
+    return Promise.resolve(payload)
+  }
+  const resolver = visualResolver()
+  if (!resolver) return Promise.resolve(payload)
+  return Promise.all(availableStyleIDs().map(async (styleID) => ({
+    styleID,
+    visuals: await Promise.all([resolver.resolve(styleID, false).catch(() => undefined), resolver.resolve(styleID, true).catch(() => undefined)]),
+  }))).then((items) => {
+    const imageCategories = new Map<string, Set<string>>()
+    payload.styles = items.map(({ styleID, visuals }) => {
+      const categories = styleLibraryCategories(styleID)
+      for (const visual of visuals) {
+        if (!visual?.imagePath) continue
+        const merged = imageCategories.get(visual.imagePath) ?? new Set<string>()
+        for (const category of categories) merged.add(category)
+        imageCategories.set(visual.imagePath, merged)
+      }
+      const kind = styleKind(styleID, styles)
+      return {
+        styleID,
+        label: stylePickerLabel(styleID),
+        kind,
+        kindLabel: styleKinds[kind].label,
+        kindIcon: styleKinds[kind].icon,
+        categories: [...categories],
+        compatible: !targetType || bdaStyleRef(styleID)?.type === targetType,
+        imagePaths: visuals.flatMap((visual) => visual?.imagePath ? [visual.imagePath] : []),
+        visuals: visuals.map(wireVisual),
+      }
+    })
+    payload.images = resourceImagePaths(source.names(), theme.value, orientation.value).flatMap((path) => {
+      const bytes = source.getBytes(path)
+      if (!bytes) return []
+      bitmaps[path] ??= imageDataURL(bytes)
+      return [{ path, categories: [...imageCategories.get(path) ?? []], referenced: imageCategories.has(path) }]
+    })
+    return payload
+  })
+}
+
+async function emitStyleLibrary(sliceBack = false): Promise<void> {
+  const payload = await nativeStyleLibraryPayload(sliceBack)
+  if (payload) await emitTo("image-picker", "style-library-data", payload)
 }
 
 for (const input of [...keyboardFields, ...toolbarFields, ...keyFields]) decorateStyleReferenceInput(input)
@@ -6001,11 +5972,12 @@ stylePickerClose.addEventListener("click", () => stylePickerDialog.close())
 let newStyleApplyTarget: HTMLInputElement | undefined
 const stylePickerAdd = $("#style-picker-add") as HTMLButtonElement
 newStyleDialog.addEventListener("close", () => { newStyleApplyTarget = undefined })
-stylePickerAdd.addEventListener("click", () => {
+function addStyleFromLibrary(): void {
   newStyleApplyTarget = stylePickerTarget
-  stylePickerDialog.close()
+  closeStylePicker()
   styleAddButton.click()
-})
+}
+stylePickerAdd.addEventListener("click", addStyleFromLibrary)
 stylePickerDialog.addEventListener("click", (event) => {
   const rect = stylePickerDialog.getBoundingClientRect()
   if (event.target === stylePickerDialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) stylePickerDialog.close()
@@ -7163,6 +7135,8 @@ function populateKeyInspector(): void {
     const property = label.querySelector<HTMLInputElement>("[data-style-field]")?.dataset.styleField ?? ""
     label.hidden = !bdaTextPropertyAvailability.get(property)
   }
+  const typographySubtitle = quickInspector.querySelector(".typography-subtitle-default")
+  if (typographySubtitle) typographySubtitle.textContent = hasSelection && !hasTextStyle ? "前景样式不含文字属性，只能修改显示内容" : "显示内容与字体颜色"
   const paddingSection = quickInspector.querySelector<HTMLElement>(".inspector-padding-section")
   if (paddingSection) paddingSection.hidden = bdaSelected || !hasSelection || sections.some(isListCell) || !sections.every((section) => effectiveKeyValue(section, "PADDING") !== undefined)
   const multiLayout = $("#inspector-multi-layout")
@@ -7226,7 +7200,8 @@ function populateKeyInspector(): void {
         ? hasSelection
           ? "混合操作"
           : ""
-        : actionDescription(values[0])
+        // 空值由输入框占位符提示「未配置」，这里不再重复
+        : values[0] ? actionDescription(values[0]) : ""
   }
   for (const field of keyFields) syncActionCodeSuggestions(field)
   void updateStylePreviews()
@@ -7262,9 +7237,9 @@ function renameDocumentTitle(): void {
   input.type = "text"
   input.value = current
   input.setAttribute("aria-label", "皮肤名称")
-  const title = documentName.parentElement
-  if (!title) return
-  currentNode.replaceWith(input)
+  // 复用原标题节点：替换节点会让全局 documentName 指向脱离 DOM 的旧节点，导致只能改名一次
+  currentNode.hidden = true
+  currentNode.after(input)
   input.select()
   input.focus()
 
@@ -7273,13 +7248,9 @@ function renameDocumentTitle(): void {
     if (finished) return
     finished = true
     const next = save ? input.value.trim() : current
-    const label = document.createElement("strong")
-    label.id = "document-name"
-    label.setAttribute("role", "button")
-    label.tabIndex = 0
-    label.title = "点击修改皮肤名称"
-    label.textContent = next || current
-    input.replaceWith(label)
+    currentNode.textContent = next || current
+    currentNode.hidden = false
+    input.remove()
     if (!save || !next || next === current) return
     // Keep the archive's skin metadata in sync with the title when available.
     const infoPath = currentArchive.names().includes(`${theme.value}/skin/Info.txt`)
@@ -7529,7 +7500,7 @@ function imageDataURL(bytes: Uint8Array): string {
 
 // 图片切片与「全部图片」列表共用一个窗口，不再另开资源窗口。
 async function showPickerWindow(
-  view: "image" | "list",
+  view: "image" | "list" | "styles",
   title: string,
   width: number,
   height: number,
@@ -7537,6 +7508,7 @@ async function showPickerWindow(
   const existing = await WebviewWindow.getByLabel("image-picker")
   if (existing) {
     if (view === "list") await emitTo("image-picker", "image-picker-show-list")
+    else if (view === "styles") await emitStyleLibrary()
     else if (nativeImagePickerPayload) await emitTo("image-picker", "image-picker-data", nativeImagePickerPayload)
     await existing.setFocus()
     return
@@ -7619,14 +7591,9 @@ function renderStyleImageResources(): void {
 
 function openStyleImageResourcePicker(): void {
   if (isTauri() || !archive || (!pickerTarget && !resourcePickerSelect)) return
-  ++styleImageGalleryRenderID
-  styleImageMore.hidden = true
   styleImageSource.hidden = !(pickerTarget?.path && pickerTarget.sections?.length)
-  styleImageMore.setAttribute("aria-expanded", "false")
-  styleImageGallery.hidden = true
   if (!pickerTarget) {
     showStyleImageDialog()
-    styleImagePreview.hidden = true
     styleImagePicker.hidden = true
     styleImageResourceOpen.hidden = true
     styleImageTitle.textContent = "选择图片资源"
@@ -7638,8 +7605,6 @@ function openStyleImageResourcePicker(): void {
 }
 
 function clearImageSlicePicker(): void {
-  ++styleImageGalleryRenderID
-  sourceStylePreviewID = ""
   if (pickerURL) URL.revokeObjectURL(pickerURL)
   pickerURL = ""
   pickerImage = undefined
@@ -7649,18 +7614,8 @@ function clearImageSlicePicker(): void {
   resourcePickerSelect = undefined
   pickerSelectedIndex = undefined
   styleImagePicker.hidden = true
-  styleImagePreview.hidden = false
   styleImageResourceOpen.hidden = true
   styleImageSource.hidden = true
-  styleImageMore.hidden = true
-  styleImageMore.setAttribute("aria-expanded", "false")
-  styleImageMore.title = "更多样式"
-  styleImageMore.setAttribute("aria-label", "展示全部样式")
-  styleImageGallery.hidden = true
-  styleImageGallerySearch.value = ""
-  styleImageGalleryGrid.replaceChildren()
-  styleImageGalleryCount.textContent = ""
-  styleImageGalleryEmpty.hidden = true
   closeStyleImageResourcePicker()
   styleImageImgList.replaceChildren()
   styleImageResourceCount.textContent = ""
@@ -7675,8 +7630,13 @@ function clearImageSlicePicker(): void {
 
 function drawImageSlicePicker(): void {
   if (!pickerImage?.naturalWidth) return
-  pickerScale = drawSlicePicker(styleImagePickerCanvas, pickerImage, pickerSlices, pickerSelectedIndex, pickerFit * pickerZoom, { normal: "#3a6df0", selected: "#ff6b2c" })
+  pickerScale = drawSlicePicker(styleImagePickerCanvas, pickerImage, pickableSlices(pickerSlices, pickerImage), pickerSelectedIndex, pickerFit * pickerZoom, { normal: "#3a6df0", selected: "#ff6b2c" })
   pickerOffset = { x: 0, y: 0 }
+}
+
+function pickerImageReference(index: number): string {
+  const name = pickerPath.split("/").pop()?.replace(/\.png$/i, "") ?? pickerPath
+  return index === WHOLE_IMAGE_INDEX ? name : `${name},${index}`
 }
 
 function openImageSlicePicker(path: string, target: StyleImagePickerTarget, selectedSource?: TileRect): void {
@@ -7689,7 +7649,9 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
   pickerTarget = target
   const tilePathForPicker = path.replace(/\.png$/i, ".til")
   pickerSlices = archive.isText(tilePathForPicker) ? tileSlices(IniDocument.parse(archive.getText(tilePathForPicker))) : []
-  pickerSelectedIndex = pickerSlices.find((slice) => selectedSource && slice.source.join(",") === selectedSource.join(","))?.index
+  pickerSelectedIndex = !pickerSlices.length && selectedSource
+    ? WHOLE_IMAGE_INDEX
+    : pickerSlices.find((slice) => selectedSource && slice.source.join(",") === selectedSource.join(","))?.index
   nativeImagePickerPayload = {
     path,
     dataURL: imageDataURL(bytes),
@@ -7697,7 +7659,8 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
     selectedIndex: pickerSelectedIndex,
     editable: isEditing(),
     styleName: imagePickerStyleName(target),
-    styleLibrary: Boolean(stylePickerTarget?.isConnected),
+    // 行内缩略图传入的是未挂载的克隆输入框，只要有引用目标就能回到样式库。
+    styleLibrary: Boolean(stylePickerTarget),
   }
   if ("__TAURI_INTERNALS__" in window) {
     if (styleImageDialog.open) styleImageDialog.close()
@@ -7716,17 +7679,12 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
     drawImageSlicePicker()
   }
   pickerImage.src = pickerURL
-  ++styleImageGalleryRenderID
-  styleImageMore.hidden = true
   styleImageSource.hidden = !(target.path && target.sections?.length)
-  styleImageMore.setAttribute("aria-expanded", "false")
-  styleImageGallery.hidden = true
-  styleImagePreview.hidden = true
   styleImagePicker.hidden = false
   styleImageResourceOpen.hidden = false
   styleImageTitle.textContent = path.split("/").pop() ?? path
   styleImageSubtitle.textContent = " · 选择切片"
-  styleImagePickerMeta.textContent = `${pickerSlices.length ? "点击图片中的切片以修改引用" : "此图片没有可用的 TIL 切片"} · ⌘/Ctrl + 滚轮或双指捏合缩放`
+  styleImagePickerMeta.textContent = `${pickerSlices.length ? "点击图片中的切片以修改引用" : "点击整张图以修改引用"} · ⌘/Ctrl + 滚轮或双指捏合缩放`
   showStyleImageDialog()
 }
 
@@ -9042,7 +9000,8 @@ async function loadArchive(
   saveButton.disabled = false
   for (const button of exportButtons) {
     const format = button.dataset.exportFormat as ExportFormat
-    button.disabled = archive.format !== "bda" && format === "bda"
+    button.hidden = archive.format !== "bda" && format === "bda"
+    button.disabled = button.hidden
   }
   updateFileOperationProgress(68, "正在生成文件列表…")
   await waitForInterfacePaint()
@@ -9651,10 +9610,9 @@ openButton.addEventListener("click", () => {
     })
   }
 })
-emptyOpenButton.addEventListener("click", () => openButton.click())
 
 const recentFilesKey = "recent-files"
-const recentFilesLimit = 6
+const recentFilesLimit = 9
 
 interface RecentFile {
   path: string
@@ -9712,31 +9670,6 @@ function recentFolderLabel(path: string): string {
   if (parts.length < 2) return ""
   const folder = parts.slice(0, -1)
   return folder.length > 2 ? `…/${folder.slice(-2).join("/")}` : folder.join("/")
-}
-
-function recentAsideItem(item: RecentFile): HTMLButtonElement {
-  const button = document.createElement("button")
-  button.type = "button"
-  button.className = "recent-item"
-  button.title = item.path
-  const icon = document.createElement("span")
-  icon.className = "recent-icon"
-  icon.append(createSystemSymbol("keyboard"))
-  const copy = document.createElement("span")
-  copy.className = "recent-copy"
-  const name = document.createElement("span")
-  name.className = "recent-name"
-  name.textContent = item.name
-  const path = document.createElement("span")
-  path.className = "recent-path"
-  path.textContent = item.path
-  copy.append(name, path)
-  const time = document.createElement("span")
-  time.className = "recent-time"
-  time.textContent = formatRecentTime(item.at)
-  button.append(icon, copy, time)
-  button.addEventListener("click", () => openRecentFile(item))
-  return button
 }
 
 function recentFormatLabel(path: string): string {
@@ -9803,12 +9736,56 @@ function waitForPreviewFrame(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()))
 }
 
-// 最近皮肤最多 6 张，逐个串行取图，避免同时读多份皮肤阻塞 UI。
+// 最近皮肤最多 9 张，逐个串行取图，避免同时读多份皮肤阻塞 UI。
 const recentPreviewQueue: HTMLButtonElement[] = []
 const recentPreviewQueued = new Set<HTMLButtonElement>()
 let recentPreviewRunning = false
 
+// 持久缩略图缓存：重启后不必再读整包解 demo 图。按路径存，条目随最近列表裁剪（最多 9 个）。
+let recentThumbDb: Promise<IDBDatabase> | undefined
+
+function recentThumbRequest<T>(
+  mode: IDBTransactionMode,
+  run: (store: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
+  recentThumbDb ??= new Promise((resolve, reject) => {
+    const request = indexedDB.open("recent-previews", 1)
+    request.onupgradeneeded = () => request.result.createObjectStore("previews")
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  return recentThumbDb.then((db) => new Promise<T>((resolve, reject) => {
+    const request = run(db.transaction("previews", mode).objectStore("previews"))
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  }))
+}
+
+interface RecentThumb {
+  stamp: string
+  blob: Blob
+}
+
 async function renderRecentPreview(path: string, host: HTMLElement): Promise<HTMLImageElement> {
+  const stamp = (await invoke<number[]>("skin_file_stamp", { path })).join(":")
+  const stored = await recentThumbRequest<RecentThumb | undefined>("readonly", (store) => store.get(path))
+    .catch(() => undefined)
+  if (stored?.stamp === stamp) {
+    try {
+      return await renderBlobPreview(stored.blob, host)
+    } catch {
+      // 缓存的图解码失败就当没缓存，重新从皮肤包取。
+    }
+  }
+  const image = await renderArchivePreviewWithRetry(path, host)
+  void fetch(image.src)
+    .then((response) => response.blob())
+    .then((blob) => recentThumbRequest("readwrite", (store) => store.put({ stamp, blob } satisfies RecentThumb, path)))
+    .catch(() => undefined)
+  return image
+}
+
+async function renderArchivePreviewWithRetry(path: string, host: HTMLElement): Promise<HTMLImageElement> {
   let lastError: unknown
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -9870,7 +9847,7 @@ function queueRecentPreview(card: HTMLButtonElement): void {
   void drainRecentPreviews()
 }
 
-// 只渲染真正滚进视野的卡片：6 张十几 MB 的皮肤不该在启动时全部读一遍。
+// 只渲染真正滚进视野的卡片：9 张十几 MB 的皮肤不该在启动时全部读一遍。
 const welcomeScroller = document.querySelector<HTMLElement>(".welcome-main")
 const recentPreviewObserver = welcomeScroller && "IntersectionObserver" in window
   ? new IntersectionObserver((entries) => {
@@ -9896,17 +9873,12 @@ function observeRecentPreviews(): void {
 }
 
 function renderRecentFiles(): void {
-  const list = $("#recent-list")
-  const empty = $("#recent-empty")
   const clear = $("#recent-clear")
-  if (!list || !empty) return
   recentPreviewObserver?.disconnect()
   recentPreviewQueue.length = 0
   recentPreviewQueued.clear()
   const items = readRecentFiles()
   clear?.toggleAttribute("hidden", items.length === 0)
-  empty.hidden = items.length > 0
-  list.replaceChildren(...items.map(recentAsideItem))
   const grid = $("#welcome-recent-grid")
   const gridEmpty = $("#welcome-recent-empty")
   const hint = $("#welcome-recent-hint")
@@ -9921,6 +9893,10 @@ function renderRecentFiles(): void {
     releaseArchivePreview(image)
     recentPreviewCache.delete(path)
   }
+  void recentThumbRequest("readonly", (store) => store.getAllKeys())
+    .then((keys) => Promise.all(keys.filter((key) => !listed.has(String(key)))
+      .map((key) => recentThumbRequest("readwrite", (store) => store.delete(key)))))
+    .catch(() => undefined)
   if (items.length) observeRecentPreviews()
 }
 
@@ -9928,12 +9904,11 @@ $("#recent-clear")?.addEventListener("click", () => {
   localStorage.removeItem(recentFilesKey)
   for (const image of recentPreviewCache.values()) releaseArchivePreview(image)
   recentPreviewCache.clear()
+  void recentThumbRequest("readwrite", (store) => store.clear()).catch(() => undefined)
   renderRecentFiles()
 })
 
-for (const trigger of [$("#welcome-recent-open"), $("#welcome-recent-empty-open")]) {
-  trigger?.addEventListener("click", () => openButton.click())
-}
+$("#welcome-recent-open")?.addEventListener("click", () => openButton.click())
 renderRecentFiles()
 
 void hydrateTemplateCardPreviews(document.querySelector(".template-grid")!, { lazy: true })
@@ -10032,7 +10007,6 @@ function showSettingsPage(page: string): void {
   const target = settingsPages.find(panel => panel.dataset.settingsPanel === page && !panel.hasAttribute("data-platform-hidden"))
     ?? settingsPages.find(panel => !panel.hasAttribute("data-platform-hidden"))
   if (!target) return
-  $("#settings-crumb").textContent = target.querySelector("h3")?.textContent?.replace(/^关于.*/, "关于") ?? "设置"
   for (const panel of settingsPages) panel.hidden = panel !== target
   for (const button of settingsNavItems) {
     const selected = button.dataset.settingsPage === target.dataset.settingsPanel
@@ -11166,7 +11140,8 @@ source.addEventListener("valueclick", (event) => {
   const detail = (event as CustomEvent<SourceEditorValueClick>).detail
   if (!detail || detail.kind === "action") return
   if (detail.kind === "color") openSourceColorPicker(detail)
-  else if (detail.kind === "style") openSourceStylePreview(detail)
+  else if (detail.kind === "style" && detail.modifier) openSourceStyleDefinition(detail.value.replace(/^STYLE/i, ""))
+  else if (detail.kind === "style") openSourceStylePicker(detail)
 })
 sourceSearch.addEventListener("input", () => {
   sourceSearchIndex = sourceSearch.value.trim() ? 0 : -1
@@ -11946,24 +11921,21 @@ bindSlicePickerZoom(styleImagePicker, styleImagePickerCanvas, (factor) => {
 })
 styleImagePickerCanvas.addEventListener("click", (event) => {
   if (!isEditing()) return
-  if (!pickerImage || !pickerTarget || !pickerSlices.length) return
+  if (!pickerImage || !pickerTarget) return
   const bounds = styleImagePickerCanvas.getBoundingClientRect()
   const point = {
     x: ((event.clientX - bounds.left) / bounds.width) * styleImagePickerCanvas.width,
     y: ((event.clientY - bounds.top) / bounds.height) * styleImagePickerCanvas.height,
   }
   const imagePoint = { x: (point.x - pickerOffset.x) / pickerScale, y: (point.y - pickerOffset.y) / pickerScale }
-  const selected = tileSliceAt(pickerSlices, imagePoint)
+  const selected = tileSliceAt(pickableSlices(pickerSlices, pickerImage), imagePoint)
   if (!selected) return
   pickerSelectedIndex = selected.index
-  const name = pickerPath.split("/").pop()?.replace(/\.png$/i, "") ?? pickerPath
-  updateSelectedImageReference(pickerTarget, `${name},${selected.index}`)
+  updateSelectedImageReference(pickerTarget, pickerImageReference(selected.index))
   drawImageSlicePicker()
 })
 styleImageClose.addEventListener("click", clearImageSlicePicker)
-styleImageSource.addEventListener("click", openSourceStyleDefinition)
-styleImageMore.addEventListener("click", toggleStyleImageGallery)
-styleImageGallerySearch.addEventListener("input", () => void renderStyleImageGallery())
+styleImageSource.addEventListener("click", () => openSourceStyleDefinition())
 styleImageDialog.addEventListener("cancel", (event) => {
   event.preventDefault()
   clearImageSlicePicker()
@@ -11992,20 +11964,30 @@ if (isTauri()) {
   void listen("new-project-cancel", () => finishNativeProjectChoice())
   void listen("picker-window-ready", () => {
     if (pickerRequestedView === "list") void emitTo("image-picker", "image-picker-show-list")
+    else if (pickerRequestedView === "styles") void emitStyleLibrary()
     else if (nativeImagePickerPayload) void emitTo("image-picker", "image-picker-data", nativeImagePickerPayload)
   })
   void listen<{ index: number }>("image-picker-select", (event) => {
     if (!isEditing() || !pickerTarget) return
-    const selected = pickerSlices.find((slice) => slice.index === event.payload.index)
-    if (!selected) return
-    pickerSelectedIndex = selected.index
-    const name = pickerPath.split("/").pop()?.replace(/\.png$/i, "") ?? pickerPath
-    updateSelectedImageReference(pickerTarget, `${name},${selected.index}`)
+    const { index } = event.payload
+    if (index === WHOLE_IMAGE_INDEX ? pickerSlices.length : !pickerSlices.some((slice) => slice.index === index)) return
+    pickerSelectedIndex = index
+    updateSelectedImageReference(pickerTarget, pickerImageReference(index))
   })
-  void listen("image-picker-back-styles", () => {
-    if (!stylePickerTarget?.isConnected) return
-    void WebviewWindow.getByLabel("image-picker").then((pickerWindow) => pickerWindow?.close())
-    openStylePicker(stylePickerTarget, styleLibraryHighlighted)
+  // 切片窗口返回「全部样式」：留在同一个窗口里切视图。
+  void listen("image-picker-back-styles", () => void emitStyleLibrary(true))
+  void listen<{ styleID?: string; imagePath?: string }>("style-library-apply", (event) => {
+    styleLibrarySelected = event.payload
+    applyStyleLibrarySelection()
+  })
+  void listen<{ styleID?: string; imagePath?: string }>("style-library-edit", (event) => {
+    styleLibrarySelected = event.payload
+    editStyleLibrarySelection()
+  })
+  void listen("style-library-add", addStyleFromLibrary)
+  void listen<{ filename: string }>("style-library-play", (event) => {
+    const path = soundPathForFilename(archive?.names() ?? [], theme.value, orientation.value, event.payload.filename)
+    if (path) playSoundPath(path)
   })
   void listen("image-picker-resources-request", () => {
     void emitTo("image-picker", "image-picker-resources-data", resourcePickerPayload())

@@ -1,7 +1,9 @@
 const fs = await import('node:fs/promises');
 await page.goto('http://127.0.0.1:4189/', { waitUntil: 'networkidle' });
 await page.setViewportSize({ width: 1440, height: 1000 });
-await page.locator('#browser-open').setInputFiles({ name: '3花季-IOS.bda', mimeType: 'application/octet-stream', buffer: await fs.readFile('/Users/kaze/work/bd/3花季-IOS.bda') });
+// 真实 BDA 路径可用 REAL_BDA 覆盖。
+const skin = process.env.REAL_BDA ?? '/Users/kaze/work/bd/5边缘-百度安卓（藏青色）.bda';
+await page.locator('#browser-open').setInputFiles({ name: skin.split('/').pop(), mimeType: 'application/octet-stream', buffer: await fs.readFile(skin) });
 await expect(page.locator('#bda-config-fields')).toHaveAttribute('data-bda-scope', 'panel', { timeout: 30000 });
 const close = page.locator('#file-operation-dialog[open]').getByRole('button', { name: '关闭', exact: true });
 if (await close.isVisible()) await close.click();
@@ -32,4 +34,4 @@ await page.setViewportSize({ width: 390, height: 844 });
 await page.locator('[data-mobile-pane=inspector]').first().click();
 expect(await page.locator('#quick-inspector').evaluate(n => n.scrollWidth <= n.clientWidth)).toBe(true);
 await page.setViewportSize({ width: 1440, height: 1000 });
-return { passed: true, checks: ['iOS BDA imported', 'BDA panel flags', 'panel/key separation', 'no INI appearance controls', 'normal/pressed state', 'style picker', '390px overflow'], screenshot: await page.screenshot({ path: artifactPath('bda-key-right-sidebar.png') }) };
+return { passed: true, checks: ['real BDA imported', 'BDA panel flags', 'panel/key separation', 'no INI appearance controls', 'normal/pressed state', 'style picker', '390px overflow'] };

@@ -1,8 +1,10 @@
 import { emitTo, listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { LogicalSize } from "@tauri-apps/api/dpi"
-import { bindSlicePickerZoom, drawSlicePicker, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM } from "./slice-picker-canvas.ts"
+import { bindSlicePickerZoom, drawSlicePicker, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM, pickableSlices } from "./slice-picker-canvas.ts"
 import { tileSliceAt, type TilePoint, type TileSlice } from "./tiles.ts"
+import { drawVisualPreview, retinaThumbnail, type Visual } from "./atlas.ts"
+import { inspectorIcon } from "./inspector-icons.ts"
 
 type ImagePayload = {
   path: string
@@ -16,6 +18,36 @@ type ImagePayload = {
 
 type ResourcePayload = { path: string; dataURL: string }[]
 
+// 位图不能跨窗口传，图片以 bitmaps 里的 data URL 传过来，由 imageKey 引用。
+export type StyleLibraryVisual = Omit<Visual, "image"> & { imageKey?: string }
+export type StyleLibraryPayload = {
+  sliceBack: boolean
+  editable: boolean
+  canAdd: boolean
+  soundOnly: boolean
+  foreground: boolean
+  bda: boolean
+  kind: string
+  currentID: string
+  currentLabel: string
+  source: string
+  imagesCompatible: boolean
+  bitmaps: Record<string, string>
+  styles: {
+    styleID: string
+    label: string
+    kind: string
+    kindLabel: string
+    kindIcon: string
+    categories: string[]
+    compatible: boolean
+    imagePaths: string[]
+    visuals: Array<StyleLibraryVisual | null>
+  }[]
+  images: { path: string; categories: string[]; referenced: boolean }[]
+  sounds: { styleID: string; filename: string; playable: boolean }[]
+}
+
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 const title = $("#picker-title")
 const styleName = $("#picker-style")
@@ -26,9 +58,17 @@ const search = $("#resource-search") as HTMLInputElement
 const imageView = $("#image-picker-view")
 const resourceView = $("#resource-picker-view")
 const canvas = $("#picker-canvas") as HTMLCanvasElement
-const meta = $("#picker-meta")
 const grid = $("#resource-picker-grid")
 const empty = $("#resource-empty")
+const libraryView = $("#style-library-view")
+const libraryGrid = $("#style-library-grid")
+const libraryEmpty = $("#style-library-empty")
+const libraryKinds = $("#style-library-kinds")
+const libraryFilters = $("#style-library-filters")
+const libraryAdd = $("#style-library-add") as HTMLButtonElement
+const libraryPreview = $("#style-library-preview")
+const libraryPreviewImage = $("#style-library-preview-image")
+const libraryApply = $("#style-library-apply") as HTMLButtonElement
 const isTauri = "__TAURI_INTERNALS__" in window
 
 let imagePayload: ImagePayload | undefined
@@ -39,7 +79,13 @@ let zoom = 1
 let offset: TilePoint = { x: 0, y: 0 }
 let resources: ResourcePayload = []
 let resourcesLoaded = false
-let view: "empty" | "image" | "resources" = "empty"
+let view: "empty" | "image" | "resources" | "styles" = "empty"
+let library: StyleLibraryPayload | undefined
+let libraryMode: "styles" | "images" = "styles"
+let libraryKind = "all"
+let libraryFilter = "all"
+let librarySelected: { styleID?: string; imagePath?: string } | undefined
+const libraryBitmaps = new Map<string, Promise<ImageBitmap | undefined>>()
 
 function setWindowTitle(text: string): void {
   if (isTauri) void getCurrentWindow().setTitle(text)
@@ -53,15 +99,14 @@ async function fitWindowHeight(): Promise<void> {
   const scaleFactor = inner.height / window.innerHeight
   const chrome = (outer.height - inner.height) / scaleFactor
   // documentElement.scrollHeight 不小于视口高度，窗口只会变大不会缩小，所以量 body
-  // 画布区域限高后内部滚动，加回它被截掉的部分才是完整内容高度
-  const stage = $(".picker-canvas-stage")
-  const content = document.body.scrollHeight - stage.clientHeight + stage.scrollHeight
+  // 画布区域铺满窗口并内部滚动，按画布本身（加内边距）算内容高度
+  const content = $(".picker-toolbar").offsetHeight + Math.max(300, canvas.offsetHeight + 32)
   void appWindow.setSize(new LogicalSize(outer.width / scaleFactor, Math.ceil(content + chrome)))
 }
 
 function drawImage(): void {
   if (!image?.naturalWidth || !imagePayload) return
-  scale = drawSlicePicker(canvas, image, imagePayload.slices, imagePayload.selectedIndex, fit * zoom, { normal: "#0a84ff", selected: "#ff453a" })
+  scale = drawSlicePicker(canvas, image, pickableSlices(imagePayload.slices, image), imagePayload.selectedIndex, fit * zoom, { normal: "#0a84ff", selected: "#ff453a" })
   offset = { x: 0, y: 0 }
 }
 
@@ -103,6 +148,7 @@ function showEmptyView(): void {
   view = "empty"
   imageView.hidden = true
   resourceView.hidden = true
+  libraryView.hidden = true
   search.hidden = true
   back.hidden = true
   styleName.hidden = true
@@ -113,6 +159,7 @@ function showSliceView(): void {
   view = "image"
   imageView.hidden = false
   resourceView.hidden = true
+  libraryView.hidden = true
   search.hidden = true
   back.hidden = !imagePayload
   backLabel.textContent = imagePayload?.styleLibrary ? "全部样式" : "全部图片"
@@ -127,7 +174,9 @@ function showResourceList(): void {
   view = "resources"
   imageView.hidden = true
   resourceView.hidden = false
+  libraryView.hidden = true
   search.hidden = false
+  search.placeholder = "搜索图片资源"
   back.hidden = !imagePayload
   backLabel.textContent = "图片切片"
   back.setAttribute("aria-label", "返回图片切片")
@@ -141,12 +190,228 @@ function showResourceList(): void {
   if (isTauri && !resources.length) void emitTo("main", "image-picker-resources-request")
 }
 
+function libraryBitmap(key: string | undefined): Promise<ImageBitmap | undefined> {
+  const dataURL = key ? library?.bitmaps[key] : undefined
+  if (!key || !dataURL) return Promise.resolve(undefined)
+  let bitmap = libraryBitmaps.get(key)
+  if (!bitmap) {
+    const image = new Image()
+    image.src = dataURL
+    bitmap = image.decode().then(() => createImageBitmap(image)).catch(() => undefined)
+    libraryBitmaps.set(key, bitmap)
+  }
+  return bitmap
+}
+
+async function drawLibraryVisual(canvas: HTMLCanvasElement, visual: StyleLibraryVisual | null, foreground: boolean): Promise<void> {
+  if (!visual) return
+  const { imageKey, ...rest } = visual
+  drawVisualPreview(canvas, [{ ...rest, image: await libraryBitmap(imageKey) }], foreground)
+}
+
+// 缩略图进入视口才绘制，几百个样式的窗口打开时不必一次画完。
+const libraryCanvasObserver = new IntersectionObserver((entries) => {
+  for (const entry of entries) {
+    if (!entry.isIntersecting) continue
+    const canvas = entry.target as HTMLCanvasElement & { libraryVisual?: StyleLibraryVisual | null }
+    libraryCanvasObserver.unobserve(canvas)
+    void drawLibraryVisual(canvas, canvas.libraryVisual ?? null, Boolean(library?.foreground))
+  }
+}, { rootMargin: "200px" })
+
+function libraryButtons(selector: string): HTMLButtonElement[] {
+  return Array.from(libraryView.querySelectorAll<HTMLButtonElement>(selector))
+}
+
+function emitLibrary(event: string, payload: unknown = {}): void {
+  if (isTauri) void emitTo("main", event, payload)
+}
+
+function previewLibraryItem(card: HTMLElement, selected: { styleID?: string; imagePath?: string }): void {
+  if (!library) return
+  librarySelected = selected
+  libraryGrid.querySelector(".previewing")?.classList.remove("previewing")
+  card.classList.add("previewing")
+  libraryPreviewImage.replaceChildren()
+  const style = library.styles.find((item) => item.styleID === selected.styleID)
+  if (selected.imagePath) {
+    const image = new Image()
+    image.alt = selected.imagePath.split("/").pop() ?? selected.imagePath
+    image.src = library.bitmaps[selected.imagePath] ?? ""
+    libraryPreviewImage.append(image)
+  } else {
+    for (const visual of style?.visuals ?? []) {
+      const canvas = retinaThumbnail(document.createElement("canvas"), 180, 120)
+      void drawLibraryVisual(canvas, visual, false)
+      libraryPreviewImage.append(canvas)
+    }
+  }
+  $("#style-library-preview-title").textContent = selected.imagePath?.split("/").pop() ?? `样式 ${style?.label ?? selected.styleID}`
+  $("#style-library-preview-meta").textContent = selected.imagePath ?? "正常 / 按下 · 确认后应用到当前项"
+  const compatible = selected.imagePath ? library.imagesCompatible : Boolean(style?.compatible)
+  libraryApply.disabled = !compatible || !library.editable
+  libraryApply.textContent = !compatible ? "样式类型不兼容" : selected.imagePath && !library.bda ? "选择切片并应用" : "应用到当前项"
+  libraryPreview.hidden = false
+}
+
+function renderLibrarySounds(payload: StyleLibraryPayload, query: string): number {
+  const sounds = payload.sounds.filter(({ styleID, filename }) => !query || styleID.includes(query) || filename.toLowerCase().includes(query))
+  for (const { styleID, filename, playable } of sounds) {
+    const card = document.createElement("div")
+    card.className = "style-library-item style-library-sound"
+    card.classList.toggle("selected", payload.currentID === styleID)
+    const select = document.createElement("button")
+    select.type = "button"
+    select.title = `点击使用声音样式 ${styleID}；Command/Ctrl 点击编辑`
+    const label = document.createElement("strong")
+    label.textContent = `STYLE${styleID}`
+    const name = document.createElement("small")
+    name.textContent = filename
+    select.append(inspectorIcon("music", 16), label, name)
+    select.addEventListener("click", (event) => emitLibrary(event.metaKey || event.ctrlKey ? "style-library-edit" : "style-library-apply", { styleID }))
+    const play = document.createElement("button")
+    play.type = "button"
+    play.disabled = !playable
+    play.title = playable ? `播放 ${filename}` : "声音文件不存在"
+    play.setAttribute("aria-label", play.title)
+    play.append(inspectorIcon("play", 14))
+    play.addEventListener("click", () => emitLibrary("style-library-play", { filename }))
+    card.append(select, play)
+    libraryGrid.append(card)
+  }
+  $("#style-library-status").textContent = `显示 ${sounds.length} 个声音样式`
+  return sounds.length
+}
+
+function renderLibrary(): void {
+  const payload = library
+  for (const canvas of Array.from(libraryGrid.querySelectorAll("canvas"))) libraryCanvasObserver.unobserve(canvas)
+  libraryGrid.replaceChildren()
+  libraryPreview.hidden = true
+  librarySelected = undefined
+  if (!payload) {
+    libraryEmpty.textContent = "正在加载样式…"
+    libraryEmpty.hidden = false
+    return
+  }
+  const sound = payload.soundOnly
+  const images = libraryMode === "images" && !sound
+  title.textContent = images ? "全部图片" : "全部样式"
+  setWindowTitle(title.textContent)
+  subtitle.textContent = sound ? `${payload.sounds.length} 个声音样式` : `${payload.styles.length} 个样式 · ${payload.images.length} 张图片`
+  search.placeholder = images ? "搜索图片名称" : "搜索样式名称或编号"
+  for (const button of libraryButtons("[data-library-mode]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.libraryMode === libraryMode))
+    button.disabled = sound && button.dataset.libraryMode === "images"
+  }
+  const kinds = new Set(payload.styles.map((item) => item.kind))
+  for (const button of libraryButtons("[data-library-kind]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.libraryKind === libraryKind))
+    button.hidden = button.dataset.libraryKind !== "all" && !kinds.has(button.dataset.libraryKind!)
+  }
+  for (const button of libraryButtons("[data-library-filter]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.libraryFilter === libraryFilter))
+  }
+  libraryKinds.hidden = images || sound
+  libraryFilters.hidden = sound
+  libraryAdd.hidden = !payload.canAdd
+  libraryAdd.disabled = !payload.editable
+  const hint = sound ? "单击应用声音样式 · Command/Ctrl 单击编辑" : "单击预览 · 双击应用 · Command/Ctrl 单击编辑"
+  $("#style-library-source").textContent = `${hint} · 来源 ${payload.source}`
+  const query = search.value.trim().toLowerCase().replace(/^#/, "")
+  let count: number
+  if (sound) count = renderLibrarySounds(payload, query)
+  else {
+    const currentImages = payload.styles.find((item) => item.styleID === payload.currentID)?.imagePaths ?? []
+    const items = images
+      ? payload.images.filter(({ path, categories }) => path.toLowerCase().includes(query) && (libraryFilter === "all" || categories.includes(libraryFilter)))
+        .map((image) => ({ imagePath: image.path, image, style: undefined }))
+      : payload.styles.filter((style) =>
+        [style.styleID, style.label, ...style.imagePaths].join(" ").toLowerCase().includes(query)
+          && (libraryFilter === "all" || style.categories.includes(libraryFilter))
+          && (libraryKind === "all" || style.kind === libraryKind))
+        .map((style) => ({ imagePath: "", image: undefined, style }))
+    for (const { imagePath, image, style } of items) {
+      const card = document.createElement("button")
+      card.type = "button"
+      card.className = "style-library-item"
+      const selected = imagePath ? currentImages.includes(imagePath) : payload.currentID === style?.styleID
+      card.classList.toggle("selected", selected)
+      card.setAttribute("aria-pressed", String(selected))
+      const previews = document.createElement("span")
+      previews.className = "style-library-previews"
+      if (image) {
+        const preview = new Image()
+        preview.alt = ""
+        preview.loading = "lazy"
+        preview.src = payload.bitmaps[image.path] ?? ""
+        previews.append(preview)
+      } else if (style) {
+        for (const [index, visual] of style.visuals.entries()) {
+          const canvas = retinaThumbnail(document.createElement("canvas"), 128, 88) as HTMLCanvasElement & { libraryVisual?: StyleLibraryVisual | null }
+          canvas.setAttribute("aria-label", index ? "按下状态" : "正常状态")
+          canvas.libraryVisual = visual
+          libraryCanvasObserver.observe(canvas)
+          previews.append(canvas)
+        }
+        const badge = document.createElement("span")
+        badge.className = "style-kind-badge"
+        badge.append(inspectorIcon(style.kindIcon, 11), style.kindLabel)
+        previews.append(badge)
+      }
+      const label = document.createElement("strong")
+      label.textContent = imagePath ? imagePath.split("/").pop()! : `样式 ${style!.label}`
+      card.title = imagePath || `${label.textContent} · 单击预览，双击应用，Command/Ctrl 单击编辑`
+      const note = document.createElement("small")
+      note.textContent = image ? (image.referenced ? "已引用" : "图片资源") : `#${style!.label}`
+      card.append(previews, label, note)
+      const target = imagePath ? { imagePath } : { styleID: style!.styleID }
+      card.addEventListener("click", (event) => {
+        if (event.metaKey || event.ctrlKey) emitLibrary("style-library-edit", target)
+        else previewLibraryItem(card, target)
+      })
+      card.addEventListener("dblclick", () => { if (!libraryApply.disabled) emitLibrary("style-library-apply", target) })
+      libraryGrid.append(card)
+    }
+    count = items.length
+    $("#style-library-status").textContent = `显示 ${count} 项${payload.currentID ? ` · 当前 ${payload.currentLabel}` : ""}`
+  }
+  libraryEmpty.textContent = images ? "没有匹配的图片" : "没有匹配的样式"
+  libraryEmpty.hidden = count > 0
+}
+
+function showStyleLibrary(payload?: StyleLibraryPayload): void {
+  const reset = view !== "styles" || Boolean(payload)
+  view = "styles"
+  imageView.hidden = true
+  resourceView.hidden = true
+  libraryView.hidden = false
+  search.hidden = false
+  styleName.hidden = true
+  subtitle.hidden = false
+  back.hidden = !(payload ?? library)?.sliceBack || !imagePayload
+  backLabel.textContent = "图片切片"
+  back.setAttribute("aria-label", "返回图片切片")
+  if (payload) {
+    library = payload
+    libraryBitmaps.clear()
+    libraryMode = "styles"
+    libraryKind = payload.kind
+    libraryFilter = "all"
+  } else if (reset) library = undefined
+  if (reset) search.value = ""
+  // 切片窗口会按图片高度收窄，样式库需要足够的可视面积。
+  if (isTauri && (window.innerWidth < 960 || window.innerHeight < 680)) {
+    void getCurrentWindow().setSize(new LogicalSize(Math.max(window.innerWidth, 1100), Math.max(window.innerHeight, 760)))
+  }
+  renderLibrary()
+}
+
 function showImage(payload: ImagePayload): void {
   imagePayload = payload
   styleName.textContent = payload.styleName ?? ""
   showSliceView()
-  meta.textContent = `${payload.slices.length ? "点击图片中的切片以修改引用" : "此图片没有可用的 TIL 切片"} · ⌘/Ctrl + 滚轮或双指捏合缩放`
-  canvas.style.cursor = payload.editable && payload.slices.length ? "crosshair" : "default"
+  canvas.style.cursor = payload.editable ? "crosshair" : "default"
   image = new Image()
   image.onload = () => {
     if (!image) return
@@ -161,11 +426,37 @@ function showImage(payload: ImagePayload): void {
 document.title = "图片切片"
 showEmptyView()
 back.addEventListener("click", () => {
-  if (view === "image" && imagePayload?.styleLibrary && isTauri) void emitTo("main", "image-picker-back-styles")
-  else if (view === "image") showResourceList()
+  if (view === "image" && imagePayload?.styleLibrary && isTauri) {
+    showStyleLibrary()
+    void emitTo("main", "image-picker-back-styles")
+  } else if (view === "image") showResourceList()
   else if (imagePayload) showSliceView()
 })
-search.addEventListener("input", filterResources)
+search.addEventListener("input", () => {
+  if (view === "styles") renderLibrary()
+  else filterResources()
+})
+for (const button of libraryButtons("[data-library-mode]")) {
+  button.addEventListener("click", () => {
+    libraryMode = button.dataset.libraryMode as "styles" | "images"
+    libraryFilter = "all"
+    search.value = ""
+    renderLibrary()
+  })
+}
+for (const button of libraryButtons("[data-library-kind]")) {
+  button.addEventListener("click", () => { libraryKind = button.dataset.libraryKind!; renderLibrary() })
+}
+for (const button of libraryButtons("[data-library-filter]")) {
+  button.addEventListener("click", () => { libraryFilter = button.dataset.libraryFilter!; renderLibrary() })
+}
+libraryAdd.addEventListener("click", () => emitLibrary("style-library-add"))
+libraryApply.addEventListener("click", () => { if (librarySelected) emitLibrary("style-library-apply", librarySelected) })
+$("#style-library-edit").addEventListener("click", () => { if (librarySelected) emitLibrary("style-library-edit", librarySelected) })
+$("#style-library-preview-close").addEventListener("click", () => {
+  libraryPreview.hidden = true
+  libraryGrid.querySelector(".previewing")?.classList.remove("previewing")
+})
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !event.isComposing && isTauri) void getCurrentWindow().close()
 })
@@ -174,13 +465,13 @@ bindSlicePickerZoom($(".picker-canvas-stage"), canvas, (factor) => {
   drawImage()
 })
 canvas.addEventListener("click", (event) => {
-  if (!imagePayload?.editable || !image || !imagePayload.slices.length) return
+  if (!imagePayload?.editable || !image) return
   const bounds = canvas.getBoundingClientRect()
   const point = {
     x: ((event.clientX - bounds.left) / bounds.width * canvas.width - offset.x) / scale,
     y: ((event.clientY - bounds.top) / bounds.height * canvas.height - offset.y) / scale,
   }
-  const selected = tileSliceAt(imagePayload.slices, point)
+  const selected = tileSliceAt(pickableSlices(imagePayload.slices, image), point)
   if (!selected) return
   imagePayload.selectedIndex = selected.index
   drawImage()
@@ -190,6 +481,7 @@ canvas.addEventListener("click", (event) => {
 if (isTauri) {
   await listen<ImagePayload>("image-picker-data", (event) => showImage(event.payload))
   await listen("image-picker-show-list", () => showResourceList())
+  await listen<StyleLibraryPayload>("style-library-data", (event) => showStyleLibrary(event.payload))
   await listen<ResourcePayload>("image-picker-resources-data", (event) => {
     resources = event.payload
     resourcesLoaded = true

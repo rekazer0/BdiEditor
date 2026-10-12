@@ -52,7 +52,7 @@ test('undoing image and sound creation removes new files; redo restores their by
   const archive = SkinArchive.fromSourceFiles([{ path: 'port/main.ini', data: new TextEncoder().encode('[PANEL]\n') }])
   const originalNames = archive.names()
   const noop = () => {}
-  const context = vm.createContext({
+  const context = vm.createContext({ acceptAiDraftPreview: () => {}, recordChange: (stack, change) => stack.push(change), numberInputGesture: () => undefined,
     archive, undoStack: [], redoStack: [], Uint8Array, sourceHistoryHighlight: undefined,
     scheduleSourceAutosave: noop, updateHistoryButtons: noop, refreshBdaLayout: noop,
     refreshPreview: noop, populateKeyInspector: noop, updateDirty: noop,
@@ -83,7 +83,7 @@ test('undoing image and sound creation removes new files; redo restores their by
       const doc = IniDocument.parse('')
       Object.assign(context, {
         pngPath: 'light/skin/res/new.png', tilPath: 'light/skin/res/new.til',
-        layoutImageBytes: new Uint8Array([4]), tilesBytes: new Uint8Array([5]),
+        source: new Uint8Array([4]), layoutImageBytes: new Uint8Array([4]), tilesBytes: new Uint8Array([5]),
         candPath: 'light/skin/port/main.ini', targetPath: 'light/skin/port/main.ini', stylePath: 'unused',
         cand: doc, candDoc: doc, layout: doc, layoutDoc: doc, styles: doc, stylesDoc: doc,
       })
@@ -110,7 +110,7 @@ test('sound upload reports cancellation and does not commit after the editing co
   for (const scenario of ['cancel', 'switch archive', 'leave edit mode', 'success']) {
     let editing = true
     let commits = 0
-    const context = vm.createContext({
+    const context = vm.createContext({ acceptAiDraftPreview: () => {}, recordChange: (stack, change) => stack.push(change), numberInputGesture: () => undefined,
       archive: { names: () => [], getBytes: () => new Uint8Array([1]) },
       isSoundPath: () => true, isEditing: () => editing,
       currentSoundEntries: () => [], selectedSoundID: '', soundResourcePaths: () => [],
@@ -139,7 +139,7 @@ test('asset replacement uses history and autosave, keeps its target, and rejects
     let handler
     const autosaved = []
     const noop = () => {}
-    const context = vm.createContext({
+    const context = vm.createContext({ acceptAiDraftPreview: () => {}, recordChange: (stack, change) => stack.push(change), numberInputGesture: () => undefined,
       archive, selectedPath: 'light/skin/res/a.png', undoStack: [], redoStack: [],
       Uint8Array, Blob, isEditing: () => true, sourceHistoryHighlight: undefined,
       scheduleSourceAutosave: paths => autosaved.push(...paths), updateHistoryButtons: noop,

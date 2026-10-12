@@ -23,7 +23,44 @@
     <main>
       <section id="image-picker-view" class="image-picker-view" hidden>
         <div class="picker-canvas-stage"><canvas id="picker-canvas" width="720" height="420" aria-label="原始图片切片选择器"></canvas></div>
-        <p id="picker-meta">点击图片中的切片以修改引用</p>
+      </section>
+      <section id="style-library-view" class="style-library-view" hidden>
+        <div class="style-library-bar">
+          <div class="style-library-segmented" role="group" aria-label="内容类型">
+            <button type="button" data-library-mode="styles" aria-pressed="true">全部样式</button>
+            <button type="button" data-library-mode="images" aria-pressed="false">全部图片</button>
+          </div>
+          <div id="style-library-kinds" class="style-library-chips" role="group" aria-label="按样式类型筛选">
+            <button type="button" data-library-kind="all" aria-pressed="true">全部类型</button>
+            <button type="button" data-library-kind="image" aria-pressed="false">图片</button>
+            <button type="button" data-library-kind="color" aria-pressed="false">颜色</button>
+            <button type="button" data-library-kind="anim" aria-pressed="false">动画</button>
+            <button type="button" data-library-kind="text" aria-pressed="false">文字</button>
+          </div>
+          <div id="style-library-filters" class="style-library-chips" role="group" aria-label="按当前布局用途筛选">
+            <button type="button" data-library-filter="all" aria-pressed="true">全部</button>
+            <button type="button" data-library-filter="panel" aria-pressed="false">键盘背景</button>
+            <button type="button" data-library-filter="key" aria-pressed="false">按键背景</button>
+            <button type="button" data-library-filter="candidate" aria-pressed="false">候选栏</button>
+            <button type="button" data-library-filter="foreground" aria-pressed="false">前景</button>
+          </div>
+          <button id="style-library-add" class="style-library-add" type="button" title="新增样式" aria-label="新增样式">＋</button>
+        </div>
+        <div id="style-library-grid" class="style-library-grid"></div>
+        <p id="style-library-empty" class="style-library-empty" role="status" hidden></p>
+        <section id="style-library-preview" class="style-library-preview" aria-label="所选资源预览" hidden>
+          <div id="style-library-preview-image" class="style-library-preview-image"></div>
+          <div class="style-library-preview-info">
+            <strong id="style-library-preview-title"></strong>
+            <small id="style-library-preview-meta"></small>
+            <div>
+              <button id="style-library-apply" type="button">应用到当前项</button>
+              <button id="style-library-edit" type="button">编辑</button>
+              <button id="style-library-preview-close" type="button">关闭预览</button>
+            </div>
+          </div>
+        </section>
+        <footer class="style-library-footer"><span id="style-library-status"></span><span id="style-library-source"></span></footer>
       </section>
       <section id="resource-picker-view" class="resource-picker-view" hidden>
         <div id="resource-picker-grid" class="resource-picker-grid"></div>

@@ -54,9 +54,13 @@ export type SourceEditorValueRange = {
   kind: "action" | "color" | "style"
   label?: string
   color?: string
+  /** Property / INI key the value belongs to, e.g. `FORE_STYLE`. */
+  key?: string
 }
 
 export type SourceEditorValueClick = SourceEditorValueRange & {
+  /** Command/Ctrl was held: jump to the definition instead of editing. */
+  modifier: boolean
   anchor: {
     left: number
     bottom: number
@@ -283,17 +287,15 @@ export class SourceCodeEditor extends EventTarget {
               this.refreshExplanation()
               return false
             },
-            mousedown: (event, view) => {
-              if (!this.features.valueHints || event.button !== 0) return false
-              const target = event.target instanceof HTMLElement ? event.target.closest(".cm-source-value") : null
-              if (!target) return false
-              const position = view.posAtCoords({ x: event.clientX, y: event.clientY })
-              if (position === null) return false
-              const range = this.valueRanges.find((item) => item.kind !== "action" && position >= item.from && position < item.to)
-              if (!range) return false
-              const bounds = target.getBoundingClientRect()
+            // Swallow the press so the caret stays put, but only open pickers on click:
+            // opening a dialog/window mid-press leaves the editor stuck in a drag.
+            mousedown: (event, view) => Boolean(this.valueAt(event, view)),
+            click: (event, view) => {
+              const hit = this.valueAt(event, view)
+              if (!hit) return false
+              const bounds = hit.target.getBoundingClientRect()
               this.dispatchEvent(new CustomEvent<SourceEditorValueClick>("valueclick", {
-                detail: { ...range, anchor: { left: bounds.left, bottom: bounds.bottom } },
+                detail: { ...hit.range, modifier: event.metaKey || event.ctrlKey, anchor: { left: bounds.left, bottom: bounds.bottom } },
               }))
               return true
             },
@@ -517,6 +519,16 @@ export class SourceCodeEditor extends EventTarget {
   destroy(): void {
     this.closeCompletion()
     this.view.destroy()
+  }
+
+  private valueAt(event: MouseEvent, view: EditorView): { range: SourceEditorValueRange; target: HTMLElement } | undefined {
+    if (!this.features.valueHints || event.button !== 0) return
+    const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>(".cm-source-value") : null
+    if (!target) return
+    const position = view.posAtCoords({ x: event.clientX, y: event.clientY })
+    if (position === null) return
+    const range = this.valueRanges.find((item) => item.kind !== "action" && position >= item.from && position < item.to)
+    return range && { range, target }
   }
 
   private handleKeydown(event: KeyboardEvent): boolean {

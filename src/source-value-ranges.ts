@@ -67,6 +67,7 @@ export function sourceValueRanges(
     from: number,
     to: number,
     forcedKind?: SourceEditorValueRange["kind"],
+    key?: string,
   ): void => {
     if (ranges.length >= SOURCE_VALUE_HINT_LIMIT) return
     const normalized = value.trim()
@@ -94,15 +95,16 @@ export function sourceValueRanges(
         ? actionDescription(action![1].toUpperCase())
         : kind === "color" ? `颜色 ${normalized}` : `样式 ${normalized.replace(/^STYLE/i, "")}`,
       color: kind === "color" ? color : undefined,
+      key,
     })
   }
 
-  const addStyleTokens = (raw: string, offset: number): void => {
+  const addStyleTokens = (raw: string, offset: number, key: string): void => {
     for (const match of raw.matchAll(/(?:STYLE)?\d+/gi)) {
       const before = raw.slice(0, match.index).trimEnd()
       const after = raw.slice(match.index! + match[0].length).trimStart()
       if (before && !before.endsWith(",") || after && !after.startsWith(",")) continue
-      add(match[0], offset + match.index!, offset + match.index! + match[0].length, "style")
+      add(match[0], offset + match.index!, offset + match.index! + match[0].length, "style", key)
     }
   }
 
@@ -113,8 +115,8 @@ export function sourceValueRanges(
       const raw = match[2]
       const offset = match.index! + match[0].length - raw.length
       const value = uncommentIniValue(raw)
-      if (isStyleKey(key)) addStyleTokens(value, offset)
-      else if (isColorKey(key)) add(value, offset, offset + value.length, "color")
+      if (isStyleKey(key)) addStyleTokens(value, offset, key)
+      else if (isColorKey(key)) add(value, offset, offset + value.length, "color", key)
       else add(value, offset, offset + value.length)
     }
   } else {
@@ -123,8 +125,8 @@ export function sourceValueRanges(
       const key = match[1]
       const value = match[2] ?? match[3] ?? ""
       const start = match.index! + match[0].lastIndexOf(value)
-      if (isStyleKey(key)) add(value, start, start + value.length, "style")
-      else if (isColorKey(key)) add(value, start, start + value.length, "color")
+      if (isStyleKey(key)) add(value, start, start + value.length, "style", key)
+      else if (isColorKey(key)) add(value, start, start + value.length, "color", key)
       else add(value, start, start + value.length)
     }
   }
