@@ -6,7 +6,7 @@
  * 只负责呈现，不写配置：重置也是把输入框改回基线再派发 input / change，由 main.ts 写回。
  */
 
-import { createIcon, symbolIcon } from "./icons"
+import { createIcon } from "./icons"
 
 type InspectorInput = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
 type Row = { el: HTMLElement; inputs: InspectorInput[] }
@@ -194,26 +194,10 @@ function syncGestures(): void {
   }
 }
 
-/*
- * 图片、文档与 BDA 面板的工具按钮仍由 main.ts 用平台符号名生成；这里换成 Lucide，
- * 保持整列图标同一族。全局图标统一后（DESIGN.md §5）删除这一步。
- */
-function decoratePanelIcons(): void {
-  for (const symbol of Array.from(document.querySelectorAll<HTMLElement>("#quick-inspector .system-symbol[data-system-symbol], #resource-inspector .system-symbol[data-system-symbol]"))) {
-    if (symbol.dataset.inspectorGlyph === "true") continue
-    const icon = symbolIcon(symbol.dataset.systemSymbol ?? "")
-    if (!icon) continue
-    icon.classList.add("system-symbol-fallback")
-    symbol.dataset.inspectorGlyph = "true"
-    symbol.replaceChildren(icon)
-  }
-}
-
 export function initInspectorShell(): void {
   renderEmptyState()
   ensureResetControls()
   decorateSections()
-  decoratePanelIcons()
   collectRows()
   const root = inspector()
   root?.addEventListener("click", onSectionHeading)
@@ -230,8 +214,7 @@ export function initInspectorShell(): void {
     requestAnimationFrame(() => {
       scheduled = false
       decorateSections()
-      decoratePanelIcons()
-    })
+        })
   })
   for (const view of Array.from(document.querySelectorAll("#quick-inspector, #resource-inspector"))) {
     observer.observe(view, { childList: true, subtree: true })

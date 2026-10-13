@@ -102,12 +102,7 @@
     "src/style-performance.css": 10
   },
   "icon-outside-registry": {
-    "src/ai-chat.ts": 3,
-    "src/atlas-workspace.ts": 2,
-    "src/main.ts": 2,
-    "src/preview.ts": 1,
-    "index.html": 67,
-    "picker.html": 1
+    "src/preview.ts": 1
   },
   "html-inline-style": {
     "index.html": 7
@@ -115,7 +110,7 @@
   "ts-file-too-long": {
     "src/bda-editor.ts": 29,
     "src/bda.ts": 1214,
-    "src/main.ts": 11841,
+    "src/main.ts": 11699,
     "src/preview.ts": 2061,
     "src/skin.ts": 6
   }

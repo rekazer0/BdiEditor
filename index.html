@@ -17,56 +17,56 @@
     <header class="titlebar" data-tauri-drag-region>
       <div class="titlebar-left">
         <details class="toolbar-more mobile-command-menu">
-          <summary class="titlebar-icon-button" title="操作" aria-label="操作"><span class="system-symbol" data-system-symbol="line.3.horizontal" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" /></svg></span></summary>
+          <summary class="titlebar-icon-button" title="操作" aria-label="操作"><span class="system-symbol" data-icon="menu" aria-hidden="true"></span></summary>
           <div class="toolbar-menu mobile-command-actions" aria-label="手机操作">
-            <button type="button" data-mobile-command="new"><span class="system-symbol" data-system-symbol="plus" aria-hidden="true"></span><span>新建皮肤</span></button>
-            <button type="button" data-mobile-command="open"><span class="system-symbol" data-system-symbol="folder" aria-hidden="true"></span><span>打开皮肤</span></button>
-            <button type="button" data-mobile-command="save"><span class="system-symbol" data-system-symbol="externaldrive" aria-hidden="true"></span><span>保存皮肤</span></button>
-            <button type="button" data-mobile-command="mobile-share"><span class="system-symbol" data-system-symbol="square.and.arrow.up" aria-hidden="true"></span><span>分享皮肤</span></button>
+            <button type="button" data-mobile-command="new"><span class="system-symbol" data-icon="plus" aria-hidden="true"></span><span>新建皮肤</span></button>
+            <button type="button" data-mobile-command="open"><span class="system-symbol" data-icon="folder" aria-hidden="true"></span><span>打开皮肤</span></button>
+            <button type="button" data-mobile-command="save"><span class="system-symbol" data-icon="hard-drive" aria-hidden="true"></span><span>保存皮肤</span></button>
+            <button type="button" data-mobile-command="mobile-share"><span class="system-symbol" data-icon="share" aria-hidden="true"></span><span>分享皮肤</span></button>
             <span class="mobile-menu-separator" role="separator"></span>
-            <button type="button" data-mobile-export-format="bdi"><span class="system-symbol" data-system-symbol="square.and.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/></svg></span><span>导出 iOS 皮肤</span></button>
-            <button type="button" data-mobile-export-format="bds"><span class="system-symbol" data-system-symbol="square.and.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/></svg></span><span>导出 Android 皮肤</span></button>
-            <button type="button" data-mobile-export-format="bda" data-bda-platform="ios"><span class="system-symbol" data-system-symbol="square.and.arrow.down.badge.new" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/><circle class="fallback-dot" cx="16.2" cy="3.8" r="1.5"/></svg></span><span>导出新版 iOS 皮肤</span></button>
-            <button type="button" data-mobile-export-format="bda" data-bda-platform="android"><span class="system-symbol" data-system-symbol="square.and.arrow.down.badge.new" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/><circle class="fallback-dot" cx="16.2" cy="3.8" r="1.5"/></svg></span><span>导出新版 Android 皮肤</span></button>
+            <button type="button" data-mobile-export-format="bdi"><span class="system-symbol" data-icon="download" aria-hidden="true"></span><span>导出 iOS 皮肤</span></button>
+            <button type="button" data-mobile-export-format="bds"><span class="system-symbol" data-icon="download" aria-hidden="true"></span><span>导出 Android 皮肤</span></button>
+            <button type="button" data-mobile-export-format="bda" data-bda-platform="ios"><span class="system-symbol" data-icon="file-down" aria-hidden="true"></span><span>导出新版 iOS 皮肤</span></button>
+            <button type="button" data-mobile-export-format="bda" data-bda-platform="android"><span class="system-symbol" data-icon="file-down" aria-hidden="true"></span><span>导出新版 Android 皮肤</span></button>
             <span class="mobile-menu-separator" role="separator"></span>
-            <button type="button" data-mobile-command="panel-scale"><span class="system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"></span><span>面板复制</span></button>
-            <button type="button" data-mobile-command="replace-layout-image"><span class="system-symbol" data-system-symbol="photo.badge.arrow.down" aria-hidden="true"></span><span>替换键盘样式</span></button>
-            <button type="button" data-mobile-command="adapt-ios26"><span class="system-symbol" data-system-symbol="iphone.gen3.badge.checkmark" aria-hidden="true"></span><span>适配 iOS 26 透明背景</span></button>
+            <button type="button" data-mobile-command="panel-scale"><span class="system-symbol" data-icon="arrow-left-right" aria-hidden="true"></span><span>面板复制</span></button>
+            <button type="button" data-mobile-command="replace-layout-image"><span class="system-symbol" data-icon="image-down" aria-hidden="true"></span><span>替换键盘样式</span></button>
+            <button type="button" data-mobile-command="adapt-ios26"><span class="system-symbol" data-icon="smartphone" aria-hidden="true"></span><span>适配 iOS 26 透明背景</span></button>
             <span class="mobile-menu-separator" role="separator"></span>
           </div>
         </details>
         <details class="toolbar-more pen-file-menu">
-          <summary class="titlebar-icon-button" title="文件操作" aria-label="文件操作"><span class="system-symbol" data-system-symbol="line.3.horizontal" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" /></svg></span></summary>
+          <summary class="titlebar-icon-button" title="文件操作" aria-label="文件操作"><span class="system-symbol" data-icon="menu" aria-hidden="true"></span></summary>
           <div class="toolbar-menu file-actions" role="menu" aria-label="文件操作">
             <span class="toolbar-menu-label">文件</span>
-            <button id="new" type="button" role="menuitem" title="新建皮肤" aria-label="新建皮肤"><span class="system-symbol" data-system-symbol="plus" aria-hidden="true"></span><span>新建皮肤…</span></button>
-            <button id="open" type="button" role="menuitem" title="打开皮肤" aria-label="打开皮肤"><span class="system-symbol" data-system-symbol="folder" aria-hidden="true"></span><span>打开皮肤…</span></button>
-            <button id="save" type="button" role="menuitem" disabled title="保存皮肤" aria-label="保存皮肤"><span class="system-symbol" data-system-symbol="externaldrive" aria-hidden="true"></span><span>保存皮肤</span></button>
+            <button id="new" type="button" role="menuitem" title="新建皮肤" aria-label="新建皮肤"><span class="system-symbol" data-icon="plus" aria-hidden="true"></span><span>新建皮肤…</span></button>
+            <button id="open" type="button" role="menuitem" title="打开皮肤" aria-label="打开皮肤"><span class="system-symbol" data-icon="folder" aria-hidden="true"></span><span>打开皮肤…</span></button>
+            <button id="save" type="button" role="menuitem" disabled title="保存皮肤" aria-label="保存皮肤"><span class="system-symbol" data-icon="hard-drive" aria-hidden="true"></span><span>保存皮肤</span></button>
             <span class="toolbar-menu-separator" role="separator"></span>
             <span class="toolbar-menu-label">导出</span>
-            <button type="button" role="menuitem" data-export-format="bdi" disabled><span class="system-symbol" data-system-symbol="square.and.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/></svg></span><span>导出 iOS 皮肤 (.bdi)…</span></button>
-            <button type="button" role="menuitem" data-export-format="bds" disabled><span class="system-symbol" data-system-symbol="square.and.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/></svg></span><span>导出 Android 皮肤 (.bds)…</span></button>
-            <button type="button" role="menuitem" data-export-format="bda" data-bda-platform="ios" disabled><span class="system-symbol" data-system-symbol="square.and.arrow.down.badge.new" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/><circle class="fallback-dot" cx="16.2" cy="3.8" r="1.5"/></svg></span><span>导出新版 iOS 皮肤 (.bda)…</span></button>
-            <button type="button" role="menuitem" data-export-format="bda" data-bda-platform="android" disabled><span class="system-symbol" data-system-symbol="square.and.arrow.down.badge.new" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/><circle class="fallback-dot" cx="16.2" cy="3.8" r="1.5"/></svg></span><span>导出新版 Android 皮肤 (.bda)…</span></button>
+            <button type="button" role="menuitem" data-export-format="bdi" disabled><span class="system-symbol" data-icon="download" aria-hidden="true"></span><span>导出 iOS 皮肤 (.bdi)…</span></button>
+            <button type="button" role="menuitem" data-export-format="bds" disabled><span class="system-symbol" data-icon="download" aria-hidden="true"></span><span>导出 Android 皮肤 (.bds)…</span></button>
+            <button type="button" role="menuitem" data-export-format="bda" data-bda-platform="ios" disabled><span class="system-symbol" data-icon="file-down" aria-hidden="true"></span><span>导出新版 iOS 皮肤 (.bda)…</span></button>
+            <button type="button" role="menuitem" data-export-format="bda" data-bda-platform="android" disabled><span class="system-symbol" data-icon="file-down" aria-hidden="true"></span><span>导出新版 Android 皮肤 (.bda)…</span></button>
             <span class="toolbar-menu-separator" role="separator"></span>
             <span class="toolbar-menu-label">工具 · 编辑模式可用</span>
-            <button id="panel-scale" type="button" role="menuitem" disabled><span class="system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"></span><span>面板复制…</span></button>
-            <button id="replace-layout-image" type="button" role="menuitem" disabled><span class="system-symbol" data-system-symbol="photo.badge.arrow.down" aria-hidden="true"></span><span>替换键盘样式…</span></button>
-            <button id="adapt-ios26" type="button" role="menuitem" disabled><span class="system-symbol" data-system-symbol="iphone.gen3.badge.checkmark" aria-hidden="true"></span><span>适配 iOS 26 透明背景…</span></button>
+            <button id="panel-scale" type="button" role="menuitem" disabled><span class="system-symbol" data-icon="arrow-left-right" aria-hidden="true"></span><span>面板复制…</span></button>
+            <button id="replace-layout-image" type="button" role="menuitem" disabled><span class="system-symbol" data-icon="image-down" aria-hidden="true"></span><span>替换键盘样式…</span></button>
+            <button id="adapt-ios26" type="button" role="menuitem" disabled><span class="system-symbol" data-icon="smartphone" aria-hidden="true"></span><span>适配 iOS 26 透明背景…</span></button>
             <span class="toolbar-menu-separator" role="separator"></span>
-            <button id="mobile-share" type="button" role="menuitem" disabled title="分享皮肤" aria-label="分享皮肤"><span class="system-symbol" data-system-symbol="square.and.arrow.up" aria-hidden="true"></span><span>分享皮肤</span></button>
+            <button id="mobile-share" type="button" role="menuitem" disabled title="分享皮肤" aria-label="分享皮肤"><span class="system-symbol" data-icon="share" aria-hidden="true"></span><span>分享皮肤</span></button>
             <span class="toolbar-menu-separator" role="separator"></span>
-            <button id="undo" type="button" role="menuitem" disabled title="撤销" aria-label="撤销"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12"/><path d="M4 8.5h7.2a5 5 0 0 1 5 5"/></svg></span><span>撤销</span></button>
-            <button id="redo" type="button" role="menuitem" disabled title="重做" aria-label="重做"><span class="system-symbol" data-system-symbol="arrow.uturn.forward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m13 5 4 3.5-4 3.5"/><path d="M16 8.5H8.8a5 5 0 0 0-5 5"/></svg></span><span>重做</span></button>
+            <button id="undo" type="button" role="menuitem" disabled title="撤销" aria-label="撤销"><span class="system-symbol" data-icon="undo-2" aria-hidden="true"></span><span>撤销</span></button>
+            <button id="redo" type="button" role="menuitem" disabled title="重做" aria-label="重做"><span class="system-symbol" data-icon="redo-2" aria-hidden="true"></span><span>重做</span></button>
             <span class="toolbar-menu-separator" role="separator"></span>
-            <button type="button" role="menuitem" data-app-dialog="settings"><span class="system-symbol" data-system-symbol="gearshape" aria-hidden="true"></span><span>设置</span></button>
+            <button type="button" role="menuitem" data-app-dialog="settings"><span class="system-symbol" data-icon="settings" aria-hidden="true"></span><span>设置</span></button>
           </div>
         </details>
         <span class="spacer" data-tauri-drag-region></span>
       </div>
       <div class="titlebar-center">
         <div class="document-title" data-tauri-drag-region>
-          <span class="icon system-symbol document-icon" data-system-symbol="keyboard" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2" y="5.5" width="16" height="9" rx="2"/><path d="M5 8.5h1M8 8.5h1M11 8.5h1M14 8.5h1M5 11.5h10"/></svg></span>
+          <span class="icon system-symbol document-icon" data-icon="keyboard" aria-hidden="true"></span>
           <strong id="document-name" role="button" tabindex="0" title="点击修改皮肤名称">未打开皮肤</strong>
           <span id="dirty" hidden>未保存</span>
         </div>
@@ -74,39 +74,39 @@
       <div class="titlebar-right">
         <div class="desktop-quick-actions" aria-label="编辑操作">
           <button id="desktop-undo" class="titlebar-icon-button" type="button" title="撤销" aria-label="撤销" disabled>
-            <span class="system-symbol" data-system-symbol="arrow.uturn.left" aria-hidden="true"></span>
+            <span class="system-symbol" data-icon="undo-2" aria-hidden="true"></span>
           </button>
           <button id="desktop-redo" class="titlebar-icon-button" type="button" title="重做" aria-label="重做" disabled>
-            <span class="system-symbol" data-system-symbol="arrow.uturn.right" aria-hidden="true"></span>
+            <span class="system-symbol" data-icon="redo-2" aria-hidden="true"></span>
           </button>
         </div>
         <div class="mobile-quick-actions" aria-label="常用操作">
-          <button id="mobile-undo" class="titlebar-icon-button" type="button" title="撤销" aria-label="撤销"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12"/><path d="M4 8.5h7.2a5 5 0 0 1 5 5"/></svg></span></button>
-          <button id="mobile-redo" class="titlebar-icon-button" type="button" title="重做" aria-label="重做"><span class="system-symbol" data-system-symbol="arrow.uturn.forward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m13 5 4 3.5-4 3.5"/><path d="M16 8.5H8.8a5 5 0 0 0-5 5"/></svg></span></button>
+          <button id="mobile-undo" class="titlebar-icon-button" type="button" title="撤销" aria-label="撤销"><span class="system-symbol" data-icon="undo-2" aria-hidden="true"></span></button>
+          <button id="mobile-redo" class="titlebar-icon-button" type="button" title="重做" aria-label="重做"><span class="system-symbol" data-icon="redo-2" aria-hidden="true"></span></button>
         </div>
         <div class="mode-control" aria-label="工作模式">
           <button data-mode-choice="edit">编辑模式</button>
           <button class="active" data-mode-choice="preview">交互预览</button>
           <button class="mobile-choice-toggle" type="button" data-mobile-choice="mode" title="切换工作模式" aria-label="交互预览">
-            <span class="system-symbol mode-toggle-icon" data-system-symbol="rectangle.and.hand.point" aria-hidden="true"></span>
+            <span class="system-symbol mode-toggle-icon" data-icon="zap" aria-hidden="true"></span>
             <span class="mobile-choice-label">交互预览</span>
           </button>
           <select id="mode" hidden><option value="preview">交互预览</option><option value="edit">编辑模式</option></select>
         </div>
         <button class="titlebar-icon-button titlebar-preferences" type="button" data-app-dialog="settings" title="设置" aria-label="设置">
-          <span class="system-symbol" data-system-symbol="ellipsis" aria-hidden="true"></span>
+          <span class="system-symbol" data-icon="ellipsis" aria-hidden="true"></span>
         </button>
         <div class="mobile-title-choices" aria-label="预览选项">
           <button class="mobile-choice-toggle" type="button" data-mobile-choice="orientation" title="切换方向" aria-label="竖屏">
             <span class="mobile-choice-icons" aria-hidden="true">
-              <span class="mobile-choice-icon" data-mobile-choice-value="port"><span class="system-symbol" data-system-symbol="rectangle.portrait" aria-hidden="true"></span></span>
-              <span class="mobile-choice-icon" data-mobile-choice-value="land"><span class="system-symbol" data-system-symbol="rectangle.landscape" aria-hidden="true"></span></span>
+              <span class="mobile-choice-icon" data-mobile-choice-value="port"><span class="system-symbol" data-icon="rectangle-vertical" aria-hidden="true"></span></span>
+              <span class="mobile-choice-icon" data-mobile-choice-value="land"><span class="system-symbol" data-icon="rectangle-horizontal" aria-hidden="true"></span></span>
             </span>
           </button>
           <button class="mobile-choice-toggle" type="button" data-mobile-choice="theme" title="切换外观" aria-label="浅色">
             <span class="mobile-choice-icons" aria-hidden="true">
-              <span class="mobile-choice-icon" data-mobile-choice-value="light"><span class="system-symbol" data-system-symbol="sun.max" aria-hidden="true"></span></span>
-              <span class="mobile-choice-icon" data-mobile-choice-value="dark"><span class="system-symbol" data-system-symbol="moon" aria-hidden="true"></span></span>
+              <span class="mobile-choice-icon" data-mobile-choice-value="light"><span class="system-symbol" data-icon="sun" aria-hidden="true"></span></span>
+              <span class="mobile-choice-icon" data-mobile-choice-value="dark"><span class="system-symbol" data-icon="moon" aria-hidden="true"></span></span>
             </span>
           </button>
         </div>
@@ -118,23 +118,23 @@
         <button class="active" type="button" data-mobile-pane="layout" aria-pressed="true" title="文件与布局（左右滑动切换）" aria-label="文件与布局">文件与布局</button>
         <button type="button" data-mobile-pane="inspector" aria-pressed="false" title="属性检查器（左右滑动切换）" aria-label="属性检查器">属性检查器</button>
         <button id="mobile-split-handle" class="mobile-split-handle" type="button" role="slider" aria-orientation="vertical" aria-valuemin="28" aria-valuemax="72" aria-valuenow="50" aria-expanded="true" title="拖动调整画布与配置区域比例；点击收起或展开预览" aria-label="拖动调整画布与配置区域比例；点击收起或展开预览">
-          <span class="system-symbol mobile-split-icon" data-system-symbol="chevron.up.chevron.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m5 8 5-5 5 5M5 12l5 5 5-5"/></svg></span>
+          <span class="system-symbol mobile-split-icon" data-icon="chevrons-up-down" aria-hidden="true"></span>
         </button>
       </nav>
       <aside class="sidebar">
         <div class="pane-heading">
           <div class="sidebar-view-control glass-module" aria-label="左侧视图">
-            <button class="active" data-sidebar-view="overview"><span class="system-symbol" data-system-symbol="square.grid.2x2" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="3" y="3" width="5" height="5" rx="1"/><rect x="12" y="3" width="5" height="5" rx="1"/><rect x="3" y="12" width="5" height="5" rx="1"/><rect x="12" y="12" width="5" height="5" rx="1"/></svg></span><span>概览</span></button>
-            <button data-sidebar-view="source"><span class="system-symbol" data-system-symbol="code.xml" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="m18 16 4-4-4-4M6 8l-4 4 4 4M14.5 4l-5 16"/></svg></span><span>源文件</span></button>
+            <button class="active" data-sidebar-view="overview"><span class="system-symbol" data-icon="layout-grid" aria-hidden="true"></span><span>概览</span></button>
+            <button data-sidebar-view="source"><span class="system-symbol" data-icon="code-xml" aria-hidden="true"></span><span>源文件</span></button>
           </div>
         </div>
         <div id="source-file-toolbar" class="source-file-toolbar" aria-label="源文件操作" hidden>
-          <button id="source-upload" class="toolbar-button" type="button" title="上传文件" aria-label="上传文件"><span class="icon system-symbol" data-system-symbol="upload" aria-hidden="true"></span></button>
-          <button id="source-download" class="toolbar-button" type="button" title="下载选中文件" aria-label="下载选中文件" disabled><span class="icon system-symbol" data-system-symbol="download" aria-hidden="true"></span></button>
-          <button id="source-copy" class="toolbar-button" type="button" title="复制" aria-label="复制" disabled><span class="icon system-symbol" data-system-symbol="copy" aria-hidden="true"></span></button>
-          <button id="source-paste" class="toolbar-button" type="button" title="粘贴" aria-label="粘贴" disabled><span class="icon system-symbol" data-system-symbol="clipboard-paste" aria-hidden="true"></span></button>
-          <button id="source-move" class="toolbar-button" type="button" title="剪切" aria-label="剪切" disabled><span class="icon system-symbol" data-system-symbol="scissors" aria-hidden="true"></span></button>
-          <button id="source-delete" class="toolbar-button" type="button" title="删除" aria-label="删除" disabled><span class="icon system-symbol" data-system-symbol="trash-2" aria-hidden="true"></span></button>
+          <button id="source-upload" class="toolbar-button" type="button" title="上传文件" aria-label="上传文件"><span class="icon system-symbol" data-icon="upload" aria-hidden="true"></span></button>
+          <button id="source-download" class="toolbar-button" type="button" title="下载选中文件" aria-label="下载选中文件" disabled><span class="icon system-symbol" data-icon="download" aria-hidden="true"></span></button>
+          <button id="source-copy" class="toolbar-button" type="button" title="复制" aria-label="复制" disabled><span class="icon system-symbol" data-icon="copy" aria-hidden="true"></span></button>
+          <button id="source-paste" class="toolbar-button" type="button" title="粘贴" aria-label="粘贴" disabled><span class="icon system-symbol" data-icon="clipboard-paste" aria-hidden="true"></span></button>
+          <button id="source-move" class="toolbar-button" type="button" title="剪切" aria-label="剪切" disabled><span class="icon system-symbol" data-icon="scissors" aria-hidden="true"></span></button>
+          <button id="source-delete" class="toolbar-button" type="button" title="删除" aria-label="删除" disabled><span class="icon system-symbol" data-icon="trash-2" aria-hidden="true"></span></button>
           <input id="source-upload-input" type="file" multiple hidden>
         </div>
         <div id="files"></div>
@@ -144,7 +144,7 @@
       <section class="workspace">
         <div class="preview-toolbar">
           <div class="preview-toolbar-start">
-            <button id="toggle-guides" class="preview-tool-toggle glass-module" aria-label="辅助线" title="辅助线" aria-pressed="false"><span class="system-symbol" data-system-symbol="lucide-crosshair" aria-hidden="true"></span></button>
+            <button id="toggle-guides" class="preview-tool-toggle glass-module" aria-label="辅助线" title="辅助线" aria-pressed="false"><span class="system-symbol" data-icon="crosshair" aria-hidden="true"></span></button>
             <div class="preview-choice glass-module key-mode-control" role="group" aria-label="指针模式">
               <button class="active" type="button" data-key-mode="select" title="选择按键" aria-label="选择按键" aria-pressed="true" data-icon="mouse-pointer-2"></button>
               <button type="button" data-key-mode="move" title="拖动按键" aria-label="拖动按键" aria-pressed="false" data-icon="move"></button>
@@ -155,7 +155,7 @@
             </label>
           </div>
           <label id="device-control" class="field-control">
-            <span class="system-symbol device-control-icon" data-system-symbol="lucide-smartphone" aria-hidden="true"></span>
+            <span class="system-symbol device-control-icon" data-icon="smartphone" aria-hidden="true"></span>
             <select id="device" aria-label="设备">
               <option value="iphone-17-pro">iPhone 17 Pro · 1206×2622</option>
               <option value="iphone-17-pro-max">iPhone 17 Pro Max · 1320×2868</option>
@@ -171,16 +171,16 @@
           </label>
           <div class="preview-toolbar-end">
             <div class="preview-choice glass-module" aria-label="方向">
-              <button class="active" data-orientation-choice="port" title="竖屏" aria-label="竖屏"><span class="system-symbol" data-system-symbol="lucide-rectangle-vertical" aria-hidden="true"></span></button>
-              <button data-orientation-choice="land" title="横屏" aria-label="横屏"><span class="system-symbol" data-system-symbol="lucide-rectangle-horizontal" aria-hidden="true"></span></button>
+              <button class="active" data-orientation-choice="port" title="竖屏" aria-label="竖屏"><span class="system-symbol" data-icon="rectangle-vertical" aria-hidden="true"></span></button>
+              <button data-orientation-choice="land" title="横屏" aria-label="横屏"><span class="system-symbol" data-icon="rectangle-horizontal" aria-hidden="true"></span></button>
               <select id="orientation" hidden>
                 <option value="port">竖屏</option>
                 <option value="land">横屏</option>
               </select>
             </div>
             <div class="preview-choice glass-module" aria-label="外观">
-              <button class="active" data-theme-choice="light" title="浅色" aria-label="浅色"><span class="system-symbol" data-system-symbol="lucide-sun" aria-hidden="true"></span></button>
-              <button data-theme-choice="dark" title="深色" aria-label="深色"><span class="system-symbol" data-system-symbol="lucide-moon" aria-hidden="true"></span></button>
+              <button class="active" data-theme-choice="light" title="浅色" aria-label="浅色"><span class="system-symbol" data-icon="sun" aria-hidden="true"></span></button>
+              <button data-theme-choice="dark" title="深色" aria-label="深色"><span class="system-symbol" data-icon="moon" aria-hidden="true"></span></button>
               <select id="theme" hidden><option value="light">浅色</option><option value="dark">深色</option></select>
             </div>
             <select id="layout" hidden><option value="py_9.ini">9键</option><option value="py_26.ini">26 键</option></select>
@@ -194,11 +194,11 @@
                   <h2>最近打开</h2>
                   <span id="welcome-recent-hint">还没有记录</span>
                   <button id="recent-clear" class="welcome-head-action welcome-head-clear" type="button" hidden>清除记录</button>
-                  <button id="welcome-recent-open" class="welcome-head-action" type="button"><span class="icon system-symbol" data-system-symbol="folder" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M2.8 15.3V6.7c0-.65.53-1.2 1.2-1.2h3.35l1.4 1.85h7.25c.67 0 1.2.55 1.2 1.2v6.75c0 .65-.53 1.2-1.2 1.2H4c-.67 0-1.2-.55-1.2-1.2z"/></svg></span>打开皮肤…</button>
+                  <button id="welcome-recent-open" class="welcome-head-action" type="button"><span class="icon system-symbol" data-icon="folder" aria-hidden="true"></span>打开皮肤…</button>
                 </div>
                 <div id="welcome-recent-grid" class="recent-grid" hidden></div>
                 <div id="welcome-recent-empty" class="recent-grid-empty">
-                  <span class="icon system-symbol" data-system-symbol="folder" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M2.8 15.3V6.7c0-.65.53-1.2 1.2-1.2h3.35l1.4 1.85h7.25c.67 0 1.2.55 1.2 1.2v6.75c0 .65-.53 1.2-1.2 1.2H4c-.67 0-1.2-.55-1.2-1.2z"/></svg></span>
+                  <span class="icon system-symbol" data-icon="folder" aria-hidden="true"></span>
                   <span class="recent-grid-empty-copy"><strong>还没有打开过皮肤</strong><span>拖入或选择 .bdi / .bds / .bda 文件，最近打开的皮肤会显示在这里。</span></span>
                 </div>
               </section>
@@ -216,7 +216,7 @@
                     <span class="template-foot">
                       <span class="template-name-row">
                         <span class="template-name">百度 BDA 默认</span>
-                        <span class="icon system-symbol template-go" data-system-symbol="arrow.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10h11m-4-4 4 4-4 4"/></svg></span>
+                        <span class="icon system-symbol template-go" data-icon="arrow-right" aria-hidden="true"></span>
                       </span>
                       <span class="template-meta"><em>.bda</em><span>官方 · 新版格式</span></span>
                     </span>
@@ -226,7 +226,7 @@
                     <span class="template-foot">
                       <span class="template-name-row">
                         <span class="template-name">百度 BDS 旧版</span>
-                        <span class="icon system-symbol template-go" data-system-symbol="arrow.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10h11m-4-4 4 4-4 4"/></svg></span>
+                        <span class="icon system-symbol template-go" data-icon="arrow-right" aria-hidden="true"></span>
                       </span>
                       <span class="template-meta"><em>.bds</em><span>官方 · 经典皮肤</span></span>
                     </span>
@@ -236,7 +236,7 @@
                     <span class="template-foot">
                       <span class="template-name-row">
                         <span class="template-name">小米统一圆角</span>
-                        <span class="icon system-symbol template-go" data-system-symbol="arrow.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10h11m-4-4 4 4-4 4"/></svg></span>
+                        <span class="icon system-symbol template-go" data-icon="arrow-right" aria-hidden="true"></span>
                       </span>
                       <span class="template-meta"><em>.bds</em><span>互联网整理</span></span>
                     </span>
@@ -248,7 +248,7 @@
                     <span class="template-foot">
                       <span class="template-name-row">
                         <span class="template-name">OPPO 双色</span>
-                        <span class="icon system-symbol template-go" data-system-symbol="arrow.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10h11m-4-4 4 4-4 4"/></svg></span>
+                        <span class="icon system-symbol template-go" data-icon="arrow-right" aria-hidden="true"></span>
                       </span>
                       <span class="template-meta"><em>.bds</em><span>互联网整理</span></span>
                     </span>
@@ -258,7 +258,7 @@
                     <span class="template-foot">
                       <span class="template-name-row">
                         <span class="template-name">iQOO 圆角黑</span>
-                        <span class="icon system-symbol template-go" data-system-symbol="arrow.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10h11m-4-4 4 4-4 4"/></svg></span>
+                        <span class="icon system-symbol template-go" data-icon="arrow-right" aria-hidden="true"></span>
                       </span>
                       <span class="template-meta"><em>.bds</em><span>互联网整理</span></span>
                     </span>
@@ -268,7 +268,7 @@
                     <span class="template-foot">
                       <span class="template-name-row">
                         <span class="template-name">华为滑动符号</span>
-                        <span class="icon system-symbol template-go" data-system-symbol="arrow.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10h11m-4-4 4 4-4 4"/></svg></span>
+                        <span class="icon system-symbol template-go" data-icon="arrow-right" aria-hidden="true"></span>
                       </span>
                       <span class="template-meta"><em>.bds</em><span>互联网整理</span></span>
                     </span>
@@ -280,7 +280,7 @@
                     <span class="template-foot">
                       <span class="template-name-row">
                         <span class="template-name">OPPO 皮肤加下滑</span>
-                        <span class="icon system-symbol template-go" data-system-symbol="arrow.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10h11m-4-4 4 4-4 4"/></svg></span>
+                        <span class="icon system-symbol template-go" data-icon="arrow-right" aria-hidden="true"></span>
                       </span>
                       <span class="template-meta"><em>.bds</em><span>互联网整理</span></span>
                     </span>
@@ -290,7 +290,7 @@
               </section>
 
               <div class="welcome-note">
-                <span class="icon system-symbol" data-system-symbol="lightbulb" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 2.5a5 5 0 0 1 3 9.1V13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-1.4A5 5 0 0 1 10 2.5zM8 16.5h4"/></svg></span>
+                <span class="icon system-symbol" data-icon="lightbulb" aria-hidden="true"></span>
                 <p>新建后可在左侧切换 9 键 / 26 键布局；macOS 使用 ⌘ 单击多选按键，Windows 使用 Ctrl 单击。</p>
               </div>
             </div>
@@ -299,12 +299,12 @@
           <div id="device-shell" class="device-shell canvas-only" data-device="canvas" data-orientation="port">
             <div class="device-screen">
               <div class="device-reference-background" aria-hidden="true"></div>
-              <div class="device-status"><span class="device-status-time">18:23 <span class="system-symbol" data-system-symbol="speaker.slash" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4zM17 9l4 6M21 9l-4 6"/></svg></span></span><span class="device-status-icons"><span class="system-symbol" data-system-symbol="cellularbars" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 16v-2m4 2v-5m4 5V8m4 8V5"/></svg></span><span class="system-symbol" data-system-symbol="wifi" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 8a11 11 0 0 1 14 0M6 11a7 7 0 0 1 8 0m-5 3a2 2 0 0 1 2 0"/></svg></span><span class="system-symbol" data-system-symbol="battery.100" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 20"><rect x="2" y="5" width="18" height="10" rx="2"/><path d="M22 8v4M5 8h12v4H5z"/></svg></span></span></div>
+              <div class="device-status"><span class="device-status-time">18:23 <span class="system-symbol" data-icon="volume-x" aria-hidden="true"></span></span><span class="device-status-icons"><span class="system-symbol" data-icon="signal" aria-hidden="true"></span><span class="system-symbol" data-icon="wifi" aria-hidden="true"></span><span class="system-symbol" data-icon="battery-full" aria-hidden="true"></span></span></div>
               <div class="phone-navigation" aria-hidden="true">
-                <span class="phone-nav-round"><span class="system-symbol" data-system-symbol="chevron.left" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m12 4-6 6 6 6"/></svg></span></span>
-                <span class="phone-nav-round phone-nav-undo"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12M4 8.5h7a5 5 0 0 1 5 5"/></svg></span></span>
-                <span class="phone-nav-actions"><span class="system-symbol" data-system-symbol="square.and.arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 13V3m-4 4 4-4 4 4M4 10v6h12v-6"/></svg></span><span class="system-symbol" data-system-symbol="ellipsis" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><circle class="fallback-dot" cx="4" cy="10" r="1"/><circle class="fallback-dot" cx="10" cy="10" r="1"/><circle class="fallback-dot" cx="16" cy="10" r="1"/></svg></span></span>
-                <span class="phone-nav-done"><span class="system-symbol" data-system-symbol="checkmark" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m4 10 4 4 8-9"/></svg></span></span>
+                <span class="phone-nav-round"><span class="system-symbol" data-icon="chevron-left" aria-hidden="true"></span></span>
+                <span class="phone-nav-round phone-nav-undo"><span class="system-symbol" data-icon="undo-2" aria-hidden="true"></span></span>
+                <span class="phone-nav-actions"><span class="system-symbol" data-icon="share" aria-hidden="true"></span><span class="system-symbol" data-icon="ellipsis" aria-hidden="true"></span></span>
+                <span class="phone-nav-done"><span class="system-symbol" data-icon="check" aria-hidden="true"></span></span>
               </div>
               <div class="simulation">
                 <div class="simulation-heading">
@@ -315,10 +315,10 @@
               </div>
               <div class="phone-editing-toolbar" aria-hidden="true">
                 <strong>格式</strong>
-                <span class="system-symbol" data-system-symbol="list.bullet" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg></span>
-                <span class="system-symbol" data-system-symbol="square.grid.2x2" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></span>
-                <span class="system-symbol" data-system-symbol="paperclip" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="M8 12.5 15.5 5a4 4 0 0 1 5.7 5.7L11 20.8a6 6 0 0 1-8.5-8.5L13 1.8"/></svg></span>
-                <span class="system-symbol" data-system-symbol="pencil" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="m4 20 4.5-1 11-11-3.5-3.5-11 11zM14.5 6 18 9.5"/></svg></span>
+                <span class="system-symbol" data-icon="list" aria-hidden="true"></span>
+                <span class="system-symbol" data-icon="layout-grid" aria-hidden="true"></span>
+                <span class="system-symbol" data-icon="paperclip" aria-hidden="true"></span>
+                <span class="system-symbol" data-icon="pen-line" aria-hidden="true"></span>
               </div>
               <div class="keyboard-dock">
                 <div id="candidate-area">
@@ -347,22 +347,22 @@
           <div id="canvas-multi-toolbar" class="canvas-multi-toolbar" role="toolbar" aria-label="多选批量布局" data-available="false">
             <span class="canvas-multi-count" id="canvas-multi-count" role="status">选择 2 个或更多按键</span>
             <span class="canvas-multi-divider" aria-hidden="true"></span>
-            <button data-layout-action="left" title="左对齐" aria-label="左对齐"><span class="system-symbol" data-system-symbol="align.horizontal.left" aria-hidden="true"></span></button>
-            <button data-layout-action="right" title="右对齐" aria-label="右对齐"><span class="system-symbol" data-system-symbol="align.horizontal.right" aria-hidden="true"></span></button>
-            <button data-layout-action="top" title="顶对齐" aria-label="顶对齐"><span class="system-symbol" data-system-symbol="align.vertical.top" aria-hidden="true"></span></button>
-            <button data-layout-action="bottom" title="底对齐" aria-label="底对齐"><span class="system-symbol" data-system-symbol="align.vertical.bottom" aria-hidden="true"></span></button>
+            <button data-layout-action="left" title="左对齐" aria-label="左对齐"><span class="system-symbol" data-icon="align-start-vertical" aria-hidden="true"></span></button>
+            <button data-layout-action="right" title="右对齐" aria-label="右对齐"><span class="system-symbol" data-icon="align-end-vertical" aria-hidden="true"></span></button>
+            <button data-layout-action="top" title="顶对齐" aria-label="顶对齐"><span class="system-symbol" data-icon="align-start-horizontal" aria-hidden="true"></span></button>
+            <button data-layout-action="bottom" title="底对齐" aria-label="底对齐"><span class="system-symbol" data-icon="align-end-horizontal" aria-hidden="true"></span></button>
             <span class="canvas-multi-divider" aria-hidden="true"></span>
-            <button data-layout-action="same-width" title="等宽" aria-label="等宽"><span class="system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"></span></button>
-            <button data-layout-action="same-height" title="等高" aria-label="等高"><span class="system-symbol" data-system-symbol="arrow.up.and.down" aria-hidden="true"></span></button>
+            <button data-layout-action="same-width" title="等宽" aria-label="等宽"><span class="system-symbol" data-icon="arrow-left-right" aria-hidden="true"></span></button>
+            <button data-layout-action="same-height" title="等高" aria-label="等高"><span class="system-symbol" data-icon="arrow-up-down" aria-hidden="true"></span></button>
             <span class="canvas-multi-divider" aria-hidden="true"></span>
-            <button data-layout-action="horizontal-gap" title="水平等间距" aria-label="水平等间距"><span class="system-symbol" data-system-symbol="arrow.left.and.right.righttriangle.left.righttriangle.right" aria-hidden="true"></span></button>
-            <button data-layout-action="vertical-gap" title="垂直等间距" aria-label="垂直等间距"><span class="system-symbol" data-system-symbol="arrow.up.and.down.righttriangle.up.righttriangle.down" aria-hidden="true"></span></button>
+            <button data-layout-action="horizontal-gap" title="水平等间距" aria-label="水平等间距"><span class="system-symbol" data-icon="fold-horizontal" aria-hidden="true"></span></button>
+            <button data-layout-action="vertical-gap" title="垂直等间距" aria-label="垂直等间距"><span class="system-symbol" data-icon="fold-vertical" aria-hidden="true"></span></button>
           </div>
         </div>
         <div class="preview-zoom-control" aria-label="画布缩放">
-          <button id="preview-zoom-out" type="button" aria-label="缩小画布" title="缩小"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10" /></svg></button>
-          <button id="preview-zoom-fit" type="button" aria-label="适配窗口，画布已锁定，双击解锁" title="画布已锁定（双击解锁）" aria-pressed="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v4m8-4h4v4M8 16H4v-4m8 4h4v-4" /></svg></button>
-          <button id="preview-zoom-in" type="button" aria-label="放大画布" title="放大"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M10 5v10" /></svg></button>
+          <button id="preview-zoom-out" type="button" aria-label="缩小画布" title="缩小" data-icon="minus" data-icon-size="16"></button>
+          <button id="preview-zoom-fit" type="button" aria-label="适配窗口，画布已锁定，双击解锁" title="画布已锁定（双击解锁）" aria-pressed="true" data-icon="scan" data-icon-size="16"></button>
+          <button id="preview-zoom-in" type="button" aria-label="放大画布" title="放大" data-icon="plus" data-icon-size="16"></button>
         </div>
         <div class="workspace-status" hidden aria-hidden="true"><div id="event-log" aria-live="polite">打开皮肤后可预览按键。</div><div id="panel-status">面板：-- × -- · 预览缩放：--%</div></div>
       </section>
@@ -535,13 +535,13 @@
                   <option value="sound">声音样式</option>
                   <option value="visual">视觉样式</option>
                 </select>
-                <label class="search-control" aria-label="搜索图片"><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"></span><input id="resource-search" type="search" results="0" placeholder="搜索图片"></label>
+                <label class="search-control" aria-label="搜索图片"><span class="system-symbol" data-icon="search" aria-hidden="true"></span><input id="resource-search" type="search" results="0" placeholder="搜索图片"></label>
               </div>
               <div class="resource-actions">
-                <button id="style-add" class="toolbar-button" type="button" title="新增样式" aria-label="新增样式" hidden><span class="icon system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14"/></svg></span></button>
-                <button id="resource-upload" class="toolbar-button" type="button" title="上传图片" aria-label="上传图片"><span class="icon system-symbol" data-system-symbol="arrow.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 13V4m-4 4 4-4 4 4M4 16h12"/></svg></span></button>
-                <button id="resource-download" class="toolbar-button" type="button" title="下载选中图片" aria-label="下载选中图片" disabled><span class="icon system-symbol" data-system-symbol="arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 4v9m-4-4 4 4 4-4M4 16h12"/></svg></span></button>
-                <button id="resource-delete" class="toolbar-button" type="button" title="删除选中图片" aria-label="删除选中图片" disabled><span class="icon system-symbol" data-system-symbol="trash" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 6h12M8 3h4l1 3H7zm-2 3 1 9h8l1-9M8 9v6m4-6v6"/></svg></span></button>
+                <button id="style-add" class="toolbar-button" type="button" title="新增样式" aria-label="新增样式" hidden><span class="icon system-symbol" data-icon="plus" aria-hidden="true"></span></button>
+                <button id="resource-upload" class="toolbar-button" type="button" title="上传图片" aria-label="上传图片"><span class="icon system-symbol" data-icon="upload" aria-hidden="true"></span></button>
+                <button id="resource-download" class="toolbar-button" type="button" title="下载选中图片" aria-label="下载选中图片" disabled><span class="icon system-symbol" data-icon="download" aria-hidden="true"></span></button>
+                <button id="resource-delete" class="toolbar-button" type="button" title="删除选中图片" aria-label="删除选中图片" disabled><span class="icon system-symbol" data-icon="trash-2" aria-hidden="true"></span></button>
               </div>
             </div>
             <input id="resource-upload-input" type="file" accept=".png,image/png" hidden>
@@ -549,18 +549,18 @@
           </div>
           <div id="resource-detail" hidden>
             <div class="resource-detail-heading">
-              <button id="resource-back" class="toolbar-button" type="button" title="返回" aria-label="返回"><span class="icon system-symbol" data-system-symbol="chevron.left" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m12 4-6 6 6 6"/></svg></span></button>
+              <button id="resource-back" class="toolbar-button" type="button" title="返回" aria-label="返回"><span class="icon system-symbol" data-icon="chevron-left" aria-hidden="true"></span></button>
               <div><strong id="resource-name">图片</strong><small id="resource-meta"></small></div>
             </div>
             <div id="image-resource-detail">
               <div class="tile-toolbar">
               <div class="tile-mode-control" aria-label="切片操作模式">
-                <button id="select-tile" class="toolbar-button active" type="button" data-tile-mode="select" title="选择切片" aria-label="选择切片"><span class="icon system-symbol" data-system-symbol="cursorarrow" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 2.5 15.5 11l-5 .8 2.8 5-2.5 1.4-2.7-5L4 16z"/></svg></span></button>
-                <button id="move-tile" class="toolbar-button" type="button" data-tile-mode="move" title="移动切片" aria-label="移动切片"><span class="icon system-symbol" data-system-symbol="arrow.up.and.down.and.arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 2v16m0-16L7 5m3-3 3 3M2 10h16m-16 0 3-3m-3 3 3 3m13-3-3-3m3 3-3 3m-5 5-3-3m3 3 3-3"/></svg></span></button>
+                <button id="select-tile" class="toolbar-button active" type="button" data-tile-mode="select" title="选择切片" aria-label="选择切片"><span class="icon system-symbol" data-icon="mouse-pointer-2" aria-hidden="true"></span></button>
+                <button id="move-tile" class="toolbar-button" type="button" data-tile-mode="move" title="移动切片" aria-label="移动切片"><span class="icon system-symbol" data-icon="move" aria-hidden="true"></span></button>
               </div>
-              <button id="new-tile" class="toolbar-button" type="button" title="新建切片" aria-label="新建切片"><span class="icon system-symbol" data-system-symbol="plus.rectangle" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M10 7v6M7 10h6"/></svg></span></button>
-              <button id="duplicate-tile" class="toolbar-button" type="button" title="复制选中切片" aria-label="复制选中切片"><span class="icon system-symbol" data-system-symbol="plus.square.on.square" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2.5" y="5.5" width="12" height="12" rx="2"/><rect x="5.5" y="2.5" width="12" height="12" rx="2"/><path d="M11.5 6v5m-2.5-2.5h5"/></svg></span></button>
-              <button id="delete-tile" class="toolbar-button" type="button" title="删除选中切片" aria-label="删除选中切片"><span class="icon system-symbol" data-system-symbol="trash" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 6h12M8 3h4l1 3H7zm-2 3 1 9h8l1-9M8 9v6m4-6v6"/></svg></span></button>
+              <button id="new-tile" class="toolbar-button" type="button" title="新建切片" aria-label="新建切片"><span class="icon system-symbol" data-icon="square-plus" aria-hidden="true"></span></button>
+              <button id="duplicate-tile" class="toolbar-button" type="button" title="复制选中切片" aria-label="复制选中切片"><span class="icon system-symbol" data-icon="copy-plus" aria-hidden="true"></span></button>
+              <button id="delete-tile" class="toolbar-button" type="button" title="删除选中切片" aria-label="删除选中切片"><span class="icon system-symbol" data-icon="trash-2" aria-hidden="true"></span></button>
             </div>
           <div id="tile-inspector" class="inspector-group">
             <div class="tile-heading">
@@ -595,11 +595,11 @@
         <div id="source-editor" hidden>
           <div class="source-toolbar" id="source-toolbar">
             <div class="source-find-row">
-              <label class="search-control" aria-label="搜索源代码"><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"></span><input id="source-search" type="search" results="0" placeholder="查找"><span id="source-search-count" aria-live="polite"></span></label>
+              <label class="search-control" aria-label="搜索源代码"><span class="system-symbol" data-icon="search" aria-hidden="true"></span><input id="source-search" type="search" results="0" placeholder="查找"><span id="source-search-count" aria-live="polite"></span></label>
               <div class="source-search-actions">
-                <button id="source-search-previous" type="button" title="上一个（Shift + Enter）" aria-label="上一个搜索结果"><span class="system-symbol" data-system-symbol="chevron.up" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m5 12 5-5 5 5"/></svg></span></button>
-                <button id="source-search-next" type="button" title="下一个（Enter）" aria-label="下一个搜索结果"><span class="system-symbol" data-system-symbol="chevron.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m5 8 5 5 5-5"/></svg></span></button>
-                <button id="source-replace-toggle" type="button" title="展开替换" aria-label="展开替换" aria-expanded="false"><span class="system-symbol" data-system-symbol="arrow.left.arrow.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 7h12m-3-3 3 3-3 3M17 13H5m3-3-3 3 3 3"/></svg></span></button>
+                <button id="source-search-previous" type="button" title="上一个（Shift + Enter）" aria-label="上一个搜索结果"><span class="system-symbol" data-icon="chevron-up" aria-hidden="true"></span></button>
+                <button id="source-search-next" type="button" title="下一个（Enter）" aria-label="下一个搜索结果"><span class="system-symbol" data-icon="chevron-down" aria-hidden="true"></span></button>
+                <button id="source-replace-toggle" type="button" title="展开替换" aria-label="展开替换" aria-expanded="false"><span class="system-symbol" data-icon="arrow-left-right" aria-hidden="true"></span></button>
               </div>
             </div>
             <div class="source-replace-row" hidden>
@@ -610,7 +610,7 @@
           </div>
           <div class="source-code">
             <div id="source"></div>
-            <button id="source-find-toggle" class="source-find-fab" type="button" title="查找（Ctrl/⌘ + F）" aria-label="查找" aria-controls="source-toolbar" aria-expanded="false" aria-pressed="false" hidden><span class="system-symbol source-find-fab-search" data-system-symbol="magnifyingglass" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><circle cx="8.7" cy="8.7" r="5.5"/><path d="m12.9 12.9 4.2 4.2"/></svg></span><svg class="source-find-fab-close" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg></button>
+            <button id="source-find-toggle" class="source-find-fab" type="button" title="查找（Ctrl/⌘ + F）" aria-label="查找" aria-controls="source-toolbar" aria-expanded="false" aria-pressed="false" hidden><span class="system-symbol source-find-fab-search" data-icon="search" aria-hidden="true"></span><span class="source-find-fab-close" data-icon="chevron-down" data-icon-size="20" aria-hidden="true"></span></button>
           </div>
         </div>
         <div id="ai-design-panel" hidden>
@@ -619,7 +619,7 @@
               <span id="ai-context-preview" class="ai-chip">画布</span>
               <span id="ai-context-key" class="ai-chip" hidden></span>
             </div>
-            <button id="ai-new-session" class="ai-new-session" type="button" title="清空当前对话，不影响已应用的修改"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9"/></svg>新对话</button>
+            <button id="ai-new-session" class="ai-new-session" type="button" title="清空当前对话，不影响已应用的修改" data-icon="plus">新对话</button>
           </header>
           <p id="ai-design-status" class="ai-design-status" role="status" aria-live="polite"></p>
           <div class="ai-design-composer">
@@ -656,7 +656,7 @@
         </div>
         <div id="asset" hidden>
           <div class="asset-toolbar">
-            <button id="asset-back" title="返回之前的配置" aria-label="返回之前的配置"><span class="system-symbol" data-system-symbol="chevron.left" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m12 4-6 6 6 6"/></svg></span></button>
+            <button id="asset-back" title="返回之前的配置" aria-label="返回之前的配置"><span class="system-symbol" data-icon="chevron-left" aria-hidden="true"></span></button>
             <span>图片资源</span>
           </div>
           <img id="asset-image" alt="皮肤资源预览" />
@@ -708,7 +708,7 @@
     <dialog id="file-operation-dialog" class="project-dialog file-operation-dialog" aria-labelledby="file-operation-title">
       <form method="dialog">
         <header>
-          <span class="file-operation-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 9h.01M12 9h.01M17 9h.01M7 12h.01M12 12h.01M17 12h.01M8 15h8"/></svg></span>
+          <span class="file-operation-icon" data-icon="keyboard" data-icon-size="24" aria-hidden="true"></span>
           <div><h2 id="file-operation-title">正在处理</h2><p class="file-operation-subtitle">为你的创作准备就绪</p></div>
         </header>
         <div class="file-operation-meter">
@@ -760,8 +760,8 @@
         </div>
         <div class="style-image-actions">
           <button id="style-image-resource-open" type="button">选择图片资源</button>
-          <button id="style-image-source" class="toolbar-button" type="button" title="跳转至源代码" aria-label="跳转至样式源代码" hidden><span class="icon system-symbol" data-system-symbol="doc.text" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v5h5M9 12h6M9 16h6"/></svg></span></button>
-          <button id="style-image-close" class="toolbar-button" type="button" title="关闭" aria-label="关闭图片预览"><span class="icon system-symbol" data-system-symbol="xmark" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></span></button>
+          <button id="style-image-source" class="toolbar-button" type="button" title="跳转至源代码" aria-label="跳转至样式源代码" hidden><span class="icon system-symbol" data-icon="file-text" aria-hidden="true"></span></button>
+          <button id="style-image-close" class="toolbar-button" type="button" title="关闭" aria-label="关闭图片预览"><span class="icon system-symbol" data-icon="x" aria-hidden="true"></span></button>
         </div>
       </header>
       <div id="style-image-picker" hidden>
@@ -775,7 +775,7 @@
             <small id="style-image-resource-count"></small>
           </div>
           <div class="style-image-resource-tools">
-            <label class="search-control" aria-label="搜索图片资源"><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"></span><input id="style-image-resource-search" type="search" results="0" placeholder="搜索图片资源"></label>
+            <label class="search-control" aria-label="搜索图片资源"><span class="system-symbol" data-icon="search" aria-hidden="true"></span><input id="style-image-resource-search" type="search" results="0" placeholder="搜索图片资源"></label>
             <button id="style-image-resource-close" type="button" aria-label="返回图片切片">关闭</button>
           </div>
         </header>
@@ -789,7 +789,7 @@
         <header><h2 id="layout-image-title">替换键盘样式</h2><small id="layout-image-layout"></small></header>
         <button id="layout-image-file" class="layout-image-file" type="button" autofocus>
           <img id="layout-image-preview" alt="待切片的键盘图片预览" hidden>
-          <span class="system-symbol layout-image-file-icon" data-system-symbol="photo.badge.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="m4.5 14 4-4 3 3 2-2 2 2M10 2v6m-2-2 2 2 2-2"/></svg></span>
+          <span class="system-symbol layout-image-file-icon" data-icon="image-down" aria-hidden="true"></span>
           <span id="layout-image-file-label">选择或拖入一张 PNG 图片</span>
           <small id="layout-image-size">支持 PNG · 也可以直接拖到画布</small>
         </button>
@@ -833,12 +833,12 @@
           <span class="style-picker-hint">单击预览 · 双击应用 · Command/Ctrl 单击编辑</span>
         </div>
         <div class="style-picker-tools">
-          <button id="style-picker-add" class="toolbar-button" type="button" title="新增样式" aria-label="新增样式"><span class="icon system-symbol" data-system-symbol="plus" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14"/></svg></span></button>
+          <button id="style-picker-add" class="toolbar-button" type="button" title="新增样式" aria-label="新增样式"><span class="icon system-symbol" data-icon="plus" aria-hidden="true"></span></button>
           <div class="style-library-tabs" role="group" aria-label="内容类型">
             <button type="button" data-style-library-mode="styles" aria-pressed="true">全部样式</button>
             <button type="button" data-style-library-mode="images" aria-pressed="false">全部图片</button>
           </div>
-          <button id="style-picker-close" class="toolbar-button" type="button" title="关闭" aria-label="关闭样式选择器"><span class="icon system-symbol" data-system-symbol="xmark" aria-hidden="true">×</span></button>
+          <button id="style-picker-close" class="toolbar-button" type="button" title="关闭" aria-label="关闭样式选择器"><span class="icon system-symbol" data-icon="x" aria-hidden="true"></span></button>
         </div>
       </header>
       <div class="style-library-toolbar">
@@ -856,7 +856,7 @@
           <button type="button" data-style-library-filter="candidate" aria-pressed="false">候选栏</button>
           <button type="button" data-style-library-filter="foreground" aria-pressed="false">前景</button>
         </div>
-        <label class="search-control"><span class="system-symbol" data-system-symbol="magnifyingglass" aria-hidden="true"></span><input id="style-picker-search" type="search" aria-label="搜索样式或图片" placeholder="搜索样式名称或编号"></label>
+        <label class="search-control"><span class="system-symbol" data-icon="search" aria-hidden="true"></span><input id="style-picker-search" type="search" aria-label="搜索样式或图片" placeholder="搜索样式名称或编号"></label>
       </div>
       <div class="style-library-content">
         <div id="style-picker-grid" class="style-picker-grid"></div>
@@ -873,20 +873,20 @@
 
     <dialog id="settings-dialog" class="app-dialog" aria-labelledby="settings-title">
       <form method="dialog">
-        <header><div class="settings-title-cluster"><span class="system-symbol" data-system-symbol="slider.horizontal.3" aria-hidden="true"></span><h2 id="settings-title">设置</h2></div><button id="settings-close" type="button" aria-label="关闭设置">×</button></header>
+        <header><div class="settings-title-cluster"><span class="system-symbol" data-icon="sliders-horizontal" aria-hidden="true"></span><h2 id="settings-title">设置</h2></div><button id="settings-close" type="button" aria-label="关闭设置">×</button></header>
         <div class="settings-layout">
           <nav class="settings-sidebar" role="tablist" aria-label="设置分类">
             <div class="settings-group-label">界面</div>
-            <button class="settings-nav-item" type="button" data-settings-page="appearance" role="tab" id="settings-tab-appearance" aria-controls="settings-panel-appearance" aria-selected="true"><span class="system-symbol" data-system-symbol="paintbrush" aria-hidden="true"></span><span>外观</span></button>
-            <button class="settings-nav-item" type="button" data-settings-page="workspace" role="tab" id="settings-tab-workspace" aria-controls="settings-panel-workspace" aria-selected="false"><span class="system-symbol" data-system-symbol="rectangle.3.group" aria-hidden="true"></span><span>工作区</span></button>
-            <button class="settings-nav-item" type="button" data-settings-page="device" role="tab" id="settings-tab-device" aria-controls="settings-panel-device" aria-selected="false"><span class="system-symbol" data-system-symbol="smartphone" aria-hidden="true"></span><span>默认预览设备</span><small data-settings-summary="device">画布</small></button>
-            <button class="settings-nav-item" type="button" data-settings-page="background" role="tab" id="settings-tab-background" aria-controls="settings-panel-background" aria-selected="false"><span class="system-symbol" data-system-symbol="square.grid.2x2" aria-hidden="true"></span><span>画布背景</span><small data-settings-summary="background">浅色</small></button>
-            <button class="settings-nav-item" type="button" data-settings-page="guides" role="tab" id="settings-tab-guides" aria-controls="settings-panel-guides" aria-selected="false"><span class="system-symbol" data-system-symbol="ruler" aria-hidden="true"></span><span>安全区与辅助线</span><small data-settings-summary="guides">已启用</small></button>
+            <button class="settings-nav-item" type="button" data-settings-page="appearance" role="tab" id="settings-tab-appearance" aria-controls="settings-panel-appearance" aria-selected="true"><span class="system-symbol" data-icon="paintbrush" aria-hidden="true"></span><span>外观</span></button>
+            <button class="settings-nav-item" type="button" data-settings-page="workspace" role="tab" id="settings-tab-workspace" aria-controls="settings-panel-workspace" aria-selected="false"><span class="system-symbol" data-icon="layout-grid" aria-hidden="true"></span><span>工作区</span></button>
+            <button class="settings-nav-item" type="button" data-settings-page="device" role="tab" id="settings-tab-device" aria-controls="settings-panel-device" aria-selected="false"><span class="system-symbol" data-icon="smartphone" aria-hidden="true"></span><span>默认预览设备</span><small data-settings-summary="device">画布</small></button>
+            <button class="settings-nav-item" type="button" data-settings-page="background" role="tab" id="settings-tab-background" aria-controls="settings-panel-background" aria-selected="false"><span class="system-symbol" data-icon="layout-grid" aria-hidden="true"></span><span>画布背景</span><small data-settings-summary="background">浅色</small></button>
+            <button class="settings-nav-item" type="button" data-settings-page="guides" role="tab" id="settings-tab-guides" aria-controls="settings-panel-guides" aria-selected="false"><span class="system-symbol" data-icon="ruler" aria-hidden="true"></span><span>安全区与辅助线</span><small data-settings-summary="guides">已启用</small></button>
             <div class="settings-group-label">服务</div>
-            <button id="settings-storage-nav" class="settings-nav-item" type="button" data-settings-page="storage" role="tab" aria-controls="settings-storage-section" aria-selected="false" hidden><span class="system-symbol" data-system-symbol="internaldrive" aria-hidden="true"></span><span>源码存储</span></button>
-            <button id="settings-model-nav" class="settings-nav-item" type="button" data-settings-page="model" role="tab" aria-controls="settings-model-section" aria-selected="false" hidden><span class="system-symbol" data-system-symbol="sparkles" aria-hidden="true"></span><span>大模型</span><small data-settings-summary="model"></small></button>
+            <button id="settings-storage-nav" class="settings-nav-item" type="button" data-settings-page="storage" role="tab" aria-controls="settings-storage-section" aria-selected="false" hidden><span class="system-symbol" data-icon="hard-drive" aria-hidden="true"></span><span>源码存储</span></button>
+            <button id="settings-model-nav" class="settings-nav-item" type="button" data-settings-page="model" role="tab" aria-controls="settings-model-section" aria-selected="false" hidden><span class="system-symbol" data-icon="sparkles" aria-hidden="true"></span><span>大模型</span><small data-settings-summary="model"></small></button>
             <div class="settings-group-label">应用</div>
-            <button class="settings-nav-item" type="button" data-settings-page="about" role="tab" id="settings-tab-about" aria-controls="settings-panel-about" aria-selected="false"><span class="system-symbol" data-system-symbol="info.circle" aria-hidden="true"></span><span>关于</span></button>
+            <button class="settings-nav-item" type="button" data-settings-page="about" role="tab" id="settings-tab-about" aria-controls="settings-panel-about" aria-selected="false"><span class="system-symbol" data-icon="info" aria-hidden="true"></span><span>关于</span></button>
           </nav>
           <div class="settings-content">
           <section class="settings-section settings-page" data-settings-panel="appearance" role="tabpanel" id="settings-panel-appearance" aria-labelledby="settings-appearance-title">
@@ -935,8 +935,8 @@
             <label class="source-directory-setting">
               <span class="settings-path-control">
                 <input id="source-directory" type="text" autocomplete="off" spellcheck="false" aria-label="皮肤源码保存目录">
-                <button id="choose-source-directory" type="button" title="选择目录" aria-label="选择皮肤源码保存目录"><span class="system-symbol" data-system-symbol="folder" aria-hidden="true"></span></button>
-                <button id="reset-source-directory" type="button" title="恢复内置目录" aria-label="恢复内置皮肤源码保存目录"><span class="system-symbol" data-system-symbol="arrow.uturn.backward" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m7 5-4 3.5L7 12"/><path d="M4 8.5h7.2a5 5 0 0 1 5 5"/></svg></span></button>
+                <button id="choose-source-directory" type="button" title="选择目录" aria-label="选择皮肤源码保存目录"><span class="system-symbol" data-icon="folder" aria-hidden="true"></span></button>
+                <button id="reset-source-directory" type="button" title="恢复内置目录" aria-label="恢复内置皮肤源码保存目录"><span class="system-symbol" data-icon="undo-2" aria-hidden="true"></span></button>
               </span>
               <small id="source-directory-status"></small>
             </label>
@@ -946,17 +946,17 @@
               <h3 id="settings-model-title">大模型</h3>
               <p>添加模型服务商并勾选要使用的模型。列表第一个服务商的第一个模型为默认模型，密钥仅保存在本机。</p>
             </div>
-            <h4 class="settings-subheading">服务商<button id="model-profile-add" class="settings-model-add" type="button"><span class="system-symbol" data-system-symbol="plus" aria-hidden="true"></span>新增</button></h4>
+            <h4 class="settings-subheading">服务商<button id="model-profile-add" class="settings-model-add" type="button"><span class="system-symbol" data-icon="plus" aria-hidden="true"></span>新增</button></h4>
             <ul id="model-profiles" class="model-profiles" aria-label="已配置服务商"></ul>
             <div id="model-editor" class="settings-list model-editor" hidden>
               <label class="settings-row"><span>服务商</span><select id="model-provider"></select></label>
               <label class="settings-row settings-text-row"><span>API 地址</span><input id="model-api-url" type="url" autocomplete="url" spellcheck="false" placeholder="https://api.openai.com/v1"></label>
-              <label class="settings-row settings-text-row"><span>API 密钥</span><span class="settings-secret-control"><input id="model-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…"><button id="toggle-model-api-key" type="button" title="显示 API 密钥" aria-label="显示 API 密钥"><span class="system-symbol" data-system-symbol="eye" aria-hidden="true"></span></button></span></label>
+              <label class="settings-row settings-text-row"><span>API 密钥</span><span class="settings-secret-control"><input id="model-api-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…"><button id="toggle-model-api-key" type="button" title="显示 API 密钥" aria-label="显示 API 密钥"><span class="system-symbol" data-icon="eye" aria-hidden="true"></span></button></span></label>
               <div class="settings-row model-choices-row">
                 <span>模型</span>
                 <div class="model-choices-panel">
                   <ul id="model-choices" class="model-choices" aria-label="可用模型"></ul>
-                  <span class="settings-model-control"><input id="model-name" type="text" autocomplete="off" spellcheck="false" placeholder="手动添加模型 ID" aria-label="手动添加模型 ID"><button id="model-name-add" type="button" title="添加模型" aria-label="添加模型"><span class="system-symbol" data-system-symbol="plus" aria-hidden="true"></span></button><button id="refresh-model-list" type="button" title="从服务商获取模型列表" aria-label="从服务商获取模型列表"><span class="system-symbol" data-system-symbol="arrow.clockwise" aria-hidden="true"></span></button></span>
+                  <span class="settings-model-control"><input id="model-name" type="text" autocomplete="off" spellcheck="false" placeholder="手动添加模型 ID" aria-label="手动添加模型 ID"><button id="model-name-add" type="button" title="添加模型" aria-label="添加模型"><span class="system-symbol" data-icon="plus" aria-hidden="true"></span></button><button id="refresh-model-list" type="button" title="从服务商获取模型列表" aria-label="从服务商获取模型列表"><span class="system-symbol" data-icon="rotate-cw" aria-hidden="true"></span></button></span>
                 </div>
               </div>
             </div>

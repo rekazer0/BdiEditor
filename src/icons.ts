@@ -14,6 +14,10 @@ import {
   Sigma, Pi, Omega, Slash, Parentheses, Braces, DollarSign, Hand, ScanLine, Spline, ListTree,
   ListFilter, Smile, Laugh, SmilePlus, LayoutTemplate, PanelBottom, SquareDashedBottom,
   LayoutDashboard, Columns3, Table2, Box, Folder, File,
+  HardDrive, Smartphone, Crosshair, Moon, Sun, RectangleHorizontal, RectangleVertical, Scissors, ClipboardPaste,
+  Undo2, Redo2, RotateCw, Share, Menu, Eye, EyeOff, Wifi, Signal, BatteryFull, Lightbulb, SlidersHorizontal,
+  Paperclip, Sparkles, VolumeX, Check, ChevronsUpDown, CodeXml, FileDown, Minus, Scan, Paintbrush,
+  CircleAlert, FolderInput, Grid2x2, Maximize,
 } from "lucide"
 
 // Exact Lucide names from 属性检查器.pen, read through Pen MCP.
@@ -52,6 +56,15 @@ const icons: Record<string, IconNode> = {
   "layout-dashboard": LayoutDashboard, "columns-3": Columns3, "table-2": Table2, box: Box,
   // 源文件树
   folder: Folder, file: File,
+  // 工具栏、菜单与状态
+  "hard-drive": HardDrive, smartphone: Smartphone, crosshair: Crosshair, moon: Moon, sun: Sun,
+  "rectangle-horizontal": RectangleHorizontal, "rectangle-vertical": RectangleVertical, scissors: Scissors,
+  "clipboard-paste": ClipboardPaste, "undo-2": Undo2, "redo-2": Redo2, "rotate-cw": RotateCw, share: Share,
+  menu: Menu, eye: Eye, "eye-off": EyeOff, wifi: Wifi, signal: Signal, "battery-full": BatteryFull,
+  lightbulb: Lightbulb, "sliders-horizontal": SlidersHorizontal, paperclip: Paperclip, sparkles: Sparkles,
+  "volume-x": VolumeX, check: Check, "chevrons-up-down": ChevronsUpDown, "code-xml": CodeXml,
+  "file-down": FileDown, minus: Minus, scan: Scan, paintbrush: Paintbrush,
+  "circle-alert": CircleAlert, "folder-input": FolderInput, "grid-2x2": Grid2x2, maximize: Maximize,
 }
 
 export function createIcon(name: string, size = 14): SVGElement {
@@ -77,47 +90,63 @@ export function groupIcon(label: string): SVGElement {
   return createIcon(name, 16)
 }
 
-/*
- * The panel's own tools (rail, key tool row, chevrons, section heads) draw the set above, but the
- * markup and the image/document panels still create platform symbols: those are a 20-unit box at
- * stroke 1.7, one optical step bolder than 1.5 in the 24-unit box here, so the same row reads as
- * two different icon families. Everything the panel still ships resolves through this map, which
- * keeps one glyph size (14px, like the tool rows) and one weight across the whole panel.
+/**
+ * 旧代码里的平台符号名（SF Symbols 风格）→ Lucide 名。只用于迁移期间解析遗留名称，
+ * 新代码直接写 Lucide 名（DESIGN.md §5）。
  */
-const symbolIcons: Record<string, [string, number]> = {
-  magnifyingglass: ["search", 14], plus: ["plus", 14], xmark: ["x", 14], trash: ["trash-2", 14],
-  "arrow.up": ["upload", 14], "arrow.down": ["download", 14], "arrow.right": ["arrow-right", 14],
-  "chevron.left": ["chevron-left", 14], "chevron.up": ["chevron-up", 14],
-  "chevron.down": ["chevron-down", 14], "chevron.right": ["chevron-right", 14],
-  cursorarrow: ["mouse-pointer-2", 14],
-  "arrow.up.and.down.and.arrow.left.and.right": ["move", 14],
-  "arrow.left.and.right": ["arrow-left-right", 14], "arrow.left.arrow.right": ["arrow-left-right", 14],
-  "arrow.up.and.down": ["arrow-up-down", 14], "doc.on.doc": ["copy", 14],
-  "doc.text": ["file-text", 14], "square.grid.2x2": ["layout-grid", 14],
-  "plus.rectangle": ["square-plus", 14], "plus.square.on.square": ["copy-plus", 14],
-  "photo.badge.arrow.down": ["image-down", 14],
-  "align.horizontal.left": ["align-start-vertical", 14],
-  "align.horizontal.right": ["align-end-vertical", 14],
-  "align.vertical.top": ["align-start-horizontal", 14],
-  "align.vertical.bottom": ["align-end-horizontal", 14],
-  "arrow.left.and.right.righttriangle.left.righttriangle.right": ["fold-horizontal", 14],
-  "arrow.up.and.down.righttriangle.up.righttriangle.down": ["fold-vertical", 14],
-  "square.2.layers.3d": ["square-stack", 14], "rectangle.3.group": ["layout-grid", 14],
-  paintbrush: ["palette", 14], paintpalette: ["palette", 14],
-  "rectangle.and.hand.point": ["zap", 14], "text.bubble": ["panel-top", 14],
-  sparkles: ["clapperboard", 14], "info.circle": ["info", 14], photo: ["images", 14],
-  "list.bullet": ["list", 14], "speaker.wave.2": ["volume-2", 14], "music.note": ["music", 14],
-  play: ["play", 14], "play.fill": ["play", 14],
-  keyboard: ["keyboard", 14], gearshape: ["settings", 14], pencil: ["pen-line", 14],
-  asterisk: ["asterisk", 14], app: ["app-window", 14],
-  folder: ["folder", 14], doc: ["file", 14],
+const SYMBOL_ALIASES: Record<string, string> = {
+  magnifyingglass: "search", xmark: "x", trash: "trash-2", "arrow.up": "upload", "arrow.down": "download",
+  "arrow.right": "arrow-right", "chevron.left": "chevron-left", "chevron.up": "chevron-up",
+  "chevron.down": "chevron-down", "chevron.right": "chevron-right", "chevron.up.chevron.down": "chevrons-up-down",
+  cursorarrow: "mouse-pointer-2", "arrow.up.and.down.and.arrow.left.and.right": "move",
+  "arrow.left.and.right": "arrow-left-right", "arrow.left.arrow.right": "arrow-left-right",
+  "arrow.up.and.down": "arrow-up-down", "doc.on.doc": "copy", "doc.text": "file-text", doc: "file",
+  "square.grid.2x2": "layout-grid", "rectangle.3.group": "layout-grid", "plus.rectangle": "square-plus",
+  "plus.square.on.square": "copy-plus", "photo.badge.arrow.down": "image-down",
+  "align.horizontal.left": "align-start-vertical", "align.horizontal.right": "align-end-vertical",
+  "align.vertical.top": "align-start-horizontal", "align.vertical.bottom": "align-end-horizontal",
+  "arrow.left.and.right.righttriangle.left.righttriangle.right": "fold-horizontal",
+  "arrow.up.and.down.righttriangle.up.righttriangle.down": "fold-vertical",
+  "square.2.layers.3d": "square-stack", paintbrush: "paintbrush", paintpalette: "palette",
+  "rectangle.and.hand.point": "zap", "text.bubble": "message-square", sparkles: "sparkles",
+  "info.circle": "info", photo: "images", "list.bullet": "list", "speaker.wave.2": "volume-2",
+  "speaker.slash": "volume-x", "music.note": "music", "play.fill": "play", gearshape: "settings",
+  pencil: "pen-line", app: "app-window", externaldrive: "hard-drive", internaldrive: "hard-drive",
+  "square.and.arrow.down": "download", "square.and.arrow.down.badge.new": "file-down",
+  "square.and.arrow.up": "share", "iphone.gen3.badge.checkmark": "smartphone",
+  "arrow.uturn.backward": "undo-2", "arrow.uturn.forward": "redo-2", "arrow.uturn.left": "undo-2",
+  "arrow.uturn.right": "redo-2", "arrow.clockwise": "rotate-cw", "line.3.horizontal": "menu",
+  "sun.max": "sun", "slider.horizontal.3": "sliders-horizontal", "rectangle.portrait": "rectangle-vertical",
+  "rectangle.landscape": "rectangle-horizontal", "rectangle.dashed": "square-dashed", checkmark: "check",
+  cellularbars: "signal", "battery.100": "battery-full", "code.xml": "code-xml", "eye.slash": "eye-off",
 }
 
-/** The panel icon for a platform symbol name, or null when the panel has no equivalent. */
-export function symbolIcon(symbol: string, size?: number): SVGElement | null {
-  // 概览条目里也直接写 Lucide 名（palette、images…），同样走这套图标。
-  const entry = symbolIcons[symbol] ?? (icons[symbol] ? [symbol, 14] : undefined)
-  return entry ? createIcon(entry[0], size ?? entry[1]) : null
+/** 解析图标名：Lucide 名原样返回，旧平台符号名与 lucide- 前缀名转成 Lucide 名。 */
+export function iconName(name: string): string {
+  const plain = name.replace(/^lucide-/, "")
+  return icons[plain] ? plain : SYMBOL_ALIASES[name] ?? "file"
+}
+
+/** 带 .system-symbol 外壳的图标（沿用原有尺寸规则）。 */
+export function symbolSpan(name: string, size = 16): HTMLSpanElement {
+  const span = document.createElement("span")
+  span.className = "system-symbol"
+  span.setAttribute("aria-hidden", "true")
+  span.append(createIcon(iconName(name), size))
+  return span
+}
+
+/** 平台符号名或 Lucide 名对应的图标；没有对应时返回 null。 */
+export function symbolIcon(symbol: string, size = 14): SVGElement | null {
+  const name = iconName(symbol)
+  return name === "file" && symbol !== "file" && symbol !== "doc" ? null : createIcon(name, size)
+}
+
+/** 需要 HTML 字符串的地方（如 deep-chat 的配置）用这个，图标仍来自同一张注册表。 */
+export function iconMarkup(name: string, size = 14, strokeWidth = 1.5): string {
+  const svg = createIcon(name, size)
+  svg.setAttribute("stroke-width", String(strokeWidth))
+  return svg.outerHTML
 }
 
 /**
@@ -127,6 +156,6 @@ export function symbolIcon(symbol: string, size?: number): SVGElement | null {
 export function hydrateIcons(root: ParentNode = document): void {
   for (const el of Array.from(root.querySelectorAll<HTMLElement>("[data-icon]"))) {
     if (el.querySelector(":scope > .ui-icon")) continue
-    el.prepend(createIcon(el.dataset.icon ?? "", Number(el.dataset.iconSize) || 14))
+    el.prepend(createIcon(iconName(el.dataset.icon ?? ""), Number(el.dataset.iconSize) || 14))
   }
 }

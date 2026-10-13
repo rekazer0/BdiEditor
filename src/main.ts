@@ -5,26 +5,6 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { getCurrentWebview } from "@tauri-apps/api/webview"
 import { message, open, save } from "@tauri-apps/plugin-dialog"
 import { readFile, watch, writeFile, type UnwatchFn } from "@tauri-apps/plugin-fs"
-import {
-  ClipboardPaste,
-  Copy,
-  Download,
-  Scissors,
-  Trash2,
-  Upload,
-  Crosshair,
-  Moon,
-  RectangleHorizontal,
-  RectangleVertical,
-  SquareDashed,
-  Smartphone,
-  Sun,
-  HardDrive,
-  ImageDown,
-  Palette,
-  createElement as createLucideElement,
-  type IconNode,
-} from "lucide"
 import "./tokens.css"
 import "./components.css"
 import "./style.css"
@@ -40,7 +20,7 @@ import {
   renderBlobPreview,
 } from "./template-preview"
 import { initInspectorShell, setInspectorKind, syncInspectorRows } from "./inspector-shell.ts"
-import { createIcon, groupIcon, hydrateIcons, symbolIcon } from "./icons"
+import { createIcon, groupIcon, hydrateIcons, symbolSpan } from "./icons"
 import { sourceKeyLabels } from "./config-labels.ts"
 import "./style-library.css"
 import "./design-workbench.css"
@@ -1456,86 +1436,6 @@ mobileShareButton.title = mobileShareLabel
 mobileShareButton.setAttribute("aria-label", mobileShareLabel)
 mobileShareMenuLabel.textContent = mobileShareLabel
 
-const svgNamespace = "http://www.w3.org/2000/svg"
-const lucideToolbarIcons: Record<string, IconNode> = {
-  externaldrive: HardDrive,
-  "photo.badge.arrow.down": ImageDown,
-  "iphone.gen3.badge.checkmark": [...Smartphone, ["path", { d: "m9 11 2 2 4-4" }]],
-  paintpalette: Palette,
-  "rectangle.dashed": SquareDashed,
-  upload: Upload,
-  download: Download,
-  copy: Copy,
-  "clipboard-paste": ClipboardPaste,
-  scissors: Scissors,
-  "trash-2": Trash2,
-  "lucide-crosshair": Crosshair,
-  "lucide-moon": Moon,
-  "lucide-rectangle-horizontal": RectangleHorizontal,
-  "lucide-rectangle-vertical": RectangleVertical,
-  "lucide-smartphone": Smartphone,
-  "lucide-sun": Sun,
-}
-const fallbackSymbolPaths: Record<string, string[]> = {
-  "info.circle": ["M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18", "M12 10v7", "M12 7h.01"],
-  keyboard: ["M3 6h18v12H3z", "M6 10h2m2 0h2m2 0h2m2 0h1M7 14h10"],
-  "square.grid.2x2": ["M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"],
-  asterisk: ["M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"],
-  pencil: ["m4 20 4.5-1 11-11-3.5-3.5-11 11z", "m14.5 6 3.5 3.5"],
-  "list.bullet": ["M9 6h11M9 12h11M9 18h11", "M4 6h.01M4 12h.01M4 18h.01"],
-  paperclip: ["M8 12.5 15.5 5a4 4 0 0 1 5.7 5.7L11 20.8a6 6 0 0 1-8.5-8.5L13 1.8", "M6 15.5 16.5 5a2 2 0 0 1 2.8 2.8L8.8 18.3"],
-  play: ["M9 5v14l10-7z"],
-  "play.fill": ["M8 5v14l11-7z"],
-  "music.note": ["M9 18V5l12-2v13", "M9 9l12-2", "M9 18a3 3 0 1 1-3-3h3", "M21 16a3 3 0 1 1-3-3h3"],
-  "speaker.wave.2": ["M4 9h4l5-4v14l-5-4H4z", "M16 9a4 4 0 0 1 0 6", "M18.5 6.5a8 8 0 0 1 0 11"],
-  "speaker.slash": ["M4 9h4l5-4v14l-5-4H4z", "m17 9 4 6M21 9l-4 6"],
-  // 齿轮：8 齿多边形轮廓 + 中心孔，替代此前与 `sun.max` 混淆的「圆+射线」画法。
-  gearshape: [
-    "M10.48 1.91L13.52 1.91L13.71 4.39L16.17 5.41L18.06 3.80L20.20 5.94L18.59 7.83L19.61 10.29L22.09 10.48L22.09 13.52L19.61 13.71L18.59 16.17L20.20 18.06L18.06 20.20L16.17 18.59L13.71 19.61L13.52 22.09L10.48 22.09L10.29 19.61L7.83 18.59L5.94 20.20L3.80 18.06L5.41 16.17L4.39 13.71L1.91 13.52L1.91 10.48L4.39 10.29L5.41 7.83L3.80 5.94L5.94 3.80L7.83 5.41L10.29 4.39Z",
-    "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6",
-  ],
-  "text.bubble": ["M4 4h16v12H9l-5 4z", "M8 8h8M8 12h5"],
-  app: ["M4 4h16v16H4z", "M8 8h8v8H8z"],
-  "rectangle.and.hand.point": ["M3 4h18v14H3z", "M8 8h8M12 8v6m0 0 3-3m-3 3-3-3"],
-  paintpalette: ["M12 3a9 9 0 1 0 0 18h2a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h9a9 9 0 0 0-6-14", "M7 9h.01M10 6h.01M15 7h.01M18 11h.01"],
-  folder: ["M3 6h7l2 2h9l-2 10H5z", "M5 6V4h6l2 2"],
-  "doc.text": ["M6 3h8l4 4v14H6z", "M14 3v5h5M9 12h6M9 16h6"],
-  "doc.on.doc": ["M8 7V3h10l3 3v12h-4", "M5 7h10v14H5z", "M9 12h2m-2 4h2"],
-  "arrow.uturn.backward": ["m7 5-4 3.5L7 12", "M4 8.5h7.2a5 5 0 0 1 5 5"],
-  "arrow.uturn.forward": ["m13 5 4 3.5-4 3.5", "M16 8.5H8.8a5 5 0 0 0-5 5"],
-  "arrow.uturn.left": ["M9 14.25 4.5 9.75m0 0L9 5.25m-4.5 4.5h10.125a6.375 6.375 0 0 1 0 12.75H12"],
-  "arrow.uturn.right": ["m15 14.25 4.5-4.5m0 0-4.5-4.5m4.5 4.5H9.375a6.375 6.375 0 0 0 0 12.75H12"],
-  "arrow.left.and.right": ["M3 7h18M3 7l4-4M3 7l4 4M21 17H3m18 0-4-4m4 4-4 4"],
-  "arrow.up.and.down": ["M7 3v18M7 3 3 7m4-4 4 4M17 21V3m0 18 4-4m-4 4-4-4"],
-  "align.horizontal.left": ["M4 4v16M8 7h12M8 12h8M8 17h10"],
-  "align.horizontal.right": ["M20 4v16M4 7h12M8 12h8M6 17h10"],
-  "align.vertical.top": ["M4 4h16M7 8v12M12 8v8M17 8v10"],
-  "align.vertical.bottom": ["M4 20h16M7 4v12M12 4v12M17 4v12"],
-  "arrow.left.and.right.righttriangle.left.righttriangle.right": ["M3 12h18M3 12l4-4v8zm18 0-4-4v8z"],
-  "arrow.up.and.down.righttriangle.up.righttriangle.down": ["M12 3v18M12 3 8 7h8zm0 18-4-4h8z"],
-  "square.2.layers.3d": ["M4 7h12v12H4zM8 3h12v12M8 7h8"],
-  "arrow.clockwise": ["M19 8a8 8 0 1 0 1 6", "M19 3v5h-5"],
-  "slider.horizontal.3": ["M4 6h4m4 0h8M4 12h10m4 0h2M4 18h2m4 0h10M8 3v6m6 0v6M6 15v6"],
-  ruler: ["m3 16 13-13 5 5L8 21zM7 12l2 2m2-6 2 2m2-6 2 2"],
-  paintbrush: ["m4 17 10-10 3 3-10 10H4z", "m14 7 2-2 3 3-2 2", "M4 20h5"],
-  "rectangle.3.group": ["M3 5h18v4H3zM3 11h8v8H3zM13 11h8v8h-8z"],
-  eye: ["M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6", "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6"],
-  "eye.slash": ["M3 3l18 18", "M2.5 12s3.5-6 9.5-6c6 0 9.5 6 9.5 6a16 16 0 0 1-3.2 3.8M6.2 17.8A15 15 0 0 1 2.5 12", "M10 9.7A3 3 0 0 1 14.3 14"],
-  internaldrive: ["M4 5h16l2 11H2z", "M2 16v3h20v-3M17 12h1"],
-  sparkles: ["m12 2 1.4 4.6L18 8l-4.6 1.4L12 14l-1.4-4.6L6 8l4.6-1.4z", "m19 14 .8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8z", "m5 14 .8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8z"],
-  "rectangle.portrait": ["M6 2.5h12v19H6z", "M9 5h6M9 19h6"],
-  smartphone: ["M7 2.5h10A1.5 1.5 0 0 1 18.5 4v16a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 20V4A1.5 1.5 0 0 1 7 2.5z", "M11 18.5h2"],
-  "rectangle.dashed": ["M4 5h3M10.5 5h3M17 5h3M20 8v3M20 14v3M17 19h-3M10.5 19h-3M4 19v-3M4 13v-3M4 8V5"],
-  "rectangle.landscape": ["M2.5 6h19v12h-19z", "M5 9v6M19 9v6"],
-  "sun.max": ["M12 4V2m0 20v-2M4 12H2m20 0h-2M5.6 5.6 4.2 4.2m15.6 15.6-1.4-1.4m0-12.8 1.4-1.4M5.6 18.4l-1.4 1.4", "M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10"],
-  moon: ["M20 15.5A8 8 0 0 1 8.5 4 8 8 0 1 0 20 15.5z"],
-  magnifyingglass: ["M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14", "m16 16 5 5"],
-  trash: ["M5 7h14M9 7V4h6v3m2 0-1 14H8L7 7m4 4v6m2-6v6"],
-  plus: ["M12 5v14M5 12h14"],
-  photo: ["M4 4h16v16H4z", "m6 16 4-5 3 3 2-2 3 4M9 9h.01"],
-  doc: ["M6 3h8l4 4v14H6z", "M14 3v5h5"],
-}
-
 // 源文件树缩略图按 PNG 字节缓存：文件被改写时换成新的字节对象，旧缓存随之回收。
 // 只保留 16px（按像素比放大）的小图，大图解码后立即释放。
 const sourceThumbnails = new WeakMap<Uint8Array, Promise<string | undefined>>()
@@ -1558,48 +1458,14 @@ function sourceThumbnail(bytes: Uint8Array): Promise<string | undefined> {
   return thumbnail
 }
 
-function createSystemSymbol(name: string): HTMLSpanElement {
-  const symbol = document.createElement("span")
-  symbol.className = "system-symbol"
-  symbol.dataset.systemSymbol = name
-  symbol.ariaHidden = "true"
-  const lucideIcon = lucideToolbarIcons[name]
-  if (lucideIcon) {
-    symbol.append(createLucideElement(lucideIcon, { class: "system-symbol-fallback canvas-toolbar-icon" }))
-    return symbol
-  }
-  const existingFallback = document.querySelector<SVGSVGElement>(
-    `[data-system-symbol="${CSS.escape(name)}"] .system-symbol-fallback`,
-  )
-  if (existingFallback) {
-    symbol.append(existingFallback.cloneNode(true))
-    return symbol
-  }
-  const fallback = document.createElementNS(svgNamespace, "svg")
-  fallback.classList.add("system-symbol-fallback")
-  fallback.setAttribute("viewBox", "0 0 24 24")
-  for (const pathData of fallbackSymbolPaths[name] ?? fallbackSymbolPaths.doc) {
-    const path = document.createElementNS(svgNamespace, "path")
-    path.setAttribute("d", pathData)
-    fallback.append(path)
-  }
-  symbol.append(fallback)
-  return symbol
-}
-
 function syncDeviceControlIcon(): void {
-  const name = currentDeviceValue() === "canvas" ? "rectangle.dashed" : "lucide-smartphone"
-  if (deviceControlIcon.dataset.systemSymbol === name && deviceControlIcon.childElementCount) return
-  const rendered = createSystemSymbol(name)
-  deviceControlIcon.dataset.systemSymbol = name
-  deviceControlIcon.replaceChildren(...rendered.childNodes)
+  const name = currentDeviceValue() === "canvas" ? "square-dashed" : "smartphone"
+  if (deviceControlIcon.dataset.icon === name && deviceControlIcon.childElementCount) return
+  deviceControlIcon.dataset.icon = name
+  deviceControlIcon.replaceChildren(createIcon(name, 16))
 }
 
 hydrateIcons()
-for (const symbol of Array.from(document.querySelectorAll<HTMLElement>(".system-symbol[data-system-symbol]:empty"))) {
-  const rendered = createSystemSymbol(symbol.dataset.systemSymbol ?? "doc")
-  symbol.replaceChildren(...rendered.childNodes)
-}
 
 function mobileCommandTarget(button: HTMLButtonElement): HTMLButtonElement | undefined {
   const command = button.dataset.mobileCommand
@@ -4214,7 +4080,7 @@ async function renderStyleResourceDetail(): Promise<void> {
       playButton.disabled = !soundPath
       playButton.title = soundPath ? `播放 ${filename}` : "当前声音文件不存在"
       playButton.setAttribute("aria-label", playButton.title)
-      playButton.append(createSystemSymbol("play.fill"))
+      playButton.append(symbolSpan("play.fill"))
       playButton.addEventListener("click", () => {
         if (soundPath) playSoundPath(soundPath)
       })
@@ -4351,7 +4217,7 @@ async function renderStyleResourceGallery(): Promise<void> {
       : undefined
     if (soundFilename) {
       button.classList.add("has-sound")
-      const badge = createSystemSymbol("play")
+      const badge = symbolSpan("play")
       badge.classList.add("sound-style-badge")
       badge.title = soundPath ? `点击试听 ${soundFilename}` : `声音文件不存在：${soundFilename}`
       button.append(badge)
@@ -4493,7 +4359,7 @@ function renderSoundResourceGallery(): void {
     button.className = "resource-item sound-resource-item"
     button.dataset.path = entry.id
     button.title = `${entry.label} · 点击试听`
-    const icon = createSystemSymbol("speaker.wave.2")
+    const icon = symbolSpan("speaker.wave.2")
     icon.classList.add("sound-resource-icon")
     const name = document.createElement("strong")
     name.textContent = entry.label
@@ -5856,7 +5722,7 @@ async function renderStylePicker(): Promise<void> {
       button.type = "button"
       button.className = "style-picker-sound-select"
       button.title = `点击使用声音样式 ${styleID}；Command/Ctrl 点击编辑`
-      const icon = createSystemSymbol("music.note")
+      const icon = symbolSpan("music.note")
       icon.classList.add("style-picker-sound-icon")
       const label = document.createElement("strong")
       label.textContent = `STYLE${styleID}`
@@ -5882,7 +5748,7 @@ async function renderStylePicker(): Promise<void> {
       playButton.disabled = !soundPath
       playButton.title = soundPath ? `播放 ${filename}` : "声音文件不存在"
       playButton.setAttribute("aria-label", playButton.title)
-      playButton.append(createSystemSymbol("play.fill"))
+      playButton.append(symbolSpan("play.fill"))
       playButton.addEventListener("click", () => {
         if (soundPath) playSoundPath(soundPath)
       })
@@ -6916,10 +6782,7 @@ function addNavButton(
   }
   // 概览与检查器分类轨共用同一套 Lucide 图标（16px、1.5 描边），平台符号只作兜底。
   const symbolName = icon ?? navigationSystemSymbols[className] ?? "doc"
-  const symbol = createSystemSymbol(symbolName)
-  const lucide = symbolIcon(symbolName, 16)
-  if (lucide) symbol.replaceChildren(lucide)
-  button.append(symbol)
+  button.append(symbolSpan(symbolName))
   const labelNode = document.createElement("span")
   labelNode.className = "nav-label"
   labelNode.textContent = label
@@ -8783,12 +8646,7 @@ function renderFiles(): void {
     node.paths.push(path)
   }
   // 与概览同一套 Lucide 图标（16px、1.5 描边）；图片行先放图标，滚到附近再换成缩略图。
-  const sourceSymbol = (name: string) => {
-    const symbol = createSystemSymbol(name)
-    const lucide = symbolIcon(name, 16)
-    if (lucide) symbol.replaceChildren(lucide)
-    return symbol
-  }
+  const sourceSymbol = (name: string) => symbolSpan(name)
   const thumbnailObserver = new IntersectionObserver((entries) => {
     for (const entry of entries) {
       if (!entry.isIntersecting) continue
@@ -9855,7 +9713,7 @@ function recentCard(item: RecentFile): HTMLButtonElement {
   const name = document.createElement("span")
   name.className = "template-name"
   name.textContent = item.name
-  const go = createSystemSymbol("arrow.right")
+  const go = symbolSpan("arrow.right")
   go.classList.add("icon", "template-go")
   nameRow.append(name, go)
   const meta = document.createElement("span")
@@ -10783,7 +10641,7 @@ function syncModelProfiles(all: ModelConfiguration[]): void {
 
 const modelSettings = initializeModelSettings($("#settings-model-section"), {
   desktop: isTauri(),
-  icon: createSystemSymbol,
+  icon: symbolSpan,
   onSaved: syncModelProfiles,
 })
 

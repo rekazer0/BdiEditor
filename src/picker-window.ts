@@ -4,7 +4,7 @@ import { LogicalSize } from "@tauri-apps/api/dpi"
 import { bindSlicePickerZoom, drawSlicePicker, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM, pickableSlices } from "./slice-picker-canvas.ts"
 import { tileSliceAt, type TilePoint, type TileSlice } from "./tiles.ts"
 import { drawVisualPreview, retinaThumbnail, type Visual } from "./atlas.ts"
-import { createIcon } from "./icons.ts"
+import { createIcon, hydrateIcons } from "./icons.ts"
 
 type ImagePayload = {
   path: string
@@ -49,6 +49,7 @@ export type StyleLibraryPayload = {
 }
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
+hydrateIcons()
 const title = $("#picker-title")
 const styleName = $("#picker-style")
 const subtitle = $("#picker-subtitle")
