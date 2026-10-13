@@ -64,7 +64,7 @@ async function withPage(run, { viewport = { width: 1440, height: 900 }, storage 
   }
 }
 
-async function check(name, run) {
+let check = async function check(name, run) {
   const started = Date.now()
   try {
     await run()
@@ -79,14 +79,17 @@ async function openTemplate(page, template = "official-android-bds") {
   await page.waitForSelector(".canvas-wrap:not(.empty)")
   await page.waitForFunction(() => document.querySelector("#preview")?.getBoundingClientRect().height > 60)
   await closeOperationDialog(page)
+  await page.waitForFunction(() => !document.querySelector("#open")?.disabled)
 }
 
 async function closeOperationDialog(page) {
+  // 成功打开时进度弹窗会自己关闭；其他操作完成后才启用「关闭」。
+  await page.waitForFunction(() => {
+    const dialog = document.querySelector("#file-operation-dialog")
+    return !dialog?.open || !document.querySelector("#file-operation-close")?.disabled
+  }, null, { timeout: 60000 })
   const close = page.locator("#file-operation-dialog[open] #file-operation-close")
-  if (await close.isVisible().catch(() => false)) {
-    await page.waitForFunction(() => !document.querySelector("#file-operation-close")?.disabled, null, { timeout: 30000 })
-    await close.click()
-  }
+  if (await close.isVisible().catch(() => false)) await close.click()
 }
 
 async function editMode(page) {
@@ -162,6 +165,11 @@ function pngBytes(width, height, rgba = [40, 120, 220, 255]) {
 /* ------------------------------------------------------------------------------------------------
  * 1 · Welcome screen
  * ---------------------------------------------------------------------------------------------- */
+const only = process.env.FLOW_ONLY ? new RegExp(process.env.FLOW_ONLY) : undefined
+const runCheck = check
+// FLOW_ONLY=正则 只运行名称匹配的用例，便于单独复现。
+check = async (name, run) => (!only || only.test(name) ? runCheck(name, run) : undefined)
+
 await check("welcome: one recent section, templates, no document controls", () => withPage(async (page) => {
   assert.equal(await page.locator(".welcome-aside").count(), 0, "duplicate recent column removed")
   assert.equal(await page.locator(".template-grid .template-card").count(), 7)
@@ -398,17 +406,19 @@ await check("source files: tree, editor, search, upload, copy/paste, delete and 
   await page.locator("#source-file-toolbar").waitFor({ state: "visible" })
   // 文件夹按需展开：逐层点开，直到出现 .ini 文件。
   // 访达式树：单击选中文件夹，点三角（或双击）展开。
-  for (let round = 0; round < 6 && !(await page.locator('.source-file-row[data-path$=".ini"]:visible').count()); round += 1) {
-    for (const folder of await page.locator('.source-folder-row[aria-expanded="false"]:visible').all()) {
-      await folder.locator(".source-disclosure").click()
-      await page.waitForFunction((row) => row.getAttribute("aria-expanded") === "true", await folder.elementHandle())
-    }
+  // 每次只展开第一个收起的文件夹：展开会插入子节点，提前取的列表会失效。
+  for (let round = 0; round < 12 && !(await page.locator('.source-file-row[data-path$=".ini"]:visible').count()); round += 1) {
+    const folder = page.locator('.source-folder-row[aria-expanded="false"]:visible').first()
+    const path = await folder.getAttribute("data-folder-path")
+    await folder.locator(".source-disclosure").click()
+    await page.waitForFunction((value) => document.querySelector(`.source-folder-row[data-folder-path="${CSS.escape(value)}"]`)?.getAttribute("aria-expanded") === "true", path)
   }
   const file = page.locator('.source-file-row[data-path$=".ini"]:visible').first()
   await file.waitFor({ state: "visible" })
   await file.click()
   await page.locator('[data-inspector-tab="source"]').click()
   await page.waitForFunction(() => (document.querySelector("#source .cm-content")?.innerText ?? "").includes("["))
+  await page.locator("#source-find-toggle").click()
   await page.locator("#source-search").fill("STYLE")
   await page.waitForFunction(() => /\d/.test(document.querySelector("#source-search-count")?.textContent ?? ""))
   await page.locator("#source-search-next").click()
@@ -419,10 +429,14 @@ await check("source files: tree, editor, search, upload, copy/paste, delete and 
   await uploaded.click()
   await page.locator("#source-copy").click()
   await page.locator("#source-paste").click()
-  await page.waitForFunction(() => document.querySelectorAll('.source-file-row[data-path*="flow-test"]').length >= 2)
-  await page.locator('.source-file-row[data-path*="flow-test"]').last().click()
+  // 粘贴回原文件夹得到「flow-test 副本.png」，且保持展开、选中新文件。
+  const copy = page.locator('.source-file-row[data-path$="flow-test 副本.png"]')
+  await copy.waitFor({ state: "visible" })
+  assert.match(await copy.getAttribute("class"), /selected|active/)
+  await copy.click()
   await page.locator("#source-delete").click()
-  await page.waitForFunction(() => document.querySelectorAll('.source-file-row[data-path*="flow-test"]').length === 1)
+  await copy.waitFor({ state: "detached" })
+  assert.equal(await uploaded.isVisible(), true, "the tree stays open after deleting")
   await page.locator("#desktop-undo").click()
   await page.waitForFunction(() => document.querySelectorAll('.source-file-row[data-path*="flow-test"]').length === 2)
   await page.locator('[data-sidebar-view="overview"]').click()
@@ -630,6 +644,8 @@ if (existsSync(skinDirectory)) {
         await page.locator("#browser-open").setInputFiles({ name, mimeType: "application/octet-stream", buffer: readFileSync(join(skinDirectory, name)) })
         await page.waitForFunction((file) => document.querySelector("#document-name")?.textContent?.includes(file.replace(/\.[^.]+$/, "")), name, { timeout: 60000 })
         await closeOperationDialog(page)
+        // 标题在加载中途就会更新；等「打开」重新可用，表示整个打开操作结束。
+        await page.waitForFunction(() => !document.querySelector("#open")?.disabled, null, { timeout: 60000 })
         await page.waitForFunction(() => document.querySelector("#preview")?.getBoundingClientRect().height > 20, null, { timeout: 15000 })
         if ((await page.locator("#mode").inputValue()) !== "edit") await editMode(page)
         // 键位不一定落在画布 45% 处，选不中不算失败。

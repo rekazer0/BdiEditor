@@ -3608,11 +3608,18 @@ function adaptArchiveForIos26(): boolean {
   return true
 }
 
+let currentFileOperation = ""
+
 async function runFileOperation(
   action: string,
   operation: () => boolean | Promise<boolean>,
 ): Promise<void> {
-  if (fileOperationRunning) return
+  if (fileOperationRunning) {
+    // 拖入、最近打开、模板卡片在上一个操作结束前也能触发：给出提示，不再静默忽略。
+    showStatus(`正在${currentFileOperation}，请稍后再${action}。`, "progress")
+    return
+  }
+  currentFileOperation = action
   setFileOperationBusy(true)
   fileOperationProgressVisible = false
   showStatus(`正在${action}…`, "progress")
@@ -4779,6 +4786,9 @@ function selectedSourceSections(): string[] {
   if (resourceConfigActive && selectedResourcePath) {
     return selectedTileIndex === undefined ? [] : [`IMG${selectedTileIndex}`]
   }
+  if (resourceConfigActive && resourceInspectorMode === "style") {
+    return selectedStyleID && archive?.format !== "bda" ? [`STYLE${selectedStyleID}`] : []
+  }
   const toolbarSections = isToolbarPath(selectedPath) ? effectiveToolbarSections() : []
   if (toolbarSections.length) return toolbarSections
   return selectedPath === layoutPath ? effectiveSelectedSections() : []
@@ -4813,8 +4823,9 @@ function effectiveKeyValue(section: string, key: string): string | undefined {
 
 function scrollSelectedSource(): void {
   const sections = selectedSourceSections()
-  if (sourceEditor.hidden || !sections.length && !sourceHistoryHighlight) return
-  const bdaRange = jsonPropertyRanges(source.value, selectedBdaSourceKeys())[0]
+  const bdaKeys = selectedBdaSourceKeys()
+  if (sourceEditor.hidden || !sections.length && !bdaKeys.length && !sourceHistoryHighlight) return
+  const bdaRange = jsonPropertyRanges(source.value, bdaKeys)[0]
   const iniRange = iniSectionRanges(source.value, sections)[0]
   const range = bdaRange ?? iniRange ?? sourceHistoryHighlight
   if (range) source.revealRange(range[0], range[1])
@@ -6757,6 +6768,7 @@ function selectedBdaKeyNames(): string[] {
 }
 
 function selectedBdaSourceKeys(): string[] {
+  if (resourceConfigActive && resourceInspectorMode === "style") return selectedStyleID ? [selectedStyleID] : []
   if (selectedCandidate && selectedPath === layoutPath) return ["cand"]
   return isBdaLayoutPath(selectedPath) ? selectedBdaKeyNames() : []
 }
@@ -8026,6 +8038,19 @@ function sourcePaths(selection: { path: string; folder: boolean }): string[] {
     : archive.getBytes(selection.path) ? [selection.path] : []
 }
 
+/** 生成「名称 副本.ext」「名称 副本 2.ext」，跳过已占用的路径。 */
+function sourceCopyPath(path: string, taken: (candidate: string) => boolean): string {
+  const slash = path.lastIndexOf("/")
+  const name = path.slice(slash + 1)
+  const dot = name.lastIndexOf(".")
+  const stem = dot > 0 ? name.slice(0, dot) : name
+  const extension = dot > 0 ? name.slice(dot) : ""
+  for (let index = 1; ; index += 1) {
+    const candidate = `${path.slice(0, slash + 1)}${stem} 副本${index > 1 ? ` ${index}` : ""}${extension}`
+    if (!taken(candidate)) return candidate
+  }
+}
+
 function setSourceTransfer(mode: SourceTransfer["mode"]): void {
   const selection = sourceSelection()
   if (!archive || !selection || mode === "move" && !isEditing()) return
@@ -8054,7 +8079,10 @@ function refreshAfterSourceMutation(preferredPath?: string): void {
     : selectedStillExists
       ? selectedPath
       : archive.names().find((path) => archive?.isText(path) || archive?.isImage(path) || archive?.isBdaConfig(path))
-  if (next) selectFile(next, "source")
+  if (next) {
+    selectFile(next, "source")
+    revealSourceFile(next)
+  }
   refreshPreview()
   updateDirty()
 }
@@ -8133,12 +8161,27 @@ sourcePasteButton.addEventListener("click", () => {
     window.alert("不能将文件夹移动到自身内部。")
     return
   }
-  const copies = sourceTransfer.files.map(({ path, source, bytes }) => ({
+  let copies = sourceTransfer.files.map(({ path, source, bytes }) => ({
     path: folder ? `${folder}/${path}` : path,
     source,
     bytes,
   }))
   if (sourceTransfer.mode === "move" && copies.every(({ path, source }) => path === source)) return
+  // 复制后粘贴回原位置：按访达习惯另存为「名称 副本」，而不是询问是否用自己替换自己。
+  if (sourceTransfer.mode === "copy") {
+    const names = archive.names()
+    if (sourceTransfer.folder) {
+      const top = `${folder ? `${folder}/` : ""}${sourceTransfer.sourcePath.split("/").pop()}`
+      if (top === sourceTransfer.sourcePath) {
+        const renamed = sourceCopyPath(top, (candidate) => names.some((name) => name.startsWith(`${candidate}/`)))
+        copies = copies.map((copy) => ({ ...copy, path: renamed + copy.path.slice(top.length) }))
+      }
+    } else {
+      copies = copies.map((copy) => copy.path === copy.source
+        ? { ...copy, path: sourceCopyPath(copy.path, (candidate) => names.includes(candidate)) }
+        : copy)
+    }
+  }
   const sources = new Set(sourceTransfer.files.map(({ source }) => source))
   const conflicts = copies
     .filter(({ path }) => archive?.getBytes(path) && (sourceTransfer?.mode !== "move" || !sources.has(path)))
@@ -8357,6 +8400,10 @@ const overviewGroupState = new Map<string, boolean>()
 let mobileOverviewGroup = ""
 
 function renderFiles(): void {
+  // 重建文件树前记住展开的文件夹，上传、删除、撤销后树不会整体收起。
+  const openFolders = Array.from(files.querySelectorAll<HTMLDetailsElement>("details.raw-folder[open]"))
+    .map((folder) => folder.dataset.folderPath ?? "")
+    .filter(Boolean)
   files.replaceChildren()
   selectedFileButton = undefined
   document.documentElement.dataset.archiveFormat = archive?.format ?? ""
@@ -8887,6 +8934,7 @@ function renderFiles(): void {
     if (next) selectSourceRow(next)
   })
   files.append(sourceFiles)
+  for (const folder of openFolders) ensureSourcePathRendered(`${folder}/`)
   setSidebarView(sidebarView)
 }
 
@@ -8895,7 +8943,8 @@ function ensureSourcePathRendered(path: string): void {
   for (let index = 1; index <= parts.length; index += 1) {
     const folderPath = parts.slice(0, index).join("/")
     const folder = files.querySelector<HTMLDetailsElement>(`details.raw-folder[data-folder-path="${CSS.escape(folderPath)}"]`)
-    if (!folder) return
+    // 合并显示的文件夹（如 light/skin/）没有中间层节点，跳过继续找下一层。
+    if (!folder) continue
     folder.open = true
     folder.dispatchEvent(new Event("toggle"))
   }

@@ -9,6 +9,8 @@ const css = [
   fidelity,
   readFileSync(new URL('../src/pen-design-application.css', import.meta.url), 'utf8'),
 ].join('\n')
+const palette = readFileSync(new URL('../src/pen-design-application.css', import.meta.url), 'utf8')
+const styles = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8')
 const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8')
 const icons = readFileSync(new URL('../src/inspector-icons.ts', import.meta.url), 'utf8')
 
@@ -31,8 +33,12 @@ test('CSS locks 30px rows and BDS/BDA chips from 属性检查器.pen', () => {
   assert.match(css, /--inspector-hint-size: 9.5px/)
   assert.match(css, /data-inspector-kind="bds"/)
   assert.match(css, /data-inspector-kind="bda"/)
-  assert.match(css, /--pin-sel: #ff6b2c/)
-  assert.match(css, /--pin-accent: #2f6bff/)
+  // 检查器跟随全局 Pen 色板：选中橙与品牌蓝只在 pen-design-application.css 定义一次。
+  assert.match(css, /--pin-sel: var\(--pen-selection\)/)
+  assert.match(css, /--pin-accent: var\(--pen-accent\)/)
+  assert.match(palette, /--pen-selection: #ff6b2c/)
+  assert.match(palette, /--pen-accent: var\(--accent\)/)
+  assert.match(styles, /--accent: #3a6df0/)
   assert.match(css, /\.pin-hint/)
   assert.match(css, /height: 30px !important/)
   assert.match(css, /font: 400 9\.5px\/1 var\(--font-mono\)/)
