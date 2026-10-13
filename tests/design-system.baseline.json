@@ -180,9 +180,9 @@
   },
   "ts-file-too-long": {
     "src/bda-editor.ts": 29,
-    "src/bda.ts": 1268,
+    "src/bda.ts": 1214,
     "src/main.ts": 11886,
-    "src/preview.ts": 2067,
+    "src/preview.ts": 2061,
     "src/skin.ts": 6
   }
 }

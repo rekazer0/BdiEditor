@@ -3,7 +3,7 @@ import type { SourceEditorValueRange } from "./source-editor.ts"
 
 const SOURCE_VALUE_HINT_LIMIT = 5000
 
-export type SourceValueLanguage = "ini" | "json"
+type SourceValueLanguage = "ini" | "json"
 
 export function replacedSourceColor(value: string, rgb: string): string | undefined {
   const clean = value.trim().replace(/^#/, "")

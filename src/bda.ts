@@ -6,11 +6,11 @@ type ProtoField = {
   bytes?: Uint8Array
 }
 
-export type BdaResource = { type: number; resourceID: string }
+type BdaResource = { type: number; resourceID: string }
 export type BdaStyleRef = { type: "image" | "color" | "text"; key: number }
-export type BdaRect = { x: number; y: number; width: number; height: number }
-export type BdaScaledOffset = { x: number; y: number }
-export type BdaFontAdaptInfo = {
+type BdaRect = { x: number; y: number; width: number; height: number }
+type BdaScaledOffset = { x: number; y: number }
+type BdaFontAdaptInfo = {
   fontSize?: number
   normalColor?: number
   highlightColor?: number
@@ -25,12 +25,12 @@ export type BdaImageAtom = {
   alpha?: number
   filterColor?: number
 }
-export type BdaImageStyle = {
+type BdaImageStyle = {
   normalImage?: BdaImageAtom
   highlightImage?: BdaImageAtom
   fontInfo?: BdaFontAdaptInfo
 }
-export type BdaTextStyle = {
+type BdaTextStyle = {
   resource?: BdaResource
   fontName?: string
   fontSize?: number
@@ -38,40 +38,40 @@ export type BdaTextStyle = {
   highlightColor?: number
   contentText?: string
 }
-export type BdaColorStyle = { normalColor?: number; highlightColor?: number }
+type BdaColorStyle = { normalColor?: number; highlightColor?: number }
 export type BdaKey = {
   backStyle?: BdaStyleRef
   foreStyles: BdaStyleRef[]
   foreStyleOffsets: Array<{ x: number; y: number }>
   backStyleState?: BdaStyleRef
 }
-export type BdaBar = { backStyle?: BdaStyleRef }
-export type BdaTab = {
+type BdaBar = { backStyle?: BdaStyleRef }
+type BdaTab = {
   backStyle?: BdaStyleRef
   cellForeStyle?: BdaStyleRef
   cellBackStyle?: BdaStyleRef
   decoratorBackStyle?: BdaStyleRef
 }
-export type BdaCorpusList = {
+type BdaCorpusList = {
   backStyle?: BdaStyleRef
   cellForeStyle?: BdaStyleRef
   cellBackStyle?: BdaStyleRef
   corpusSecondTab?: BdaTab
 }
-export type BdaGamePanel = {
+type BdaGamePanel = {
   backStyle?: BdaStyleRef
   corpusFirstTab?: BdaTab
   corpusList?: BdaCorpusList
   functionBar?: BdaBar
   keys: Map<string, BdaKey>
 }
-export type BdaSwitch = {
+type BdaSwitch = {
   normalBack?: BdaStyleRef
   selectBack?: BdaStyleRef
   normalFore?: BdaStyleRef
   selectFore?: BdaStyleRef
 }
-export type BdaCand = {
+type BdaCand = {
   candBarStyle?: BdaStyleRef
   candOnBarStyle?: BdaStyleRef
   cellBackStyle?: BdaStyleRef
@@ -89,14 +89,14 @@ export type BdaCand = {
   gridLeftForeStyle?: BdaStyleRef
   gridRightForeStyle?: BdaStyleRef
 }
-export type BdaList = {
+type BdaList = {
   backStyle?: BdaStyleRef
   cellBackStyle?: BdaStyleRef
   cellForeStyle?: BdaStyleRef
   foreStyles: BdaStyleRef[]
   foreStyleOffsets: BdaScaledOffset[]
 }
-export type BdaHint = {
+type BdaHint = {
   offset?: BdaScaledOffset
   backStyle?: BdaStyleRef
   barStyle?: BdaStyleRef
@@ -104,8 +104,8 @@ export type BdaHint = {
   foreStyle?: BdaStyleRef
   cellStyle?: BdaStyleRef
 }
-export type BdaInputTile = { backStyle?: BdaStyleRef; textStyle?: BdaStyleRef }
-export type BdaGrid = {
+type BdaInputTile = { backStyle?: BdaStyleRef; textStyle?: BdaStyleRef }
+type BdaGrid = {
   backStyle?: BdaStyleRef
   cellForeStyle?: BdaStyleRef
   cellBackStyle?: BdaStyleRef
@@ -124,7 +124,7 @@ export type BdaPanel = {
   inputRegionBackStyle?: BdaStyleRef
   trackColor?: number
 }
-export type BdaColorPalette = {
+type BdaColorPalette = {
   labelColor?: number
   secondaryLabelColor?: number
   tertiaryLabelColor?: number
@@ -169,9 +169,9 @@ export type BdaAppearancePart =
   | { kind: "styles"; group: BdaAppearanceStyleGroup }
 export type BdaAnimationFrame = { resourceID?: string; duration?: number }
 export type BdaAnimationSequence = { name: string; frames: BdaAnimationFrame[] }
-export type BdaAnimationKind = "group" | "alpha" | "scale" | "shift" | "rotate" | "frame" | "image" | "emitter" | "lottie" | "video"
-export type BdaNumberRange = [number, number]
-export type BdaVectorRange = [BdaNumberRange, BdaNumberRange]
+type BdaAnimationKind = "group" | "alpha" | "scale" | "shift" | "rotate" | "frame" | "image" | "emitter" | "lottie" | "video"
+type BdaNumberRange = [number, number]
+type BdaVectorRange = [BdaNumberRange, BdaNumberRange]
 export type BdaAnimationBinding = {
   kind: BdaAnimationKind
   key: string
@@ -218,7 +218,7 @@ export type BdaEmitterAnimation = {
   acceleration: BdaNumberRange
   accelerationDirection: BdaNumberRange
 }
-export type BdaGroupAnimation = {
+type BdaGroupAnimation = {
   kind: "group"
   key: string
   buildMode: number
@@ -228,7 +228,7 @@ export type BdaGroupAnimation = {
   delay: number
   items: Array<{ kind: BdaAnimationKind; key: string }>
 }
-export type BdaResourceAnimation = {
+type BdaResourceAnimation = {
   kind: "frame" | "lottie" | "video"
   key: string
   repeatCount: number
@@ -237,7 +237,7 @@ export type BdaResourceAnimation = {
   placeholder?: BdaResource
   startRepeatFrame?: number
 }
-export type BdaImageAnimation = {
+type BdaImageAnimation = {
   kind: "image"
   key: string
   repeatCount: number
@@ -256,11 +256,11 @@ export type BdaAnimation = {
   targetBindings: Map<string, BdaAnimationBinding[]>
   effects: Map<string, BdaAnimationEffect>
 }
-export type BdaSoundConfig = {
+type BdaSoundConfig = {
   keySounds: Map<string, BdaResource>
   iosKeySounds: Map<string, BdaResource>
 }
-export type BdaConfigKind =
+type BdaConfigKind =
   | "appearance"
   | "animation"
   | "lightAnimation"
@@ -996,17 +996,6 @@ export function bdaLayoutNames(bytes: Uint8Array): string[] {
   return [...decodeBdaAppearance(bytes).panels.keys()]
 }
 
-export function bdaResourceIDs(bytes: Uint8Array): string[] {
-  const appearance = decodeBdaAppearance(bytes)
-  return [...new Set([
-    ...[...appearance.imageStyles.values()].flatMap((style) => [
-      style.normalImage?.resource?.resourceID,
-      style.highlightImage?.resource?.resourceID,
-    ]),
-    ...[...appearance.textStyles.values()].map((style) => style.resource?.resourceID),
-  ].filter((value): value is string => Boolean(value)))]
-}
-
 export function bdaColorHex(value: number): string {
   return (value >>> 0).toString(16).padStart(8, "0").toUpperCase()
 }
@@ -1023,7 +1012,7 @@ function bdaCssColor(value: number): string | undefined {
 
 // BDA filterColor 是叠加在图片之上的颜色滤镜（tint），不是背景填充。
 // 0 与 0xFFFFFFFF（不透明白）都表示「无滤镜」。
-export function bdaFilterColor(value: number): string | undefined {
+function bdaFilterColor(value: number): string | undefined {
   const unsigned = value >>> 0
   if (!unsigned || unsigned === 0xffffffff) return
   return bdaCssColor(unsigned)
@@ -2019,49 +2008,6 @@ export function applyDecodedBdaAppearancePart(
   return applyDecodedBdaSource(path, bytes, JSON.stringify(full))
 }
 
-export function describeBdaConfig(path: string, bytes: Uint8Array): string {
-  const name = path.split("/").pop() ?? path
-  const header = `${name} · BDA Protocol Buffers · ${bytes.length} 字节`
-  if (/^\d*animationConfig$/.test(name)) {
-    const animation = decodeBdaAnimation(bytes)
-    const frames = [...animation.sequences.values()].reduce((sum, sequence) => sum + sequence.frames.length, 0)
-    const kinds = new Set([...animation.effects.values()].map((effect) => effect.kind))
-    return [
-      header,
-      "",
-      `动画目标：${animation.targets.length}`,
-      `动画定义：${animation.effects.size}（${[...kinds].join("、") || "无"}）`,
-      `图片序列：${animation.sequences.size}`,
-      `序列帧：${frames}`,
-      ...[...animation.sequences.values()].map((sequence) => `- ${sequence.name}（${sequence.frames.length} 帧）`),
-      "",
-      "保存时保留原始配置和未知字段。",
-    ].join("\n")
-  }
-  if (!/^\d*appearanceConfig$/.test(name)) {
-    const values = fields(bytes).flatMap((field) => {
-      if (field.varint !== undefined) return [`字段 ${field.number}：${field.varint}`]
-      const value = string(field)
-      return value ? [`字段 ${field.number}：${value}`] : []
-    })
-    return [header, "", ...values, "", "保存时保留原始配置和未知字段。"].join("\n")
-  }
-  const appearance = decodeBdaAppearance(bytes)
-  const resources = bdaResourceIDs(bytes)
-  return [
-    header,
-    "",
-    `设计宽度：${appearance.designWidth || "未配置"}`,
-    `图片样式：${appearance.imageStyles.size}`,
-    `文字样式：${appearance.textStyles.size}`,
-    `颜色样式：${appearance.colorStyles.size}`,
-    `资源引用：${resources.length}`,
-    `布局：${appearance.panels.size}`,
-    ...[...appearance.panels.keys()].map((layout) => `- ${layout}（${appearance.panels.get(layout)?.keys.size ?? 0} 个按键）`),
-    "",
-    "已按百度官方 protobuf 字段解析；保存时保留原始配置和未知字段。",
-  ].join("\n")
-}
 import type { StyleTextVisual, TextVisual, Visual, VisualResolver } from "./atlas.ts"
 import { IniDocument } from "./ini.ts"
 import { SkinArchive } from "./skin.ts"

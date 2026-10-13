@@ -52,7 +52,7 @@ export function deleteForward(
   return { value: value.slice(0, safeStart) + value.slice(safeStart + next.length), caret: safeStart }
 }
 
-export function compositionBeforeCaret(value: string, caret: number): string {
+function compositionBeforeCaret(value: string, caret: number): string {
   const safeCaret = Math.max(0, Math.min(caret, value.length))
   return value.slice(0, safeCaret).match(/[A-Za-z']+$/)?.[0] ?? ""
 }

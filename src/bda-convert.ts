@@ -19,7 +19,7 @@ import { soundPathForFilename } from "./sounds.ts"
 /** Sound styles sit above the image/color/text ranges used by bdaStyleID. */
 const SOUND_STYLE_BASE = 4_000_000
 
-export type BdaConversion = { archive: SkinArchive; warnings: string[] }
+type BdaConversion = { archive: SkinArchive; warnings: string[] }
 
 function pngSize(bytes: Uint8Array): [number, number] {
   if (

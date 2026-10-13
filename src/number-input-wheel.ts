@@ -1,5 +1,5 @@
 type NumberInputRoot = Document | HTMLElement
-export const NUMBER_WHEEL_IDLE_MS = 350
+const NUMBER_WHEEL_IDLE_MS = 350
 
 type WheelSession = {
   field: HTMLInputElement

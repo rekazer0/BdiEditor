@@ -25,7 +25,7 @@ export function modelConfigurationKey(configuration: ModelConfiguration): string
 }
 
 /** One service account in the editor; it is stored as one flat ModelConfiguration per enabled model. */
-export interface ModelProvider {
+interface ModelProvider {
   provider: string
   protocol: ModelProtocol
   apiUrl: string

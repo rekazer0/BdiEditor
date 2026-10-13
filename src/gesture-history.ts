@@ -1,7 +1,7 @@
 import { pushChange, type Change } from "./history"
 
 /** Compact many gesture snapshots to first-before / final-after, including BDA bytes. */
-export function compactGestureChanges(changes: readonly Change[]): Change[] {
+function compactGestureChanges(changes: readonly Change[]): Change[] {
   const result: Change[] = []
   const index = new Map<string, number>()
   const visit = (change: Change) => {

@@ -1,4 +1,4 @@
-export type IniEntry = {
+type IniEntry = {
   section: string
   key: string
   value: string

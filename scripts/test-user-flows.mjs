@@ -507,7 +507,7 @@ await check("settings: every page, live preview, cancel restores and save persis
   }
   await page.locator('[data-settings-page="appearance"]').click()
   const accent = await page.locator('[data-settings-page="appearance"]').evaluate((node) => getComputedStyle(node).color)
-  const brand = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--pen-accent").trim())
+  const brand = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())
   assert.ok(brand, "accent token resolves")
   assert.notEqual(accent, "rgb(255, 107, 44)", "selected settings tab uses the accent, not the selection orange")
   await page.locator('[data-setting-choice="app-theme"][data-value="dark"]').click()

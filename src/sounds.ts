@@ -2,12 +2,7 @@ import { IniDocument } from "./ini.ts"
 
 export const SOUND_ACCEPT = ".ogg,.wav,.aiff,.aif,audio/ogg,audio/wav,audio/x-aiff"
 
-export type IniSoundStyle = {
-  styleID: string
-  filename: string
-}
-
-export type DecodedSound = {
+type DecodedSound = {
   channelData: Float32Array[]
   samplesDecoded: number
   sampleRate: number
@@ -122,14 +117,6 @@ export function soundPathForFilename(
     ?? paths.find((path) => name(path).replace(/\.(?:ogg|wav|aiff?|caf)$/i, "") === stem)
 }
 
-export function iniSoundStyles(styles: IniDocument): IniSoundStyle[] {
-  return styles.sections().flatMap((section) => {
-    const styleID = section.match(/^STYLE(.+)$/i)?.[1]
-    const filename = styles.get(section, "PRESS_SOUND_PATH")?.trim()
-    return styleID && filename ? [{ styleID, filename }] : []
-  })
-}
-
 export function soundStyleForKey(
   layout: IniDocument,
   section: string,
@@ -151,23 +138,7 @@ export function soundFilenameForKey(
   return styleID ? styles.get(`STYLE${styleID}`, "PRESS_SOUND_PATH")?.trim() || undefined : undefined
 }
 
-export function nextSoundStyleID(styles: IniDocument): string {
-  const ids = styles.sections()
-    .map((section) => Number(section.match(/^STYLE(\d+)$/i)?.[1]))
-    .filter(Number.isSafeInteger)
-  return String((ids.length ? Math.max(...ids) : -1) + 1)
-}
-
-export function setIniSoundStyle(styles: IniDocument, styleID: string, filename: string): void {
-  const section = `STYLE${styleID}`
-  if (!styles.sections().includes(section)) styles.appendSection(section, [])
-  styles.set(section, "PRESS_SOUND_PATH", filename)
-  const maximum = Number(styles.get("GLOBAL", "STYLE_NUM") ?? -1)
-  const numeric = Number(styleID)
-  if (!Number.isFinite(maximum) || numeric > maximum) styles.set("GLOBAL", "STYLE_NUM", styleID)
-}
-
-export function encodeAiffPcm16(sound: DecodedSound): Uint8Array {
+function encodeAiffPcm16(sound: DecodedSound): Uint8Array {
   const channels = sound.channelData.length
   const frames = sound.samplesDecoded
   const dataLength = frames * channels * 2
@@ -256,7 +227,7 @@ async function decodeSound(bytes: Uint8Array): Promise<DecodedSound> {
  */
 const NATIVE_SOUND_EXTENSION = { bdi: "aiff", bds: "ogg" } as const
 
-export function soundNeedsTranscode(path: string, format: "bdi" | "bds"): boolean {
+function soundNeedsTranscode(path: string, format: "bdi" | "bds"): boolean {
   return format === "bdi" ? /\.ogg$/i.test(path) : /\.(?:aiff?|caf)$/i.test(path)
 }
 

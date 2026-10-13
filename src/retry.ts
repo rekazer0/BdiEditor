@@ -1,4 +1,4 @@
-export type RetryOptions = {
+type RetryOptions = {
   attempts: number
   delayMs: number
 }

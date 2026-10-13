@@ -12,8 +12,8 @@ import {
   type BdaStyleRef,
 } from "./bda.ts"
 
-export type BdaStyleChange = (ref: BdaStyleRef, property: string, value: string) => void
-export type BdaLayoutScope = "panel" | "candidate"
+type BdaStyleChange = (ref: BdaStyleRef, property: string, value: string) => void
+type BdaLayoutScope = "panel" | "candidate"
 
 type LayoutEditorOptions = {
   appearance: BdaAppearance
@@ -36,7 +36,7 @@ type LayoutEditorOptions = {
 
 // label 是中文说明，field 是 BDA appearanceConfig 解码源码里的真实字段名，
 // path 指向单个样式引用；多选时 paths 汇总所有同步写回位置。
-export type BdaLayoutStyleItem = {
+type BdaLayoutStyleItem = {
   ref: BdaStyleRef
   label: string
   field: string
@@ -44,7 +44,7 @@ export type BdaLayoutStyleItem = {
   paths?: string[][]
   owner?: string
 }
-export type BdaLayoutStyleGroup = { key: string; title: string; items: BdaLayoutStyleItem[] }
+type BdaLayoutStyleGroup = { key: string; title: string; items: BdaLayoutStyleItem[] }
 
 function uniqueStyleItems(items: BdaLayoutStyleItem[]): BdaLayoutStyleItem[] {
   return [...new Map(items.map((item) => [item.path.join("."), item])).values()]
@@ -64,7 +64,7 @@ function keyStyleItems(name: string, key: BdaKey, path: string[]): BdaLayoutStyl
   ]
 }
 
-export function bdaLayoutStyleGroups(
+function bdaLayoutStyleGroups(
   panel: BdaPanel,
   keys: Array<{ name: string; key: BdaKey }>,
   scope: BdaLayoutScope = "panel",
@@ -256,7 +256,7 @@ function paintVisual(canvas: HTMLCanvasElement, visual: Visual | undefined, boun
   if (visual) drawVisualText(context, visual, { x: 0, y: 0, width, height })
 }
 
-export function bdaAnimationDurations(frames: BdaAnimationFrame[]): number[] {
+function bdaAnimationDurations(frames: BdaAnimationFrame[]): number[] {
   return frames.map((frame) => Math.max(16, frame.duration ?? 100))
 }
 

@@ -8,7 +8,7 @@ export function exportFormatFromPath(path: string): ExportFormat | undefined {
     : undefined
 }
 
-export function exportPath(path: string, format: ExportFormat): string {
+function exportPath(path: string, format: ExportFormat): string {
   return /\.[^.\\/]+$/.test(path) ? path.replace(/\.[^.\\/]+$/, `.${format}`) : `${path}.${format}`
 }
 

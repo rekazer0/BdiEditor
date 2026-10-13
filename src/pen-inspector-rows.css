@@ -4,7 +4,6 @@
  * Design reference: /Users/kaze/Downloads/bdi.pen
  *   · Row components: jkJSA (数字行) Yobgh (文本行) wfFq9 (选择行) ZIYFB (分段行)
  *                     n4lEsQ (双列数字行) PPKbB (颜色行) RhapN (开关行) IBWPv (滑块行)
- *   · Live HTML reference: http://127.0.0.1:1420/inspector-redesign.html
  *
  * Scope of this file (do not style section chrome or the panel shell here):
  *   .inspector-grid > label, label > span, input / select / textarea inside the inspector,

@@ -1,4 +1,4 @@
-export function resolveViewportFrame(options: {
+function resolveViewportFrame(options: {
   viewportHeight: number
   viewportOffsetTop: number
   viewportOffsetLeft: number
@@ -14,7 +14,7 @@ export function resolveViewportFrame(options: {
   }
 }
 
-export function isKeyboardViewportOpen(options: {
+function isKeyboardViewportOpen(options: {
   viewportHeight: number
   baselineHeight: number
 }): boolean {
@@ -23,7 +23,7 @@ export function isKeyboardViewportOpen(options: {
   return baseline - Math.max(1, options.viewportHeight) > threshold
 }
 
-export function isTextInput(target: EventTarget | null): boolean {
+function isTextInput(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
   if (target.isContentEditable) return true
   if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true

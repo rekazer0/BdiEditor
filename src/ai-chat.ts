@@ -13,7 +13,7 @@ export type AiChatRunResult = {
   summary?: string
 }
 
-export type AiChatRun = (prompt: string, hooks: AiChatRunHooks, files: readonly File[]) => Promise<AiChatRunResult>
+type AiChatRun = (prompt: string, hooks: AiChatRunHooks, files: readonly File[]) => Promise<AiChatRunResult>
 
 export type AiChatController = {
   clear: () => void

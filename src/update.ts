@@ -1,16 +1,15 @@
-export type UpdateResult =
+type UpdateResult =
   | { status: "latest"; currentVersion: string; latestVersion: string }
   | { status: "available"; currentVersion: string; latestVersion: string; url: string }
 
-export const releaseUrl = "https://github.com/rekazer0/BdiEditor/releases"
-export const releaseApiUrl = "https://api.github.com/repos/rekazer0/BdiEditor/releases/latest"
+const releaseApiUrl = "https://api.github.com/repos/rekazer0/BdiEditor/releases/latest"
 
 function versionParts(value: string): number[] | undefined {
   const match = value.trim().replace(/^v/i, "").match(/^(\d+)\.(\d+)\.(\d+)/)
   return match?.slice(1).map(Number)
 }
 
-export function compareVersions(left: string, right: string): number {
+function compareVersions(left: string, right: string): number {
   const a = versionParts(left) ?? [0, 0, 0]
   const b = versionParts(right) ?? [0, 0, 0]
   for (let index = 0; index < 3; index += 1) {

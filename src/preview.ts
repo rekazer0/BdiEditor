@@ -26,7 +26,7 @@ type NineSliceCanvas = Pick<HTMLCanvasElement, "width" | "height" | "getContext"
 
 let nineSliceBuffer: HTMLCanvasElement | undefined
 
-export function setCanvasSize(
+function setCanvasSize(
   canvas: Pick<HTMLCanvasElement, "width" | "height">,
   width: number,
   height: number,
@@ -122,7 +122,7 @@ export function drawNineSliceImage(
   )
 }
 
-export type PreviewItem = {
+type PreviewItem = {
   section: string
   sections: string[]
   rect: Rect
@@ -163,7 +163,7 @@ type LegacyAnimationFrame = {
   to: readonly [number, number]
 }
 
-export type LegacyParticleEmitter = {
+type LegacyParticleEmitter = {
   images: string[]
   life: readonly [number, number]
   emitRegion: readonly [number, number, number, number]
@@ -181,7 +181,7 @@ export type LegacyParticleEmitter = {
   alphaSpeed: readonly [number, number]
 }
 
-export type LegacyParticleFrame = {
+type LegacyParticleFrame = {
   styleID: string
   x: number
   y: number
@@ -196,9 +196,9 @@ type LegacyAnimationEffect = {
   parallel: boolean
 }
 
-export type LegacyAnimation = Map<string, LegacyAnimationEffect>
+type LegacyAnimation = Map<string, LegacyAnimationEffect>
 
-export type LegacyHintIcon = {
+type LegacyHintIcon = {
   backStyle: string
   foreStyle: string
   size: readonly [number, number]
@@ -206,7 +206,7 @@ export type LegacyHintIcon = {
   padding: readonly [number, number, number, number]
 }
 
-export type LegacyHint = {
+type LegacyHint = {
   icons: Map<string, LegacyHintIcon>
   upIcon?: string
   downIcon?: string
@@ -255,7 +255,7 @@ export function parseLegacyHint(document: IniDocument | undefined): LegacyHint |
   }
 }
 
-export function legacyHintIconID(
+function legacyHintIconID(
   hint: LegacyHint | undefined,
   direction: "center" | "up" | "down" | "left" | "right" | "hold",
 ): string | undefined {
@@ -280,7 +280,7 @@ export function legacyHintText(
   return !/^F\d+$/i.test(key[direction]) ? key[direction] : ""
 }
 
-export function isLegacyHintInputKey(key: Pick<PreviewItem, "section" | "center">): boolean {
+function isLegacyHintInputKey(key: Pick<PreviewItem, "section" | "center">): boolean {
   return /^KEY\d+$/i.test(key.section) && Boolean(key.center.trim()) && !/^F\d+$/i.test(key.center.trim())
 }
 
@@ -387,7 +387,7 @@ function ranged(range: readonly [number, number], seed: number): number {
   return range[0] + (range[1] - range[0]) * seededUnit(seed)
 }
 
-export function legacyParticleFrames(
+function legacyParticleFrames(
   emitter: LegacyParticleEmitter,
   elapsed: number,
   panelWidth: number,
@@ -502,8 +502,6 @@ export function parseLegacyAnimation(
   return result
 }
 
-export const parseLegacyScaleAnimation = parseLegacyAnimation
-
 function legacyAnimationPair(
   animation: LegacyAnimation | undefined,
   styleID: string | undefined,
@@ -564,7 +562,7 @@ function legacyAnimationPair(
   return previous ? relativeValue(previous, previous.reverse ? previous.from : previous.to) : undefined
 }
 
-export function legacyAnimationScale(
+function legacyAnimationScale(
   animation: LegacyAnimation | undefined,
   styleID: string | undefined,
   elapsed: number,
@@ -572,7 +570,7 @@ export function legacyAnimationScale(
   return legacyAnimationPair(animation, styleID, elapsed, "scale")
 }
 
-export function legacyAnimationTranslation(
+function legacyAnimationTranslation(
   animation: LegacyAnimation | undefined,
   styleID: string | undefined,
   elapsed: number,
@@ -581,7 +579,7 @@ export function legacyAnimationTranslation(
   return legacyAnimationPair(animation, styleID, elapsed, "translate", relativeSize)
 }
 
-export function legacyAnimationOpacity(
+function legacyAnimationOpacity(
   animation: LegacyAnimation | undefined,
   styleID: string | undefined,
   elapsed: number,
@@ -589,16 +587,12 @@ export function legacyAnimationOpacity(
   return legacyAnimationPair(animation, styleID, elapsed, "opacity")?.[0]
 }
 
-export function legacyAnimationRotation(
+function legacyAnimationRotation(
   animation: LegacyAnimation | undefined,
   styleID: string | undefined,
   elapsed: number,
 ): number | undefined {
   return legacyAnimationPair(animation, styleID, elapsed, "rotate")?.[0]
-}
-
-export function previewStateActive(item: PreviewItem, state: number | undefined): boolean {
-  return state !== undefined && stateStyleValue(item.statStyle, state) !== undefined
 }
 
 function duplicateKeySignature(item: PreviewItem): string | undefined {
@@ -608,7 +602,7 @@ function duplicateKeySignature(item: PreviewItem): string | undefined {
   return [item.rect.x, item.rect.y, item.rect.width, item.rect.height, ...actions].join("\u0000")
 }
 
-export function visiblePreviewItems(
+function visiblePreviewItems(
   items: readonly PreviewItem[],
   state?: number,
 ): PreviewItem[] {
@@ -642,7 +636,7 @@ export function visiblePreviewItems(
   return visible
 }
 
-export function effectivePreviewItem(
+function effectivePreviewItem(
   document: IniDocument,
   item: PreviewItem,
   state?: number,
@@ -727,7 +721,7 @@ export function previewStateImpact(
   }
 }
 
-export function animationSequenceForKey(
+function animationSequenceForKey(
   animation: BdaAnimation | undefined,
   item: PreviewItem,
 ): BdaAnimationSequence | undefined {
@@ -750,7 +744,7 @@ function bdaTargetForKey(animation: BdaAnimation, item: PreviewItem): string | u
   return animation.targets.find((value) => value.toUpperCase() === semantic)
 }
 
-export function bdaAnimationBindingsForKey(
+function bdaAnimationBindingsForKey(
   animation: BdaAnimation | undefined,
   item: PreviewItem,
   event = 1,
@@ -826,7 +820,7 @@ function bdaTransforms(
   return result
 }
 
-export function bdaParticleEmitter(effect: BdaEmitterAnimation): LegacyParticleEmitter {
+function bdaParticleEmitter(effect: BdaEmitterAnimation): LegacyParticleEmitter {
   const [left, top, right, bottom] = effect.emitRegion
   const region: [number, number, number, number] = left === 0 && top === 0 && right === 0 && bottom === 0
     ? [0, 0, 1, 1]
@@ -850,15 +844,15 @@ export function bdaParticleEmitter(effect: BdaEmitterAnimation): LegacyParticleE
   }
 }
 
-export function previewBackground(theme: "light" | "dark"): string {
+function previewBackground(theme: "light" | "dark"): string {
   return theme === "dark" ? "#1c1c1e" : "#d1d4da"
 }
 
-export function previewSurfaceColor(theme: "light" | "dark", transparent: boolean): string | undefined {
+function previewSurfaceColor(theme: "light" | "dark", transparent: boolean): string | undefined {
   return transparent ? undefined : previewBackground(theme)
 }
 
-export function isFullPanelPreviewItem(
+function isFullPanelPreviewItem(
   item: Pick<PreviewItem, "rect">,
   panelWidth: number,
   panelHeight: number,
@@ -868,7 +862,7 @@ export function isFullPanelPreviewItem(
     item.rect.y + item.rect.height >= panelHeight
 }
 
-export function previewDrawOrder(
+function previewDrawOrder(
   items: readonly PreviewItem[],
   panelWidth: number,
   panelHeight: number,
@@ -880,7 +874,7 @@ export function previewDrawOrder(
   return [...items].sort((left, right) => layer(left) - layer(right))
 }
 
-export function shouldDrawItemBackground(
+function shouldDrawItemBackground(
   item: PreviewItem,
   panelStyle: string,
   panelWidth: number,
@@ -889,7 +883,7 @@ export function shouldDrawItemBackground(
   return !(item.backStyle === panelStyle && isFullPanelPreviewItem(item, panelWidth, panelHeight))
 }
 
-export function previewHitItem(
+function previewHitItem(
   items: readonly PreviewItem[],
   point: { x: number; y: number },
   mode: "edit" | "preview",
@@ -920,7 +914,7 @@ export function previewHitItem(
   return best ?? fallback
 }
 
-export function effectivePreviewHitItem(
+function effectivePreviewHitItem(
   document: IniDocument,
   items: readonly PreviewItem[],
   point: { x: number; y: number },
@@ -934,18 +928,18 @@ export function effectivePreviewHitItem(
   return effectivePreviewItem(document, item, state)
 }
 
-export function previewSelectionVisible(mode: "edit" | "preview", selected: boolean): boolean {
+function previewSelectionVisible(mode: "edit" | "preview", selected: boolean): boolean {
   return mode === "edit" && selected
 }
 
-export function previewFallbackText(
+function previewFallbackText(
   item: PreviewItem,
   hasForeground: boolean,
 ): string {
   return !hasForeground && item.section?.startsWith("LIST:") ? item.show : ""
 }
 
-export function drawListText(
+function drawListText(
   context: CanvasRenderingContext2D,
   text: string,
   x: number,
@@ -981,7 +975,7 @@ export function drawListText(
   context.restore()
 }
 
-export function foregroundLayerRect(
+function foregroundLayerRect(
   key: Rect,
   source: [number, number, number, number] | undefined,
   offset?: [number, number],
@@ -996,34 +990,34 @@ export function foregroundLayerRect(
   }
 }
 
-export function foregroundTextPoint(rect: Rect, offset?: [number, number]): { x: number; y: number } {
+function foregroundTextPoint(rect: Rect, offset?: [number, number]): { x: number; y: number } {
   return {
     x: rect.x + rect.width / 2 + (offset?.[0] ?? 0),
     y: rect.y + rect.height / 2 + (offset?.[1] ?? 0),
   }
 }
 
-export function phoneForegroundVisual(visual: Visual | undefined): Visual | undefined {
+function phoneForegroundVisual(visual: Visual | undefined): Visual | undefined {
   if (!visual?.image || !visual.source) return
   const { color: _, ...imageVisual } = visual
   return imageVisual
 }
 
-export function phoneForegroundLayers(visuals: Array<Visual | undefined>): Array<Visual | undefined> {
+function phoneForegroundLayers(visuals: Array<Visual | undefined>): Array<Visual | undefined> {
   return visuals.map(phoneForegroundVisual)
 }
 
-export function isAdditiveSelection(
+function isAdditiveSelection(
   event: Pick<MouseEvent, "metaKey" | "ctrlKey" | "shiftKey">,
 ): boolean {
   return event.metaKey || event.ctrlKey || event.shiftKey
 }
 
-export function isTouchLongPress(pointerType: string, duration: number, distance: number): boolean {
+function isTouchLongPress(pointerType: string, duration: number, distance: number): boolean {
   return pointerType === "touch" && duration >= 450 && distance <= 12
 }
 
-export function previewHitRect(item: PreviewItem, mode: "edit" | "preview"): Rect | undefined {
+function previewHitRect(item: PreviewItem, mode: "edit" | "preview"): Rect | undefined {
   if (mode === "edit") return item.rect
   return item.touchRect === null ? undefined : item.touchRect ?? item.rect
 }
@@ -1060,7 +1054,7 @@ function previewItemSections(document: IniDocument, section: string): string[] {
 
 // gen.ini 的 OFFSET 段既有 POS=x,y 也有 R_POS=x,y（部分 Android 皮肤）。
 // 两者同义，解析时优先 POS、回退 R_POS。
-export function offsetFromSection(document: IniDocument | undefined, section: string): [number, number] | undefined {
+function offsetFromSection(document: IniDocument | undefined, section: string): [number, number] | undefined {
   if (!document) return
   return parseOffset(
     document.get(section, "POS") ?? document.get(section, "R_POS"),
@@ -1182,7 +1176,7 @@ function listItems(document: IniDocument, defaults?: IniDocument): PreviewItem[]
   return [bar, ...cells]
 }
 
-export function dynamicToolbarRect(
+function dynamicToolbarRect(
   document: IniDocument,
   panelWidth: number,
   panelHeight: number,
