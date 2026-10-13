@@ -4,7 +4,7 @@ import vm from "node:vm"
 import ts from "typescript"
 
 const root = new URL("../../", import.meta.url)
-const files = ["src/main.ts", ...readdirSync(new URL("src/app/", root)).filter((f) => f.endsWith(".ts")).map((f) => `src/app/${f}`)]
+const files = ["src/main.ts", ...readdirSync(new URL("src/app/", root), { recursive: true }).filter((f) => f.endsWith(".ts")).map((f) => `src/app/${f}`)]
 const parsed = files.map((file) => ts.createSourceFile(file, readFileSync(new URL(file, root), "utf8"), ts.ScriptTarget.Latest, true))
 
 /** main.ts 与 src/app/*.ts 的全部源码，用于文本断言。 */

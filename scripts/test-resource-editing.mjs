@@ -133,7 +133,10 @@ test('sound upload reports cancellation and does not commit after the editing co
 
 test('asset replacement uses history and autosave, keeps its target, and rejects invalid images', async () => {
   const source = combinedSource()
-  const listener = source.statements.find(node => ts.isExpressionStatement(node) && ts.isCallExpression(node.expression) && node.expression.expression.getText(source) === 'imageOpen.addEventListener')
+  // 启动时的事件绑定在 wire 函数里，按语法树整体查找
+  let listener
+  const find = (node) => { if (!listener && ts.isExpressionStatement(node) && ts.isCallExpression(node.expression) && node.expression.expression.getText(source) === 'imageOpen.addEventListener') listener = node; ts.forEachChild(node, find) }
+  find(source)
   const functions = source.statements.filter(node => ts.isFunctionDeclaration(node) && ['commitBytes', 'applyChangeSnapshot', 'applyBytesSnapshot'].includes(node.name?.text)).map(node => node.getText(source)).join('\n')
   for (const invalid of [false, true]) {
     const archive = SkinArchive.fromSourceFiles([{ path: 'light/skin/res/a.png', data: new Uint8Array([1]) }])
