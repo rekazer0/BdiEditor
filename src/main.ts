@@ -104,7 +104,9 @@ import {
 import {
   exportFormatFromPath,
   exportName,
+  isExportFormat,
   type ExportFormat,
+  type ExportTarget,
 } from "./export.ts"
 import {
   applyDecodedBdaAppearancePart,
@@ -189,6 +191,7 @@ import { groupModelConfigurations, initializeModelSettings, modelConfigurationKe
 import { modelProviderPreset } from "./model-providers.ts"
 import { installNumberInputWheel, numberInputGesture, flushNumberInputWheel, deferNumberInputRefresh } from "./number-input-wheel.ts"
 import { loadBuiltInProjectTemplate, operationError } from "./operations.ts"
+import { buildSxiZip } from "./palm/palm-export.ts"
 import {
   archiveCopyPaths,
   archivePathOptions,
@@ -3485,7 +3488,7 @@ function setFileOperationBusy(busy: boolean): void {
   updatePanelToolButtons()
   updateSourceFileActions()
   for (const button of exportButtons) {
-    const format = button.dataset.exportFormat as ExportFormat
+    const format = button.dataset.exportFormat as ExportTarget
     // 只有 BDA 皮肤能导出 BDA；其他格式直接隐藏这两项，不留一排无法解释的灰色菜单。
     button.hidden = Boolean(archive) && archive!.format !== "bda" && format === "bda"
     button.disabled = busy || !archive || button.hidden
@@ -9053,7 +9056,7 @@ async function loadArchive(
   if (!isNew && isTauri() && path) recordRecentFile(path, documentName.textContent)
   saveButton.disabled = false
   for (const button of exportButtons) {
-    const format = button.dataset.exportFormat as ExportFormat
+    const format = button.dataset.exportFormat as ExportTarget
     button.hidden = archive.format !== "bda" && format === "bda"
     button.disabled = button.hidden
   }
@@ -9225,13 +9228,46 @@ function mobileShareFormat(): ExportFormat {
   return currentExportFormat()
 }
 
-async function exportArchive(format: ExportFormat, targetBdaPlatform?: Exclude<BdaPlatform, "unknown">): Promise<{
+// `.sxi` is a Palm converter artifact rather than a skin package, so save dialogs label
+// it separately.
+function exportTargetLabel(format: ExportTarget): string {
+  return format === "sxi" ? "手心皮肤" : `${format.toUpperCase()} 皮肤`
+}
+
+// BDA packages are protobuf, while every INI-based export (`.bdi`, `.bds`, `.sxi`) needs the
+// official INI base layout, so a BDA source is converted once here before writing.
+async function convertBdaToBaseLayout(label: string): Promise<{ archive: SkinArchive; warnings: string[] } | undefined> {
+  if (!archive) throw new Error("当前没有可保存的皮肤")
+  if (!bdaBase) throw new Error("无法加载 BDA 官方基础布局")
+  await waitForInterfacePaint()
+  updateFileOperationProgress(34, "正在转换 BDA 配置…")
+  const result = convertBdaArchive(archive, bdaBase)
+  if (result.warnings.length && !window.confirm(
+    `BDA 转换为 ${label} 时将降级以下内容：\n\n${result.warnings.join("\n")}\n\n继续导出吗？`,
+  )) return undefined
+  return result
+}
+
+async function exportArchive(format: ExportTarget, targetBdaPlatform?: Exclude<BdaPlatform, "unknown">): Promise<{
   bytes: Uint8Array
   converted: boolean
   warnings: string[]
 } | undefined> {
   if (!archive) throw new Error("当前没有可保存的皮肤")
   if (aiDraftPreview) throw new Error("请先应用或丢弃 AI 修改草稿")
+  if (format === "sxi") {
+    updateFileOperationProgress(22, "正在导出手心皮肤…")
+    await waitForInterfacePaint()
+    let source: SkinArchive = archive
+    if (archive.format === "bda") {
+      const converted = await convertBdaToBaseLayout("手心皮肤")
+      if (!converted) return
+      source = converted.archive
+    }
+    const result = buildSxiZip(source)
+    if (result.warnings.length) clientLog.info("sxi.export.warning", { warnings: result.warnings.join("；") })
+    return { bytes: result.bytes, converted: true, warnings: result.warnings }
+  }
   updateFileOperationProgress(22, `正在生成 ${format.toUpperCase()} 皮肤包…`)
   if (archive.format === "bda" && format === "bda" && targetBdaPlatform) {
     const result = convertBdaPlatform(archive, targetBdaPlatform)
@@ -9263,7 +9299,7 @@ function reportSoundWarnings(warnings: string[]): void {
   window.alert(`以下按键音未能转换为目标平台格式，导出包中仍引用原文件，目标平台可能没有声音：\n\n${warnings.join("\n")}`)
 }
 
-async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: string): Promise<boolean> {
+async function saveNative(saveAs: boolean, format: ExportTarget, suggestedName: string): Promise<boolean> {
   if (!archive) throw new Error("当前没有可保存的皮肤")
   let exported: Awaited<ReturnType<typeof exportArchive>>
   let path = currentPath
@@ -9271,7 +9307,7 @@ async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: 
     const written = await writeToChosenFile(suggestedName, async () => {
       exported = await exportArchive(format)
       return exported?.bytes
-    }, `${format.toUpperCase()} 皮肤`)
+    }, exportTargetLabel(format))
     if (!written || !exported) return false
     path = written
   } else {
@@ -9279,7 +9315,7 @@ async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: 
     if (!exported) return false
     await writeNativePath(path, exported.bytes)
   }
-  if (!exported.converted) {
+  if (!exported.converted && isExportFormat(format)) {
     currentPath = path
     unsavedNew = false
     archive.markSaved(exported.bytes, format)
@@ -9397,15 +9433,15 @@ async function writeToChosenFile(
   return file.name
 }
 
-async function downloadArchive(format: ExportFormat, suggestedName: string): Promise<boolean> {
+async function downloadArchive(format: ExportTarget, suggestedName: string): Promise<boolean> {
   if (!archive) throw new Error("当前没有可保存的皮肤")
   let exported: Awaited<ReturnType<typeof exportArchive>>
   const path = await writeToChosenFile(suggestedName, async () => {
     exported = await exportArchive(format)
     return exported?.bytes
-  }, `${format.toUpperCase()} 皮肤`)
+  }, exportTargetLabel(format))
   if (!path || !exported) return false
-  if (!exported.converted) {
+  if (!exported.converted && isExportFormat(format)) {
     currentPath = path
     documentName.textContent = suggestedName
     archive.markSaved(exported.bytes, format)
@@ -9417,7 +9453,7 @@ async function downloadArchive(format: ExportFormat, suggestedName: string): Pro
 
 async function saveArchive(
   saveAs: boolean,
-  format: ExportFormat,
+  format: ExportTarget,
   targetBdaPlatform?: Exclude<BdaPlatform, "unknown">,
 ): Promise<boolean> {
   flushNumberInputWheel()
@@ -9992,7 +10028,7 @@ mobileShareButton.addEventListener("click", () => {
 })
 for (const button of exportButtons) {
   button.addEventListener("click", () => {
-    const format = button.dataset.exportFormat as ExportFormat
+    const format = button.dataset.exportFormat as ExportTarget
     const platform = button.dataset.bdaPlatform as Exclude<BdaPlatform, "unknown"> | undefined
     void runFileOperation("导出", () => saveArchive(true, format, platform))
   })
