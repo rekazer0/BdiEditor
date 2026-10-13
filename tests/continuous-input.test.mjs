@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
+import { appSource, declarations, run } from './helpers/app-source.mjs'
 
 function load(name, globals = {}) {
   const context = vm.createContext({ exports: {}, ...globals })
@@ -167,16 +168,15 @@ test('duplicate installation cannot double-step a field', () => {
   s.wheel(field); s.tick(); assert.equal(field.value, '1')
 })
 
-const source = ts.createSourceFile('main.ts', readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true)
 const names = ['schedulePointerCoordinates', 'paintPreviewInteraction', 'schedulePreviewInteractionFrame', 'schedulePreviewPan', 'flushPreviewPan']
-const functions = source.statements.filter(n => ts.isFunctionDeclaration(n) && names.includes(n.name?.text)).map(n => n.getText(source)).join('\n')
+const functions = declarations(...names)
 test('pan and crosshair use the latest pointer snapshot in a single frame', () => {
   const frames = new Map(), paints = []; let id = 0
-  const context = vm.createContext({
+  const context = run(functions, {
     requestAnimationFrame: cb => { frames.set(++id, cb); return id }, cancelAnimationFrame: id => frames.delete(id),
     updatePointerCoordinates: e => paints.push(['crosshair', e.clientX]), setPreviewPan: x => paints.push(['pan', x]),
+    pointerCoordinatesFrame: 0,
   })
-  vm.runInContext(ts.transpile(`let pendingPointerCoordinates, pendingPreviewPan; let pointerCoordinatesFrame = 0; ${functions}`, { target: ts.ScriptTarget.ES2022 }), context)
   vm.runInContext('for (let i=1; i<=100; i++) { schedulePointerCoordinates({clientX:i,clientY:0,pointerType:"mouse"},{},{}); schedulePreviewPan(i,0) }', context)
   assert.equal(frames.size, 1)
   const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(cb => cb())

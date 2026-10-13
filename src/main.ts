@@ -4,7 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window"
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { getCurrentWebview } from "@tauri-apps/api/webview"
 import { message, open, save } from "@tauri-apps/plugin-dialog"
-import { readFile, watch, writeFile, type UnwatchFn } from "@tauri-apps/plugin-fs"
+import { readFile, watch, writeFile } from "@tauri-apps/plugin-fs"
 import "./tokens.css"
 import "./components.css"
 import "./style.css"
@@ -31,12 +31,7 @@ import { createAtlasWorkspace } from "./atlas-workspace"
 import { resizeTileSlice } from "./tiles"
 import type { AiChatController, AiChatRunHooks, AiChatRunResult } from "./ai-chat.ts"
 import type { StyleLibraryPayload, StyleLibraryVisual } from "./picker-window.ts"
-import type { AiDesignConversation } from "./ai-design.ts"
-import {
-  DEFAULT_BDA_PANEL_HEIGHT,
-  DEFAULT_BDA_PANEL_WIDTH,
-  DEFAULT_PANEL_WIDTH,
-} from "./keyboard.ts"
+import { DEFAULT_BDA_PANEL_HEIGHT, DEFAULT_BDA_PANEL_WIDTH } from "./keyboard.ts"
 import {
   actionDescription,
   isConfiguredSymbolLayout,
@@ -240,6 +235,8 @@ import { checkForUpdate } from "./update.ts"
 import { clientLog, clientLogZip, flushClientLogs, installClientLogging } from "./client-log.ts"
 import { installSafeAreaLock } from "./safe-area.ts"
 import { bindSlicePickerZoom, drawSlicePicker, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM, pickableSlices, WHOLE_IMAGE_INDEX } from "./slice-picker-canvas.ts"
+import { appState } from "./app/state"
+import { type AiDraft, type LayoutImageConfig, type StyleImagePickerTarget, type SourceTransfer, type BdaTileUsage, type SourceFilePayload, type SourceChangePayload, type SoundEntry, type StyleKind, type NativeResourcePickerPayload, type SourceUpload, type SourceReadFilePayload, type ChosenFileData, type BrowserSaveFileHandle, type RecentFile, type RecentThumb, type AiDraftVariant, type WindowMaterialKind } from "./app/types"
 
 installClientLogging(document.querySelector<HTMLElement>("#about-update")?.dataset.currentVersion ?? "unknown")
 installSafeAreaLock()
@@ -426,7 +423,6 @@ const fileOperationPercent = $("#file-operation-percent")
 const fileOperationResult = $("#file-operation-result")
 const fileOperationClose = $("#file-operation-close") as HTMLButtonElement
 const LARGE_SKIN_BYTES = 5 * 1024 * 1024
-let fileOperationProgressVisible = false
 const panelStatus = $("#panel-status")
 const previewCoordinates = $("#preview-coordinates")
 const previewCoordinateX = $("#preview-coordinate-x")
@@ -612,8 +608,6 @@ const toolbarCanvas = $("#toolbar-preview") as HTMLCanvasElement
 const candidateComposition = $("#candidate-composition")
 const candidateInput = $("#candidate-input")
 const candidateWords = $("#candidate-words")
-let simulatedComposition = ""
-let lastSimulationLanguage: "zh" | "en" | undefined
 const modeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mode-choice]"))
 const themeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-theme-choice]"))
 const orientationChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-orientation-choice]"))
@@ -639,178 +633,16 @@ const stylePickerCount = $("#style-picker-count")
 const stylePickerGrid = $("#style-picker-grid")
 const stylePickerEmpty = $("#style-picker-empty")
 const stylePickerClose = $("#style-picker-close") as HTMLButtonElement
-
-let archive: SkinArchive | undefined
-let bdaBase: SkinArchive | undefined
-let currentPath = ""
-let sourceWorkspacePath = ""
-let sourceWorkspacePrefix = ""
-let sourceWorkspacePendingArchive: SkinArchive | undefined
 const LAST_SOURCE_WORKSPACE_KEY = "last-source-workspace"
 
 function sourceDirectoryEnabledBySettings(): boolean {
   const stored = localStorage.getItem("source-directory-enabled")
   return isAndroidTauri() ? stored === "true" : stored !== "false"
 }
-let stopSourceWatch: UnwatchFn | undefined
-let sourceAutosaveTimer: number | undefined
-let sourceAutosaveQueue = Promise.resolve()
 const pendingSourcePaths = new Set<string>()
 const sourceWriteSnapshots = new Map<string, SourceWriteSnapshot[]>()
-let sourceWriteSnapshotTimer: number | undefined
 const pendingSourceWatchPaths = new Set<string>()
-let sourceWatchTimer: number | undefined
-let selectedPath = ""
-let selectedDocument: IniDocument | undefined
-let layoutPath = ""
-let layoutDocument: IniDocument | undefined
-let selectedKeySections: string[] = []
-let selectedToolbarSections: string[] = []
-let selectedCandidate = false
-let unsavedNew = false
-let assetURL = ""
-let assetReturnPath = ""
-let inspectorTab: "properties" | "source" | "ai" = "properties"
-let sourceFindVisible = false
-let sourceSearchIndex = -1
-let sourceInputHighlightTimer: number | undefined
-let sourceInputRefreshPending = false
-let sourceSearchTimer: number | undefined
-let sourceHistoryHighlight: readonly [number, number] | undefined
-type LayoutImageConfig = "none" | "image-follows-layout" | "layout-follows-image"
-let undoStack: Change[] = []
 const recordChange = createGestureHistory()
-let redoStack: Change[] = []
-let aiDesignConversationTarget: SkinArchive | undefined
-/**
- * A finished AI run held for confirmation. Nothing reaches the archive until
- * the user applies it, so a draft can be discarded without side effects.
- */
-type AiDraft = {
-  target: SkinArchive
-  changes: Change[]
-  drafts: AiSkinDraftChange[]
-  sections: string[]
-  conversation: AiDesignConversation
-  response: string
-  variants?: AiDraftVariant[]
-}
-type AiDraftVariant = {
-  id: string
-  title: string
-  changes: Change[]
-  drafts: AiSkinDraftChange[]
-  sections: string[]
-  conversation: AiDesignConversation
-  response: string
-}
-let aiDesignDraft: AiDraft | undefined
-/** Draft changes written into the archive so the canvas shows them; kept out of undo history until accepted. */
-let aiDraftPreview: { target: SkinArchive; changes: Change[] } | undefined
-let aiDesignBusy = false
-let savedModels: ModelConfiguration[] = []
-let savedImageModel: ModelConfiguration | undefined
-// ponytail: keep three exchanges in memory; persist sessions only if cross-restart chat is needed.
-let aiDesignConversation: AiDesignConversation = []
-let aiChatController: AiChatController | undefined
-let aiChatInitialization: Promise<AiChatController> | undefined
-let layoutImageBytes: Uint8Array | undefined
-let layoutImageWidth = 0
-let layoutImageHeight = 0
-let layoutImageTarget: LayoutImageTarget | undefined
-let layoutImageConfig: LayoutImageConfig = "none"
-let layoutImageObjectURL = ""
-let layoutImageHighlight = false
-let layoutImageApplying = false
-let fileOperationRunning = false
-let firstCandidateTextVisual: TextVisual | undefined
-let candidateTextWidth = DEFAULT_PANEL_WIDTH
-let canvasLogicalSize: {
-  width: number
-  height: number
-  panelHeight: number
-  /** PANEL.SIZE height; panelHeight also covers keys placed below it. */
-  layoutPanelHeight: number
-  panelVisibleHeight: number
-} | undefined
-let pickerURL = ""
-let pickerImage: HTMLImageElement | undefined
-let pickerPath = ""
-let pickerSlices: TileSlice[] = []
-let pickerScale = 1
-let pickerOffset: TilePoint = { x: 0, y: 0 }
-let pickerFit = 1
-let pickerZoom = 1
-type StyleImagePickerTarget = {
-  source: "BACK_STYLE" | "FORE_STYLE"
-  property: "NM_IMG" | "HL_IMG"
-  document?: IniDocument
-  path?: string
-  sections?: string[]
-}
-let pickerTarget: StyleImagePickerTarget | undefined
-let resourcePickerSelect: ((resourceID: string) => void) | undefined
-type NativeImagePickerPayload = {
-  path: string
-  dataURL: string
-  slices: TileSlice[]
-  selectedIndex?: number
-  editable: boolean
-  styleName?: string
-  // 有样式引用输入框时，切片窗口的返回回到样式库「全部样式」。
-  styleLibrary?: boolean
-}
-type NativeResourcePickerPayload = { path: string; dataURL: string }[]
-let nativeImagePickerPayload: NativeImagePickerPayload | undefined
-// 切片窗口下次创建时的起始视图（列表优先用于「样式还没有图片」等入口）。
-let pickerRequestedView: "image" | "list" | "styles" = "image"
-let selectedFileButton: HTMLElement | undefined
-type SourceTransfer = {
-  mode: "copy" | "move"
-  sourcePath: string
-  folder: boolean
-  files: { path: string; source: string; bytes: Uint8Array }[]
-}
-let sourceTransfer: SourceTransfer | undefined
-let sidebarView: "overview" | "source" = "overview"
-let guidesVisible = false
-let previewReturnName = "py_9.ini"
-let resourceConfigActive = false
-let resourceInspectorMode: "image" | "style" | "sound" = "image"
-let selectedStyleID = ""
-let selectedSoundID = ""
-let selectedBdaStyleGroup: BdaAppearanceStyleGroup = "imageStyles"
-let styleReturnPath = ""
-let styleReturnSelection: string[] = []
-let styleReturnCandidate = false
-let styleReturnScrollTop = 0
-let styleReturnInspectorGroup = ""
-let bdaSliceReturn: { path: string; styleID: string } | undefined
-let selectedResourcePath = ""
-let resourceURLs: string[] = []
-let tilePath = ""
-let tileDocument = IniDocument.parse("")
-let slices: TileSlice[] = []
-type BdaTileUsage = {
-  index: number
-  ref: BdaStyleRef
-  highlighted: boolean
-  label: string
-}
-let bdaTileUsages: BdaTileUsage[] = []
-let selectedTileIndex: number | undefined
-let drawingTile = false
-let tileDragStart: TilePoint | undefined
-let tileDraft: TileRect | undefined
-let tileMode: "select" | "move" = "select"
-let keyMode: "select" | "move" = "select"
-let movingTile: TileSlice | undefined
-let moveStart: TilePoint | undefined
-let atlasWorkspace: ReturnType<typeof createAtlasWorkspace> | undefined
-let tileResizeCorner: number | undefined
-let tileDragOriginal: TileSlice | undefined
-let moveSource: TileRect | undefined
-let copiedTile: TileSlice | undefined
 
 const deviceGeometryProperties = [
   "--keyboard-height-port",
@@ -842,10 +674,10 @@ const preview = new Preview(
     handlePreviewEvent(event)
   },
   (sections) => {
-    selectedCandidate = false
+    appState.selectedCandidate = false
     syncCandidateSelection()
-    if (selectedPath !== layoutPath) selectFile(layoutPath, "overview")
-    selectedKeySections = sections
+    if (appState.selectedPath !== appState.layoutPath) selectFile(appState.layoutPath, "overview")
+    appState.selectedKeySections = sections
     if (!sections.length) source.collapseSelection()
     if (sections.length && mobilePortraitQuery.matches) setMobilePane("inspector")
     scheduleSelectionInspectorSync(preview)
@@ -880,7 +712,7 @@ function updatePointerCoordinates(
   const snapPreview = canvas === previewCanvas ? preview : canvas === toolbarCanvas ? toolbarPreview : undefined
   const logicalSize = snapPreview?.logicalSize() ?? { width: canvas.width, height: canvas.height }
   const raw = { x: x / bounds.width * logicalSize.width, y: y / bounds.height * logicalSize.height }
-  const point = !previewPanStart && editorCrosshair.checked && editorCoordinateSnap.checked && snapPreview
+  const point = !appState.previewPanStart && editorCrosshair.checked && editorCoordinateSnap.checked && snapPreview
     ? snapPreview.snapPoint(raw, bounds)
     : raw
   const snappedX = Math.min(logicalSize.width - 1, Math.max(0, point.x))
@@ -905,17 +737,17 @@ function updatePointerCoordinates(
   if (snapX === "true") previewCoordinates.style.setProperty("--snap-x", `${bounds.left - wrapBounds.left + snappedX / logicalSize.width * bounds.width}px`)
   if (snapY === "true") previewCoordinates.style.setProperty("--snap-y", `${bounds.top - wrapBounds.top + snappedY / logicalSize.height * bounds.height}px`)
   if (
-    !pointerOverlayGeometry ||
-    pointerOverlayGeometry.left !== overlayGeometry.left ||
-    pointerOverlayGeometry.top !== overlayGeometry.top ||
-    pointerOverlayGeometry.width !== overlayGeometry.width ||
-    pointerOverlayGeometry.height !== overlayGeometry.height
+    !appState.pointerOverlayGeometry ||
+    appState.pointerOverlayGeometry.left !== overlayGeometry.left ||
+    appState.pointerOverlayGeometry.top !== overlayGeometry.top ||
+    appState.pointerOverlayGeometry.width !== overlayGeometry.width ||
+    appState.pointerOverlayGeometry.height !== overlayGeometry.height
   ) {
-    pointerOverlayGeometry = overlayGeometry
-    previewCoordinates.style.left = `${pointerOverlayGeometry.left}px`
-    previewCoordinates.style.top = `${pointerOverlayGeometry.top}px`
-    previewCoordinates.style.width = `${pointerOverlayGeometry.width}px`
-    previewCoordinates.style.height = `${pointerOverlayGeometry.height}px`
+    appState.pointerOverlayGeometry = overlayGeometry
+    previewCoordinates.style.left = `${appState.pointerOverlayGeometry.left}px`
+    previewCoordinates.style.top = `${appState.pointerOverlayGeometry.top}px`
+    previewCoordinates.style.width = `${appState.pointerOverlayGeometry.width}px`
+    previewCoordinates.style.height = `${appState.pointerOverlayGeometry.height}px`
   }
   previewCoordinates.style.setProperty("--crosshair-x", `${crosshairX}px`)
   previewCoordinates.style.setProperty("--crosshair-y", `${crosshairY}px`)
@@ -931,22 +763,13 @@ function updatePointerCoordinates(
   previewCoordinates.hidden = false
 }
 
-let pendingPointerCoordinates: {
-  event: Pick<PointerEvent, "clientX" | "clientY" | "pointerType">
-  target: HTMLElement
-  canvas: HTMLCanvasElement
-  geometry?: { target: DOMRect; wrap: DOMRect; wrapWidth: number; wrapHeight: number }
-} | undefined
-let pointerCoordinatesFrame = 0
-let pointerOverlayGeometry: { left: number; top: number; width: number; height: number } | undefined
-
 function schedulePointerCoordinates(
   event: PointerEvent,
   target: HTMLElement,
   canvas: HTMLCanvasElement,
   geometry?: { target: DOMRect; wrap: DOMRect; wrapWidth: number; wrapHeight: number },
 ): void {
-  pendingPointerCoordinates = {
+  appState.pendingPointerCoordinates = {
     event: { clientX: event.clientX, clientY: event.clientY, pointerType: event.pointerType },
     target,
     canvas,
@@ -956,12 +779,12 @@ function schedulePointerCoordinates(
 }
 
 function paintPreviewInteraction(): void {
-  if (pointerCoordinatesFrame) cancelAnimationFrame(pointerCoordinatesFrame)
-  pointerCoordinatesFrame = 0
-  const coordinates = pendingPointerCoordinates
-  const pan = pendingPreviewPan
-  pendingPointerCoordinates = undefined
-  pendingPreviewPan = undefined
+  if (appState.pointerCoordinatesFrame) cancelAnimationFrame(appState.pointerCoordinatesFrame)
+  appState.pointerCoordinatesFrame = 0
+  const coordinates = appState.pendingPointerCoordinates
+  const pan = appState.pendingPreviewPan
+  appState.pendingPointerCoordinates = undefined
+  appState.pendingPreviewPan = undefined
   // All geometry reads occur before changing the shell transform. The overlay and
   // artwork are painted from the same latest pointer snapshot, in a single frame.
   if (coordinates) updatePointerCoordinates(coordinates.event, coordinates.target, coordinates.canvas, coordinates.geometry)
@@ -969,22 +792,18 @@ function paintPreviewInteraction(): void {
 }
 
 function schedulePreviewInteractionFrame(): void {
-  if (!pointerCoordinatesFrame) pointerCoordinatesFrame = requestAnimationFrame(paintPreviewInteraction)
+  if (!appState.pointerCoordinatesFrame) appState.pointerCoordinatesFrame = requestAnimationFrame(paintPreviewInteraction)
 }
 
 // Runs callback in its own task right after the next frame is painted.
 function afterNextPaint(callback: () => void): void {
   requestAnimationFrame(() => window.setTimeout(callback))
 }
-
-// Rebuilding the inspector costs 10–30ms in WebKit; run it after the canvas has
-// painted the new selection so a key click shows up on the very next frame.
-let selectionInspectorSyncPending = false
 function scheduleSelectionInspectorSync(canvasPreview: Preview): void {
-  if (selectionInspectorSyncPending) return
-  selectionInspectorSyncPending = true
+  if (appState.selectionInspectorSyncPending) return
+  appState.selectionInspectorSyncPending = true
   afterNextPaint(() => void canvasPreview.rendered().then(() => {
-    selectionInspectorSyncPending = false
+    appState.selectionInspectorSyncPending = false
     populateKeyInspector()
     updateSourceHighlight()
     scrollSelectedSource()
@@ -992,19 +811,19 @@ function scheduleSelectionInspectorSync(canvasPreview: Preview): void {
 }
 
 canvasWrap.addEventListener("pointermove", (event) => {
-  if (previewPanStart || deviceShell.hidden) return
+  if (appState.previewPanStart || deviceShell.hidden) return
   const onToolbar = toolbarStrip.contains(event.target as Node)
   schedulePointerCoordinates(event, onToolbar ? toolbarStrip : previewCanvas, onToolbar ? toolbarCanvas : previewCanvas)
 })
 document.addEventListener("pointermove", (event) => {
-  if (previewPanStart) return
+  if (appState.previewPanStart) return
   const target = event.target as Node
   if (
     event.pointerType === "mouse" &&
     !canvasWrap.contains(target) &&
     !toolbarStrip.contains(target)
   ) {
-    pendingPointerCoordinates = undefined
+    appState.pendingPointerCoordinates = undefined
     if (editorCrosshair.checked) previewCoordinates.hidden = true
     else {
       previewCoordinateX.textContent = "—"
@@ -1016,8 +835,8 @@ document.addEventListener("pointermove", (event) => {
 const toolbarPreview = new Preview(toolbarCanvas, handlePreviewEvent, (sections) => {
   const path = toolbarStrip.dataset.path
   if (!path) return
-  if (selectedPath !== path) selectFile(path, "overview")
-  selectedToolbarSections = sections
+  if (appState.selectedPath !== path) selectFile(path, "overview")
+  appState.selectedToolbarSections = sections
   toolbarPreview.setSelected(sections)
   syncCandidateSelection()
   scheduleSelectionInspectorSync(toolbarPreview)
@@ -1029,12 +848,6 @@ function resizeKeyboardPreviews(): void {
   toolbarPreview.resize()
   candidateBackgroundPreview.resize()
 }
-let activeKeyboardGeometry: {
-  panelWidth: number
-  panelHeight: number
-  candidateHeight: number
-  candidateInputHeight: number
-} | undefined
 
 function applySkinState(state?: number, message?: string): void {
   skinState.value = state === undefined ? "" : String(state)
@@ -1045,14 +858,14 @@ function applySkinState(state?: number, message?: string): void {
 }
 
 function setSimulatedComposition(value: string): void {
-  simulatedComposition = value
+  appState.simulatedComposition = value
   const current = skinState.value ? Number(skinState.value) : undefined
   const next = compositionSkinState(value, current)
   if (next !== current) applySkinState(next)
 }
 
 function skinStatePreviewMessage(state: number): string {
-  const impact = previewStateImpact(layoutDocument, state)
+  const impact = previewStateImpact(appState.layoutDocument, state)
   if (impact.resolved) return `皮肤状态：S${state}`
   if (impact.mapped) return `皮肤状态：S${state} · 当前布局的状态定义缺少 TIP 内容`
   if (state === 4) return `皮肤状态：S4 · 已进入输入编码预览，当前布局未配置按键换层`
@@ -1066,37 +879,31 @@ function activateSkinState(state?: number, message?: string): void {
   updateSourceHighlight()
   scrollSelectedSource()
 }
-
-let keySoundAudio: HTMLAudioElement | undefined
-let keySoundURL = ""
-let keySoundPath = ""
-let keySoundContext: AudioContext | undefined
-let keySoundSource: AudioBufferSourceNode | undefined
 const keySoundBuffers = new Map<string, AudioBuffer>()
 
 function releaseKeySound(): void {
-  keySoundAudio?.pause()
-  keySoundAudio = undefined
+  appState.keySoundAudio?.pause()
+  appState.keySoundAudio = undefined
   try {
-    keySoundSource?.stop()
+    appState.keySoundSource?.stop()
   } catch {}
-  keySoundSource = undefined
-  keySoundPath = ""
-  if (keySoundURL) URL.revokeObjectURL(keySoundURL)
-  keySoundURL = ""
+  appState.keySoundSource = undefined
+  appState.keySoundPath = ""
+  if (appState.keySoundURL) URL.revokeObjectURL(appState.keySoundURL)
+  appState.keySoundURL = ""
 }
 
 async function playDecodedSound(path: string, bytes: Uint8Array): Promise<void> {
-  keySoundContext ??= new AudioContext()
-  if (keySoundContext.state === "suspended") await keySoundContext.resume()
+  appState.keySoundContext ??= new AudioContext()
+  if (appState.keySoundContext.state === "suspended") await appState.keySoundContext.resume()
   let buffer = keySoundBuffers.get(path)
   if (!buffer) {
     try {
-      buffer = await keySoundContext.decodeAudioData(new Uint8Array(bytes).buffer)
+      buffer = await appState.keySoundContext.decodeAudioData(new Uint8Array(bytes).buffer)
     } catch (error) {
       if (/^FORM$/.test(new TextDecoder("ascii").decode(bytes.subarray(0, 4)))) {
         const decoded = decodeAiffPcm(bytes)
-        buffer = keySoundContext.createBuffer(decoded.channelData.length, decoded.samplesDecoded, decoded.sampleRate)
+        buffer = appState.keySoundContext.createBuffer(decoded.channelData.length, decoded.samplesDecoded, decoded.sampleRate)
         decoded.channelData.forEach((channel, index) => buffer!.copyToChannel(new Float32Array(channel), index))
       } else {
         const ogg = /^OggS$/.test(new TextDecoder("ascii").decode(bytes.subarray(0, 4))) || /\.ogg$/i.test(path)
@@ -1107,7 +914,7 @@ async function playDecodedSound(path: string, bytes: Uint8Array): Promise<void> 
         const decoded = await decoder.decodeFile(bytes)
         decoder.free()
         if (!decoded.samplesDecoded || !decoded.channelData.length) throw new Error("OGG 文件没有可播放的音频")
-        buffer = keySoundContext.createBuffer(decoded.channelData.length, decoded.samplesDecoded, decoded.sampleRate)
+        buffer = appState.keySoundContext.createBuffer(decoded.channelData.length, decoded.samplesDecoded, decoded.sampleRate)
         decoded.channelData.forEach((channel, index) => buffer!.copyToChannel(new Float32Array(channel), index))
       }
       if (!buffer) {
@@ -1116,26 +923,26 @@ async function playDecodedSound(path: string, bytes: Uint8Array): Promise<void> 
     }
     keySoundBuffers.set(path, buffer)
   }
-  keySoundSource = keySoundContext.createBufferSource()
-  keySoundSource.buffer = buffer
-  keySoundSource.connect(keySoundContext.destination)
-  keySoundSource.start()
+  appState.keySoundSource = appState.keySoundContext.createBufferSource()
+  appState.keySoundSource.buffer = buffer
+  appState.keySoundSource.connect(appState.keySoundContext.destination)
+  appState.keySoundSource.start()
 }
 
 function playSoundPath(path: string): void {
-  const bytes = archive?.getBytes(path)
+  const bytes = appState.archive?.getBytes(path)
   if (!bytes) return
-  if (path !== keySoundPath) {
+  if (path !== appState.keySoundPath) {
     releaseKeySound()
     const copy = bytes.slice()
-    keySoundURL = URL.createObjectURL(new Blob([copy.buffer], { type: soundMimeType(path) }))
-    keySoundPath = path
-    keySoundAudio = new Audio(keySoundURL)
-    keySoundAudio.preload = "auto"
+    appState.keySoundURL = URL.createObjectURL(new Blob([copy.buffer], { type: soundMimeType(path) }))
+    appState.keySoundPath = path
+    appState.keySoundAudio = new Audio(appState.keySoundURL)
+    appState.keySoundAudio.preload = "auto"
   }
-  if (!keySoundAudio) return
-  keySoundAudio.currentTime = 0
-  void keySoundAudio.play().catch(async (error: unknown) => {
+  if (!appState.keySoundAudio) return
+  appState.keySoundAudio.currentTime = 0
+  void appState.keySoundAudio.play().catch(async (error: unknown) => {
     if (error instanceof DOMException && error.name === "NotSupportedError") {
       try {
         await playDecodedSound(path, bytes)
@@ -1150,14 +957,14 @@ function playSoundPath(path: string): void {
 }
 
 function keySoundForEvent(event: PreviewEvent): string | undefined {
-  if (!archive || !layoutDocument) return
-  const names = archive.names()
-  if (archive.format === "bda") {
-    const path = bdaConfigPath(archive, theme.value, orientation.value, "sound")
-    const bytes = path ? archive.getBytes(path) : undefined
+  if (!appState.archive || !appState.layoutDocument) return
+  const names = appState.archive.names()
+  if (appState.archive.format === "bda") {
+    const path = bdaConfigPath(appState.archive, theme.value, orientation.value, "sound")
+    const bytes = path ? appState.archive.getBytes(path) : undefined
     if (!bytes) return
     const sound = decodeBdaSoundConfig(bytes)
-    const sounds = bdaPlatform(archive) === "ios" ? sound.iosKeySounds : sound.keySounds
+    const sounds = bdaPlatform(appState.archive) === "ios" ? sound.iosKeySounds : sound.keySounds
     const resource = sounds.get(bdaPanelKeyName(event.code))
       ?? sounds.get(event.section)
       ?? [...sounds.values()][0]
@@ -1166,13 +973,13 @@ function keySoundForEvent(event: PreviewEvent): string | undefined {
       : undefined
   }
   const stylesPath = styleConfigPath()
-  if (!archive.isText(stylesPath)) return
+  if (!appState.archive.isText(stylesPath)) return
   const generalPath = genConfigPath()
-  const general = archive.isText(generalPath) ? IniDocument.parse(archive.getText(generalPath)) : undefined
+  const general = appState.archive.isText(generalPath) ? IniDocument.parse(appState.archive.getText(generalPath)) : undefined
   const filename = soundFilenameForKey(
-    layoutDocument,
+    appState.layoutDocument,
     event.section,
-    IniDocument.parse(archive.getText(stylesPath)),
+    IniDocument.parse(appState.archive.getText(stylesPath)),
     general,
   )
   return filename ? soundPathForFilename(names, theme.value, orientation.value, filename) : undefined
@@ -1215,25 +1022,25 @@ function handlePreviewEvent(event: PreviewEvent): void {
     )
     return
   }
-  const currentName = layoutPath.split("/").pop() ?? ""
-  const currentDirectory = layoutPath.slice(0, layoutPath.lastIndexOf("/") + 1)
-  const availableNames = archive
-    ? archive.format === "bda"
+  const currentName = appState.layoutPath.split("/").pop() ?? ""
+  const currentDirectory = appState.layoutPath.slice(0, appState.layoutPath.lastIndexOf("/") + 1)
+  const availableNames = appState.archive
+    ? appState.archive.format === "bda"
       ? bdaAvailableLayoutPaths().map((path) => path.slice(path.lastIndexOf("/") + 1))
-      : archive.names()
+      : appState.archive.names()
         .filter((path) => path.startsWith(currentDirectory) && path.slice(currentDirectory.length).includes("/") === false)
         .map((path) => path.slice(currentDirectory.length))
     : undefined
-  const general = archive && archive.isText(genConfigPath())
-    ? IniDocument.parse(archive.getText(genConfigPath()))
+  const general = appState.archive && appState.archive.isText(genConfigPath())
+    ? IniDocument.parse(appState.archive.getText(genConfigPath()))
     : undefined
   const symbolLayout = general?.get("MORE", "SYM_LAYOUT")?.trim()?.replace(/\.ini$/i, "") || "symbol"
-  const transition = previewPageTransition(code, currentName, previewReturnName, availableNames, symbolLayout)
+  const transition = previewPageTransition(code, currentName, appState.previewReturnName, availableNames, symbolLayout)
   const target = transition.target
   if (target) {
     const path = currentConfigPath(target)
-    if (archive?.isText(path) || isBdaLayoutPath(path)) {
-      previewReturnName = transition.returnName
+    if (appState.archive?.isText(path) || isBdaLayoutPath(path)) {
+      appState.previewReturnName = transition.returnName
       if (code === "F15" || code === "F16") setSimulatedComposition("")
       if (skinState.value === "38") activateSkinState(undefined)
       selectFile(path, "overview")
@@ -1242,8 +1049,8 @@ function handlePreviewEvent(event: PreviewEvent): void {
     }
   }
   if (code === "F36") {
-    if (simulatedComposition) {
-      setSimulatedComposition(Array.from(simulatedComposition).slice(0, -1).join(""))
+    if (appState.simulatedComposition) {
+      setSimulatedComposition(Array.from(appState.simulatedComposition).slice(0, -1).join(""))
       refreshSimulationPreview()
       return
     }
@@ -1271,7 +1078,7 @@ function handlePreviewEvent(event: PreviewEvent): void {
     return
   }
   if (code === "F38") {
-    if (simulatedComposition) {
+    if (appState.simulatedComposition) {
       setSimulatedComposition("")
       refreshSimulationPreview()
       return
@@ -1321,7 +1128,7 @@ function handlePreviewEvent(event: PreviewEvent): void {
   }
   if (!code || /^(F\d+|S\d+|Z\+)/.test(code)) return
   if (simulationLanguage() === "zh" && /^[A-Za-z']$/.test(code)) {
-    setSimulatedComposition(simulatedComposition + code.toLowerCase())
+    setSimulatedComposition(appState.simulatedComposition + code.toLowerCase())
     refreshSimulationPreview()
     return
   }
@@ -1337,38 +1144,38 @@ function clearSimulatedOutput(): void {
 }
 
 function copySelectedKeys(): void {
-  if (!archive || !layoutDocument || !selectedKeySections.length) return
-  const before = layoutDocument.toString()
-  const occupied = new Set(layoutDocument.sections())
+  if (!appState.archive || !appState.layoutDocument || !appState.selectedKeySections.length) return
+  const before = appState.layoutDocument.toString()
+  const occupied = new Set(appState.layoutDocument.sections())
   let number = Math.max(0, ...[...occupied].flatMap((section) => {
     const value = section.match(/^KEY(\d+)$/)?.[1]
     return value ? [Number(value)] : []
   })) + 1
   const copies: string[] = []
   const copyBySource = new Map<string, string>()
-  for (const section of preview.expandSections(selectedKeySections)) {
+  for (const section of preview.expandSections(appState.selectedKeySections)) {
     while (occupied.has(`KEY${number}`)) number += 1
     const target = `KEY${number++}`
-    const entries = layoutDocument.entries(section).map(({ key, value }) => {
+    const entries = appState.layoutDocument.entries(section).map(({ key, value }) => {
       if (key !== "VIEW_RECT") return { key, value }
       const rect = value.split(",").map(Number)
       if (rect.length === 4 && rect.every(Number.isFinite)) rect[0] += 18
       return { key, value: rect.join(",") }
     })
-    layoutDocument.appendSection(target, entries)
+    appState.layoutDocument.appendSection(target, entries)
     occupied.add(target)
     copies.push(target)
     copyBySource.set(section, target)
   }
-  const renamed = normalizeKeySections(layoutDocument)
-  const text = layoutDocument.toString()
-  commitText(layoutPath, before, text)
-  if (selectedPath === layoutPath) setSourceValue(text)
-  selectedKeySections = selectedKeySections.flatMap((section) => {
+  const renamed = normalizeKeySections(appState.layoutDocument)
+  const text = appState.layoutDocument.toString()
+  commitText(appState.layoutPath, before, text)
+  if (appState.selectedPath === appState.layoutPath) setSourceValue(text)
+  appState.selectedKeySections = appState.selectedKeySections.flatMap((section) => {
     const copy = copyBySource.get(section)
     return copy ? [renamed.get(copy) ?? copy] : []
   })
-  preview.setDocument(layoutDocument)
+  preview.setDocument(appState.layoutDocument)
   preview.setSelected(copies.map((copy) => renamed.get(copy) ?? copy))
   populateKeyInspector()
   updateSourceHighlight()
@@ -1376,15 +1183,15 @@ function copySelectedKeys(): void {
 }
 
 function deleteSelectedKeys(): void {
-  if (!archive || !layoutDocument || !selectedKeySections.length) return
-  const before = layoutDocument.toString()
-  if (!layoutDocument.removeSections(preview.expandSections(selectedKeySections))) return
-  normalizeKeySections(layoutDocument)
-  const text = layoutDocument.toString()
-  commitText(layoutPath, before, text)
-  if (selectedPath === layoutPath) setSourceValue(text)
-  selectedKeySections = []
-  preview.setDocument(layoutDocument)
+  if (!appState.archive || !appState.layoutDocument || !appState.selectedKeySections.length) return
+  const before = appState.layoutDocument.toString()
+  if (!appState.layoutDocument.removeSections(preview.expandSections(appState.selectedKeySections))) return
+  normalizeKeySections(appState.layoutDocument)
+  const text = appState.layoutDocument.toString()
+  commitText(appState.layoutPath, before, text)
+  if (appState.selectedPath === appState.layoutPath) setSourceValue(text)
+  appState.selectedKeySections = []
+  preview.setDocument(appState.layoutDocument)
   preview.setSelected([])
   refreshPreview()
   populateKeyInspector()
@@ -1555,7 +1362,7 @@ function syncSegmentedControls(): void {
 
 function syncMobileInspectorHeader(): void {
   mobileInspectorSelection.textContent = selectedKeyName.textContent
-  sourceHeading.dataset.mobileKeyTools = selectedKeySections.length ? "on" : "off"
+  sourceHeading.dataset.mobileKeyTools = appState.selectedKeySections.length ? "on" : "off"
 }
 
 function mobileInspectorGroupLabel(group: HTMLElement): string {
@@ -1576,12 +1383,6 @@ function mobileInspectorGroupLabel(group: HTMLElement): string {
   return label.split(/[、与（(]/)[0]
 }
 
-/**
- * 分类轨当前分组。属性面板每次重绘都会重建分区元素，DOM 上的高亮无法跨重绘留住，
- * 所以记住一个稳定的分组标识：文档分区用分区代码，其余分组用分组标签。
- */
-let inspectorGroupKey = ""
-
 function mobileInspectorGroupKey(group: HTMLElement): string {
   return group.querySelector(":scope > h3 .document-section-code")?.textContent?.trim()
     || mobileInspectorGroupLabel(group)
@@ -1596,7 +1397,7 @@ function setMobileInspectorGroup(id: string, scroll = true): void {
   }
   const current = Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))
     .find((group) => group.dataset.mobileInspectorGroup === id)
-  inspectorGroupKey = current ? mobileInspectorGroupKey(current) : ""
+  appState.inspectorGroupKey = current ? mobileInspectorGroupKey(current) : ""
   // Each group owns its scrolling area. Scrolling the outer grid here moves the
   // summary card and category rail together, so switching tabs appears to make
   // the controls jump away from the pointer.
@@ -1617,15 +1418,13 @@ function scrollToSinglePageInspectorGroup(): void {
   quickInspector.scrollTop = 0
   if (current && current !== groups[0]) quickInspector.scrollTop = current.getBoundingClientRect().top - quickInspector.getBoundingClientRect().top
 }
-
-let singlePageInspectorContext = ""
 /** 换了选中对象时停在记住的分区（与分组模式一致）；同一对象重绘时只按滚动位置刷新分类轨。 */
 function revealSinglePageInspectorGroup(context: string): void {
-  if (context === singlePageInspectorContext) {
+  if (context === appState.singlePageInspectorContext) {
     syncSinglePageInspectorGroup()
     return
   }
-  singlePageInspectorContext = context
+  appState.singlePageInspectorContext = context
   scrollToSinglePageInspectorGroup()
 }
 
@@ -1646,7 +1445,7 @@ function syncSinglePageInspectorGroup(): void {
 quickInspector.addEventListener("scroll", syncSinglePageInspectorGroup, { passive: true })
 
 function syncMobileInspectorGroups(): void {
-  const combinedBda = archive?.format === "bda" && selectedKeySections.length > 0 && !selectedCandidate
+  const combinedBda = appState.archive?.format === "bda" && appState.selectedKeySections.length > 0 && !appState.selectedCandidate
   if (combinedBda && keyTypographyFieldsGroup.parentElement !== bdaConfigFieldsGroup) bdaConfigFieldsGroup.append(keyTypographyFieldsGroup)
   else if (!combinedBda && keyTypographyFieldsGroup.parentElement !== quickInspector) quickInspector.insertBefore(keyTypographyFieldsGroup, quickInspector.querySelector(".key-gesture-fields"))
   let groups = Array.from(quickInspector.querySelectorAll<HTMLElement>(":scope > .inspector-group"))
@@ -1661,14 +1460,14 @@ function syncMobileInspectorGroups(): void {
       return [group]
     })
   const managed = Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))
-  if (archive?.format !== "bda" && groups.length === managed.length && groups.every((group, index) =>
+  if (appState.archive?.format !== "bda" && groups.length === managed.length && groups.every((group, index) =>
     group === managed[index] && mobileInspectorGroupLabel(group) === mobileInspectorGroups.children[index]?.querySelector(".inspector-group-label")?.textContent,
   )) return
   for (const group of Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))) {
     group.classList.remove("mobile-inspector-managed", "mobile-inspector-active")
     delete group.dataset.mobileInspectorGroup
   }
-  const selectedBdaKey = archive?.format === "bda" && selectedKeySections.length > 0 && !selectedCandidate
+  const selectedBdaKey = appState.archive?.format === "bda" && appState.selectedKeySections.length > 0 && !appState.selectedCandidate
   bdaSelectedStyleHeading.hidden = !selectedBdaKey
   if (selectedBdaKey) {
     bdaConfigFieldsGroup.dataset.inspectorGroupLabel = "样式"
@@ -1699,7 +1498,7 @@ function syncMobileInspectorGroups(): void {
     railLabels.set(group, label)
     if (code) railCodes.set(group, code)
   }
-  const active = groups.find((group) => mobileInspectorGroupKey(group) === inspectorGroupKey)
+  const active = groups.find((group) => mobileInspectorGroupKey(group) === appState.inspectorGroupKey)
     ?? groups[0]
   // 分类轨只在检查器没有任何分组时隐藏。单分区文档（例如只有 [PANEL] 的 help.ini）
   // 此前也会被当成「没有可切换的分组」而整条收起，属性检查器于是少了一侧导航。
@@ -1721,7 +1520,7 @@ function syncMobileInspectorGroups(): void {
     return button
   }))
   setMobileInspectorGroup(active?.dataset.mobileInspectorGroup ?? "", false)
-  if (archive && selectedKeySections.length) {
+  if (appState.archive && appState.selectedKeySections.length) {
     const addDestination = (label: string, action: () => void) => {
       const button = document.createElement("button")
       button.type = "button"
@@ -1730,10 +1529,10 @@ function syncMobileInspectorGroups(): void {
       button.addEventListener("click", action)
       mobileInspectorGroups.append(button)
     }
-    if (archive.format === "bda") {
+    if (appState.archive.format === "bda") {
       addDestination("面板", () => inspectorBackButton.click())
       for (const [kind, label] of [["animation", "动画"], ["sound", "声音"]] as const) {
-        const path = bdaConfigPath(archive, theme.value, orientation.value, kind)
+        const path = bdaConfigPath(appState.archive, theme.value, orientation.value, kind)
         if (path) addDestination(label, () => selectFile(path, "overview"))
       }
       mobileInspectorGroups.hidden = false
@@ -1786,19 +1585,17 @@ function setMobileSplit(value: number, persist = true): void {
 }
 
 setMobileSplit(Number(localStorage.getItem("mobile-workspace-split")) || 50, false)
-
-let mobileSplitBeforeCollapse = Number(localStorage.getItem("mobile-workspace-split")) || 50
 function setMobilePreviewCollapsed(collapsed: boolean): void {
   if (collapsed) {
-    mobileSplitBeforeCollapse = Number.parseFloat(
+    appState.mobileSplitBeforeCollapse = Number.parseFloat(
       getComputedStyle(document.documentElement).getPropertyValue("--mobile-workspace-split"),
-    ) || mobileSplitBeforeCollapse
+    ) || appState.mobileSplitBeforeCollapse
   }
   document.documentElement.dataset.mobilePreviewCollapsed = String(collapsed)
   mobileSplitHandle.setAttribute("aria-expanded", String(!collapsed))
   mobileSplitHandle.title = collapsed ? "点击展开预览" : "拖动调整画布与配置区域比例；点击收起或展开预览"
   mobileSplitHandle.setAttribute("aria-label", mobileSplitHandle.title)
-  if (!collapsed) setMobileSplit(mobileSplitBeforeCollapse)
+  if (!collapsed) setMobileSplit(appState.mobileSplitBeforeCollapse)
 }
 
 setMobilePane("layout")
@@ -1816,34 +1613,33 @@ mobilePortraitQuery.addEventListener("change", () => {
   syncMobileInspectorHeader()
   updateSourceFindVisibility()
 })
-let mobileSwipeStart: { pointerId: number; x: number; y: number } | undefined
 mainWorkspace.addEventListener("pointerdown", (event) => {
   if (!mobilePortraitQuery.matches || event.pointerType === "mouse" && event.button !== 0 ||
     !(event.target as Element).closest("aside, .source")) return
-  mobileSwipeStart = { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
+  appState.mobileSwipeStart = { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
 })
 mainWorkspace.addEventListener("pointermove", (event) => {
-  if (!mobileSwipeStart || mobileSwipeStart.pointerId !== event.pointerId) return
-  const deltaX = event.clientX - mobileSwipeStart.x
-  const deltaY = event.clientY - mobileSwipeStart.y
+  if (!appState.mobileSwipeStart || appState.mobileSwipeStart.pointerId !== event.pointerId) return
+  const deltaX = event.clientX - appState.mobileSwipeStart.x
+  const deltaY = event.clientY - appState.mobileSwipeStart.y
   if (Math.abs(deltaY) > 12 && Math.abs(deltaY) > Math.abs(deltaX)) {
-    mobileSwipeStart = undefined
+    appState.mobileSwipeStart = undefined
     return
   }
   if (Math.abs(deltaX) < 56 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return
-  mobileSwipeStart = undefined
+  appState.mobileSwipeStart = undefined
   setMobilePane(deltaX < 0 ? "inspector" : "layout")
 })
 mainWorkspace.addEventListener("pointerup", (event) => {
-  if (!mobileSwipeStart || mobileSwipeStart.pointerId !== event.pointerId) return
-  const deltaX = event.clientX - mobileSwipeStart.x
-  const deltaY = event.clientY - mobileSwipeStart.y
-  mobileSwipeStart = undefined
+  if (!appState.mobileSwipeStart || appState.mobileSwipeStart.pointerId !== event.pointerId) return
+  const deltaX = event.clientX - appState.mobileSwipeStart.x
+  const deltaY = event.clientY - appState.mobileSwipeStart.y
+  appState.mobileSwipeStart = undefined
   if (Math.abs(deltaX) < 56 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return
   setMobilePane(deltaX < 0 ? "inspector" : "layout")
 })
 mainWorkspace.addEventListener("pointercancel", (event) => {
-  if (mobileSwipeStart?.pointerId === event.pointerId) mobileSwipeStart = undefined
+  if (appState.mobileSwipeStart?.pointerId === event.pointerId) appState.mobileSwipeStart = undefined
 })
 
 {
@@ -1900,9 +1696,9 @@ mainWorkspace.addEventListener("pointercancel", (event) => {
 
 function updatePanelToolButtons(): void {
   const editing = isEditing()
-  panelScaleButton.disabled = !editing || fileOperationRunning || !archive
-  replaceLayoutImageButton.disabled = !editing || fileOperationRunning || !archive || archive.format === "bda"
-  adaptIos26Button.disabled = !editing || fileOperationRunning || !archive || archive.format === "bda"
+  panelScaleButton.disabled = !editing || appState.fileOperationRunning || !appState.archive
+  replaceLayoutImageButton.disabled = !editing || appState.fileOperationRunning || !appState.archive || appState.archive.format === "bda"
+  adaptIos26Button.disabled = !editing || appState.fileOperationRunning || !appState.archive || appState.archive.format === "bda"
 }
 
 function applyModeState(): void {
@@ -1911,7 +1707,7 @@ function applyModeState(): void {
   deviceShell.dataset.mode = editing ? "edit" : "preview"
   preview.setMode(editing ? "edit" : "preview")
   toolbarPreview.setMode(editing ? "edit" : "preview")
-  preview.setEditTool(keyMode)
+  preview.setEditTool(appState.keyMode)
   source.readOnly = !editing
   replaceAssetButton.disabled = !editing
   quickInspector.dataset.readonly = editing ? "false" : "true"
@@ -1934,21 +1730,17 @@ function selectChoice(select: HTMLSelectElement, value: string): void {
   select.dispatchEvent(new Event("change"))
 }
 
-type SourceFilePayload = { path: string; data: string }
-type SourceReadFilePayload = { path: string; data: number[] }
-type SourceChangePayload = { path: string; data: number[] | null; directory: boolean }
-
 function sourcePathForWorkspace(path: string): string {
-  return sourceWorkspacePrefix && path.startsWith(sourceWorkspacePrefix)
-    ? path.slice(sourceWorkspacePrefix.length)
+  return appState.sourceWorkspacePrefix && path.startsWith(appState.sourceWorkspacePrefix)
+    ? path.slice(appState.sourceWorkspacePrefix.length)
     : path
 }
 
 function sourcePathForArchive(path: string): string {
   return resolveSourceArchivePath(
     path,
-    sourceWorkspacePrefix,
-    archive?.sourceFiles().map((file) => file.path) ?? [],
+    appState.sourceWorkspacePrefix,
+    appState.archive?.sourceFiles().map((file) => file.path) ?? [],
   )
 }
 
@@ -1962,10 +1754,10 @@ function rememberSourceWrite(path: string, data: SourceWriteSnapshot): void {
   const snapshots = sourceWriteSnapshots.get(key) ?? []
   snapshots.push(data)
   sourceWriteSnapshots.set(key, snapshots.slice(-4))
-  if (sourceWriteSnapshotTimer !== undefined) clearTimeout(sourceWriteSnapshotTimer)
-  sourceWriteSnapshotTimer = window.setTimeout(() => {
+  if (appState.sourceWriteSnapshotTimer !== undefined) clearTimeout(appState.sourceWriteSnapshotTimer)
+  appState.sourceWriteSnapshotTimer = window.setTimeout(() => {
     sourceWriteSnapshots.clear()
-    sourceWriteSnapshotTimer = undefined
+    appState.sourceWriteSnapshotTimer = undefined
   }, 10_000)
 }
 
@@ -2011,15 +1803,15 @@ function sourceArchiveFromFiles(files: Array<{ path: string; data: Uint8Array }>
 }
 
 async function flushSourceAutosave(): Promise<void> {
-  if (aiDraftPreview) discardAiDesignDraft("保存源码前已丢弃未应用的 AI 草稿。")
-  if (sourceAutosaveTimer !== undefined) {
-    clearTimeout(sourceAutosaveTimer)
-    sourceAutosaveTimer = undefined
+  if (appState.aiDraftPreview) discardAiDesignDraft("保存源码前已丢弃未应用的 AI 草稿。")
+  if (appState.sourceAutosaveTimer !== undefined) {
+    clearTimeout(appState.sourceAutosaveTimer)
+    appState.sourceAutosaveTimer = undefined
   }
-  if (archive && sourceWorkspacePath && pendingSourcePaths.size) {
-    const workspace = sourceWorkspacePath
-    const value = archive
-    sourceAutosaveQueue = sourceAutosaveQueue.catch(() => {}).then(() =>
+  if (appState.archive && appState.sourceWorkspacePath && pendingSourcePaths.size) {
+    const workspace = appState.sourceWorkspacePath
+    const value = appState.archive
+    appState.sourceAutosaveQueue = appState.sourceAutosaveQueue.catch(() => {}).then(() =>
       writePendingSourcePaths(pendingSourcePaths, async (paths) => {
         const changes: SourceChangePayload[] = paths.map((path) => {
           const archivePath = sourcePathForArchive(path)
@@ -2033,17 +1825,17 @@ async function flushSourceAutosave(): Promise<void> {
       }),
     )
   }
-  await sourceAutosaveQueue
+  await appState.sourceAutosaveQueue
 }
 
 function scheduleSourceAutosave(paths: string[]): void {
-  if (!archive || (!sourceWorkspacePath && sourceWorkspacePendingArchive !== archive)) return
-  for (const path of paths) pendingSourcePaths.add(sourcePathForWorkspace(archive.sourcePath(path)))
-  if (!sourceWorkspacePath || sourceAutosaveTimer !== undefined) return
-  sourceAutosaveTimer = window.setTimeout(() => {
+  if (!appState.archive || (!appState.sourceWorkspacePath && appState.sourceWorkspacePendingArchive !== appState.archive)) return
+  for (const path of paths) pendingSourcePaths.add(sourcePathForWorkspace(appState.archive.sourcePath(path)))
+  if (!appState.sourceWorkspacePath || appState.sourceAutosaveTimer !== undefined) return
+  appState.sourceAutosaveTimer = window.setTimeout(() => {
     // Never write a previewed draft to disk; retry once the draft is resolved.
-    if (aiDraftPreview) {
-      sourceAutosaveTimer = undefined
+    if (appState.aiDraftPreview) {
+      appState.sourceAutosaveTimer = undefined
       return scheduleSourceAutosave([])
     }
     void flushSourceAutosave().catch((error) => showError(error, "自动保存源码"))
@@ -2051,19 +1843,19 @@ function scheduleSourceAutosave(paths: string[]): void {
 }
 
 async function refreshExternalSourceFiles(workspace: string, paths: string[]): Promise<void> {
-  if (!archive || workspace !== sourceWorkspacePath || !paths.length) return
+  if (!appState.archive || workspace !== appState.sourceWorkspacePath || !paths.length) return
   const changes = await invoke<SourceChangePayload[]>("read_source_changes", {
     path: workspace,
     changedPaths: paths,
   })
-  if (!archive || workspace !== sourceWorkspacePath) return
+  if (!appState.archive || workspace !== appState.sourceWorkspacePath) return
   let changed = false
   const affected = new Set<string>()
   const ignoredChanges = new Set(changes.filter((change) => {
     const data = change.data ? new Uint8Array(change.data) : null
     return consumeSourceWriteSnapshot(sourceWriteSnapshots, sourceWriteKey(change.path), data)
   }))
-  if (aiDraftPreview && changes.some((change) => !ignoredChanges.has(change))) {
+  if (appState.aiDraftPreview && changes.some((change) => !ignoredChanges.has(change))) {
     discardAiDesignDraft("源码文件在外部被修改，AI 草稿已丢弃。")
   }
   const directorySnapshots = changes.filter((change) => change.directory && !ignoredChanges.has(change))
@@ -2071,11 +1863,11 @@ async function refreshExternalSourceFiles(workspace: string, paths: string[]): P
   for (const snapshot of directorySnapshots) {
     const archiveSnapshotPath = sourcePathForArchive(snapshot.path).replace(/\/$/, "")
     const prefix = archiveSnapshotPath ? `${archiveSnapshotPath}/` : ""
-    const removed = archive.sourceFiles()
+    const removed = appState.archive.sourceFiles()
       .filter((file) => (file.path === archiveSnapshotPath || file.path.startsWith(prefix)) && !presentPaths.has(file.path))
-      .map((file) => archive!.canonicalSourcePath(file.path))
+      .map((file) => appState.archive!.canonicalSourcePath(file.path))
     for (const canonical of removed) {
-      archive.delete(canonical)
+      appState.archive.delete(canonical)
       affected.add(canonical)
       changed = true
     }
@@ -2085,44 +1877,44 @@ async function refreshExternalSourceFiles(workspace: string, paths: string[]): P
     pendingSourcePaths.delete(change.path)
     const data = change.data ? new Uint8Array(change.data) : null
     if (change.data) {
-      const canonical = archive.canonicalSourcePath(sourcePathForArchive(change.path))
-      const before = archive.getBytes(canonical)
-      const after = before && archive.isBdaConfig(canonical)
+      const canonical = appState.archive.canonicalSourcePath(sourcePathForArchive(change.path))
+      const before = appState.archive.getBytes(canonical)
+      const after = before && appState.archive.isBdaConfig(canonical)
         ? applyDecodedBdaSource(canonical, before, new TextDecoder().decode(data!))
         : data!
       if (before && before.length === after.length && before.every((byte, index) => byte === after[index])) continue
-      archive.setBytes(canonical, after)
+      appState.archive.setBytes(canonical, after)
       affected.add(canonical)
       changed = true
       continue
     }
-    const removed = archive.sourceFiles()
+    const removed = appState.archive.sourceFiles()
       .filter((file) => {
         const archivePath = sourcePathForArchive(change.path)
         return file.path === archivePath || file.path.startsWith(`${archivePath}/`)
       })
-      .map((file) => archive!.canonicalSourcePath(file.path))
+      .map((file) => appState.archive!.canonicalSourcePath(file.path))
     for (const canonical of removed) {
-      archive.delete(canonical)
+      appState.archive.delete(canonical)
       affected.add(canonical)
       changed = true
     }
   }
   if (!changed) return
-  undoStack = []
-  redoStack = []
+  appState.undoStack = []
+  appState.redoStack = []
   updateHistoryButtons()
   renderFiles()
   try {
-    if (affected.has(layoutPath) && archive.isText(layoutPath)) {
-      layoutDocument = IniDocument.parse(archive.getText(layoutPath))
+    if (affected.has(appState.layoutPath) && appState.archive.isText(appState.layoutPath)) {
+      appState.layoutDocument = IniDocument.parse(appState.archive.getText(appState.layoutPath))
     }
-    if (selectedPath && (archive.getBytes(selectedPath) || isBdaAppearancePartPath(selectedPath))) {
-      selectFile(selectedPath, sidebarView, "document", true)
+    if (appState.selectedPath && (appState.archive.getBytes(appState.selectedPath) || isBdaAppearancePartPath(appState.selectedPath))) {
+      selectFile(appState.selectedPath, appState.sidebarView, "document", true)
     }
     else {
-      const next = archive.names().find((path) => archive?.isText(path))
-      if (next) selectFile(next, sidebarView)
+      const next = appState.archive.names().find((path) => appState.archive?.isText(path))
+      if (next) selectFile(next, appState.sidebarView)
     }
     refreshBdaLayout()
     refreshPreview()
@@ -2135,11 +1927,11 @@ async function refreshExternalSourceFiles(workspace: string, paths: string[]): P
 }
 
 function queueSourceWatch(paths: string[], workspace: string): void {
-  if (workspace !== sourceWorkspacePath) return
+  if (workspace !== appState.sourceWorkspacePath) return
   for (const path of paths) pendingSourceWatchPaths.add(path)
-  if (sourceWatchTimer !== undefined) clearTimeout(sourceWatchTimer)
-  sourceWatchTimer = window.setTimeout(() => {
-    sourceWatchTimer = undefined
+  if (appState.sourceWatchTimer !== undefined) clearTimeout(appState.sourceWatchTimer)
+  appState.sourceWatchTimer = window.setTimeout(() => {
+    appState.sourceWatchTimer = undefined
     const changed = [...pendingSourceWatchPaths]
     pendingSourceWatchPaths.clear()
     void refreshExternalSourceFiles(workspace, changed).catch((error) => showError(error, "刷新外部源码"))
@@ -2147,35 +1939,35 @@ function queueSourceWatch(paths: string[], workspace: string): void {
 }
 
 async function activateSourceWorkspace(path: string, prefix = ""): Promise<void> {
-  stopSourceWatch?.()
-  stopSourceWatch = undefined
+  appState.stopSourceWatch?.()
+  appState.stopSourceWatch = undefined
   if (isAndroidTauri()) await invoke("stop_source_observer").catch(() => {})
   pendingSourcePaths.clear()
   sourceWriteSnapshots.clear()
-  if (sourceWriteSnapshotTimer !== undefined) clearTimeout(sourceWriteSnapshotTimer)
-  sourceWriteSnapshotTimer = undefined
+  if (appState.sourceWriteSnapshotTimer !== undefined) clearTimeout(appState.sourceWriteSnapshotTimer)
+  appState.sourceWriteSnapshotTimer = undefined
   pendingSourceWatchPaths.clear()
-  sourceWorkspacePath = path
-  sourceWorkspacePrefix = prefix
+  appState.sourceWorkspacePath = path
+  appState.sourceWorkspacePrefix = prefix
   if (!isTauri() || !path) return
   if (isAndroidTauri() && path.startsWith("content://")) {
     const handler = new Channel<string>()
     handler.onmessage = (changedPath) => queueSourceWatch([changedPath || path], path)
     await invoke("start_source_observer", { path, handler })
-    stopSourceWatch = () => { void invoke("stop_source_observer") }
+    appState.stopSourceWatch = () => { void invoke("stop_source_observer") }
     if (localStorage.getItem("source-directory-enabled") === "true") {
       localStorage.setItem(LAST_SOURCE_WORKSPACE_KEY, path)
     }
     return
   }
-  stopSourceWatch = await watch(path, (event) => {
+  appState.stopSourceWatch = await watch(path, (event) => {
     if (typeof event.type === "object" && "access" in event.type) return
     queueSourceWatch(event.paths, path)
   }, { recursive: true, delayMs: 120 })
 }
 
 function hasUnsavedChanges(): boolean {
-  return unsavedNew || Boolean(archive?.changed.size)
+  return appState.unsavedNew || Boolean(appState.archive?.changed.size)
 }
 
 function chooseUnsavedDecision(): Promise<UnsavedDecision> {
@@ -2216,67 +2008,67 @@ async function prepareDocumentReplacement(): Promise<boolean> {
 }
 
 function updateDirty(): void {
-  dirty.hidden = !unsavedNew && !archive?.changed.size
+  dirty.hidden = !appState.unsavedNew && !appState.archive?.changed.size
 }
 
 function updateHistoryButtons(): void {
-  undoButton.disabled = undoStack.length === 0
-  redoButton.disabled = redoStack.length === 0
+  undoButton.disabled = appState.undoStack.length === 0
+  redoButton.disabled = appState.redoStack.length === 0
 }
 
 function commitText(path: string, before: string, after: string, coalesce = false): void {
-  if (!archive || before === after) return
+  if (!appState.archive || before === after) return
   acceptAiDraftPreview()
-  sourceHistoryHighlight = undefined
-  archive.setText(path, after)
-  recordChange(undoStack, { kind: "text", path, before, after }, numberInputGesture(), coalesce)
-  redoStack = []
+  appState.sourceHistoryHighlight = undefined
+  appState.archive.setText(path, after)
+  recordChange(appState.undoStack, { kind: "text", path, before, after }, numberInputGesture(), coalesce)
+  appState.redoStack = []
   scheduleSourceAutosave([path])
   updateHistoryButtons()
 }
 
 function commitBytes(path: string, before: Uint8Array | undefined, after: Uint8Array): void {
-  if (!archive || before && before.length === after.length && before.every((byte, index) => byte === after[index])) return
+  if (!appState.archive || before && before.length === after.length && before.every((byte, index) => byte === after[index])) return
   acceptAiDraftPreview()
-  archive.setBytes(path, after)
-  recordChange(undoStack, { kind: "bytes", path, before, after }, numberInputGesture())
-  redoStack = []
+  appState.archive.setBytes(path, after)
+  recordChange(appState.undoStack, { kind: "bytes", path, before, after }, numberInputGesture())
+  appState.redoStack = []
   scheduleSourceAutosave([path])
   updateHistoryButtons()
 }
 
 function commitBatch(changes: Change[]): void {
-  if (!archive || !changes.length) return
+  if (!appState.archive || !changes.length) return
   acceptAiDraftPreview()
   for (const change of changes) {
-    if (change.kind === "text") archive.setText(change.path, change.after)
+    if (change.kind === "text") appState.archive.setText(change.path, change.after)
     else if (change.kind === "bytes") {
-      if (change.after) archive.setBytes(change.path, change.after)
-      else archive.delete(change.path)
+      if (change.after) appState.archive.setBytes(change.path, change.after)
+      else appState.archive.delete(change.path)
     }
   }
-  recordChange(undoStack, { kind: "batch", changes }, numberInputGesture())
-  redoStack = []
+  recordChange(appState.undoStack, { kind: "batch", changes }, numberInputGesture())
+  appState.redoStack = []
   scheduleSourceAutosave(changes.flatMap((change) => change.kind === "batch" ? [] : [change.path]))
   updateHistoryButtons()
 }
 
 function applyTextSnapshot(path: string, text: string): void {
-  if (!archive) return
-  if (path === selectedPath) sourceHistoryHighlight = insertedTextRange(archive.getText(path), text)
-  archive.setText(path, text)
+  if (!appState.archive) return
+  if (path === appState.selectedPath) appState.sourceHistoryHighlight = insertedTextRange(appState.archive.getText(path), text)
+  appState.archive.setText(path, text)
   scheduleSourceAutosave([path])
-  if (path === layoutPath) layoutDocument = IniDocument.parse(text)
-  if (path === selectedPath) {
-    selectedDocument = IniDocument.parse(text)
+  if (path === appState.layoutPath) appState.layoutDocument = IniDocument.parse(text)
+  if (path === appState.selectedPath) {
+    appState.selectedDocument = IniDocument.parse(text)
     setSourceValue(text)
   }
-  if (resourceConfigActive && path === tilePath) {
-    tileDocument = IniDocument.parse(text)
-    slices = tileSlices(tileDocument)
+  if (appState.resourceConfigActive && path === appState.tilePath) {
+    appState.tileDocument = IniDocument.parse(text)
+    appState.slices = tileSlices(appState.tileDocument)
     setSourceValue(text)
-    sourceName.textContent = tilePath
-    if (!slices.some((slice) => slice.index === selectedTileIndex)) selectedTileIndex = undefined
+    sourceName.textContent = appState.tilePath
+    if (!appState.slices.some((slice) => slice.index === appState.selectedTileIndex)) appState.selectedTileIndex = undefined
     updateSourceHighlight()
     populateTileInspector()
     drawAtlas()
@@ -2287,15 +2079,15 @@ function applyTextSnapshot(path: string, text: string): void {
 }
 
 function refreshHistorySelection(): void {
-  const path = selectedResourcePath
-  const index = selectedTileIndex
-  const resourceMode = resourceConfigActive ? resourceInspectorMode : "document"
+  const path = appState.selectedResourcePath
+  const index = appState.selectedTileIndex
+  const resourceMode = appState.resourceConfigActive ? appState.resourceInspectorMode : "document"
   renderFiles()
-  if (selectedPath && (archive?.getBytes(selectedPath) || isBdaAppearancePartPath(selectedPath))) {
-    selectFile(selectedPath, sidebarView, resourceMode)
-    if (resourceMode === "image" && archive?.isImage(path)) {
+  if (appState.selectedPath && (appState.archive?.getBytes(appState.selectedPath) || isBdaAppearancePartPath(appState.selectedPath))) {
+    selectFile(appState.selectedPath, appState.sidebarView, resourceMode)
+    if (resourceMode === "image" && appState.archive?.isImage(path)) {
       selectResourceImage(path)
-      selectedTileIndex = slices.some(slice => slice.index === index) ? index : undefined
+      appState.selectedTileIndex = appState.slices.some(slice => slice.index === index) ? index : undefined
       populateTileInspector()
       drawAtlas()
     }
@@ -2305,22 +2097,22 @@ function refreshHistorySelection(): void {
 
 function undo(): void {
   flushNumberInputWheel()
-  if (aiDraftPreview) return discardAiDesignDraft("已撤销 AI 草稿预览 · 未修改皮肤。")
-  const change = undoStack.pop()
+  if (appState.aiDraftPreview) return discardAiDesignDraft("已撤销 AI 草稿预览 · 未修改皮肤。")
+  const change = appState.undoStack.pop()
   if (!change) return
-  sourceHistoryHighlight = undefined
-  redoStack.push(change)
+  appState.sourceHistoryHighlight = undefined
+  appState.redoStack.push(change)
   applyChangeSnapshot(change, "before")
   refreshHistorySelection()
 }
 
 function redo(): void {
   flushNumberInputWheel()
-  if (aiDraftPreview) discardAiDesignDraft("AI 草稿预览已丢弃。")
-  const change = redoStack.pop()
+  if (appState.aiDraftPreview) discardAiDesignDraft("AI 草稿预览已丢弃。")
+  const change = appState.redoStack.pop()
   if (!change) return
-  sourceHistoryHighlight = undefined
-  undoStack.push(change)
+  appState.sourceHistoryHighlight = undefined
+  appState.undoStack.push(change)
   applyChangeSnapshot(change, "after")
   refreshHistorySelection()
 }
@@ -2334,14 +2126,14 @@ function applyChangeSnapshot(change: Change, side: "before" | "after"): void {
 }
 
 function applyBytesSnapshot(path: string, bytes?: Uint8Array): void {
-  if (!archive) return
-  if (bytes) archive.setBytes(path, bytes)
-  else archive.delete(path)
+  if (!appState.archive) return
+  if (bytes) appState.archive.setBytes(path, bytes)
+  else appState.archive.delete(path)
   scheduleSourceAutosave([path])
   refreshBdaLayout()
-  if (selectedPath === path && bytes && archive.isBdaConfig(path)) setSourceValue(decodedBdaEditorSource(path, bytes))
-  if (resourceConfigActive && archive.format === "bda" && selectedResourcePath) {
-    loadTiles(selectedResourcePath)
+  if (appState.selectedPath === path && bytes && appState.archive.isBdaConfig(path)) setSourceValue(decodedBdaEditorSource(path, bytes))
+  if (appState.resourceConfigActive && appState.archive.format === "bda" && appState.selectedResourcePath) {
+    loadTiles(appState.selectedResourcePath)
     renderResourceInspector()
   }
   refreshPreview()
@@ -2354,7 +2146,7 @@ function preferredPath(): string {
 }
 
 function selectedVariant(): { theme: "light" | "dark"; orientation: "port" | "land" } {
-  const match = layoutPath.match(/^(light|dark)\/skin\/(port|land)\//)
+  const match = appState.layoutPath.match(/^(light|dark)\/skin\/(port|land)\//)
   return {
     theme: (match?.[1] as "light" | "dark") ?? theme.value as "light" | "dark",
     orientation: (match?.[2] as "port" | "land") ?? orientation.value,
@@ -2362,13 +2154,13 @@ function selectedVariant(): { theme: "light" | "dark"; orientation: "port" | "la
 }
 
 function preferredVariantExists(path: string): boolean {
-  return archive?.format === "bda"
+  return appState.archive?.format === "bda"
     ? bdaAvailableLayoutPaths().includes(path)
-    : Boolean(archive?.names().includes(path))
+    : Boolean(appState.archive?.names().includes(path))
 }
 
 function createMissingVariant(path: string): boolean {
-  if (!archive || preferredVariantExists(path)) return true
+  if (!appState.archive || preferredVariantExists(path)) return true
   const { theme: sourceTheme, orientation: sourceOrientation } = selectedVariant()
   const targetTheme = theme.value as "light" | "dark"
   const targetOrientation = orientation.value
@@ -2381,7 +2173,7 @@ function createMissingVariant(path: string): boolean {
     syncSegmentedControls()
     return false
   }
-  const copies = variantCopyPaths(archive.names(), sourceTheme, sourceOrientation, targetTheme, targetOrientation)
+  const copies = variantCopyPaths(appState.archive.names(), sourceTheme, sourceOrientation, targetTheme, targetOrientation)
   if (!copies.some(({ target }) => target === path)) {
     theme.value = sourceTheme
     orientation.value = sourceOrientation
@@ -2389,7 +2181,7 @@ function createMissingVariant(path: string): boolean {
     showError(new Error("当前配置没有可复制的对应布局"), `创建${label}`)
     return false
   }
-  for (const { source, target } of copies) archive.setBytes(target, archive.getBytes(source)!.slice())
+  for (const { source, target } of copies) appState.archive.setBytes(target, appState.archive.getBytes(source)!.slice())
   scheduleSourceAutosave(copies.map(({ target }) => target))
   renderFiles()
   updateDirty()
@@ -2402,9 +2194,9 @@ function bdaBasePath(path = preferredPath()): string {
 }
 
 function currentBdaAppearance(): { path: string; bytes: Uint8Array; appearance: BdaAppearance } | undefined {
-  if (!archive || archive.format !== "bda") return
-  const path = bdaAppearancePath(archive, theme.value, orientation.value)
-  const bytes = path && archive.getBytes(path)
+  if (!appState.archive || appState.archive.format !== "bda") return
+  const path = bdaAppearancePath(appState.archive, theme.value, orientation.value)
+  const bytes = path && appState.archive.getBytes(path)
   return path && bytes ? { path, bytes, appearance: decodeBdaAppearance(bytes) } : undefined
 }
 
@@ -2419,7 +2211,7 @@ function bdaAppearanceStylePath(group: BdaAppearanceStyleGroup): string {
 }
 
 function bdaAppearancePart(path: string): BdaAppearancePart | undefined {
-  if (!archive || archive.format !== "bda") return
+  if (!appState.archive || appState.archive.format !== "bda") return
   const prefix = `${theme.value}/skin/${orientation.value}/`
   if (!path.startsWith(prefix)) return
   const style = path.slice(prefix.length).match(/^\.appearance\/(imageStyles|textStyles|colorStyles)\.json$/)
@@ -2436,33 +2228,33 @@ function isBdaAppearancePartPath(path: string): boolean {
 
 function refreshSelectedBdaSource(): void {
   if (deferNumberInputRefresh(refreshSelectedBdaSource, refreshSelectedBdaSource)) return
-  if (!archive || archive.format !== "bda") return
-  const part = bdaAppearancePart(selectedPath)
+  if (!appState.archive || appState.archive.format !== "bda") return
+  const part = bdaAppearancePart(appState.selectedPath)
   if (part) {
     const info = currentBdaAppearance()
     if (info) setSourceValue(decodedBdaAppearancePart(info.bytes, part))
     return
   }
-  if (archive.isBdaConfig(selectedPath)) {
-    const bytes = archive.getBytes(selectedPath)
-    if (bytes) setSourceValue(decodedBdaEditorSource(selectedPath, bytes))
+  if (appState.archive.isBdaConfig(appState.selectedPath)) {
+    const bytes = appState.archive.getBytes(appState.selectedPath)
+    if (bytes) setSourceValue(decodedBdaEditorSource(appState.selectedPath, bytes))
     return
   }
-  if (!isBdaVirtualTextPath(selectedPath)) return
+  if (!isBdaVirtualTextPath(appState.selectedPath)) return
   const info = currentBdaAppearance()
-  if (info) setSourceValue(decodedBdaSource(info.path, info.bytes, selectedPath.split("/").pop()))
+  if (info) setSourceValue(decodedBdaSource(info.path, info.bytes, appState.selectedPath.split("/").pop()))
 }
 
 function commitBdaSourceEdit(): void {
-  if (!isEditing() || !archive) return
-  const part = bdaAppearancePart(selectedPath)
+  if (!isEditing() || !appState.archive) return
+  const part = bdaAppearancePart(appState.selectedPath)
   if (part) {
     const info = currentBdaAppearance()
     if (!info) return
     try {
       const after = applyDecodedBdaAppearancePart(info.path, info.bytes, source.value, part)
       commitBytes(info.path, info.bytes, after)
-      refreshBdaLayout(layoutPath)
+      refreshBdaLayout(appState.layoutPath)
       setSourceValue(decodedBdaAppearancePart(after, part))
       refreshPreview()
       populateKeyInspector()
@@ -2473,36 +2265,36 @@ function commitBdaSourceEdit(): void {
     }
     return
   }
-  if (!archive.isBdaConfig(selectedPath) || !bdaDecodedSourceEditable(selectedPath)) return
-  const before = archive.getBytes(selectedPath)
+  if (!appState.archive.isBdaConfig(appState.selectedPath) || !bdaDecodedSourceEditable(appState.selectedPath)) return
+  const before = appState.archive.getBytes(appState.selectedPath)
   if (!before) return
   try {
-    const after = applyDecodedBdaSource(selectedPath, before, source.value)
-    commitBytes(selectedPath, before, after)
-    if (/appearanceConfig$/i.test(selectedPath)) refreshBdaLayout(layoutPath)
-    setSourceValue(decodedBdaEditorSource(selectedPath, after))
+    const after = applyDecodedBdaSource(appState.selectedPath, before, source.value)
+    commitBytes(appState.selectedPath, before, after)
+    if (/appearanceConfig$/i.test(appState.selectedPath)) refreshBdaLayout(appState.layoutPath)
+    setSourceValue(decodedBdaEditorSource(appState.selectedPath, after))
     refreshPreview()
     populateKeyInspector()
     updateDirty()
   } catch (error) {
-    setSourceValue(decodedBdaEditorSource(selectedPath, before))
+    setSourceValue(decodedBdaEditorSource(appState.selectedPath, before))
     showError(error, "编辑 BDA JSON")
   }
 }
 
 function bdaAvailableLayoutPaths(): string[] {
-  if (!archive || archive.format !== "bda") return []
-  const path = bdaAppearancePath(archive, theme.value, orientation.value)
-  const appearanceBytes = path && archive.getBytes(path)
+  if (!appState.archive || appState.archive.format !== "bda") return []
+  const path = bdaAppearancePath(appState.archive, theme.value, orientation.value)
+  const appearanceBytes = path && appState.archive.getBytes(path)
   if (!appearanceBytes) return []
   const prefix = `${theme.value}/skin/${orientation.value}/`
   return bdaLayoutNames(appearanceBytes)
     .map((name) => `${prefix}${name.replace(/\.ini$/i, "")}.ini`)
-    .filter((name) => bdaBase?.isText(bdaBasePath(name)))
+    .filter((name) => appState.bdaBase?.isText(bdaBasePath(name)))
 }
 
 function isBdaVirtualTextPath(path: string): boolean {
-  return Boolean(archive?.format === "bda" && bdaBase?.isText(bdaBasePath(path)))
+  return Boolean(appState.archive?.format === "bda" && appState.bdaBase?.isText(bdaBasePath(path)))
 }
 
 function isBdaLayoutPath(path: string): boolean {
@@ -2510,9 +2302,9 @@ function isBdaLayoutPath(path: string): boolean {
 }
 
 function textDocument(path: string): IniDocument | undefined {
-  if (archive?.isText(path)) return IniDocument.parse(archive.getText(path))
+  if (appState.archive?.isText(path)) return IniDocument.parse(appState.archive.getText(path))
   if (isBdaVirtualTextPath(path)) {
-    let base = IniDocument.parse(bdaBase!.getText(bdaBasePath(path)))
+    let base = IniDocument.parse(appState.bdaBase!.getText(bdaBasePath(path)))
     const info = currentBdaAppearance()
     const width = Number(base.get("PANEL", "SIZE")?.split(",")[0])
     if (info?.appearance.designWidth && width) {
@@ -2525,14 +2317,14 @@ function textDocument(path: string): IniDocument | undefined {
 function refreshBdaLayout(path = preferredPath()): boolean {
   const info = currentBdaAppearance()
   const basePath = bdaBasePath(path)
-  if (!info || !bdaBase?.isText(basePath)) return false
-  layoutPath = path
-  let base = IniDocument.parse(bdaBase.getText(basePath))
+  if (!info || !appState.bdaBase?.isText(basePath)) return false
+  appState.layoutPath = path
+  let base = IniDocument.parse(appState.bdaBase.getText(basePath))
   const width = Number(base.get("PANEL", "SIZE")?.split(",")[0])
   if (info.appearance.designWidth && width) {
     base = scaleIniDocument(base, info.appearance.designWidth / width, info.appearance.designWidth / width)
   }
-  layoutDocument = bdaLayoutDocument(
+  appState.layoutDocument = bdaLayoutDocument(
     base,
     info.appearance,
     path.split("/").pop() ?? layout.value,
@@ -2540,24 +2332,22 @@ function refreshBdaLayout(path = preferredPath()): boolean {
   return true
 }
 
-let cachedVisualResolver: { key: readonly unknown[]; resolver: VisualResolver } | undefined
-
 function visualResolver(): VisualResolver | undefined {
-  if (!archive) return
-  const appearancePath = archive.format === "bda" ? bdaAppearancePath(archive, theme.value, orientation.value) : undefined
-  const appearanceBytes = appearancePath ? archive.getBytes(appearancePath) : undefined
+  if (!appState.archive) return
+  const appearancePath = appState.archive.format === "bda" ? bdaAppearancePath(appState.archive, theme.value, orientation.value) : undefined
+  const appearanceBytes = appearancePath ? appState.archive.getBytes(appearancePath) : undefined
   // 新建解析器会重新解析样式、重新解码全部 PNG；归档内容（revision）与主题方向不变时复用，保留位图缓存。
-  const key = [archive, archive.revision, bdaBase, bdaBase?.revision, appearanceBytes, theme.value, orientation.value]
-  if (cachedVisualResolver?.key.every((value, index) => value === key[index])) return cachedVisualResolver.resolver
+  const key = [appState.archive, appState.archive.revision, appState.bdaBase, appState.bdaBase?.revision, appearanceBytes, theme.value, orientation.value]
+  if (appState.cachedVisualResolver?.key.every((value, index) => value === key[index])) return appState.cachedVisualResolver.resolver
   const resolver = appearanceBytes
-    ? new BdaResolver(archive, appearanceBytes, bdaBase, theme.value, orientation.value)
-    : new AtlasResolver(archive, theme.value, orientation.value)
-  cachedVisualResolver = { key, resolver }
+    ? new BdaResolver(appState.archive, appearanceBytes, appState.bdaBase, theme.value, orientation.value)
+    : new AtlasResolver(appState.archive, theme.value, orientation.value)
+  appState.cachedVisualResolver = { key, resolver }
   return resolver
 }
 
 function simulationLanguage(): "zh" | "en" {
-  return /^en_/i.test(layoutPath.split("/").pop() ?? "") ? "en" : "zh"
+  return /^en_/i.test(appState.layoutPath.split("/").pop() ?? "") ? "en" : "zh"
 }
 
 function applyCandidateTextVisual(
@@ -2575,14 +2365,14 @@ function applyCandidateTextVisual(
 
 function renderCandidateState(): boolean {
   const language = simulationLanguage()
-  if (lastSimulationLanguage !== undefined && lastSimulationLanguage !== language) {
+  if (appState.lastSimulationLanguage !== undefined && appState.lastSimulationLanguage !== language) {
     setSimulatedComposition("")
   }
-  lastSimulationLanguage = language
-  const candidateSource = language === "en" ? simulatedOutput.value : simulatedComposition
+  appState.lastSimulationLanguage = language
+  const candidateSource = language === "en" ? simulatedOutput.value : appState.simulatedComposition
   const candidateCaret = language === "en"
     ? simulatedOutput.selectionStart ?? simulatedOutput.value.length
-    : simulatedComposition.length
+    : appState.simulatedComposition.length
   const state = candidatePreview(
     candidateSource,
     candidateCaret,
@@ -2599,14 +2389,14 @@ function renderCandidateState(): boolean {
   }))
   const firstCandidate = candidateWords.firstElementChild as HTMLElement | null
   if (firstCandidate) {
-    applyCandidateTextVisual(firstCandidate, firstCandidateTextVisual, candidateTextWidth)
+    applyCandidateTextVisual(firstCandidate, appState.firstCandidateTextVisual, appState.candidateTextWidth)
   }
   return state.composing
 }
 
 function refreshSimulationState(): boolean {
   const composing = renderCandidateState()
-  const symbolPanel = isConfiguredSymbolLayout(layoutPath, textDocument(genConfigPath()))
+  const symbolPanel = isConfiguredSymbolLayout(appState.layoutPath, textDocument(genConfigPath()))
   candidateArea.hidden = symbolPanel
   toolbarStrip.hidden = symbolPanel || !toolbarStrip.dataset.path
   toolbarPreview.setPersistentOnly(composing)
@@ -2651,24 +2441,24 @@ function devicePreviewTransparent(): boolean {
 }
 
 function refreshPreview(): void {
-  if (!archive) return
-  const currentArchive = archive
+  if (!appState.archive) return
+  const currentArchive = appState.archive
   const composing = refreshSimulationState()
   const resolver = visualResolver()
   const context = keyboardContext()
   const toolbarSize = resolver ? refreshToolbarPreview(composing, resolver) : undefined
   preview.setResolver(resolver)
-  const animationPath = archive.format === "bda"
-    ? bdaConfigPath(archive, theme.value, orientation.value, "animation")
+  const animationPath = appState.archive.format === "bda"
+    ? bdaConfigPath(appState.archive, theme.value, orientation.value, "animation")
     : undefined
-  const animationBytes = animationPath && archive.getBytes(animationPath)
+  const animationBytes = animationPath && appState.archive.getBytes(animationPath)
   preview.setAnimation(animationBytes ? decodeBdaAnimation(animationBytes) : undefined)
   const legacyAnimationPath = legacyAnimationConfigPath()
   const legacyAnimation =
-    archive.format !== "bda" && archive.isText(styleConfigPath()) && legacyAnimationPath
+    appState.archive.format !== "bda" && appState.archive.isText(styleConfigPath()) && legacyAnimationPath
       ? parseLegacyAnimation(
-          IniDocument.parse(archive.getText(styleConfigPath())),
-          IniDocument.parse(archive.getText(legacyAnimationPath)),
+          IniDocument.parse(appState.archive.getText(styleConfigPath())),
+          IniDocument.parse(appState.archive.getText(legacyAnimationPath)),
         )
       : undefined
   preview.setLegacyAnimation(legacyAnimation)
@@ -2678,7 +2468,7 @@ function refreshPreview(): void {
   const bdaInfo = currentBdaAppearance()
   const bdaHintPanel = bdaInfo?.appearance.panels.get(layout.value.replace(/\.ini$/i, ""))
   const hasBdaHints = Boolean(bdaHintPanel?.hints.size)
-  const hintSource = currentArchive.format === "bda" ? bdaBase : currentArchive
+  const hintSource = currentArchive.format === "bda" ? appState.bdaBase : currentArchive
   const hintDocument = (name: string) => {
     if (currentArchive.format === "bda" && !hasBdaHints) return
     const path = currentArchive.format === "bda" ? bdaBasePath(hintPath(name)) : hintPath(name)
@@ -2687,7 +2477,7 @@ function refreshPreview(): void {
     return bdaInfo ? bdaLayoutDocument(document, bdaInfo.appearance, layout.value) : document
   }
   // 每个面板用 [HINT] LAYOUT_NAME 指定一个 pop（未写时取 gen.ini），pop 内同时含普通气泡与长按 [BAR]。
-  const hintName = (layoutDocument?.get("HINT", "LAYOUT_NAME") ?? context?.gen?.get("HINT", "LAYOUT_NAME"))?.trim()
+  const hintName = (appState.layoutDocument?.get("HINT", "LAYOUT_NAME") ?? context?.gen?.get("HINT", "LAYOUT_NAME"))?.trim()
   const namedHint = hintName ? hintDocument(`${hintName.replace(/\.pop$/i, "")}.pop`) : undefined
   const shortHint = namedHint ?? hintDocument("hint1.pop") ?? hintDocument("hint.pop")
   const longHint = namedHint ?? hintDocument("hint2.pop") ?? shortHint
@@ -2697,21 +2487,21 @@ function refreshPreview(): void {
     hintPreviewEnabled.checked && currentArchive.format === "bda" && hasBdaHints,
   )
   const bdaGenPath = bdaBasePath(genConfigPath())
-  const bdaGen = archive.format === "bda" && bdaBase?.isText(bdaGenPath)
-    ? IniDocument.parse(bdaBase.getText(bdaGenPath))
+  const bdaGen = appState.archive.format === "bda" && appState.bdaBase?.isText(bdaGenPath)
+    ? IniDocument.parse(appState.bdaBase.getText(bdaGenPath))
     : undefined
   preview.setOffsets(context?.gen ?? bdaGen)
   preview.setDefaults(context?.gen ?? bdaGen)
   preview.setTheme(theme.value === "dark" ? "dark" : "light")
   preview.setTransparent(devicePreviewTransparent())
-  if (context && layoutDocument && resolver) {
+  if (context && appState.layoutDocument && resolver) {
     const symbolPanel = candidateArea.hidden
     const candidatePath = toolbarConfigPath()
-    const candidateLayout = candidatePath && archive.isText(candidatePath)
-      ? IniDocument.parse(archive.getText(candidatePath))
+    const candidateLayout = candidatePath && appState.archive.isText(candidatePath)
+      ? IniDocument.parse(appState.archive.getText(candidatePath))
       : undefined
     const config = resolvePanelConfig(
-      layoutDocument,
+      appState.layoutDocument,
       context.gen,
       context.styles,
     )
@@ -2721,28 +2511,28 @@ function refreshPreview(): void {
     )
     const { normal: candidateVisual, first: firstCandidateVisual } =
       resolveCandidateTextVisuals(candidateLayout, context.gen, resolver)
-    firstCandidateTextVisual = firstCandidateVisual
-    candidateTextWidth = config.width
-    applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth)
+    appState.firstCandidateTextVisual = firstCandidateVisual
+    appState.candidateTextWidth = config.width
+    applyCandidateTextVisual(candidateInput, inputVisual, appState.candidateTextWidth)
     applyCandidateTextVisual(
       candidateWords,
       candidateVisual ?? { color: "#ffffff" },
-      candidateTextWidth,
+      appState.candidateTextWidth,
     )
     const firstCandidate = candidateWords.firstElementChild as HTMLElement | null
     if (firstCandidate) {
-      applyCandidateTextVisual(firstCandidate, firstCandidateTextVisual, candidateTextWidth)
+      applyCandidateTextVisual(firstCandidate, appState.firstCandidateTextVisual, appState.candidateTextWidth)
     }
     preview.setPanel(
       config.styleID,
       config.width,
       config.height,
-      layoutDocument.get("PANEL", "ANIM_STYLE") ?? "",
+      appState.layoutDocument.get("PANEL", "ANIM_STYLE") ?? "",
     )
     const candidateHeight = symbolPanel ? 0 : (toolbarSize?.height ?? 0)
     const candidateInputHeight = symbolPanel ? 0 : (toolbarSize?.inputHeight ?? 0)
     const surfaceHeight = updatePanelTools(config.width, config.height, candidateHeight)
-    activeKeyboardGeometry = {
+    appState.activeKeyboardGeometry = {
       panelWidth: config.width,
       panelHeight: surfaceHeight,
       candidateHeight,
@@ -2754,9 +2544,9 @@ function refreshPreview(): void {
       candidateHeight,
       candidateInputHeight,
     )
-  } else if (bdaGen && layoutDocument) {
+  } else if (bdaGen && appState.layoutDocument) {
     const generalSize = bdaGen.get("PANEL", "SIZE")?.split(",").map(Number)
-    const layoutSize = layoutDocument.get("PANEL", "SIZE")?.split(",").map(Number)
+    const layoutSize = appState.layoutDocument.get("PANEL", "SIZE")?.split(",").map(Number)
     const generalPanelWidth = generalSize?.[0] || DEFAULT_BDA_PANEL_WIDTH
     const panelWidth = layoutSize?.[0] || generalPanelWidth
     const panelHeight = layoutSize?.[1] || generalSize?.[1] || DEFAULT_BDA_PANEL_HEIGHT
@@ -2771,16 +2561,16 @@ function refreshPreview(): void {
     const { normal: candidateVisual, first: firstVisual } = resolver
       ? resolveCandidateTextVisuals(candidateDocument, bdaGen, resolver)
       : { normal: undefined, first: undefined }
-    candidateTextWidth = panelWidth
-    firstCandidateTextVisual = firstVisual
-    applyCandidateTextVisual(candidateInput, inputVisual, candidateTextWidth)
+    appState.candidateTextWidth = panelWidth
+    appState.firstCandidateTextVisual = firstVisual
+    applyCandidateTextVisual(candidateInput, inputVisual, appState.candidateTextWidth)
     applyCandidateTextVisual(
       candidateWords,
       candidateVisual ?? { color: "#ffffff" },
-      candidateTextWidth,
+      appState.candidateTextWidth,
     )
     const firstCandidate = candidateWords.firstElementChild as HTMLElement | null
-    if (firstCandidate) applyCandidateTextVisual(firstCandidate, firstVisual, candidateTextWidth)
+    if (firstCandidate) applyCandidateTextVisual(firstCandidate, firstVisual, appState.candidateTextWidth)
     preview.setPanel(
       bdaStyleID(panel?.wholeBackStyle ?? panel?.backStyle),
       panelWidth,
@@ -2790,7 +2580,7 @@ function refreshPreview(): void {
     const candidateHeight = bdaSymbolPanel ? 0 : (toolbarSize?.height ?? 0)
     const candidateInputHeight = bdaSymbolPanel ? 0 : (toolbarSize?.inputHeight ?? 0)
     const surfaceHeight = updatePanelTools(panelWidth, panelHeight, candidateHeight)
-    activeKeyboardGeometry = {
+    appState.activeKeyboardGeometry = {
       panelWidth,
       panelHeight: surfaceHeight,
       candidateHeight,
@@ -2803,39 +2593,39 @@ function refreshPreview(): void {
       candidateInputHeight,
     )
   } else {
-    activeKeyboardGeometry = undefined
+    appState.activeKeyboardGeometry = undefined
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
   }
-  preview.setDocument(layoutDocument)
+  preview.setDocument(appState.layoutDocument)
 }
 
 function refreshSimulationPreview(): void {
   const composing = refreshSimulationState()
-  if (!archive || !activeKeyboardGeometry) return
+  if (!appState.archive || !appState.activeKeyboardGeometry) return
   applyDeviceKeyboardGeometry(
-    activeKeyboardGeometry.panelWidth,
-    activeKeyboardGeometry.panelHeight,
-    activeKeyboardGeometry.candidateHeight,
-    activeKeyboardGeometry.candidateInputHeight,
+    appState.activeKeyboardGeometry.panelWidth,
+    appState.activeKeyboardGeometry.panelHeight,
+    appState.activeKeyboardGeometry.candidateHeight,
+    appState.activeKeyboardGeometry.candidateInputHeight,
   )
-  updateCanvasCandidateGeometry(activeKeyboardGeometry.candidateHeight)
+  updateCanvasCandidateGeometry(appState.activeKeyboardGeometry.candidateHeight)
   const resolver = visualResolver()
   if (!resolver) return
   const toolbarSize = refreshToolbarPreview(composing, resolver)
   const symbolPanel = candidateArea.hidden
-  const candidateHeight = symbolPanel ? 0 : (toolbarSize?.height ?? activeKeyboardGeometry.candidateHeight)
+  const candidateHeight = symbolPanel ? 0 : (toolbarSize?.height ?? appState.activeKeyboardGeometry.candidateHeight)
   const candidateInputHeight = symbolPanel
     ? 0
-    : (toolbarSize?.inputHeight ?? activeKeyboardGeometry.candidateInputHeight)
+    : (toolbarSize?.inputHeight ?? appState.activeKeyboardGeometry.candidateInputHeight)
   if (
-    candidateHeight !== activeKeyboardGeometry.candidateHeight ||
-    candidateInputHeight !== activeKeyboardGeometry.candidateInputHeight
+    candidateHeight !== appState.activeKeyboardGeometry.candidateHeight ||
+    candidateInputHeight !== appState.activeKeyboardGeometry.candidateInputHeight
   ) {
-    activeKeyboardGeometry.candidateHeight = candidateHeight
-    activeKeyboardGeometry.candidateInputHeight = candidateInputHeight
+    appState.activeKeyboardGeometry.candidateHeight = candidateHeight
+    appState.activeKeyboardGeometry.candidateInputHeight = candidateInputHeight
     applyDeviceKeyboardGeometry(
-      activeKeyboardGeometry.panelWidth,
-      activeKeyboardGeometry.panelHeight,
+      appState.activeKeyboardGeometry.panelWidth,
+      appState.activeKeyboardGeometry.panelHeight,
       candidateHeight,
       candidateInputHeight,
     )
@@ -2843,32 +2633,26 @@ function refreshSimulationPreview(): void {
   }
 }
 
-let cachedSkinStates: { key: readonly unknown[]; byLayout: Map<string, number[]> } | undefined
-
 // 每次切换布局都会把全部布局文件重新解析（BDA 还要按当前布局逐个合成）来统计皮肤状态；内容不变时复用结果。
 function currentSkinStates(): number[] {
-  const key = [archive, archive?.revision, bdaBase, bdaBase?.revision, theme.value, orientation.value]
-  if (!cachedSkinStates?.key.every((value, index) => value === key[index])) cachedSkinStates = { key, byLayout: new Map() }
-  let states = cachedSkinStates.byLayout.get(layout.value)
-  if (!states) cachedSkinStates.byLayout.set(layout.value, states = availableSkinStates(...skinStateDocuments()))
+  const key = [appState.archive, appState.archive?.revision, appState.bdaBase, appState.bdaBase?.revision, theme.value, orientation.value]
+  if (!appState.cachedSkinStates?.key.every((value, index) => value === key[index])) appState.cachedSkinStates = { key, byLayout: new Map() }
+  let states = appState.cachedSkinStates.byLayout.get(layout.value)
+  if (!states) appState.cachedSkinStates.byLayout.set(layout.value, states = availableSkinStates(...skinStateDocuments()))
   return [...states]
 }
 
 function skinStateDocuments(): IniDocument[] {
-  if (!archive) return []
+  if (!appState.archive) return []
   const prefix = `${theme.value}/skin/${orientation.value}/`
-  const paths = archive.format === "bda"
+  const paths = appState.archive.format === "bda"
     ? bdaAvailableLayoutPaths()
-    : archive.names().filter((path) => path.startsWith(prefix) && path.endsWith(".ini") && archive?.isText(path))
+    : appState.archive.names().filter((path) => path.startsWith(prefix) && path.endsWith(".ini") && appState.archive?.isText(path))
   return paths.flatMap((path) => {
     const document = textDocument(path)
     return document ? [document] : []
   })
 }
-
-// 切换布局时在点击处理中途读取尺寸会强制整页重排；改由 ResizeObserver 回调（布局已就绪）缓存。
-// canvas-wrap 的 padding 只随媒体查询变化，而媒体查询变化必然伴随尺寸变化，缓存不会过期。
-let canvasWrapInnerSize: { width: number; height: number } | undefined
 
 function measureCanvasWrapInnerSize(): { width: number; height: number } {
   const canvasStyle = getComputedStyle(canvasWrap)
@@ -2883,18 +2667,18 @@ function measureCanvasWrapInnerSize(): { width: number; height: number } {
 }
 
 function fitCanvasPreview(): void {
-  if (!canvasLogicalSize) return
-  const { width: availableWidth, height: availableHeight } = canvasWrapInnerSize ?? measureCanvasWrapInnerSize()
+  if (!appState.canvasLogicalSize) return
+  const { width: availableWidth, height: availableHeight } = appState.canvasWrapInnerSize ?? measureCanvasWrapInnerSize()
   if (availableWidth <= 0 || availableHeight <= 0) return
   const width = canvasFitWidth(
     availableWidth,
     availableHeight,
-    canvasLogicalSize.width,
-    canvasLogicalSize.height,
+    appState.canvasLogicalSize.width,
+    appState.canvasLogicalSize.height,
   )
-  const renderedWidth = width * previewZoom
-  const scale = renderedWidth / canvasLogicalSize.width
-  const panelViewportHeight = Math.round(canvasLogicalSize.panelHeight * scale)
+  const renderedWidth = width * appState.previewZoom
+  const scale = renderedWidth / appState.canvasLogicalSize.width
+  const panelViewportHeight = Math.round(appState.canvasLogicalSize.panelHeight * scale)
   deviceShell.style.setProperty("--canvas-fit-width", `${renderedWidth}px`)
   deviceShell.style.setProperty("--panel-viewport-height", `${panelViewportHeight}px`)
   const toolbarHeight = Number(toolbarCanvas.style.getPropertyValue("--toolbar-height") || "0")
@@ -2913,29 +2697,18 @@ function fitCanvasPreview(): void {
 }
 
 function updateCanvasPanelStatus(renderedWidth: number): void {
-  if (!canvasLogicalSize) return
-  panelStatus.textContent = `面板：${Math.round(canvasLogicalSize.width)} × ${Math.round(canvasLogicalSize.layoutPanelHeight)} · 预览缩放：${Math.round(renderedWidth / canvasLogicalSize.width * 100)}%`
+  if (!appState.canvasLogicalSize) return
+  panelStatus.textContent = `面板：${Math.round(appState.canvasLogicalSize.width)} × ${Math.round(appState.canvasLogicalSize.layoutPanelHeight)} · 预览缩放：${Math.round(renderedWidth / appState.canvasLogicalSize.width * 100)}%`
 }
 
-let fitCanvasDebounce: ReturnType<typeof setTimeout> | undefined
-let canvasFitFrozen = false
-let previewZoom = 1
-let previewPanLocked = true
-let previewPanX = 0
-let previewPanY = 0
-let previewPanStart: { pointerId: number; x: number; y: number; panX: number; panY: number } | undefined
-let previewPanCandidate: { pointerId: number; x: number; y: number; panX: number; panY: number } | undefined
-let pendingPreviewPan: { x: number; y: number } | undefined
-let previewPanGeometry: { target: DOMRect; wrap: DOMRect; wrapWidth: number; wrapHeight: number } | undefined
-
 function setPreviewPan(x: number, y: number): void {
-  previewPanX = x
-  previewPanY = y
-  deviceShell.style.transform = `translate(${x}px, ${y}px) scale(${currentDeviceValue() === "canvas" ? 1 : previewZoom})`
+  appState.previewPanX = x
+  appState.previewPanY = y
+  deviceShell.style.transform = `translate(${x}px, ${y}px) scale(${currentDeviceValue() === "canvas" ? 1 : appState.previewZoom})`
 }
 
 function schedulePreviewPan(x: number, y: number): void {
-  pendingPreviewPan = { x, y }
+  appState.pendingPreviewPan = { x, y }
   schedulePreviewInteractionFrame()
 }
 
@@ -2947,60 +2720,60 @@ function applyPreviewZoom(value: number, anchor?: { x: number; y: number }): voi
   const before = anchor ? deviceShell.getBoundingClientRect() : undefined
   const anchorX = before && anchor ? (anchor.x - before.left) / before.width : 0.5
   const anchorY = before && anchor ? (anchor.y - before.top) / before.height : 0.5
-  previewZoom = Math.min(3, Math.max(0.4, Math.round(value * 10) / 10))
-  previewZoomOut.disabled = previewZoom <= 0.4
-  previewZoomIn.disabled = previewZoom >= 3
+  appState.previewZoom = Math.min(3, Math.max(0.4, Math.round(value * 10) / 10))
+  previewZoomOut.disabled = appState.previewZoom <= 0.4
+  previewZoomIn.disabled = appState.previewZoom >= 3
   if (currentDeviceValue() === "canvas") fitCanvasPreview()
-  else setPreviewPan(previewPanX, previewPanY)
+  else setPreviewPan(appState.previewPanX, appState.previewPanY)
   if (anchor && before) {
     const after = deviceShell.getBoundingClientRect()
     setPreviewPan(
-      previewPanX + anchor.x - (after.left + anchorX * after.width),
-      previewPanY + anchor.y - (after.top + anchorY * after.height),
+      appState.previewPanX + anchor.x - (after.left + anchorX * after.width),
+      appState.previewPanY + anchor.y - (after.top + anchorY * after.height),
     )
   }
-  if (currentDeviceValue() !== "canvas" && canvasLogicalSize) {
+  if (currentDeviceValue() !== "canvas" && appState.canvasLogicalSize) {
     requestAnimationFrame(() => {
       const bounds = ($("#preview") as HTMLCanvasElement).getBoundingClientRect()
-      panelStatus.textContent = `面板：${Math.round(canvasLogicalSize!.width)} × ${Math.round(canvasLogicalSize!.layoutPanelHeight)} · 预览缩放：${previewScalePercent(bounds.width, bounds.height, canvasLogicalSize!.width, canvasLogicalSize!.panelHeight)}%`
+      panelStatus.textContent = `面板：${Math.round(appState.canvasLogicalSize!.width)} × ${Math.round(appState.canvasLogicalSize!.layoutPanelHeight)} · 预览缩放：${previewScalePercent(bounds.width, bounds.height, appState.canvasLogicalSize!.width, appState.canvasLogicalSize!.panelHeight)}%`
     })
   }
   requestAnimationFrame(resizeKeyboardPreviews)
 }
 
 function scheduleFitCanvasPreview(): void {
-  if (canvasFitFrozen) return
-  clearTimeout(fitCanvasDebounce)
-  fitCanvasDebounce = setTimeout(() => {
+  if (appState.canvasFitFrozen) return
+  clearTimeout(appState.fitCanvasDebounce)
+  appState.fitCanvasDebounce = setTimeout(() => {
     if (currentDeviceValue() === "canvas") fitCanvasPreview()
   }, 50)
 }
 
 new ResizeObserver(() => {
-  canvasWrapInnerSize = measureCanvasWrapInnerSize()
+  appState.canvasWrapInnerSize = measureCanvasWrapInnerSize()
   scheduleFitCanvasPreview()
 }).observe(canvasWrap)
 
-previewZoomOut.addEventListener("click", () => applyPreviewZoom(previewZoom - 0.1))
+previewZoomOut.addEventListener("click", () => applyPreviewZoom(appState.previewZoom - 0.1))
 previewZoomFit.addEventListener("click", () => {
   setPreviewPan(0, 0)
   applyPreviewZoom(1)
 })
 previewZoomFit.addEventListener("dblclick", () => {
-  previewPanLocked = !previewPanLocked
-  previewZoomFit.ariaPressed = String(previewPanLocked)
-  previewZoomFit.ariaLabel = previewPanLocked ? "适配窗口，画布已锁定，双击解锁" : "适配窗口，双击锁定画布"
-  previewZoomFit.title = previewPanLocked ? "画布已锁定（双击解锁）" : "适配窗口（双击锁定画布）"
+  appState.previewPanLocked = !appState.previewPanLocked
+  previewZoomFit.ariaPressed = String(appState.previewPanLocked)
+  previewZoomFit.ariaLabel = appState.previewPanLocked ? "适配窗口，画布已锁定，双击解锁" : "适配窗口，双击锁定画布"
+  previewZoomFit.title = appState.previewPanLocked ? "画布已锁定（双击解锁）" : "适配窗口（双击锁定画布）"
   finishPreviewPan()
 })
-previewZoomIn.addEventListener("click", () => applyPreviewZoom(previewZoom + 0.1))
+previewZoomIn.addEventListener("click", () => applyPreviewZoom(appState.previewZoom + 0.1))
 canvasWrap.addEventListener("wheel", (event) => {
   // 欢迎页（未打开皮肤）需要正常的纵向滚动，不能被画布缩放拦截
   if (deviceShell.hidden || canvasWrap.classList.contains("empty")) return
   event.preventDefault()
-  if (previewPanLocked) return
+  if (appState.previewPanLocked) return
   applyPreviewZoom(
-    previewZoom + (event.deltaY < 0 ? 0.1 : -0.1),
+    appState.previewZoom + (event.deltaY < 0 ? 0.1 : -0.1),
     { x: event.clientX, y: event.clientY },
   )
 }, { passive: false })
@@ -3013,55 +2786,55 @@ window.addEventListener("blur", () => {
 canvasWrap.addEventListener("pointerdown", (event) => {
   if (
     event.button !== 0 ||
-    previewPanLocked ||
+    appState.previewPanLocked ||
     event.pointerType === "touch" ||
     deviceShell.hidden ||
-    isEditing() && keyMode === "move" && previewPanelViewport.contains(event.target as Node)
+    isEditing() && appState.keyMode === "move" && previewPanelViewport.contains(event.target as Node)
   ) return
-  previewPanCandidate = {
+  appState.previewPanCandidate = {
     pointerId: event.pointerId,
     x: event.clientX,
     y: event.clientY,
-    panX: previewPanX,
-    panY: previewPanY,
+    panX: appState.previewPanX,
+    panY: appState.previewPanY,
   }
   canvasWrap.classList.add("preview-pan-ready")
 })
 
 canvasWrap.addEventListener("pointermove", (event) => {
-  if (isEditing() && keyMode === "move" && previewPanelViewport.contains(event.target as Node)) return
-  if (!previewPanStart && previewPanCandidate?.pointerId === event.pointerId) {
-    const dx = event.clientX - previewPanCandidate.x
-    const dy = event.clientY - previewPanCandidate.y
+  if (isEditing() && appState.keyMode === "move" && previewPanelViewport.contains(event.target as Node)) return
+  if (!appState.previewPanStart && appState.previewPanCandidate?.pointerId === event.pointerId) {
+    const dx = event.clientX - appState.previewPanCandidate.x
+    const dy = event.clientY - appState.previewPanCandidate.y
     if (Math.hypot(dx, dy) < 3) return
-    previewPanStart = previewPanCandidate
+    appState.previewPanStart = appState.previewPanCandidate
     preview.setPointerInteractionLocked(true)
     toolbarPreview.setPointerInteractionLocked(true)
     // Cache layout before the first transform write. Every subsequent frame
     // can derive the transformed canvas bounds from this snapshot and the pan
     // delta, avoiding forced reflow in the crosshair update path.
-    previewPanGeometry = {
+    appState.previewPanGeometry = {
       target: previewCanvas.getBoundingClientRect(),
       wrap: canvasWrap.getBoundingClientRect(),
       wrapWidth: canvasWrap.clientWidth,
       wrapHeight: canvasWrap.clientHeight,
     }
-    if (pointerCoordinatesFrame) cancelAnimationFrame(pointerCoordinatesFrame)
-    pointerCoordinatesFrame = 0
-    pendingPointerCoordinates = undefined
+    if (appState.pointerCoordinatesFrame) cancelAnimationFrame(appState.pointerCoordinatesFrame)
+    appState.pointerCoordinatesFrame = 0
+    appState.pendingPointerCoordinates = undefined
     canvasWrap.classList.add("preview-panning")
     canvasWrap.setPointerCapture(event.pointerId)
   }
-  if (!previewPanStart || previewPanStart.pointerId !== event.pointerId) return
+  if (!appState.previewPanStart || appState.previewPanStart.pointerId !== event.pointerId) return
   event.preventDefault()
   schedulePreviewPan(
-    previewPanStart.panX + event.clientX - previewPanStart.x,
-    previewPanStart.panY + event.clientY - previewPanStart.y,
+    appState.previewPanStart.panX + event.clientX - appState.previewPanStart.x,
+    appState.previewPanStart.panY + event.clientY - appState.previewPanStart.y,
   )
-  const geometry = previewPanGeometry
+  const geometry = appState.previewPanGeometry
   if (geometry) {
-    const offsetX = event.clientX - previewPanStart.x
-    const offsetY = event.clientY - previewPanStart.y
+    const offsetX = event.clientX - appState.previewPanStart.x
+    const offsetY = event.clientY - appState.previewPanStart.y
     const target = geometry.target
     schedulePointerCoordinates(event, previewCanvas, previewCanvas, {
       target: new DOMRect(target.left + offsetX, target.top + offsetY, target.width, target.height),
@@ -3075,31 +2848,28 @@ canvasWrap.addEventListener("pointermove", (event) => {
 })
 
 function finishPreviewPan(): void {
-  const pointerId = previewPanStart?.pointerId
+  const pointerId = appState.previewPanStart?.pointerId
   flushPreviewPan()
-  previewPanCandidate = undefined
-  previewPanStart = undefined
-  previewPanGeometry = undefined
+  appState.previewPanCandidate = undefined
+  appState.previewPanStart = undefined
+  appState.previewPanGeometry = undefined
   preview.setPointerInteractionLocked(false)
   toolbarPreview.setPointerInteractionLocked(false)
   canvasWrap.classList.remove("preview-pan-ready", "preview-panning")
   if (pointerId !== undefined && canvasWrap.hasPointerCapture(pointerId)) canvasWrap.releasePointerCapture(pointerId)
 }
-
-// 点击画布外的空白区域（棋盘格背景）同样取消选中，回到面板配置；拖动平移不算点击。
-let canvasWrapClickStart: { x: number; y: number } | undefined
-canvasWrap.addEventListener("pointerdown", (event) => { canvasWrapClickStart = { x: event.clientX, y: event.clientY } })
+canvasWrap.addEventListener("pointerdown", (event) => { appState.canvasWrapClickStart = { x: event.clientX, y: event.clientY } })
 canvasWrap.addEventListener("click", (event) => {
   const target = event.target as Element
-  const start = canvasWrapClickStart
-  canvasWrapClickStart = undefined
+  const start = appState.canvasWrapClickStart
+  appState.canvasWrapClickStart = undefined
   if (
     !isEditing() ||
     !start || Math.hypot(event.clientX - start.x, event.clientY - start.y) >= 3 ||
     candidateArea.contains(target) ||
     target.closest("canvas, button, input, select, label, [role=button]")
   ) return
-  if (selectedKeySections.length || selectedToolbarSections.length || selectedCandidate) inspectorBackButton.click()
+  if (appState.selectedKeySections.length || appState.selectedToolbarSections.length || appState.selectedCandidate) inspectorBackButton.click()
 })
 
 canvasWrap.addEventListener("pointerup", finishPreviewPan)
@@ -3108,8 +2878,8 @@ canvasWrap.addEventListener("pointercancel", finishPreviewPan)
 canvasWrap.addEventListener("lostpointercapture", (event) => { if (event.target === canvasWrap) finishPreviewPan() })
 
 function updateCanvasCandidateGeometry(candidateHeight: number): void {
-  if (!canvasLogicalSize) return
-  canvasLogicalSize.height = canvasLogicalSize.panelHeight + candidateHeight
+  if (!appState.canvasLogicalSize) return
+  appState.canvasLogicalSize.height = appState.canvasLogicalSize.panelHeight + candidateHeight
   fitCanvasPreview()
 }
 
@@ -3118,14 +2888,14 @@ function updatePanelTools(
   height: number,
   candidateHeight = 0,
 ): number {
-  const items = layoutDocument ? previewItems(layoutDocument, width, height) : []
+  const items = appState.layoutDocument ? previewItems(appState.layoutDocument, width, height) : []
   const surfaceHeight = previewSurfaceHeight(items, height)
   const content = previewContentVerticalBounds(items, width, surfaceHeight)
   deviceShell.style.setProperty("--canvas-width", `${width}px`)
   deviceShell.style.setProperty("--canvas-ratio-width", String(width))
   deviceShell.style.setProperty("--panel-visible-height", String(content.height))
   deviceShell.style.removeProperty("--panel-crop-offset")
-  canvasLogicalSize = {
+  appState.canvasLogicalSize = {
     width,
     height: surfaceHeight + candidateHeight,
     panelHeight: surfaceHeight,
@@ -3201,7 +2971,7 @@ function updateDevicePreview(): void {
     for (const property of deviceFrameProperties) deviceShell.style.removeProperty(property)
   }
   preview.setTransparent(devicePreviewTransparent())
-  applyPreviewZoom(previewZoom)
+  applyPreviewZoom(appState.previewZoom)
   // Device switches change whether the canvas is the panel surface, which
   // decides if the gesture hot zones can line up.
   populateKeyInspector()
@@ -3215,17 +2985,17 @@ function panelSizeFrom(document: IniDocument | undefined): [number, number] | un
 }
 
 function panelSizeForPath(path: string): [number, number] | undefined {
-  if (!archive?.isText(path)) return
+  if (!appState.archive?.isText(path)) return
   const directory = path.slice(0, path.lastIndexOf("/"))
-  return panelSizeFrom(IniDocument.parse(archive.getText(path))) ??
-    (archive.isText(`${directory}/gen.ini`) ? panelSizeFrom(IniDocument.parse(archive.getText(`${directory}/gen.ini`))) : undefined)
+  return panelSizeFrom(IniDocument.parse(appState.archive.getText(path))) ??
+    (appState.archive.isText(`${directory}/gen.ini`) ? panelSizeFrom(IniDocument.parse(appState.archive.getText(`${directory}/gen.ini`))) : undefined)
 }
 
 function panelCopySourceSize(): [number, number] | undefined {
-  if (!archive) return
+  if (!appState.archive) return
   const source = panelCopySource.value.trim().replace(/\\/g, "/").replace(/\/+$/, "")
-  if (archive.isText(source)) return panelSizeForPath(source)
-  for (const path of archive.names()) {
+  if (appState.archive.isText(source)) return panelSizeForPath(source)
+  for (const path of appState.archive.names()) {
     if (path.startsWith(`${source}/`) && /\.ini$/i.test(path)) {
       const size = panelSizeForPath(path)
       if (size) return size
@@ -3234,7 +3004,7 @@ function panelCopySourceSize(): [number, number] | undefined {
 }
 
 function updatePanelCopyForm(): void {
-  if (!archive) return
+  if (!appState.archive) return
   const sourceSize = panelCopySourceSize()
   panelSourceWidth.value = sourceSize ? String(sourceSize[0]) : ""
   panelSourceHeight.value = sourceSize ? String(sourceSize[1]) : ""
@@ -3248,7 +3018,7 @@ function updatePanelCopyForm(): void {
   panelTargetWidth.disabled = !panelScaleEnabled.checked
   panelTargetHeight.disabled = !panelScaleEnabled.checked
   try {
-    const copies = archiveCopyPaths(archive.names(), panelCopySource.value, panelCopyTarget.value)
+    const copies = archiveCopyPaths(appState.archive.names(), panelCopySource.value, panelCopyTarget.value)
     panelScaleSummary.textContent = copies.length === 1
       ? `目标：${copies[0].target}`
       : `目标：${panelCopyTarget.value.trim()}（${copies.length} 个文件）`
@@ -3307,8 +3077,8 @@ function defaultPanelCopyTarget(source: string): string {
 }
 
 function openPanelCopyDialog(): void {
-  if (!archive) return
-  const paths = archivePathOptions(archive.names())
+  if (!appState.archive) return
+  const paths = archivePathOptions(appState.archive.names())
   if (!paths.length) {
     showError(new Error("皮肤中没有可复制的目录或文件"), "打开面板复制")
     return
@@ -3316,7 +3086,7 @@ function openPanelCopyDialog(): void {
   const options = paths.map((value) => Object.assign(document.createElement("option"), { value }))
   panelCopySourceOptions.replaceChildren(...options.map((option) => option.cloneNode(true)))
   panelCopyTargetOptions.replaceChildren(...options)
-  panelCopySource.value = paths.includes(selectedPath) ? selectedPath :
+  panelCopySource.value = paths.includes(appState.selectedPath) ? appState.selectedPath :
     paths.find((path) => path === `${theme.value}/skin/${orientation.value}/${layout.value}`) ?? paths[0]
   panelCopyTarget.value = defaultPanelCopyTarget(panelCopySource.value)
   panelScaleEnabled.checked = false
@@ -3327,8 +3097,8 @@ function openPanelCopyDialog(): void {
 }
 
 async function copyPanel(): Promise<boolean> {
-  if (!archive) return false
-  const currentArchive = archive
+  if (!appState.archive) return false
+  const currentArchive = appState.archive
   const copies = archiveCopyPaths(currentArchive.names(), panelCopySource.value, panelCopyTarget.value)
   const existingTargets = copies.filter(({ target }) => currentArchive.getBytes(target))
   if (existingTargets.length && !window.confirm(`目标中已有 ${existingTargets.length} 个文件，是否覆盖？`)) return false
@@ -3376,18 +3146,18 @@ async function copyPanel(): Promise<boolean> {
 }
 
 function setFileOperationBusy(busy: boolean): void {
-  fileOperationRunning = busy
+  appState.fileOperationRunning = busy
   newButton.disabled = busy
   openButton.disabled = busy
-  saveButton.disabled = busy || !archive
-  mobileShareButton.disabled = busy || !archive
+  saveButton.disabled = busy || !appState.archive
+  mobileShareButton.disabled = busy || !appState.archive
   updatePanelToolButtons()
   updateSourceFileActions()
   for (const button of exportButtons) {
     const format = button.dataset.exportFormat as ExportFormat
     // 只有 BDA 皮肤能导出 BDA；其他格式直接隐藏这两项，不留一排无法解释的灰色菜单。
-    button.hidden = Boolean(archive) && archive!.format !== "bda" && format === "bda"
-    button.disabled = busy || !archive || button.hidden
+    button.hidden = Boolean(appState.archive) && appState.archive!.format !== "bda" && format === "bda"
+    button.disabled = busy || !appState.archive || button.hidden
   }
 }
 
@@ -3416,8 +3186,8 @@ function updateFileOperationProgress(value: number, detail: string): void {
 
 function showSkinLoadProgress(size: number): boolean {
   if (size <= LARGE_SKIN_BYTES) return false
-  if (!fileOperationProgressVisible) {
-    fileOperationProgressVisible = true
+  if (!appState.fileOperationProgressVisible) {
+    appState.fileOperationProgressVisible = true
     if (!fileOperationDialog.open) fileOperationDialog.showModal()
   }
   return true
@@ -3446,7 +3216,7 @@ async function readNativeSkinFile(path: string): Promise<Uint8Array> {
   }
   const progress = new Channel<[number, number]>()
   progress.onmessage = ([loaded, total]) => {
-    if (!fileOperationProgressVisible) return
+    if (!appState.fileOperationProgressVisible) return
     updateFileOperationProgress(2 + loaded / total * 16, `正在读取皮肤文件… ${Math.round(loaded / total * 100)}%`)
   }
   // 后端直接回传二进制，避免 Vec<u8> 被序列化成 JSON 数字数组。
@@ -3458,32 +3228,32 @@ function waitForInterfacePaint(): Promise<void> {
 }
 
 function ios26StylePath(genPath: string): string | undefined {
-  if (!archive) return
+  if (!appState.archive) return
   const directory = genPath.slice(0, genPath.lastIndexOf("/"))
   const themeRoot = genPath.split("/").slice(0, 2).join("/")
   return [`${directory}/res/default.css`, `${themeRoot}/res/default.css`]
-    .find((path) => archive?.isText(path))
+    .find((path) => appState.archive?.isText(path))
 }
 
 function adaptArchiveForIos26(): boolean {
-  if (!archive) return false
+  if (!appState.archive) return false
   const staged = new Map<string, string>()
   let variants = 0
-  const text = (path: string) => staged.get(path) ?? archive!.getText(path)
-  for (const genPath of archive.names().filter((path) => /\/(?:port|land)\/gen\.ini$/i.test(path))) {
+  const text = (path: string) => staged.get(path) ?? appState.archive!.getText(path)
+  for (const genPath of appState.archive.names().filter((path) => /\/(?:port|land)\/gen\.ini$/i.test(path))) {
     const directory = genPath.slice(0, genPath.lastIndexOf("/"))
     const gen = IniDocument.parse(text(genPath))
     const candidateName = gen.get("CAND", "LAYOUT_NAME") ?? "cand1"
     const candidatePath = `${directory}/${candidateName.replace(/\.cnd$/i, "")}.cnd`
     const stylePath = ios26StylePath(genPath)
-    if (!archive.isText(candidatePath) || !stylePath) continue
+    if (!appState.archive.isText(candidatePath) || !stylePath) continue
     variants++
     const adapted = adaptIos26Variant(text(candidatePath), text(genPath), text(stylePath))
     staged.set(candidatePath, adapted.candidate)
     staged.set(genPath, adapted.general)
     staged.set(stylePath, adapted.styles)
-    for (const path of archive.names().filter((path) => path.startsWith(`${directory}/`) && /\.ini$/i.test(path))) {
-      if (!archive.isText(path)) continue
+    for (const path of appState.archive.names().filter((path) => path.startsWith(`${directory}/`) && /\.ini$/i.test(path))) {
+      if (!appState.archive.isText(path)) continue
       const name = path.slice(directory.length + 1)
       staged.set(path, adaptIos26KeyboardLayout(
         name,
@@ -3494,33 +3264,31 @@ function adaptArchiveForIos26(): boolean {
     }
   }
   const changes: Change[] = [...staged].flatMap(([path, after]) => {
-    const before = archive!.getText(path)
+    const before = appState.archive!.getText(path)
     return before === after ? [] : [{ kind: "text" as const, path, before, after }]
   })
   if (!variants) throw new Error("没有找到可适配的候选栏和通用配置。")
   if (!changes.length) return true
   commitBatch(changes)
   renderFiles()
-  if (selectedPath && archive.isText(selectedPath)) selectFile(selectedPath)
+  if (appState.selectedPath && appState.archive.isText(appState.selectedPath)) selectFile(appState.selectedPath)
   refreshPreview()
   updateDirty()
   return true
 }
 
-let currentFileOperation = ""
-
 async function runFileOperation(
   action: string,
   operation: () => boolean | Promise<boolean>,
 ): Promise<void> {
-  if (fileOperationRunning) {
+  if (appState.fileOperationRunning) {
     // 拖入、最近打开、模板卡片在上一个操作结束前也能触发：给出提示，不再静默忽略。
-    showStatus(`正在${currentFileOperation}，请稍后再${action}。`, "progress")
+    showStatus(`正在${appState.currentFileOperation}，请稍后再${action}。`, "progress")
     return
   }
-  currentFileOperation = action
+  appState.currentFileOperation = action
   setFileOperationBusy(true)
-  fileOperationProgressVisible = false
+  appState.fileOperationProgressVisible = false
   showStatus(`正在${action}…`, "progress")
   fileOperationDialog.dataset.outcome = "progress"
   fileOperationTitle.textContent = `正在${action}`
@@ -3539,7 +3307,7 @@ async function runFileOperation(
     })
     const result = completed ? `${action}完成。` : `${action}已取消。`
     showStatus(result)
-    if (fileOperationProgressVisible) {
+    if (appState.fileOperationProgressVisible) {
       fileOperationDialog.dataset.outcome = completed ? "success" : "cancelled"
       fileOperationTitle.textContent = completed ? `${action}完成` : `${action}已取消`
       updateFileOperationProgress(completed ? 100 : fileOperationProgress.value, completed ? "处理完成" : "未进行更改")
@@ -3547,7 +3315,7 @@ async function runFileOperation(
       fileOperationResult.hidden = false
       if (completed && action === "打开") {
         fileOperationDialog.close()
-        fileOperationProgressVisible = false
+        appState.fileOperationProgressVisible = false
       }
     }
   } catch (error) {
@@ -3557,7 +3325,7 @@ async function runFileOperation(
       durationMs: Math.round(performance.now() - started),
     })
     showError(error, action)
-    if (fileOperationProgressVisible) {
+    if (appState.fileOperationProgressVisible) {
       fileOperationDialog.dataset.outcome = "error"
       fileOperationTitle.textContent = `${action}失败`
       fileOperationDetail.textContent = "处理已停止"
@@ -3566,23 +3334,23 @@ async function runFileOperation(
     }
   } finally {
     setFileOperationBusy(false)
-    if (fileOperationProgressVisible) fileOperationClose.disabled = false
+    if (appState.fileOperationProgressVisible) fileOperationClose.disabled = false
   }
 }
 
 function showImage(path: string): void {
-  const bytes = archive?.getBytes(path)
+  const bytes = appState.archive?.getBytes(path)
   if (!bytes) return
-  assetURL = replaceImagePreviewURL(assetURL, bytes)
+  appState.assetURL = replaceImagePreviewURL(appState.assetURL, bytes)
   clearImagePreviewError()
-  workspaceImage.src = assetURL
-  assetImage.src = assetURL
+  workspaceImage.src = appState.assetURL
+  assetImage.src = appState.assetURL
   deviceShell.hidden = true
   workspaceImageFigure.hidden = false
   sourceEditor.hidden = true
-  asset.hidden = resourceConfigActive
+  asset.hidden = appState.resourceConfigActive
   sourceName.textContent = path
-  assetBackButton.disabled = !assetReturnPath
+  assetBackButton.disabled = !appState.assetReturnPath
 }
 
 function bdaTileUsageKey(usage: BdaTileUsage | undefined): string {
@@ -3590,7 +3358,7 @@ function bdaTileUsageKey(usage: BdaTileUsage | undefined): string {
 }
 
 function selectedBdaTileUsage(): BdaTileUsage | undefined {
-  return bdaTileUsages.find((usage) => usage.index === selectedTileIndex)
+  return appState.bdaTileUsages.find((usage) => usage.index === appState.selectedTileIndex)
 }
 
 function bdaImageResourceID(path: string): string {
@@ -3618,7 +3386,7 @@ function bdaImageUsageCounts(): Map<string, number> {
 
 function bdaImageTiles(path: string): { slices: TileSlice[]; usages: BdaTileUsage[] } {
   const info = currentBdaAppearance()
-  const size = pngPixelSize(archive?.getBytes(path))
+  const size = pngPixelSize(appState.archive?.getBytes(path))
   if (!info || !size) return { slices: [], usages: [] }
   const resourceID = bdaImageResourceID(path)
   const matches = [...info.appearance.imageStyles].flatMap(([key, style]) => [
@@ -3643,12 +3411,12 @@ function bdaImageTiles(path: string): { slices: TileSlice[]; usages: BdaTileUsag
 }
 
 function syncAtlasWorkspace(): void {
-  if (resourceConfigActive && resourceInspectorMode === "image" && inspectorTab === "properties" && selectedResourcePath) sourceName.textContent = selectedResourcePath
-  const slice = movingTile ?? slices.find(item => item.index === selectedTileIndex)
+  if (appState.resourceConfigActive && appState.resourceInspectorMode === "image" && appState.inspectorTab === "properties" && appState.selectedResourcePath) sourceName.textContent = appState.selectedResourcePath
+  const slice = appState.movingTile ?? appState.slices.find(item => item.index === appState.selectedTileIndex)
   const references: string[] = []
-  if (slice && archive?.isText(styleConfigPath())) {
-    const styles = IniDocument.parse(archive.getText(styleConfigPath()))
-    const name = selectedResourcePath.split("/").pop()?.replace(/\.png$/i, "")
+  if (slice && appState.archive?.isText(styleConfigPath())) {
+    const styles = IniDocument.parse(appState.archive.getText(styleConfigPath()))
+    const name = appState.selectedResourcePath.split("/").pop()?.replace(/\.png$/i, "")
     for (const section of styles.sections()) {
       for (const key of ["NM_IMG", "HL_IMG"]) {
         const value = styles.get(section, key)?.split(",").map(item => item.trim())
@@ -3656,29 +3424,27 @@ function syncAtlasWorkspace(): void {
       }
     }
   }
-  atlasWorkspace?.update({
-    active: resourceConfigActive && resourceInspectorMode === "image",
-    path: selectedResourcePath,
+  appState.atlasWorkspace?.update({
+    active: appState.resourceConfigActive && appState.resourceInspectorMode === "image",
+    path: appState.selectedResourcePath,
     width: workspaceImage.naturalWidth,
     height: workspaceImage.naturalHeight,
-    slices, selected: slice, editable: isEditing(), bda: archive?.format === "bda",
-    guides: guidesVisible, reference: selectedBdaTileUsage()?.label ?? references.join("、"),
+    slices: appState.slices, selected: slice, editable: isEditing(), bda: appState.archive?.format === "bda",
+    guides: appState.guidesVisible, reference: selectedBdaTileUsage()?.label ?? references.join("、"),
   })
 }
 
-let atlasDrawFrame = 0
-
 function scheduleAtlasDraw(): void {
-  if (atlasDrawFrame) return
-  atlasDrawFrame = requestAnimationFrame(() => {
-    atlasDrawFrame = 0
+  if (appState.atlasDrawFrame) return
+  appState.atlasDrawFrame = requestAnimationFrame(() => {
+    appState.atlasDrawFrame = 0
     drawAtlas()
   })
 }
 
 function drawAtlas(): void {
-  if (atlasDrawFrame) cancelAnimationFrame(atlasDrawFrame)
-  atlasDrawFrame = 0
+  if (appState.atlasDrawFrame) cancelAnimationFrame(appState.atlasDrawFrame)
+  appState.atlasDrawFrame = 0
   syncAtlasWorkspace()
   if (!workspaceImage.complete || !workspaceImage.naturalWidth) return
   const { naturalWidth, naturalHeight } = workspaceImage
@@ -3699,15 +3465,15 @@ function drawAtlas(): void {
   context.imageSmoothingEnabled = pixelScale <= 1
   context.drawImage(workspaceImage, 0, 0)
   drawTilePreview()
-  if (!resourceConfigActive || !guidesVisible) return
+  if (!appState.resourceConfigActive || !appState.guidesVisible) return
 
-  const allVisible = tileDraft
-    ? [...slices, { index: nextTileIndex(tileDocument), source: tileDraft }]
-    : movingTile
-      ? slices.map((slice) => slice.index === movingTile?.index ? movingTile : slice)
-      : slices
-  const visible = archive?.format === "bda"
-    ? allVisible.filter((slice) => slice.index === selectedTileIndex)
+  const allVisible = appState.tileDraft
+    ? [...appState.slices, { index: nextTileIndex(appState.tileDocument), source: appState.tileDraft }]
+    : appState.movingTile
+      ? appState.slices.map((slice) => slice.index === appState.movingTile?.index ? appState.movingTile : slice)
+      : appState.slices
+  const visible = appState.archive?.format === "bda"
+    ? allVisible.filter((slice) => slice.index === appState.selectedTileIndex)
     : allVisible
   const displayScale = Math.max(0.01, atlasCanvas.getBoundingClientRect().width / Math.max(1, naturalWidth))
   const lineWidth = Math.min(6, 1.5 / displayScale)
@@ -3718,11 +3484,11 @@ function drawAtlas(): void {
   const labelHeight = 17 / displayScale
   for (const slice of visible) {
     const [x, y, width, height] = slice.source
-    const selected = slice.index === selectedTileIndex || slice.source === tileDraft
+    const selected = slice.index === appState.selectedTileIndex || slice.source === appState.tileDraft
     context.lineWidth = selected ? lineWidth * 2 : lineWidth
     context.strokeStyle = selected ? accent : "#8d96a7"
     context.strokeRect(x + context.lineWidth / 2, y + context.lineWidth / 2, width - context.lineWidth, height - context.lineWidth)
-    const usage = bdaTileUsages.find((item) => item.index === slice.index)
+    const usage = appState.bdaTileUsages.find((item) => item.index === slice.index)
     const label = usage?.label ?? `IMG${slice.index}`
     const labelWidth = context.measureText(label).width + 6 / displayScale
     context.fillStyle = selected ? accent : "#68758a"
@@ -3738,7 +3504,7 @@ function drawAtlas(): void {
         context.strokeRect(hx - handle / 2, hy - handle / 2, handle, handle)
       }
     }
-    if (slice.inner && (archive?.format === "bda" || selected)) {
+    if (slice.inner && (appState.archive?.format === "bda" || selected)) {
       const [innerX, innerY, innerWidth, innerHeight] = slice.inner
       if (innerWidth > 0 && innerHeight > 0) {
         context.save()
@@ -3753,9 +3519,9 @@ function drawAtlas(): void {
 }
 
 function drawTilePreview(): void {
-  const slice = movingTile?.index === selectedTileIndex
-    ? movingTile
-    : slices.find((item) => item.index === selectedTileIndex)
+  const slice = appState.movingTile?.index === appState.selectedTileIndex
+    ? appState.movingTile
+    : appState.slices.find((item) => item.index === appState.selectedTileIndex)
   tilePreviewWrap.hidden = !slice
   const context = tilePreview.getContext("2d")
   if (!context) return
@@ -3788,24 +3554,24 @@ function drawTilePreview(): void {
 }
 
 function populateTileInspector(): void {
-  const slice = slices.find((item) => item.index === selectedTileIndex)
-  const bdaSelected = archive?.format === "bda"
+  const slice = appState.slices.find((item) => item.index === appState.selectedTileIndex)
+  const bdaSelected = appState.archive?.format === "bda"
   const usage = selectedBdaTileUsage()
-  tileInspector.hidden = !selectedResourcePath
-  bdaTileUsage.hidden = !bdaSelected || !bdaTileUsages.length
+  tileInspector.hidden = !appState.selectedResourcePath
+  bdaTileUsage.hidden = !bdaSelected || !appState.bdaTileUsages.length
   tileSourceFieldsGroup.hidden = bdaSelected
   tileInnerTitle.textContent = bdaSelected ? "切片区域" : "拉伸边距"
   tileInspector.dataset.empty = String(!slice)
-  bdaTileUsage.replaceChildren(...bdaTileUsages.map((item) => {
+  bdaTileUsage.replaceChildren(...appState.bdaTileUsages.map((item) => {
     const option = new Option(item.label, String(item.index))
-    option.selected = item.index === selectedTileIndex
+    option.selected = item.index === appState.selectedTileIndex
     return option
   }))
   newTileButton.hidden = Boolean(bdaSelected)
   duplicateTileButton.hidden = Boolean(bdaSelected)
   deleteTileButton.hidden = Boolean(bdaSelected)
   moveTileButton.hidden = Boolean(bdaSelected)
-  newTileButton.disabled = !selectedResourcePath || !isEditing() || bdaSelected
+  newTileButton.disabled = !appState.selectedResourcePath || !isEditing() || bdaSelected
   duplicateTileButton.disabled = !slice || !isEditing() || bdaSelected
   deleteTileButton.disabled = !slice || !isEditing() || bdaSelected
   tileTitle.textContent = usage ? "图片样式切片" : (slice ? `切片 #${slice.index}` : bdaSelected ? "未被当前 BDA 外观引用" : "未选择切片 · 点击图片中的切片进行编辑")
@@ -3829,58 +3595,58 @@ function populateTileInspector(): void {
 
 function loadTiles(path: string): void {
   const previousUsage = bdaTileUsageKey(selectedBdaTileUsage())
-  if (archive?.format === "bda") {
+  if (appState.archive?.format === "bda") {
     const tiles = bdaImageTiles(path)
-    tilePath = ""
-    tileDocument = IniDocument.parse("")
+    appState.tilePath = ""
+    appState.tileDocument = IniDocument.parse("")
     setSourceValue("")
     source.disabled = true
-    slices = tiles.slices
-    bdaTileUsages = tiles.usages
-    selectedTileIndex = bdaTileUsages.find((usage) => bdaTileUsageKey(usage) === previousUsage)?.index
-      ?? bdaTileUsages[0]?.index
-    tileDraft = undefined
-    movingTile = undefined
-    moveStart = undefined
-    moveSource = undefined
+    appState.slices = tiles.slices
+    appState.bdaTileUsages = tiles.usages
+    appState.selectedTileIndex = appState.bdaTileUsages.find((usage) => bdaTileUsageKey(usage) === previousUsage)?.index
+      ?? appState.bdaTileUsages[0]?.index
+    appState.tileDraft = undefined
+    appState.movingTile = undefined
+    appState.moveStart = undefined
+    appState.moveSource = undefined
     populateTileInspector()
     drawAtlas()
     return
   }
-  bdaTileUsages = []
-  tilePath = path.replace(/\.png$/i, ".til")
-  tileDocument = archive?.isText(tilePath) ? IniDocument.parse(archive.getText(tilePath)) : IniDocument.parse("")
-  slices = tileSlices(tileDocument)
-  setSourceValue(tileDocument.toString())
-  sourceName.textContent = tilePath
+  appState.bdaTileUsages = []
+  appState.tilePath = path.replace(/\.png$/i, ".til")
+  appState.tileDocument = appState.archive?.isText(appState.tilePath) ? IniDocument.parse(appState.archive.getText(appState.tilePath)) : IniDocument.parse("")
+  appState.slices = tileSlices(appState.tileDocument)
+  setSourceValue(appState.tileDocument.toString())
+  sourceName.textContent = appState.tilePath
   source.disabled = false
-  selectedTileIndex = undefined
+  appState.selectedTileIndex = undefined
   updateSourceHighlight()
-  tileDraft = undefined
-  movingTile = undefined
-  moveStart = undefined
-  moveSource = undefined
+  appState.tileDraft = undefined
+  appState.movingTile = undefined
+  appState.moveStart = undefined
+  appState.moveSource = undefined
   populateTileInspector()
   drawAtlas()
 }
 
 function openStyleImageResourceChooser(target: StyleImagePickerTarget): void {
-  resourcePickerSelect = undefined
-  pickerTarget = target
+  appState.resourcePickerSelect = undefined
+  appState.pickerTarget = target
   if (isTauri()) openImagePickerList()
   else openStyleImageResourcePicker()
 }
 
 function openBdaAnimationResourceChooser(onSelect: (resourceID: string) => void): void {
-  pickerTarget = undefined
-  resourcePickerSelect = onSelect
+  appState.pickerTarget = undefined
+  appState.resourcePickerSelect = onSelect
   if (isTauri()) openImagePickerList()
   else openStyleImageResourcePicker()
 }
 
 function openBdaStyleImageResourceChooser(ref: BdaStyleRef, highlighted: boolean): void {
-  pickerTarget = undefined
-  resourcePickerSelect = (resourceID) => {
+  appState.pickerTarget = undefined
+  appState.resourcePickerSelect = (resourceID) => {
     const property = highlighted ? "HL_IMG" : "NM_IMG"
     if (updateBdaRefs([ref], property, resourceID)) void renderStyleResourceDetail()
   }
@@ -3899,28 +3665,28 @@ function editBdaStyleImageSlice(ref: BdaStyleRef, highlighted: boolean): void {
   const atom = highlighted ? style?.highlightImage : style?.normalImage
   const resourceID = atom?.resource?.resourceID.replace(/\.png$/i, "")
   if (!info || !resourceID) return
-  const path = resourceImagePaths(archive?.names() ?? [], theme.value, orientation.value)
+  const path = resourceImagePaths(appState.archive?.names() ?? [], theme.value, orientation.value)
     .find((candidate) => candidate.split("/").pop()?.replace(/\.png$/i, "") === resourceID)
   if (!path) return
-  const returnState = { path: selectedPath, styleID: selectedStyleID }
+  const returnState = { path: appState.selectedPath, styleID: appState.selectedStyleID }
   selectFile(info.path, "overview", "image")
-  bdaSliceReturn = returnState
+  appState.bdaSliceReturn = returnState
   selectResourceImage(path)
-  selectedTileIndex = bdaTileUsages.find((usage) =>
+  appState.selectedTileIndex = appState.bdaTileUsages.find((usage) =>
     usage.ref.type === ref.type && usage.ref.key === ref.key && usage.highlighted === highlighted)?.index
-    ?? selectedTileIndex
+    ?? appState.selectedTileIndex
   populateTileInspector()
   drawAtlas()
 }
 
 function chooseStyleImageSlice(property: "NM_IMG" | "HL_IMG"): void {
-  const target = styleSectionTarget(selectedStyleID, property)
+  const target = styleSectionTarget(appState.selectedStyleID, property)
   const path = styleConfigPath()
-  const stylesDocument = archive?.isText(path) ? IniDocument.parse(archive.getText(path)) : undefined
-  const current = stylesDocument?.get(`STYLE${selectedStyleID}`, property)?.split(",")[0]?.trim()
-  const imagePath = resourceImagePaths(archive?.names() ?? [], theme.value, orientation.value)
+  const stylesDocument = appState.archive?.isText(path) ? IniDocument.parse(appState.archive.getText(path)) : undefined
+  const current = stylesDocument?.get(`STYLE${appState.selectedStyleID}`, property)?.split(",")[0]?.trim()
+  const imagePath = resourceImagePaths(appState.archive?.names() ?? [], theme.value, orientation.value)
     .find((candidate) => candidate.split("/").pop()?.replace(/\.png$/i, "") === current)
-  stylePickerTarget = undefined
+  appState.stylePickerTarget = undefined
   if (imagePath && target) openImageSlicePicker(imagePath, target)
   else if (target) openStyleImageResourceChooser(target)
 }
@@ -3931,11 +3697,11 @@ for (const button of styleDetailImageButtons) {
 
 function styleSectionTarget(styleID: string, property: "NM_IMG" | "HL_IMG"): StyleImagePickerTarget | undefined {
   const path = styleConfigPath()
-  if (!archive?.isText(path)) return
+  if (!appState.archive?.isText(path)) return
   return {
     source: "BACK_STYLE",
     property,
-    document: IniDocument.parse(archive.getText(path)),
+    document: IniDocument.parse(appState.archive.getText(path)),
     path,
     sections: [`STYLE${styleID}`],
   }
@@ -3976,12 +3742,12 @@ function bindStyleDetailColor(
 }
 
 async function renderStyleResourceDetail(): Promise<void> {
-  const appearancePart = bdaAppearancePart(selectedPath)
+  const appearancePart = bdaAppearancePart(appState.selectedPath)
   const appearanceInfo = currentBdaAppearance()
-  if (archive?.format === "bda" && appearancePart?.kind === "styles" && appearanceInfo && selectedStyleID) {
+  if (appState.archive?.format === "bda" && appearancePart?.kind === "styles" && appearanceInfo && appState.selectedStyleID) {
     const type = appearancePart.group === "imageStyles" ? "image" : appearancePart.group === "textStyles" ? "text" : "color"
-    const ref: BdaStyleRef = { type, key: Number(selectedStyleID) }
-    resourceName.textContent = `STYLE ${selectedStyleID}`
+    const ref: BdaStyleRef = { type, key: Number(appState.selectedStyleID) }
+    resourceName.textContent = `STYLE ${appState.selectedStyleID}`
     resourceMeta.textContent = appearancePart.group
     imageResourceDetail.hidden = true
     styleResourceDetail.hidden = false
@@ -4000,9 +3766,9 @@ async function renderStyleResourceDetail(): Promise<void> {
     return
   }
   const path = styleConfigPath()
-  if (!archive?.isText(path) || !selectedStyleID) return
-  const stylesDocument = IniDocument.parse(archive.getText(path))
-  const section = `STYLE${selectedStyleID}`
+  if (!appState.archive?.isText(path) || !appState.selectedStyleID) return
+  const stylesDocument = IniDocument.parse(appState.archive.getText(path))
+  const section = `STYLE${appState.selectedStyleID}`
   resourceName.textContent = section
   resourceMeta.textContent = path
   imageResourceDetail.hidden = true
@@ -4010,8 +3776,8 @@ async function renderStyleResourceDetail(): Promise<void> {
   styleDetailPreviews.hidden = false
   const resolver = visualResolver()
   if (resolver) {
-    drawVisualPreview(retinaThumbnail(styleDetailNormal, 128, 88), [await resolver.resolve(selectedStyleID, false).catch(() => undefined)], false)
-    drawVisualPreview(retinaThumbnail(styleDetailHighlighted, 128, 88), [await resolver.resolve(selectedStyleID, true).catch(() => undefined)], false)
+    drawVisualPreview(retinaThumbnail(styleDetailNormal, 128, 88), [await resolver.resolve(appState.selectedStyleID, false).catch(() => undefined)], false)
+    drawVisualPreview(retinaThumbnail(styleDetailHighlighted, 128, 88), [await resolver.resolve(appState.selectedStyleID, true).catch(() => undefined)], false)
   }
   styleDetailFields.replaceChildren()
   const existing = stylesDocument.entries(section)
@@ -4036,8 +3802,8 @@ async function renderStyleResourceDetail(): Promise<void> {
     const row = document.createElement("span")
     row.className = "style-detail-field-row"
     const updateField = (value: string) => {
-      if (!archive?.isText(path)) return
-      const current = IniDocument.parse(archive.getText(path))
+      if (!appState.archive?.isText(path)) return
+      const current = IniDocument.parse(appState.archive.getText(path))
       const before = current.toString()
       if (!current.set(section, key, value)) return
       commitText(path, before, current.toString())
@@ -4069,7 +3835,7 @@ async function renderStyleResourceDetail(): Promise<void> {
     } else if (key.endsWith("SOUND_PATH")) {
       const filename = stylesDocument.get(section, key) ?? ""
       const soundPaths = currentSoundEntries()
-      const soundPath = soundPathForFilename(archive.names(), theme.value, orientation.value, filename)
+      const soundPath = soundPathForFilename(appState.archive.names(), theme.value, orientation.value, filename)
       const card = document.createElement("span")
       card.className = "style-detail-sound-card"
       const playButton = document.createElement("button")
@@ -4119,8 +3885,8 @@ async function renderStyleResourceDetail(): Promise<void> {
 }
 
 function selectStyleResource(styleID: string): void {
-  if (archive?.format === "bda") {
-    const part = bdaAppearancePart(selectedPath)
+  if (appState.archive?.format === "bda") {
+    const part = bdaAppearancePart(appState.selectedPath)
     const appearance = currentBdaAppearance()?.appearance
     if (part?.kind !== "styles" || !appearance) return
     const styles = part.group === "imageStyles"
@@ -4130,7 +3896,7 @@ function selectStyleResource(styleID: string): void {
         : appearance.colorStyles
     if (!styles.has(Number(styleID))) return
   } else if (!availableStyleIDs().includes(styleID)) return
-  selectedStyleID = styleID
+  appState.selectedStyleID = styleID
   resourceListView.hidden = true
   resourceDetail.hidden = false
   resourceInspector.scrollTop = 0
@@ -4138,9 +3904,9 @@ function selectStyleResource(styleID: string): void {
 }
 
 function selectResourceImage(path: string): void {
-  if (!archive?.isImage(path)) return
-  selectedResourcePath = path
-  selectedResourceGalleryPath = path
+  if (!appState.archive?.isImage(path)) return
+  appState.selectedResourcePath = path
+  appState.selectedResourceGalleryPath = path
   resourceListView.hidden = true
   resourceDetail.hidden = false
   resourceInspector.scrollTop = 0
@@ -4148,8 +3914,8 @@ function selectResourceImage(path: string): void {
   resourceMeta.textContent = path
   imageResourceDetail.hidden = false
   styleResourceDetail.hidden = true
-  tileMode = "select"
-  tileModeButtons.forEach((button) => button.classList.toggle("active", button.dataset.tileMode === tileMode))
+  appState.tileMode = "select"
+  tileModeButtons.forEach((button) => button.classList.toggle("active", button.dataset.tileMode === appState.tileMode))
   showImage(path)
   loadTiles(path)
   syncAtlasWorkspace()
@@ -4161,16 +3927,16 @@ function selectResourceImage(path: string): void {
 }
 
 function releaseResourceURLs(): void {
-  for (const url of resourceURLs) URL.revokeObjectURL(url)
-  resourceURLs = []
+  for (const url of appState.resourceURLs) URL.revokeObjectURL(url)
+  appState.resourceURLs = []
 }
 
 async function renderStyleResourceGallery(): Promise<void> {
-  if (archive?.format === "bda") {
+  if (appState.archive?.format === "bda") {
     await renderBdaStyleResourceGallery()
     return
   }
-  if (!archive?.isText(styleConfigPath())) return
+  if (!appState.archive?.isText(styleConfigPath())) return
   if (resourceCategory.dataset.styleCategories !== "bdi") {
     resourceCategory.replaceChildren(
       new Option("全部样式", "all"),
@@ -4179,7 +3945,7 @@ async function renderStyleResourceGallery(): Promise<void> {
     resourceCategory.dataset.styleCategories = "bdi"
   }
   const query = resourceSearch.value.trim().toLowerCase()
-  const stylesDocument = IniDocument.parse(archive.getText(styleConfigPath()))
+  const stylesDocument = IniDocument.parse(appState.archive.getText(styleConfigPath()))
   const category = resourceCategory.value
   const styleIDs = availableStyleIDs().filter((styleID) => {
     const entries = stylesDocument.entries(`STYLE${styleID}`)
@@ -4200,8 +3966,8 @@ async function renderStyleResourceGallery(): Promise<void> {
   styleAddButton.hidden = false
   resourceDownloadButton.hidden = true
   resourceDeleteButton.hidden = true
-  resourceListView.hidden = Boolean(selectedStyleID)
-  resourceDetail.hidden = !selectedStyleID
+  resourceListView.hidden = Boolean(appState.selectedStyleID)
+  resourceDetail.hidden = !appState.selectedStyleID
   const resolver = visualResolver()
   if (!resolver) return
   for (const styleID of styleIDs) {
@@ -4211,7 +3977,7 @@ async function renderStyleResourceGallery(): Promise<void> {
     button.title = `STYLE${styleID}`
     const soundFilename = stylesDocument.get(`STYLE${styleID}`, "PRESS_SOUND_PATH")?.trim()
     const soundPath = soundFilename
-      ? soundPathForFilename(archive.names(), theme.value, orientation.value, soundFilename)
+      ? soundPathForFilename(appState.archive.names(), theme.value, orientation.value, soundFilename)
       : undefined
     if (soundFilename) {
       button.classList.add("has-sound")
@@ -4247,12 +4013,12 @@ async function renderStyleResourceGallery(): Promise<void> {
     })
     resourceGallery.append(button)
   }
-  if (selectedResourceGalleryPath) selectGalleryItem(selectedResourceGalleryPath, resourceGallery)
+  if (appState.selectedResourceGalleryPath) selectGalleryItem(appState.selectedResourceGalleryPath, resourceGallery)
 }
 
 async function renderBdaStyleResourceGallery(): Promise<void> {
   const info = currentBdaAppearance()
-  const part = bdaAppearancePart(selectedPath)
+  const part = bdaAppearancePart(appState.selectedPath)
   if (!info || part?.kind !== "styles") return
   const definitions = {
     imageStyles: { label: "图片样式", type: "image", styles: info.appearance.imageStyles },
@@ -4277,8 +4043,8 @@ async function renderBdaStyleResourceGallery(): Promise<void> {
   styleAddButton.hidden = true
   resourceDownloadButton.hidden = true
   resourceDeleteButton.hidden = true
-  resourceListView.hidden = Boolean(selectedStyleID)
-  resourceDetail.hidden = !selectedStyleID
+  resourceListView.hidden = Boolean(appState.selectedStyleID)
+  resourceDetail.hidden = !appState.selectedStyleID
   const resolver = visualResolver()
   for (const key of keys) {
     const ref: BdaStyleRef = { type: definition.type, key }
@@ -4304,20 +4070,12 @@ async function renderBdaStyleResourceGallery(): Promise<void> {
     button.addEventListener("dblclick", () => selectStyleResource(String(key)))
     resourceGallery.append(button)
   }
-  if (selectedResourceGalleryPath) selectGalleryItem(selectedResourceGalleryPath, resourceGallery)
-}
-
-type SoundEntry = {
-  id: string
-  label: string
-  filename: string
-  path: string
-  usage: string
+  if (appState.selectedResourceGalleryPath) selectGalleryItem(appState.selectedResourceGalleryPath, resourceGallery)
 }
 
 function currentSoundEntries(): SoundEntry[] {
-  if (!archive) return []
-  return soundResourcePaths(archive.names(), theme.value, orientation.value).map((path) => {
+  if (!appState.archive) return []
+  return soundResourcePaths(appState.archive.names(), theme.value, orientation.value).map((path) => {
     const filename = path.split("/").pop() ?? path
     return {
       id: `file:${path}`,
@@ -4330,7 +4088,7 @@ function currentSoundEntries(): SoundEntry[] {
 }
 
 function renderSoundResourceGallery(): void {
-  if (!archive) return
+  if (!appState.archive) return
   const query = resourceSearch.value.trim().toLowerCase()
   const entries = currentSoundEntries().filter((entry) =>
     !query || `${entry.label} ${entry.filename} ${entry.usage}`.toLowerCase().includes(query)
@@ -4343,7 +4101,7 @@ function renderSoundResourceGallery(): void {
   resourceCount.textContent = `${entries.length} 个音效文件`
   resourceUploadInput.accept = SOUND_ACCEPT
   resourceUploadButton.hidden = false
-  resourceUploadButton.title = selectedSoundID ? "替换选中按键音效" : "添加按键音效"
+  resourceUploadButton.title = appState.selectedSoundID ? "替换选中按键音效" : "添加按键音效"
   resourceUploadButton.setAttribute("aria-label", resourceUploadButton.title)
   styleAddButton.hidden = true
   resourceDownloadButton.hidden = false
@@ -4365,7 +4123,7 @@ function renderSoundResourceGallery(): void {
     meta.textContent = `${entry.filename} · ${entry.usage}`
     button.append(icon, name, meta)
     button.addEventListener("click", () => {
-      selectedSoundID = entry.id
+      appState.selectedSoundID = entry.id
       selectGalleryItem(entry.id, resourceGallery)
       resourceUploadButton.title = "替换选中按键音效"
       resourceUploadButton.setAttribute("aria-label", resourceUploadButton.title)
@@ -4373,18 +4131,18 @@ function renderSoundResourceGallery(): void {
     })
     resourceGallery.append(button)
   }
-  if (selectedSoundID) selectGalleryItem(selectedSoundID, resourceGallery)
+  if (appState.selectedSoundID) selectGalleryItem(appState.selectedSoundID, resourceGallery)
 }
 
 function renderResourceInspector(): void {
-  if (!archive) return
+  if (!appState.archive) return
   releaseResourceURLs()
   resourceGallery.replaceChildren()
-  if (resourceInspectorMode === "style") {
+  if (appState.resourceInspectorMode === "style") {
     void renderStyleResourceGallery()
     return
   }
-  if (resourceInspectorMode === "sound") {
+  if (appState.resourceInspectorMode === "sound") {
     renderSoundResourceGallery()
     return
   }
@@ -4403,19 +4161,19 @@ function renderResourceInspector(): void {
   resourceDownloadButton.setAttribute("aria-label", resourceDownloadButton.title)
   resourceDeleteButton.hidden = false
   const query = resourceSearch.value.trim().toLowerCase()
-  const paths = resourceImagePaths(archive.names(), theme.value, orientation.value)
+  const paths = resourceImagePaths(appState.archive.names(), theme.value, orientation.value)
     .filter((path) => !query || path.toLowerCase().includes(query))
-  const bdaUsageCounts = archive.format === "bda" ? bdaImageUsageCounts() : new Map<string, number>()
+  const bdaUsageCounts = appState.archive.format === "bda" ? bdaImageUsageCounts() : new Map<string, number>()
   resourceCount.textContent = `${paths.length} 张图片`
-  resourceListView.hidden = Boolean(selectedResourcePath) && !document.body.classList.contains("atlas-workspace")
-  resourceDetail.hidden = !selectedResourcePath
+  resourceListView.hidden = Boolean(appState.selectedResourcePath) && !document.body.classList.contains("atlas-workspace")
+  resourceDetail.hidden = !appState.selectedResourcePath
   for (const path of paths) {
-    const bytes = archive.getBytes(path)
+    const bytes = appState.archive.getBytes(path)
     if (!bytes) continue
     const copy = new Uint8Array(bytes.byteLength)
     copy.set(bytes)
     const url = URL.createObjectURL(new Blob([copy.buffer], { type: "image/png" }))
-    resourceURLs.push(url)
+    appState.resourceURLs.push(url)
     const button = document.createElement("button")
     button.className = "resource-item"
     button.dataset.path = path
@@ -4426,9 +4184,9 @@ function renderResourceInspector(): void {
     const name = document.createElement("strong")
     name.textContent = path.split("/").pop() ?? path
     const meta = document.createElement("small")
-    const hasTil = archive.isText(path.replace(/\.png$/i, ".til"))
+    const hasTil = appState.archive.isText(path.replace(/\.png$/i, ".til"))
     const bdaUsageCount = bdaUsageCounts.get(bdaImageResourceID(path)) ?? 0
-    meta.textContent = archive.format === "bda"
+    meta.textContent = appState.archive.format === "bda"
       ? bdaUsageCount ? `${bdaUsageCount} 个样式引用` : "未被外观引用"
       : hasTil ? "TIL" : "无 TIL"
     image.addEventListener("load", () => {
@@ -4442,9 +4200,9 @@ function renderResourceInspector(): void {
     resourceGallery.append(button)
   }
   // Restore selection state after re-render
-  if (selectedResourceGalleryPath) {
+  if (appState.selectedResourceGalleryPath) {
     for (const item of resourceGallery.querySelectorAll<HTMLElement>(".resource-item")) {
-      item.classList.toggle("selected", item.dataset.path === selectedResourceGalleryPath)
+      item.classList.toggle("selected", item.dataset.path === appState.selectedResourceGalleryPath)
     }
   }
   updateResourceActionButtons()
@@ -4455,16 +4213,16 @@ function showResourceList(): void {
   resourceListView.hidden = false
   resourceDetail.hidden = true
   resourceInspector.scrollTop = 0
-  if (resourceInspectorMode === "style") {
-    selectedStyleID = ""
+  if (appState.resourceInspectorMode === "style") {
+    appState.selectedStyleID = ""
     renderResourceInspector()
     return
   }
   setDrawingTile(false)
-  movingTile = undefined
-  selectedTileIndex = undefined
-  if (selectedDocument) setSourceValue(selectedDocument.toString())
-  sourceName.textContent = selectedPath
+  appState.movingTile = undefined
+  appState.selectedTileIndex = undefined
+  if (appState.selectedDocument) setSourceValue(appState.selectedDocument.toString())
+  sourceName.textContent = appState.selectedPath
   populateTileInspector()
 }
 
@@ -4502,45 +4260,45 @@ workspaceImage.addEventListener("error", showImagePreviewError)
 
 function updateInspectorView(): void {
   syncAtlasWorkspace()
-  inspectorBackButton.hidden = resourceConfigActive || Boolean(archive?.isImage(selectedPath)) || inspectorTab === "ai"
-  const imageSelected = Boolean(archive?.isImage(selectedPath))
+  inspectorBackButton.hidden = appState.resourceConfigActive || Boolean(appState.archive?.isImage(appState.selectedPath)) || appState.inspectorTab === "ai"
+  const imageSelected = Boolean(appState.archive?.isImage(appState.selectedPath))
   const overviewSelected = Boolean(
-    files.querySelector(`.sidebar-overview button[data-path="${CSS.escape(selectedPath)}"]`),
+    files.querySelector(`.sidebar-overview button[data-path="${CSS.escape(appState.selectedPath)}"]`),
   )
-  const layoutSelected = selectedPath === layoutPath && /\.ini$/i.test(selectedPath)
+  const layoutSelected = appState.selectedPath === appState.layoutPath && /\.ini$/i.test(appState.selectedPath)
   // ini/cnd/pop 布局配置文档自带属性面板，无需依赖概览分组；其余文本仍要求来自概览或当前布局。
-  const configLayoutSelected = showsLayoutProperties(selectedPath)
+  const configLayoutSelected = showsLayoutProperties(appState.selectedPath)
   const propertiesAvailable = Boolean(
-    selectedPath && (
-      archive?.isText(selectedPath) || archive?.isBdaConfig(selectedPath) || isBdaLayoutPath(selectedPath) ||
-      bdaAppearancePart(selectedPath)
+    appState.selectedPath && (
+      appState.archive?.isText(appState.selectedPath) || appState.archive?.isBdaConfig(appState.selectedPath) || isBdaLayoutPath(appState.selectedPath) ||
+      bdaAppearancePart(appState.selectedPath)
     ) && (configLayoutSelected || overviewSelected || layoutSelected) && !imageSelected,
   )
   for (const button of inspectorTabButtons) {
     const tab = button.dataset.inspectorTab
-    const available = resourceConfigActive
-      ? tab === "ai" || tab === "properties" || tab === "source" && Boolean(selectedPath) && !(
-        archive?.format === "bda" && resourceInspectorMode === "image"
+    const available = appState.resourceConfigActive
+      ? tab === "ai" || tab === "properties" || tab === "source" && Boolean(appState.selectedPath) && !(
+        appState.archive?.format === "bda" && appState.resourceInspectorMode === "image"
       )
       :
       tab === "ai"
         ? true
         : tab === "properties"
         ? imageSelected || propertiesAvailable
-        : !imageSelected && Boolean(selectedPath)
+        : !imageSelected && Boolean(appState.selectedPath)
     button.disabled = !available
-    button.classList.toggle("active", tab === inspectorTab && available)
-    button.setAttribute("aria-pressed", String(tab === inspectorTab && available))
+    button.classList.toggle("active", tab === appState.inspectorTab && available)
+    button.setAttribute("aria-pressed", String(tab === appState.inspectorTab && available))
   }
-  if (resourceConfigActive) {
-    sourceName.textContent = inspectorTab === "source" && selectedResourcePath
-      ? archive?.format === "bda" ? "BDA 切片由 appearanceConfig 管理" : tilePath
-      : selectedResourcePath || selectedPath
+  if (appState.resourceConfigActive) {
+    sourceName.textContent = appState.inspectorTab === "source" && appState.selectedResourcePath
+      ? appState.archive?.format === "bda" ? "BDA 切片由 appearanceConfig 管理" : appState.tilePath
+      : appState.selectedResourcePath || appState.selectedPath
     quickInspector.hidden = true
     asset.hidden = true
-    resourceInspector.hidden = inspectorTab !== "properties"
-    sourceEditor.hidden = inspectorTab !== "source"
-    aiDesignPanel.hidden = inspectorTab !== "ai"
+    resourceInspector.hidden = appState.inspectorTab !== "properties"
+    sourceEditor.hidden = appState.inspectorTab !== "source"
+    aiDesignPanel.hidden = appState.inspectorTab !== "ai"
     updateSourceFindVisibility()
     loadVisibleSourceEditor()
     return
@@ -4549,15 +4307,15 @@ function updateInspectorView(): void {
   if (imageSelected) {
     quickInspector.hidden = true
     sourceEditor.hidden = true
-    aiDesignPanel.hidden = inspectorTab !== "ai"
-    asset.hidden = inspectorTab === "ai"
+    aiDesignPanel.hidden = appState.inspectorTab !== "ai"
+    asset.hidden = appState.inspectorTab === "ai"
     updateSourceFindVisibility()
     return
   }
   asset.hidden = true
-  quickInspector.hidden = inspectorTab !== "properties" || !propertiesAvailable
-  sourceEditor.hidden = inspectorTab !== "source"
-  aiDesignPanel.hidden = inspectorTab !== "ai"
+  quickInspector.hidden = appState.inspectorTab !== "properties" || !propertiesAvailable
+  sourceEditor.hidden = appState.inspectorTab !== "source"
+  aiDesignPanel.hidden = appState.inspectorTab !== "ai"
   updateSourceFindVisibility()
   loadVisibleSourceEditor()
 }
@@ -4571,26 +4329,26 @@ function syncSourceFindBarOffset(): void {
 function updateSourceFindVisibility(): void {
   // 圆形查找按钮悬浮在源代码右下角，点击后底部弹出搜索栏；Ctrl/Cmd + F 也可唤出。
   const sourceVisible = !sourceEditor.hidden
-  const expanded = sourceVisible && sourceFindVisible
+  const expanded = sourceVisible && appState.sourceFindVisible
   sourceFindToggle.hidden = !sourceVisible
   sourceFindToggle.setAttribute("aria-pressed", String(expanded))
   sourceFindToggle.setAttribute("aria-expanded", String(expanded))
-  sourceFindToggle.title = sourceFindToggle.ariaLabel = sourceFindVisible ? "收起查找" : "查找（Ctrl/⌘ + F）"
+  sourceFindToggle.title = sourceFindToggle.ariaLabel = appState.sourceFindVisible ? "收起查找" : "查找（Ctrl/⌘ + F）"
   sourceToolbar.hidden = !expanded
   syncSourceFindBarOffset()
 }
 
 function openSourceFind(): void {
   if (sourceEditor.hidden) return
-  sourceFindVisible = true
+  appState.sourceFindVisible = true
   updateSourceFindVisibility()
   sourceSearch.focus()
   sourceSearch.select()
 }
 
 function closeSourceFind(): void {
-  if (!sourceFindVisible) return
-  sourceFindVisible = false
+  if (!appState.sourceFindVisible) return
+  appState.sourceFindVisible = false
   updateSourceFindVisibility()
   sourceFindToggle.focus()
 }
@@ -4598,46 +4356,46 @@ function closeSourceFind(): void {
 const SOURCE_SEARCH_HIGHLIGHT_LIMIT = 20_000
 
 function scheduleSourceInputHighlight(refreshInspector = false): void {
-  sourceInputRefreshPending ||= refreshInspector
-  if (sourceInputHighlightTimer !== undefined) window.clearTimeout(sourceInputHighlightTimer)
-  sourceInputHighlightTimer = window.setTimeout(() => {
-    sourceInputHighlightTimer = undefined
+  appState.sourceInputRefreshPending ||= refreshInspector
+  if (appState.sourceInputHighlightTimer !== undefined) window.clearTimeout(appState.sourceInputHighlightTimer)
+  appState.sourceInputHighlightTimer = window.setTimeout(() => {
+    appState.sourceInputHighlightTimer = undefined
     updateSourceHighlight()
   }, 100)
 }
 
 function scheduleSourceSearch(): void {
-  if (sourceSearchTimer !== undefined) window.clearTimeout(sourceSearchTimer)
-  sourceSearchTimer = window.setTimeout(() => {
-    sourceSearchTimer = undefined
+  if (appState.sourceSearchTimer !== undefined) window.clearTimeout(appState.sourceSearchTimer)
+  appState.sourceSearchTimer = window.setTimeout(() => {
+    appState.sourceSearchTimer = undefined
     updateSourceHighlight()
   }, 80)
 }
 
 function updateSourceHighlight(): void {
-  if (sourceSearchTimer !== undefined) window.clearTimeout(sourceSearchTimer)
-  sourceSearchTimer = undefined
-  if (sourceInputHighlightTimer !== undefined) window.clearTimeout(sourceInputHighlightTimer)
-  sourceInputHighlightTimer = undefined
-  if (sourceInputRefreshPending) {
-    sourceInputRefreshPending = false
+  if (appState.sourceSearchTimer !== undefined) window.clearTimeout(appState.sourceSearchTimer)
+  appState.sourceSearchTimer = undefined
+  if (appState.sourceInputHighlightTimer !== undefined) window.clearTimeout(appState.sourceInputHighlightTimer)
+  appState.sourceInputHighlightTimer = undefined
+  if (appState.sourceInputRefreshPending) {
+    appState.sourceInputRefreshPending = false
     refreshPreview()
     populateKeyInspector()
   }
   const sections = selectedSourceSections()
   const query = sourceSearch.value.trim()
-  const bdaSource = Boolean(archive?.format === "bda" && (
-    archive.isBdaConfig(selectedPath) || isBdaVirtualTextPath(selectedPath) || isBdaAppearancePartPath(selectedPath)
+  const bdaSource = Boolean(appState.archive?.format === "bda" && (
+    appState.archive.isBdaConfig(appState.selectedPath) || isBdaVirtualTextPath(appState.selectedPath) || isBdaAppearancePartPath(appState.selectedPath)
   ))
   source.setLanguage(bdaSource ? "json" : "ini")
   const matches = sourceSearchMatches()
   updateSourceSearchStatus(matches)
   const selectedRanges = bdaSource
     ? jsonPropertyRanges(source.value, selectedBdaSourceKeys())
-    : sections.length ? iniSectionRanges(source.value, sections) : sourceHistoryHighlight ? [sourceHistoryHighlight] : []
+    : sections.length ? iniSectionRanges(source.value, sections) : appState.sourceHistoryHighlight ? [appState.sourceHistoryHighlight] : []
   const searchRanges = matches.slice(0, SOURCE_SEARCH_HIGHLIGHT_LIMIT)
     .map((start) => [start, start + query.length] as const)
-  const activeStart = matches[sourceSearchIndex]
+  const activeStart = matches[appState.sourceSearchIndex]
   source.setDecorations({
     selectedRanges,
     searchRanges,
@@ -4656,9 +4414,9 @@ function sourceSearchMatches(): number[] {
 }
 
 function updateSourceSearchStatus(matches = sourceSearchMatches()): void {
-  if (sourceSearchIndex >= matches.length) sourceSearchIndex = -1
+  if (appState.sourceSearchIndex >= matches.length) appState.sourceSearchIndex = -1
   sourceSearchCount.textContent = sourceSearch.value.trim()
-    ? `${sourceSearchIndex < 0 ? 0 : sourceSearchIndex + 1}/${matches.length}`
+    ? `${appState.sourceSearchIndex < 0 ? 0 : appState.sourceSearchIndex + 1}/${matches.length}`
     : ""
   sourceSearchPrevious.disabled = sourceSearchNext.disabled = !matches.length
   const replaceable = Boolean(matches.length) && !source.disabled && !source.readOnly
@@ -4668,14 +4426,14 @@ function updateSourceSearchStatus(matches = sourceSearchMatches()): void {
 function findSourceMatch(direction: 1 | -1): void {
   const matches = sourceSearchMatches()
   if (!matches.length) {
-    sourceSearchIndex = -1
+    appState.sourceSearchIndex = -1
     updateSourceHighlight()
     return
   }
-  sourceSearchIndex = sourceSearchIndex < 0
+  appState.sourceSearchIndex = appState.sourceSearchIndex < 0
     ? direction > 0 ? 0 : matches.length - 1
-    : (sourceSearchIndex + direction + matches.length) % matches.length
-  const start = matches[sourceSearchIndex]
+    : (appState.sourceSearchIndex + direction + matches.length) % matches.length
+  const start = matches[appState.sourceSearchIndex]
   source.setSelectionRange(start, start + sourceSearch.value.trim().length)
   updateSourceHighlight()
 }
@@ -4684,24 +4442,24 @@ function replaceSourceMatches(replaceAll: boolean): void {
   const query = sourceSearch.value.trim()
   const matches = sourceSearchMatches()
   if (!query || !matches.length || source.disabled || source.readOnly) return
-  const index = sourceSearchIndex < 0 ? 0 : sourceSearchIndex
+  const index = appState.sourceSearchIndex < 0 ? 0 : appState.sourceSearchIndex
   source.value = replaceTextMatches(source.value, query, sourceReplacement.value, replaceAll ? undefined : index)
-  sourceSearchIndex = replaceAll ? -1 : index
+  appState.sourceSearchIndex = replaceAll ? -1 : index
   source.dispatchEvent(new Event("input", { bubbles: true }))
-  if (archive?.isBdaConfig(selectedPath) || isBdaAppearancePartPath(selectedPath)) commitBdaSourceEdit()
+  if (appState.archive?.isBdaConfig(appState.selectedPath) || isBdaAppearancePartPath(appState.selectedPath)) commitBdaSourceEdit()
   if (!replaceAll) findSourceMatch(1)
 }
 
 function selectedSourceSections(): string[] {
-  if (resourceConfigActive && selectedResourcePath) {
-    return selectedTileIndex === undefined ? [] : [`IMG${selectedTileIndex}`]
+  if (appState.resourceConfigActive && appState.selectedResourcePath) {
+    return appState.selectedTileIndex === undefined ? [] : [`IMG${appState.selectedTileIndex}`]
   }
-  if (resourceConfigActive && resourceInspectorMode === "style") {
-    return selectedStyleID && archive?.format !== "bda" ? [`STYLE${selectedStyleID}`] : []
+  if (appState.resourceConfigActive && appState.resourceInspectorMode === "style") {
+    return appState.selectedStyleID && appState.archive?.format !== "bda" ? [`STYLE${appState.selectedStyleID}`] : []
   }
-  const toolbarSections = isToolbarPath(selectedPath) ? effectiveToolbarSections() : []
+  const toolbarSections = isToolbarPath(appState.selectedPath) ? effectiveToolbarSections() : []
   if (toolbarSections.length) return toolbarSections
-  return selectedPath === layoutPath ? effectiveSelectedSections() : []
+  return appState.selectedPath === appState.layoutPath ? effectiveSelectedSections() : []
 }
 
 function currentSkinState(): number | undefined {
@@ -4709,35 +4467,35 @@ function currentSkinState(): number | undefined {
 }
 
 function effectiveKeySection(section: string): string {
-  if (!layoutDocument || isListCell(section)) return section
-  return effectivePanelSection(layoutDocument, section, currentSkinState())
+  if (!appState.layoutDocument || isListCell(section)) return section
+  return effectivePanelSection(appState.layoutDocument, section, currentSkinState())
 }
 
 function effectiveSelectedSections(): string[] {
-  return selectedKeySections.map(effectiveKeySection)
+  return appState.selectedKeySections.map(effectiveKeySection)
 }
 
 function effectiveToolbarSections(): string[] {
-  if (!selectedDocument) return selectedToolbarSections
-  return [...new Set(selectedToolbarSections.flatMap((section) => {
-    const effective = effectivePanelSection(selectedDocument!, section, currentSkinState())
+  if (!appState.selectedDocument) return appState.selectedToolbarSections
+  return [...new Set(appState.selectedToolbarSections.flatMap((section) => {
+    const effective = effectivePanelSection(appState.selectedDocument!, section, currentSkinState())
     return effective === section ? [section] : [section, effective]
   }))]
 }
 
 function effectiveKeyValue(section: string, key: string): string | undefined {
-  if (!layoutDocument) return
+  if (!appState.layoutDocument) return
   const effective = effectiveKeySection(section)
-  return layoutDocument.get(effective, key) ?? layoutDocument.get(section, key)
+  return appState.layoutDocument.get(effective, key) ?? appState.layoutDocument.get(section, key)
 }
 
 function scrollSelectedSource(): void {
   const sections = selectedSourceSections()
   const bdaKeys = selectedBdaSourceKeys()
-  if (sourceEditor.hidden || !sections.length && !bdaKeys.length && !sourceHistoryHighlight) return
+  if (sourceEditor.hidden || !sections.length && !bdaKeys.length && !appState.sourceHistoryHighlight) return
   const bdaRange = jsonPropertyRanges(source.value, bdaKeys)[0]
   const iniRange = iniSectionRanges(source.value, sections)[0]
-  const range = bdaRange ?? iniRange ?? sourceHistoryHighlight
+  const range = bdaRange ?? iniRange ?? appState.sourceHistoryHighlight
   if (range) source.revealRange(range[0], range[1])
 }
 
@@ -4756,7 +4514,7 @@ function styleConfigPath(): string {
     `${theme.value}/skin/${orientation.value}/res/default.css`,
     `${theme.value}/skin/res/default.css`,
   ]
-  return candidates.find((path) => archive?.names().includes(path)) ?? candidates[0]
+  return candidates.find((path) => appState.archive?.names().includes(path)) ?? candidates[0]
 }
 
 function legacyAnimationConfigPath(): string | undefined {
@@ -4764,7 +4522,7 @@ function legacyAnimationConfigPath(): string | undefined {
     `${theme.value}/skin/${orientation.value}/anim.ini`,
     `${theme.value}/skin/${orientation.value}/res/anim.ini`,
     `${theme.value}/skin/res/anim.ini`,
-  ].find((path) => archive?.isText(path))
+  ].find((path) => appState.archive?.isText(path))
 }
 
 function genConfigPath(): string {
@@ -4773,13 +4531,13 @@ function genConfigPath(): string {
 
 // LIST 候选栏单元的几何（POS/CELL_SIZE）可能定义在布局自身或 gen.ini（候选栏几何通常全局共享）
 function listGeometryDocument(): { document: IniDocument; path: string } | undefined {
-  if (!archive || !layoutDocument) return
-  if (layoutDocument.get("LIST", "POS") !== undefined || layoutDocument.get("LIST", "CELL_SIZE") !== undefined) {
-    return { document: layoutDocument, path: layoutPath }
+  if (!appState.archive || !appState.layoutDocument) return
+  if (appState.layoutDocument.get("LIST", "POS") !== undefined || appState.layoutDocument.get("LIST", "CELL_SIZE") !== undefined) {
+    return { document: appState.layoutDocument, path: appState.layoutPath }
   }
   const path = genConfigPath()
-  if (archive.isText(path)) return { document: IniDocument.parse(archive.getText(path)), path }
-  return { document: layoutDocument, path: layoutPath }
+  if (appState.archive.isText(path)) return { document: IniDocument.parse(appState.archive.getText(path)), path }
+  return { document: appState.layoutDocument, path: appState.layoutPath }
 }
 
 function isSkinInfoPath(path: string): boolean {
@@ -4800,7 +4558,7 @@ function isConfigLayoutPath(path: string): boolean {
  * BDA 容器内的同名遗留文件由 bda 解析器处理，不能按普通布局文档放行。
  */
 function showsLayoutProperties(path: string): boolean {
-  return archive?.format !== "bda" && isConfigLayoutPath(path)
+  return appState.archive?.format !== "bda" && isConfigLayoutPath(path)
 }
 
 function colorControlKey(field: HTMLInputElement): string {
@@ -4838,34 +4596,34 @@ function writeColorControl(control: HTMLInputElement, alphaValue: number): void 
 function keyboardContext():
   | { gen: IniDocument; genPath: string; styles: IniDocument; stylePath: string }
   | undefined {
-  if (!archive) return
+  if (!appState.archive) return
   const genPath = genConfigPath()
   const stylePath = styleConfigPath()
-  if (!archive.isText(genPath) || !archive.isText(stylePath)) return
+  if (!appState.archive.isText(genPath) || !appState.archive.isText(stylePath)) return
   return {
-    gen: IniDocument.parse(archive.getText(genPath)),
+    gen: IniDocument.parse(appState.archive.getText(genPath)),
     genPath,
-    styles: IniDocument.parse(archive.getText(stylePath)),
+    styles: IniDocument.parse(appState.archive.getText(stylePath)),
     stylePath,
   }
 }
 
 function toolbarConfigPath(): string | undefined {
-  if (!archive) return
+  if (!appState.archive) return
   const directory = `${theme.value}/skin/${orientation.value}`
   const genPath = genConfigPath()
-  const source = archive.format === "bda" ? bdaBase : archive
-  const sourceGenPath = archive.format === "bda" ? bdaBasePath(genPath) : genPath
+  const source = appState.archive.format === "bda" ? appState.bdaBase : appState.archive
+  const sourceGenPath = appState.archive.format === "bda" ? bdaBasePath(genPath) : genPath
   const configured = source?.isText(sourceGenPath)
     ? IniDocument.parse(source.getText(sourceGenPath)).get("CAND", "LAYOUT_NAME")?.trim()
     : undefined
-  const sourceDirectory = archive.format === "bda" ? bdaBasePath(directory) : directory
+  const sourceDirectory = appState.archive.format === "bda" ? bdaBasePath(directory) : directory
   const found = source && firstExistingPath(source.names(), sourceDirectory, [
     ...(configured ? [`${configured}.cnd`] : []),
     "cand1.cnd",
     "cand.cnd",
   ])
-  return found && (archive.format === "bda"
+  return found && (appState.archive.format === "bda"
     ? `${directory}/${found.split("/").pop()}`
     : found)
 }
@@ -4904,7 +4662,7 @@ function refreshToolbarPreview(
   composing: boolean,
   resolver: VisualResolver,
 ): { width: number; height: number; inputHeight: number } | undefined {
-  if (isConfiguredSymbolLayout(layoutPath, textDocument(genConfigPath()))) {
+  if (isConfiguredSymbolLayout(appState.layoutPath, textDocument(genConfigPath()))) {
     delete toolbarStrip.dataset.path
     toolbarStrip.hidden = true
     candidateBackgroundCanvas.hidden = true
@@ -4912,15 +4670,15 @@ function refreshToolbarPreview(
   }
   const path = toolbarConfigPath()
   const document = path ? textDocument(path) : undefined
-  if (!archive || !path || !document) {
+  if (!appState.archive || !path || !document) {
     delete toolbarStrip.dataset.path
     toolbarStrip.hidden = true
     candidateBackgroundCanvas.hidden = true
     return
   }
   const gen = textDocument(genConfigPath())
-  const bdaPanel = archive.format === "bda"
-    ? currentBdaAppearance()?.appearance.panels.get(layoutPath.split("/").pop()?.replace(/\.ini$/i, "") ?? "")
+  const bdaPanel = appState.archive.format === "bda"
+    ? currentBdaAppearance()?.appearance.panels.get(appState.layoutPath.split("/").pop()?.replace(/\.ini$/i, "") ?? "")
     : undefined
   toolbarStrip.hidden = false
   toolbarStrip.dataset.path = path
@@ -4936,7 +4694,7 @@ function refreshToolbarPreview(
     : gen
   const inputStyle = resolveCandidateInputStyle(inputGeneral, resolver, width, document)
   const inputHeight = inputStyle.height
-  const backgroundStyle = archive?.format === "bda"
+  const backgroundStyle = appState.archive?.format === "bda"
     ? bdaStyleID(bdaPanel?.backStyle)
     : document.get("CAND", "BACK_STYLE")?.split(",")[0] ??
       gen?.get("SCAND", "BACK_STYLE")?.split(",")[0] ?? ""
@@ -4980,12 +4738,10 @@ function renderSourceValueThumbnail(canvas: HTMLCanvasElement, range: SourceEdit
   }).catch(() => {})
 }
 
-let sourceColorPickerTarget: SourceEditorValueRange | undefined
-
 function openSourceColorPicker(range: SourceEditorValueClick): void {
   const clean = range.value.trim().replace(/^#/, "")
   if (range.kind !== "color" || !/^[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(clean)) return
-  sourceColorPickerTarget = range
+  appState.sourceColorPickerTarget = range
   sourceColorPicker.value = `#${(clean.length === 8 ? clean.slice(2) : clean).toLowerCase()}`
   sourceColorPicker.title = range.label ?? `颜色 ${range.value}`
   sourceColorPicker.style.left = `${Math.max(0, Math.min(window.innerWidth - 1, range.anchor.left))}px`
@@ -4998,8 +4754,8 @@ function openSourceColorPicker(range: SourceEditorValueClick): void {
 }
 
 function applySourceColorPicker(): void {
-  const target = sourceColorPickerTarget
-  sourceColorPickerTarget = undefined
+  const target = appState.sourceColorPickerTarget
+  appState.sourceColorPickerTarget = undefined
   if (!target || source.disabled || source.readOnly) return
   if (source.value.slice(target.from, target.to) !== target.value) return
   const next = replacedSourceColor(target.value, sourceColorPicker.value)
@@ -5014,9 +4770,9 @@ function showStyleImageDialog(): void {
 
 /** Jumps to a style's definition: the slice picker's target, or `styleID` when given (source Command/Ctrl click). */
 function openSourceStyleDefinition(styleID = ""): void {
-  const target = styleID ? undefined : pickerTarget
-  if (!archive || !styleID && (!target?.path || !target.sections?.length)) return
-  const ref = archive.format === "bda" ? bdaStyleRef(styleID) : undefined
+  const target = styleID ? undefined : appState.pickerTarget
+  if (!appState.archive || !styleID && (!target?.path || !target.sections?.length)) return
+  const ref = appState.archive.format === "bda" ? bdaStyleRef(styleID) : undefined
   const path = target?.path ?? (ref ? bdaAppearanceStylePath(`${ref.type}Styles`) : styleConfigPath())
   const sections = target?.sections
   clearImageSlicePicker()
@@ -5033,28 +4789,27 @@ function openSourceStyleDefinition(styleID = ""): void {
 
 // 源码里的样式引用借用一个隐藏输入框接入属性检查器的样式库，选择结果写回源码。
 const sourceStyleProxy = document.createElement("input")
-let sourceStyleProxyTarget: SourceEditorValueRange | undefined
 sourceStyleProxy.hidden = true
 document.body.append(sourceStyleProxy)
 sourceStyleProxy.addEventListener("change", () => {
-  const target = sourceStyleProxyTarget
+  const target = appState.sourceStyleProxyTarget
   if (!target || source.disabled || source.readOnly) return
   if (source.value.slice(target.from, target.to) !== target.value) return
   const next = replacedSourceStyle(target.value, sourceStyleProxy.value.split(",")[0]?.trim() ?? "")
   if (!next) return
   source.replaceRange(target.from, target.to, next)
-  sourceStyleProxyTarget = { ...target, to: target.from + next.length, value: next }
+  appState.sourceStyleProxyTarget = { ...target, to: target.from + next.length, value: next }
   source.commit()
 })
 
 function openSourceStylePicker(range: SourceEditorValueRange): void {
   if (range.kind !== "style") return
   const styleID = range.value.replace(/^STYLE/i, "")
-  sourceStyleProxyTarget = range
+  appState.sourceStyleProxyTarget = range
   sourceStyleProxy.value = styleID
   const key = (range.key ?? "STYLE").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase()
   sourceStyleProxy.dataset.documentStyleKey = key
-  const type = archive?.format === "bda" ? bdaStyleRef(styleID)?.type : undefined
+  const type = appState.archive?.format === "bda" ? bdaStyleRef(styleID)?.type : undefined
   if (type) sourceStyleProxy.dataset.bdaStyleType = type
   else delete sourceStyleProxy.dataset.bdaStyleType
   sourceStyleProxy.disabled = source.disabled || source.readOnly || !isEditing()
@@ -5062,9 +4817,6 @@ function openSourceStylePicker(range: SourceEditorValueRange): void {
   if (key === "SOUND_STYLE") openStylePicker(sourceStyleProxy)
   else void openStyleReferenceStateImage(sourceStyleProxy, key, false)
 }
-
-let stylePickerTarget: HTMLInputElement | undefined
-let stylePickerRenderID = 0
 const styleReferenceDrawIDs = new WeakMap<HTMLElement, number>()
 
 function styleReferenceKey(input: HTMLInputElement): string {
@@ -5077,11 +4829,11 @@ function isStyleReferenceKey(key: string): boolean {
 }
 
 function soundPathForStyle(styleID: string): string | undefined {
-  if (!archive) return
+  if (!appState.archive) return
   const path = styleConfigPath()
-  if (!archive.isText(path)) return
-  const filename = IniDocument.parse(archive.getText(path)).get(`STYLE${styleID}`, "PRESS_SOUND_PATH")?.trim()
-  return filename ? soundPathForFilename(archive.names(), theme.value, orientation.value, filename) : undefined
+  if (!appState.archive.isText(path)) return
+  const filename = IniDocument.parse(appState.archive.getText(path)).get(`STYLE${styleID}`, "PRESS_SOUND_PATH")?.trim()
+  return filename ? soundPathForFilename(appState.archive.names(), theme.value, orientation.value, filename) : undefined
 }
 
 function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferenceKey(input)): void {
@@ -5306,10 +5058,10 @@ function styleWriteTarget(
   property: "NM_IMG" | "HL_IMG",
   styleIDs: string[],
 ): StyleImagePickerTarget {
-  if (archive?.format === "bda") return { source, property }
+  if (appState.archive?.format === "bda") return { source, property }
   const path = styleConfigPath()
-  if (!archive?.isText(path)) return { source, property }
-  const document = IniDocument.parse(archive.getText(path))
+  if (!appState.archive?.isText(path)) return { source, property }
+  const document = IniDocument.parse(appState.archive.getText(path))
   const sections = [...new Set(styleIDs.flatMap((token) => {
     const value = Number(token)
     return [`STYLE${token}`, source === "FORE_STYLE" && Number.isFinite(value) ? `STYLE${Math.floor(value / 100)}` : ""]
@@ -5356,40 +5108,40 @@ async function openStyleReferenceStateImage(
     }
   }
   const target = styleWriteTarget(targetSource, property, styleIDs)
-  stylePickerTarget = input
-  styleLibraryHighlighted = highlighted
+  appState.stylePickerTarget = input
+  appState.styleLibraryHighlighted = highlighted
   if (visual?.imagePath) openImageSlicePicker(visual.imagePath, target, visual.source)
   else openStyleImageResourceChooser(target)
 }
 
 function openStyleReferenceEditor(styleID: string): void {
-  if (!styleID || !availableStyleIDs().includes(styleID) || !archive) return
-  const returnPath = selectedPath
-  const returnSelection = [...selectedKeySections]
-  const returnCandidate = selectedCandidate
+  if (!styleID || !availableStyleIDs().includes(styleID) || !appState.archive) return
+  const returnPath = appState.selectedPath
+  const returnSelection = [...appState.selectedKeySections]
+  const returnCandidate = appState.selectedCandidate
   const returnScrollTop = quickInspector.scrollTop
   const returnInspectorGroup = quickInspector.dataset.mobileInspectorGroup ?? ""
-  if (archive.format === "bda") {
+  if (appState.archive.format === "bda") {
     const ref = bdaStyleRef(styleID)
     if (!ref) return
     const group = `${ref.type}Styles` as BdaAppearanceStyleGroup
     const path = bdaAppearanceStylePath(group)
     selectFile(path, "overview", "style")
-    styleReturnPath = returnPath === path ? "" : returnPath
-    styleReturnSelection = returnSelection
-    styleReturnCandidate = returnCandidate
-    styleReturnScrollTop = returnScrollTop
-    styleReturnInspectorGroup = returnInspectorGroup
+    appState.styleReturnPath = returnPath === path ? "" : returnPath
+    appState.styleReturnSelection = returnSelection
+    appState.styleReturnCandidate = returnCandidate
+    appState.styleReturnScrollTop = returnScrollTop
+    appState.styleReturnInspectorGroup = returnInspectorGroup
     selectStyleResource(String(ref.key))
     return
   }
   const path = styleConfigPath()
-  if (!archive.isText(path)) return
+  if (!appState.archive.isText(path)) return
   selectFile(path, "overview", "style")
-  styleReturnPath = returnPath === path ? "" : returnPath
-  styleReturnSelection = returnSelection
-  styleReturnScrollTop = returnScrollTop
-  styleReturnInspectorGroup = returnInspectorGroup
+  appState.styleReturnPath = returnPath === path ? "" : returnPath
+  appState.styleReturnSelection = returnSelection
+  appState.styleReturnScrollTop = returnScrollTop
+  appState.styleReturnInspectorGroup = returnInspectorGroup
   selectStyleResource(styleID)
 }
 
@@ -5406,12 +5158,12 @@ function openBdaStyleReferencePicker(paths: string[][], ref: BdaStyleRef, field:
 }
 
 function stylePickerLabel(styleID: string): string {
-  return archive?.format === "bda" ? String(bdaStyleRef(styleID)?.key ?? styleID) : styleID
+  return appState.archive?.format === "bda" ? String(bdaStyleRef(styleID)?.key ?? styleID) : styleID
 }
 
 function availableStyleIDs(): string[] {
-  if (!archive) return []
-  if (archive.format === "bda") {
+  if (!appState.archive) return []
+  if (appState.archive.format === "bda") {
     const appearance = currentBdaAppearance()?.appearance
     if (!appearance) return []
     return [
@@ -5421,13 +5173,11 @@ function availableStyleIDs(): string[] {
     ]
   }
   const path = styleConfigPath()
-  if (!archive.isText(path)) return []
-  return IniDocument.parse(archive.getText(path)).sections()
+  if (!appState.archive.isText(path)) return []
+  return IniDocument.parse(appState.archive.getText(path)).sections()
     .flatMap((section) => section.match(/^STYLE(\d+)$/)?.[1] ?? [])
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
 }
-
-type StyleKind = "image" | "color" | "anim" | "text" | "sound" | "empty"
 const styleKinds: Record<StyleKind, { label: string; icon: string }> = {
   image: { label: "图片", icon: "images" },
   color: { label: "颜色", icon: "palette" },
@@ -5439,7 +5189,7 @@ const styleKinds: Record<StyleKind, { label: string; icon: string }> = {
 
 /** 按样式内容判定类型：有图即图片样式，其次动画、颜色、声音，只剩文字属性的归为文字样式。 */
 function styleKind(styleID: string, styles = styleConfigDocument()): StyleKind {
-  if (archive?.format === "bda") return bdaStyleRef(styleID)?.type ?? "empty"
+  if (appState.archive?.format === "bda") return bdaStyleRef(styleID)?.type ?? "empty"
   const keys = new Set(styles?.entries(`STYLE${styleID}`).filter((entry) => entry.value.trim()).map((entry) => entry.key) ?? [])
   const has = (pattern: RegExp) => [...keys].some((key) => pattern.test(key))
   if (has(/^(?:NM|HL)_IMG$/)) return "image"
@@ -5451,7 +5201,7 @@ function styleKind(styleID: string, styles = styleConfigDocument()): StyleKind {
 
 function styleConfigDocument(): IniDocument | undefined {
   const path = styleConfigPath()
-  return archive?.isText(path) ? IniDocument.parse(archive.getText(path)) : undefined
+  return appState.archive?.isText(path) ? IniDocument.parse(appState.archive.getText(path)) : undefined
 }
 
 /** 样式类型徽标：样式库、检查器缩略图、样式配置列表共用，保证同一类型处处同一图标与文字。 */
@@ -5470,12 +5220,6 @@ function styleKindForKey(key: string): StyleKind | "all" {
   if (key === "HW_FORE_STYLE") return "color"
   return "all"
 }
-
-let styleLibraryMode: "styles" | "images" = "styles"
-let styleLibraryFilter = "all"
-let styleLibraryKind: StyleKind | "all" = "all"
-let styleLibraryHighlighted = false
-let styleLibrarySelected: { styleID?: string; imagePath?: string } | undefined
 const styleLibraryPreview = $("#style-library-preview")
 const styleLibraryPreviewImage = $("#style-library-preview-image")
 const styleLibraryApply = $("#style-library-apply") as HTMLButtonElement
@@ -5483,7 +5227,7 @@ const styleLibraryEdit = $("#style-library-edit") as HTMLButtonElement
 
 function styleLibraryCategories(styleID: string): Set<string> {
   const categories = new Set<string>()
-  for (const { section, key, value } of layoutDocument?.entries() ?? []) {
+  for (const { section, key, value } of appState.layoutDocument?.entries() ?? []) {
     if (!isStyleReferenceKey(key) || !value.split(",").map((value) => value.trim()).includes(styleID)) continue
     if (/CAND|INPUT|CELL/.test(section + key)) categories.add("candidate")
     else if (styleReferenceForeground(key)) categories.add("foreground")
@@ -5494,8 +5238,8 @@ function styleLibraryCategories(styleID: string): Set<string> {
 }
 
 function applyStyleLibrarySelection(): void {
-  const target = stylePickerTarget
-  const selected = styleLibrarySelected
+  const target = appState.stylePickerTarget
+  const selected = appState.styleLibrarySelected
   if (!target || target.disabled || !selected || !isEditing()) return
   if (selected.styleID) {
     const ref = bdaStyleRef(selected.styleID)
@@ -5506,16 +5250,16 @@ function applyStyleLibrarySelection(): void {
     closeStylePicker()
   } else if (selected.imagePath) {
     const styleID = target.value.split(",")[0]?.trim() ?? ""
-    if (archive?.format === "bda") {
+    if (appState.archive?.format === "bda") {
       const ref = bdaStyleRef(styleID)
       if (ref?.type !== "image") return
-      if (updateBdaRefs([ref], styleLibraryHighlighted ? "HL_IMG" : "NM_IMG", bdaImageResourceID(selected.imagePath))) {
+      if (updateBdaRefs([ref], appState.styleLibraryHighlighted ? "HL_IMG" : "NM_IMG", bdaImageResourceID(selected.imagePath))) {
         closeStylePicker()
         void refreshStyleReferenceThumbnails()
       }
     } else {
       stylePickerDialog.close()
-      openImageSlicePicker(selected.imagePath, styleWriteTarget(styleReferenceForeground(styleReferenceKey(target)) ? "FORE_STYLE" : "BACK_STYLE", styleLibraryHighlighted ? "HL_IMG" : "NM_IMG", [styleID]))
+      openImageSlicePicker(selected.imagePath, styleWriteTarget(styleReferenceForeground(styleReferenceKey(target)) ? "FORE_STYLE" : "BACK_STYLE", appState.styleLibraryHighlighted ? "HL_IMG" : "NM_IMG", [styleID]))
     }
   }
 }
@@ -5525,12 +5269,12 @@ function previewStyleLibraryItem(
   selected: { styleID?: string; imagePath?: string },
   visuals: Array<Visual | undefined> = [],
 ): void {
-  styleLibrarySelected = selected
+  appState.styleLibrarySelected = selected
   stylePickerGrid.querySelectorAll(".previewing").forEach((item) => item.classList.remove("previewing"))
   button.classList.add("previewing")
   styleLibraryPreviewImage.replaceChildren()
   if (selected.imagePath) {
-    const bytes = archive?.getBytes(selected.imagePath)
+    const bytes = appState.archive?.getBytes(selected.imagePath)
     if (!bytes) return
     const image = new Image()
     image.alt = selected.imagePath.split("/").pop() ?? selected.imagePath
@@ -5545,11 +5289,11 @@ function previewStyleLibraryItem(
   }
   $("#style-library-preview-title").textContent = selected.imagePath?.split("/").pop() ?? `样式 ${stylePickerLabel(selected.styleID!)}`
   $("#style-library-preview-meta").textContent = selected.imagePath ?? "正常 / 按下 · 确认后应用到当前项"
-  const targetType = stylePickerTarget?.dataset.bdaStyleType
-  const ref = bdaStyleRef(selected.styleID ?? stylePickerTarget?.value.split(",")[0]?.trim() ?? "")
+  const targetType = appState.stylePickerTarget?.dataset.bdaStyleType
+  const ref = bdaStyleRef(selected.styleID ?? appState.stylePickerTarget?.value.split(",")[0]?.trim() ?? "")
   const compatible = !targetType || (selected.imagePath ? ref?.type === "image" : ref?.type === targetType)
   styleLibraryApply.disabled = !compatible || !isEditing()
-  styleLibraryApply.textContent = !compatible ? "样式类型不兼容" : selected.imagePath && archive?.format !== "bda" ? "选择切片并应用" : "应用到当前项"
+  styleLibraryApply.textContent = !compatible ? "样式类型不兼容" : selected.imagePath && appState.archive?.format !== "bda" ? "选择切片并应用" : "应用到当前项"
   styleLibraryPreview.hidden = false
 }
 
@@ -5559,7 +5303,7 @@ function closeStylePicker(): void {
 }
 
 function editStyleLibrarySelection(): void {
-  const selected = styleLibrarySelected
+  const selected = appState.styleLibrarySelected
   if (!selected) return
   closeStylePicker()
   if (selected.styleID) openStyleReferenceEditor(selected.styleID)
@@ -5571,8 +5315,8 @@ styleLibraryEdit.addEventListener("click", editStyleLibrarySelection)
 $("#style-library-preview-close").addEventListener("click", () => { styleLibraryPreview.hidden = true })
 for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-mode]")) {
   button.addEventListener("click", () => {
-    styleLibraryMode = button.dataset.styleLibraryMode as "styles" | "images"
-    styleLibraryFilter = "all"
+    appState.styleLibraryMode = button.dataset.styleLibraryMode as "styles" | "images"
+    appState.styleLibraryFilter = "all"
     stylePickerSearch.value = ""
     styleLibraryPreview.hidden = true
     void renderStylePicker()
@@ -5580,14 +5324,14 @@ for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[dat
 }
 for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-kind]")) {
   button.addEventListener("click", () => {
-    styleLibraryKind = button.dataset.styleLibraryKind as StyleKind | "all"
+    appState.styleLibraryKind = button.dataset.styleLibraryKind as StyleKind | "all"
     styleLibraryPreview.hidden = true
     void renderStylePicker()
   })
 }
 for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-filter]")) {
   button.addEventListener("click", () => {
-    styleLibraryFilter = button.dataset.styleLibraryFilter!
+    appState.styleLibraryFilter = button.dataset.styleLibraryFilter!
     styleLibraryPreview.hidden = true
     void renderStylePicker()
   })
@@ -5599,10 +5343,10 @@ async function renderStyleLibraryItems(renderID: number, styleIDs: string[], res
     styleID,
     visuals: await Promise.all([resolver.resolve(styleID, false).catch(() => undefined), resolver.resolve(styleID, true).catch(() => undefined)]),
   })))
-  if (renderID !== stylePickerRenderID || !stylePickerDialog.open) return
+  if (renderID !== appState.stylePickerRenderID || !stylePickerDialog.open) return
   const styles = styleConfigDocument()
-  const paths = resourceImagePaths(archive?.names() ?? [], theme.value, orientation.value)
-  const currentID = stylePickerTarget?.value.split(",")[0]?.trim()
+  const paths = resourceImagePaths(appState.archive?.names() ?? [], theme.value, orientation.value)
+  const currentID = appState.stylePickerTarget?.value.split(",")[0]?.trim()
   const currentImages = allItems.find((item) => item.styleID === currentID)?.visuals.map((visual) => visual?.imagePath) ?? []
   const imageCategories = new Map<string, Set<string>>()
   for (const item of allItems) {
@@ -5613,13 +5357,13 @@ async function renderStyleLibraryItems(renderID: number, styleIDs: string[], res
       imageCategories.set(visual.imagePath, categories)
     }
   }
-  const items = styleLibraryMode === "images"
-    ? paths.filter((path) => path.toLowerCase().includes(query) && (styleLibraryFilter === "all" || imageCategories.get(path)?.has(styleLibraryFilter)))
+  const items = appState.styleLibraryMode === "images"
+    ? paths.filter((path) => path.toLowerCase().includes(query) && (appState.styleLibraryFilter === "all" || imageCategories.get(path)?.has(appState.styleLibraryFilter)))
       .map((imagePath) => ({ styleID: "", imagePath, visuals: [] as Array<Visual | undefined> }))
     : allItems.filter(({ styleID, visuals }) => {
       const searchText = [styleID, stylePickerLabel(styleID), ...visuals.map((visual) => visual?.imagePath ?? "")].join(" ").toLowerCase()
-      return searchText.includes(query) && (styleLibraryFilter === "all" || styleLibraryCategories(styleID).has(styleLibraryFilter))
-        && (styleLibraryKind === "all" || styleKind(styleID, styles) === styleLibraryKind)
+      return searchText.includes(query) && (appState.styleLibraryFilter === "all" || styleLibraryCategories(styleID).has(appState.styleLibraryFilter))
+        && (appState.styleLibraryKind === "all" || styleKind(styleID, styles) === appState.styleLibraryKind)
     }).map((item) => ({ ...item, imagePath: "" }))
   // 当前皮肤没有的类型不显示筛选项，避免点出空列表。
   const kinds = new Set(allItems.map(({ styleID }) => styleKind(styleID, styles)))
@@ -5629,9 +5373,9 @@ async function renderStyleLibraryItems(renderID: number, styleIDs: string[], res
   stylePickerGrid.replaceChildren()
   stylePickerCount.textContent = `${allItems.length} 个样式 · ${paths.length} 张图片`
   stylePickerEmpty.hidden = items.length > 0
-  stylePickerEmpty.textContent = styleLibraryMode === "images" ? "没有匹配的图片" : "没有匹配的样式"
+  stylePickerEmpty.textContent = appState.styleLibraryMode === "images" ? "没有匹配的图片" : "没有匹配的样式"
   $("#style-library-status").textContent = `显示 ${items.length} 项${currentID ? ` · 当前 ${stylePickerLabel(currentID)}` : ""}`
-  $("#style-library-source").textContent = `来源 ${layoutPath.split("/").pop() || "当前皮肤"}`
+  $("#style-library-source").textContent = `来源 ${appState.layoutPath.split("/").pop() || "当前皮肤"}`
   for (const { styleID, imagePath, visuals } of items) {
     const button = document.createElement("button")
     button.type = "button"
@@ -5641,7 +5385,7 @@ async function renderStyleLibraryItems(renderID: number, styleIDs: string[], res
     const previews = document.createElement("span")
     previews.className = "style-picker-previews"
     if (imagePath) {
-      const bytes = archive?.getBytes(imagePath)
+      const bytes = appState.archive?.getBytes(imagePath)
       if (!bytes) continue
       const image = new Image()
       image.alt = ""
@@ -5652,7 +5396,7 @@ async function renderStyleLibraryItems(renderID: number, styleIDs: string[], res
       for (const [index, visual] of visuals.entries()) {
         const canvas = retinaThumbnail(document.createElement("canvas"), 128, 88)
         canvas.setAttribute("aria-label", index ? "按下状态" : "正常状态")
-        drawVisualPreview(canvas, [visual], styleReferenceForeground(styleReferenceKey(stylePickerTarget!)))
+        drawVisualPreview(canvas, [visual], styleReferenceForeground(styleReferenceKey(appState.stylePickerTarget!)))
         previews.append(canvas)
       }
     }
@@ -5673,31 +5417,31 @@ async function renderStyleLibraryItems(renderID: number, styleIDs: string[], res
 }
 
 async function renderStylePicker(): Promise<void> {
-  const renderID = ++stylePickerRenderID
+  const renderID = ++appState.stylePickerRenderID
   for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-mode]")) {
-    button.setAttribute("aria-pressed", String(button.dataset.styleLibraryMode === styleLibraryMode))
-    button.disabled = styleReferenceKey(stylePickerTarget!) === "SOUND_STYLE" && button.dataset.styleLibraryMode === "images"
+    button.setAttribute("aria-pressed", String(button.dataset.styleLibraryMode === appState.styleLibraryMode))
+    button.disabled = styleReferenceKey(appState.stylePickerTarget!) === "SOUND_STYLE" && button.dataset.styleLibraryMode === "images"
   }
   for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-filter]")) {
-    button.setAttribute("aria-pressed", String(button.dataset.styleLibraryFilter === styleLibraryFilter))
-    button.disabled = styleReferenceKey(stylePickerTarget!) === "SOUND_STYLE"
+    button.setAttribute("aria-pressed", String(button.dataset.styleLibraryFilter === appState.styleLibraryFilter))
+    button.disabled = styleReferenceKey(appState.stylePickerTarget!) === "SOUND_STYLE"
   }
   for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-kind]")) {
-    button.setAttribute("aria-pressed", String(button.dataset.styleLibraryKind === styleLibraryKind))
+    button.setAttribute("aria-pressed", String(button.dataset.styleLibraryKind === appState.styleLibraryKind))
   }
   stylePickerDialog.querySelector<HTMLElement>(".style-library-kinds")!.hidden =
-    styleLibraryMode === "images" || styleReferenceKey(stylePickerTarget!) === "SOUND_STYLE"
-  stylePickerAdd.hidden = !archive?.isText(styleConfigPath()) || archive.format === "bda"
+    appState.styleLibraryMode === "images" || styleReferenceKey(appState.stylePickerTarget!) === "SOUND_STYLE"
+  stylePickerAdd.hidden = !appState.archive?.isText(styleConfigPath()) || appState.archive.format === "bda"
   stylePickerAdd.disabled = !isEditing()
-  stylePickerSearch.placeholder = styleLibraryMode === "images" ? "搜索图片名称" : "搜索样式名称或编号"
+  stylePickerSearch.placeholder = appState.styleLibraryMode === "images" ? "搜索图片名称" : "搜索样式名称或编号"
   const query = stylePickerSearch.value.trim().toLowerCase()
-  const soundOnly = styleReferenceKey(stylePickerTarget!) === "SOUND_STYLE"
+  const soundOnly = styleReferenceKey(appState.stylePickerTarget!) === "SOUND_STYLE"
   stylePickerDialog.querySelector(".style-picker-hint")!.textContent = soundOnly
     ? "单击应用声音样式 · Command/Ctrl 单击编辑"
     : "单击预览 · 双击应用 · Command/Ctrl 单击编辑"
-  const bdaTargetType = archive?.format === "bda" ? stylePickerTarget?.dataset.bdaStyleType : undefined
+  const bdaTargetType = appState.archive?.format === "bda" ? appState.stylePickerTarget?.dataset.bdaStyleType : undefined
   const stylesPath = styleConfigPath()
-  const styles = archive?.isText(stylesPath) ? IniDocument.parse(archive.getText(stylesPath)) : undefined
+  const styles = appState.archive?.isText(stylesPath) ? IniDocument.parse(appState.archive.getText(stylesPath)) : undefined
   const styleIDs = availableStyleIDs().filter((styleID) => {
     if (bdaTargetType && bdaStyleRef(styleID)?.type !== bdaTargetType) return false
     const filename = styles?.get(`STYLE${styleID}`, "PRESS_SOUND_PATH")?.trim() ?? ""
@@ -5715,7 +5459,7 @@ async function renderStylePicker(): Promise<void> {
       const filename = styles?.get(`STYLE${styleID}`, "PRESS_SOUND_PATH")?.trim() ?? ""
       const card = document.createElement("div")
       card.className = "style-picker-item style-picker-sound"
-      card.classList.toggle("selected", stylePickerTarget?.value.split(",")[0]?.trim() === styleID)
+      card.classList.toggle("selected", appState.stylePickerTarget?.value.split(",")[0]?.trim() === styleID)
       const button = document.createElement("button")
       button.type = "button"
       button.className = "style-picker-sound-select"
@@ -5733,13 +5477,13 @@ async function renderStylePicker(): Promise<void> {
           openStyleReferenceEditor(styleID)
           return
         }
-        if (!stylePickerTarget) return
-        stylePickerTarget.value = styleID
-        stylePickerTarget.dispatchEvent(new Event("input", { bubbles: true }))
-        stylePickerTarget.dispatchEvent(new Event("change", { bubbles: true }))
+        if (!appState.stylePickerTarget) return
+        appState.stylePickerTarget.value = styleID
+        appState.stylePickerTarget.dispatchEvent(new Event("input", { bubbles: true }))
+        appState.stylePickerTarget.dispatchEvent(new Event("change", { bubbles: true }))
         stylePickerDialog.close()
       })
-      const soundPath = soundPathForFilename(archive?.names() ?? [], theme.value, orientation.value, filename)
+      const soundPath = soundPathForFilename(appState.archive?.names() ?? [], theme.value, orientation.value, filename)
       const playButton = document.createElement("button")
       playButton.type = "button"
       playButton.className = "style-picker-sound-play"
@@ -5766,13 +5510,13 @@ async function renderStylePicker(): Promise<void> {
 }
 
 function openStylePicker(input: HTMLInputElement, highlighted = false): void {
-  styleLibraryHighlighted = highlighted
+  appState.styleLibraryHighlighted = highlighted
   if (input.disabled || !availableStyleIDs().length) return
-  stylePickerTarget = input
-  styleLibraryMode = "styles"
-  styleLibraryFilter = "all"
-  styleLibraryKind = styleKindForKey(styleReferenceKey(input))
-  styleLibrarySelected = undefined
+  appState.stylePickerTarget = input
+  appState.styleLibraryMode = "styles"
+  appState.styleLibraryFilter = "all"
+  appState.styleLibraryKind = styleKindForKey(styleReferenceKey(input))
+  appState.styleLibrarySelected = undefined
   styleLibraryPreview.hidden = true
   stylePickerSearch.value = ""
   // 桌面端样式库与图片切片共用同一个原生窗口，避免页内弹窗叠加模糊背景导致点击卡顿。
@@ -5786,14 +5530,14 @@ function openStylePicker(input: HTMLInputElement, highlighted = false): void {
 }
 
 function nativeStyleLibraryPayload(sliceBack: boolean): Promise<StyleLibraryPayload | undefined> {
-  const target = stylePickerTarget
-  if (!archive || !target) return Promise.resolve(undefined)
-  const source = archive
+  const target = appState.stylePickerTarget
+  if (!appState.archive || !target) return Promise.resolve(undefined)
+  const source = appState.archive
   const key = styleReferenceKey(target)
   const soundOnly = key === "SOUND_STYLE"
   const styles = styleConfigDocument()
   const currentID = target.value.split(",")[0]?.trim() ?? ""
-  const targetType = archive.format === "bda" ? target.dataset.bdaStyleType : undefined
+  const targetType = appState.archive.format === "bda" ? target.dataset.bdaStyleType : undefined
   const bitmaps: Record<string, string> = {}
   const bitmapKeys = new Map<ImageBitmap, string>()
   // 位图不能跨窗口传：有归档路径就直接编码原始 PNG，否则（如 BDA 基础皮肤里的图）画到画布再导出。
@@ -5819,14 +5563,14 @@ function nativeStyleLibraryPayload(sliceBack: boolean): Promise<StyleLibraryPayl
   const payload = {
     sliceBack,
     editable: isEditing() && !target.disabled,
-    canAdd: Boolean(archive.isText(styleConfigPath()) && archive.format !== "bda"),
+    canAdd: Boolean(appState.archive.isText(styleConfigPath()) && appState.archive.format !== "bda"),
     soundOnly,
     foreground: styleReferenceForeground(key),
-    bda: archive.format === "bda",
+    bda: appState.archive.format === "bda",
     kind: styleKindForKey(key),
     currentID,
     currentLabel: currentID ? stylePickerLabel(currentID) : "",
-    source: (soundOnly ? styleConfigPath() : layoutPath).split("/").pop() || "当前皮肤",
+    source: (soundOnly ? styleConfigPath() : appState.layoutPath).split("/").pop() || "当前皮肤",
     imagesCompatible: !targetType || bdaStyleRef(currentID)?.type === "image",
     bitmaps,
     styles: [] as StyleLibraryPayload["styles"],
@@ -5887,14 +5631,12 @@ async function emitStyleLibrary(sliceBack = false): Promise<void> {
 
 for (const input of [...keyboardFields, ...toolbarFields, ...keyFields]) decorateStyleReferenceInput(input)
 stylePickerSearch.addEventListener("input", () => { styleLibraryPreview.hidden = true; void renderStylePicker() })
-stylePickerDialog.addEventListener("close", () => { ++stylePickerRenderID; styleLibrarySelected = undefined })
+stylePickerDialog.addEventListener("close", () => { ++appState.stylePickerRenderID; appState.styleLibrarySelected = undefined })
 stylePickerClose.addEventListener("click", () => stylePickerDialog.close())
-// 样式库内新增：复用「新增样式」对话框，创建后直接应用到当前引用并进入编辑。
-let newStyleApplyTarget: HTMLInputElement | undefined
 const stylePickerAdd = $("#style-picker-add") as HTMLButtonElement
-newStyleDialog.addEventListener("close", () => { newStyleApplyTarget = undefined })
+newStyleDialog.addEventListener("close", () => { appState.newStyleApplyTarget = undefined })
 function addStyleFromLibrary(): void {
-  newStyleApplyTarget = stylePickerTarget
+  appState.newStyleApplyTarget = appState.stylePickerTarget
   closeStylePicker()
   styleAddButton.click()
 }
@@ -5903,14 +5645,11 @@ stylePickerDialog.addEventListener("click", (event) => {
   const rect = stylePickerDialog.getBoundingClientRect()
   if (event.target === stylePickerDialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) stylePickerDialog.close()
 })
-
-// Thumbnails redraw a frame later so they don't share a task with the inspector rebuild.
-let stylePreviewsPending = false
 async function updateStylePreviews(): Promise<void> {
-  if (stylePreviewsPending) return
-  stylePreviewsPending = true
+  if (appState.stylePreviewsPending) return
+  appState.stylePreviewsPending = true
   afterNextPaint(() => {
-    stylePreviewsPending = false
+    appState.stylePreviewsPending = false
     refreshStyleReferenceThumbnails()
   })
 }
@@ -5925,11 +5664,11 @@ function refreshStyleReferenceThumbnails(): void {
     const input = button.previousElementSibling
     if (!(input instanceof HTMLInputElement)) continue
     const key = styleReferenceKey(input)
-    if (archive) {
-      const signature = `${archive.revision}|${theme.value}|${orientation.value}|${key}|${input.value}`
+    if (appState.archive) {
+      const signature = `${appState.archive.revision}|${theme.value}|${orientation.value}|${key}|${input.value}`
       const previous = styleReferenceThumbnailInputs.get(button)
-      if (previous?.archive === archive && previous.signature === signature) continue
-      styleReferenceThumbnailInputs.set(button, { archive, signature })
+      if (previous?.archive === appState.archive && previous.signature === signature) continue
+      styleReferenceThumbnailInputs.set(button, { archive: appState.archive, signature })
     } else styleReferenceThumbnailInputs.delete(button)
     resolver ??= visualResolver()
     void refreshStyleReferenceThumbnail(button, input, key, resolver)
@@ -5939,15 +5678,15 @@ function refreshStyleReferenceThumbnails(): void {
 function selectedStylePropertyContext(property: string, styles?: IniDocument):
   | { document: IniDocument; path: string; sources: StylePropertySource[] }
   | undefined {
-  if (!archive || !layoutDocument || !selectedKeySections.length) return
+  if (!appState.archive || !appState.layoutDocument || !appState.selectedKeySections.length) return
   const path = styleConfigPath()
-  if (!archive.isText(path)) return
-  const document = styles ?? IniDocument.parse(archive.getText(path))
+  if (!appState.archive.isText(path)) return
+  const document = styles ?? IniDocument.parse(appState.archive.getText(path))
   const sources = resolveStylePropertySources(
     document,
-    selectedKeySections.map((section) =>
+    appState.selectedKeySections.map((section) =>
       isListCell(section)
-        ? (layoutDocument?.get("LIST", "FORE_STYLE") ?? "").trim()
+        ? (appState.layoutDocument?.get("LIST", "FORE_STYLE") ?? "").trim()
         : effectiveKeyValue(section, "FORE_STYLE") ?? "",
     ),
     property,
@@ -5960,10 +5699,10 @@ function selectedBdaRefs(
   type: BdaStyleRef["type"],
   fallbackSource?: "BACK_STYLE" | "FORE_STYLE",
 ): BdaStyleRef[] {
-  if (archive?.format !== "bda" || !layoutDocument) return []
+  if (appState.archive?.format !== "bda" || !appState.layoutDocument) return []
   const collect = (name: "BACK_STYLE" | "FORE_STYLE") =>
-    selectedKeySections.flatMap((section) => {
-      const ref = (layoutDocument?.get(section, name) ?? "")
+    appState.selectedKeySections.flatMap((section) => {
+      const ref = (appState.layoutDocument?.get(section, name) ?? "")
         .split(",")
         .map(bdaStyleRef)
         .find((item) => item?.type === type)
@@ -6011,7 +5750,7 @@ function updateBdaRefs(refs: BdaStyleRef[], property: string, value: string): bo
     bytes = updateBdaStyle(bytes, ref, property, value)
   }
   commitBytes(info.path, info.bytes, bytes)
-  refreshBdaLayout(layoutPath)
+  refreshBdaLayout(appState.layoutPath)
   refreshSelectedBdaSource()
   refreshPreview()
   populateKeyInspector()
@@ -6022,7 +5761,7 @@ function updateBdaRefs(refs: BdaStyleRef[], property: string, value: string): bo
 // 将样式引用写回 appearanceConfig 的面板片段，path 指向解码 JSON 中的字段位置。
 function updateBdaAppearanceStyleRef(paths: string[][], ref: BdaStyleRef, owner?: HTMLElement): boolean {
   const info = currentBdaAppearance()
-  const part = bdaAppearancePart(selectedPath)
+  const part = bdaAppearancePart(appState.selectedPath)
   if (!info || part?.kind !== "panel" || !paths.length) return false
   const source = JSON.parse(decodedBdaAppearancePart(info.bytes, part)) as Record<string, unknown>
   const value = { type: ref.type, key: ref.key }
@@ -6041,7 +5780,7 @@ function updateBdaAppearanceStyleRef(paths: string[][], ref: BdaStyleRef, owner?
   }
   const after = applyDecodedBdaAppearancePart(info.path, info.bytes, JSON.stringify(source), part)
   commitBytes(info.path, info.bytes, after)
-  refreshBdaLayout(layoutPath)
+  refreshBdaLayout(appState.layoutPath)
   refreshSelectedBdaSource()
   refreshPreview()
   if (owner) void refreshBdaStyleReferenceField(owner, ref, visualResolver())
@@ -6054,13 +5793,13 @@ function updateSelectedBdaPanelProperty(
   value: boolean | string,
 ): boolean {
   const info = currentBdaAppearance()
-  const part = bdaAppearancePart(selectedPath)
+  const part = bdaAppearancePart(appState.selectedPath)
   if (!info || part?.kind !== "panel") return false
   const source = JSON.parse(decodedBdaAppearancePart(info.bytes, part)) as Record<string, unknown>
   source[property] = value
   const after = applyDecodedBdaAppearancePart(info.path, info.bytes, JSON.stringify(source), part)
   commitBytes(info.path, info.bytes, after)
-  refreshBdaLayout(layoutPath)
+  refreshBdaLayout(appState.layoutPath)
   refreshSelectedBdaSource()
   refreshPreview()
   populateKeyInspector()
@@ -6314,7 +6053,6 @@ const particleFieldGroups = [
 const particlePairFields = new Set<string>(particleFieldGroups.flatMap(([, keys]) => keys).filter((key) =>
   !["PARTICLE_IMAGE", "EMIT_REGION", "TOTAL_NUMBER", "BIRTH_RATE", "EMIT_TYPE"].includes(key),
 ))
-let particlePreviewSection = ""
 
 function isParticleSection(document: IniDocument, section: string): boolean {
   return document.get(section, "CATEGORY")?.trim() === "3" || Boolean(document.get(section, "PARTICLE_IMAGE")?.trim())
@@ -6345,54 +6083,54 @@ function particleNumberStep(key: string): string {
 
 function populateDocumentInspector(): void {
   documentFields.replaceChildren()
-  const hasSelection = selectedPath === layoutPath && selectedKeySections.length > 0
-  if (archive?.format === "bda" || !selectedDocument || hasSelection || !archive?.isText(selectedPath)) {
+  const hasSelection = appState.selectedPath === appState.layoutPath && appState.selectedKeySections.length > 0
+  if (appState.archive?.format === "bda" || !appState.selectedDocument || hasSelection || !appState.archive?.isText(appState.selectedPath)) {
     documentFieldsGroup.hidden = true
-    particlePreviewSection = ""
+    appState.particlePreviewSection = ""
     preview.setParticlePreview()
     return
   }
   const specialized = new Set<string>()
-  const toolbarSections = new Set(isToolbarPath(selectedPath) ? effectiveToolbarSections() : [])
-  if (isSkinInfoPath(selectedPath)) {
+  const toolbarSections = new Set(isToolbarPath(appState.selectedPath) ? effectiveToolbarSections() : [])
+  if (isSkinInfoPath(appState.selectedPath)) {
     for (const field of skinFields) specialized.add(`\u0000${field.dataset.skinField ?? ""}`)
   }
-  if (isToolbarPath(selectedPath)) {
+  if (isToolbarPath(appState.selectedPath)) {
     for (const field of toolbarFields) {
       const [section, key] = (field.dataset.toolbarField ?? "").split(".")
       specialized.add(`${key ? section : "CAND"}\u0000${key || section}`)
     }
   }
-  const entries = selectedDocument.entries().filter((entry) =>
+  const entries = appState.selectedDocument.entries().filter((entry) =>
     !/^KEY\d+$/.test(entry.section) &&
-    !isHiddenConfigEntry(entry.section, entry.key, isToolbarPath(selectedPath)) &&
+    !isHiddenConfigEntry(entry.section, entry.key, isToolbarPath(appState.selectedPath)) &&
     (!toolbarSections.size || toolbarSections.has(entry.section)) &&
     !specialized.has(`${entry.section}\u0000${entry.key}`),
   )
   documentFieldsGroup.hidden = entries.length === 0
   if (!entries.length) {
-    particlePreviewSection = ""
+    appState.particlePreviewSection = ""
     preview.setParticlePreview()
     return
   }
 
   const sections = [...new Set(entries.map((entry) => entry.section))]
-  const particleSections = sections.filter((section) => isParticleSection(selectedDocument!, section))
-  if (!particleSections.includes(particlePreviewSection)) particlePreviewSection = particleSections[0] ?? ""
+  const particleSections = sections.filter((section) => isParticleSection(appState.selectedDocument!, section))
+  if (!particleSections.includes(appState.particlePreviewSection)) appState.particlePreviewSection = particleSections[0] ?? ""
   preview.setParticlePreview(
-    particlePreviewSection ? parseLegacyParticleEmitter(selectedDocument, particlePreviewSection) : undefined,
+    appState.particlePreviewSection ? parseLegacyParticleEmitter(appState.selectedDocument, appState.particlePreviewSection) : undefined,
   )
   const update = (section: string, key: string, value: string): boolean => {
-    if (!selectedDocument || selectedPath !== documentFieldsGroup.dataset.path) return false
-    const before = selectedDocument.toString()
-    if (!selectedDocument.set(section, key, value)) return false
-    const text = selectedDocument.toString()
-    commitText(selectedPath, before, text)
+    if (!appState.selectedDocument || appState.selectedPath !== documentFieldsGroup.dataset.path) return false
+    const before = appState.selectedDocument.toString()
+    if (!appState.selectedDocument.set(section, key, value)) return false
+    const text = appState.selectedDocument.toString()
+    commitText(appState.selectedPath, before, text)
     setSourceValue(text)
-    if (selectedPath === layoutPath) layoutDocument = selectedDocument
+    if (appState.selectedPath === appState.layoutPath) appState.layoutDocument = appState.selectedDocument
     refreshPreview()
-    if (section === particlePreviewSection) {
-      preview.setParticlePreview(parseLegacyParticleEmitter(selectedDocument, section))
+    if (section === appState.particlePreviewSection) {
+      preview.setParticlePreview(parseLegacyParticleEmitter(appState.selectedDocument, section))
     }
     updateDirty()
     return true
@@ -6585,7 +6323,7 @@ function populateDocumentInspector(): void {
     const sectionPanel = document.createElement("section")
     sectionPanel.className = "document-property-section"
     const sectionEntries = entries.filter((item) => item.section === section)
-    const particle = isParticleSection(selectedDocument, section)
+    const particle = isParticleSection(appState.selectedDocument, section)
     if (particle) sectionPanel.classList.add("particle-property-section")
     const sectionLabel = particle
       ? `粒子动效 ${section.replace(/^ANIM/, "")}（${section}）`
@@ -6613,14 +6351,14 @@ function populateDocumentInspector(): void {
       const toolbar = document.createElement("div")
       toolbar.className = "particle-preview-toolbar"
       const status = document.createElement("span")
-      status.textContent = section === particlePreviewSection ? "正在画布预览" : "可在键盘画布中预览"
+      status.textContent = section === appState.particlePreviewSection ? "正在画布预览" : "可在键盘画布中预览"
       const replay = document.createElement("button")
       replay.type = "button"
-      replay.textContent = section === particlePreviewSection ? "重新播放" : "在画布预览"
+      replay.textContent = section === appState.particlePreviewSection ? "重新播放" : "在画布预览"
       replay.addEventListener("click", () => {
-        if (!selectedDocument) return
-        particlePreviewSection = section
-        preview.setParticlePreview(parseLegacyParticleEmitter(selectedDocument, section))
+        if (!appState.selectedDocument) return
+        appState.particlePreviewSection = section
+        preview.setParticlePreview(parseLegacyParticleEmitter(appState.selectedDocument, section))
         populateDocumentInspector()
         syncMobileInspectorGroups()
       })
@@ -6662,43 +6400,43 @@ function populateDocumentInspector(): void {
     sectionPanel.append(grid)
     documentFields.append(sectionPanel)
   }
-  documentFieldsGroup.dataset.path = selectedPath
+  documentFieldsGroup.dataset.path = appState.selectedPath
 }
 
 function selectedBdaKeyNames(): string[] {
-  if (!layoutDocument || !selectedKeySections.length) return []
-  return [...new Set(selectedKeySections.flatMap((section) => {
+  if (!appState.layoutDocument || !appState.selectedKeySections.length) return []
+  return [...new Set(appState.selectedKeySections.flatMap((section) => {
     const effective = effectiveKeySection(section)
-    return [layoutDocument?.get(effective, "CENTER"), layoutDocument?.get(section, "CENTER"), layoutDocument?.get(section, "DOWN")]
+    return [appState.layoutDocument?.get(effective, "CENTER"), appState.layoutDocument?.get(section, "CENTER"), appState.layoutDocument?.get(section, "DOWN")]
       .filter((value): value is string => Boolean(value))
       .map(bdaPanelKeyName)
   }))]
 }
 
 function selectedBdaSourceKeys(): string[] {
-  if (resourceConfigActive && resourceInspectorMode === "style") return selectedStyleID ? [selectedStyleID] : []
-  if (selectedCandidate && selectedPath === layoutPath) return ["cand"]
-  return isBdaLayoutPath(selectedPath) ? selectedBdaKeyNames() : []
+  if (appState.resourceConfigActive && appState.resourceInspectorMode === "style") return appState.selectedStyleID ? [appState.selectedStyleID] : []
+  if (appState.selectedCandidate && appState.selectedPath === appState.layoutPath) return ["cand"]
+  return isBdaLayoutPath(appState.selectedPath) ? selectedBdaKeyNames() : []
 }
 
 function populateBdaConfigInspector(): void {
   bdaConfigFields.replaceChildren()
-  if (!archive || archive.format !== "bda") {
+  if (!appState.archive || appState.archive.format !== "bda") {
     bdaConfigFieldsGroup.hidden = true
     return
   }
   const info = currentBdaAppearance()
-  if (isSkinInfoPath(selectedPath) && selectedDocument) {
+  if (isSkinInfoPath(appState.selectedPath) && appState.selectedDocument) {
     bdaConfigFieldsGroup.hidden = false
     renderBdaMetadataEditor(bdaConfigFields, {
-      entries: selectedDocument.entries("").map(({ key, value }) => ({ key, value })),
+      entries: appState.selectedDocument.entries("").map(({ key, value }) => ({ key, value })),
       editable: isEditing(),
       onChange: (key, value) => {
-        if (!selectedDocument) return
-        const before = selectedDocument.toString()
-        if (!selectedDocument.set("", key, value)) return
-        const after = selectedDocument.toString()
-        commitText(selectedPath, before, after)
+        if (!appState.selectedDocument) return
+        const before = appState.selectedDocument.toString()
+        if (!appState.selectedDocument.set("", key, value)) return
+        const after = appState.selectedDocument.toString()
+        commitText(appState.selectedPath, before, after)
         setSourceValue(after)
         populateBdaConfigInspector()
         updateDirty()
@@ -6706,8 +6444,8 @@ function populateBdaConfigInspector(): void {
     })
     return
   }
-  if (bdaAppearancePart(selectedPath)?.kind === "panel" && info) {
-    const panelName = selectedPath.split("/").pop()?.replace(/\.ini$/i, "") ?? ""
+  if (bdaAppearancePart(appState.selectedPath)?.kind === "panel" && info) {
+    const panelName = appState.selectedPath.split("/").pop()?.replace(/\.ini$/i, "") ?? ""
     const panel = info.appearance.panels.get(panelName)
     const selectedKeys = selectedBdaKeyNames().flatMap((name) => {
       const key = panel?.keys.get(name)
@@ -6718,7 +6456,7 @@ function populateBdaConfigInspector(): void {
       appearance: info.appearance,
       panelName,
       keys: selectedKeys,
-      scope: selectedCandidate ? "candidate" : "panel",
+      scope: appState.selectedCandidate ? "candidate" : "panel",
       resolver: visualResolver(),
       editable: isEditing(),
       onStyleChange: (ref, property, value) => { updateBdaRefs([ref], property, value) },
@@ -6731,19 +6469,19 @@ function populateBdaConfigInspector(): void {
     })
     return
   }
-  const bytes = archive.isBdaConfig(selectedPath) ? archive.getBytes(selectedPath) : undefined
+  const bytes = appState.archive.isBdaConfig(appState.selectedPath) ? appState.archive.getBytes(appState.selectedPath) : undefined
   bdaConfigFieldsGroup.hidden = !bytes
   if (!bytes) return
   const update = (after: Uint8Array) => {
-    commitBytes(selectedPath, bytes, after)
-    if (/appearanceConfig$/i.test(selectedPath)) refreshBdaLayout(layoutPath)
+    commitBytes(appState.selectedPath, bytes, after)
+    if (/appearanceConfig$/i.test(appState.selectedPath)) refreshBdaLayout(appState.layoutPath)
     refreshSelectedBdaSource()
     refreshPreview()
     populateBdaConfigInspector()
     updateDirty()
   }
   renderBdaConfigEditor(bdaConfigFields, {
-    path: selectedPath,
+    path: appState.selectedPath,
     bytes,
     resolver: visualResolver(),
     editable: isEditing(),
@@ -6766,7 +6504,7 @@ function addNavButton(
   navMode = className === "nav-resource" ? "resource" : "document",
   meta = path.split("/").pop() ?? path,
 ): void {
-  if (!archive?.names().includes(path) && !isBdaVirtualTextPath(path) && !isBdaAppearancePartPath(path)) return
+  if (!appState.archive?.names().includes(path) && !isBdaVirtualTextPath(path) && !isBdaAppearancePartPath(path)) return
   const button = document.createElement("button")
   button.className = `nav-item ${className}`
   button.dataset.path = path
@@ -6795,7 +6533,7 @@ function addNavButton(
   button.addEventListener("click", () => {
     if (path.endsWith("py_9.ini") || path.endsWith("py_26.ini")) {
       layout.value = path.endsWith("_9.ini") ? "py_9.ini" : "py_26.ini"
-      previewReturnName = path.split("/").pop() ?? layout.value
+      appState.previewReturnName = path.split("/").pop() ?? layout.value
     }
     selectFile(path, "overview", navMode === "resource" ? "image" : navMode === "style" ? "style" : navMode === "sound" ? "sound" : "document")
     if (mobilePortraitQuery.matches) setMobilePane("inspector")
@@ -6820,13 +6558,13 @@ function syncBdaKeyFieldLabels(bdaSelected: boolean): void {
 
 function populatePrimaryCssFields(hasSelection: boolean, sections: string[]): void {
   primaryCssFields.replaceChildren()
-  if (!hasSelection || archive?.format === "bda" || sections.length !== 1 || !layoutDocument) return
+  if (!hasSelection || appState.archive?.format === "bda" || sections.length !== 1 || !appState.layoutDocument) return
   const path = styleConfigPath()
-  if (!archive?.isText(path)) return
-  const styles = IniDocument.parse(archive.getText(path))
+  if (!appState.archive?.isText(path)) return
+  const styles = IniDocument.parse(appState.archive.getText(path))
   const section = sections[0]
   const foreground = isListCell(section)
-    ? layoutDocument.get("LIST", "FORE_STYLE") ?? ""
+    ? appState.layoutDocument.get("LIST", "FORE_STYLE") ?? ""
     : effectiveKeyValue(section, "FORE_STYLE") ?? ""
   const sources = [...new Map(
     resolveStylePropertyLayers(styles, foreground, "SHOW").map((source) => [source.section, source]),
@@ -6855,29 +6593,29 @@ function populatePrimaryCssFields(hasSelection: boolean, sections: string[]): vo
 
 function populateKeyInspector(): void {
   if (deferNumberInputRefresh(populateKeyInspector, populateKeyInspector)) return
-  if (selectedPath !== layoutPath && selectedKeySections.length) {
-    selectedKeySections = []
+  if (appState.selectedPath !== appState.layoutPath && appState.selectedKeySections.length) {
+    appState.selectedKeySections = []
     preview.setSelected([])
   }
-  const document = layoutDocument
-  const sections = selectedKeySections
-  const hasSelection = Boolean(document && sections.length && selectedPath === layoutPath)
-  const skinSelected = isSkinInfoPath(selectedPath)
-  const toolbarSelected = isToolbarPath(selectedPath)
+  const document = appState.layoutDocument
+  const sections = appState.selectedKeySections
+  const hasSelection = Boolean(document && sections.length && appState.selectedPath === appState.layoutPath)
+  const skinSelected = isSkinInfoPath(appState.selectedPath)
+  const toolbarSelected = isToolbarPath(appState.selectedPath)
   const toolbarSections = toolbarSelected ? effectiveToolbarSections() : []
   const toolbarHasSelection = toolbarSections.length > 0
-  const toolbarSection = selectedToolbarSections[0] ?? ""
-  const effectiveToolbarSection = toolbarSection && selectedDocument
-    ? effectivePanelSection(selectedDocument, toolbarSection, currentSkinState())
+  const toolbarSection = appState.selectedToolbarSections[0] ?? ""
+  const effectiveToolbarSection = toolbarSection && appState.selectedDocument
+    ? effectivePanelSection(appState.selectedDocument, toolbarSection, currentSkinState())
     : toolbarSection
-  const bdaConfigSelected = Boolean(archive?.isBdaConfig(selectedPath))
-  const bdaSelected = archive?.format === "bda"
-  const candidateSelected = Boolean(bdaSelected && selectedCandidate && selectedPath === layoutPath)
+  const bdaConfigSelected = Boolean(appState.archive?.isBdaConfig(appState.selectedPath))
+  const bdaSelected = appState.archive?.format === "bda"
+  const candidateSelected = Boolean(bdaSelected && appState.selectedCandidate && appState.selectedPath === appState.layoutPath)
   inspectorBackButton.disabled = !(hasSelection || toolbarHasSelection || candidateSelected)
   syncBdaKeyFieldLabels(bdaSelected)
   skinFieldsGroup.hidden = !skinSelected || bdaSelected
   toolbarFieldsGroup.hidden = !toolbarSelected || bdaSelected || toolbarHasSelection
-  keyboardFieldsGroup.hidden = bdaSelected || skinSelected || toolbarSelected || bdaConfigSelected || candidateSelected || selectedPath !== layoutPath || hasSelection
+  keyboardFieldsGroup.hidden = bdaSelected || skinSelected || toolbarSelected || bdaConfigSelected || candidateSelected || appState.selectedPath !== appState.layoutPath || hasSelection
   for (const group of keyOnlyGroups) {
     const availableForBda = group === keyTypographyFieldsGroup
     group.hidden = skinSelected || bdaConfigSelected || !hasSelection || bdaSelected && !availableForBda
@@ -6887,22 +6625,22 @@ function populateKeyInspector(): void {
     : skinSelected
     ? "皮肤信息"
     : bdaConfigSelected
-      ? selectedPath.split("/").pop() ?? "BDA 专属配置"
+      ? appState.selectedPath.split("/").pop() ?? "BDA 专属配置"
     : candidateSelected
       ? "候选栏"
     : toolbarHasSelection
-      ? `${toolbarSection} · ${selectedDocument?.get(effectiveToolbarSection, "KEY") || selectedDocument?.get(toolbarSection, "KEY") || "未配置点击动作"}`
+      ? `${toolbarSection} · ${appState.selectedDocument?.get(effectiveToolbarSection, "KEY") || appState.selectedDocument?.get(toolbarSection, "KEY") || "未配置点击动作"}`
     : toolbarSelected
       ? "候选栏与工具栏"
-    : selectedPath !== layoutPath
-      ? selectedPath.split("/").pop() ?? "文档配置"
-      : `${selectedPath.split("/").pop() ?? "键盘"} · 整体布局`
+    : appState.selectedPath !== appState.layoutPath
+      ? appState.selectedPath.split("/").pop() ?? "文档配置"
+      : `${appState.selectedPath.split("/").pop() ?? "键盘"} · 整体布局`
   selectedKeyPreview.replaceChildren(createIcon(hasSelection ? bdaSelected ? "component" : sections.length > 1 ? "layers" : "key-round" : "panel-top"))
   selectedKeyPreview.hidden = false
   selectedKeyName.title = selectedKeyName.textContent ?? ""
   selectedKeyContext.textContent = hasSelection
-    ? `${selectedPath.split("/").pop()} · ${sections.length > 1 ? "keys.*" : sections[0]}`
-    : selectedPath || "选择文件以查看属性"
+    ? `${appState.selectedPath.split("/").pop()} · ${sections.length > 1 ? "keys.*" : sections[0]}`
+    : appState.selectedPath || "选择文件以查看属性"
   syncAiDesignContext()
   quickInspector.dataset.selectionCount = String(hasSelection ? sections.length : 0)
   quickInspector.dataset.selectionNames = JSON.stringify(hasSelection ? sections : [])
@@ -6910,21 +6648,21 @@ function populateKeyInspector(): void {
     const label = field.closest("label")
     if (label) label.hidden = bdaSelected
   }
-  selectedKeyContext.title = selectedPath
-  setInspectorKind(archive?.format === "bda" ? "bda" : archive ? "bds" : "")
+  selectedKeyContext.title = appState.selectedPath
+  setInspectorKind(appState.archive?.format === "bda" ? "bda" : appState.archive ? "bds" : "")
   syncMobileInspectorHeader()
   for (const field of skinFields) {
-    field.value = skinSelected ? selectedDocument?.get("", field.dataset.skinField ?? "") ?? "" : ""
+    field.value = skinSelected ? appState.selectedDocument?.get("", field.dataset.skinField ?? "") ?? "" : ""
     field.disabled = !skinSelected
   }
-  const general = archive?.isText(genConfigPath())
-    ? IniDocument.parse(archive.getText(genConfigPath()))
+  const general = appState.archive?.isText(genConfigPath())
+    ? IniDocument.parse(appState.archive.getText(genConfigPath()))
     : undefined
   const toolbarGen = toolbarSelected ? general : undefined
   for (const field of toolbarFields) {
     const [section, key] = (field.dataset.toolbarField ?? "").split(".")
     field.value = toolbarSelected
-      ? selectedDocument?.get(key ? section : "CAND", key || section) ?? toolbarGen?.get("CAND", key || section) ?? ""
+      ? appState.selectedDocument?.get(key ? section : "CAND", key || section) ?? toolbarGen?.get("CAND", key || section) ?? ""
       : ""
     field.disabled = !toolbarSelected || !isEditing()
   }
@@ -6951,7 +6689,7 @@ function populateKeyInspector(): void {
   for (const field of keyFields) {
     const name = field.dataset.keyField ?? ""
     // BDA 样式引用由源码结构控件编辑，旧格式按键字段只负责非 BDA 皮肤。
-    field.disabled = !hasSelection || archive?.format === "bda"
+    field.disabled = !hasSelection || appState.archive?.format === "bda"
     field.placeholder = ""
     if (!hasSelection || bdaSelected) {
       field.value = ""
@@ -7041,7 +6779,7 @@ function populateKeyInspector(): void {
       label.hidden = true
       continue
     }
-    if (archive?.format !== "bda") {
+    if (appState.archive?.format !== "bda") {
       label.hidden = false
       for (const fieldLabel of Array.from(label.querySelectorAll<HTMLLabelElement>("label"))) fieldLabel.hidden = false
       continue
@@ -7062,42 +6800,42 @@ function populateKeyInspector(): void {
   const paddingSection = quickInspector.querySelector<HTMLElement>(".inspector-padding-section")
   if (paddingSection) paddingSection.hidden = bdaSelected || !hasSelection || sections.some(isListCell) || !sections.every((section) => effectiveKeyValue(section, "PADDING") !== undefined)
   const multiLayout = $("#inspector-multi-layout")
-  const multiAvailable = sections.length > 1 && archive?.format !== "bda" && !sections.some(isListCell)
+  const multiAvailable = sections.length > 1 && appState.archive?.format !== "bda" && !sections.some(isListCell)
   multiLayout.dataset.available = String(multiAvailable)
   multiLayout.hidden = !multiAvailable
   canvasMultiToolbar.dataset.available = String(multiAvailable)
-  const multiLabel = archive?.format === "bda"
+  const multiLabel = appState.archive?.format === "bda"
     ? "此格式不支持布局编辑" : sections.some(isListCell) ? "列表单元不支持批量布局"
       : multiAvailable ? `将修改 ${sections.length} 个按键` : "选择 2 个或更多按键"
   multiLayout.querySelector("[role=status]")!.textContent = multiLabel
   canvasMultiCount.textContent = multiLabel
   const layoutNote = keyLayoutFieldsGroup.querySelector<HTMLElement>(".inspector-note")!
-  layoutNote.textContent = archive?.format === "bda"
+  layoutNote.textContent = appState.archive?.format === "bda"
     ? "此格式的位置与尺寸仅供查看。外观和文字可在对应分类中修改。"
     : "方向键移动 1 px · Shift + 方向键移动 10 px"
   const listSelected = sections.some(isListCell)
-  const keyToolsAvailable = hasSelection && isEditing() && archive?.format !== "bda" && !listSelected
+  const keyToolsAvailable = hasSelection && isEditing() && appState.archive?.format !== "bda" && !listSelected
   for (const button of keyModeButtons) button.disabled = !keyToolsAvailable
   for (const button of keyActionButtons) {
     button.disabled = !keyToolsAvailable || (
-      button.dataset.keyAction === "swap" && selectedKeySections.length !== 2
+      button.dataset.keyAction === "swap" && appState.selectedKeySections.length !== 2
     )
   }
-  if (!keyToolsAvailable && keyMode === "move") {
-    keyMode = "select"
-    keyModeButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.keyMode === keyMode)))
-    preview.setEditTool(keyMode)
+  if (!keyToolsAvailable && appState.keyMode === "move") {
+    appState.keyMode = "select"
+    keyModeButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.keyMode === appState.keyMode)))
+    preview.setEditTool(appState.keyMode)
   }
   for (const button of layoutActionButtons) {
-    button.disabled = archive?.format === "bda" || listSelected || (
+    button.disabled = appState.archive?.format === "bda" || listSelected || (
       button.dataset.layoutAction === "swap" || button.dataset.layoutAction === "merge"
-        ? selectedKeySections.length !== 2
-        : selectedKeySections.length < 2
+        ? appState.selectedKeySections.length !== 2
+        : appState.selectedKeySections.length < 2
     )
   }
   const rects = selectedRects().filter((rect) => !isListCell(rect.section))
   for (const field of gapFields) {
-    field.disabled = rects.length < 2 || archive?.format === "bda" || listSelected
+    field.disabled = rects.length < 2 || appState.archive?.format === "bda" || listSelected
     field.placeholder = ""
     if (rects.length < 2) {
       field.value = ""
@@ -7117,7 +6855,7 @@ function populateKeyInspector(): void {
   }
   for (const node of actionMeaningNodes) {
     const name = node.dataset.actionMeaning ?? ""
-    const values = selectedKeySections.map((section) => effectiveKeyValue(section, name) ?? "")
+    const values = appState.selectedKeySections.map((section) => effectiveKeyValue(section, name) ?? "")
     node.textContent =
       !hasSelection || !values.every((value) => value === values[0])
         ? hasSelection
@@ -7136,24 +6874,24 @@ function populateKeyInspector(): void {
     }
   }
   syncMobileInspectorGroups()
-  revealSinglePageInspectorGroup(JSON.stringify([selectedPath, selectedKeySections, selectedCandidate]))
+  revealSinglePageInspectorGroup(JSON.stringify([appState.selectedPath, appState.selectedKeySections, appState.selectedCandidate]))
   applyModeState()
-  syncInspectorRows(JSON.stringify([selectedPath, selectedKeySections, mode.value]))
+  syncInspectorRows(JSON.stringify([appState.selectedPath, appState.selectedKeySections, mode.value]))
 }
 
 function updateSkinInfo(field: HTMLInputElement): void {
-  if (!archive || !selectedDocument || !isSkinInfoPath(selectedPath)) return
-  const before = selectedDocument.toString()
-  selectedDocument.set("", field.dataset.skinField ?? "", field.value)
-  const text = selectedDocument.toString()
-  commitText(selectedPath, before, text)
+  if (!appState.archive || !appState.selectedDocument || !isSkinInfoPath(appState.selectedPath)) return
+  const before = appState.selectedDocument.toString()
+  appState.selectedDocument.set("", field.dataset.skinField ?? "", field.value)
+  const text = appState.selectedDocument.toString()
+  commitText(appState.selectedPath, before, text)
   setSourceValue(text)
   updateDirty()
 }
 
 function renameDocumentTitle(): void {
   const currentNode = $("#document-name")
-  const currentArchive = archive
+  const currentArchive = appState.archive
   if (!currentArchive || currentNode.parentElement?.querySelector("input")) return
   const current = currentNode.textContent?.trim() ?? ""
   if (!current || current === "未打开皮肤") return
@@ -7181,16 +6919,16 @@ function renameDocumentTitle(): void {
       ? `${theme.value}/skin/Info.txt`
       : currentArchive.names().includes("Info.txt") ? "Info.txt" : undefined
     if (infoPath && currentArchive.isText(infoPath)) {
-      const info = infoPath === selectedPath && selectedDocument
-        ? selectedDocument
+      const info = infoPath === appState.selectedPath && appState.selectedDocument
+        ? appState.selectedDocument
         : IniDocument.parse(currentArchive.getText(infoPath))
       const before = info.toString()
       info.set("", "Name", next)
       const after = info.toString()
       if (before !== after) {
         commitText(infoPath, before, after)
-        if (infoPath === selectedPath) {
-          selectedDocument = info
+        if (infoPath === appState.selectedPath) {
+          appState.selectedDocument = info
           setSourceValue(after)
           populateKeyInspector()
         }
@@ -7222,7 +6960,7 @@ documentName.parentElement?.addEventListener("keydown", (event) => {
 })
 
 function updateKeyboard(field: HTMLInputElement): void {
-  if (!archive) return
+  if (!appState.archive) return
   const context = keyboardContext()
   if (!context) return
   const name = field.dataset.keyboardField ?? ""
@@ -7247,18 +6985,18 @@ function updateKeyboard(field: HTMLInputElement): void {
 }
 
 function updateToolbar(field: HTMLInputElement): void {
-  if (!archive || !selectedDocument || !isToolbarPath(selectedPath) || !isEditing()) return
+  if (!appState.archive || !appState.selectedDocument || !isToolbarPath(appState.selectedPath) || !isEditing()) return
   const [section, key] = (field.dataset.toolbarField ?? "").split(".")
   const property = key || section
   const targetSection = key ? section : "CAND"
-  const path = property === "VIEW_RECT" ? genConfigPath() : selectedPath
-  if (!archive.isText(path)) return
-  const document = path === selectedPath ? selectedDocument : IniDocument.parse(archive.getText(path))
+  const path = property === "VIEW_RECT" ? genConfigPath() : appState.selectedPath
+  if (!appState.archive.isText(path)) return
+  const document = path === appState.selectedPath ? appState.selectedDocument : IniDocument.parse(appState.archive.getText(path))
   const before = document.toString()
   if (!document.set(targetSection, property, field.value)) return
   const text = document.toString()
   commitText(path, before, text)
-  if (path === selectedPath) setSourceValue(text)
+  if (path === appState.selectedPath) setSourceValue(text)
   refreshPreview()
   populateKeyInspector()
   updateDirty()
@@ -7266,45 +7004,45 @@ function updateToolbar(field: HTMLInputElement): void {
 
 function updateSelectedKey(field: HTMLInputElement): void {
   const name = field.dataset.keyField ?? ""
-  if (archive?.format === "bda") return
-  if (!archive || !layoutDocument || !selectedKeySections.length) return
+  if (appState.archive?.format === "bda") return
+  if (!appState.archive || !appState.layoutDocument || !appState.selectedKeySections.length) return
   const rectNames = ["x", "y", "width", "height"]
-  if (selectedKeySections.length === 1 && isListCell(selectedKeySections[0])) {
+  if (appState.selectedKeySections.length === 1 && isListCell(appState.selectedKeySections[0])) {
     // LIST 候选栏单元：几何字段写回定义处（布局或 gen.ini），其余写回布局的 [LIST]
     if (rectNames.includes(name)) {
       const geometry = listGeometryDocument()
       if (!geometry) return
       const before = geometry.document.toString()
       const count = name === "height"
-        ? Number(layoutDocument.get("LIST", "LIST_NUM")) || 1
+        ? Number(appState.layoutDocument.get("LIST", "LIST_NUM")) || 1
         : undefined
-      setListCellValue(geometry.document, selectedKeySections[0], name, field.value, count)
+      setListCellValue(geometry.document, appState.selectedKeySections[0], name, field.value, count)
       const text = geometry.document.toString()
       if (text === before) return
       commitText(geometry.path, before, text)
-      if (selectedPath === geometry.path) setSourceValue(text)
+      if (appState.selectedPath === geometry.path) setSourceValue(text)
       refreshPreview()
     } else {
-      const before = layoutDocument.toString()
-      setListCellValue(layoutDocument, selectedKeySections[0], name, field.value)
-      const text = layoutDocument.toString()
-      commitText(layoutPath, before, text)
-      if (selectedPath === layoutPath) setSourceValue(text)
-      preview.setDocument(layoutDocument)
+      const before = appState.layoutDocument.toString()
+      setListCellValue(appState.layoutDocument, appState.selectedKeySections[0], name, field.value)
+      const text = appState.layoutDocument.toString()
+      commitText(appState.layoutPath, before, text)
+      if (appState.selectedPath === appState.layoutPath) setSourceValue(text)
+      preview.setDocument(appState.layoutDocument)
     }
     populateKeyInspector()
     updateDirty()
     return
   }
-  const before = layoutDocument.toString()
+  const before = appState.layoutDocument.toString()
   const rectIndex = rectNames.indexOf(name)
-  for (const section of preview.expandSections(selectedKeySections)) {
+  for (const section of preview.expandSections(appState.selectedKeySections)) {
     if (rectIndex >= 0) {
-      const rect = layoutDocument.get(section, "VIEW_RECT")?.split(",").map(Number)
+      const rect = appState.layoutDocument.get(section, "VIEW_RECT")?.split(",").map(Number)
       const value = Number(field.value)
       if (!rect || rect.length !== 4 || !Number.isFinite(value)) continue
       rect[rectIndex] = value
-      layoutDocument.set(section, "VIEW_RECT", rect.map(Math.round).join(","))
+      appState.layoutDocument.set(section, "VIEW_RECT", rect.map(Math.round).join(","))
     } else {
       const target = name === "STAT_STYLE" ? section : effectiveKeySection(section)
       if (name.startsWith("PADDING.")) {
@@ -7312,54 +7050,54 @@ function updateSelectedKey(field: HTMLInputElement): void {
         const value = Number(field.value)
         if (!Number.isFinite(value)) continue
         values[Number(name.split(".")[1])] = String(value)
-        layoutDocument.set(target, "PADDING", values.join(","))
-      } else layoutDocument.set(target, name, field.value)
+        appState.layoutDocument.set(target, "PADDING", values.join(","))
+      } else appState.layoutDocument.set(target, name, field.value)
     }
   }
-  const text = layoutDocument.toString()
-  commitText(layoutPath, before, text)
-  if (selectedPath === layoutPath) setSourceValue(text)
-  preview.setDocument(layoutDocument)
+  const text = appState.layoutDocument.toString()
+  commitText(appState.layoutPath, before, text)
+  if (appState.selectedPath === appState.layoutPath) setSourceValue(text)
+  preview.setDocument(appState.layoutDocument)
   populateKeyInspector()
   updateDirty()
 }
 
 function updateSelectedStyle(field: HTMLInputElement): void {
   const property = field.dataset.styleField ?? ""
-  if (archive?.format === "bda") {
+  if (appState.archive?.format === "bda") {
     updateBdaRefs(selectedBdaRefs("FORE_STYLE", "text"), property, field.value)
     return
   }
   const context = selectedStylePropertyContext(property)
-  if (!archive || !context) return
+  if (!appState.archive || !context) return
   const before = context.document.toString()
   for (const section of new Set(context.sources.map((source) => source.section))) {
     context.document.set(section, property, field.value)
   }
   const text = context.document.toString()
   commitText(context.path, before, text)
-  if (selectedPath === context.path) setSourceValue(text)
+  if (appState.selectedPath === context.path) setSourceValue(text)
   refreshPreview()
   populateKeyInspector()
   updateDirty()
 }
 
 function selectedStyleImageSections(source: "BACK_STYLE" | "FORE_STYLE"): { document: IniDocument; path: string; sections: string[] } | undefined {
-  if (!archive || !layoutDocument || !selectedKeySections.length) return
+  if (!appState.archive || !appState.layoutDocument || !appState.selectedKeySections.length) return
   const path = styleConfigPath()
-  if (!archive.isText(path)) return
-  const document = IniDocument.parse(archive.getText(path))
+  if (!appState.archive.isText(path)) return
+  const document = IniDocument.parse(appState.archive.getText(path))
   const sections = source === "BACK_STYLE"
-    ? [...new Set(selectedKeySections.flatMap((key) => {
+    ? [...new Set(appState.selectedKeySections.flatMap((key) => {
         const backStyle = isListCell(key)
-          ? layoutDocument?.get("LIST", "BACK_STYLE") ?? ""
+          ? appState.layoutDocument?.get("LIST", "BACK_STYLE") ?? ""
           : effectiveKeyValue(key, source) ?? ""
         const id = backStyle.split(",")[0]?.trim()
         return id && /^\d+$/.test(id) ? [`STYLE${id}`] : []
       }))]
-    : [...new Set(selectedKeySections.flatMap((key) => {
+    : [...new Set(appState.selectedKeySections.flatMap((key) => {
         const foreStyle = isListCell(key)
-          ? layoutDocument?.get("LIST", "FORE_STYLE") ?? ""
+          ? appState.layoutDocument?.get("LIST", "FORE_STYLE") ?? ""
           : effectiveKeyValue(key, source) ?? ""
         return foreStyle.split(",").map((token) => token.trim()).flatMap((token) => {
           const value = Number(token)
@@ -7370,47 +7108,45 @@ function selectedStyleImageSections(source: "BACK_STYLE" | "FORE_STYLE"): { docu
 }
 
 function updateSelectedImageReference(target: StyleImagePickerTarget | undefined, value: string): boolean {
-  if (!archive || !target) return false
+  if (!appState.archive || !target) return false
   const { document, path, sections } = target
   if (document && path && sections?.length) {
     const before = document.toString()
     setStyleField(document, sections, target.property, value)
     const text = document.toString()
     commitText(path, before, text)
-    if (selectedPath === path) setSourceValue(text)
+    if (appState.selectedPath === path) setSourceValue(text)
     refreshPreview()
-    if (resourceInspectorMode === "style" && resourceConfigActive) {
+    if (appState.resourceInspectorMode === "style" && appState.resourceConfigActive) {
       void renderStyleResourceDetail()
     }
     populateKeyInspector()
     updateDirty()
     return true
   }
-  if (archive?.format === "bda") {
+  if (appState.archive?.format === "bda") {
     const refs = target.source === "FORE_STYLE"
       ? selectedBdaRefs("FORE_STYLE", "image", "BACK_STYLE")
       : selectedBdaRefs("BACK_STYLE", "image")
     return updateBdaRefs(refs, target.property, value)
   }
   const context = selectedStyleImageSections(target.source)
-  if (!archive || !context) return false
+  if (!appState.archive || !context) return false
   const before = context.document.toString()
   setStyleField(context.document, context.sections, target.property, value)
   const text = context.document.toString()
   commitText(context.path, before, text)
-  if (selectedPath === context.path) setSourceValue(text)
+  if (appState.selectedPath === context.path) setSourceValue(text)
   refreshPreview()
   populateKeyInspector()
   updateDirty()
   return true
 }
 
-let pickerSelectedIndex: number | undefined
-
 // 切片窗口标题栏显示所属样式：优先用引用目标里的 STYLE 段，其次退回资源检查器正在查看的样式。
 function imagePickerStyleName(target: StyleImagePickerTarget): string {
   const section = target.sections?.find((name) => /^STYLE\d+$/i.test(name))
-  const styleID = section ? section.replace(/^STYLE/i, "") : selectedStyleID
+  const styleID = section ? section.replace(/^STYLE/i, "") : appState.selectedStyleID
   return styleID ? `样式 ${stylePickerLabel(styleID)}` : ""
 }
 
@@ -7433,11 +7169,11 @@ async function showPickerWindow(
   if (existing) {
     if (view === "list") await emitTo("image-picker", "image-picker-show-list")
     else if (view === "styles") await emitStyleLibrary()
-    else if (nativeImagePickerPayload) await emitTo("image-picker", "image-picker-data", nativeImagePickerPayload)
+    else if (appState.nativeImagePickerPayload) await emitTo("image-picker", "image-picker-data", appState.nativeImagePickerPayload)
     await existing.setFocus()
     return
   }
-  pickerRequestedView = view
+  appState.pickerRequestedView = view
   new WebviewWindow("image-picker", {
     url: "picker.html",
     title,
@@ -7452,13 +7188,13 @@ async function showPickerWindow(
 }
 
 function openImagePickerList(): void {
-  if (!archive || (!pickerTarget && !resourcePickerSelect)) return
+  if (!appState.archive || (!appState.pickerTarget && !appState.resourcePickerSelect)) return
   void showPickerWindow("list", "全部图片", 960, 680)
 }
 
 function resourcePickerPayload(): NativeResourcePickerPayload {
-  return resourceImagePaths(archive?.names() ?? [], theme.value, orientation.value).flatMap((path) => {
-    const bytes = archive?.getBytes(path)
+  return resourceImagePaths(appState.archive?.names() ?? [], theme.value, orientation.value).flatMap((path) => {
+    const bytes = appState.archive?.getBytes(path)
     return bytes ? [{ path, dataURL: imageDataURL(bytes) }] : []
   })
 }
@@ -7466,28 +7202,28 @@ function resourcePickerPayload(): NativeResourcePickerPayload {
 function closeStyleImageResourcePicker(): void {
   styleImageResourcePicker.hidden = true
   styleImageResourceSearch.value = ""
-  resourcePickerSelect = undefined
+  appState.resourcePickerSelect = undefined
 }
 
 function selectImageResource(path: string): void {
-  const select = resourcePickerSelect
+  const select = appState.resourcePickerSelect
   if (select) {
     const resourceID = path.split("/").pop()?.replace(/\.png$/i, "") ?? path
     clearImageSlicePicker()
     select(resourceID)
     return
   }
-  if (pickerTarget) openImageSlicePicker(path, pickerTarget)
+  if (appState.pickerTarget) openImageSlicePicker(path, appState.pickerTarget)
 }
 
 function renderStyleImageResources(): void {
-  if (!archive) return
+  if (!appState.archive) return
   const query = styleImageResourceSearch.value.trim().toLowerCase()
-  const paths = resourceImagePaths(archive.names(), theme.value, orientation.value)
+  const paths = resourceImagePaths(appState.archive.names(), theme.value, orientation.value)
     .filter((path) => path.toLowerCase().includes(query))
   styleImageImgList.replaceChildren()
   for (const path of paths) {
-    const bytes = archive.getBytes(path)
+    const bytes = appState.archive.getBytes(path)
     if (!bytes) continue
     const button = document.createElement("button")
     button.type = "button"
@@ -7498,12 +7234,12 @@ function renderStyleImageResources(): void {
     const name = document.createElement("span")
     name.textContent = path.split("/").pop() ?? path
     button.append(image, name)
-    button.classList.toggle("active", path === pickerPath)
+    button.classList.toggle("active", path === appState.pickerPath)
     button.addEventListener("click", () => {
-      if (resourcePickerSelect) selectImageResource(path)
+      if (appState.resourcePickerSelect) selectImageResource(path)
       else {
         closeStyleImageResourcePicker()
-        if (pickerTarget) openImageSlicePicker(path, pickerTarget)
+        if (appState.pickerTarget) openImageSlicePicker(path, appState.pickerTarget)
       }
     })
     styleImageImgList.append(button)
@@ -7514,9 +7250,9 @@ function renderStyleImageResources(): void {
 }
 
 function openStyleImageResourcePicker(): void {
-  if (isTauri() || !archive || (!pickerTarget && !resourcePickerSelect)) return
-  styleImageSource.hidden = !(pickerTarget?.path && pickerTarget.sections?.length)
-  if (!pickerTarget) {
+  if (isTauri() || !appState.archive || (!appState.pickerTarget && !appState.resourcePickerSelect)) return
+  styleImageSource.hidden = !(appState.pickerTarget?.path && appState.pickerTarget.sections?.length)
+  if (!appState.pickerTarget) {
     showStyleImageDialog()
     styleImagePicker.hidden = true
     styleImageResourceOpen.hidden = true
@@ -7529,14 +7265,14 @@ function openStyleImageResourcePicker(): void {
 }
 
 function clearImageSlicePicker(): void {
-  if (pickerURL) URL.revokeObjectURL(pickerURL)
-  pickerURL = ""
-  pickerImage = undefined
-  pickerSlices = []
-  pickerPath = ""
-  pickerTarget = undefined
-  resourcePickerSelect = undefined
-  pickerSelectedIndex = undefined
+  if (appState.pickerURL) URL.revokeObjectURL(appState.pickerURL)
+  appState.pickerURL = ""
+  appState.pickerImage = undefined
+  appState.pickerSlices = []
+  appState.pickerPath = ""
+  appState.pickerTarget = undefined
+  appState.resourcePickerSelect = undefined
+  appState.pickerSelectedIndex = undefined
   styleImagePicker.hidden = true
   styleImageResourceOpen.hidden = true
   styleImageSource.hidden = true
@@ -7545,46 +7281,46 @@ function clearImageSlicePicker(): void {
   styleImageResourceCount.textContent = ""
   styleImageResourceEmpty.hidden = true
   if (styleImageDialog.open) styleImageDialog.close()
-  nativeImagePickerPayload = undefined
+  appState.nativeImagePickerPayload = undefined
   if (isTauri()) {
-    pickerRequestedView = "image"
+    appState.pickerRequestedView = "image"
     void WebviewWindow.getByLabel("image-picker").then((pickerWindow) => pickerWindow?.close())
   }
 }
 
 function drawImageSlicePicker(): void {
-  if (!pickerImage?.naturalWidth) return
-  pickerScale = drawSlicePicker(styleImagePickerCanvas, pickerImage, pickableSlices(pickerSlices, pickerImage), pickerSelectedIndex, pickerFit * pickerZoom, { normal: "#3a6df0", selected: "#ff6b2c" })
-  pickerOffset = { x: 0, y: 0 }
+  if (!appState.pickerImage?.naturalWidth) return
+  appState.pickerScale = drawSlicePicker(styleImagePickerCanvas, appState.pickerImage, pickableSlices(appState.pickerSlices, appState.pickerImage), appState.pickerSelectedIndex, appState.pickerFit * appState.pickerZoom, { normal: "#3a6df0", selected: "#ff6b2c" })
+  appState.pickerOffset = { x: 0, y: 0 }
 }
 
 function pickerImageReference(index: number): string {
-  const name = pickerPath.split("/").pop()?.replace(/\.png$/i, "") ?? pickerPath
+  const name = appState.pickerPath.split("/").pop()?.replace(/\.png$/i, "") ?? appState.pickerPath
   return index === WHOLE_IMAGE_INDEX ? name : `${name},${index}`
 }
 
 function openImageSlicePicker(path: string, target: StyleImagePickerTarget, selectedSource?: TileRect): void {
-  if (!archive?.isImage(path)) return
-  const bytes = archive.getBytes(path)
+  if (!appState.archive?.isImage(path)) return
+  const bytes = appState.archive.getBytes(path)
   if (!bytes) return
-  if (pickerURL) URL.revokeObjectURL(pickerURL)
-  pickerURL = URL.createObjectURL(new Blob([new Uint8Array(bytes).buffer], { type: "image/png" }))
-  pickerPath = path
-  pickerTarget = target
+  if (appState.pickerURL) URL.revokeObjectURL(appState.pickerURL)
+  appState.pickerURL = URL.createObjectURL(new Blob([new Uint8Array(bytes).buffer], { type: "image/png" }))
+  appState.pickerPath = path
+  appState.pickerTarget = target
   const tilePathForPicker = path.replace(/\.png$/i, ".til")
-  pickerSlices = archive.isText(tilePathForPicker) ? tileSlices(IniDocument.parse(archive.getText(tilePathForPicker))) : []
-  pickerSelectedIndex = !pickerSlices.length && selectedSource
+  appState.pickerSlices = appState.archive.isText(tilePathForPicker) ? tileSlices(IniDocument.parse(appState.archive.getText(tilePathForPicker))) : []
+  appState.pickerSelectedIndex = !appState.pickerSlices.length && selectedSource
     ? WHOLE_IMAGE_INDEX
-    : pickerSlices.find((slice) => selectedSource && slice.source.join(",") === selectedSource.join(","))?.index
-  nativeImagePickerPayload = {
+    : appState.pickerSlices.find((slice) => selectedSource && slice.source.join(",") === selectedSource.join(","))?.index
+  appState.nativeImagePickerPayload = {
     path,
     dataURL: imageDataURL(bytes),
-    slices: pickerSlices,
-    selectedIndex: pickerSelectedIndex,
+    slices: appState.pickerSlices,
+    selectedIndex: appState.pickerSelectedIndex,
     editable: isEditing(),
     styleName: imagePickerStyleName(target),
     // 行内缩略图传入的是未挂载的克隆输入框，只要有引用目标就能回到样式库。
-    styleLibrary: Boolean(stylePickerTarget),
+    styleLibrary: Boolean(appState.stylePickerTarget),
   }
   if ("__TAURI_INTERNALS__" in window) {
     if (styleImageDialog.open) styleImageDialog.close()
@@ -7592,30 +7328,30 @@ function openImageSlicePicker(path: string, target: StyleImagePickerTarget, sele
     return
   }
   closeStyleImageResourcePicker()
-  pickerImage = new Image()
-  pickerImage.onload = () => {
-    if (!pickerImage) return
+  appState.pickerImage = new Image()
+  appState.pickerImage.onload = () => {
+    if (!appState.pickerImage) return
     // 初始大小铺满可视区域（减去内边距与底部说明），之后由缩放倍率调整
     const width = styleImagePicker.clientWidth - 38
     const height = styleImagePicker.clientHeight - 38 - styleImagePickerMeta.offsetHeight - 7
-    pickerFit = Math.min((width > 0 ? width : 960) / pickerImage.naturalWidth, (height > 0 ? height : 640) / pickerImage.naturalHeight)
-    pickerZoom = 1
+    appState.pickerFit = Math.min((width > 0 ? width : 960) / appState.pickerImage.naturalWidth, (height > 0 ? height : 640) / appState.pickerImage.naturalHeight)
+    appState.pickerZoom = 1
     drawImageSlicePicker()
   }
-  pickerImage.src = pickerURL
+  appState.pickerImage.src = appState.pickerURL
   styleImageSource.hidden = !(target.path && target.sections?.length)
   styleImagePicker.hidden = false
   styleImageResourceOpen.hidden = false
   styleImageTitle.textContent = path.split("/").pop() ?? path
   styleImageSubtitle.textContent = " · 选择切片"
-  styleImagePickerMeta.textContent = `${pickerSlices.length ? "点击图片中的切片以修改引用" : "点击整张图以修改引用"} · ⌘/Ctrl + 滚轮或双指捏合缩放`
+  styleImagePickerMeta.textContent = `${appState.pickerSlices.length ? "点击图片中的切片以修改引用" : "点击整张图以修改引用"} · ⌘/Ctrl + 滚轮或双指捏合缩放`
   showStyleImageDialog()
 }
 
 function selectedRects(): LayoutRect[] {
-  if (!layoutDocument) return []
-  const document = layoutDocument
-  return selectedKeySections.flatMap((section) => {
+  if (!appState.layoutDocument) return []
+  const document = appState.layoutDocument
+  return appState.selectedKeySections.flatMap((section) => {
     if (isListCell(section)) {
       const rect = listCellRect(document, section)
       return rect ? [rect] : []
@@ -7628,7 +7364,7 @@ function selectedRects(): LayoutRect[] {
 }
 
 function applyLayoutAction(action: string): void {
-  if (!archive || !layoutDocument) return
+  if (!appState.archive || !appState.layoutDocument) return
   if (action === "merge") {
     mergeSelectedKeys()
     return
@@ -7636,44 +7372,44 @@ function applyLayoutAction(action: string): void {
   const real = selectedRects().filter((rect) => !isListCell(rect.section))
   const rects = transformLayout(real, action as LayoutAction)
   if (rects.length < 2) return
-  const before = layoutDocument.toString()
+  const before = appState.layoutDocument.toString()
   for (const rect of rects) {
-    layoutDocument.set(
+    appState.layoutDocument.set(
       rect.section,
       "VIEW_RECT",
       [rect.x, rect.y, rect.width, rect.height].map(Math.round).join(","),
     )
   }
-  const text = layoutDocument.toString()
-  commitText(layoutPath, before, text)
-  if (selectedPath === layoutPath) setSourceValue(text)
-  preview.setDocument(layoutDocument)
+  const text = appState.layoutDocument.toString()
+  commitText(appState.layoutPath, before, text)
+  if (appState.selectedPath === appState.layoutPath) setSourceValue(text)
+  preview.setDocument(appState.layoutDocument)
   populateKeyInspector()
   updateDirty()
 }
 
 function mergeSelectedKeys(): void {
-  if (!archive || !layoutDocument) return
+  if (!appState.archive || !appState.layoutDocument) return
   const rects = selectedRects().filter((rect) => !isListCell(rect.section))
   if (rects.length !== 2) return
-  const before = layoutDocument.toString()
+  const before = appState.layoutDocument.toString()
   const merged = mergeLayoutRects(rects[0], rects[1])
-  layoutDocument.set(merged.section, "VIEW_RECT", [merged.x, merged.y, merged.width, merged.height].map(Math.round).join(","))
-  if (!layoutDocument.removeSections([rects[1].section])) return
-  const renamed = normalizeKeySections(layoutDocument)
-  const text = layoutDocument.toString()
-  commitText(layoutPath, before, text)
-  if (selectedPath === layoutPath) setSourceValue(text)
-  selectedKeySections = [renamed.get(merged.section) ?? merged.section]
-  preview.setDocument(layoutDocument)
-  preview.setSelected(selectedKeySections)
+  appState.layoutDocument.set(merged.section, "VIEW_RECT", [merged.x, merged.y, merged.width, merged.height].map(Math.round).join(","))
+  if (!appState.layoutDocument.removeSections([rects[1].section])) return
+  const renamed = normalizeKeySections(appState.layoutDocument)
+  const text = appState.layoutDocument.toString()
+  commitText(appState.layoutPath, before, text)
+  if (appState.selectedPath === appState.layoutPath) setSourceValue(text)
+  appState.selectedKeySections = [renamed.get(merged.section) ?? merged.section]
+  preview.setDocument(appState.layoutDocument)
+  preview.setSelected(appState.selectedKeySections)
   populateKeyInspector()
   updateSourceHighlight()
   updateDirty()
 }
 
 function applyExactGap(field: HTMLInputElement): void {
-  if (!archive || !layoutDocument) return
+  if (!appState.archive || !appState.layoutDocument) return
   const gap = Number(field.value)
   if (!Number.isFinite(gap)) return
   const rects = setExactGap(
@@ -7682,18 +7418,18 @@ function applyExactGap(field: HTMLInputElement): void {
     gap,
   )
   if (rects.length < 2) return
-  const before = layoutDocument.toString()
+  const before = appState.layoutDocument.toString()
   for (const rect of rects) {
-    layoutDocument.set(
+    appState.layoutDocument.set(
       rect.section,
       "VIEW_RECT",
       [rect.x, rect.y, rect.width, rect.height].map(Math.round).join(","),
     )
   }
-  const text = layoutDocument.toString()
-  commitText(layoutPath, before, text)
-  if (selectedPath === layoutPath) setSourceValue(text)
-  preview.setDocument(layoutDocument)
+  const text = appState.layoutDocument.toString()
+  commitText(appState.layoutPath, before, text)
+  if (appState.selectedPath === appState.layoutPath) setSourceValue(text)
+  preview.setDocument(appState.layoutDocument)
   populateKeyInspector()
   updateDirty()
 }
@@ -7701,29 +7437,29 @@ function applyExactGap(field: HTMLInputElement): void {
 function moveSelectedKeys(
   deltaX: number,
   deltaY: number,
-  sections: readonly string[] = selectedKeySections,
+  sections: readonly string[] = appState.selectedKeySections,
   coalesce = false,
 ): void {
-  if (!archive || !layoutDocument) return
+  if (!appState.archive || !appState.layoutDocument) return
   const rects = moveRects(sections.flatMap((section) => {
-    const values = layoutDocument?.get(section, "VIEW_RECT")?.split(",").map(Number)
+    const values = appState.layoutDocument?.get(section, "VIEW_RECT")?.split(",").map(Number)
     if (!values || values.length !== 4 || values.some((value) => !Number.isFinite(value))) return []
     const [x, y, width, height] = values
     return [{ section, x, y, width, height }]
   }), deltaX, deltaY)
   if (!rects.length) return
-  const before = layoutDocument.toString()
+  const before = appState.layoutDocument.toString()
   for (const rect of rects) {
-    layoutDocument.set(
+    appState.layoutDocument.set(
       rect.section,
       "VIEW_RECT",
       [rect.x, rect.y, rect.width, rect.height].map(Math.round).join(","),
     )
   }
-  const text = layoutDocument.toString()
-  commitText(layoutPath, before, text, coalesce)
-  if (selectedPath === layoutPath) setSourceValue(text)
-  preview.setDocument(layoutDocument)
+  const text = appState.layoutDocument.toString()
+  commitText(appState.layoutPath, before, text, coalesce)
+  if (appState.selectedPath === appState.layoutPath) setSourceValue(text)
+  preview.setDocument(appState.layoutDocument)
   populateKeyInspector()
   updateDirty()
 }
@@ -7744,33 +7480,33 @@ function atlasPoint(event: Pick<PointerEvent, "clientX" | "clientY">): TilePoint
 function commitBdaTileInnerRect(rect: TileRect): void {
   const info = currentBdaAppearance()
   const usage = selectedBdaTileUsage()
-  const slice = slices.find((item) => item.index === selectedTileIndex)
+  const slice = appState.slices.find((item) => item.index === appState.selectedTileIndex)
   if (!info || !usage || !slice || !isEditing()) return
   const [x, y, width, height] = rect
   if (rect.some((value) => !Number.isInteger(value) || value < 0)) return
   if (x + width > slice.source[2] || y + height > slice.source[3]) return
   const after = updateBdaImageInnerRect(info.bytes, usage.ref, usage.highlighted, rect)
   commitBytes(info.path, info.bytes, after)
-  loadTiles(selectedResourcePath)
+  loadTiles(appState.selectedResourcePath)
   refreshPreview()
   populateKeyInspector()
   updateDirty()
 }
 
 function commitTile(slice: TileSlice, coalesce = false): void {
-  if (!archive || archive.format === "bda" || !selectedResourcePath || !isEditing()) return
+  if (!appState.archive || appState.archive.format === "bda" || !appState.selectedResourcePath || !isEditing()) return
   const [x, y, width, height] = slice.source
   if (
     slice.source.some(value => !Number.isInteger(value)) ||
     width <= 0 || height <= 0 || x < 0 || y < 0 ||
     x + width > workspaceImage.naturalWidth || y + height > workspaceImage.naturalHeight
   ) return
-  const before = tileDocument.toString()
-  updateTileSlice(tileDocument, slice)
-  commitText(tilePath, before, tileDocument.toString(), coalesce)
-  setSourceValue(tileDocument.toString())
-  slices = tileSlices(tileDocument)
-  selectedTileIndex = slice.index
+  const before = appState.tileDocument.toString()
+  updateTileSlice(appState.tileDocument, slice)
+  commitText(appState.tilePath, before, appState.tileDocument.toString(), coalesce)
+  setSourceValue(appState.tileDocument.toString())
+  appState.slices = tileSlices(appState.tileDocument)
+  appState.selectedTileIndex = slice.index
   updateSourceHighlight()
   populateTileInspector()
   drawAtlas()
@@ -7779,9 +7515,9 @@ function commitTile(slice: TileSlice, coalesce = false): void {
 }
 
 async function autoSliceSelectedImage(): Promise<void> {
-  const currentArchive = archive
-  const path = selectedResourcePath
-  if (!currentArchive || currentArchive.format === "bda" || !path || !tilePath || !isEditing()) return
+  const currentArchive = appState.archive
+  const path = appState.selectedResourcePath
+  if (!currentArchive || currentArchive.format === "bda" || !path || !appState.tilePath || !isEditing()) return
   const bytes = currentArchive.getBytes(path)
   if (!bytes) return
   try {
@@ -7791,14 +7527,14 @@ async function autoSliceSelectedImage(): Promise<void> {
       showStatus("未识别到可切片的透明图块")
       return
     }
-    if (slices.length && !window.confirm(`自动切片将替换当前 ${slices.length} 个切片，是否继续？`)) return
-    if (archive !== currentArchive || selectedResourcePath !== path || !isEditing()) return
-    const before = tileDocument.toString()
-    for (const slice of slices) removeTileSlice(tileDocument, slice.index)
-    cells.forEach((source, index) => updateTileSlice(tileDocument, { index: index + 1, source }))
-    commitText(tilePath, before, tileDocument.toString())
+    if (appState.slices.length && !window.confirm(`自动切片将替换当前 ${appState.slices.length} 个切片，是否继续？`)) return
+    if (appState.archive !== currentArchive || appState.selectedResourcePath !== path || !isEditing()) return
+    const before = appState.tileDocument.toString()
+    for (const slice of appState.slices) removeTileSlice(appState.tileDocument, slice.index)
+    cells.forEach((source, index) => updateTileSlice(appState.tileDocument, { index: index + 1, source }))
+    commitText(appState.tilePath, before, appState.tileDocument.toString())
     loadTiles(path)
-    selectedTileIndex = 1
+    appState.selectedTileIndex = 1
     updateSourceHighlight()
     populateTileInspector()
     drawAtlas()
@@ -7811,7 +7547,7 @@ async function autoSliceSelectedImage(): Promise<void> {
 
 function renderResourceInspectorMetadata(): void {
   for (const item of resourceGallery.querySelectorAll<HTMLElement>(".resource-item")) {
-    if (item.dataset.path !== selectedResourcePath) continue
+    if (item.dataset.path !== appState.selectedResourcePath) continue
     const meta = item.querySelector("small")
     const size = meta?.textContent?.split(" · ")[0]
     if (meta) meta.textContent = `${size ? `${size} · ` : ""}TIL`
@@ -7819,13 +7555,13 @@ function renderResourceInspectorMetadata(): void {
 }
 
 function setDrawingTile(active: boolean): void {
-  drawingTile = active
-  tileDragStart = undefined
-  tileDraft = undefined
+  appState.drawingTile = active
+  appState.tileDragStart = undefined
+  appState.tileDraft = undefined
   if (active) {
-    movingTile = undefined
-    moveStart = undefined
-    moveSource = undefined
+    appState.movingTile = undefined
+    appState.moveStart = undefined
+    appState.moveSource = undefined
   }
   newTileButton.classList.toggle("active", active)
   atlasCanvas.classList.toggle("drawing", active)
@@ -7833,8 +7569,8 @@ function setDrawingTile(active: boolean): void {
 }
 
 function moveSelectedTile(deltaX: number, deltaY: number, coalesce = false): void {
-  if (!archive || !selectedResourcePath || !isEditing()) return
-  const existing = slices.find((slice) => slice.index === selectedTileIndex)
+  if (!appState.archive || !appState.selectedResourcePath || !isEditing()) return
+  const existing = appState.slices.find((slice) => slice.index === appState.selectedTileIndex)
   if (!existing) return
   const source = moveTileRect(existing.source, deltaX, deltaY, workspaceImage.naturalWidth, workspaceImage.naturalHeight)
   const actualX = source[0] - existing.source[0]
@@ -7847,25 +7583,25 @@ function moveSelectedTile(deltaX: number, deltaY: number, coalesce = false): voi
 }
 
 function deleteSelectedTile(): void {
-  if (!archive || archive.format === "bda" || !selectedResourcePath || !isEditing() || selectedTileIndex === undefined) return
-  const before = tileDocument.toString()
-  if (!removeTileSlice(tileDocument, selectedTileIndex)) return
+  if (!appState.archive || appState.archive.format === "bda" || !appState.selectedResourcePath || !isEditing() || appState.selectedTileIndex === undefined) return
+  const before = appState.tileDocument.toString()
+  if (!removeTileSlice(appState.tileDocument, appState.selectedTileIndex)) return
   // 工具书 V6 p43：切片序号禁止跳号；删中间切片后顺延重排，并同步同目录 css 中 *_IMG=素材名,序号 的引用。
-  const shifted = new Map([...tileDocument.renumberSections("IMG")].map(([from, to]) => [from.slice(3), to.slice(3)]))
-  const changes: Change[] = [{ kind: "text", path: tilePath, before, after: tileDocument.toString() }]
-  const directory = selectedResourcePath.slice(0, selectedResourcePath.lastIndexOf("/") + 1)
-  const stem = selectedResourcePath.slice(directory.length).replace(/\.png$/i, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const shifted = new Map([...appState.tileDocument.renumberSections("IMG")].map(([from, to]) => [from.slice(3), to.slice(3)]))
+  const changes: Change[] = [{ kind: "text", path: appState.tilePath, before, after: appState.tileDocument.toString() }]
+  const directory = appState.selectedResourcePath.slice(0, appState.selectedResourcePath.lastIndexOf("/") + 1)
+  const stem = appState.selectedResourcePath.slice(directory.length).replace(/\.png$/i, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   const reference = new RegExp(`^(\\s*[A-Z_]*IMG\\s*=\\s*${stem}\\s*,\\s*)(\\d+)`, "gim")
-  for (const path of shifted.size ? archive.names() : []) {
-    if (!path.startsWith(directory) || path.slice(directory.length).includes("/") || !/\.css$/i.test(path) || !archive.isText(path)) continue
-    const text = archive.getText(path)
+  for (const path of shifted.size ? appState.archive.names() : []) {
+    if (!path.startsWith(directory) || path.slice(directory.length).includes("/") || !/\.css$/i.test(path) || !appState.archive.isText(path)) continue
+    const text = appState.archive.getText(path)
     const next = text.replace(reference, (_, prefix: string, index: string) => prefix + (shifted.get(index) ?? index))
     if (next !== text) changes.push({ kind: "text", path, before: text, after: next })
   }
   commitBatch(changes)
-  setSourceValue(tileDocument.toString())
-  slices = tileSlices(tileDocument)
-  selectedTileIndex = undefined
+  setSourceValue(appState.tileDocument.toString())
+  appState.slices = tileSlices(appState.tileDocument)
+  appState.selectedTileIndex = undefined
   updateSourceHighlight()
   populateTileInspector()
   drawAtlas()
@@ -7873,18 +7609,18 @@ function deleteSelectedTile(): void {
 }
 
 function duplicateSelectedTile(): void {
-  const existing = slices.find((slice) => slice.index === selectedTileIndex)
+  const existing = appState.slices.find((slice) => slice.index === appState.selectedTileIndex)
   if (!existing || !isEditing()) return
-  commitTile(duplicateTileSlice(existing, nextTileIndex(tileDocument)))
+  commitTile(duplicateTileSlice(existing, nextTileIndex(appState.tileDocument)))
 }
 
 function updateSelectedTile(): void {
-  const existing = slices.find((slice) => slice.index === selectedTileIndex)
+  const existing = appState.slices.find((slice) => slice.index === appState.selectedTileIndex)
   if (!existing) return
   const innerValues = tileInnerFields.map((field) => field.value.trim())
   const innerNumbers = innerValues.map(Number) as TileRect
   let inner = innerValues.every(Boolean) && innerNumbers.every(Number.isFinite) ? innerNumbers : undefined
-  if (archive?.format === "bda") {
+  if (appState.archive?.format === "bda") {
     if (inner) commitBdaTileInnerRect(inner)
     return
   }
@@ -7903,7 +7639,7 @@ function updateSelectedTile(): void {
 }
 
 function setSidebarView(view: "overview" | "source"): void {
-  sidebarView = view
+  appState.sidebarView = view
   for (const button of sidebarViewButtons) {
     button.classList.toggle("active", button.dataset.sidebarView === view)
   }
@@ -7914,26 +7650,26 @@ function setSidebarView(view: "overview" | "source"): void {
 }
 
 function sourceSelection(): { path: string; folder: boolean } | undefined {
-  if (!selectedFileButton?.closest(".raw-files")) return
-  const path = selectedFileButton.dataset.path
-    ?? selectedFileButton.dataset.folderPath
-    ?? selectedFileButton.closest<HTMLDetailsElement>("details.raw-folder")?.dataset.folderPath
-  return path ? { path, folder: !selectedFileButton.dataset.path } : undefined
+  if (!appState.selectedFileButton?.closest(".raw-files")) return
+  const path = appState.selectedFileButton.dataset.path
+    ?? appState.selectedFileButton.dataset.folderPath
+    ?? appState.selectedFileButton.closest<HTMLDetailsElement>("details.raw-folder")?.dataset.folderPath
+  return path ? { path, folder: !appState.selectedFileButton.dataset.path } : undefined
 }
 
 function updateSourceFileActions(): void {
   const selection = sourceSelection()
-  const editable = Boolean(archive) && isEditing() && !fileOperationRunning
+  const editable = Boolean(appState.archive) && isEditing() && !appState.fileOperationRunning
   sourceUploadButton.disabled = !editable
-  sourceDownloadButton.disabled = fileOperationRunning || !selection || selection.folder
-  sourceCopyButton.disabled = fileOperationRunning || !selection
-  sourcePasteButton.disabled = !editable || !sourceTransfer?.files.length
+  sourceDownloadButton.disabled = appState.fileOperationRunning || !selection || selection.folder
+  sourceCopyButton.disabled = appState.fileOperationRunning || !selection
+  sourcePasteButton.disabled = !editable || !appState.sourceTransfer?.files.length
   sourceMoveButton.disabled = !editable || !selection
   sourceDeleteButton.disabled = !editable || !selection
-  sourceCopyButton.classList.toggle("active", sourceTransfer?.mode === "copy")
-  sourceMoveButton.classList.toggle("active", sourceTransfer?.mode === "move")
-  sourceCopyButton.setAttribute("aria-pressed", String(sourceTransfer?.mode === "copy"))
-  sourceMoveButton.setAttribute("aria-pressed", String(sourceTransfer?.mode === "move"))
+  sourceCopyButton.classList.toggle("active", appState.sourceTransfer?.mode === "copy")
+  sourceMoveButton.classList.toggle("active", appState.sourceTransfer?.mode === "move")
+  sourceCopyButton.setAttribute("aria-pressed", String(appState.sourceTransfer?.mode === "copy"))
+  sourceMoveButton.setAttribute("aria-pressed", String(appState.sourceTransfer?.mode === "move"))
 }
 
 function sourceTargetFolder(): string {
@@ -7944,10 +7680,10 @@ function sourceTargetFolder(): string {
 }
 
 function sourcePaths(selection: { path: string; folder: boolean }): string[] {
-  if (!archive) return []
+  if (!appState.archive) return []
   return selection.folder
-    ? archive.names().filter((path) => !path.endsWith("/") && path.startsWith(`${selection.path}/`))
-    : archive.getBytes(selection.path) ? [selection.path] : []
+    ? appState.archive.names().filter((path) => !path.endsWith("/") && path.startsWith(`${selection.path}/`))
+    : appState.archive.getBytes(selection.path) ? [selection.path] : []
 }
 
 /** 生成「名称 副本.ext」「名称 副本 2.ext」，跳过已占用的路径。 */
@@ -7965,14 +7701,14 @@ function sourceCopyPath(path: string, taken: (candidate: string) => boolean): st
 
 function setSourceTransfer(mode: SourceTransfer["mode"]): void {
   const selection = sourceSelection()
-  if (!archive || !selection || mode === "move" && !isEditing()) return
+  if (!appState.archive || !selection || mode === "move" && !isEditing()) return
   const base = selection.folder ? `${selection.path.split("/").pop()}/` : ""
-  sourceTransfer = {
+  appState.sourceTransfer = {
     mode,
     sourcePath: selection.path,
     folder: selection.folder,
     files: sourcePaths(selection).flatMap((source) => {
-      const bytes = archive?.getBytes(source)
+      const bytes = appState.archive?.getBytes(source)
       if (!bytes) return []
       const relative = selection.folder ? source.slice(selection.path.length + 1) : source.split("/").pop() ?? source
       return [{ path: `${base}${relative}`, source, bytes: bytes.slice() }]
@@ -7982,15 +7718,15 @@ function setSourceTransfer(mode: SourceTransfer["mode"]): void {
 }
 
 function refreshAfterSourceMutation(preferredPath?: string): void {
-  if (!archive) return
-  const selectedStillExists = archive.getBytes(selectedPath)
+  if (!appState.archive) return
+  const selectedStillExists = appState.archive.getBytes(appState.selectedPath)
   renderFiles()
   setSidebarView("source")
-  const next = preferredPath && archive.getBytes(preferredPath)
+  const next = preferredPath && appState.archive.getBytes(preferredPath)
     ? preferredPath
     : selectedStillExists
-      ? selectedPath
-      : archive.names().find((path) => archive?.isText(path) || archive?.isImage(path) || archive?.isBdaConfig(path))
+      ? appState.selectedPath
+      : appState.archive.names().find((path) => appState.archive?.isText(path) || appState.archive?.isImage(path) || appState.archive?.isBdaConfig(path))
   if (next) {
     selectFile(next, "source")
     revealSourceFile(next)
@@ -7998,8 +7734,6 @@ function refreshAfterSourceMutation(preferredPath?: string): void {
   refreshPreview()
   updateDirty()
 }
-
-type SourceUpload = { name: string; bytes: Uint8Array }
 
 function sourceDropFolder(target: Element | null): string | undefined {
   if (!target?.closest(".raw-files")) return
@@ -8015,18 +7749,18 @@ function setSourceDropTarget(target?: Element | null): void {
 }
 
 function commitSourceUploads(uploads: SourceUpload[], folder: string): boolean {
-  if (!archive || !uploads.length) return false
+  if (!appState.archive || !uploads.length) return false
   const changes = uploads.map(({ name, bytes }) => {
     const filename = name.split(/[\\/]/).pop() ?? name
     const path = folder ? `${folder}/${filename}` : filename
     return { path, bytes }
   })
-  const conflicts = changes.filter(({ path }) => archive?.getBytes(path)).map(({ path }) => path)
+  const conflicts = changes.filter(({ path }) => appState.archive?.getBytes(path)).map(({ path }) => path)
   if (conflicts.length && !window.confirm(`以下文件已存在，是否替换？\n\n${conflicts.join("\n")}`)) return false
   commitBatch(changes.map(({ path, bytes }) => ({
     kind: "bytes",
     path,
-    before: archive!.getBytes(path)?.slice(),
+    before: appState.archive!.getBytes(path)?.slice(),
     after: bytes,
   })))
   refreshAfterSourceMutation(changes[0]?.path)
@@ -8034,14 +7768,14 @@ function commitSourceUploads(uploads: SourceUpload[], folder: string): boolean {
 }
 
 sourceUploadButton.addEventListener("click", () => {
-  if (!archive || !isEditing()) return
+  if (!appState.archive || !isEditing()) return
   sourceUploadInput.value = ""
   sourceUploadInput.click()
 })
 
 sourceUploadInput.addEventListener("change", () => {
   void runFileOperation("上传文件", async () => {
-    if (!archive || !sourceUploadInput.files?.length) return false
+    if (!appState.archive || !sourceUploadInput.files?.length) return false
     const folder = sourceTargetFolder()
     const uploads = await Promise.all(Array.from(sourceUploadInput.files).map(async (file) => ({
       name: file.name,
@@ -8054,8 +7788,8 @@ sourceUploadInput.addEventListener("change", () => {
 sourceDownloadButton.addEventListener("click", () => {
   void runFileOperation("下载文件", async () => {
     const selection = sourceSelection()
-    if (!archive || !selection || selection.folder) return false
-    const bytes = archive.getBytes(selection.path)
+    if (!appState.archive || !selection || selection.folder) return false
+    const bytes = appState.archive.getBytes(selection.path)
     if (!bytes) return false
     return Boolean(await writeToChosenFile(selection.path.split("/").pop() ?? "download", bytes))
   })
@@ -8066,25 +7800,25 @@ sourceCopyButton.addEventListener("click", () => {
 })
 
 sourcePasteButton.addEventListener("click", () => {
-  if (!archive || !isEditing() || !sourceTransfer?.files.length) return
+  if (!appState.archive || !isEditing() || !appState.sourceTransfer?.files.length) return
   const folder = sourceTargetFolder()
-  if (sourceTransfer.mode === "move" && sourceTransfer.folder &&
-    (folder === sourceTransfer.sourcePath || folder.startsWith(`${sourceTransfer.sourcePath}/`))) {
+  if (appState.sourceTransfer.mode === "move" && appState.sourceTransfer.folder &&
+    (folder === appState.sourceTransfer.sourcePath || folder.startsWith(`${appState.sourceTransfer.sourcePath}/`))) {
     window.alert("不能将文件夹移动到自身内部。")
     return
   }
-  let copies = sourceTransfer.files.map(({ path, source, bytes }) => ({
+  let copies = appState.sourceTransfer.files.map(({ path, source, bytes }) => ({
     path: folder ? `${folder}/${path}` : path,
     source,
     bytes,
   }))
-  if (sourceTransfer.mode === "move" && copies.every(({ path, source }) => path === source)) return
+  if (appState.sourceTransfer.mode === "move" && copies.every(({ path, source }) => path === source)) return
   // 复制后粘贴回原位置：按访达习惯另存为「名称 副本」，而不是询问是否用自己替换自己。
-  if (sourceTransfer.mode === "copy") {
-    const names = archive.names()
-    if (sourceTransfer.folder) {
-      const top = `${folder ? `${folder}/` : ""}${sourceTransfer.sourcePath.split("/").pop()}`
-      if (top === sourceTransfer.sourcePath) {
+  if (appState.sourceTransfer.mode === "copy") {
+    const names = appState.archive.names()
+    if (appState.sourceTransfer.folder) {
+      const top = `${folder ? `${folder}/` : ""}${appState.sourceTransfer.sourcePath.split("/").pop()}`
+      if (top === appState.sourceTransfer.sourcePath) {
         const renamed = sourceCopyPath(top, (candidate) => names.some((name) => name.startsWith(`${candidate}/`)))
         copies = copies.map((copy) => ({ ...copy, path: renamed + copy.path.slice(top.length) }))
       }
@@ -8094,24 +7828,24 @@ sourcePasteButton.addEventListener("click", () => {
         : copy)
     }
   }
-  const sources = new Set(sourceTransfer.files.map(({ source }) => source))
+  const sources = new Set(appState.sourceTransfer.files.map(({ source }) => source))
   const conflicts = copies
-    .filter(({ path }) => archive?.getBytes(path) && (sourceTransfer?.mode !== "move" || !sources.has(path)))
+    .filter(({ path }) => appState.archive?.getBytes(path) && (appState.sourceTransfer?.mode !== "move" || !sources.has(path)))
     .map(({ path }) => path)
   if (conflicts.length && !window.confirm(`以下文件已存在，是否替换？\n\n${conflicts.join("\n")}`)) return
   const changes: Change[] = copies.map(({ path, bytes }) => ({
     kind: "bytes",
     path,
-    before: archive!.getBytes(path)?.slice(),
+    before: appState.archive!.getBytes(path)?.slice(),
     after: bytes.slice(),
   }))
-  if (sourceTransfer.mode === "move") {
+  if (appState.sourceTransfer.mode === "move") {
     for (const source of sources) {
       if (!copies.some(({ path }) => path === source)) {
-        changes.push({ kind: "bytes", path: source, before: archive.getBytes(source)?.slice() })
+        changes.push({ kind: "bytes", path: source, before: appState.archive.getBytes(source)?.slice() })
       }
     }
-    sourceTransfer = undefined
+    appState.sourceTransfer = undefined
   }
   commitBatch(changes)
   refreshAfterSourceMutation(copies[0]?.path)
@@ -8123,64 +7857,64 @@ sourceMoveButton.addEventListener("click", () => {
 
 sourceDeleteButton.addEventListener("click", () => {
   const selection = sourceSelection()
-  if (!archive || !selection || !isEditing()) return
+  if (!appState.archive || !selection || !isEditing()) return
   const paths = sourcePaths(selection)
   if (!paths.length || !window.confirm(`确定要删除${selection.folder ? "文件夹" : "文件"} ${selection.path} 吗？此操作可撤销。`)) return
   commitBatch(paths.map((path) => ({
     kind: "bytes",
     path,
-    before: archive!.getBytes(path)?.slice(),
+    before: appState.archive!.getBytes(path)?.slice(),
   })))
   refreshAfterSourceMutation()
 })
 
 function selectFile(
   path: string,
-  preferredSidebarView = sidebarView,
+  preferredSidebarView = appState.sidebarView,
   resourceMode: "document" | "image" | "style" | "sound" = "document",
   preserveInspectorView = false,
 ): void {
-  if (resourceMode !== "image") bdaSliceReturn = undefined
-  if (path !== selectedPath) {
+  if (resourceMode !== "image") appState.bdaSliceReturn = undefined
+  if (path !== appState.selectedPath) {
     source.commit()
-    selectedToolbarSections = []
+    appState.selectedToolbarSections = []
     toolbarPreview.setSelected([])
   }
-  selectedCandidate = false
-  const previousInspectorTab = inspectorTab
-  const preserveCurrentInspectorView = preserveInspectorView || path === selectedPath
-  if (path !== selectedPath) sourceHistoryHighlight = undefined
-  styleReturnPath = ""
-  styleReturnCandidate = false
-  resourceConfigActive = resourceMode !== "document"
-  resourceInspectorMode = resourceMode === "style" ? "style" : resourceMode === "sound" ? "sound" : "image"
-  const guideLabel = resourceInspectorMode === "image" && resourceConfigActive ? "切片网格" : "辅助线"
+  appState.selectedCandidate = false
+  const previousInspectorTab = appState.inspectorTab
+  const preserveCurrentInspectorView = preserveInspectorView || path === appState.selectedPath
+  if (path !== appState.selectedPath) appState.sourceHistoryHighlight = undefined
+  appState.styleReturnPath = ""
+  appState.styleReturnCandidate = false
+  appState.resourceConfigActive = resourceMode !== "document"
+  appState.resourceInspectorMode = resourceMode === "style" ? "style" : resourceMode === "sound" ? "sound" : "image"
+  const guideLabel = appState.resourceInspectorMode === "image" && appState.resourceConfigActive ? "切片网格" : "辅助线"
   for (const button of [toggleGuides, mobileToggleGuides]) {
     button.title = guideLabel
     button.setAttribute("aria-label", guideLabel)
   }
-  if (resourceInspectorMode === "image" && resourceConfigActive) setGuidesVisible(true)
-  if (!resourceConfigActive) {
-    selectedResourcePath = ""
-    drawingTile = false
-    tileDragStart = undefined
-    tileDraft = undefined
+  if (appState.resourceInspectorMode === "image" && appState.resourceConfigActive) setGuidesVisible(true)
+  if (!appState.resourceConfigActive) {
+    appState.selectedResourcePath = ""
+    appState.drawingTile = false
+    appState.tileDragStart = undefined
+    appState.tileDraft = undefined
     newTileButton.classList.remove("active")
     atlasCanvas.classList.remove("drawing")
   } else {
-    selectedResourcePath = ""
-    selectedStyleID = ""
-    selectedSoundID = ""
-    selectedResourceGalleryPath = ""
+    appState.selectedResourcePath = ""
+    appState.selectedStyleID = ""
+    appState.selectedSoundID = ""
+    appState.selectedResourceGalleryPath = ""
     resourceListView.hidden = false
     resourceDetail.hidden = true
   }
-  if (archive?.isImage(path) && selectedPath && !archive.isImage(selectedPath)) {
-    assetReturnPath = selectedPath
+  if (appState.archive?.isImage(path) && appState.selectedPath && !appState.archive.isImage(appState.selectedPath)) {
+    appState.assetReturnPath = appState.selectedPath
   }
-  selectedPath = path
-  if (path !== layoutPath) {
-    selectedKeySections = []
+  appState.selectedPath = path
+  if (path !== appState.layoutPath) {
+    appState.selectedKeySections = []
     preview.setSelected([])
   }
   const appearancePart = bdaAppearancePart(path)
@@ -8189,119 +7923,119 @@ function selectFile(
     const info = currentBdaAppearance()
     if (!info) return
     const basePath = bdaBasePath(path)
-    const base = appearancePart.kind === "panel" && bdaBase?.isText(basePath)
-      ? IniDocument.parse(bdaBase.getText(basePath))
+    const base = appearancePart.kind === "panel" && appState.bdaBase?.isText(basePath)
+      ? IniDocument.parse(appState.bdaBase.getText(basePath))
       : undefined
     const previewLayout = Boolean(base && previewItems(base).some((item) => item.editable))
     if (previewLayout && !refreshBdaLayout(path)) return
-    selectedDocument = previewLayout ? layoutDocument : undefined
+    appState.selectedDocument = previewLayout ? appState.layoutDocument : undefined
     if (previewLayout) {
-      selectedKeySections = []
+      appState.selectedKeySections = []
       preview.setSelected([])
     }
     setSourceValue(decodedBdaAppearancePart(info.bytes, appearancePart))
     source.disabled = false
     const partName = appearancePart.kind === "panel" ? appearancePart.name : appearancePart.group
     sourceName.textContent = `${info.path} · ${partName} · 解码源码`
-    inspectorTab = "properties"
+    appState.inspectorTab = "properties"
   } else if (isBdaVirtualTextPath(path)) {
     hideImageWorkspace()
     const panelName = path.split("/").pop()?.replace(/\.ini$/i, "") ?? path
-    const base = IniDocument.parse(bdaBase!.getText(bdaBasePath(path)))
+    const base = IniDocument.parse(appState.bdaBase!.getText(bdaBasePath(path)))
     const previewLayout = isBdaLayoutPath(path) && previewItems(base).some((item) => item.editable)
     if (previewLayout && !refreshBdaLayout(path)) return
-    if (previewLayout) layoutPath = path
-    selectedDocument = previewLayout ? layoutDocument : base
+    if (previewLayout) appState.layoutPath = path
+    appState.selectedDocument = previewLayout ? appState.layoutDocument : base
     if (previewLayout) {
-      selectedKeySections = []
+      appState.selectedKeySections = []
       preview.setSelected([])
     }
     const info = currentBdaAppearance()
     setSourceValue(info ? decodedBdaSource(info.path, info.bytes, panelName) : "{}")
     source.disabled = true
     sourceName.textContent = info ? `${info.path} · ${panelName} · 解码源码` : panelName
-    inspectorTab = "properties"
-  } else if (archive?.isImage(path)) {
-    inspectorTab = "properties"
-    selectedDocument = undefined
+    appState.inspectorTab = "properties"
+  } else if (appState.archive?.isImage(path)) {
+    appState.inspectorTab = "properties"
+    appState.selectedDocument = undefined
     showImage(path)
-  } else if (archive?.isText(path)) {
+  } else if (appState.archive?.isText(path)) {
     hideImageWorkspace()
-    selectedDocument = IniDocument.parse(archive.getText(path))
-    setSourceValue(selectedDocument.toString())
+    appState.selectedDocument = IniDocument.parse(appState.archive.getText(path))
+    setSourceValue(appState.selectedDocument.toString())
     source.disabled = false
     sourceName.textContent = path
     const previewLayout =
       /\.ini$/i.test(path) &&
       !/(^|\/)gen\.ini$/i.test(path) &&
-      previewItems(selectedDocument).some((item) => item.editable)
+      previewItems(appState.selectedDocument).some((item) => item.editable)
     if (previewLayout) {
       // 撤销 / 重做会重新选中同一个布局：保留仍然存在的按键选择，检查器不跳回面板。
-      const existing = new Set(selectedDocument.sections())
-      const kept = path === layoutPath
-        ? selectedKeySections.filter((section) => existing.has(section) || isListCell(section))
+      const existing = new Set(appState.selectedDocument.sections())
+      const kept = path === appState.layoutPath
+        ? appState.selectedKeySections.filter((section) => existing.has(section) || isListCell(section))
         : []
-      layoutPath = path
-      layoutDocument = selectedDocument
-      selectedKeySections = kept
+      appState.layoutPath = path
+      appState.layoutDocument = appState.selectedDocument
+      appState.selectedKeySections = kept
       preview.setSelected(kept)
-      inspectorTab = "properties"
+      appState.inspectorTab = "properties"
     } else if (preferredSidebarView === "overview" || showsLayoutProperties(path)) {
       // INI/CND/POP 布局文件始终打开属性面板，不论从哪个侧边栏点进来。
-      inspectorTab = "properties"
-    } else if (path !== layoutPath) {
-      inspectorTab = "source"
+      appState.inspectorTab = "properties"
+    } else if (path !== appState.layoutPath) {
+      appState.inspectorTab = "source"
     }
-  } else if (archive?.isBdaConfig(path)) {
+  } else if (appState.archive?.isBdaConfig(path)) {
     hideImageWorkspace()
-    selectedDocument = undefined
-    setSourceValue(decodedBdaEditorSource(path, archive.getBytes(path)!))
+    appState.selectedDocument = undefined
+    setSourceValue(decodedBdaEditorSource(path, appState.archive.getBytes(path)!))
     source.disabled = !bdaDecodedSourceEditable(path)
     sourceName.textContent = `${path} · 解码源码${source.disabled ? "（原始字段，只读）" : ""}`
-    inspectorTab = "properties"
+    appState.inspectorTab = "properties"
   } else {
     return
   }
-  if (path === layoutPath && selectedDocument) {
-    layoutDocument = selectedDocument
+  if (path === appState.layoutPath && appState.selectedDocument) {
+    appState.layoutDocument = appState.selectedDocument
     refreshPreview()
   }
   if (preferredSidebarView === "source" && (
-    archive?.isText(path) || archive?.isBdaConfig(path) || isBdaAppearancePartPath(path)
-) && path !== layoutPath && !showsLayoutProperties(path)) {
-    inspectorTab = "source"
+    appState.archive?.isText(path) || appState.archive?.isBdaConfig(path) || isBdaAppearancePartPath(path)
+) && path !== appState.layoutPath && !showsLayoutProperties(path)) {
+    appState.inspectorTab = "source"
   }
   // 右侧停在源代码时，任何选择操作都不跳回属性面板。
   if (preserveCurrentInspectorView || previousInspectorTab === "source") {
-    inspectorTab = previousInspectorTab
+    appState.inspectorTab = previousInspectorTab
   }
   updateInspectorView()
-  if (resourceConfigActive) renderResourceInspector()
-  if (resourceMode === "image" && archive) {
-    const firstImage = resourceImagePaths(archive.names(), theme.value, orientation.value)[0]
+  if (appState.resourceConfigActive) renderResourceInspector()
+  if (resourceMode === "image" && appState.archive) {
+    const firstImage = resourceImagePaths(appState.archive.names(), theme.value, orientation.value)[0]
     if (firstImage) selectResourceImage(firstImage)
   }
   if (!quickInspector.hidden) populateKeyInspector()
-  selectedFileButton?.classList.remove("selected")
+  appState.selectedFileButton?.classList.remove("selected")
   if (preferredSidebarView === "source") ensureSourcePathRendered(path)
   const preferredContainer = files.querySelector(preferredSidebarView === "overview" ? ".sidebar-overview" : ".raw-files")
-  const navMode = resourceInspectorMode === "style" && resourceConfigActive
+  const navMode = appState.resourceInspectorMode === "style" && appState.resourceConfigActive
     ? "style"
-    : resourceInspectorMode === "sound" && resourceConfigActive
+    : appState.resourceInspectorMode === "sound" && appState.resourceConfigActive
       ? "sound"
-    : resourceConfigActive
+    : appState.resourceConfigActive
       ? "resource"
       : "document"
-  selectedFileButton = preferredContainer?.querySelector<HTMLElement>(`button[data-path="${CSS.escape(path)}"][data-nav-mode="${navMode}"]`)
+  appState.selectedFileButton = preferredContainer?.querySelector<HTMLElement>(`button[data-path="${CSS.escape(path)}"][data-nav-mode="${navMode}"]`)
     ?? preferredContainer?.querySelector<HTMLElement>(`button[data-path="${CSS.escape(path)}"]`)
     ?? files.querySelector<HTMLElement>(`button[data-path="${CSS.escape(path)}"]`)
     ?? undefined
-  if (selectedFileButton) {
-    setSidebarView(selectedFileButton.closest(".raw-files") ? "source" : "overview")
+  if (appState.selectedFileButton) {
+    setSidebarView(appState.selectedFileButton.closest(".raw-files") ? "source" : "overview")
   }
-  selectedFileButton?.classList.add("selected")
+  appState.selectedFileButton?.classList.add("selected")
   if (mobilePortraitQuery.matches) {
-    const group = selectedFileButton?.closest<HTMLElement>(".nav-group")?.dataset.overviewGroup
+    const group = appState.selectedFileButton?.closest<HTMLElement>(".nav-group")?.dataset.overviewGroup
     files.querySelector<HTMLButtonElement>(`.mobile-overview-groups button[data-overview-group="${CSS.escape(group ?? "")}"]`)?.click()
   }
   updateSourceFileActions()
@@ -8310,7 +8044,6 @@ function selectFile(
 }
 
 const overviewGroupState = new Map<string, boolean>()
-let mobileOverviewGroup = ""
 
 function renderFiles(): void {
   // 重建文件树前记住展开的文件夹，上传、删除、撤销后树不会整体收起。
@@ -8318,9 +8051,9 @@ function renderFiles(): void {
     .map((folder) => folder.dataset.folderPath ?? "")
     .filter(Boolean)
   files.replaceChildren()
-  selectedFileButton = undefined
-  document.documentElement.dataset.archiveFormat = archive?.format ?? ""
-  if (!archive) return
+  appState.selectedFileButton = undefined
+  document.documentElement.dataset.archiveFormat = appState.archive?.format ?? ""
+  if (!appState.archive) return
 
   const overview = document.createElement("div")
   overview.className = "sidebar-overview"
@@ -8332,7 +8065,7 @@ function renderFiles(): void {
   overview.append(mobileGroups)
 
   const setMobileOverviewGroup = (title: string): void => {
-    mobileOverviewGroup = title
+    appState.mobileOverviewGroup = title
     for (const button of Array.from(mobileGroups.querySelectorAll<HTMLButtonElement>("button"))) {
       const active = button.dataset.overviewGroup === title
       button.classList.toggle("active", active)
@@ -8394,19 +8127,19 @@ function renderFiles(): void {
     ["sticker", "贴纸配置", "贴纸配置", "sticker"],
     ["scene", "场景配置", "场景配置", "layers"],
   ] as const
-  const overviewPath = archive.names().includes(`${theme.value}/skin/Info.txt`)
+  const overviewPath = appState.archive.names().includes(`${theme.value}/skin/Info.txt`)
     ? `${theme.value}/skin/Info.txt`
     : "Info.txt"
   entries.push({
-    group: archive.format === "bda" ? "皮肤信息" : "皮肤",
+    group: appState.archive.format === "bda" ? "皮肤信息" : "皮肤",
     label: "皮肤信息",
     path: overviewPath,
     className: "nav-overview",
     icon: "info",
   })
   // BDA 的 demo 在主题目录下，其他格式放在包根；条目只在文件存在时才显示。
-  const demoPath = archive.names().includes(`${theme.value}/skin/demo.png`) ? `${theme.value}/skin/demo.png` : "demo.png"
-  entries.push({ group: archive.format === "bda" ? "皮肤信息" : "皮肤", label: "效果预览", path: demoPath, className: "nav-overview", icon: "image" })
+  const demoPath = appState.archive.names().includes(`${theme.value}/skin/demo.png`) ? `${theme.value}/skin/demo.png` : "demo.png"
+  entries.push({ group: appState.archive.format === "bda" ? "皮肤信息" : "皮肤", label: "效果预览", path: demoPath, className: "nav-overview", icon: "image" })
 
   const iniTypes: Record<string, Omit<NavEntry, "path">> = {
     "bh.ini": { group: "键盘布局", label: "笔画键盘", className: "nav-layout", icon: "brush" },
@@ -8447,10 +8180,10 @@ function renderFiles(): void {
   }
   const hiddenLayouts = new Set<string>()
   const configPrefix = `${theme.value}/skin/${orientation.value}/`
-  const appearancePath = bdaAppearancePath(archive, theme.value, orientation.value)
-  const appearanceBytes = appearancePath && archive.getBytes(appearancePath)
+  const appearancePath = bdaAppearancePath(appState.archive, theme.value, orientation.value)
+  const appearanceBytes = appearancePath && appState.archive.getBytes(appearancePath)
   const appearance = appearanceBytes ? decodeBdaAppearance(appearanceBytes) : undefined
-  if (archive.format === "bda" && appearance) {
+  if (appState.archive.format === "bda" && appearance) {
     for (const panelName of appearance.panels.keys()) {
       const name = `${panelName}.ini`
       if (hiddenLayouts.has(name)) continue
@@ -8470,7 +8203,7 @@ function renderFiles(): void {
     entries.push({
       group: "资源配置",
       label: "样式配置",
-      path: bdaAppearanceStylePath(selectedBdaStyleGroup),
+      path: bdaAppearanceStylePath(appState.selectedBdaStyleGroup),
       className: "nav-style",
       icon: "palette",
       navMode: "style",
@@ -8493,11 +8226,11 @@ function renderFiles(): void {
       navMode: "sound",
     })
   }
-  const layoutPaths = archive.format === "bda" ? [] : archive.names()
+  const layoutPaths = appState.archive.format === "bda" ? [] : appState.archive.names()
   for (const path of layoutPaths.sort()) {
     const basePath = path
     if (!path.startsWith(configPrefix) || path.slice(configPrefix.length).includes("/") || !/\.ini$/i.test(path)) continue
-    if (archive.format === "bda" && !bdaBase?.isText(basePath)) continue
+    if (appState.archive.format === "bda" && !appState.bdaBase?.isText(basePath)) continue
     const name = path.split("/").pop() ?? path
     if (hiddenLayouts.has(name)) continue
     const info = iniTypes[name] ?? {
@@ -8513,16 +8246,16 @@ function renderFiles(): void {
     })
   }
 
-  const candidatePath = archive.format === "bda" ? undefined : toolbarConfigPath()
+  const candidatePath = appState.archive.format === "bda" ? undefined : toolbarConfigPath()
   if (candidatePath) {
     entries.push({ group: "键盘组件", label: "候选栏与工具栏", path: candidatePath, className: "nav-component", icon: "panel-top" })
   }
-  const hintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
+  const hintPath = firstExistingPath(appState.archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
   if (hintPath) entries.push({ group: "键盘组件", label: "按键气泡", path: hintPath, className: "nav-component", icon: "message-square" })
-  const longHintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint2.pop"])
+  const longHintPath = firstExistingPath(appState.archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint2.pop"])
   if (longHintPath) entries.push({ group: "键盘组件", label: "长按气泡", path: longHintPath, className: "nav-component", icon: "message-square-more" })
-  const stylePath = appearancePath ?? (archive.format === "bda" ? undefined : styleConfigPath())
-  if (stylePath && archive.format !== "bda") {
+  const stylePath = appearancePath ?? (appState.archive.format === "bda" ? undefined : styleConfigPath())
+  if (stylePath && appState.archive.format !== "bda") {
     entries.push({
       group: "资源配置",
       label: "图片资源",
@@ -8534,13 +8267,13 @@ function renderFiles(): void {
     entries.push({ group: "资源配置", label: "样式配置", path: stylePath, className: "nav-style", icon: "palette", navMode: "style" })
     entries.push({ group: "资源配置", label: "按键音效", path: stylePath, className: "nav-resource", icon: "volume-2", navMode: "sound" })
   }
-  const legacyAnimationPath = archive.format === "bda" ? undefined : legacyAnimationConfigPath()
+  const legacyAnimationPath = appState.archive.format === "bda" ? undefined : legacyAnimationConfigPath()
   if (legacyAnimationPath) {
     entries.push({ group: "资源配置", label: "粒子动效", path: legacyAnimationPath, className: "nav-style", icon: "wand-sparkles" })
   }
-  if (archive.format === "bda") {
+  if (appState.archive.format === "bda") {
     for (const [kind, group, label, icon] of bdaConfigGroups) {
-      const paths = bdaConfigPaths(archive, theme.value, orientation.value, kind)
+      const paths = bdaConfigPaths(appState.archive, theme.value, orientation.value, kind)
       for (const path of paths) entries.push({
         group,
         label: paths.length > 1 ? `${label} · ${path.split("/").pop()}` : label,
@@ -8569,13 +8302,13 @@ function renderFiles(): void {
     entry.icon = [...family, ...spareIcons].find((icon) => !iconOwners.has(icon)) ?? (entry.icon || "keyboard")
     iconOwners.set(entry.icon, entry)
   }
-  const groups = archive.format === "bda"
+  const groups = appState.archive.format === "bda"
     ? ["皮肤信息", "资源配置", "面板样式", "动画效果", "按键音效", "轻量动画", "开关配置", "贴纸配置", "场景配置"]
     : ["皮肤", "资源配置", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "扩展配置", "扩展布局"]
   for (const group of groups) {
     const grouped = entries.filter((entry) => entry.group === group && (
-      archive?.names().includes(entry.path) ||
-      archive?.format === "bda" && (isBdaAppearancePartPath(entry.path) || Boolean(bdaBase?.isText(bdaBasePath(entry.path))))
+      appState.archive?.names().includes(entry.path) ||
+      appState.archive?.format === "bda" && (isBdaAppearancePartPath(entry.path) || Boolean(appState.bdaBase?.isText(bdaBasePath(entry.path))))
     ))
     if (group === "键盘布局") {
       const layoutRank: Record<string, number> = { "py_9.ini": 0, "py_26.ini": 1, "bh.ini": 3 }
@@ -8585,7 +8318,7 @@ function renderFiles(): void {
         return (layoutRank[aName] ?? 2) - (layoutRank[bName] ?? 2)
       })
     }
-    if (archive.format === "bda" && group === "面板样式") {
+    if (appState.archive.format === "bda" && group === "面板样式") {
       const bdaLayoutRank: Record<string, number> = {
         "py_9": 0,
         "py_26": 1,
@@ -8618,10 +8351,10 @@ function renderFiles(): void {
     }
   }
   const availableMobileGroups = Array.from(mobileGroups.querySelectorAll<HTMLButtonElement>("button"))
-  if (!availableMobileGroups.some((button) => button.dataset.overviewGroup === mobileOverviewGroup)) {
-    mobileOverviewGroup = availableMobileGroups[0]?.dataset.overviewGroup ?? ""
+  if (!availableMobileGroups.some((button) => button.dataset.overviewGroup === appState.mobileOverviewGroup)) {
+    appState.mobileOverviewGroup = availableMobileGroups[0]?.dataset.overviewGroup ?? ""
   }
-  setMobileOverviewGroup(mobileOverviewGroup)
+  setMobileOverviewGroup(appState.mobileOverviewGroup)
 
   const sourceFiles = document.createElement("div")
   sourceFiles.className = "raw-files"
@@ -8630,7 +8363,7 @@ function renderFiles(): void {
   const sourceNameCompare = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" }).compare
   type SourceNode = { folders: Map<string, SourceNode>; paths: string[] }
   const root: SourceNode = { folders: new Map(), paths: [] }
-  for (const path of archive.names().filter((name) => !name.endsWith("/"))) {
+  for (const path of appState.archive.names().filter((name) => !name.endsWith("/"))) {
     const parts = path.split("/")
     let node = root
     for (const part of parts.slice(0, -1)) {
@@ -8650,7 +8383,7 @@ function renderFiles(): void {
       if (!entry.isIntersecting) continue
       const symbol = entry.target as HTMLElement
       thumbnailObserver.unobserve(symbol)
-      const bytes = archive?.getBytes(symbol.dataset.thumbnailPath ?? "")
+      const bytes = appState.archive?.getBytes(symbol.dataset.thumbnailPath ?? "")
       if (!bytes) continue
       void sourceThumbnail(bytes).then((url) => {
         if (!url) return
@@ -8665,8 +8398,8 @@ function renderFiles(): void {
   const sourceFileCount = (node: SourceNode): number =>
     node.paths.length + [...node.folders.values()].reduce((total, child) => total + sourceFileCount(child), 0)
   const selectSourceRow = (row: HTMLElement) => {
-    selectedFileButton?.classList.remove("selected")
-    selectedFileButton = row
+    appState.selectedFileButton?.classList.remove("selected")
+    appState.selectedFileButton = row
     row.classList.add("selected")
     for (const item of sourceFiles.querySelectorAll<HTMLElement>(".source-tree-row")) {
       item.tabIndex = item === row ? 0 : -1
@@ -8739,9 +8472,9 @@ function renderFiles(): void {
       button.className = "source-tree-row source-file-row"
       button.setAttribute("role", "treeitem")
       button.tabIndex = -1
-      const symbolName = archive?.isText(path) || archive?.isBdaConfig(path)
+      const symbolName = appState.archive?.isText(path) || appState.archive?.isBdaConfig(path)
         ? "doc.text"
-        : archive?.isImage(path)
+        : appState.archive?.isImage(path)
           ? "image"
           : "doc"
       const symbol = sourceSymbol(symbolName)
@@ -8758,18 +8491,18 @@ function renderFiles(): void {
       button.dataset.path = path
       button.draggable = true
       button.addEventListener("click", () => {
-        if (archive?.isText(path) || archive?.isImage(path) || archive?.isBdaConfig(path)) {
+        if (appState.archive?.isText(path) || appState.archive?.isImage(path) || appState.archive?.isBdaConfig(path)) {
           selectFile(path, "source")
           if (mobilePortraitQuery.matches) setMobilePane("inspector")
         } else selectSourceRow(button)
         updateSourceFileActions()
       })
       button.addEventListener("dragstart", (event) => {
-        const bytes = archive?.getBytes(path)
+        const bytes = appState.archive?.getBytes(path)
         if (!bytes || !event.dataTransfer) return
-        const mime = archive?.isText(path)
+        const mime = appState.archive?.isText(path)
           ? "text/plain"
-          : archive?.isImage(path)
+          : appState.archive?.isImage(path)
             ? "image/png"
             : isSoundPath(path)
               ? soundMimeType(path)
@@ -8797,7 +8530,7 @@ function renderFiles(): void {
   rootDisclosure.ariaHidden = "true"
   const rootTitle = document.createElement("span")
   rootTitle.className = "nav-label"
-  rootTitle.textContent = documentName.textContent?.trim() || `未命名.${archive.format}`
+  rootTitle.textContent = documentName.textContent?.trim() || `未命名.${appState.archive.format}`
   const rootCount = document.createElement("span")
   rootCount.className = "nav-meta source-item-count"
   rootCount.textContent = `${sourceFileCount(root)} 项`
@@ -8825,7 +8558,7 @@ function renderFiles(): void {
   sourceFiles.append(rootFolder)
   appendNode(rootChildren, root)
   sourceFiles.addEventListener("dragover", (event) => {
-    if (!archive || !isEditing() || !event.dataTransfer?.types.includes("Files")) return
+    if (!appState.archive || !isEditing() || !event.dataTransfer?.types.includes("Files")) return
     event.preventDefault()
     event.dataTransfer.dropEffect = "copy"
     setSourceDropTarget(event.target as Element)
@@ -8836,7 +8569,7 @@ function renderFiles(): void {
   sourceFiles.addEventListener("drop", (event) => {
     const folder = sourceDropFolder(event.target as Element)
     setSourceDropTarget()
-    if (!archive || !isEditing() || folder === undefined || !event.dataTransfer?.files.length) return
+    if (!appState.archive || !isEditing() || folder === undefined || !event.dataTransfer?.files.length) return
     event.preventDefault()
     const dropped = Array.from(event.dataTransfer.files)
     void runFileOperation("上传文件", async () => commitSourceUploads(
@@ -8890,7 +8623,7 @@ function renderFiles(): void {
   })
   files.append(sourceFiles)
   for (const folder of openFolders) ensureSourcePathRendered(`${folder}/`)
-  setSidebarView(sidebarView)
+  setSidebarView(appState.sidebarView)
 }
 
 function ensureSourcePathRendered(path: string): void {
@@ -8935,7 +8668,7 @@ async function loadArchive(
   if (showSkinLoadProgress(bytes.byteLength)) await waitForInterfacePaint()
   await flushSourceAutosave()
   await activateSourceWorkspace("", "")
-  sourceWorkspacePendingArchive = undefined
+  appState.sourceWorkspacePendingArchive = undefined
   releaseKeySound()
   keySoundBuffers.clear()
   let nextArchive: SkinArchive
@@ -8944,7 +8677,7 @@ async function loadArchive(
     nextArchive = await SkinArchive.openAsync(
       bytes,
       exportFormatFromPath(displayName || path),
-      fileOperationProgressVisible
+      appState.fileOperationProgressVisible
         ? (progress) => updateFileOperationProgress(18 + progress * 32, `正在解析皮肤包… ${Math.round(progress * 100)}%`)
         : undefined,
     )
@@ -8957,11 +8690,11 @@ async function loadArchive(
     void flushClientLogs()
     throw error
   }
-  if (nextArchive.format === "bda" && !bdaBase) {
+  if (nextArchive.format === "bda" && !appState.bdaBase) {
     updateFileOperationProgress(52, "正在加载 BDA 基础布局…")
     const response = await fetch(new URL("bda-base.bds", document.baseURI))
     if (!response.ok) throw new Error("无法加载 BDA 官方基础布局")
-    bdaBase = await SkinArchive.openAsync(new Uint8Array(await response.arrayBuffer()))
+    appState.bdaBase = await SkinArchive.openAsync(new Uint8Array(await response.arrayBuffer()))
   }
   const bdaWarnings = bdaCompatibilityWarnings(nextArchive)
   if (bdaWarnings.length) clientLog.info("bda.compatibility.warning", { warnings: bdaWarnings.join("；") })
@@ -8973,19 +8706,19 @@ async function loadArchive(
   if (isTauri() && sourceDirectoryActive && !nextSourceWorkspace && (!isAndroidTauri() || configuredDirectory)) {
     pendingSourceDirectory = configuredDirectory
   }
-  assetURL = releaseImagePreviewURL(assetURL)
+  appState.assetURL = releaseImagePreviewURL(appState.assetURL)
   clearImageSlicePicker()
-  archive = nextArchive
-  aiDesignConversationTarget = nextArchive
-  aiDesignConversation = []
+  appState.archive = nextArchive
+  appState.aiDesignConversationTarget = nextArchive
+  appState.aiDesignConversation = []
   aiDesignStatus.textContent = ""
   aiDesignPanel.dataset.state = "idle"
   setAiDesignDraft(undefined)
-  aiChatController?.clear()
-  if (pendingSourceDirectory !== undefined) sourceWorkspacePendingArchive = nextArchive
-  sourceTransfer = undefined
+  appState.aiChatController?.clear()
+  if (pendingSourceDirectory !== undefined) appState.sourceWorkspacePendingArchive = nextArchive
+  appState.sourceTransfer = undefined
   const availableThemes = ["light", "dark"].filter((value) =>
-    archive?.names().some((name) => name.startsWith(`${value}/skin/`)),
+    appState.archive?.names().some((name) => name.startsWith(`${value}/skin/`)),
   )
   if (!availableThemes.includes(theme.value)) theme.value = availableThemes[0] ?? "light"
   syncSegmentedControls()
@@ -8996,37 +8729,37 @@ async function loadArchive(
     device.value = preferredDevice
   }
   canvasWrap.classList.remove("empty")
-  currentPath = path
-  unsavedNew = isNew
-  undoStack = []
-  redoStack = []
+  appState.currentPath = path
+  appState.unsavedNew = isNew
+  appState.undoStack = []
+  appState.redoStack = []
   updateHistoryButtons()
   documentName.textContent = isNew
-    ? exportName("未命名", archive.format)
+    ? exportName("未命名", appState.archive.format)
     : displayName || path.split(/[\\/]/).pop() || "未命名皮肤"
   syncAiDesignContext()
   if (!isNew && isTauri() && path) recordRecentFile(path, documentName.textContent)
   saveButton.disabled = false
   for (const button of exportButtons) {
     const format = button.dataset.exportFormat as ExportFormat
-    button.hidden = archive.format !== "bda" && format === "bda"
+    button.hidden = appState.archive.format !== "bda" && format === "bda"
     button.disabled = button.hidden
   }
   updateFileOperationProgress(68, "正在生成文件列表…")
   await waitForInterfacePaint()
   renderFiles()
   const bdaLayouts = bdaAvailableLayoutPaths()
-  layoutPath = archive.format === "bda" && !bdaLayouts.includes(preferredPath())
+  appState.layoutPath = appState.archive.format === "bda" && !bdaLayouts.includes(preferredPath())
     ? bdaLayouts[0] ?? preferredPath()
     : preferredPath()
-  previewReturnName = layoutPath.split("/").pop() ?? layout.value
-  const initial = archive.format === "bda" && isBdaLayoutPath(layoutPath)
-    ? layoutPath
-    : archive.names().includes(layoutPath)
-      ? layoutPath
-      : archive.names().find((name) => archive?.isText(name))
+  appState.previewReturnName = appState.layoutPath.split("/").pop() ?? layout.value
+  const initial = appState.archive.format === "bda" && isBdaLayoutPath(appState.layoutPath)
+    ? appState.layoutPath
+    : appState.archive.names().includes(appState.layoutPath)
+      ? appState.layoutPath
+      : appState.archive.names().find((name) => appState.archive?.isText(name))
   if (initial) {
-    layoutPath = initial
+    appState.layoutPath = initial
     updateFileOperationProgress(82, "正在生成皮肤预览…")
     selectFile(initial)
   }
@@ -9053,17 +8786,17 @@ async function loadArchive(
         return workspace
       }
     })().then(async (workspace) => {
-      if (archive !== pendingArchive || sourceWorkspacePendingArchive !== pendingArchive) return
+      if (appState.archive !== pendingArchive || appState.sourceWorkspacePendingArchive !== pendingArchive) return
       const pendingPaths = [...pendingSourcePaths]
       await activateSourceWorkspace(workspace, sourcePrefix)
-      if (archive !== pendingArchive || sourceWorkspacePendingArchive !== pendingArchive) return
+      if (appState.archive !== pendingArchive || appState.sourceWorkspacePendingArchive !== pendingArchive) return
       pendingPaths.forEach((changedPath) => pendingSourcePaths.add(changedPath))
       await flushSourceAutosave()
-      sourceWorkspacePendingArchive = undefined
+      appState.sourceWorkspacePendingArchive = undefined
       showStatus(isAndroidTauri() ? "源码已保存到授权目录" : "源码工作区已就绪")
     }).catch((error) => {
-      if (archive !== pendingArchive || sourceWorkspacePendingArchive !== pendingArchive) return
-      sourceWorkspacePendingArchive = undefined
+      if (appState.archive !== pendingArchive || appState.sourceWorkspacePendingArchive !== pendingArchive) return
+      appState.sourceWorkspacePendingArchive = undefined
       pendingSourcePaths.clear()
       showError(error, "保存源码到授权目录")
     })
@@ -9170,11 +8903,11 @@ async function loadDroppedSourceWorkspace(path: string): Promise<boolean> {
 }
 
 function currentExportFormat(): ExportFormat {
-  return exportFormatFromPath(currentPath) ?? archive?.format ?? "bdi"
+  return exportFormatFromPath(appState.currentPath) ?? appState.archive?.format ?? "bdi"
 }
 
 function mobileShareFormat(): ExportFormat {
-  if (archive?.format === "bda") return "bda"
+  if (appState.archive?.format === "bda") return "bda"
   if (isIOSWeb()) return "bdi"
   if (isAndroidTauri() || isAndroidWeb()) return "bds"
   return currentExportFormat()
@@ -9185,23 +8918,23 @@ async function exportArchive(format: ExportFormat, targetBdaPlatform?: Exclude<B
   converted: boolean
   warnings: string[]
 } | undefined> {
-  if (!archive) throw new Error("当前没有可保存的皮肤")
-  if (aiDraftPreview) throw new Error("请先应用或丢弃 AI 修改草稿")
+  if (!appState.archive) throw new Error("当前没有可保存的皮肤")
+  if (appState.aiDraftPreview) throw new Error("请先应用或丢弃 AI 修改草稿")
   updateFileOperationProgress(22, `正在生成 ${format.toUpperCase()} 皮肤包…`)
-  if (archive.format === "bda" && format === "bda" && targetBdaPlatform) {
-    const result = convertBdaPlatform(archive, targetBdaPlatform)
-    return { bytes: await result.toBytesAsync(), converted: true, warnings: bdaCompatibilityWarnings(archive) }
+  if (appState.archive.format === "bda" && format === "bda" && targetBdaPlatform) {
+    const result = convertBdaPlatform(appState.archive, targetBdaPlatform)
+    return { bytes: await result.toBytesAsync(), converted: true, warnings: bdaCompatibilityWarnings(appState.archive) }
   }
-  if (archive.format !== "bda" || format === "bda") {
+  if (appState.archive.format !== "bda" || format === "bda") {
     const soundWarnings: string[] = []
-    const bytes = await archive.toBytesAsync(format, soundWarnings)
+    const bytes = await appState.archive.toBytesAsync(format, soundWarnings)
     reportSoundWarnings(soundWarnings)
     return { bytes, converted: false, warnings: soundWarnings }
   }
-  if (!bdaBase) throw new Error("无法加载 BDA 官方基础布局")
+  if (!appState.bdaBase) throw new Error("无法加载 BDA 官方基础布局")
   await waitForInterfacePaint()
   updateFileOperationProgress(34, "正在转换 BDA 配置…")
-  const result = convertBdaArchive(archive, bdaBase, format)
+  const result = convertBdaArchive(appState.archive, appState.bdaBase, format)
   if (result.warnings.length && !window.confirm(
     `BDA 转换为 ${format.toUpperCase()} 时将降级以下内容：\n\n${result.warnings.join("\n")}\n\n继续导出吗？`,
   )) return
@@ -9219,9 +8952,9 @@ function reportSoundWarnings(warnings: string[]): void {
 }
 
 async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: string): Promise<boolean> {
-  if (!archive) throw new Error("当前没有可保存的皮肤")
+  if (!appState.archive) throw new Error("当前没有可保存的皮肤")
   let exported: Awaited<ReturnType<typeof exportArchive>>
-  let path = currentPath
+  let path = appState.currentPath
   if (saveAs || !path || (!path.startsWith("content://") && exportFormatFromPath(path) !== format)) {
     const written = await writeToChosenFile(suggestedName, async () => {
       exported = await exportArchive(format)
@@ -9235,18 +8968,13 @@ async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: 
     await writeNativePath(path, exported.bytes)
   }
   if (!exported.converted) {
-    currentPath = path
-    unsavedNew = false
-    archive.markSaved(exported.bytes, format)
+    appState.currentPath = path
+    appState.unsavedNew = false
+    appState.archive.markSaved(exported.bytes, format)
     documentName.textContent = path.split(/[\\/]/).pop() || "未命名皮肤"
     updateDirty()
   }
   return true
-}
-
-type BrowserSaveFileHandle = {
-  name: string
-  createWritable(): Promise<{ write(data: Uint8Array): Promise<void>; close(): Promise<void> }>
 }
 
 async function writeNativePath(path: string, bytes: Uint8Array): Promise<void> {
@@ -9257,8 +8985,6 @@ async function writeNativePath(path: string, bytes: Uint8Array): Promise<void> {
   }
   await invoke("write_file", { path, data: bytes })
 }
-
-type ChosenFileData = Uint8Array | (() => Promise<Uint8Array | undefined>)
 
 /**
  * Asks for the destination before producing the bytes: browsers only open the save picker while the
@@ -9353,7 +9079,7 @@ async function writeToChosenFile(
 }
 
 async function downloadArchive(format: ExportFormat, suggestedName: string): Promise<boolean> {
-  if (!archive) throw new Error("当前没有可保存的皮肤")
+  if (!appState.archive) throw new Error("当前没有可保存的皮肤")
   let exported: Awaited<ReturnType<typeof exportArchive>>
   const path = await writeToChosenFile(suggestedName, async () => {
     exported = await exportArchive(format)
@@ -9361,10 +9087,10 @@ async function downloadArchive(format: ExportFormat, suggestedName: string): Pro
   }, `${format.toUpperCase()} 皮肤`)
   if (!path || !exported) return false
   if (!exported.converted) {
-    currentPath = path
+    appState.currentPath = path
     documentName.textContent = suggestedName
-    archive.markSaved(exported.bytes, format)
-    unsavedNew = false
+    appState.archive.markSaved(exported.bytes, format)
+    appState.unsavedNew = false
     updateDirty()
   }
   return true
@@ -9391,7 +9117,7 @@ async function saveArchive(
 }
 
 async function shareArchiveToMobile(): Promise<boolean> {
-  if (!archive) return false
+  if (!appState.archive) return false
   const format = mobileShareFormat()
   const exported = await exportArchive(format, format === "bda" ? (isIOSWeb() ? "ios" : "android") : undefined)
   if (!exported) return false
@@ -9423,7 +9149,7 @@ async function shareArchiveToMobile(): Promise<boolean> {
  */
 function waitForTap(detail: string, label: string, onTap?: () => void): Promise<boolean> {
   return new Promise((resolve) => {
-    fileOperationProgressVisible = true
+    appState.fileOperationProgressVisible = true
     if (!fileOperationDialog.open) fileOperationDialog.showModal()
     updateFileOperationProgress(90, detail)
     const share = document.createElement("button")
@@ -9470,14 +9196,11 @@ async function chooseAndroidProjectTemplate(): Promise<string | undefined> {
   }
 }
 
-let newProjectOptions: ProjectChoice | undefined
-let projectChooserInitialized = false
-
 function chooseEmbeddedProjectTemplate(): Promise<string | undefined> {
-  if (!projectChooserInitialized) {
+  if (!appState.projectChooserInitialized) {
     initializeProjectChooser(newProjectForm)
     newProjectForm.addEventListener("project-import", () => newProjectDialog.close("import"))
-    projectChooserInitialized = true
+    appState.projectChooserInitialized = true
   }
   newProjectDialog.returnValue = ""
   newProjectDialog.showModal()
@@ -9485,8 +9208,8 @@ function chooseEmbeddedProjectTemplate(): Promise<string | undefined> {
     newProjectDialog.addEventListener(
       "close",
       () => {
-        newProjectOptions = projectChoice(newProjectForm)
-        const templateID = newProjectOptions.templateID
+        appState.newProjectOptions = projectChoice(newProjectForm)
+        const templateID = appState.newProjectOptions.templateID
         if (newProjectDialog.returnValue === "import") { resolve("__import__"); return }
         resolve(
           newProjectDialog.returnValue === "create" && typeof templateID === "string"
@@ -9498,27 +9221,22 @@ function chooseEmbeddedProjectTemplate(): Promise<string | undefined> {
     )
   })
 }
-
-let nativeProjectChoice: Promise<string | undefined> | undefined
-let resolveNativeProjectChoice: ((templateID: string | undefined) => void) | undefined
-let nativeProjectWindowReady = false
-let nativeProjectReadyTimer: number | undefined
 const EMBEDDED_PROJECT_FALLBACK = "__embedded-project-fallback__"
 
 function finishNativeProjectChoice(templateID?: string): void {
-  if (!resolveNativeProjectChoice) return
-  window.clearTimeout(nativeProjectReadyTimer)
-  nativeProjectReadyTimer = undefined
-  const resolve = resolveNativeProjectChoice
-  resolveNativeProjectChoice = undefined
-  nativeProjectChoice = undefined
+  if (!appState.resolveNativeProjectChoice) return
+  window.clearTimeout(appState.nativeProjectReadyTimer)
+  appState.nativeProjectReadyTimer = undefined
+  const resolve = appState.resolveNativeProjectChoice
+  appState.resolveNativeProjectChoice = undefined
+  appState.nativeProjectChoice = undefined
   resolve(templateID)
 }
 
 async function chooseNativeProjectTemplate(): Promise<string | undefined> {
-  if (nativeProjectChoice) {
+  if (appState.nativeProjectChoice) {
     void WebviewWindow.getByLabel("new-project").then((window) => window?.setFocus())
-    return nativeProjectChoice
+    return appState.nativeProjectChoice
   }
 
   // Remove a window left behind by a previous reload before installing the new
@@ -9527,10 +9245,10 @@ async function chooseNativeProjectTemplate(): Promise<string | undefined> {
   if (existing) await existing.close().catch(() => undefined)
 
   const choice = new Promise<string | undefined>((resolve) => {
-    resolveNativeProjectChoice = resolve
+    appState.resolveNativeProjectChoice = resolve
   })
-  nativeProjectChoice = choice
-  nativeProjectWindowReady = false
+  appState.nativeProjectChoice = choice
+  appState.nativeProjectWindowReady = false
 
   try {
     const projectWindow = new WebviewWindow("new-project", {
@@ -9552,11 +9270,11 @@ async function chooseNativeProjectTemplate(): Promise<string | undefined> {
       parent: navigator.userAgent.includes("Macintosh") ? undefined : "main",
     })
     void projectWindow.once("tauri://destroyed", () => {
-      finishNativeProjectChoice(nativeProjectWindowReady ? undefined : EMBEDDED_PROJECT_FALLBACK)
+      finishNativeProjectChoice(appState.nativeProjectWindowReady ? undefined : EMBEDDED_PROJECT_FALLBACK)
     })
     void projectWindow.once("tauri://error", () => finishNativeProjectChoice(EMBEDDED_PROJECT_FALLBACK))
-    nativeProjectReadyTimer = window.setTimeout(() => {
-      if (nativeProjectWindowReady || !resolveNativeProjectChoice) return
+    appState.nativeProjectReadyTimer = window.setTimeout(() => {
+      if (appState.nativeProjectWindowReady || !appState.resolveNativeProjectChoice) return
       void WebviewWindow.getByLabel("new-project").then((window) => window?.close())
       finishNativeProjectChoice(EMBEDDED_PROJECT_FALLBACK)
     }, 2500)
@@ -9574,8 +9292,8 @@ async function newDocument(templateID: string): Promise<boolean> {
 }
 
 async function startNewDocument(): Promise<void> {
-  if (fileOperationRunning) return
-  newProjectOptions = undefined
+  if (appState.fileOperationRunning) return
+  appState.newProjectOptions = undefined
   const templateID = await chooseProjectTemplate()
   if (templateID === "__import__") { openButton.click(); return }
   if (!templateID) {
@@ -9584,15 +9302,15 @@ async function startNewDocument(): Promise<void> {
   }
   await runFileOperation("新建皮肤", async () => {
     if (!(await newDocument(templateID))) return false
-    const options = newProjectOptions
-    if (archive && options?.name) documentName.textContent = exportName(options.name, archive.format)
-    if (archive && options?.savePath) {
-      const bytes = await archive.toBytesAsync(archive.format)
+    const options = appState.newProjectOptions
+    if (appState.archive && options?.name) documentName.textContent = exportName(options.name, appState.archive.format)
+    if (appState.archive && options?.savePath) {
+      const bytes = await appState.archive.toBytesAsync(appState.archive.format)
       await writeNativePath(options.savePath, bytes)
-      currentPath = options.savePath
+      appState.currentPath = options.savePath
       documentName.textContent = options.savePath.split(/[\\/]/).pop() || documentName.textContent
-      archive.markSaved(bytes, archive.format)
-      unsavedNew = false
+      appState.archive.markSaved(bytes, appState.archive.format)
+      appState.unsavedNew = false
       updateDirty()
     }
     return true
@@ -9610,10 +9328,10 @@ document.addEventListener("keydown", (event) => {
   for (const menu of toolbarMenus) menu.open = false
   // Esc 取消画布上的按键选择（与点空白处一致）；输入框、弹窗和菜单里的 Esc 留给它们自己。
   const target = event.target as Element | null
-  if (menuOpen || !isEditing() || !selectedKeySections.length || document.querySelector("dialog[open]")) return
+  if (menuOpen || !isEditing() || !appState.selectedKeySections.length || document.querySelector("dialog[open]")) return
   if (target?.closest?.("input, textarea, select, [contenteditable], .cm-editor")) return
   preview.setSelected([])
-  selectedKeySections = []
+  appState.selectedKeySections = []
   source.collapseSelection()
   scheduleSelectionInspectorSync(preview)
 })
@@ -9631,12 +9349,6 @@ openButton.addEventListener("click", () => {
 
 const recentFilesKey = "recent-files"
 const recentFilesLimit = 9
-
-interface RecentFile {
-  path: string
-  name: string
-  at: number
-}
 
 function readRecentFiles(): RecentFile[] {
   try {
@@ -9676,7 +9388,7 @@ function formatRecentTime(at: number): string {
 }
 
 function openRecentFile(item: RecentFile): void {
-  if (fileOperationRunning) return
+  if (appState.fileOperationRunning) return
   void runFileOperation("打开", async () => {
     if (!(await prepareDocumentReplacement())) return false
     return loadNativePath(item.path)
@@ -9757,31 +9469,22 @@ function waitForPreviewFrame(): Promise<void> {
 // 最近皮肤最多 9 张，逐个串行取图，避免同时读多份皮肤阻塞 UI。
 const recentPreviewQueue: HTMLButtonElement[] = []
 const recentPreviewQueued = new Set<HTMLButtonElement>()
-let recentPreviewRunning = false
-
-// 持久缩略图缓存：重启后不必再读整包解 demo 图。按路径存，条目随最近列表裁剪（最多 9 个）。
-let recentThumbDb: Promise<IDBDatabase> | undefined
 
 function recentThumbRequest<T>(
   mode: IDBTransactionMode,
   run: (store: IDBObjectStore) => IDBRequest<T>,
 ): Promise<T> {
-  recentThumbDb ??= new Promise((resolve, reject) => {
+  appState.recentThumbDb ??= new Promise((resolve, reject) => {
     const request = indexedDB.open("recent-previews", 1)
     request.onupgradeneeded = () => request.result.createObjectStore("previews")
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
   })
-  return recentThumbDb.then((db) => new Promise<T>((resolve, reject) => {
+  return appState.recentThumbDb.then((db) => new Promise<T>((resolve, reject) => {
     const request = run(db.transaction("previews", mode).objectStore("previews"))
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
   }))
-}
-
-interface RecentThumb {
-  stamp: string
-  blob: Blob
 }
 
 async function renderRecentPreview(path: string, host: HTMLElement): Promise<HTMLImageElement> {
@@ -9819,8 +9522,8 @@ async function renderArchivePreviewWithRetry(path: string, host: HTMLElement): P
 }
 
 async function drainRecentPreviews(): Promise<void> {
-  if (recentPreviewRunning) return
-  recentPreviewRunning = true
+  if (appState.recentPreviewRunning) return
+  appState.recentPreviewRunning = true
   try {
     for (;;) {
       // Let the welcome page paint between archive reads so the first interaction is immediate.
@@ -9853,7 +9556,7 @@ async function drainRecentPreviews(): Promise<void> {
       }
     }
   } finally {
-    recentPreviewRunning = false
+    appState.recentPreviewRunning = false
     if (recentPreviewQueue.length && welcomeVisible()) void drainRecentPreviews()
   }
 }
@@ -9935,7 +9638,7 @@ void hydrateTemplateCardPreviews(document.querySelector(".template-grid")!, { la
 for (const card of document.querySelectorAll<HTMLButtonElement>(".template-card[data-template]")) {
   card.addEventListener("click", () => {
     const templateID = card.dataset.template
-    if (!templateID || fileOperationRunning) return
+    if (!templateID || appState.fileOperationRunning) return
     void runFileOperation("新建皮肤", () => newDocument(templateID))
   })
 }
@@ -10056,11 +9759,10 @@ settingsStorageSection.toggleAttribute("data-platform-hidden", !nativeSettings)
 settingsModelSection.toggleAttribute("data-platform-hidden", !nativeSettings)
 showSettingsPage("appearance")
 
-
 function aiEditableProjectFiles(target: SkinArchive, scope: "panel" | "project" = "project"): AiSkinEditableFile[] {
   const panelConfig = target.format === "bda"
     ? bdaConfigPath(target, theme.value, orientation.value, "appearance")
-    : layoutPath || selectedPath || preferredPath()
+    : appState.layoutPath || appState.selectedPath || preferredPath()
   // 面板范围同时授权它引用的全局配置与样式表：按键文字、字体、颜色都定义在样式表里。
   const panelFiles = new Set([panelConfig, ...target.format === "bda" ? [] : [genConfigPath(), styleConfigPath()]])
   return target.names().flatMap((path) => {
@@ -10131,7 +9833,7 @@ function aiPreviewImage(): { type: "image"; data: string; mimeType: string } | u
 }
 
 function aiSelectedKeyContext(): { label: string; sections: string[]; values: Record<string, string> } {
-  const sections = selectedKeySections.slice()
+  const sections = appState.selectedKeySections.slice()
   const keys = ["BACK_STYLE", "FORE_STYLE", "FONT_NAME", "FONT_SIZE", "NM_COLOR", "HL_COLOR", "CENTER", "CLICK", "LONG_CLICK", "SWIPE"]
   const values: Record<string, string> = {}
   for (const key of keys) {
@@ -10142,11 +9844,11 @@ function aiSelectedKeyContext(): { label: string; sections: string[]; values: Re
 }
 
 function syncAiDesignContext(): void {
-  aiContextKey.hidden = selectedKeySections.length === 0
-  aiContextKey.textContent = selectedKeySections.length > 1
-    ? `${selectedKeySections.length} 个按键`
-    : `${selectedKeyName.textContent?.trim() || "按键"} · ${selectedKeySections[0] ?? ""}`
-  const available = Boolean(archive && previewCanvas.width && previewCanvas.height)
+  aiContextKey.hidden = appState.selectedKeySections.length === 0
+  aiContextKey.textContent = appState.selectedKeySections.length > 1
+    ? `${appState.selectedKeySections.length} 个按键`
+    : `${selectedKeyName.textContent?.trim() || "按键"} · ${appState.selectedKeySections[0] ?? ""}`
+  const available = Boolean(appState.archive && previewCanvas.width && previewCanvas.height)
   aiContextPreview.textContent = available ? "画布" : "暂无画布"
   aiContextPreview.dataset.off = String(!available)
   syncAiDesignControls()
@@ -10206,26 +9908,26 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks, files: 
   if (!isTauri()) {
     throw new Error("AI 设计当前仅在桌面应用中可用。")
   }
-  if (!archive) {
+  if (!appState.archive) {
     throw new Error("请先打开一个皮肤项目。")
   }
   if (!isEditing()) {
     throw new Error("请先切换到编辑模式。")
   }
   if (!prompt.trim()) throw new Error("请填写设计要求。")
-  if (aiDesignBusy) throw new Error("上一轮设计尚未结束，请稍候。")
-  if (aiDesignDraft) throw new Error("请先应用或丢弃待确认的草稿，再继续对话。")
+  if (appState.aiDesignBusy) throw new Error("上一轮设计尚未结束，请稍候。")
+  if (appState.aiDesignDraft) throw new Error("请先应用或丢弃待确认的草稿，再继续对话。")
   source.commit()
-  const target = archive
-  const configuration = savedModels[Number(aiDesignModel.value)]
+  const target = appState.archive
+  const configuration = appState.savedModels[Number(aiDesignModel.value)]
   if (!configuration) {
     throw new Error("请先配置 AI 模型。")
   }
-  if (aiDesignConversationTarget !== target) {
-    aiDesignConversationTarget = target
-    aiDesignConversation = []
+  if (appState.aiDesignConversationTarget !== target) {
+    appState.aiDesignConversationTarget = target
+    appState.aiDesignConversation = []
   }
-  aiDesignBusy = true
+  appState.aiDesignBusy = true
   // Progress lives in the conversation timeline; the status line only reports outcomes.
   aiDesignPanel.dataset.state = "running"
   aiDesignStatus.textContent = ""
@@ -10233,12 +9935,12 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks, files: 
   try {
     const panelScope = aiWantsWholeProject(prompt) ? "project" as const : "panel" as const
     const panelPath = target.format === "bda"
-      ? bdaConfigPath(target, theme.value, orientation.value, "appearance") ?? layoutPath
-      : layoutPath || selectedPath || preferredPath()
+      ? bdaConfigPath(target, theme.value, orientation.value, "appearance") ?? appState.layoutPath
+      : appState.layoutPath || appState.selectedPath || preferredPath()
     const project = {
       format: target.format,
       skinName: documentName.textContent?.trim() ?? "",
-      skinPath: currentPath.split(/[\\/]/).pop() ?? "",
+      skinPath: appState.currentPath.split(/[\\/]/).pop() ?? "",
       theme: theme.value,
       orientation: orientation.value,
       layout: layout.value,
@@ -10253,21 +9955,21 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks, files: 
     const { aiDesignAttachments, runAiSkinDesign } = await import("./ai-design.ts")
     const attachments = files.length ? await aiDesignAttachments(files) : undefined
     const result = await runAiSkinDesign(configuration, project, prompt, {
-      imageModel: savedImageModel,
+      imageModel: appState.savedImageModel,
       attachments,
-      history: aiDesignConversation,
+      history: appState.aiDesignConversation,
       variantCount: aiWantsVariants(prompt) ? 3 : 1,
       thinkingLevel: aiDesignThinking.value as "off" | "low" | "medium" | "high",
       signal: hooks.signal,
       onStatus: async (kind, text) => {
-        if (hooks.signal.aborted || archive !== target) return
+        if (hooks.signal.aborted || appState.archive !== target) return
         await hooks.onStatus?.(text, kind)
       },
       onTextDelta: hooks.onTextDelta,
       onThinking: hooks.onThinking,
     })
     if (hooks.signal.aborted) throw new DOMException("AI 设计已取消", "AbortError")
-    if (archive !== target) throw new Error("AI 运行期间已切换皮肤项目，本轮草稿未应用")
+    if (appState.archive !== target) throw new Error("AI 运行期间已切换皮肤项目，本轮草稿未应用")
     if (!isEditing()) throw new Error("已退出编辑模式，本轮草稿未应用")
     if (result.variants?.length) {
       const variants = result.variants.flatMap<AiDraftVariant>((variant) => {
@@ -10302,7 +10004,7 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks, files: 
     }
     const changes = validatedAiChanges(target, result.changes)
     if (!changes.length) {
-      aiDesignConversation = result.conversation
+      appState.aiDesignConversation = result.conversation
       aiDesignPanel.dataset.state = "done"
       aiDesignStatus.textContent = "分析完成 · 没有文件修改"
       return { fallback: result.response || "AI 分析完成，没有需要应用的修改。" }
@@ -10321,7 +10023,7 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks, files: 
       summary: `已生成 ${changes.length} 个文件的草稿，审阅后应用。`,
     }
   } catch (error) {
-    if (archive === target) {
+    if (appState.archive === target) {
       aiDesignPanel.dataset.state = hooks.signal.aborted ? "stopped" : "error"
       // The conversation already shows the error; repeating it above reads as a second failure.
       aiDesignStatus.textContent = hooks.signal.aborted ? "已停止 · 未应用任何修改" : ""
@@ -10329,7 +10031,7 @@ async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks, files: 
     if (hooks.signal.aborted) throw error
     throw new Error(aiDesignErrorMessage(error))
   } finally {
-    aiDesignBusy = false
+    appState.aiDesignBusy = false
     syncAiDesignControls()
   }
 }
@@ -10386,7 +10088,7 @@ function createAiVariantReview(variant: AiDraftVariant, index: number): HTMLLIEl
 }
 
 function chooseAiVariant(id: string): void {
-  const draft = aiDesignDraft
+  const draft = appState.aiDesignDraft
   const variant = draft?.variants?.find((item) => item.id === id)
   if (!draft || !variant) return
   draft.changes = variant.changes
@@ -10401,7 +10103,7 @@ function chooseAiVariant(id: string): void {
 
 function setAiDesignDraft(draft: AiDraft | undefined): void {
   revertAiDraftPreview()
-  aiDesignDraft = draft
+  appState.aiDesignDraft = draft
   aiDraftPanel.hidden = !draft
   // The draft card takes the composer's place until it is applied or discarded.
   aiDesignChat.toggleAttribute("data-draft", Boolean(draft))
@@ -10439,7 +10141,7 @@ function writeAiDraftChanges(target: SkinArchive, changes: readonly Change[], si
 
 /** Shows a draft on the canvas by writing it into the archive without recording history. */
 function previewAiDraft(draft: AiDraft): void {
-  if (archive !== draft.target) return
+  if (appState.archive !== draft.target) return
   try {
     source.commit()
     // Revalidate before writing: never overwrite edits made since generation.
@@ -10449,56 +10151,56 @@ function previewAiDraft(draft: AiDraft): void {
     return
   }
   writeAiDraftChanges(draft.target, draft.changes, "after")
-  aiDraftPreview = { target: draft.target, changes: draft.changes }
+  appState.aiDraftPreview = { target: draft.target, changes: draft.changes }
   refreshAfterAiDraft(draft.target)
 }
 
 function revertAiDraftPreview(): void {
-  const current = aiDraftPreview
+  const current = appState.aiDraftPreview
   if (!current) return
-  aiDraftPreview = undefined
+  appState.aiDraftPreview = undefined
   writeAiDraftChanges(current.target, current.changes, "before")
-  if (archive === current.target) refreshAfterAiDraft(current.target)
+  if (appState.archive === current.target) refreshAfterAiDraft(current.target)
 }
 
 /** Turns the previewed draft into a normal undoable edit; the archive already holds its content. */
 function acceptAiDraftPreview(): void {
-  const current = aiDraftPreview
+  const current = appState.aiDraftPreview
   if (!current) return
-  aiDraftPreview = undefined
+  appState.aiDraftPreview = undefined
   commitBatch(current.changes)
-  if (aiDesignDraft) aiDesignConversation = aiDesignDraft.conversation
+  if (appState.aiDesignDraft) appState.aiDesignConversation = appState.aiDesignDraft.conversation
   setAiDesignDraft(undefined)
   aiDesignPanel.dataset.state = "done"
   aiDesignStatus.textContent = `已应用 ${current.changes.length} 个文件的修改，可使用撤销恢复。`
 }
 
 function discardAiDesignDraft(message: string): void {
-  if (!aiDesignDraft) return
+  if (!appState.aiDesignDraft) return
   setAiDesignDraft(undefined)
   aiDesignPanel.dataset.state = "idle"
   aiDesignStatus.textContent = message
 }
 
 function refreshAfterAiDraft(target: SkinArchive): void {
-  if (target.format === "bda") refreshBdaLayout(layoutPath)
-  else if (target.isText(layoutPath)) layoutDocument = IniDocument.parse(target.getText(layoutPath))
+  if (target.format === "bda") refreshBdaLayout(appState.layoutPath)
+  else if (target.isText(appState.layoutPath)) appState.layoutDocument = IniDocument.parse(target.getText(appState.layoutPath))
   renderFiles()
-  if (selectedPath && target.getBytes(selectedPath)) selectFile(selectedPath, sidebarView, "document", true)
+  if (appState.selectedPath && target.getBytes(appState.selectedPath)) selectFile(appState.selectedPath, appState.sidebarView, "document", true)
   refreshPreview()
   populateKeyInspector()
   updateDirty()
 }
 
 function applyAiDesignDraft(): void {
-  const draft = aiDesignDraft
+  const draft = appState.aiDesignDraft
   if (!draft) return
-  if (archive !== draft.target) {
+  if (appState.archive !== draft.target) {
     setAiDesignDraft(undefined)
     aiDesignStatus.textContent = "皮肤项目已切换，草稿已丢弃。"
     return
   }
-  if (!isEditing() || aiDesignBusy) {
+  if (!isEditing() || appState.aiDesignBusy) {
     aiDesignStatus.textContent = "请在编辑模式下应用草稿，并等待生成结束。"
     return
   }
@@ -10506,7 +10208,7 @@ function applyAiDesignDraft(): void {
     aiDesignStatus.textContent = "请先选择一个设计方案。"
     return
   }
-  if (!aiDraftPreview) {
+  if (!appState.aiDraftPreview) {
     aiDesignPanel.dataset.state = "error"
     aiDesignStatus.textContent = "草稿无法在画布预览，请丢弃后重新生成。"
     return
@@ -10517,35 +10219,35 @@ function applyAiDesignDraft(): void {
 }
 
 function ensureAiChat(): Promise<AiChatController> {
-  aiChatInitialization ??= import("./ai-chat.ts")
+  appState.aiChatInitialization ??= import("./ai-chat.ts")
     .then(({ connectAiChat }) => connectAiChat(aiDesignChat, runAiDesignRequest))
-    .catch((error) => { aiChatInitialization = undefined; throw error })
-  return aiChatInitialization.then((controller) => {
-    aiChatController = controller
+    .catch((error) => { appState.aiChatInitialization = undefined; throw error })
+  return appState.aiChatInitialization.then((controller) => {
+    appState.aiChatController = controller
     syncAiDesignControls()
     return controller
   })
 }
 
 function syncAiDesignControls(): void {
-  aiDesignModel.disabled = aiDesignBusy || savedModels.length === 0
+  aiDesignModel.disabled = appState.aiDesignBusy || appState.savedModels.length === 0
   aiDesignThinking.disabled = aiDesignModel.disabled
-  aiNewSession.disabled = aiDesignBusy || Boolean(aiDesignDraft)
+  aiNewSession.disabled = appState.aiDesignBusy || Boolean(appState.aiDesignDraft)
   // A pending draft must be applied or discarded first; deep-chat keeps its stop
   // button during a run, so only the idle submit state is affected.
-  aiChatController?.setEnabled(!aiDesignDraft && savedModels.length > 0)
-  aiDraftApply.disabled = aiDesignBusy || !isEditing() || Boolean(aiDesignDraft?.variants?.length)
-  aiDraftCancel.disabled = aiDesignBusy
+  appState.aiChatController?.setEnabled(!appState.aiDesignDraft && appState.savedModels.length > 0)
+  aiDraftApply.disabled = appState.aiDesignBusy || !isEditing() || Boolean(appState.aiDesignDraft?.variants?.length)
+  aiDraftCancel.disabled = appState.aiDesignBusy
 }
 
 aiNewSession.addEventListener("click", () => {
-  if (aiDesignBusy || aiDesignDraft) return
-  aiChatController?.clear()
-  aiDesignConversation = []
+  if (appState.aiDesignBusy || appState.aiDesignDraft) return
+  appState.aiChatController?.clear()
+  appState.aiDesignConversation = []
   aiDesignStatus.textContent = "已开始新对话 · 已应用的修改不受影响"
   aiDesignPanel.dataset.state = "idle"
   syncAiDesignControls()
-  aiChatController?.focus()
+  appState.aiChatController?.focus()
 })
 aiDraftApply.addEventListener("click", () => applyAiDesignDraft())
 aiDraftCancel.addEventListener("click", () => {
@@ -10611,10 +10313,10 @@ async function initializeSourceDirectory(): Promise<void> {
 }
 
 function syncModelProfiles(all: ModelConfiguration[]): void {
-  const selected = savedModels[Number(aiDesignModel.value)]
+  const selected = appState.savedModels[Number(aiDesignModel.value)]
   const models = all.filter((model) => model.kind !== "image")
-  savedImageModel = all.find((model) => model.kind === "image")
-  savedModels = models
+  appState.savedImageModel = all.find((model) => model.kind === "image")
+  appState.savedModels = models
   // One optgroup per provider account; option values stay indexes into the flat saved list.
   const groups = groupModelConfigurations(models)
   const labels = groups.map((group) => modelProviderPreset(group.provider).label)
@@ -10662,7 +10364,7 @@ sourceDirectoryEnabled.addEventListener("change", () => void (async () => {
     if (isAndroidTauri()) localStorage.removeItem("source-directory-enabled")
     else localStorage.setItem("source-directory-enabled", "false")
     localStorage.removeItem(LAST_SOURCE_WORKSPACE_KEY)
-    sourceWorkspacePendingArchive = undefined
+    appState.sourceWorkspacePendingArchive = undefined
     await activateSourceWorkspace("", "")
     sourceDirectory.disabled = true
     chooseSourceDirectory.disabled = true
@@ -10816,8 +10518,6 @@ function saveSourceFontSize(): void {
 sourceFontSize.addEventListener("input", applySourceFontSize)
 sourceFontSize.addEventListener("change", saveSourceFontSize)
 sourceFontSize.addEventListener("blur", saveSourceFontSize)
-type WindowMaterialKind = "glass" | "acrylic" | "none"
-let windowMaterialKind: WindowMaterialKind = "glass"
 function currentWindowMaterialOpacity(): number {
   return Math.max(20, Math.min(100, Number(windowMaterialOpacity.value) || 100))
 }
@@ -10826,7 +10526,7 @@ function applyWindowMaterialOpacity(): void {
   windowMaterialOpacity.value = String(opacity)
   windowMaterialOpacityValue.value = `${opacity}%`
   windowMaterialOpacity.disabled = !windowMaterial.checked
-  document.documentElement.dataset.windowMaterialKind = windowMaterialKind
+  document.documentElement.dataset.windowMaterialKind = appState.windowMaterialKind
   // 滑杆值就是材质填充强度：100% 时每个表面都合成到完全不透明，因此不再像旧版那样乘一个小系数
   // （那样 100% 也只有半透明）。各表面按层角色取系数：单层直接用 f，下沉层用 1-√(1-f) 让两层叠加后
   // 正好等于 f，浮层用 1-(1-f)² 让对话框正文始终落在接近实心的底上。模糊无需再关闭。
@@ -10854,17 +10554,17 @@ function handleWindowMaterialError(error: unknown, action: string): void {
 }
 async function initializeWindowMaterial(): Promise<void> {
   if (isTauri()) {
-    windowMaterialKind = await retryAsync(
+    appState.windowMaterialKind = await retryAsync(
       () => invoke<WindowMaterialKind>("window_material_kind"),
       { attempts: 4, delayMs: 100 },
     )
   }
   const savedWindowMaterial = localStorage.getItem("window-material")
   windowMaterial.checked = savedWindowMaterial === null
-    ? windowMaterialKind !== "acrylic"
+    ? appState.windowMaterialKind !== "acrylic"
     : savedWindowMaterial !== "off"
-  windowMaterialOpacitySetting.hidden = windowMaterialKind === "none"
-  const storageKey = windowMaterialKind === "acrylic" ? "window-acrylic-opacity" : "window-glass-opacity"
+  windowMaterialOpacitySetting.hidden = appState.windowMaterialKind === "none"
+  const storageKey = appState.windowMaterialKind === "acrylic" ? "window-acrylic-opacity" : "window-glass-opacity"
   // 玻璃默认值取 50%：滑杆现在代表填充强度，100% 等同于实心窗口，默认值要留出材质本身。
   windowMaterialOpacity.value = localStorage.getItem(storageKey) ?? "87"
   await applyWindowMaterialWithRetry()
@@ -10875,7 +10575,7 @@ windowMaterial.addEventListener("change", () => {
   void applyWindowMaterialWithRetry().catch((error) => handleWindowMaterialError(error, "切换窗口材质"))
 })
 windowMaterialOpacity.addEventListener("input", () => {
-  const storageKey = windowMaterialKind === "acrylic" ? "window-acrylic-opacity" : "window-glass-opacity"
+  const storageKey = appState.windowMaterialKind === "acrylic" ? "window-acrylic-opacity" : "window-glass-opacity"
   localStorage.setItem(storageKey, String(currentWindowMaterialOpacity()))
   applyWindowMaterialOpacity()
 })
@@ -10883,24 +10583,20 @@ windowMaterialOpacity.addEventListener("change", () => {
   void applyWindowMaterialWithRetry().catch((error) => handleWindowMaterialError(error, "切换窗口材质"))
 })
 
-let windowDragPointerDown = false
-let windowDragMaterialDisabled = false
-let windowDragMaterialTransition: Promise<unknown> | undefined
-
 async function restoreWindowMaterialAfterDrag(): Promise<void> {
-  windowDragPointerDown = false
+  appState.windowDragPointerDown = false
   try {
-    await windowDragMaterialTransition
+    await appState.windowDragMaterialTransition
   } catch {
-    windowDragMaterialDisabled = false
+    appState.windowDragMaterialDisabled = false
     document.documentElement.dataset.windowMaterial = windowMaterial.checked ? "on" : "off"
     return
   }
-  if (!windowDragMaterialDisabled) {
+  if (!appState.windowDragMaterialDisabled) {
     document.documentElement.dataset.windowMaterial = windowMaterial.checked ? "on" : "off"
     return
   }
-  windowDragMaterialDisabled = false
+  appState.windowDragMaterialDisabled = false
   await new Promise(resolve => setTimeout(resolve, 50))
   try {
     await applyWindowMaterialWithRetry()
@@ -10910,13 +10606,13 @@ async function restoreWindowMaterialAfterDrag(): Promise<void> {
 }
 
 async function startWindowsWindowDrag(): Promise<void> {
-  windowDragPointerDown = true
+  appState.windowDragPointerDown = true
   document.documentElement.dataset.windowMaterial = "off"
   try {
-    windowDragMaterialTransition = invoke("set_window_material", { enabled: false, opacity: currentWindowMaterialOpacity() })
-    await windowDragMaterialTransition
-    windowDragMaterialDisabled = true
-    if (!windowDragPointerDown) {
+    appState.windowDragMaterialTransition = invoke("set_window_material", { enabled: false, opacity: currentWindowMaterialOpacity() })
+    await appState.windowDragMaterialTransition
+    appState.windowDragMaterialDisabled = true
+    if (!appState.windowDragPointerDown) {
       await restoreWindowMaterialAfterDrag()
       return
     }
@@ -10925,11 +10621,11 @@ async function startWindowsWindowDrag(): Promise<void> {
     await mouseReleased
     await restoreWindowMaterialAfterDrag()
   } catch (error) {
-    windowDragMaterialTransition = undefined
+    appState.windowDragMaterialTransition = undefined
     await restoreWindowMaterialAfterDrag()
     showError(error, "拖动窗口")
   } finally {
-    windowDragMaterialTransition = undefined
+    appState.windowDragMaterialTransition = undefined
   }
 }
 
@@ -10948,7 +10644,7 @@ document.addEventListener("mousedown", (event) => {
   void startWindowsWindowDrag()
 }, true)
 window.addEventListener("mouseup", () => {
-  if (windowDragPointerDown) void restoreWindowMaterialAfterDrag()
+  if (appState.windowDragPointerDown) void restoreWindowMaterialAfterDrag()
 }, true)
 sidebarViewVisible.checked = localStorage.getItem("sidebar-view-visible") !== "off"
 function applySidebarViewVisibility(): void {
@@ -11002,15 +10698,14 @@ browserOpen.addEventListener("change", async () => {
   browserOpen.value = ""
 })
 fileOperationDialog.addEventListener("cancel", (event) => {
-  if (fileOperationRunning) event.preventDefault()
+  if (appState.fileOperationRunning) event.preventDefault()
 })
-let canvasDragDepth = 0
 function setCanvasDropState(active: boolean): void {
   canvasWrap.classList.toggle("drop-target", active)
 }
 canvasWrap.addEventListener("dragenter", (event) => {
   event.preventDefault()
-  canvasDragDepth += 1
+  appState.canvasDragDepth += 1
   setCanvasDropState(true)
 })
 canvasWrap.addEventListener("dragover", (event) => {
@@ -11018,26 +10713,26 @@ canvasWrap.addEventListener("dragover", (event) => {
   if (event.dataTransfer) {
     event.dataTransfer.dropEffect = "copy"
     const file = event.dataTransfer.files[0]
-    setLayoutImageHighlight(Boolean(archive && archive.format !== "bda" && file && /\.png$/i.test(file.name)))
+    setLayoutImageHighlight(Boolean(appState.archive && appState.archive.format !== "bda" && file && /\.png$/i.test(file.name)))
   }
 })
 canvasWrap.addEventListener("dragleave", (event) => {
   event.preventDefault()
-  canvasDragDepth = Math.max(0, canvasDragDepth - 1)
-  if (!canvasDragDepth) {
+  appState.canvasDragDepth = Math.max(0, appState.canvasDragDepth - 1)
+  if (!appState.canvasDragDepth) {
     setCanvasDropState(false)
     setLayoutImageHighlight(false)
   }
 })
 canvasWrap.addEventListener("drop", (event) => {
   event.preventDefault()
-  canvasDragDepth = 0
+  appState.canvasDragDepth = 0
   setCanvasDropState(false)
   setLayoutImageHighlight(false)
   const file = event.dataTransfer?.files[0]
   if (!file) return
   if (/\.png$/i.test(file.name)) {
-    if (!archive || archive.format === "bda") return
+    if (!appState.archive || appState.archive.format === "bda") return
     const reader = new FileReader()
     reader.onload = () => {
       setLayoutImageBytes(new Uint8Array(reader.result as ArrayBuffer))
@@ -11050,24 +10745,24 @@ canvasWrap.addEventListener("drop", (event) => {
 })
 replaceAssetButton.addEventListener("click", () => imageOpen.click())
 assetBackButton.addEventListener("click", () => {
-  const path = assetReturnPath
-  if (!path || !archive?.names().includes(path)) return
-  assetReturnPath = ""
+  const path = appState.assetReturnPath
+  if (!path || !appState.archive?.names().includes(path)) return
+  appState.assetReturnPath = ""
   selectFile(path)
   revealSourceFile(path)
 })
 imageOpen.addEventListener("change", async () => {
   const file = imageOpen.files?.[0]
-  if (file && isEditing() && archive?.isImage(selectedPath)) {
-    const targetArchive = archive
-    const path = selectedPath
+  if (file && isEditing() && appState.archive?.isImage(appState.selectedPath)) {
+    const targetArchive = appState.archive
+    const path = appState.selectedPath
     await runFileOperation("替换图片", async () => {
       const bytes = new Uint8Array(await file.arrayBuffer())
       const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }))
       bitmap.close()
-      if (archive !== targetArchive || !isEditing()) return false
-      commitBytes(path, archive.getBytes(path)?.slice(), bytes)
-      if (selectedPath === path) showImage(path)
+      if (appState.archive !== targetArchive || !isEditing()) return false
+      commitBytes(path, appState.archive.getBytes(path)?.slice(), bytes)
+      if (appState.selectedPath === path) showImage(path)
       refreshPreview()
       updateDirty()
       return true
@@ -11076,27 +10771,27 @@ imageOpen.addEventListener("change", async () => {
   imageOpen.value = ""
 })
 source.addEventListener("input", () => {
-  if (!isEditing() || !archive || !selectedPath) return
-  if (archive.isBdaConfig(selectedPath) || isBdaAppearancePartPath(selectedPath)) {
+  if (!isEditing() || !appState.archive || !appState.selectedPath) return
+  if (appState.archive.isBdaConfig(appState.selectedPath) || isBdaAppearancePartPath(appState.selectedPath)) {
     scheduleSourceInputHighlight()
     return
   }
-  if (resourceConfigActive && selectedResourcePath) {
-    const before = tileDocument.toString()
-    tileDocument = IniDocument.parse(source.value)
-    commitText(tilePath, before, source.value)
-    slices = tileSlices(tileDocument)
-    if (!slices.some((slice) => slice.index === selectedTileIndex)) selectedTileIndex = undefined
+  if (appState.resourceConfigActive && appState.selectedResourcePath) {
+    const before = appState.tileDocument.toString()
+    appState.tileDocument = IniDocument.parse(source.value)
+    commitText(appState.tilePath, before, source.value)
+    appState.slices = tileSlices(appState.tileDocument)
+    if (!appState.slices.some((slice) => slice.index === appState.selectedTileIndex)) appState.selectedTileIndex = undefined
     populateTileInspector()
     drawAtlas()
     updateDirty()
     scheduleSourceInputHighlight()
     return
   }
-  const before = selectedDocument?.toString() ?? archive.getText(selectedPath)
-  selectedDocument = IniDocument.parse(source.value)
-  commitText(selectedPath, before, source.value)
-  if (selectedPath === layoutPath) layoutDocument = selectedDocument
+  const before = appState.selectedDocument?.toString() ?? appState.archive.getText(appState.selectedPath)
+  appState.selectedDocument = IniDocument.parse(source.value)
+  commitText(appState.selectedPath, before, source.value)
+  if (appState.selectedPath === appState.layoutPath) appState.layoutDocument = appState.selectedDocument
   updateDirty()
   scheduleSourceInputHighlight(true)
 })
@@ -11109,28 +10804,28 @@ sourceColorPicker.addEventListener("change", applySourceColorPicker)
  * without fighting over the caret.
  */
 function selectKeyFromSourceOffset(offset: number): void {
-  if (!isEditing() || !archive || !selectedPath) return
-  if (selectedPath !== layoutPath) return
-  const bdaSource = archive.format === "bda" && (
-    archive.isBdaConfig(selectedPath) || isBdaVirtualTextPath(selectedPath) || isBdaAppearancePartPath(selectedPath)
+  if (!isEditing() || !appState.archive || !appState.selectedPath) return
+  if (appState.selectedPath !== appState.layoutPath) return
+  const bdaSource = appState.archive.format === "bda" && (
+    appState.archive.isBdaConfig(appState.selectedPath) || isBdaVirtualTextPath(appState.selectedPath) || isBdaAppearancePartPath(appState.selectedPath)
   )
   const property = bdaSource ? jsonPropertyAtOffset(source.value, offset) : undefined
   const section = bdaSource ? undefined : iniSectionAtOffset(source.value, offset)
   const panelKey = property && property !== "cand" ? property : undefined
   if (!section && !panelKey) return
-  if (!layoutDocument) return
-  const items = previewItems(layoutDocument)
+  if (!appState.layoutDocument) return
+  const items = previewItems(appState.layoutDocument)
   const match = items.find((item) => item.editable && (
     section !== undefined
       ? item.section === section || item.sections.includes(section)
       : item.center.trim().toLowerCase() === panelKey
   ))
   if (!match) return
-  if (selectedKeySections.length === 1 && selectedKeySections[0] === match.section) return
-  selectedCandidate = false
+  if (appState.selectedKeySections.length === 1 && appState.selectedKeySections[0] === match.section) return
+  appState.selectedCandidate = false
   syncCandidateSelection()
-  selectedKeySections = [match.section]
-  preview.setSelected(selectedKeySections)
+  appState.selectedKeySections = [match.section]
+  preview.setSelected(appState.selectedKeySections)
   populateKeyInspector()
 }
 
@@ -11157,7 +10852,7 @@ source.addEventListener("valueclick", (event) => {
   else if (detail.kind === "style") openSourceStylePicker(detail)
 })
 sourceSearch.addEventListener("input", () => {
-  sourceSearchIndex = sourceSearch.value.trim() ? 0 : -1
+  appState.sourceSearchIndex = sourceSearch.value.trim() ? 0 : -1
   scheduleSourceSearch()
 })
 sourceSearch.addEventListener("keydown", (event) => {
@@ -11173,7 +10868,7 @@ sourceSearch.addEventListener("keydown", (event) => {
 sourceSearchPrevious.addEventListener("click", () => findSourceMatch(-1))
 sourceSearchNext.addEventListener("click", () => findSourceMatch(1))
 sourceFindToggle.addEventListener("click", () => {
-  if (sourceFindVisible) closeSourceFind()
+  if (appState.sourceFindVisible) closeSourceFind()
   else openSourceFind()
 })
 window.addEventListener("keydown", (event) => {
@@ -11231,7 +10926,7 @@ function moveMixedCoordinate(field: HTMLInputElement, direction: number, coalesc
     direction,
   )
   if (!delta) return false
-  moveSelectedKeys(delta[0], delta[1], selectedKeySections, coalesce)
+  moveSelectedKeys(delta[0], delta[1], appState.selectedKeySections, coalesce)
   return true
 }
 // Mixed coordinate wheel edits share the document-level gesture scheduler/history.
@@ -11263,9 +10958,9 @@ for (const button of layoutActionButtons) {
 }
 for (const button of keyModeButtons) {
   button.addEventListener("click", () => {
-    keyMode = button.dataset.keyMode === "move" ? "move" : "select"
+    appState.keyMode = button.dataset.keyMode === "move" ? "move" : "select"
     keyModeButtons.forEach((item) => item.setAttribute("aria-pressed", String(item === button)))
-    preview.setEditTool(keyMode)
+    preview.setEditTool(appState.keyMode)
   })
 }
 for (const button of keyActionButtons) {
@@ -11277,12 +10972,12 @@ for (const button of keyActionButtons) {
 }
 inspectorBackButton.addEventListener("click", () => {
   source.commit()
-  selectedKeySections = []
-  selectedToolbarSections = []
-  selectedCandidate = false
+  appState.selectedKeySections = []
+  appState.selectedToolbarSections = []
+  appState.selectedCandidate = false
   preview.setSelected([])
   toolbarPreview.setSelected([])
-  if (inspectorTab !== "source") inspectorTab = "properties"
+  if (appState.inspectorTab !== "source") appState.inspectorTab = "properties"
   syncCandidateSelection()
   updateInspectorView()
   populateKeyInspector()
@@ -11292,7 +10987,7 @@ inspectorBackButton.addEventListener("click", () => {
 for (const button of inspectorTabButtons) {
   button.addEventListener("click", () => {
     const tab = button.dataset.inspectorTab
-    inspectorTab = tab === "source" ? "source" : tab === "ai" ? "ai" : "properties"
+    appState.inspectorTab = tab === "source" ? "source" : tab === "ai" ? "ai" : "properties"
     if (mobilePortraitQuery.matches) setMobilePane("inspector")
     updateInspectorView()
     if (!quickInspector.hidden) populateKeyInspector()
@@ -11307,16 +11002,16 @@ for (const control of [theme, orientation, layout]) {
     const path = preferredPath()
     if (control !== layout && !createMissingVariant(path)) return
     let selected = false
-    if (archive?.format === "bda") {
+    if (appState.archive?.format === "bda") {
       renderFiles()
       if (bdaAvailableLayoutPaths().includes(path)) {
         selectFile(path)
         selected = true
       }
-    } else if (archive?.names().includes(path)) {
-      layoutPath = path
-      layoutDocument = IniDocument.parse(archive.getText(path))
-      selectedKeySections = []
+    } else if (appState.archive?.names().includes(path)) {
+      appState.layoutPath = path
+      appState.layoutDocument = IniDocument.parse(appState.archive.getText(path))
+      appState.selectedKeySections = []
       preview.setSelected([])
       renderFiles()
       selectFile(path)
@@ -11329,7 +11024,7 @@ for (const control of [theme, orientation, layout]) {
 }
 mode.addEventListener("change", () => {
   applyModeState()
-  if (resourceConfigActive) populateTileInspector()
+  if (appState.resourceConfigActive) populateTileInspector()
   else populateKeyInspector()
   eventLog.textContent =
     mode.value === "edit"
@@ -11355,46 +11050,46 @@ for (const button of mobileChoiceButtons) {
   })
 }
 function setGuidesVisible(enabled: boolean): void {
-  guidesVisible = enabled
+  appState.guidesVisible = enabled
   ;($("#settings-layout-guides") as HTMLInputElement).checked = enabled
   for (const button of [toggleGuides, mobileToggleGuides]) {
-    button.classList.toggle("active", guidesVisible)
-    button.setAttribute("aria-pressed", String(guidesVisible))
+    button.classList.toggle("active", appState.guidesVisible)
+    button.setAttribute("aria-pressed", String(appState.guidesVisible))
   }
-  preview.setGuides(guidesVisible)
-  toolbarPreview.setGuides(guidesVisible)
+  preview.setGuides(appState.guidesVisible)
+  toolbarPreview.setGuides(appState.guidesVisible)
   if (!enabled) setDrawingTile(false)
   drawAtlas()
 }
 
-toggleGuides.addEventListener("click", () => setGuidesVisible(!guidesVisible))
-mobileToggleGuides.addEventListener("click", () => setGuidesVisible(!guidesVisible))
+toggleGuides.addEventListener("click", () => setGuidesVisible(!appState.guidesVisible))
+mobileToggleGuides.addEventListener("click", () => setGuidesVisible(!appState.guidesVisible))
 newTileButton.addEventListener("click", () => {
-  if (!selectedResourcePath || !isEditing()) return
-  if (!guidesVisible) setGuidesVisible(true)
-  setDrawingTile(!drawingTile)
+  if (!appState.selectedResourcePath || !isEditing()) return
+  if (!appState.guidesVisible) setGuidesVisible(true)
+  setDrawingTile(!appState.drawingTile)
 })
 duplicateTileButton.addEventListener("click", duplicateSelectedTile)
 deleteTileButton.addEventListener("click", deleteSelectedTile)
 resourceBackButton.addEventListener("click", () => {
-  if (resourceInspectorMode === "image" && bdaSliceReturn) {
-    const { path, styleID } = bdaSliceReturn
-    bdaSliceReturn = undefined
+  if (appState.resourceInspectorMode === "image" && appState.bdaSliceReturn) {
+    const { path, styleID } = appState.bdaSliceReturn
+    appState.bdaSliceReturn = undefined
     selectFile(path, "overview", "style")
     selectStyleResource(styleID)
     return
   }
-  if (resourceInspectorMode === "style" && styleReturnPath) {
-    const path = styleReturnPath
-    const selection = [...styleReturnSelection]
-    const candidate = styleReturnCandidate
-    const scrollTop = styleReturnScrollTop
-    const inspectorGroup = styleReturnInspectorGroup
-    styleReturnPath = ""
-    styleReturnCandidate = false
+  if (appState.resourceInspectorMode === "style" && appState.styleReturnPath) {
+    const path = appState.styleReturnPath
+    const selection = [...appState.styleReturnSelection]
+    const candidate = appState.styleReturnCandidate
+    const scrollTop = appState.styleReturnScrollTop
+    const inspectorGroup = appState.styleReturnInspectorGroup
+    appState.styleReturnPath = ""
+    appState.styleReturnCandidate = false
     selectFile(path, "overview")
-    selectedKeySections = selection
-    selectedCandidate = candidate
+    appState.selectedKeySections = selection
+    appState.selectedCandidate = candidate
     preview.setSelected(selection)
     syncCandidateSelection()
     populateKeyInspector()
@@ -11407,112 +11102,112 @@ resourceBackButton.addEventListener("click", () => {
 })
 resourceSearch.addEventListener("input", renderResourceInspector)
 resourceCategory.addEventListener("change", () => {
-  if (archive?.format !== "bda" || resourceInspectorMode !== "style" || !resourceConfigActive) {
+  if (appState.archive?.format !== "bda" || appState.resourceInspectorMode !== "style" || !appState.resourceConfigActive) {
     renderResourceInspector()
     return
   }
   const group = resourceCategory.value as BdaAppearanceStyleGroup
   if (!bdaAppearanceStyleGroups.some(([value]) => value === group)) return
   source.commit()
-  selectedBdaStyleGroup = group
+  appState.selectedBdaStyleGroup = group
   renderFiles()
   selectFile(bdaAppearanceStylePath(group), "overview", "style")
 })
 bdaTileUsage.addEventListener("change", () => {
-  selectedTileIndex = Number(bdaTileUsage.value)
+  appState.selectedTileIndex = Number(bdaTileUsage.value)
   populateTileInspector()
   drawAtlas()
 })
 for (const button of tileModeButtons) {
   button.addEventListener("click", () => {
-    tileMode = button.dataset.tileMode === "move" ? "move" : "select"
+    appState.tileMode = button.dataset.tileMode === "move" ? "move" : "select"
     tileModeButtons.forEach((item) => item.classList.toggle("active", item === button))
     setDrawingTile(false)
   })
 }
 atlasCanvas.addEventListener("pointerdown", (event) => {
-  if (!resourceConfigActive || event.button !== 0) return
+  if (!appState.resourceConfigActive || event.button !== 0) return
   const point = atlasPoint(event)
-  if (drawingTile) {
-    tileDragStart = point
-    tileDraft = undefined
+  if (appState.drawingTile) {
+    appState.tileDragStart = point
+    appState.tileDraft = undefined
     atlasCanvas.setPointerCapture(event.pointerId)
     return
   }
-  tileResizeCorner = undefined
-  const selected = slices.find(slice => slice.index === selectedTileIndex)
-  if (selected && isEditing() && archive?.format !== "bda" && guidesVisible) {
+  appState.tileResizeCorner = undefined
+  const selected = appState.slices.find(slice => slice.index === appState.selectedTileIndex)
+  if (selected && isEditing() && appState.archive?.format !== "bda" && appState.guidesVisible) {
     const [x, y, w, h] = selected.source
     const radius = 9 * workspaceImage.naturalWidth / Math.max(1, atlasCanvas.getBoundingClientRect().width)
     const corner = [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].findIndex(([cx, cy]) => Math.abs(point.x - cx) <= radius && Math.abs(point.y - cy) <= radius)
     if (corner >= 0) {
-      tileResizeCorner = corner
-      movingTile = tileDragOriginal = selected
+      appState.tileResizeCorner = corner
+      appState.movingTile = appState.tileDragOriginal = selected
       atlasCanvas.setPointerCapture(event.pointerId)
       return
     }
   }
-  const hit = archive?.format === "bda"
-    ? slices.find((slice) => slice.index === selectedTileIndex)
-    : tileSliceAt(slices, point)
-  selectedTileIndex = hit?.index
+  const hit = appState.archive?.format === "bda"
+    ? appState.slices.find((slice) => slice.index === appState.selectedTileIndex)
+    : tileSliceAt(appState.slices, point)
+  appState.selectedTileIndex = hit?.index
   updateSourceHighlight()
   if (hit) requestAnimationFrame(scrollSelectedSource)
-  if (tileMode === "move" && hit && isEditing() && archive?.format !== "bda") {
-    movingTile = hit
-    tileDragOriginal = hit
-    moveStart = point
-    moveSource = hit.source
+  if (appState.tileMode === "move" && hit && isEditing() && appState.archive?.format !== "bda") {
+    appState.movingTile = hit
+    appState.tileDragOriginal = hit
+    appState.moveStart = point
+    appState.moveSource = hit.source
     atlasCanvas.setPointerCapture(event.pointerId)
   }
   populateTileInspector()
   drawAtlas()
 })
 atlasCanvas.addEventListener("pointermove", (event) => {
-  if (tileResizeCorner !== undefined && tileDragOriginal) {
-    movingTile = resizeTileSlice(tileDragOriginal, tileResizeCorner, atlasPoint(event), workspaceImage.naturalWidth, workspaceImage.naturalHeight)
+  if (appState.tileResizeCorner !== undefined && appState.tileDragOriginal) {
+    appState.movingTile = resizeTileSlice(appState.tileDragOriginal, appState.tileResizeCorner, atlasPoint(event), workspaceImage.naturalWidth, workspaceImage.naturalHeight)
     scheduleAtlasDraw()
     return
   }
-  if (tileDragStart && drawingTile) {
-    tileDraft = boundedTileRect(tileDragStart, atlasPoint(event), workspaceImage.naturalWidth, workspaceImage.naturalHeight)
+  if (appState.tileDragStart && appState.drawingTile) {
+    appState.tileDraft = boundedTileRect(appState.tileDragStart, atlasPoint(event), workspaceImage.naturalWidth, workspaceImage.naturalHeight)
     scheduleAtlasDraw()
     return
   }
-  if (!moveStart || !moveSource || !movingTile) return
+  if (!appState.moveStart || !appState.moveSource || !appState.movingTile) return
   const point = atlasPoint(event)
-  const source = moveTileRect(moveSource, point.x - moveStart.x, point.y - moveStart.y, workspaceImage.naturalWidth, workspaceImage.naturalHeight)
-  const dx = source[0] - moveSource[0]
-  const dy = source[1] - moveSource[1]
-  movingTile = { ...movingTile, source, ...(tileDragOriginal?.inner ? { inner: moveTileRect(tileDragOriginal.inner, dx, dy, workspaceImage.naturalWidth, workspaceImage.naturalHeight) } : {}) }
+  const source = moveTileRect(appState.moveSource, point.x - appState.moveStart.x, point.y - appState.moveStart.y, workspaceImage.naturalWidth, workspaceImage.naturalHeight)
+  const dx = source[0] - appState.moveSource[0]
+  const dy = source[1] - appState.moveSource[1]
+  appState.movingTile = { ...appState.movingTile, source, ...(appState.tileDragOriginal?.inner ? { inner: moveTileRect(appState.tileDragOriginal.inner, dx, dy, workspaceImage.naturalWidth, workspaceImage.naturalHeight) } : {}) }
   scheduleAtlasDraw()
 })
 atlasCanvas.addEventListener("pointerup", (event) => {
   if (atlasCanvas.hasPointerCapture(event.pointerId)) atlasCanvas.releasePointerCapture(event.pointerId)
-  tileResizeCorner = undefined
-  tileDragOriginal = undefined
-  if (tileDragStart && drawingTile) {
-    tileDraft = boundedTileRect(tileDragStart, atlasPoint(event), workspaceImage.naturalWidth, workspaceImage.naturalHeight)
-    const source = tileDraft
+  appState.tileResizeCorner = undefined
+  appState.tileDragOriginal = undefined
+  if (appState.tileDragStart && appState.drawingTile) {
+    appState.tileDraft = boundedTileRect(appState.tileDragStart, atlasPoint(event), workspaceImage.naturalWidth, workspaceImage.naturalHeight)
+    const source = appState.tileDraft
     setDrawingTile(false)
-    if (source) commitTile({ index: nextTileIndex(tileDocument), source })
+    if (source) commitTile({ index: nextTileIndex(appState.tileDocument), source })
     return
   }
-  if (movingTile) {
-    const moved = movingTile
-    movingTile = undefined
-    moveStart = undefined
-    moveSource = undefined
+  if (appState.movingTile) {
+    const moved = appState.movingTile
+    appState.movingTile = undefined
+    appState.moveStart = undefined
+    appState.moveSource = undefined
     commitTile(moved)
   }
 })
 atlasCanvas.addEventListener("pointercancel", () => {
-  tileResizeCorner = undefined
-  tileDragOriginal = undefined
+  appState.tileResizeCorner = undefined
+  appState.tileDragOriginal = undefined
   setDrawingTile(false)
-  movingTile = undefined
-  moveStart = undefined
-  moveSource = undefined
+  appState.movingTile = undefined
+  appState.moveStart = undefined
+  appState.moveSource = undefined
   drawAtlas()
 })
 for (const field of [...tileSourceFields, ...tileInnerFields]) {
@@ -11537,27 +11232,27 @@ function resourceRootPath(): string {
 }
 
 function currentLayoutDocument(): IniDocument | undefined {
-  if (!archive || archive.format === "bda") return
-  if (archive.isText(layoutPath)) return IniDocument.parse(archive.getText(layoutPath))
+  if (!appState.archive || appState.archive.format === "bda") return
+  if (appState.archive.isText(appState.layoutPath)) return IniDocument.parse(appState.archive.getText(appState.layoutPath))
   const path = currentConfigPath(layout.value)
-  return archive.isText(path) ? IniDocument.parse(archive.getText(path)) : layoutDocument
+  return appState.archive.isText(path) ? IniDocument.parse(appState.archive.getText(path)) : appState.layoutDocument
 }
 
 function currentStyleDocument(): IniDocument | undefined {
   const path = styleConfigPath()
-  return archive?.isText(path) ? IniDocument.parse(archive.getText(path)) : undefined
+  return appState.archive?.isText(path) ? IniDocument.parse(appState.archive.getText(path)) : undefined
 }
 
 function currentGenDocument(): IniDocument | undefined {
   const path = genConfigPath()
-  return archive?.isText(path) ? IniDocument.parse(archive.getText(path)) : undefined
+  return appState.archive?.isText(path) ? IniDocument.parse(appState.archive.getText(path)) : undefined
 }
 
 function nextResourceBase(): string {
   const root = resourceRootPath()
   let base = `${root}/replace_image`
   let suffix = 2
-  while (archive?.names().some((path) => path === `${base}.png` || path === `${base}.til`)) {
+  while (appState.archive?.names().some((path) => path === `${base}.png` || path === `${base}.til`)) {
     base = `${root}/replace_image${suffix}`
     suffix += 1
   }
@@ -11565,61 +11260,61 @@ function nextResourceBase(): string {
 }
 
 function updateLayoutImageForm(): void {
-  const hasImage = layoutImageWidth > 0 && layoutImageHeight > 0
+  const hasImage = appState.layoutImageWidth > 0 && appState.layoutImageHeight > 0
   layoutImageSize.textContent = hasImage
-    ? `${layoutImageWidth} × ${layoutImageHeight} · 点击可更换`
+    ? `${appState.layoutImageWidth} × ${appState.layoutImageHeight} · 点击可更换`
     : "支持 PNG · 也可以直接拖到画布"
   layoutImagePreview.hidden = !hasImage
   layoutImageFileLabel.hidden = hasImage
   layoutImageFile.classList.toggle("has-image", hasImage)
   layoutImageApply.disabled =
-    !archive || archive.format === "bda" || !hasImage || !layoutImageTarget || layoutImageApplying
+    !appState.archive || appState.archive.format === "bda" || !hasImage || !appState.layoutImageTarget || appState.layoutImageApplying
 }
 
 function setLayoutImageHighlight(active: boolean): void {
-  if (layoutImageHighlight === active) return
-  layoutImageHighlight = active
+  if (appState.layoutImageHighlight === active) return
+  appState.layoutImageHighlight = active
   canvasWrap.classList.toggle("layout-image-target", active)
 }
 
 function openLayoutImageDialog(): void {
-  if (!archive || archive.format === "bda") return
+  if (!appState.archive || appState.archive.format === "bda") return
   const layout = currentLayoutDocument()
   const styles = currentStyleDocument()
   if (!layout || !styles) return
   const themeLabel = theme.value === "dark" ? "深色" : "浅色"
   const orientationLabel = orientation.value === "land" ? "横屏" : "竖屏"
-  layoutImageLayout.textContent = `当前布局：${layoutPath.split("/").pop() ?? "布局"}（${themeLabel} · ${orientationLabel}）`
-  layoutImageScope.textContent = selectedKeySections.length
-    ? `已选中 ${selectedKeySections.length} 个按键，将只替换这些按键。`
+  layoutImageLayout.textContent = `当前布局：${appState.layoutPath.split("/").pop() ?? "布局"}（${themeLabel} · ${orientationLabel}）`
+  layoutImageScope.textContent = appState.selectedKeySections.length
+    ? `已选中 ${appState.selectedKeySections.length} 个按键，将只替换这些按键。`
     : "未选中按键，将替换当前布局的全部按键。"
   layoutImageError.hidden = true
   layoutImageError.textContent = ""
-  if (!layoutImageTarget) {
-    layoutImageTarget = selectedKeySections.length ? "key-normal" : "panel"
-    layoutImageTargetInputs.find((input) => input.value === layoutImageTarget)!.checked = true
+  if (!appState.layoutImageTarget) {
+    appState.layoutImageTarget = appState.selectedKeySections.length ? "key-normal" : "panel"
+    layoutImageTargetInputs.find((input) => input.value === appState.layoutImageTarget)!.checked = true
   }
   syncLayoutImageConfig()
   updateLayoutImageForm()
   layoutImageDialog.showModal()
   // 选择器必须在 showModal 之后触发，否则部分 WebView（含 Tauri）不会弹出系统文件框。
-  if (!layoutImageBytes) layoutImageFile.click()
+  if (!appState.layoutImageBytes) layoutImageFile.click()
 }
 
 function setLayoutImageBytes(bytes: Uint8Array): void {
-  if (layoutImageObjectURL) URL.revokeObjectURL(layoutImageObjectURL)
-  layoutImageObjectURL = URL.createObjectURL(new Blob([new Uint8Array(bytes).buffer], { type: "image/png" }))
-  layoutImageBytes = bytes
-  layoutImageWidth = 0
-  layoutImageHeight = 0
-  layoutImagePreview.src = layoutImageObjectURL
+  if (appState.layoutImageObjectURL) URL.revokeObjectURL(appState.layoutImageObjectURL)
+  appState.layoutImageObjectURL = URL.createObjectURL(new Blob([new Uint8Array(bytes).buffer], { type: "image/png" }))
+  appState.layoutImageBytes = bytes
+  appState.layoutImageWidth = 0
+  appState.layoutImageHeight = 0
+  layoutImagePreview.src = appState.layoutImageObjectURL
   layoutImageError.hidden = true
   layoutImageError.textContent = ""
   updateLayoutImageForm()
   const image = new Image()
   image.onload = () => {
-    layoutImageWidth = image.naturalWidth
-    layoutImageHeight = image.naturalHeight
+    appState.layoutImageWidth = image.naturalWidth
+    appState.layoutImageHeight = image.naturalHeight
     updateLayoutImageForm()
   }
   image.onerror = () => {
@@ -11627,7 +11322,7 @@ function setLayoutImageBytes(bytes: Uint8Array): void {
     layoutImageError.hidden = false
     updateLayoutImageForm()
   }
-  image.src = layoutImageObjectURL
+  image.src = appState.layoutImageObjectURL
 }
 
 function layoutImageTargetLabel(target: LayoutImageTarget): string {
@@ -11642,8 +11337,8 @@ function layoutImageTargetLabel(target: LayoutImageTarget): string {
 }
 
 async function applyLayoutImage(): Promise<void> {
-  if (layoutImageApplying) return
-  layoutImageApplying = true
+  if (appState.layoutImageApplying) return
+  appState.layoutImageApplying = true
   layoutImageApply.textContent = "正在应用…"
   updateLayoutImageForm()
   try {
@@ -11652,7 +11347,7 @@ async function applyLayoutImage(): Promise<void> {
     layoutImageError.textContent = `替换失败：${error instanceof Error ? error.message : String(error)}`
     layoutImageError.hidden = false
   } finally {
-    layoutImageApplying = false
+    appState.layoutImageApplying = false
     layoutImageApply.textContent = "应用替换"
     updateLayoutImageForm()
   }
@@ -11662,21 +11357,21 @@ async function runLayoutImageReplace(): Promise<void> {
   const layout = currentLayoutDocument()
   const styles = currentStyleDocument()
   const gen = currentGenDocument()
-  if (!archive || !layout || !styles || !gen || !layoutImageBytes || !layoutImageTarget) return
+  if (!appState.archive || !layout || !styles || !gen || !appState.layoutImageBytes || !appState.layoutImageTarget) return
   // 每次都从最初选中的图片开始切片；复用上一次缩放后的字节会逐次降采样。
-  let source = layoutImageBytes
-  let sourceWidth = layoutImageWidth
-  let sourceHeight = layoutImageHeight
-  if (layoutImageTarget === "panel" && selectedKeySections.length) {
+  let source = appState.layoutImageBytes
+  let sourceWidth = appState.layoutImageWidth
+  let sourceHeight = appState.layoutImageHeight
+  if (appState.layoutImageTarget === "panel" && appState.selectedKeySections.length) {
     layoutImageError.textContent = "键盘背景替换作用于整个布局，请先取消按键选择。"
     layoutImageError.hidden = false
     return
   }
   const panel = resolvePanelConfig(layout, gen, styles)
-  const alphaMode = archive.format === "bds" ? 1 : 2
-  if (layoutImageTarget === "candidate") {
+  const alphaMode = appState.archive.format === "bds" ? 1 : 2
+  if (appState.layoutImageTarget === "candidate") {
     const candPath = toolbarConfigPath()
-    const cand = candPath && archive.isText(candPath) ? IniDocument.parse(archive.getText(candPath)) : undefined
+    const cand = candPath && appState.archive.isText(candPath) ? IniDocument.parse(appState.archive.getText(candPath)) : undefined
     if (!candPath || !cand) {
       layoutImageError.textContent = "当前主题未找到候选栏配置文件。"
       layoutImageError.hidden = false
@@ -11687,7 +11382,7 @@ async function runLayoutImageReplace(): Promise<void> {
       source = await fitPngTo(source, candidateRect.width, candidateRect.height)
     }
     const base = nextResourceBase()
-    const plan = planLayoutImage(layoutImageTarget, [], IniDocument.parse(""), candidateRect.width, candidateRect.height)
+    const plan = planLayoutImage(appState.layoutImageTarget, [], IniDocument.parse(""), candidateRect.width, candidateRect.height)
     const tilesBytes = layoutImageTileBytes(plan, alphaMode)
     const stylesDoc = IniDocument.parse(styles.toString())
     const candDoc = IniDocument.parse(cand.toString())
@@ -11696,29 +11391,29 @@ async function runLayoutImageReplace(): Promise<void> {
     const tilPath = `${base}.til`
     const stylePath = styleConfigPath()
     commitBatch([
-      { kind: "bytes", path: pngPath, before: archive.getBytes(pngPath), after: source },
-      { kind: "bytes", path: tilPath, before: archive.getBytes(tilPath), after: tilesBytes },
+      { kind: "bytes", path: pngPath, before: appState.archive.getBytes(pngPath), after: source },
+      { kind: "bytes", path: tilPath, before: appState.archive.getBytes(tilPath), after: tilesBytes },
       { kind: "text", path: candPath, before: cand.toString(), after: candDoc.toString() },
       { kind: "text", path: stylePath, before: styles.toString(), after: stylesDoc.toString() },
     ])
     layoutImageDialog.close()
-    if (selectedPath === candPath) {
-      selectedDocument = candDoc
+    if (appState.selectedPath === candPath) {
+      appState.selectedDocument = candDoc
       setSourceValue(candDoc.toString())
     }
     renderFiles()
     selectFile(candPath)
     refreshPreview()
     updateDirty()
-    showStatus(`已应用「${layoutImageTargetLabel(layoutImageTarget)}」替换`)
+    showStatus(`已应用「${layoutImageTargetLabel(appState.layoutImageTarget)}」替换`)
     return
   }
-  const keys = layoutKeyRects(layout, selectedKeySections, [panel.width, panel.height])
+  const keys = layoutKeyRects(layout, appState.selectedKeySections, [panel.width, panel.height])
   const layoutDoc = IniDocument.parse(layout.toString())
   let plan: LayoutImagePlan
-  if (layoutImageConfig === "none" || layoutImageTarget === "panel") {
+  if (appState.layoutImageConfig === "none" || appState.layoutImageTarget === "panel") {
     // 布局配置仅对按键类目标生效，面板替换始终按整图处理
-    if (layoutImageTarget !== "panel") {
+    if (appState.layoutImageTarget !== "panel") {
       const rectError = validateKeyRects(keys, panel.width, panel.height)
       if (rectError) {
         layoutImageError.textContent = rectError
@@ -11731,7 +11426,7 @@ async function runLayoutImageReplace(): Promise<void> {
       sourceWidth = panel.width
       sourceHeight = panel.height
     }
-    plan = planLayoutImage(layoutImageTarget, keys, IniDocument.parse(""), panel.width, panel.height)
+    plan = planLayoutImage(appState.layoutImageTarget, keys, IniDocument.parse(""), panel.width, panel.height)
   } else {
     // 图片跟随布局 / 布局跟随图片：按图片空白检测按键网格，切片源取自图片
     const scan = await decodePngMask(source)
@@ -11741,7 +11436,7 @@ async function runLayoutImageReplace(): Promise<void> {
       layoutImageError.hidden = false
       return
     }
-    if (layoutImageConfig === "image-follows-layout" && cells.length === 1 && keys.length) {
+    if (appState.layoutImageConfig === "image-follows-layout" && cells.length === 1 && keys.length) {
       const maxWidth = Math.max(...keys.map(({ rect }) => rect[2]))
       const maxHeight = Math.max(...keys.map(({ rect }) => rect[3]))
       const scale = Math.min(1, maxWidth / scan.width, maxHeight / scan.height)
@@ -11759,36 +11454,36 @@ async function runLayoutImageReplace(): Promise<void> {
         ])
       }
     }
-    const matchedKeys = layoutImageConfig === "layout-follows-image"
+    const matchedKeys = appState.layoutImageConfig === "layout-follows-image"
       ? matchLayoutKeysToCells(layoutDoc, keys, cells)
       : keys
-    plan = planLayoutImageSlices(layoutImageTarget, matchedKeys, cells, IniDocument.parse(""))
+    plan = planLayoutImageSlices(appState.layoutImageTarget, matchedKeys, cells, IniDocument.parse(""))
     sourceWidth = scan.width
     sourceHeight = scan.height
   }
   const base = nextResourceBase()
   const tilesBytes = layoutImageTileBytes(plan, alphaMode)
   const stylesDoc = IniDocument.parse(styles.toString())
-  if (layoutImageConfig === "layout-follows-image" && layoutImageTarget !== "panel") {
+  if (appState.layoutImageConfig === "layout-follows-image" && appState.layoutImageTarget !== "panel") {
     // 布局跟随图片：把按键矩形与面板尺寸改写为图片网格
     applyLayoutImageRects(layoutDoc, plan.keys, plan.slices.map((slice) => slice.source), sourceWidth, sourceHeight)
   }
-  applyLayoutImageStyles(layoutImageTarget, layoutDoc, stylesDoc, plan, base.split("/").pop()!)
+  applyLayoutImageStyles(appState.layoutImageTarget, layoutDoc, stylesDoc, plan, base.split("/").pop()!)
   normalizeKeySections(layoutDoc)
   const pngPath = `${base}.png`
   const tilPath = `${base}.til`
-  const targetPath = layoutPath
+  const targetPath = appState.layoutPath
   const stylePath = styleConfigPath()
   commitBatch([
-    { kind: "bytes", path: pngPath, before: archive.getBytes(pngPath), after: source },
-    { kind: "bytes", path: tilPath, before: archive.getBytes(tilPath), after: tilesBytes },
+    { kind: "bytes", path: pngPath, before: appState.archive.getBytes(pngPath), after: source },
+    { kind: "bytes", path: tilPath, before: appState.archive.getBytes(tilPath), after: tilesBytes },
     { kind: "text", path: targetPath, before: layout.toString(), after: layoutDoc.toString() },
     { kind: "text", path: stylePath, before: styles.toString(), after: stylesDoc.toString() },
   ])
-  layoutDocument = layoutDoc
+  appState.layoutDocument = layoutDoc
   layoutImageDialog.close()
-  if (selectedPath === targetPath) {
-    selectedDocument = layoutDoc
+  if (appState.selectedPath === targetPath) {
+    appState.selectedDocument = layoutDoc
     setSourceValue(layoutDoc.toString())
   }
   renderFiles()
@@ -11796,7 +11491,7 @@ async function runLayoutImageReplace(): Promise<void> {
   refreshPreview()
   populateKeyInspector()
   updateDirty()
-  showStatus(`已应用「${layoutImageTargetLabel(layoutImageTarget)}」替换`)
+  showStatus(`已应用「${layoutImageTargetLabel(appState.layoutImageTarget)}」替换`)
 }
 
 replaceLayoutImageButton.addEventListener("click", openLayoutImageDialog)
@@ -11817,12 +11512,10 @@ layoutImageOpen.addEventListener("change", () => {
   acceptLayoutImageFile(layoutImageOpen.files?.[0])
   layoutImageOpen.value = ""
 })
-// 投放区：拖入 PNG 与点击选择等价；同时拦掉浏览器直接打开文件的默认行为。
-let layoutImageDragDepth = 0
 layoutImageFile.addEventListener("dragenter", (event) => {
   if (!event.dataTransfer?.types.includes("Files")) return
   event.preventDefault()
-  layoutImageDragDepth += 1
+  appState.layoutImageDragDepth += 1
   layoutImageFile.classList.add("drop-target")
 })
 layoutImageFile.addEventListener("dragover", (event) => {
@@ -11831,13 +11524,13 @@ layoutImageFile.addEventListener("dragover", (event) => {
   event.dataTransfer.dropEffect = "copy"
 })
 layoutImageFile.addEventListener("dragleave", () => {
-  layoutImageDragDepth = Math.max(0, layoutImageDragDepth - 1)
-  if (!layoutImageDragDepth) layoutImageFile.classList.remove("drop-target")
+  appState.layoutImageDragDepth = Math.max(0, appState.layoutImageDragDepth - 1)
+  if (!appState.layoutImageDragDepth) layoutImageFile.classList.remove("drop-target")
 })
 layoutImageFile.addEventListener("drop", (event) => {
   if (!event.dataTransfer?.types.includes("Files")) return
   event.preventDefault()
-  layoutImageDragDepth = 0
+  appState.layoutImageDragDepth = 0
   layoutImageFile.classList.remove("drop-target")
   acceptLayoutImageFile(event.dataTransfer.files[0])
 })
@@ -11849,13 +11542,13 @@ layoutImageDialog.addEventListener("drop", (event) => {
 })
 for (const input of layoutImageTargetInputs) {
   input.addEventListener("change", () => {
-    layoutImageTarget = input.value as LayoutImageTarget
-    layoutImageScope.textContent = layoutImageTarget === "panel"
+    appState.layoutImageTarget = input.value as LayoutImageTarget
+    layoutImageScope.textContent = appState.layoutImageTarget === "panel"
       ? "替换当前布局的完整背景。"
-      : layoutImageTarget === "candidate"
+      : appState.layoutImageTarget === "candidate"
         ? "替换当前主题候选栏的背景图片。"
-        : selectedKeySections.length
-        ? `已选中 ${selectedKeySections.length} 个按键，将只替换这些按键。`
+        : appState.selectedKeySections.length
+        ? `已选中 ${appState.selectedKeySections.length} 个按键，将只替换这些按键。`
         : "未选中按键，将替换当前布局的全部按键。"
     layoutImageError.hidden = true
     layoutImageError.textContent = ""
@@ -11870,17 +11563,17 @@ const layoutImageConfigDescriptions: Record<LayoutImageConfig, string> = {
 }
 function syncLayoutImageConfig(): void {
   for (const button of layoutImageConfigButtons) {
-    button.classList.toggle("active", button.dataset.layoutImageConfig === layoutImageConfig)
+    button.classList.toggle("active", button.dataset.layoutImageConfig === appState.layoutImageConfig)
   }
-  layoutImageConfigDesc.textContent = layoutImageConfigDescriptions[layoutImageConfig]
-  layoutImageConfigFieldset.disabled = layoutImageTarget === "panel" || layoutImageTarget === "candidate"
+  layoutImageConfigDesc.textContent = layoutImageConfigDescriptions[appState.layoutImageConfig]
+  layoutImageConfigFieldset.disabled = appState.layoutImageTarget === "panel" || appState.layoutImageTarget === "candidate"
 }
 for (const button of layoutImageConfigButtons) {
   button.addEventListener("click", () => {
     if (layoutImageConfigFieldset.disabled) return
     const value = button.dataset.layoutImageConfig as LayoutImageConfig
-    if (value === layoutImageConfig) return
-    layoutImageConfig = value
+    if (value === appState.layoutImageConfig) return
+    appState.layoutImageConfig = value
     syncLayoutImageConfig()
   })
 }
@@ -11904,19 +11597,19 @@ panelScaleForm.addEventListener("submit", (event) => {
   void runFileOperation("复制面板", copyPanel)
 })
 function syncCandidateSelection(): void {
-  const selected = selectedCandidate && archive?.format === "bda" && selectedPath === layoutPath
-    || archive?.format !== "bda" && isToolbarPath(selectedPath) && !selectedToolbarSections.length
+  const selected = appState.selectedCandidate && appState.archive?.format === "bda" && appState.selectedPath === appState.layoutPath
+    || appState.archive?.format !== "bda" && isToolbarPath(appState.selectedPath) && !appState.selectedToolbarSections.length
   candidateArea.classList.toggle("candidate-selected", selected)
   candidateArea.setAttribute("aria-selected", String(selected))
 }
 
 candidateArea.addEventListener("click", (event) => {
   if (!isEditing()) return
-  if (event.target === toolbarCanvas && selectedToolbarSections.length) return
-  if (archive?.format === "bda") {
-    if (selectedPath !== layoutPath) selectFile(layoutPath, "overview")
-    selectedCandidate = true
-    selectedKeySections = []
+  if (event.target === toolbarCanvas && appState.selectedToolbarSections.length) return
+  if (appState.archive?.format === "bda") {
+    if (appState.selectedPath !== appState.layoutPath) selectFile(appState.layoutPath, "overview")
+    appState.selectedCandidate = true
+    appState.selectedKeySections = []
     preview.setSelected([])
     syncCandidateSelection()
     populateKeyInspector()
@@ -11929,22 +11622,22 @@ candidateArea.addEventListener("click", (event) => {
   if (path) selectFile(path)
 })
 bindSlicePickerZoom(styleImagePicker, styleImagePickerCanvas, (factor) => {
-  pickerZoom = Math.min(MAX_SLICE_ZOOM, Math.max(MIN_SLICE_ZOOM, pickerZoom * factor))
+  appState.pickerZoom = Math.min(MAX_SLICE_ZOOM, Math.max(MIN_SLICE_ZOOM, appState.pickerZoom * factor))
   drawImageSlicePicker()
 })
 styleImagePickerCanvas.addEventListener("click", (event) => {
   if (!isEditing()) return
-  if (!pickerImage || !pickerTarget) return
+  if (!appState.pickerImage || !appState.pickerTarget) return
   const bounds = styleImagePickerCanvas.getBoundingClientRect()
   const point = {
     x: ((event.clientX - bounds.left) / bounds.width) * styleImagePickerCanvas.width,
     y: ((event.clientY - bounds.top) / bounds.height) * styleImagePickerCanvas.height,
   }
-  const imagePoint = { x: (point.x - pickerOffset.x) / pickerScale, y: (point.y - pickerOffset.y) / pickerScale }
-  const selected = tileSliceAt(pickableSlices(pickerSlices, pickerImage), imagePoint)
+  const imagePoint = { x: (point.x - appState.pickerOffset.x) / appState.pickerScale, y: (point.y - appState.pickerOffset.y) / appState.pickerScale }
+  const selected = tileSliceAt(pickableSlices(appState.pickerSlices, appState.pickerImage), imagePoint)
   if (!selected) return
-  pickerSelectedIndex = selected.index
-  updateSelectedImageReference(pickerTarget, pickerImageReference(selected.index))
+  appState.pickerSelectedIndex = selected.index
+  updateSelectedImageReference(appState.pickerTarget, pickerImageReference(selected.index))
   drawImageSlicePicker()
 })
 styleImageClose.addEventListener("click", clearImageSlicePicker)
@@ -11958,48 +11651,48 @@ styleImageDialog.addEventListener("click", (event) => {
 })
 styleImageResourceOpen.addEventListener("click", openStyleImageResourcePicker)
 styleImageResourceClose.addEventListener("click", () => {
-  if (pickerTarget) closeStyleImageResourcePicker()
+  if (appState.pickerTarget) closeStyleImageResourcePicker()
   else clearImageSlicePicker()
 })
 styleImageResourceSearch.addEventListener("input", renderStyleImageResources)
 
 if (isTauri()) {
   void listen("new-project-ready", () => {
-    nativeProjectWindowReady = true
-    window.clearTimeout(nativeProjectReadyTimer)
-    nativeProjectReadyTimer = undefined
+    appState.nativeProjectWindowReady = true
+    window.clearTimeout(appState.nativeProjectReadyTimer)
+    appState.nativeProjectReadyTimer = undefined
     void WebviewWindow.getByLabel("new-project").then((window) => window?.setFocus())
   })
   void listen<ProjectChoice>("new-project-select", (event) => {
-    newProjectOptions = event.payload
+    appState.newProjectOptions = event.payload
     finishNativeProjectChoice(event.payload.templateID)
   })
   void listen("new-project-cancel", () => finishNativeProjectChoice())
   void listen("picker-window-ready", () => {
-    if (pickerRequestedView === "list") void emitTo("image-picker", "image-picker-show-list")
-    else if (pickerRequestedView === "styles") void emitStyleLibrary()
-    else if (nativeImagePickerPayload) void emitTo("image-picker", "image-picker-data", nativeImagePickerPayload)
+    if (appState.pickerRequestedView === "list") void emitTo("image-picker", "image-picker-show-list")
+    else if (appState.pickerRequestedView === "styles") void emitStyleLibrary()
+    else if (appState.nativeImagePickerPayload) void emitTo("image-picker", "image-picker-data", appState.nativeImagePickerPayload)
   })
   void listen<{ index: number }>("image-picker-select", (event) => {
-    if (!isEditing() || !pickerTarget) return
+    if (!isEditing() || !appState.pickerTarget) return
     const { index } = event.payload
-    if (index === WHOLE_IMAGE_INDEX ? pickerSlices.length : !pickerSlices.some((slice) => slice.index === index)) return
-    pickerSelectedIndex = index
-    updateSelectedImageReference(pickerTarget, pickerImageReference(index))
+    if (index === WHOLE_IMAGE_INDEX ? appState.pickerSlices.length : !appState.pickerSlices.some((slice) => slice.index === index)) return
+    appState.pickerSelectedIndex = index
+    updateSelectedImageReference(appState.pickerTarget, pickerImageReference(index))
   })
   // 切片窗口返回「全部样式」：留在同一个窗口里切视图。
   void listen("image-picker-back-styles", () => void emitStyleLibrary(true))
   void listen<{ styleID?: string; imagePath?: string }>("style-library-apply", (event) => {
-    styleLibrarySelected = event.payload
+    appState.styleLibrarySelected = event.payload
     applyStyleLibrarySelection()
   })
   void listen<{ styleID?: string; imagePath?: string }>("style-library-edit", (event) => {
-    styleLibrarySelected = event.payload
+    appState.styleLibrarySelected = event.payload
     editStyleLibrarySelection()
   })
   void listen("style-library-add", addStyleFromLibrary)
   void listen<{ filename: string }>("style-library-play", (event) => {
-    const path = soundPathForFilename(archive?.names() ?? [], theme.value, orientation.value, event.payload.filename)
+    const path = soundPathForFilename(appState.archive?.names() ?? [], theme.value, orientation.value, event.payload.filename)
     if (path) playSoundPath(path)
   })
   void listen("image-picker-resources-request", () => {
@@ -12058,7 +11751,7 @@ function showNewStyleError(text: string): void {
 }
 
 styleAddButton.addEventListener("click", () => {
-  if (!archive?.isText(styleConfigPath()) || !isEditing()) return
+  if (!appState.archive?.isText(styleConfigPath()) || !isEditing()) return
   newStyleID.value = nextStyleID()
   showNewStyleError("")
   newStyleDialog.showModal()
@@ -12078,8 +11771,8 @@ newStyleForm.addEventListener("submit", (event) => {
     return
   }
   const path = styleConfigPath()
-  if (!archive?.isText(path)) return
-  const stylesDocument = IniDocument.parse(archive.getText(path))
+  if (!appState.archive?.isText(path)) return
+  const stylesDocument = IniDocument.parse(appState.archive.getText(path))
   const before = stylesDocument.toString()
   stylesDocument.appendSection(`STYLE${styleID}`, [])
   const currentMax = Number(stylesDocument.get("GLOBAL", "STYLE_NUM") ?? -1)
@@ -12087,7 +11780,7 @@ newStyleForm.addEventListener("submit", (event) => {
   if (!Number.isFinite(currentMax) || numericID > currentMax) stylesDocument.set("GLOBAL", "STYLE_NUM", styleID)
   commitText(path, before, stylesDocument.toString())
   setSourceValue(stylesDocument.toString())
-  const applyTarget = newStyleApplyTarget
+  const applyTarget = appState.newStyleApplyTarget
   newStyleDialog.close()
   // 检查器缩略图传入的是行内克隆输入框（未挂载），只看是否可编辑。
   if (applyTarget && !applyTarget.disabled) {
@@ -12099,34 +11792,31 @@ newStyleForm.addEventListener("submit", (event) => {
     updateDirty()
     return
   }
-  selectedResourceGalleryPath = `STYLE${styleID}`
+  appState.selectedResourceGalleryPath = `STYLE${styleID}`
   selectStyleResource(styleID)
   refreshPreview()
   updateDirty()
 })
 
-// Resource image actions
-let selectedResourceGalleryPath = ""
-
-atlasWorkspace = createAtlasWorkspace({
-  back: () => selectFile(layoutPath || currentConfigPath(layout.value)),
+appState.atlasWorkspace = createAtlasWorkspace({
+  back: () => selectFile(appState.layoutPath || currentConfigPath(layout.value)),
   autoSlice: () => { void autoSliceSelectedImage() },
-  guides: () => setGuidesVisible(!guidesVisible),
+  guides: () => setGuidesVisible(!appState.guidesVisible),
   redraw: () => drawAtlas(),
   stretch: enabled => {
-    const slice = slices.find(item => item.index === selectedTileIndex)
-    if (!slice || !isEditing() || archive?.format === "bda") return
+    const slice = appState.slices.find(item => item.index === appState.selectedTileIndex)
+    if (!slice || !isEditing() || appState.archive?.format === "bda") return
     const [x, y, width, height] = slice.source
     const left = Math.floor(width / 4), top = Math.floor(height / 4)
     commitTile({ index: slice.index, source: slice.source, ...(enabled ? { inner: [x + left, y + top, width - left * 2, height - top * 2] as TileRect } : {}) })
   },
   copy: () => {
-    if (!archive || !selectedResourcePath || !isEditing()) return
-    const base = selectedResourcePath.replace(/\.png$/i, "")
+    if (!appState.archive || !appState.selectedResourcePath || !isEditing()) return
+    const base = appState.selectedResourcePath.replace(/\.png$/i, "")
     let target = `${base}_copy`
-    for (let index = 2; archive.getBytes(`${target}.png`) || archive.getBytes(`${target}.til`); index++) target = `${base}_copy${index}`
+    for (let index = 2; appState.archive.getBytes(`${target}.png`) || appState.archive.getBytes(`${target}.til`); index++) target = `${base}_copy${index}`
     const changes: Change[] = ["png", "til"].flatMap(extension => {
-      const bytes = archive!.getBytes(`${base}.${extension}`)
+      const bytes = appState.archive!.getBytes(`${base}.${extension}`)
       return bytes ? [{ kind: "bytes" as const, path: `${target}.${extension}`, after: bytes.slice() }] : []
     })
     commitBatch(changes)
@@ -12135,21 +11825,21 @@ atlasWorkspace = createAtlasWorkspace({
     updateDirty()
   },
   create: (name, width, height) => {
-    if (!archive || !isEditing()) return
+    if (!appState.archive || !isEditing()) return
     if (!/^[^\\/:*?"<>|]+\.png$/i.test(name) || name.startsWith(".")) { showStatus("请输入有效的 PNG 文件名"); return }
     const size = [width, height]
     if (size.length !== 2 || size.some(n => !Number.isInteger(n) || n < 1 || n > 8192)) { showStatus("图片宽高必须是 1 至 8192 的整数"); return }
-    const base = selectedResourcePath.substring(0, selectedResourcePath.lastIndexOf("/")) || resourceRootPath()
+    const base = appState.selectedResourcePath.substring(0, appState.selectedResourcePath.lastIndexOf("/")) || resourceRootPath()
     const path = `${base}/${name}`
-    if (archive.getBytes(path)) { showStatus("同名图片已存在"); return }
-    const targetArchive = archive
+    if (appState.archive.getBytes(path)) { showStatus("同名图片已存在"); return }
+    const targetArchive = appState.archive
     const canvas = document.createElement("canvas")
     canvas.width = size[0]; canvas.height = size[1]
     canvas.toBlob(blob => {
       if (!blob) return
       void runFileOperation("新建图片", async () => {
         const bytes = new Uint8Array(await blob.arrayBuffer())
-        if (archive !== targetArchive || !isEditing()) return false
+        if (appState.archive !== targetArchive || !isEditing()) return false
         commitBatch([{ kind: "bytes", path, after: bytes }])
         renderResourceInspector()
         selectResourceImage(path)
@@ -12159,9 +11849,9 @@ atlasWorkspace = createAtlasWorkspace({
     }, "image/png")
   },
   import: files => {
-    if (!archive || !isEditing() || !files.length) return
-    const targetArchive = archive
-    const base = selectedResourcePath.substring(0, selectedResourcePath.lastIndexOf("/")) || resourceRootPath()
+    if (!appState.archive || !isEditing() || !files.length) return
+    const targetArchive = appState.archive
+    const base = appState.selectedResourcePath.substring(0, appState.selectedResourcePath.lastIndexOf("/")) || resourceRootPath()
     void runFileOperation("导入图片目录", async () => {
       const changes: Array<Extract<Change, { kind: "bytes" }>> = []
       const paths = new Set<string>()
@@ -12178,7 +11868,7 @@ atlasWorkspace = createAtlasWorkspace({
         }
         changes.push({ kind: "bytes", path, before: targetArchive.getBytes(path)?.slice(), after: bytes })
       }
-      if (archive !== targetArchive || !isEditing()) return false
+      if (appState.archive !== targetArchive || !isEditing()) return false
       if (changes.some(change => change.kind === "bytes" && change.before) && !window.confirm("目录包含已有资源，是否替换？")) return false
       commitBatch(changes)
       renderResourceInspector()
@@ -12191,9 +11881,9 @@ atlasWorkspace = createAtlasWorkspace({
 })
 
 function updateResourceActionButtons(): void {
-  const imageSelected = resourceInspectorMode === "image" && Boolean(selectedResourceGalleryPath)
-  const soundSelected = resourceInspectorMode === "sound"
-    && Boolean(currentSoundEntries().find((entry) => entry.id === selectedSoundID)?.path)
+  const imageSelected = appState.resourceInspectorMode === "image" && Boolean(appState.selectedResourceGalleryPath)
+  const soundSelected = appState.resourceInspectorMode === "sound"
+    && Boolean(currentSoundEntries().find((entry) => entry.id === appState.selectedSoundID)?.path)
   resourceDownloadButton.disabled = !imageSelected && !soundSelected
   resourceDeleteButton.disabled = !imageSelected || !isEditing()
   resourceUploadButton.disabled = !isEditing()
@@ -12201,7 +11891,7 @@ function updateResourceActionButtons(): void {
 }
 
 function selectGalleryItem(path: string, container: HTMLElement): void {
-  selectedResourceGalleryPath = path
+  appState.selectedResourceGalleryPath = path
   for (const item of container.querySelectorAll<HTMLElement>(".resource-item")) {
     item.classList.toggle("selected", item.dataset.path === path)
   }
@@ -12209,30 +11899,30 @@ function selectGalleryItem(path: string, container: HTMLElement): void {
 }
 
 resourceUploadButton.addEventListener("click", () => {
-  if (!archive || !isEditing()) return
+  if (!appState.archive || !isEditing()) return
   resourceUploadInput.value = ""
   resourceUploadInput.click()
 })
 
 async function uploadKeySound(file: File): Promise<boolean> {
-  if (!archive || !isSoundPath(file.name)) throw new Error("按键音效仅支持 OGG、WAV 或 AIFF 文件")
+  if (!appState.archive || !isSoundPath(file.name)) throw new Error("按键音效仅支持 OGG、WAV 或 AIFF 文件")
   if (!isEditing()) return false
-  const targetArchive = archive
+  const targetArchive = appState.archive
   const filename = file.name.split(/[\\/]/).pop() ?? file.name
   const entries = currentSoundEntries()
-  const selected = entries.find((entry) => entry.id === selectedSoundID)
+  const selected = entries.find((entry) => entry.id === appState.selectedSoundID)
   const base = selected?.path.split("/").slice(0, -1).join("/")
-    ?? soundResourcePaths(archive.names(), theme.value, orientation.value)[0]?.split("/").slice(0, -1).join("/")
+    ?? soundResourcePaths(appState.archive.names(), theme.value, orientation.value)[0]?.split("/").slice(0, -1).join("/")
     ?? `${theme.value}/skin/res`
   const targetPath = `${base}/${filename}`
-  const beforeResource = archive.getBytes(targetPath)?.slice()
+  const beforeResource = appState.archive.getBytes(targetPath)?.slice()
   if (beforeResource && targetPath !== selected?.path && !window.confirm(`音效 ${filename} 已存在，是否替换？`)) return false
   const resourceBytes = new Uint8Array(await file.arrayBuffer())
-  if (archive !== targetArchive || !isEditing()) return false
+  if (appState.archive !== targetArchive || !isEditing()) return false
   keySoundBuffers.delete(targetPath)
   releaseKeySound()
   commitBytes(targetPath, beforeResource, resourceBytes)
-  selectedSoundID = `file:${targetPath}`
+  appState.selectedSoundID = `file:${targetPath}`
   renderResourceInspector()
   updateDirty()
   showStatus(`按键音效文件已更新：${filename}`)
@@ -12241,21 +11931,21 @@ async function uploadKeySound(file: File): Promise<boolean> {
 
 resourceUploadInput.addEventListener("change", () => {
   const file = resourceUploadInput.files?.[0]
-  if (!file || !archive || !isEditing()) return
-  if (resourceInspectorMode === "sound") {
+  if (!file || !appState.archive || !isEditing()) return
+  if (appState.resourceInspectorMode === "sound") {
     void runFileOperation("上传按键音效", () => uploadKeySound(file))
     return
   }
-  const targetArchive = archive
+  const targetArchive = appState.archive
   void runFileOperation("上传图片", async () => {
     const bytes = new Uint8Array(await file.arrayBuffer())
     const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }))
     bitmap.close()
-    if (archive !== targetArchive || !isEditing()) return false
-    const paths = resourceImagePaths(archive.names(), theme.value, orientation.value)
+    if (appState.archive !== targetArchive || !isEditing()) return false
+    const paths = resourceImagePaths(appState.archive.names(), theme.value, orientation.value)
     const base = paths[0]?.split("/").slice(0, -1).join("/") ?? `${theme.value}/skin/${orientation.value}/res`
     const targetPath = `${base}/${file.name}`
-    const before = archive.getBytes(targetPath)
+    const before = appState.archive.getBytes(targetPath)
     if (before) {
       if (!window.confirm(`图片 ${file.name} 已存在，是否替换？`)) return false
     }
@@ -12268,38 +11958,38 @@ resourceUploadInput.addEventListener("change", () => {
 })
 
 resourceDownloadButton.addEventListener("click", () => {
-  void runFileOperation(resourceInspectorMode === "sound" ? "下载按键音效" : "下载图片", async () => {
-    if (resourceInspectorMode === "sound") {
-      const entry = currentSoundEntries().find((item) => item.id === selectedSoundID)
-      const bytes = entry?.path ? archive?.getBytes(entry.path) : undefined
+  void runFileOperation(appState.resourceInspectorMode === "sound" ? "下载按键音效" : "下载图片", async () => {
+    if (appState.resourceInspectorMode === "sound") {
+      const entry = currentSoundEntries().find((item) => item.id === appState.selectedSoundID)
+      const bytes = entry?.path ? appState.archive?.getBytes(entry.path) : undefined
       if (!entry?.path || !bytes) return false
       return Boolean(await writeToChosenFile(entry.filename, bytes))
     }
-    if (!archive || !selectedResourceGalleryPath) return false
-    const bytes = archive.getBytes(selectedResourceGalleryPath)
+    if (!appState.archive || !appState.selectedResourceGalleryPath) return false
+    const bytes = appState.archive.getBytes(appState.selectedResourceGalleryPath)
     if (!bytes) return false
     return Boolean(await writeToChosenFile(
-      selectedResourceGalleryPath.split("/").pop() ?? "image.png",
+      appState.selectedResourceGalleryPath.split("/").pop() ?? "image.png",
       bytes,
     ))
   })
 })
 
 resourceDeleteButton.addEventListener("click", () => {
-  if (!archive || !selectedResourceGalleryPath || !isEditing()) return
-  const name = selectedResourceGalleryPath.split("/").pop() ?? selectedResourceGalleryPath
+  if (!appState.archive || !appState.selectedResourceGalleryPath || !isEditing()) return
+  const name = appState.selectedResourceGalleryPath.split("/").pop() ?? appState.selectedResourceGalleryPath
   if (!window.confirm(`确定要删除图片 ${name} 吗？此操作可撤销。`)) return
-  const before = archive.getBytes(selectedResourceGalleryPath)
+  const before = appState.archive.getBytes(appState.selectedResourceGalleryPath)
   if (!before) return
-  commitBatch([{ kind: "bytes", path: selectedResourceGalleryPath, before }])
-  if (selectedResourcePath === selectedResourceGalleryPath) {
-    selectedResourcePath = ""
-    slices = []
-    selectedTileIndex = undefined
+  commitBatch([{ kind: "bytes", path: appState.selectedResourceGalleryPath, before }])
+  if (appState.selectedResourcePath === appState.selectedResourceGalleryPath) {
+    appState.selectedResourcePath = ""
+    appState.slices = []
+    appState.selectedTileIndex = undefined
     resourceDetail.hidden = true
     hideImageWorkspace()
   }
-  selectedResourceGalleryPath = ""
+  appState.selectedResourceGalleryPath = ""
   updateResourceActionButtons()
   renderResourceInspector()
   updateDirty()
@@ -12324,20 +12014,20 @@ window.addEventListener("keydown", (event) => {
   }
   const direction = movement[event.key]
   if (direction) {
-    if (resourceConfigActive && !isTextEditingTarget(event.target)) {
-      if (selectedTileIndex === undefined || !isEditing()) return
+    if (appState.resourceConfigActive && !isTextEditingTarget(event.target)) {
+      if (appState.selectedTileIndex === undefined || !isEditing()) return
       event.preventDefault()
       const distance = event.shiftKey ? 10 : 1
       moveSelectedTile(direction[0] * distance, direction[1] * distance, event.repeat)
       return
     }
-    if (!isEditing() || !selectedKeySections.length || isTextEditingTarget(event.target)) return
+    if (!isEditing() || !appState.selectedKeySections.length || isTextEditingTarget(event.target)) return
     event.preventDefault()
     const distance = event.shiftKey ? 10 : 1
-    moveSelectedKeys(direction[0] * distance, direction[1] * distance, selectedKeySections, event.repeat)
+    moveSelectedKeys(direction[0] * distance, direction[1] * distance, appState.selectedKeySections, event.repeat)
     return
   }
-  if (resourceConfigActive && !isTextEditingTarget(event.target)) {
+  if (appState.resourceConfigActive && !isTextEditingTarget(event.target)) {
     if ((event.key === "Delete" || event.key === "Backspace") && isEditing()) {
       event.preventDefault()
       deleteSelectedTile()
@@ -12345,18 +12035,18 @@ window.addEventListener("keydown", (event) => {
     }
     if (event.metaKey || event.ctrlKey) {
       if (event.key.toLowerCase() === "c") {
-        const existing = slices.find((slice) => slice.index === selectedTileIndex)
+        const existing = appState.slices.find((slice) => slice.index === appState.selectedTileIndex)
         if (existing) {
-          copiedTile = duplicateTileSlice(existing, existing.index)
+          appState.copiedTile = duplicateTileSlice(existing, existing.index)
           event.preventDefault()
         }
         return
       }
-      if (event.key.toLowerCase() === "v" && copiedTile && isEditing()) {
+      if (event.key.toLowerCase() === "v" && appState.copiedTile && isEditing()) {
         event.preventDefault()
-        const index = nextTileIndex(tileDocument)
-        commitTile({ ...copiedTile, index })
-        selectedTileIndex = index
+        const index = nextTileIndex(appState.tileDocument)
+        commitTile({ ...appState.copiedTile, index })
+        appState.selectedTileIndex = index
         populateTileInspector()
         drawAtlas()
         return
@@ -12366,7 +12056,7 @@ window.addEventListener("keydown", (event) => {
   if (
     (event.key === "Delete" || event.key === "Backspace") &&
     isEditing() &&
-    selectedKeySections.length &&
+    appState.selectedKeySections.length &&
     !isTextEditingTarget(event.target)
   ) {
     event.preventDefault()
@@ -12392,12 +12082,12 @@ if (isTauri()) {
   let movingDebounce: ReturnType<typeof setTimeout> | undefined
   void getCurrentWindow().onMoved(() => {
     clearTimeout(movingDebounce)
-    clearTimeout(fitCanvasDebounce)
+    clearTimeout(appState.fitCanvasDebounce)
     movingDebounce = setTimeout(() => { fitCanvasPreview() }, 300)
   })
   // 窗口获得焦点时重新同步材质状态，修复 Windows 10 亚克力材质导致的窗口移动卡顿问题
   void getCurrentWindow().onFocusChanged(({ payload: focused }) => {
-    if (focused && windowMaterial.checked && !windowDragPointerDown && !windowDragMaterialDisabled) {
+    if (focused && windowMaterial.checked && !appState.windowDragPointerDown && !appState.windowDragMaterialDisabled) {
       void applyWindowMaterialWithRetry().catch((error) => handleWindowMaterialError(error, "恢复窗口材质"))
     }
   })
@@ -12439,7 +12129,7 @@ if (isTauri()) {
             return
           }
         }
-        if (folder !== undefined && archive && isEditing()) {
+        if (folder !== undefined && appState.archive && isEditing()) {
           await runFileOperation("上传文件", async () => commitSourceUploads(
             await Promise.all(payload.paths.map(async (path) => ({
               name: path,
@@ -12451,7 +12141,7 @@ if (isTauri()) {
         }
         const pngPath = payload.paths.find((path) => /\.png$/i.test(path))
         if (pngPath) {
-          if (!archive || archive.format === "bda") return
+          if (!appState.archive || appState.archive.format === "bda") return
           const bytes = new Uint8Array(await invoke<ArrayBuffer>("read_file", { path: pngPath }))
           setLayoutImageBytes(bytes)
           openLayoutImageDialog()
@@ -12493,6 +12183,5 @@ void refreshUpdateStatus()
 
 // 检查器外壳：搜索 / 状态作用域 / 常驻动作条 / 分区折叠
 initInspectorShell()
-
 
 const settingsController = initializeSettings(settingsDialog, setGuidesVisible, modelSettings)

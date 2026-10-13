@@ -2,8 +2,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
+import { combinedSource, withAppState } from '../tests/helpers/app-source.mjs'
 
-const source = ts.createSourceFile('main.ts', readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true)
+const source = combinedSource()
 const names = new Set(['renderStyleReferenceRows', 'refreshStyleReferenceThumbnail', 'styleReferenceForeground'])
 const code = source.statements.filter(node => ts.isFunctionDeclaration(node) && names.has(node.name?.text)).map(node => node.getText(source)).join('\n')
 class Element {
@@ -26,7 +27,7 @@ class Element {
 const drawn = []
 let pickerTarget
 const sliceCalls = []
-const context = vm.createContext({
+const context = withAppState(vm.createContext({
   document: { createElement: tag => new Element(tag) },
   retinaThumbnail: canvas => canvas,
   styleReferenceDrawIDs: new WeakMap(),
@@ -44,7 +45,7 @@ const context = vm.createContext({
     sliceCalls.push({ styleID: target.value, key: styleKey, highlighted })
   },
   Event,
-})
+}))
 vm.runInContext(ts.transpile(code, { target: ts.ScriptTarget.ES2022 }), context)
 for (const key of ['FORE_STYLE', 'BACK_STYLE']) {
   const input = new Element('input')

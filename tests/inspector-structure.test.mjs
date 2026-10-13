@@ -2,11 +2,12 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import test from "node:test"
+import { appSource } from "./helpers/app-source.mjs"
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8")
 const html = read("index.html")
 const shell = read("src/inspector-shell.ts")
-const main = read("src/main.ts")
+const main = appSource()
 const pane = html.slice(html.indexOf('<section class="source">'), html.indexOf('<div id="resource-inspector"'))
 
 test("pane header: segmented mode switch above the object header", () => {
@@ -48,5 +49,5 @@ test("sections collapse and remember it; edits can be reset from the object head
   assert.match(shell, /inspector-collapsed-sections/)
   assert.match(shell, /function resetAll/)
   assert.match(shell, /export function setInspectorKind/)
-  assert.match(main, /setInspectorKind\(archive\?\.format === "bda" \? "bda" : archive \? "bds" : ""\)/)
+  assert.match(main, /setInspectorKind\(appState\.archive\?\.format === "bda" \? "bda" : appState\.archive \? "bds" : ""\)/)
 })

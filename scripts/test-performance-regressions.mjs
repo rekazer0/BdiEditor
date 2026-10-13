@@ -3,18 +3,19 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
+import { combinedSource, withAppState } from '../tests/helpers/app-source.mjs'
 
-const source = ts.createSourceFile('main.ts', readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true)
+const source = combinedSource()
 const scheduler = source.statements.find(n => ts.isFunctionDeclaration(n) && n.name?.text === 'scheduleAtlasDraw').getText(source)
 const draw = source.statements.find(n => ts.isFunctionDeclaration(n) && n.name?.text === 'drawAtlas')
 // Run the production scheduling/cancellation with a lightweight draw sink.
 const cancellation = draw.body.statements.slice(0, 2).map(n => n.getText(source)).join('\n')
 const frames = new Map()
 let id = 0
-const context = vm.createContext({
+const context = withAppState(vm.createContext({
   requestAnimationFrame: cb => { frames.set(++id, cb); return id },
   cancelAnimationFrame: id => frames.delete(id),
-})
+}))
 vm.runInContext(ts.transpile(`let atlasDrawFrame = 0; let state = 0; let rendered = []; ${scheduler}
 function drawAtlas() { ${cancellation}; rendered.push(state) }`, { target: ts.ScriptTarget.ES2022 }), context)
 vm.runInContext('for (let i = 1; i <= 100; i++) { state = i; scheduleAtlasDraw() }', context)

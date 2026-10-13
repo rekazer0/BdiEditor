@@ -5,17 +5,8 @@ import vm from 'node:vm'
 import ts from 'typescript'
 import { strToU8, zipSync } from 'fflate'
 import { SkinArchive } from '../src/skin.ts'
+import { appSource, declarations, run } from './helpers/app-source.mjs'
 
-const source = ts.createSourceFile('main.ts', readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true)
-const declarations = (...names) => source.statements
-  .filter(n => (ts.isFunctionDeclaration(n) && names.includes(n.name?.text)) ||
-    (ts.isVariableStatement(n) && n.declarationList.declarations.some(d => names.includes(d.name.getText(source)))))
-  .map(n => n.getText(source)).join('\n')
-const run = (code, globals) => {
-  const context = vm.createContext(globals)
-  vm.runInContext(ts.transpile(code, { target: ts.ScriptTarget.ES2022 }), context)
-  return context
-}
 
 test('key selection paints the canvas before the inspector is rebuilt', async () => {
   const frames = [], timers = [], calls = []

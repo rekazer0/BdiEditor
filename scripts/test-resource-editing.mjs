@@ -7,6 +7,7 @@ import { IniDocument } from '../src/ini.ts'
 import { SkinArchive } from '../src/skin.ts'
 import { boundedTileRect, nextTileIndex, updateTileSlice, removeTileSlice, tileSlices } from '../src/tiles.ts'
 import { applyCandidateImageStyles, applyLayoutImageStyles, planLayoutImage } from '../src/layout-image.ts'
+import { combinedSource, withAppState } from '../tests/helpers/app-source.mjs'
 
 test('new slices reserve IDs even when an existing section has no valid rectangle', () => {
   const doc = IniDocument.parse('[IMG1]\nCUSTOM=keep\n[img02]\nSOURCE_RECT=invalid\n')
@@ -46,13 +47,13 @@ test('panel and candidate image replacement retain the referenced background sty
 })
 
 test('undoing image and sound creation removes new files; redo restores their bytes', async () => {
-  const source = ts.createSourceFile('main.ts', readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true)
+  const source = combinedSource()
   const names = new Set(['commitBytes', 'commitBatch', 'applyChangeSnapshot', 'applyBytesSnapshot', 'uploadKeySound'])
   const code = source.statements.filter(node => ts.isFunctionDeclaration(node) && names.has(node.name?.text)).map(node => node.getText(source)).join('\n')
   const archive = SkinArchive.fromSourceFiles([{ path: 'port/main.ini', data: new TextEncoder().encode('[PANEL]\n') }])
   const originalNames = archive.names()
   const noop = () => {}
-  const context = vm.createContext({ acceptAiDraftPreview: () => {}, recordChange: (stack, change) => stack.push(change), numberInputGesture: () => undefined,
+  const context = withAppState(vm.createContext({ acceptAiDraftPreview: () => {}, recordChange: (stack, change) => stack.push(change), numberInputGesture: () => undefined,
     archive, undoStack: [], redoStack: [], Uint8Array, sourceHistoryHighlight: undefined,
     scheduleSourceAutosave: noop, updateHistoryButtons: noop, refreshBdaLayout: noop,
     refreshPreview: noop, populateKeyInspector: noop, updateDirty: noop,
@@ -60,7 +61,7 @@ test('undoing image and sound creation removes new files; redo restores their by
     isSoundPath: () => true, isEditing: () => true, currentSoundEntries: () => [], soundResourcePaths: () => [],
     theme: { value: 'light' }, orientation: { value: 'port' }, keySoundBuffers: new Map(),
     releaseKeySound: noop, renderResourceInspector: noop, showStatus: noop,
-  })
+  }))
   vm.runInContext(ts.transpile(code, { target: ts.ScriptTarget.ES2022 }), context)
   const checkUndoRedo = () => {
     const saved = archive.sourceFiles()
@@ -105,12 +106,12 @@ test('undoing image and sound creation removes new files; redo restores their by
 })
 
 test('sound upload reports cancellation and does not commit after the editing context changes', async () => {
-  const source = ts.createSourceFile('main.ts', readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true)
+  const source = combinedSource()
   const fn = source.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'uploadKeySound')
   for (const scenario of ['cancel', 'switch archive', 'leave edit mode', 'success']) {
     let editing = true
     let commits = 0
-    const context = vm.createContext({ acceptAiDraftPreview: () => {}, recordChange: (stack, change) => stack.push(change), numberInputGesture: () => undefined,
+    const context = withAppState(vm.createContext({ acceptAiDraftPreview: () => {}, recordChange: (stack, change) => stack.push(change), numberInputGesture: () => undefined,
       archive: { names: () => [], getBytes: () => new Uint8Array([1]) },
       isSoundPath: () => true, isEditing: () => editing,
       currentSoundEntries: () => [], selectedSoundID: '', soundResourcePaths: () => [],
@@ -118,7 +119,7 @@ test('sound upload reports cancellation and does not commit after the editing co
       window: { confirm: () => scenario !== 'cancel' }, Uint8Array,
       keySoundBuffers: new Map(), releaseKeySound: () => {}, commitBytes: () => { commits++ },
       renderResourceInspector: () => {}, updateDirty: () => {}, showStatus: () => {},
-    })
+    }))
     vm.runInContext(ts.transpile(fn.getText(source), { target: ts.ScriptTarget.ES2022 }), context)
     const result = await context.uploadKeySound({ name: 'test.ogg', arrayBuffer: async () => {
       if (scenario === 'switch archive') context.archive = {}
@@ -131,7 +132,7 @@ test('sound upload reports cancellation and does not commit after the editing co
 })
 
 test('asset replacement uses history and autosave, keeps its target, and rejects invalid images', async () => {
-  const source = ts.createSourceFile('main.ts', readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true)
+  const source = combinedSource()
   const listener = source.statements.find(node => ts.isExpressionStatement(node) && ts.isCallExpression(node.expression) && node.expression.expression.getText(source) === 'imageOpen.addEventListener')
   const functions = source.statements.filter(node => ts.isFunctionDeclaration(node) && ['commitBytes', 'applyChangeSnapshot', 'applyBytesSnapshot'].includes(node.name?.text)).map(node => node.getText(source)).join('\n')
   for (const invalid of [false, true]) {
@@ -139,7 +140,7 @@ test('asset replacement uses history and autosave, keeps its target, and rejects
     let handler
     const autosaved = []
     const noop = () => {}
-    const context = vm.createContext({ acceptAiDraftPreview: () => {}, recordChange: (stack, change) => stack.push(change), numberInputGesture: () => undefined,
+    const context = withAppState(vm.createContext({ acceptAiDraftPreview: () => {}, recordChange: (stack, change) => stack.push(change), numberInputGesture: () => undefined,
       archive, selectedPath: 'light/skin/res/a.png', undoStack: [], redoStack: [],
       Uint8Array, Blob, isEditing: () => true, sourceHistoryHighlight: undefined,
       scheduleSourceAutosave: paths => autosaved.push(...paths), updateHistoryButtons: noop,
@@ -151,7 +152,7 @@ test('asset replacement uses history and autosave, keeps its target, and rejects
         context.selectedPath = 'light/skin/res/b.png'
         return new Uint8Array([2]).buffer
       } }] },
-    })
+    }))
     vm.runInContext(ts.transpile(functions + '\n' + listener.getText(source), { target: ts.ScriptTarget.ES2022 }), context)
     if (invalid) {
       await assert.rejects(handler(), /invalid image/)

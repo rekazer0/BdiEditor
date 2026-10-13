@@ -1,11 +1,12 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import test from "node:test"
+import { appSource } from "./helpers/app-source.mjs"
 
 const html = readFileSync(new URL("../picker.html", import.meta.url), "utf8")
 const script = readFileSync(new URL("../src/picker-window.ts", import.meta.url), "utf8")
 const css = readFileSync(new URL("../src/picker.css", import.meta.url), "utf8")
-const main = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8")
+const main = appSource()
 
 test("图片切片窗口把图片名居中，并在其上显示样式名", () => {
   assert.match(html, /<span id="picker-style" hidden><\/span>/)
@@ -43,7 +44,7 @@ test("切片窗口不再提供右侧的选择图片资源按钮", () => {
 test("桌面端样式库在切片窗口内作为原生视图打开，切片返回直接切到全部样式", () => {
   assert.match(main, /if \(isTauri\(\)\) \{\s*void showPickerWindow\("styles", "全部样式"/)
   assert.match(main, /listen\("image-picker-back-styles", \(\) => void emitStyleLibrary\(true\)\)/)
-  assert.match(main, /styleLibrary: Boolean\(stylePickerTarget\),/)
+  assert.match(main, /styleLibrary: Boolean\(appState\.stylePickerTarget\),/)
   assert.match(script, /listen<StyleLibraryPayload>\("style-library-data"/)
   assert.match(html, /<section id="style-library-view"/)
 })

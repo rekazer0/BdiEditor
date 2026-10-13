@@ -1,8 +1,9 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import test from "node:test"
+import { appSource } from "./helpers/app-source.mjs"
 
-const main = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8")
+const main = appSource()
 const previews = readFileSync(new URL("../src/template-preview.ts", import.meta.url), "utf8")
 
 test("startup welcome screen keeps recent skins bounded and template previews lazy", () => {
