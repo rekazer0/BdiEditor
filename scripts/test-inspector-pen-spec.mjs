@@ -33,12 +33,12 @@ test('CSS locks 30px rows and BDS/BDA chips from 属性检查器.pen', () => {
   assert.match(css, /--inspector-hint-size: 9.5px/)
   assert.match(css, /data-inspector-kind="bds"/)
   assert.match(css, /data-inspector-kind="bda"/)
-  // 检查器跟随全局 Pen 色板：选中橙与品牌蓝只在 pen-design-application.css 定义一次。
+  // 检查器跟随全局 Pen 色板：选中橙与品牌蓝只在 tokens.css 定义一次。
   assert.match(css, /--pin-sel: var\(--selection\)/)
-  assert.match(css, /--pin-accent: var\(--pen-accent\)/)
-  assert.match(palette, /--pen-selection: #ff6b2c/)
-  assert.match(palette, /--pen-accent: var\(--accent\)/)
-  assert.match(styles, /--accent: #3a6df0/)
+  assert.match(css, /--pin-accent: var\(--accent\)/)
+  assert.match(palette, /--selection: #ff6b2c/)
+  assert.match(palette, /--accent: #3a6df0/)
+  assert.match(palette, /--accent: #3a6df0/)
   assert.match(css, /\.pin-hint/)
   assert.match(css, /height: 30px !important/)
   assert.match(css, /font: 400 9\.5px\/1 var\(--font-mono\)/)
