@@ -2,10 +2,10 @@
 /* Transparency is UI-only: CSS never paints checker pixels into exported artwork. */
 :root body :is(#style-picker-grid .style-picker-previews, #style-library-preview-image,
   .resource-style-previews, #style-image-picker-canvas) {
-  background-image: var(--checker-image) !important;
-  background-size: var(--checker-size) var(--checker-size) !important;
-  background-color: var(--checker-light) !important;
-  background-position: 0 0, calc(var(--checker-size) / 2) calc(var(--checker-size) / 2) !important;
+  background-image: var(--checker-image);
+  background-size: var(--checker-size) var(--checker-size);
+  background-color: var(--checker-light);
+  background-position: 0 0, calc(var(--checker-size) / 2) calc(var(--checker-size) / 2);
 }
-:root body .source #resource-inspector .resource-style-previews > canvas { background: transparent !important; }
+:root body .source #resource-inspector .resource-style-previews > canvas { background: transparent; }
 

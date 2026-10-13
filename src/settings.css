@@ -1,5 +1,5 @@
 /* bdi.pen · 设置窗口 P6Oksd: 920 × 640, 232px navigation, 52/56px chrome. */
-:root body #settings-dialog { width: min(920px, calc(100vw - 32px)); height: min(640px, calc(100dvh - 32px)); padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--material-panel); color: var(--text); box-shadow: var(--shadow-sm); }
+:root body #settings-dialog { width: min(920px, calc(100vw - 32px)); height: min(640px, calc(100dvh - 32px)); padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--floating); color: var(--text); box-shadow: var(--shadow-sm); }
 :root body #settings-dialog form { display: grid; grid-template-rows: 52px minmax(0, 1fr) 56px; height: 100%; gap: 0; }
 :root body #settings-dialog header { min-height: 0; padding: 0 20px; border-bottom: 1px solid var(--line); }
 :root body #settings-dialog .settings-title-cluster { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -11,8 +11,8 @@
    设置窗口才不会在玻璃界面上留下一列不透明的导航。 */
 :root body #settings-dialog .settings-sidebar { padding: 12px 12px; gap: 2px; border-right: 1px solid var(--line); background: var(--content); overflow-y: auto; }
 :root body #settings-dialog .settings-group-label { padding: 12px 12px 6px; color: var(--tertiary); font: var(--font-size-xs) var(--font-mono); letter-spacing: .5px; }
-:root body #settings-dialog .settings-nav-item { display: flex; align-items: center; flex: 0 0 auto; height: 36px; padding: 0 12px; gap: 8px; font-size: var(--font-size-sm); border-radius: var(--radius-md); box-shadow: none; }
-:root body #settings-dialog .settings-nav-item[hidden], :root body #settings-dialog [hidden] { display: none !important; }
+:root body #settings-dialog .settings-nav-item:not([hidden]) { display: flex; align-items: center; flex: 0 0 auto; height: 36px; padding: 0 12px; gap: 8px; font-size: var(--font-size-sm); border-radius: var(--radius-md); box-shadow: none; }
+:root body #settings-dialog .settings-nav-item[hidden], :root body #settings-dialog [hidden] { display: none; }
 :root body #settings-dialog .settings-nav-item > span:nth-child(2) { white-space: nowrap; }
 :root body #settings-dialog .settings-nav-item small { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tertiary); font-size: var(--font-size-xs); }
 :root body #settings-dialog .settings-nav-item[aria-selected="true"] { border-color: transparent; background: var(--accent-soft); color: var(--accent); font-weight: 500; }
@@ -161,7 +161,7 @@
 
   :root body #settings-dialog .settings-group-label,
   :root body #settings-dialog .settings-nav-item small {
-    display: none !important;
+    display: none;
   } }
 @media (max-width: 760px) {
 

@@ -10761,6 +10761,8 @@ function applyEditorCrosshairSetting(): void {
   const state = editorCrosshair.checked ? "on" : "off"
   deviceShell.dataset.crosshair = state
   previewCoordinates.dataset.crosshair = state
+  preview.setCrosshair(editorCrosshair.checked)
+  toolbarPreview.setCrosshair(editorCrosshair.checked)
   editorCoordinateSnapSetting.hidden = !editorCrosshair.checked
   previewCoordinates.hidden = editorCrosshair.checked
   if (!editorCrosshair.checked) {

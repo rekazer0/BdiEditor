@@ -6,7 +6,7 @@
 .atlas-stretch[hidden] { display: none; }
 .atlas-stretch input { width: 30px; height: 18px; accent-color: var(--accent); }
 .atlas-workspace main { grid-template-columns: 264px minmax(0, 1fr) 4px var(--inspector-width, 360px); }
-.atlas-workspace .sidebar > :not(#resource-list-view) { display: none !important; }
+.atlas-workspace .sidebar > :not(#resource-list-view) { display: none; }
 .atlas-workspace .sidebar { padding: 0; overflow: hidden; }
 .atlas-workspace #resource-list-view { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .atlas-workspace #resource-list-view .inspector-title { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 12px 6px; padding: 12px; margin: 0; border: 0; }
@@ -26,8 +26,8 @@
 .atlas-workspace .resource-item strong { font-size: var(--font-size-xs); font-weight: 500; }
 .atlas-workspace .resource-item small { font-size: var(--font-size-xs); }
 .atlas-workspace .workspace { position: relative; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
-.atlas-workspace .workspace > .preview-toolbar { display: none !important; }
-.atlas-workspace .workspace-status { display: none !important; }
+.atlas-workspace .workspace > .preview-toolbar { display: none; }
+.atlas-workspace .workspace-status { display: none; }
 .atlas-workspace .atlas-header { display: flex; flex-shrink: 0; height: 44px; padding: 0 12px; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); background: var(--material-panel); }
 .atlas-image-title { min-width: 70px; max-width: 180px; flex: 1; display: grid; gap: 2px; }
 .atlas-image-title strong { font-size: var(--font-size-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -1370,6 +1370,7 @@ export class Preview {
   private keys: PreviewItem[] = []
   private mode: "edit" | "preview" = "edit"
   private editTool: "select" | "move" = "select"
+  private crosshair = false
   private pointerInteractionLocked = false
   private renderDeferred = false
   private editDrag?: {
@@ -1924,7 +1925,7 @@ export class Preview {
         }
         event.stopPropagation()
         this.canvas.setPointerCapture(event.pointerId)
-        this.canvas.style.cursor = "grabbing"
+        this.canvas.style.cursor = this.crosshair ? "none" : "grabbing"
       }
       void this.draw()
       return
@@ -2016,7 +2017,6 @@ export class Preview {
       const original = this.editDrag.original.get(key.section)
       if (original) key.rect = { ...original, x: original.x + dx, y: original.y + dy }
     }
-    // 使用 requestAnimationFrame 而不是 scheduleDragDraw，减少拖拽延迟
     if (!this.dragDrawFrame) {
       this.dragDrawFrame = window.requestAnimationFrame(() => {
         this.dragDrawFrame = 0
@@ -2199,16 +2199,13 @@ export class Preview {
   }
 
   private updateCursor(): void {
-    this.canvas.style.cursor = this.mode === "preview" ? "pointer" : this.editTool === "move" ? "grab" : "default"
+    // 编辑模式开着十字光标时，十字线本身就是指针，系统光标隐藏
+    this.canvas.style.cursor = this.mode === "preview" ? "pointer" : this.crosshair ? "none" : this.editTool === "move" ? "grab" : "default"
   }
 
-  // @ts-ignore - 保留以备后用
-  private scheduleDragDraw(): void {
-    if (this.dragDrawFrame) return
-    this.dragDrawFrame = window.requestAnimationFrame(() => {
-      this.dragDrawFrame = 0
-      if (this.editDrag) void this.draw()
-    })
+  setCrosshair(on: boolean): void {
+    this.crosshair = on
+    this.updateCursor()
   }
 
   private cancelDragDraw(): void {

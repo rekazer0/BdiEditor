@@ -72,7 +72,7 @@ canvas {
 
 /* 拖放目标高亮 */
 .source-drop-target {
-  background: color-mix(in srgb, var(--accent) 15%, var(--control)) !important;
+  background: color-mix(in srgb, var(--accent) 15%, var(--control));
   box-shadow:
     inset 0 0 0 2px var(--accent),
     0 2px 8px color-mix(in srgb, var(--accent) 20%, transparent);
@@ -198,13 +198,13 @@ canvas {
 }
 
 :root[data-window-material="off"] * {
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 :root.windows[data-window-material="on"] * {
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 :root.macos[data-window-material="on"] :is(
@@ -880,7 +880,7 @@ h2 {
 }
 
 #skin-state-control[hidden] {
-  display: none !important;
+  display: none;
 }
 
 #skin-state {
@@ -1395,7 +1395,7 @@ body:has(.canvas-wrap.empty) main > :is(.sidebar, .source, .inspector-resize-han
 
 /* 未打开皮肤时没有可撤销、切换或处理的内容，标题栏只保留菜单与名称 */
 body:has(.canvas-wrap.empty) .titlebar :is(.desktop-quick-actions, .mobile-quick-actions, .mode-control) {
-  display: none !important;
+  display: none;
 }
 
 body:has(.canvas-wrap.empty) .preview-toolbar,
@@ -2944,7 +2944,7 @@ body:has(.canvas-wrap.empty) .workspace {
   background: color-mix(in srgb, var(--control) 34%, transparent);
 }
 
-.settings-nav-item {
+.settings-nav-item:not([hidden]) {
   min-width: 0;
   height: 34px;
   display: grid;
@@ -3507,7 +3507,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 #source .cm-selectionBackground,
 #source .cm-content ::selection {
-  background: color-mix(in srgb, var(--accent) 24%, transparent) !important;
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
 }
 
 #source .cm-cursor {
@@ -4011,7 +4011,7 @@ input[type="search"]:focus {
   #skin-state-control {
     position: absolute;
     left: 45px;
-    width: 72px !important;
+    width: 72px;
     flex: none;
     transform: none;
   }
@@ -4187,10 +4187,10 @@ input[type="search"]:focus {
   }
 
   .mobile-command-menu > summary {
-    width: auto !important;
+    width: auto;
     min-width: 68px;
     padding: 0 8px;
-    display: flex !important;
+    display: flex;
     align-items: center;
     gap: 8px;
     border: 1px solid var(--glass-border);
@@ -4217,7 +4217,7 @@ input[type="search"]:focus {
     overscroll-behavior: contain;
   }
 
-  .mobile-command-actions button {
+  .mobile-command-actions button:not([hidden]) {
     min-height: 44px;
     padding: 0 12px;
     display: grid;
@@ -4269,12 +4269,12 @@ input[type="search"]:focus {
 
   .mode-control > select,
   .preview-choice > select {
-    display: none !important;
+    display: none;
   }
 
   .mode-control > .mobile-choice-toggle,
   .mobile-title-choices > .mobile-choice-toggle {
-    display: inline-flex !important;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 34px;
@@ -4384,12 +4384,12 @@ input[type="search"]:focus {
   }
 
   :root[data-mobile-preview-collapsed="true"] :is(aside, .source) {
-    top: 18px !important;
-    height: calc(100% - 18px) !important;
+    top: 18px;
+    height: calc(100% - 18px);
   }
 
   :root[data-mobile-preview-collapsed="true"] .mobile-workspace-tabs {
-    top: 0 !important;
+    top: 0;
   }
 
   .mobile-split-handle.dragging,
@@ -6547,7 +6547,7 @@ main {
 }
 
 .toolbar-menu button[hidden] {
-  display: none !important;
+  display: none;
 }
 
 .pen-file-menu .file-actions button .system-symbol {
@@ -6616,7 +6616,7 @@ main {
   .app-actions,
   .mobile-command-actions
 ) {
-  background: var(--floating) !important;
+  background: var(--floating);
 }
 
 /* ===================== 原 pen-components.css ===================== */
@@ -7137,7 +7137,7 @@ main {
 
 /* 没有选中切片时只留标题提示，不显示一排空输入框 */
 :root body #tile-inspector[data-empty="true"] :is(.geometry-fields, #tile-inner-title, .atlas-source-heading, .atlas-stretch) {
-  display: none !important;
+  display: none;
 }
 
 :root body .dialog-note {
@@ -7164,7 +7164,7 @@ main {
   }
 }
 
-:root body .settings-nav-item {
+:root body .settings-nav-item:not([hidden]) {
   width: 100%;
   height: 34px;
   min-height: 34px;
@@ -7688,8 +7688,8 @@ main {
   }
 
   :root[data-mobile-preview-collapsed="true"] body :is(aside, .source) {
-    top: var(--mobile-dock-h) !important;
-    height: calc(100% - var(--mobile-dock-h)) !important;
+    top: var(--mobile-dock-h);
+    height: calc(100% - var(--mobile-dock-h));
   }
 
   :root body #event-log {
@@ -8570,7 +8570,7 @@ main {
   :root body .titlebar .desktop-quick-actions,
   :root body .titlebar .mobile-title-choices,
   :root body .titlebar .mode-control > button:not(.mobile-choice-toggle) {
-    display: none !important;
+    display: none;
   }
 
   :root body .titlebar .mobile-command-menu {
@@ -8667,7 +8667,7 @@ main {
     min-width: 0;
     height: 34px;
     padding: 0 12px;
-    display: inline-flex !important;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
     border: 0;
@@ -8715,7 +8715,7 @@ main {
     overscroll-behavior: contain;
   }
 
-  :root body .titlebar .mobile-command-actions button {
+  :root body .titlebar .mobile-command-actions button:not([hidden]) {
     min-height: 44px;
     padding: 0 12px;
     display: grid;
@@ -8747,13 +8747,13 @@ main {
 
 @media (max-width: 760px) {
   body:has(.canvas-wrap.empty) .mobile-workspace-tabs {
-    display: none !important;
+    display: none;
   }
 
   :root body:has(.canvas-wrap.empty) main > .workspace {
-    top: 0 !important;
-    height: 100% !important;
-    display: grid !important;
+    top: 0;
+    height: 100%;
+    display: grid;
     grid-template-rows: minmax(0, 1fr);
     border-top: 0;
   }
@@ -8881,12 +8881,12 @@ main {
   }
 
   :root[data-mobile-preview-collapsed="true"] body main > :is(aside, .source) {
-    top: var(--mobile-dock-h) !important;
-    height: calc(100% - var(--mobile-dock-h)) !important;
+    top: var(--mobile-dock-h);
+    height: calc(100% - var(--mobile-dock-h));
   }
 
   :root[data-mobile-preview-collapsed="true"] body .mobile-workspace-tabs {
-    top: 0 !important;
+    top: 0;
   }
 
   :root body main > :is(aside, .source) {
@@ -8966,7 +8966,7 @@ main {
 
   /* Canvas: compact preview toolbar on top, canvas fills the rest. The desktop grid
      (48px · 1fr · 30px) used to squeeze the canvas into the 48px toolbar row. */
-  :root body:not(:has(.canvas-wrap.empty)) main > .workspace {
+  :root:not([data-mobile-preview-collapsed="true"]) body:not(:has(.canvas-wrap.empty)) main > .workspace {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-columns: minmax(0, 1fr);
@@ -8974,7 +8974,7 @@ main {
   }
 
   :root[data-mobile-preview-collapsed="true"] body main > .workspace {
-    display: none !important;
+    display: none;
   }
 
   :root body main > .workspace > .workspace-status {
@@ -9085,7 +9085,7 @@ main {
 
 @media (max-width: 760px) and (orientation: portrait) {
   :root body .preview-toolbar #skin-state-control {
-    width: 58px !important;
+    width: 58px;
     max-width: 58px;
   }
 
@@ -9134,7 +9134,7 @@ main {
  * ------------------------------------------------------------------------------------------------- */
 
 @media (max-width: 950px) and (max-height: 600px) and (orientation: landscape) {
-  :root body:not(:has(.canvas-wrap.empty)) main > .workspace {
+  :root:not([data-mobile-preview-collapsed="true"]) body:not(:has(.canvas-wrap.empty)) main > .workspace {
     grid-template-rows: auto minmax(0, 1fr);
   }
 
@@ -9222,7 +9222,7 @@ main {
   }
 
   :root body #settings-dialog .settings-nav-item::after {
-    display: none !important;
+    display: none;
   }
 
   /* Labels with a hint stack the hint underneath instead of running into it. */

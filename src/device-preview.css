@@ -46,10 +46,6 @@
   --_canvas-tertiary: #858991;
 }
 
-.device-shell[data-mode="edit"][data-crosshair="on"] #preview,
-.device-shell[data-mode="edit"][data-crosshair="on"] #toolbar-strip {
-  cursor: none !important;
-}
 
 .device-shell {
   place-self: center;

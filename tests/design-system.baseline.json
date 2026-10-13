@@ -6,15 +6,7 @@
   "css-radius-literal": {},
   "css-spacing-off-scale": {},
   "css-motion-literal": {},
-  "css-important": {
-    "src/ai-design-panel.css": 1,
-    "src/atlas-workspace.css": 3,
-    "src/design-workbench.css": 5,
-    "src/device-preview.css": 1,
-    "src/picker.css": 2,
-    "src/settings.css": 2,
-    "src/style.css": 33
-  },
+  "css-important": {},
   "css-token-outside-tokens": {},
   "css-cross-file-selector": {},
   "icon-outside-registry": {},
@@ -22,8 +14,8 @@
   "ts-file-too-long": {
     "src/bda-editor.ts": 29,
     "src/bda.ts": 1214,
-    "src/main.ts": 11697,
-    "src/preview.ts": 2061,
+    "src/main.ts": 11699,
+    "src/preview.ts": 2058,
     "src/skin.ts": 6
   }
 }

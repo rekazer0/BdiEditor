@@ -307,7 +307,7 @@
   #ai-design-panel .ai-draft-note { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  #ai-design-panel * { transition: none !important; }
+  #ai-design-panel * { transition: none; }
 }
 
 /* Phones: the panel shares half the screen with the canvas, so the frame gives
