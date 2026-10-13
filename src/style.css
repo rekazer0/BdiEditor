@@ -1,19 +1,161 @@
-@import "./style-performance.css";
-@import "./source-files-redesign.css";
+/* ===================== 原 style-performance.css ===================== */
+/* CSS 性能优化 */
 
+/* 优化滚动性能（侧栏自身不滚动，由 #files 承担滚动） */
+.resource-gallery,
+#files {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* 减少重绘 */
+.toolbar-button, .preview-tool-toggle, .app-window :is(button, select, input) {
+  contain: layout style paint;
+}
+
+/* 字体渲染优化 */
+
+/* Canvas 优化 */
+canvas {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* 避免布局抖动 */
+.empty-state,
+.resource-detail-heading {
+  contain: layout;
+}
+
+/* 延迟动画直到需要时 */
+
+/* 优化重排 */
+.glass-module,
+.toolbar-menu,
+.style-picker-dialog {
+  contain: layout style;
+}
+
+/* ===================== 原 source-files-redesign.css ===================== */
+/*
+ * 源文件视图：只剩文件树自身的结构语义。
+ *
+ * 行高、内距、圆角、图标栏、hover / 选中态都由 pen-design-application.css 统一
+ * 提供，概览与源文件共用同一套度量；这里不再重复定义，避免两套规则互相覆盖后
+ * 两个视图长得不一样。
+ */
+
+/* 文件树结构 */
+.raw-folder {
+  margin: 0;
+}
+
+.raw-folder > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.raw-folder > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* 嵌套层级缩进 */
+.source-tree-group {
+  margin-left: 24px;
+  padding-left: var(--space-sm);
+  margin-top: var(--space-xs);
+  margin-bottom: var(--space-xs);
+  border-left: 1px solid var(--line-soft);
+}
+
+/* 拖放目标高亮 */
+.source-drop-target {
+  background: color-mix(in srgb, var(--accent) 15%, var(--control)) !important;
+  box-shadow:
+    inset 0 0 0 2px var(--accent),
+    0 2px 8px color-mix(in srgb, var(--accent) 20%, transparent);
+  animation: drop-target-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes drop-target-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 0 2px var(--accent),
+      0 2px 8px color-mix(in srgb, var(--accent) 20%, transparent);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 2px color-mix(in srgb, var(--accent) 80%, transparent),
+      0 4px 12px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+}
+
+/* 空状态 */
+.raw-files:empty::before {
+  content: "暂无文件";
+  display: block;
+  padding: var(--space-xl);
+  text-align: center;
+  color: var(--tertiary);
+  font-size: var(--font-size-sm);
+}
+
+/* 焦点样式 */
+#files .source-tree-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  z-index: 1;
+}
+
+/* 工具提示 */
+.source-tree-row[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  color: var(--text);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  z-index: 100;
+  pointer-events: none;
+  backdrop-filter: saturate(180%) blur(16px);
+  animation: tooltip-appear var(--duration-base) var(--ease-standard);
+}
+
+@keyframes tooltip-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+/* 可访问性：减少动画 */
+@media (prefers-reduced-motion: reduce) {
+  .source-drop-target {
+    animation: none;
+  }
+}
+
+/* ===================== 原 style.css ===================== */
 @font-face {
   font-family: "Source JetBrains Mono";
   src: url("/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2") format("woff2");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-}
-
-* {
-  --_scrollbar-size: 6px;
-  box-sizing: border-box;
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
 }
 
 ::-webkit-scrollbar {
@@ -47,8 +189,7 @@
   }
 }
 
-html,
-body {
+.app-window {
   background: transparent;
 }
 
@@ -81,7 +222,7 @@ body {
   backdrop-filter: saturate(180%) blur(28px);
 }
 
-body {
+.app-window {
   margin: 0;
   overflow: hidden;
   touch-action: manipulation;
@@ -92,25 +233,7 @@ body {
   transition: color var(--duration-base) var(--ease-standard), background-color var(--duration-base) var(--ease-standard);
 }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-
-input,
-textarea {
-  -webkit-user-select: text;
-  user-select: text;
-}
-
-button,
-select {
-  color: inherit;
-}
-
-button {
+.app-window button {
   appearance: none;
   -webkit-appearance: none;
   border: 0;
@@ -134,15 +257,6 @@ button {
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-button:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-input:focus-visible,
-summary:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--accent) 25%, transparent);
-  outline-offset: 1px;
 }
 
 .titlebar {
@@ -507,8 +621,7 @@ main {
   display: none;
 }
 
-aside,
-.source {
+aside {
   min-width: 0;
 }
 
@@ -4040,12 +4153,11 @@ input[type="search"]:focus {
 }
 
 @media (max-width: 760px) and (orientation: portrait) {
-  :root,
-  :root.macos {
+  .app-window {
     background: var(--material-content);
   }
 
-  body {
+  .app-window {
     background: var(--toolbar);
   }
 
@@ -4329,8 +4441,7 @@ input[type="search"]:focus {
     transition: opacity var(--duration-base) var(--ease-standard);
   }
 
-  aside,
-  .source {
+  aside {
     width: 100%;
     height: calc(50% - 18px);
     min-height: 0;
@@ -4618,9 +4729,6 @@ input[type="search"]:focus {
 }
 
 @media (max-width: 950px) and (max-height: 600px) and (orientation: landscape) {
-  :root,
-  :root.macos {
-  }
 
   .titlebar {
     height: var(--titlebar-height);
@@ -4711,10 +4819,6 @@ input[type="search"]:focus {
   #panel-status {
     padding-block: 6px;
   }
-
-  .source #style-detail-fields {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* Inspector surfaces follow the same theme and window material as the workspace. */
@@ -4753,8 +4857,7 @@ input[type="search"]:focus {
   border-radius: var(--radius-md);
 }
 
-button:focus-visible,
-.toolbar-button:focus-visible {
+.toolbar-button:focus-visible, .app-window button:focus-visible {
   outline-offset: 0;
 }
 
@@ -4980,7 +5083,6 @@ summary,
 .mode-control button,
 .preview-choice button,
 .sidebar-view-control button,
-.device-shell,
 .canvas-wrap {
   transition:
     background-color var(--duration-base) var(--ease-standard),
@@ -5412,4 +5514,3830 @@ dialog[open]::backdrop {
 .source-section-scrollbar > button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+
+/* ===================== 原 pen-design-application.css ===================== */
+/*
+ * Pen design application layer.
+ *
+ * The Pen document is the visual source of truth for the flat editor UI.
+ * This file intentionally loads after style.css and only overrides presentation:
+ * layout dimensions, surfaces, borders, radii, typography and control chrome.
+ */
+
+.app-window {
+  background: var(--material-window);
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Title bar
+ * ------------------------------------------------------------------------------------------------- */
+
+.titlebar {
+  height: var(--titlebar-height);
+  gap: 12px;
+  padding: calc(6px + var(--safe-area-top)) max(16px, env(safe-area-inset-right)) 6px max(16px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--line);
+  background: var(--material-panel);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.toolbar-button,
+.toolbar-more > summary {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.toolbar-button .icon,
+.toolbar-button .system-symbol,
+.toolbar-button .system-symbol svg {
+  width: 16px;
+  height: 16px;
+}
+
+.toolbar-button:hover:not(:disabled),
+.toolbar-more > summary:hover {
+  background: color-mix(in srgb, var(--material-content) 82%, var(--line));
+  color: var(--text);
+}
+
+.toolbar-button:active:not(:disabled),
+.toolbar-more > summary:active {
+  background: color-mix(in srgb, var(--material-content) 72%, var(--line));
+}
+
+.toolbar-button:disabled,
+.toolbar-menu button:disabled {
+  opacity: 0.38;
+}
+
+.file-menu > summary,
+.toolbar-more > summary {
+  width: auto;
+  min-width: 28px;
+  padding: 0 8px;
+}
+
+.file-menu > summary::after,
+.toolbar-more > summary::after {
+  display: none;
+}
+
+.toolbar-menu,
+.file-actions,
+.app-actions,
+.mobile-command-actions {
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--material-panel);
+  box-shadow: var(--shadow-sm);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.toolbar-menu button {
+  min-height: 32px;
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-size: var(--font-size-sm);
+}
+
+.toolbar-menu button:hover:not(:disabled) {
+  background: var(--material-content);
+}
+
+.toolbar-menu-separator,
+.mobile-menu-separator {
+  background: var(--line);
+}
+
+.document-title {
+  bottom: 50%;
+  transform: translate(-50%, 50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  pointer-events: auto;
+}
+
+.document-title strong {
+  max-width: 330px;
+  color: var(--text);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  line-height: 18px;
+}
+
+#dirty {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--material-panel);
+  color: var(--secondary);
+  font-size: var(--font-size-xs);
+}
+
+#dirty:not([hidden]) {
+  display: inline-flex;
+}
+
+#dirty::before {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  /* 未保存是提醒，不是成功状态 */
+  background: var(--state-warn);
+  content: "";
+}
+
+.mode-control,
+.preview-choice,
+.sidebar-view-control {
+  gap: 2px;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.mode-control button,
+.preview-choice button {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  color: var(--secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+}
+
+.mode-control button.active,
+.preview-choice button.active {
+  color: var(--text);
+  background: var(--material-panel);
+  box-shadow: none;
+  animation: none;
+}
+
+.mobile-choice-toggle,
+.mobile-title-choices,
+.mobile-quick-actions,
+.mobile-command-menu,
+.mobile-workspace-tabs {
+  display: none;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Main shell
+ * ------------------------------------------------------------------------------------------------- */
+
+main {
+  background: var(--canvas-surface);
+}
+
+@media (min-width: 761px) {
+  main {
+    grid-template-columns: var(--sidebar-width, 248px) minmax(0, 1fr) 4px var(--inspector-width, 360px);
+  }
+
+  .sidebar { position: relative; }
+  .sidebar-resize-handle { position: absolute; top: 0; right: -2px; bottom: 0; }
+}
+
+@media (min-width: 761px) and (max-width: 1060px) {
+  main {
+    grid-template-columns: 160px minmax(0, 1fr) 4px 300px;
+  }
+}
+
+.sidebar {
+  border-color: var(--line);
+  background: var(--material-panel);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.sidebar {
+  padding-top: 0;
+  border-right-width: 1px;
+}
+
+.pane-heading {
+  min-height: 42px;
+  padding: 0 8px 12px;
+  border-bottom: 0;
+}
+
+.sidebar > .pane-heading {
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border-bottom: 0;
+}
+
+.sidebar-view-control {
+  width: 100%;
+  min-height: 34px;
+}
+
+.sidebar-view-control button {
+  height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--secondary);
+  font-size: var(--font-size-sm);
+}
+
+.sidebar-view-control button.active {
+  color: var(--text);
+  background: var(--material-panel);
+  box-shadow: none;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Sidebar lists — 概览 and 源文件 are one list, not two designs
+ *
+ * Both views live in the single #files scroller and share one geometry: a 16px
+ * icon/chevron column, an 8px gap, 8px row padding, one corner radius and one
+ * hover/selected treatment. Only the content differs (curated groups versus the
+ * file tree); metrics, states and typography never do. Icons stay in the flow,
+ * so no glyph can ever land on a label.
+ * ------------------------------------------------------------------------------------------------- */
+
+#files {
+  padding: 8px 8px 16px;
+  scrollbar-width: none;
+}
+
+#files::-webkit-scrollbar {
+  display: none;
+}
+
+/* The panes are content, never scrollers: #files handles scrolling.
+   The phone layout keeps its own two-column overview grid, so this stays desktop-only. */
+@media (min-width: 761px) {
+  .sidebar-overview,
+  .raw-files {
+    min-height: 0;
+    padding: 0;
+    overflow: visible;
+    scroll-behavior: auto;
+  }
+}
+
+/* File operations toolbar: same 8px gutter and 28px controls as the view switch. */
+.source-file-toolbar {
+  height: auto;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+  gap: 4px;
+  margin: 0 8px 12px;
+  padding: 2px 0;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  border-bottom: 0;
+}
+
+/* The grid above outranks the user-agent [hidden] rule, so hide the 概览 view explicitly. */
+.source-file-toolbar[hidden] {
+  display: none;
+}
+
+.source-file-toolbar .toolbar-button {
+  width: 28px;
+  height: 28px;
+  max-width: 28px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--secondary);
+  background: transparent;
+}
+
+/* The rail itself is --pen-surface-subtle, so the shared hover token disappears on it:
+   hovering instead lifts the button onto the raised surface (same read as the key toolbar). */
+.source-file-toolbar .toolbar-button:hover:not(:disabled):not(.active) {
+  color: var(--text);
+  background: var(--material-panel);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 80%, transparent),
+    0 1px 3px color-mix(in srgb, var(--text) 16%, transparent);
+  transform: none;
+}
+
+.source-file-toolbar .toolbar-button:active:not(:disabled):not(.active) {
+  background: color-mix(in srgb, var(--material-panel) 78%, var(--line));
+  box-shadow: none;
+}
+
+#source-file-toolbar .toolbar-button.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+#source-file-toolbar .toolbar-button.active :is(.icon, .system-symbol) {
+  color: inherit;
+}
+
+#source-file-toolbar .toolbar-button.active:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 16%, var(--material-panel));
+}
+
+.source-file-toolbar .toolbar-button:disabled {
+  opacity: 0.45;
+}
+
+/* Rows ------------------------------------------------------------------------------------------ */
+
+/* 源文件树保持原有的扁平行；概览条目使用下面的卡片样式。 */
+#files .raw-files .source-tree-row {
+  width: 100%;
+  min-height: 34px;
+  height: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 3px keeps a two-line row inside the same 34px box as a one-line tree row. */
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--secondary);
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  transform: none;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 概览列表 — 与「源文件」树同一套行语言。
+ *
+ * 每个条目只有两件事：名字（左，可截断）与技术文件名（右，等宽、次要色）。行高、圆角、
+ * 图标尺寸与源文件树一致，状态只换颜色不换几何；列表是平铺的行，不再是叠起来的卡片。
+ * ------------------------------------------------------------------------------------------------- */
+
+/* 1px 行距即列表本身的分隔节奏，分组标题负责分段。 */
+#files .sidebar-overview .nav-group-body {
+  gap: 1px;
+}
+
+#files .sidebar-overview button.nav-item {
+  width: 100%;
+  min-height: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-md);
+  /* 描边只留给键盘焦点，列表因此不再是一叠卡片。 */
+  outline: none;
+  color: var(--secondary);
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  transform: none;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+
+/* 图标与源文件树同尺寸同色，去掉底砖后列表更安静。 */
+#files .sidebar-overview button.nav-item > .system-symbol {
+  position: static;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 0;
+  color: var(--tertiary);
+  background: none;
+  font-size: var(--font-size-lg);
+  transform: none;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+/* 名字占剩余宽度并可截断；文件名贴右边缘用等宽，和检查器的值列同一种读法。 */
+#files .sidebar-overview button.nav-item > .nav-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+#files .sidebar-overview button.nav-item > .nav-meta {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 46%;
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+#files .raw-files .source-tree-row > .system-symbol {
+  position: static;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  display: grid;
+  place-items: center;
+  color: var(--tertiary);
+  font-size: var(--font-size-lg);
+  transform: none;
+}
+
+#files .raw-files .source-folder-row > .system-symbol {
+  color: var(--accent);
+}
+/* The disclosure chevron is the same glyph in a group heading and in a folder row. */
+#files .source-disclosure {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  margin: 0;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  color: var(--tertiary);
+  transform: rotate(-45deg);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+#files .nav-group[open] > .nav-section > .source-disclosure,
+#files .raw-folder[open] > .source-folder-row > .source-disclosure {
+  color: var(--accent);
+  transform: rotate(45deg);
+}
+
+/* Labels ---------------------------------------------------------------------------------------- */
+
+#files .sidebar-overview .nav-label,
+#files .raw-files .nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#files .sidebar-overview .nav-meta {
+  min-width: 0;
+  margin-top: 0;
+  overflow: hidden;
+  color: var(--tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Group headings and folder rows ----------------------------------------------------------------- */
+
+#files .sidebar-overview .nav-section,
+#files .raw-files .source-folder-row {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  color: var(--tertiary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+/* 分组标题：列表段落的分隔行 —— 上间距 + 数量胶囊，行高比条目略矮。 */
+#files .sidebar-overview > .nav-group > .nav-section {
+  min-height: 26px;
+  margin-top: 12px;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+}
+
+#files .sidebar-overview > .nav-group:first-child > .nav-section {
+  margin-top: 0;
+}
+
+/* 数量胶囊：与卡片同宽的右边界，等宽数字让 1 / 13 对齐。 */
+#files .sidebar-overview .nav-section-count {
+  min-width: 20px;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--material-content);
+  color: var(--tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  line-height: 17px;
+  text-align: center;
+}
+
+#files .raw-files .source-folder-row {
+  color: var(--secondary);
+}
+
+/* 文件数只是辅助信息：等宽小字、常规字重、三级色，不和名字抢视线。 */
+#files .raw-files .source-item-count {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+#files .raw-files .source-thumbnail {
+  max-width: 16px;
+  max-height: 16px;
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+}
+
+/* States ---------------------------------------------------------------------------------------- */
+
+/* 三种状态只换颜色，不换几何：平铺行 → 悬停下沉色 → 选中品牌色浅底。 */
+#files .sidebar-overview button.nav-item:hover {
+  background: var(--material-content);
+  color: var(--text);
+  transform: none;
+}
+
+#files .sidebar-overview button.nav-item:hover > .system-symbol {
+  color: var(--text);
+}
+
+#files .sidebar-overview button.nav-item.selected,
+#files .sidebar-overview button.nav-item.selected:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: none;
+  transform: none;
+  font-weight: 600;
+}
+
+#files .sidebar-overview button.nav-item.selected > .nav-label,
+#files .sidebar-overview button.nav-item.selected > .system-symbol {
+  color: var(--accent);
+}
+
+/* 选中只换图标颜色，不再换底砖。 */
+#files .sidebar-overview button.nav-item.selected > .system-symbol {
+  background: none;
+}
+
+#files .sidebar-overview button.nav-item.selected > .nav-meta {
+  color: color-mix(in srgb, var(--accent) 62%, var(--tertiary));
+}
+
+/* 键盘可达性：焦点环画在行内，几何不变。 */
+#files .sidebar-overview button.nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+#files .sidebar-overview .nav-section:hover,
+#files .raw-files .source-tree-row:hover:not(.selected) {
+  color: var(--text);
+  background: var(--material-content);
+  transform: none;
+}
+
+#files .raw-files .source-tree-row.selected,
+#files .raw-files .source-tree-row.selected:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: none;
+  transform: none;
+  font-weight: 600;
+}
+
+#files .raw-files .source-tree-row.selected > .system-symbol {
+  color: var(--accent);
+}
+
+#files button:disabled {
+  opacity: 0.45;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Workspace / preview
+ * ------------------------------------------------------------------------------------------------- */
+
+.workspace {
+  grid-template-rows: 48px minmax(0, 1fr) 30px;
+  border: 0;
+  background: var(--canvas-surface);
+}
+
+.preview-toolbar {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--material-panel);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.preview-tool-toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  color: var(--secondary);
+  background: var(--material-content);
+  box-shadow: none;
+}
+
+.preview-tool-toggle.active {
+  color: var(--on-accent);
+  background: var(--accent);
+  box-shadow: none;
+}
+
+.field-control select,
+#layout,
+#device,
+#orientation,
+#theme,
+#skin-state {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-panel);
+  color: var(--text);
+  font-size: var(--font-size-sm);
+}
+
+#skin-state-control .skin-state-value {
+  line-height: 30px;
+}
+
+.canvas-wrap {
+  padding: 24px;
+  background: var(--canvas-surface);
+}
+
+.workspace-status {
+  min-height: 30px;
+  border-top: 1px solid var(--line);
+  background: var(--material-panel);
+  color: var(--secondary);
+  font-size: var(--font-size-xs);
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Inspector / source
+ * ------------------------------------------------------------------------------------------------- */
+
+.field-control input,
+.field-control select,
+.search-control input {
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--material-content);
+  color: var(--text);
+  font-size: var(--font-size-sm);
+}
+
+.field-control input:focus,
+.field-control select:focus,
+.search-control input:focus {
+  border-color: var(--accent);
+  outline: 0;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Canvas toolbar controls
+ *
+ * Mirrors the Pen "画布工具条" component: a pill of 26px icon buttons on a
+ * sunken track, the active item raised on the surface colour with a 1px
+ * inner hairline. Group padding and gap are 2px, radii come from the scale.
+ * ------------------------------------------------------------------------------------------------- */
+
+.preview-tool-toggle,
+.preview-choice {
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.preview-tool-toggle {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+}
+
+.preview-tool-toggle .system-symbol,
+.preview-tool-toggle .system-symbol svg,
+.preview-choice button .system-symbol,
+.preview-choice button .system-symbol svg {
+  width: 15px;
+  height: 15px;
+}
+
+.preview-choice button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  color: var(--tertiary);
+  background: transparent;
+  box-shadow: none;
+}
+
+.preview-choice button:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.preview-choice button.active,
+.preview-tool-toggle.active {
+  color: var(--accent);
+  background: var(--material-panel);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+/* The device pill carries the model name next to a leading glyph. */
+
+#device-control > span {
+  display: none;
+}
+
+#device-control select,
+#device {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 24px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+
+#device-control select:focus,
+#device:focus {
+  outline: 0;
+  box-shadow: none;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Floating multi-select toolbar
+ *
+ * Mirrors the Pen "多选对齐工具条": a raised bar that appears at the BOTTOM of
+ * the canvas whenever more than one key is selected, carrying the selection
+ * count and the align / size / distribute actions.
+ * ------------------------------------------------------------------------------------------------- */
+
+.canvas-multi-toolbar {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  z-index: 6;
+  display: none;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--material-panel);
+  box-shadow: var(--shadow-sm);
+  transform: translateX(-50%);
+}
+
+.canvas-multi-toolbar[data-available="true"] {
+  display: flex;
+}
+
+/* The bar is an edit-mode affordance; interaction preview stays clean. */
+.canvas-wrap:has(.device-shell[data-mode="preview"]) .canvas-multi-toolbar[data-available="true"] {
+  display: none;
+}
+
+.canvas-multi-count {
+  padding: 0 8px;
+  color: var(--secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.canvas-multi-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--line);
+}
+
+.canvas-multi-toolbar button {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--secondary);
+  cursor: pointer;
+}
+
+.canvas-multi-toolbar button:hover:not(:disabled) {
+  background: var(--material-content);
+  color: var(--text);
+}
+
+.canvas-multi-toolbar button:disabled {
+  opacity: 0.34;
+  cursor: default;
+}
+
+.canvas-multi-toolbar button .system-symbol,
+.canvas-multi-toolbar button .system-symbol svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Gesture hot zones
+ *
+ * Shown over the selected key so 点击 / 上下左右滑动 / 长按 are visible and
+ * directly pickable instead of living only in a dropdown.
+ * ------------------------------------------------------------------------------------------------- */
+
+/* Zones are revealed by the canvas hit test, not by CSS hover, because the
+ * overlay itself is click-through until a zone is live. */
+
+/* -------------------------------------------------------------------------------------------------
+ * Dialogs / overlays
+ * ------------------------------------------------------------------------------------------------- */
+
+.project-dialog,
+.app-dialog {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--material-panel);
+  box-shadow: var(--shadow-sm);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.project-dialog::backdrop,
+.app-dialog::backdrop {
+  background: var(--backdrop);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.project-dialog header,
+.app-dialog header {
+  border-bottom: 1px solid var(--line);
+}
+
+.project-dialog header h2,
+.app-dialog header h2 {
+  color: var(--text);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Mobile frames
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .titlebar {
+    height: var(--titlebar-height);
+    padding: calc(4px + var(--safe-area-top)) 12px 4px;
+    background: var(--material-panel);
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .mobile-workspace-tabs {
+    display: flex;
+    background: var(--material-panel);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .mobile-workspace-tabs button {
+    color: var(--secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  .mobile-workspace-tabs button.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+
+  .mobile-workspace-tabs,
+  .sidebar,
+  .workspace {
+    border-color: var(--line);
+  }
+
+  .preview-toolbar {
+    padding: 6px 12px;
+    background: var(--material-panel);
+  }
+
+  .canvas-multi-toolbar {
+    bottom: 10px;
+    max-width: calc(100% - 16px);
+    overflow-x: auto;
+  }
+
+  .canvas-multi-count {
+    padding: 0 6px;
+    font-size: var(--font-size-xs);
+  }
+}
+
+/* Title bar file operations are collapsed into one overflow (hamburger) menu. */
+.toolbar-more.pen-file-menu {
+  flex: none;
+}
+
+.toolbar-more.pen-file-menu > summary {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.toolbar-more.pen-file-menu > summary .system-symbol,
+.toolbar-more.pen-file-menu > summary .system-symbol svg {
+  width: 16px;
+  height: 16px;
+}
+
+.toolbar-more.pen-file-menu[open] > summary {
+  background: color-mix(in srgb, var(--material-content) 78%, var(--line));
+  color: var(--text);
+}
+
+.pen-file-menu .toolbar-menu {
+  left: 0;
+  right: auto;
+  width: 268px;
+  max-width: calc(100vw - 24px);
+  transform-origin: top left;
+}
+
+.pen-file-menu .file-actions button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.toolbar-menu button[hidden] {
+  display: none !important;
+}
+
+.pen-file-menu .file-actions button .system-symbol {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.toolbar-menu-label {
+  display: block;
+  padding: 6px 8px 4px;
+  color: var(--secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 950px) and (max-height: 600px) and (orientation: landscape) {
+  .toolbar-more.pen-file-menu > summary {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+  }
+
+  .pen-file-menu .toolbar-menu {
+    max-width: calc(100vw - 16px);
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Window material
+ *
+ * This layer paints flat, fully opaque surfaces, which hides the native macOS sidebar / Windows Mica
+ * material behind the window. While the window material is on, drop the window-level Pen tokens to
+ * translucent fills so the system material stays visible; the opacity slider is the fill strength and
+ * reaches fully opaque at 100%.
+ *
+ * 填充按层角色取自 style.css 的 --window-material-layer / -sunken / -floating（数值由材质滑杆换算）：
+ * 大块区域（工作区/画布/内容）用下沉系数 1-√(1-f)，浮层用 1-(1-f)²，这样它们会随滑杆一起走到完全
+ * 不透明，不会再出现「100% 仍然透」的情况。
+ *
+ * 控件块面（按钮、分段控件、输入框、列表行）和分隔线不参与这套系数：设计稿里它们是「比容器暗一档」
+ * 的绝对色，乘上下沉系数后色差只剩 1/255，滑杆一拉低控件就消失在玻璃里。玻璃下改成同一色差的半透明
+ * 中性色，100% 时合成结果与设计稿一致，20% 时也仍然保留同样的块面对比。
+ * ------------------------------------------------------------------------------------------------- */
+
+/* 未打开皮肤时画布承载的是应用级欢迎页，而不是文档画布；此时不能沿用「画布背景」那张
+   不透明的纸，否则欢迎页整片盖住系统材质，看起来和没有玻璃一样。 */
+:root[data-window-material-kind="glass"][data-window-material="on"] .canvas-wrap.empty {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* 浮层（设置/项目对话框、下拉菜单）压在内容之上，底下是内容而不是桌面材质，填充太低会让
+   底层文字和画布透过来，所以单独给它们浮层系数，滑杆还没拉满时就已经接近不透明。
+   用 !important 是因为 settings.css 里 `:root body #settings-dialog` 这类 ID 选择器权重更高，
+   普通声明压不过它。
+   菜单在 .titlebar 里，titlebar 自身有 backdrop-filter，嵌套的模糊取不到下面的内容，只能靠填充遮住，
+   所以给浮层透明度设一个下限。 */
+:root[data-window-material-kind="glass"][data-window-material="on"] :is(
+  .app-dialog,
+  .project-dialog,
+  .toolbar-menu,
+  .file-actions,
+  .app-actions,
+  .mobile-command-actions
+) {
+  background: var(--floating) !important;
+}
+
+/* ===================== 原 pen-components.css ===================== */
+/*
+ * Pen design system — component lock.
+ *
+ * Every rule in this file pins one *basic control* or *design component* to the
+ * value the Pen document defines for it, so the editor cannot drift away from
+ * the design system again. It deliberately:
+ *
+ *   • loads last (after style.css, pen-design-application.css, pen-sidebar.css);
+ *   • writes each selector with a `:root body` prefix, which outranks every
+ *     older layer without needing `!important` — earlier layers specify the
+ *     same controls down to the pixel and are still in the cascade;
+ *   • restates the component, never the page layout. Screens may rearrange
+ *     components; a component may not change shape.
+ *
+ * Sources in the Pen document:
+ *   设计系统 · Design System   button / segmented control / field / tabs / key cap
+ *   组件 / 标题栏               title bar, document pill, mode switch
+ *   组件 / 画布工具条            canvas toolbar pills, device select, zoom group
+ *   多选对齐工具条 (桌面 · 编辑模式)
+ *   弹层 · 设置                 settings sheet, switches, rows
+ *   组件 / 左侧导航              navigation rows, group headings
+ */
+
+/* =================================================================================================
+ * 1 · Icon button  (设计系统: Icon Button 30×30 · r8 · $bg-sunken · icon 15 · $ink-muted)
+ *     Title bar intentionally uses the 组件 / 标题栏 variant: 28×28 · icon 14.
+ * ================================================================================================= */
+
+:root body .toolbar-button,
+:root body .toolbar-more > summary {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
+  box-shadow: none;
+  transform: none;
+}
+
+:root body .toolbar-button .icon,
+:root body .toolbar-button .system-symbol,
+:root body .toolbar-more > summary .icon,
+:root body .toolbar-more > summary .system-symbol {
+  color: var(--secondary);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
+:root body .toolbar-button .icon svg,
+:root body .toolbar-button .system-symbol,
+:root body .toolbar-button .system-symbol svg,
+:root body .toolbar-more > summary .icon svg,
+:root body .toolbar-more > summary .system-symbol,
+:root body .toolbar-more > summary .system-symbol svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+:root body .toolbar-button:hover:not(:disabled),
+:root body .toolbar-more > summary:hover {
+  background: color-mix(in srgb, var(--material-content) 82%, var(--line));
+  color: var(--text);
+}
+
+:root body .toolbar-button:active:not(:disabled),
+:root body .toolbar-more > summary:active {
+  background: color-mix(in srgb, var(--material-content) 72%, var(--line));
+}
+
+:root body .toolbar-button:disabled {
+  opacity: 0.38;
+  color: var(--secondary);
+}
+
+:root body .toolbar-button:disabled .icon,
+:root body .toolbar-button:disabled .system-symbol {
+  color: var(--secondary);
+}
+
+/* The title bar keeps the 28px control the 组件 / 标题栏 component draws. */
+:root body .titlebar .toolbar-button,
+:root body .titlebar .toolbar-more > summary {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+}
+
+:root body .titlebar .toolbar-button .icon svg,
+:root body .titlebar .toolbar-button .system-symbol,
+:root body .titlebar .toolbar-button .system-symbol svg,
+:root body .titlebar .toolbar-more > summary .system-symbol,
+:root body .titlebar .toolbar-more > summary .system-symbol svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* =================================================================================================
+ * 2 · Segmented control  (设计系统: gap 2 · padding 3 · r8 · $bg-sunken;
+ *     selected segment r5 · $bg-surface · 1px $line · 12/500 $ink)
+ * ================================================================================================= */
+
+:root body .mode-control,
+:root body .sidebar-view-control {
+  gap: 2px;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* The canvas toolbar groups (方向 / 外观) are the 画布工具条 icon variant: 26px discs. */
+:root body .preview-choice {
+  gap: 2px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body .mode-control button,
+:root body .sidebar-view-control button {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--secondary);
+  box-shadow: none;
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+}
+
+:root body .sidebar-view-control button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+:root body .preview-choice button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--tertiary);
+  box-shadow: none;
+}
+
+:root body .preview-choice button .system-symbol,
+:root body .preview-choice button .system-symbol svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+:root body .mode-control button.active,
+:root body .sidebar-view-control button.active {
+  color: var(--text);
+  background: var(--material-panel);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-weight: 500;
+  animation: none;
+}
+
+:root body .preview-choice button.active {
+  color: var(--accent);
+  background: var(--material-control);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+:root body .preview-choice button:hover:not(.active):not(:disabled) {
+  color: var(--text);
+}
+
+:root body .mode-control button:hover:not(.active) {
+  color: var(--text);
+}
+
+/* =================================================================================================
+ * 3 · Tabs  (组件 / 属性检查器: 42px row · gap 18 · padding 0 12 · 1px $line bottom;
+ *     active 12.5/600 $ink + 2px $brand, idle 12.5/400 $ink-faint)
+ * ================================================================================================= */
+
+/* =================================================================================================
+ * 4 · Field / input  (设计系统: label 11/400 $ink-faint · gap 5;
+ *     box 30px · padding 0 9 · r8 · $bg-sunken · 1px $line · value 12 $ink)
+ * ================================================================================================= */
+
+:root body .source .source-toolbar input:not([type="checkbox"]):not([type="radio"]),
+:root body .source .source-toolbar select,
+:root body .app-dialog select,
+:root body .app-dialog input[type="number"],
+:root body .settings-path-control input {
+  min-height: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  box-shadow: none;
+}
+
+:root body .app-dialog select:focus,
+:root body .app-dialog input[type="number"]:focus {
+  border-color: var(--accent);
+  outline: 0;
+  box-shadow: none;
+}
+
+/* Search box: one sunken capsule, the inner input is bare. */
+:root body .search-control {
+  height: 30px;
+  padding: 0 12px;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
+  box-shadow: none;
+}
+
+:root body .search-control .system-symbol,
+:root body .search-control .system-symbol svg {
+  width: 13px;
+  height: 13px;
+  color: var(--tertiary);
+}
+
+:root body .search-control input {
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  box-shadow: none;
+}
+
+:root body .search-control input:focus {
+  outline: 0;
+  box-shadow: none;
+}
+
+/* Stepper (设计系统: 28px sunken capsule, 12px glyphs, 11.5px mono value) */
+
+/* =================================================================================================
+ * 5 · Switch  (组件 / 开关: 36×20 · padding 2 · $radius-pill · 16px thumb $on-brand)
+ *     off = $bg-sunken + 1px $line-strong, on = $brand with no hairline.
+ * ================================================================================================= */
+
+/* `#quick-inspector` / `#settings-dialog` prefixes are required: the retired
+ * inspector layer in style.css pins these controls with an ID selector, and an
+ * ID outranks any number of `:root body` class selectors. */
+:root body .settings-switch input,
+:root body input[role="switch"][type="checkbox"],
+:root body #settings-dialog .settings-switch input {
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  position: relative;
+  flex: none;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
+  background: var(--material-content);
+  box-shadow: none;
+  transition: background var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard);
+}
+
+:root body .settings-switch input::after,
+:root body input[role="switch"][type="checkbox"]::after,
+:root body #settings-dialog .settings-switch input::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--on-accent);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-base) var(--ease-standard);
+}
+
+:root body .settings-switch input:checked,
+:root body input[role="switch"][type="checkbox"]:checked,
+:root body #settings-dialog .settings-switch input:checked {
+  border-color: transparent;
+  background: var(--accent);
+}
+
+:root body .settings-switch input:checked::after,
+:root body input[role="switch"][type="checkbox"]:checked::after,
+:root body #settings-dialog .settings-switch input:checked::after {
+  transform: translateX(16px);
+}
+
+/* =================================================================================================
+ * 6 · Button  (设计系统: 32px · padding 0 14 · r8 · 12/500;
+ *     primary $brand + $on-brand, secondary $bg-surface + 1px $line-strong + $ink,
+ *     ghost $bg-sunken + $ink-muted)
+ * ================================================================================================= */
+
+/* `:where()` keeps the exclusion out of the specificity maths, so the header
+ * close button below can still outrank this default. */
+:root body .app-dialog button:where(:not([data-settings-page])),
+:root body .project-dialog button,
+:root body .toolbar-menu button {
+  min-height: 32px;
+  height: 32px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--material-panel);
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  box-shadow: none;
+}
+
+:root body .toolbar-menu button {
+  min-height: 32px;
+  height: 32px;
+  justify-content: flex-start;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text);
+  font-weight: 400;
+}
+
+:root body .toolbar-menu button:hover:not(:disabled) {
+  background: var(--material-content);
+}
+
+:root body .app-dialog button.primary,
+:root body .project-dialog button.primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 500;
+}
+
+:root body .app-dialog button.secondary,
+:root body .project-dialog button.secondary {
+  border-color: var(--line-strong);
+  background: var(--material-panel);
+  color: var(--text);
+}
+
+/* The sheet header close affordance is the quiet ghost button. */
+:root body .app-dialog header button,
+:root body .project-dialog header button {
+  min-height: 28px;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--material-content);
+  color: var(--secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+}
+
+:root body .app-dialog header button:hover,
+:root body .project-dialog header button:hover {
+  color: var(--text);
+}
+
+/* =================================================================================================
+ * 7 · Settings sheet  (弹层 · 设置: header 56px · nav 172px $bg-sunken · content padding 22/24)
+ * ================================================================================================= */
+
+:root body .app-dialog {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--material-panel);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body .app-dialog header,
+:root body .project-dialog header,
+:root body :is(#settings-dialog, #about-dialog, #new-style-dialog, #layout-image-dialog, #unsaved-dialog, #file-operation-dialog, #panel-scale-dialog, #ios26-dialog, #new-project-dialog) header {
+  min-height: 56px;
+  padding: 0 20px;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+}
+
+:root body .app-dialog header h2,
+:root body .project-dialog header h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* 紧凑弹窗（面板复制、iOS 26、替换键盘样式、新增样式、未保存）：统一的
+ * 头部 / 内容 / 底部节奏——标题与正文左对齐 20px，头尾各有一条分隔线，按钮靠右。 */
+:root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) {
+  padding: 0;
+  border-radius: var(--radius-xl);
+}
+
+:root body :is(#panel-scale-dialog, #ios26-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) {
+  width: min(460px, calc(100vw - 32px));
+}
+
+:root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) > form {
+  display: grid;
+  gap: 16px;
+  padding: 0 20px 20px;
+}
+
+:root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) > form > header {
+  display: grid;
+  justify-items: start;
+  align-content: center;
+  gap: 4px;
+  min-height: 0;
+  margin: 0 -20px;
+  padding: 16px 20px 16px;
+}
+
+:root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) > form > header :is(p, small) {
+  margin: 0;
+  color: var(--secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+:root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) > form > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 4px -20px -20px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+}
+
+:root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) > form > footer button {
+  min-width: 72px;
+}
+
+:root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) label:not(.project-template-option) {
+  display: grid;
+  gap: 6px;
+  color: var(--secondary);
+  font-size: var(--font-size-sm);
+}
+
+:root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) input:not([type="checkbox"]) {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--material-panel);
+  color: var(--text);
+  font-size: var(--font-size-sm);
+}
+
+:root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) input:not([type="checkbox"]):focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+:root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) input:disabled {
+  background: var(--material-content);
+  color: var(--tertiary);
+}
+
+:root body #panel-scale-summary {
+  margin: 0;
+  color: var(--secondary);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+:root body #panel-scale-summary:empty {
+  display: none;
+}
+
+:root body #atlas-create-dialog .atlas-create-size {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* 没有选中切片时只留标题提示，不显示一排空输入框 */
+:root body #tile-inspector[data-empty="true"] :is(.geometry-fields, #tile-inner-title, .atlas-source-heading, .atlas-stretch) {
+  display: none !important;
+}
+
+:root body .dialog-note {
+  margin: 0;
+  padding: 12px 12px;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+
+:root body .settings-sidebar {
+  padding: 12px 12px;
+  gap: 2px;
+  border-right: 1px solid var(--line);
+  background: var(--material-content);
+}
+
+/* 172px is the pen's category rail; narrow sheets keep their stacked layout. */
+@media (min-width: 641px) {
+  :root body .settings-layout {
+    grid-template-columns: 172px minmax(0, 1fr);
+  }
+}
+
+:root body .settings-nav-item {
+  width: 100%;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 12px;
+  gap: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--secondary);
+  box-shadow: none;
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+}
+
+:root body .settings-nav-item .system-symbol,
+:root body .settings-nav-item .system-symbol svg {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  color: var(--tertiary);
+}
+
+:root body .settings-nav-item:hover:not([aria-selected="true"]) {
+  background: color-mix(in srgb, var(--material-content) 76%, var(--line));
+  color: var(--text);
+}
+
+:root body .settings-nav-item[aria-selected="true"] {
+  border-color: var(--line);
+  background: var(--material-panel);
+  color: var(--text);
+  font-weight: 500;
+  box-shadow: none;
+}
+
+:root body .settings-nav-item[aria-selected="true"] .system-symbol {
+  color: var(--accent);
+}
+
+:root body .settings-content {
+  padding: 24px 24px;
+  gap: 16px;
+}
+
+:root body .settings-section-heading h3 {
+  color: var(--text);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+:root body .settings-section-heading p {
+  color: var(--tertiary);
+  font-size: var(--font-size-xs);
+}
+
+:root body .settings-list > h4 {
+  color: var(--secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+
+:root body .app-dialog .settings-row,
+:root body .settings-row {
+  min-height: 40px;
+  padding: 0 2px;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+  color: var(--text);
+  font-size: var(--font-size-md);
+}
+
+:root body .settings-row > span:first-child {
+  color: var(--text);
+  font-size: var(--font-size-md);
+}
+
+:root body .settings-row small {
+  color: var(--secondary);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-mono);
+}
+
+/* =================================================================================================
+ * 9 · Floating multi-select toolbar  (多选对齐工具条: raised bar · r12 · 1px $line ·
+ *     28px discs r5 · $key-sel count chip)
+ * ================================================================================================= */
+
+:root body .canvas-multi-toolbar {
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--material-control);
+  box-shadow: var(--shadow-sm);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body .canvas-multi-count {
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: var(--radius-full);
+  background: var(--selection-soft);
+  color: var(--selection);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+:root body .canvas-multi-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: var(--line);
+}
+
+:root body .canvas-multi-toolbar button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--secondary);
+}
+
+:root body .canvas-multi-toolbar button:hover:not(:disabled) {
+  background: var(--material-content);
+  color: var(--text);
+}
+
+:root body .canvas-multi-toolbar button:disabled {
+  opacity: 0.34;
+}
+
+:root body .canvas-multi-toolbar button .system-symbol,
+:root body .canvas-multi-toolbar button .system-symbol svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+/* =================================================================================================
+ * 10 · Canvas toolbar  (组件 / 画布工具条: 44px bar · pill groups on $bg-sunken ·
+ *      device select 28px r8)
+ * ================================================================================================= */
+
+:root body .preview-toolbar {
+  min-height: 44px;
+  padding: 0 16px;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--material-panel);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* These wrappers are layout groups, not additional rows in the fixed-height bar. */
+.preview-toolbar-start,
+.preview-toolbar-end,
+.desktop-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.preview-toolbar-start { margin-right: auto; }
+.preview-toolbar-end { margin-left: auto; }
+
+:root body .preview-toolbar :is(#device-control, #skin-state-control) {
+  position: relative;
+  left: auto;
+  transform: none;
+}
+
+:root body .preview-toolbar #device-control {
+  flex: 0 1 240px;
+  min-width: 0;
+}
+
+:root body .preview-toolbar #device {
+  width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 760px) {
+  .desktop-quick-actions { display: none; }
+}
+
+:root body .preview-tool-toggle {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
+  box-shadow: none;
+}
+
+:root body .preview-tool-toggle .system-symbol,
+:root body .preview-tool-toggle .system-symbol svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+:root body .preview-tool-toggle.active,
+:root body .preview-tool-toggle[aria-pressed="true"] {
+  color: var(--accent);
+  background: var(--material-control);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+:root body #device-control,
+:root body #skin-state-control {
+  gap: 6px;
+  min-height: 28px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--text);
+  box-shadow: none;
+}
+
+:root body #device-control select,
+:root body #device,
+:root body #skin-state {
+  height: 26px;
+  min-height: 26px;
+  padding: 0 20px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  box-shadow: none;
+}
+
+:root body #skin-state {
+  color: transparent;
+}
+
+:root body #skin-state-control .skin-state-value {
+  color: var(--text);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  line-height: 26px;
+}
+
+/* =================================================================================================
+ * 11 · Status bar
+ *     Chinese prose uses $ui-font; only the numeric readout is monospaced.
+ * ================================================================================================= */
+
+:root body .workspace-status {
+  min-height: 30px;
+  padding: 0 16px;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  background: var(--material-panel);
+  color: var(--tertiary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+}
+
+:root body #event-log {
+  color: var(--secondary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+}
+
+:root body #panel-status {
+  color: var(--tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
+
+/* =================================================================================================
+ * 12 · Navigation rows  (组件 / 左侧导航: 概览条目 = 单行列表 · 16px 单色图标 · 30px 行高 · r8;
+ *     selected = $brand-soft ground + $brand label 600 · group head 12.5/600 · tree row r5)
+ * ================================================================================================= */
+
+:root body #files .raw-files .source-tree-row {
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* 概览条目与源文件树同一套行语言：单行平铺行，无卡片描边与图标底砖。 */
+:root body #files .sidebar-overview button.nav-item {
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+/* 概览条目以中文名为主，原始文件名退为小号注脚。 */
+:root body #files .sidebar-overview button.nav-item > .nav-label {
+  font-size: var(--font-size-sm);
+}
+
+:root body #files .sidebar-overview .nav-label,
+:root body #files .raw-files .nav-label {
+  font-size: var(--font-size-sm);
+}
+
+:root body #files .sidebar-overview .nav-section {
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+/* 分组标题比条目小一档、字距放开，层级靠字号而不是颜色；展开的箭头不再用品牌色抢选中行的注意力。 */
+:root body #files .sidebar-overview > .nav-group > .nav-section {
+  min-height: 24px;
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.04em;
+}
+
+:root body #files .sidebar-overview > .nav-group[open] > .nav-section > .source-disclosure {
+  color: var(--tertiary);
+}
+
+/* 两行条目：名字在上、文件名在下，图标跨两行居中；窄栏里两行各自截断，完整内容见行的 title。 */
+:root body #files .sidebar-overview button.nav-item {
+  height: auto;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 2px;
+  align-content: center;
+  padding: 6px 8px;
+}
+
+:root body #files .sidebar-overview button.nav-item > .system-symbol {
+  grid-row: 1 / 3;
+}
+
+:root body #files .sidebar-overview button.nav-item > .nav-meta {
+  grid-column: 2;
+  max-width: none;
+  margin-left: 0;
+  font-size: var(--font-size-xs);
+}
+
+:root body #files .raw-files .source-folder-row {
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* =================================================================================================
+ * 13 · Document pill + saved state  (组件 / 标题栏)
+ * ================================================================================================= */
+
+:root body .document-title {
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+}
+
+:root body .document-title strong {
+  color: var(--text);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  line-height: 18px;
+}
+
+:root body #dirty {
+  min-height: 22px;
+  padding: 2px 8px;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--material-panel);
+  color: var(--secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+}
+
+/* =================================================================================================
+ * 14 · Source panel chrome
+ * ================================================================================================= */
+
+:root body .source-toolbar {
+  padding: 8px 12px;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--material-panel);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* =================================================================================================
+ * 16 · Inspector sub-controls that older layers styled with the retired card palette
+ *     ($card-control / $card-border) instead of the design-system tokens.
+ * ================================================================================================= */
+
+/* 按下 / 正常 state switch — the design-system segmented control.
+   Segment metrics (26px, 0/12 padding, r5) already come from the pen layer in
+   style.css; only the container still carried the retired card chrome. */
+
+/* The selected segment keeps the design-system 1px $line hairline. */
+
+/* Property fields — the design-system Field box. */
+
+/* Colour swatch input. */
+
+/* Toggle label colour and the inline style-preview surface — both still carried
+   the retired card palette ($card-tertiary / $card-control / $card-border). */
+
+/* =================================================================================================
+ * 15 · Mobile — 组件 / 移动 · 底部导航 rendered as the pane switcher.
+ *
+ * The pen draws a labelled dock (56px raised bar, 40px tabs, $brand-soft ground
+ * on the live tab). style.css had reduced the same control to an invisible 18px
+ * strip of 4px indicator bars, so this section restores the component and moves
+ * the hard-coded 18px layout budgets onto one variable.
+ * ================================================================================================= */
+
+@media (max-width: 760px) {
+
+  :root body .mobile-workspace-tabs {
+    height: var(--mobile-dock-h);
+    gap: 6px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--material-panel);
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  :root body .mobile-workspace-tabs button[data-mobile-pane] {
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: var(--radius-md);
+    color: var(--secondary);
+    background: transparent;
+    font-size: var(--font-size-sm);
+    font-weight: 400;
+    line-height: 1;
+  }
+
+  :root body .mobile-workspace-tabs button[data-mobile-pane]::before {
+    content: none;
+    display: none;
+  }
+
+  :root body .mobile-workspace-tabs button[data-mobile-pane].active {
+    color: var(--accent);
+    background: var(--accent-soft);
+    box-shadow: none;
+    font-weight: 500;
+  }
+
+  /* The pane splitter is a grab handle on the dock's lower edge. */
+  :root body .mobile-split-handle {
+    width: 72px;
+    height: 12px;
+    top: auto;
+    bottom: 0;
+    border-radius: var(--radius-full);
+  }
+
+  :root body .mobile-split-handle::before {
+    width: 32px;
+    height: 3px;
+    top: 50%;
+    margin-top: -2px;
+    border-radius: var(--radius-full);
+    background: var(--line-strong);
+  }
+
+  /* Layout budgets below used to hard-code the retired 18px strip. */
+  :root body aside,
+  :root body .source {
+    height: calc(50% - var(--mobile-dock-h));
+  }
+
+  :root[data-mobile-preview-position="top"] body .mobile-workspace-tabs {
+    top: var(--mobile-workspace-split, 50%);
+  }
+
+  :root[data-mobile-preview-position="top"] body :is(aside, .source) {
+    top: calc(var(--mobile-workspace-split, 50%) + var(--mobile-dock-h));
+    height: calc(100% - var(--mobile-workspace-split, 50%) - var(--mobile-dock-h));
+  }
+
+  :root:not([data-mobile-preview-position="top"]) body .mobile-workspace-tabs {
+    top: calc(100% - var(--mobile-workspace-split, 50%));
+  }
+
+  :root:not([data-mobile-preview-position="top"]) body .workspace {
+    top: calc(100% - var(--mobile-workspace-split, 50%) + var(--mobile-dock-h));
+    height: calc(var(--mobile-workspace-split, 50%) - var(--mobile-dock-h));
+  }
+
+  :root:not([data-mobile-preview-position="top"]) body :is(aside, .source) {
+    top: var(--mobile-dock-h);
+    height: calc(100% - var(--mobile-workspace-split, 50%) - var(--mobile-dock-h));
+  }
+
+  :root[data-mobile-preview-collapsed="true"] body :is(aside, .source) {
+    top: var(--mobile-dock-h) !important;
+    height: calc(100% - var(--mobile-dock-h)) !important;
+  }
+
+  :root body #event-log {
+    display: none;
+  }
+}
+
+/* =================================================================================================
+ * 17 · Title bar layout  (组件 / 标题栏: 54px bar · 16px padding · left 打开/保存/导出 ·
+ *      centred document pill · right mode switch + 更多)
+ *
+ * The screen layer was built around a hamburger file menu; the Pen document draws the
+ * three file actions inline and keeps only 更多 as an icon button. These rules restate
+ * the bar and give the leading actions their labelled shape.
+ * ================================================================================================= */
+
+:root body .titlebar {
+  height: var(--titlebar-height);
+  min-height: var(--titlebar-height);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--line);
+  background: var(--material-panel);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body .titlebar-left,
+:root body .titlebar-right {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+:root body .titlebar-right {
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+:root body .titlebar-left > .spacer {
+  flex: 0 1 0;
+  min-width: 0;
+}
+
+:root body .titlebar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  min-width: 0;
+}
+
+:root body .titlebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+:root body .titlebar .titlebar-actions .titlebar-action {
+  display: inline-flex;
+  height: auto;
+  width: auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--secondary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body .titlebar .titlebar-actions .titlebar-action:hover:not(:disabled) {
+  background: var(--material-content);
+  color: var(--text);
+}
+
+:root body .titlebar .titlebar-actions .titlebar-action:active:not(:disabled) {
+  background: color-mix(in srgb, var(--material-content) 72%, var(--line));
+}
+
+:root body .titlebar .titlebar-actions .titlebar-action:disabled {
+  opacity: 0.42;
+  color: var(--secondary);
+}
+
+:root body .titlebar .titlebar-action .icon,
+:root body .titlebar .titlebar-action .system-symbol,
+:root body .titlebar .titlebar-action .system-symbol svg,
+:root body .titlebar .titlebar-action .icon svg {
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  display: block;
+  color: currentColor;
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
+:root body .titlebar-icon-button,
+:root body .titlebar .toolbar-more > summary.titlebar-icon-button {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+:root body .titlebar-icon-button:hover {
+  background: color-mix(in srgb, var(--material-content) 82%, var(--line));
+  color: var(--text);
+}
+
+:root body .titlebar-icon-button .system-symbol,
+:root body .titlebar-icon-button .system-symbol svg,
+:root body .titlebar-icon-button .icon svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+/* Document pill — 组件 / 标题栏 文档 */
+:root body .titlebar .document-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: auto;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  box-shadow: none;
+}
+
+:root body .titlebar .document-title .document-icon,
+:root body .titlebar .document-title .document-icon svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+  color: var(--secondary);
+}
+
+:root body .titlebar .document-title strong {
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+:root body .titlebar .document-title #dirty[hidden] {
+  display: none;
+}
+
+/* Desktop title actions follow the rounded, raised reference toolbar.
+   Every titlebar icon button shares one size, so the left and right groups match. */
+@media (min-width: 761px) {
+  :root body .titlebar-right,
+  :root body .desktop-quick-actions {
+    gap: 6px;
+  }
+
+  :root body .titlebar .titlebar-icon-button,
+  :root body .titlebar .toolbar-more > summary.titlebar-icon-button {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    flex: none;
+    border-radius: var(--radius-md);
+    background: var(--material-content);
+  }
+
+  :root body .titlebar .titlebar-icon-button .system-symbol,
+  :root body .titlebar .titlebar-icon-button .system-symbol svg,
+  :root body .titlebar .toolbar-more > summary.titlebar-icon-button .system-symbol,
+  :root body .titlebar .toolbar-more > summary.titlebar-icon-button .system-symbol svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  :root body .titlebar .mode-control {
+    flex: none;
+  }
+
+  :root body .titlebar .mode-control,
+  :root body .sidebar-view-control {
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--radius-md);
+  }
+
+  :root body .titlebar .mode-control button,
+  :root body .sidebar-view-control button {
+    height: 28px;
+    padding: 0 12px;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
+  }
+
+  :root body .titlebar .mode-control button.active,
+  :root body .sidebar-view-control button.active {
+    box-shadow: var(--shadow-sm);
+    font-weight: 600;
+  }
+}
+
+:root body .titlebar .mobile-choice-toggle,
+:root body .mobile-command-menu,
+:root body .mobile-quick-actions,
+:root body .mobile-title-choices {
+  display: none;
+}
+
+/* =================================================================================================
+ * 18 · Welcome screen  (桌面 · 新建皮肤: single column, content capped at 1100px · gap 26 ·
+ *      280px template cards)
+ * ================================================================================================= */
+
+:root body .welcome-head-action[hidden] {
+  display: none;
+}
+
+:root body .welcome-head-clear:not([hidden]) + .welcome-head-action {
+  margin-left: 8px;
+}
+
+:root body .welcome-main {
+  gap: 24px;
+  /* 内容限宽居中；滚动条仍贴窗口右缘 */
+  padding: 40px max(48px, calc((100% - var(--content-max-width)) / 2));
+  background: var(--material-window);
+}
+
+:root body .welcome-hero {
+  gap: 8px;
+}
+
+:root body .welcome-hero h1 {
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+:root body .welcome-hero p {
+  max-width: none;
+  color: var(--secondary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-md);
+  font-weight: 400;
+  line-height: 21px;
+}
+
+:root body .welcome-section {
+  gap: 12px;
+}
+
+:root body .welcome-section-head {
+  gap: 12px;
+}
+
+:root body .welcome-section-head h2 {
+  color: var(--text);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+:root body .welcome-section-head span {
+  color: var(--tertiary);
+  font-size: var(--font-size-sm);
+}
+
+:root body .welcome-recent .welcome-section-head {
+  gap: 12px;
+}
+
+/* 与「新建皮肤」标题同级，字号对齐 hero。 */
+:root body .welcome-recent .welcome-section-head h2 {
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+:root body .recent-card-folder {
+  color: var(--tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
+
+:root body .welcome-head-action {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+:root body .welcome-head-action:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--material-content));
+  color: var(--accent);
+}
+
+:root body .recent-grid {
+  grid-template-columns: repeat(auto-fill, 280px);
+  gap: 16px;
+}
+
+/* 最近打开的皮肤预览与模板卡同一尺寸与底色，保证两个区块视觉一致。 */
+:root body .recent-grid .template-preview {
+  height: 160px;
+  padding: 0;
+  align-items: center;
+  background: var(--material-content);
+  color: var(--tertiary);
+  font-size: var(--font-size-xs);
+}
+
+:root body .recent-grid .template-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+:root body .recent-grid .template-name {
+  color: var(--text);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+}
+
+:root body .recent-grid .template-go {
+  color: var(--tertiary);
+}
+
+:root body .recent-grid .template-meta {
+  color: var(--tertiary);
+  font-size: var(--font-size-xs);
+}
+
+:root body .recent-grid .template-meta em {
+  border-radius: var(--radius-sm);
+  background: var(--material-content);
+  color: var(--secondary);
+  font-size: var(--font-size-xs);
+}
+
+:root body .recent-grid-empty {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--material-panel);
+}
+
+:root body .recent-grid-empty-copy strong {
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+:root body .recent-grid-empty-copy span {
+  color: var(--tertiary);
+  font-size: var(--font-size-xs);
+}
+
+:root body .recent-grid-empty button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+:root body .recent-grid-empty button:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--material-content));
+  color: var(--accent);
+}
+
+:root body .template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+:root body .template-grid-row {
+  display: contents;
+}
+
+:root body .template-card {
+  gap: 12px;
+  padding: 16px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  outline: 1px solid var(--line);
+  outline-offset: -1px;
+  background: var(--material-panel);
+  box-shadow: none;
+  transition: outline-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) var(--ease-standard);
+}
+
+:root body .template-card:hover {
+  border-color: transparent;
+  outline-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+:root body .template-preview {
+  border-radius: var(--radius-md);
+}
+
+:root body .template-grid .template-preview {
+  height: 160px;
+  padding: 0;
+  align-items: center;
+  background: var(--material-content);
+  color: var(--tertiary);
+  font-size: var(--font-size-xs);
+}
+
+:root body .template-grid .template-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+:root body .template-name {
+  color: var(--text);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+}
+
+:root body .template-go {
+  color: var(--tertiary);
+}
+
+:root body .template-meta {
+  color: var(--tertiary);
+  font-size: var(--font-size-xs);
+}
+
+:root body .template-meta em {
+  border-radius: var(--radius-sm);
+  background: var(--material-content);
+  color: var(--secondary);
+  font-size: var(--font-size-xs);
+}
+:root body .welcome-note {
+  gap: 8px;
+  padding: 12px 12px;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+}
+
+:root body .welcome-note p {
+  color: var(--secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+}
+
+:root body .welcome-note .system-symbol {
+  color: var(--tertiary);
+}
+/* File operation sheet: bounded icon and a compact, readable progress layout. */
+:root body #file-operation-dialog {
+  width: min(400px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+}
+:root body #file-operation-dialog > form { gap: 20px; padding: 24px; }
+:root body #file-operation-dialog header {
+  display: flex;
+  min-height: 0;
+  padding: 0;
+  gap: 12px;
+  border: 0;
+}
+:root body #file-operation-dialog .file-operation-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+:root body #file-operation-dialog .file-operation-icon svg { width: 24px; height: 24px; }
+:root body #file-operation-dialog .file-operation-subtitle { font-size: var(--font-size-sm); line-height: 1.5; }
+:root body #file-operation-dialog .file-operation-progress-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: var(--font-size-sm);
+  color: var(--secondary);
+}
+:root body #file-operation-detail { margin: 0; overflow-wrap: anywhere; }
+:root body #file-operation-percent { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+:root body #file-operation-dialog progress { display: block; height: 6px; }
+:root body #file-operation-result { font-size: var(--font-size-sm); line-height: 1.6; overflow-wrap: anywhere; }
+:root body #file-operation-dialog[data-outcome="success"] #file-operation-result { display: none; }
+:root body #file-operation-dialog footer {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 16px;
+}
+:root body #file-operation-dialog .file-operation-hint { font-size: var(--font-size-xs); color: var(--secondary); }
+:root body #file-operation-close { flex-shrink: 0; min-width: 64px; }
+
+/* =================================================================================================
+ * 8 · Replace-keyboard-style sheet  (弹层 · 替换键盘样式)
+ *     §6 的 `.app-dialog button` 默认值（32px 实线按钮）会把投放区压成一行、把分段控件
+ *     的选中态刷成背景色，这里用 #layout-image-dialog 前缀明确本弹窗自己的尺寸与状态。
+ * ================================================================================================= */
+
+:root body #layout-image-dialog {
+  width: min(680px, calc(100vw - 32px));
+}
+
+/* 内容比视口高时只滚动中间，头尾保持可见。 */
+:root body #layout-image-dialog > form {
+  max-height: calc(100dvh - 64px);
+  overflow-y: auto;
+  gap: 16px;
+}
+
+:root body #layout-image-dialog > form > header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--material-panel);
+}
+
+:root body #layout-image-dialog > form > footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  background: var(--material-panel);
+}
+
+/* ── 投放区 ── */
+
+:root body #layout-image-dialog .layout-image-file {
+  height: auto;
+  min-height: 148px;
+  display: grid;
+  align-content: center;
+  place-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--material-content);
+  color: var(--text);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+}
+
+:root body #layout-image-dialog .layout-image-file-icon {
+  font-size: var(--font-size-xl);
+  color: var(--tertiary);
+}
+
+:root body #layout-image-dialog .layout-image-file:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+:root body #layout-image-dialog .layout-image-file.drop-target {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+:root body #layout-image-dialog .layout-image-file.has-image {
+  min-height: 0;
+  padding: 12px;
+  border-style: solid;
+  border-color: var(--line);
+  background: var(--material-panel);
+}
+
+:root body #layout-image-dialog .layout-image-file.has-image:hover {
+  border-color: var(--accent);
+}
+
+:root body #layout-image-dialog .layout-image-file.has-image .layout-image-file-icon {
+  display: none;
+}
+
+:root body #layout-image-dialog .layout-image-file img {
+  max-width: 100%;
+  max-height: 168px;
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+}
+
+:root body #layout-image-dialog .layout-image-file small,
+:root body #layout-image-dialog header small {
+  color: var(--tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+}
+
+/* ── 替换位置：卡片选中态之前只有 1px 描边，单选圆点被隐藏，这里补回来 ── */
+
+:root body #layout-image-dialog .layout-image-targets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+:root body #layout-image-dialog .layout-image-config legend,
+:root body #layout-image-dialog .layout-image-targets legend {
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+:root body #layout-image-dialog .layout-image-targets label {
+  display: flex; /* 覆盖 .app-dialog label 的 grid，否则标题与说明会被拉开 */
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-panel);
+  cursor: pointer;
+}
+
+:root body #layout-image-dialog .layout-image-targets label::before {
+  content: "";
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--material-panel);
+  box-shadow: inset 0 0 0 3px var(--material-panel);
+}
+
+:root body #layout-image-dialog .layout-image-targets label:hover {
+  border-color: var(--line-strong);
+  background: var(--material-content);
+}
+
+:root body #layout-image-dialog .layout-image-targets label:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+:root body #layout-image-dialog .layout-image-targets label:has(input:checked)::before {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 3px var(--accent-soft);
+}
+
+:root body #layout-image-dialog .layout-image-targets label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+:root body #layout-image-dialog .layout-image-targets input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  opacity: 0;
+}
+
+:root body #layout-image-dialog .layout-image-targets label span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+:root body #layout-image-dialog .layout-image-targets label strong {
+  color: var(--text);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+}
+
+:root body #layout-image-dialog .layout-image-targets label small {
+  color: var(--secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.35;
+}
+
+/* ── 布局配置：分段控件的选中态原来与背景同色，等于没有反馈 ── */
+
+:root body #layout-image-dialog .layout-image-config {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+:root body #layout-image-dialog .layout-image-config-control {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  /* 容器带 glass-module 类：去掉它的投影与毛玻璃，保持扁平细线风格 */
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root body #layout-image-dialog .layout-image-config-control button {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  box-shadow: none;
+}
+
+:root body #layout-image-dialog .layout-image-config-control button:hover:not(.active) {
+  color: var(--text);
+  background: var(--material-panel);
+}
+
+:root body #layout-image-dialog .layout-image-config-control button.active {
+  background: var(--material-control);
+  color: var(--text);
+  font-weight: 500;
+  box-shadow: var(--shadow-sm);
+}
+
+:root body #layout-image-dialog .layout-image-config[disabled] {
+  opacity: 0.55;
+}
+
+:root body #layout-image-dialog .layout-image-config[disabled] button {
+  cursor: not-allowed;
+}
+
+:root body #layout-image-dialog .layout-image-config small {
+  color: var(--tertiary);
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+}
+
+/* ── 说明 · 错误 · 底部按钮 ── */
+
+:root body #layout-image-dialog .layout-image-scope {
+  color: var(--secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+:root body #layout-image-dialog .field-error {
+  color: var(--state-danger);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+:root body #layout-image-dialog footer button {
+  min-width: 84px;
+}
+
+:root body #layout-image-dialog footer button.primary:disabled {
+  border-color: var(--line);
+  background: var(--material-content);
+  color: var(--tertiary);
+  cursor: not-allowed;
+}
+
+@media (max-width: 560px) {
+  :root body #layout-image-dialog .layout-image-targets {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ===================== 原 mobile.css ===================== */
+/* =================================================================================================
+ * Mobile adaptation layer
+ *
+ * The Pen redesign layers (pen-*.css, inspector-fidelity.css, settings.css …) restate many
+ * desktop rules without a media query. Because they load after style.css, they silently
+ * override its phone rules: the title pill sits on top of the mode switch, the canvas row
+ * collapses to 48px, the welcome page renders inside half of the split view, and the
+ * settings sheet clips its navigation. This file is imported last and restates the phone
+ * layout on top of the Pen visual language.
+ *
+ *  - (max-width: 760px)                         every narrow viewport
+ *  - (max-width: 760px) and (orientation: portrait)  the split editor (mirrors
+ *                                               `mobilePortraitQuery` in main.ts)
+ * ================================================================================================= */
+
+/* -------------------------------------------------------------------------------------------------
+ * 1 · Title bar
+ *     ☰ actions · undo/redo · document name (truncates) · mode pill · more
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+
+  :root body .titlebar {
+    height: var(--titlebar-height);
+    min-height: var(--titlebar-height);
+    gap: 6px;
+    padding: var(--safe-area-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+  }
+
+  :root body .titlebar-left,
+  :root body .titlebar-right {
+    flex: none;
+    gap: 4px;
+  }
+
+  :root body .titlebar-center {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+
+  /* The phone menu mirrors the desktop file menu and also carries the panel tools,
+     so the desktop-only buttons leave the bar. */
+  :root body .titlebar .pen-file-menu,
+  :root body .titlebar-left > .titlebar-icon-button,
+  :root body .titlebar-left > .spacer,
+  :root body .titlebar .desktop-quick-actions,
+  :root body .titlebar .mobile-title-choices,
+  :root body .titlebar .mode-control > button:not(.mobile-choice-toggle) {
+    display: none !important;
+  }
+
+  :root body .titlebar .mobile-command-menu {
+    display: block;
+    position: static;
+    flex: none;
+  }
+
+  :root body .titlebar .mobile-quick-actions {
+    display: flex;
+    flex: none;
+    gap: 2px;
+  }
+
+  :root body .titlebar .titlebar-icon-button,
+  :root body .titlebar .toolbar-more > summary.titlebar-icon-button,
+  :root body .titlebar .mobile-command-menu > summary {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text);
+    box-shadow: none;
+    font-size: 0;
+  }
+
+  :root body .titlebar .mobile-command-menu > summary {
+    background: var(--material-content);
+  }
+
+  :root body .titlebar .titlebar-icon-button:disabled {
+    opacity: 0.32;
+  }
+
+  :root body .titlebar .titlebar-icon-button .system-symbol,
+  :root body .titlebar .titlebar-icon-button .system-symbol svg,
+  :root body .titlebar .toolbar-more > summary .system-symbol,
+  :root body .titlebar .toolbar-more > summary .system-symbol svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Document name: an inline, truncating pill instead of an absolutely centred label. */
+  :root body .titlebar .document-title {
+    position: static;
+    min-width: 0;
+    max-width: 100%;
+    display: inline-flex;
+    gap: 6px;
+    padding: 8px 12px;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  :root body .titlebar .document-title .document-icon {
+    display: none;
+  }
+
+  :root body .titlebar .document-title strong {
+    min-width: 0;
+    max-width: none;
+    overflow: hidden;
+    font-size: var(--font-size-lg);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :root body .titlebar .document-title input {
+    width: 100%;
+    min-width: 0;
+    font-size: var(--font-size-lg); /* ≥16px keeps iOS Safari from zooming on focus */
+  }
+
+  /* Mode switch: a labelled pill that turns accent while editing. */
+  :root body .titlebar .mode-control {
+    width: auto;
+    min-width: 0;
+    position: static;
+    flex: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+  }
+
+  :root body .titlebar .mode-control > .mobile-choice-toggle {
+    width: auto;
+    min-width: 0;
+    height: 34px;
+    padding: 0 12px;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: var(--material-content);
+    color: var(--text);
+    box-shadow: none;
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  :root body .titlebar .mode-control > .mobile-choice-toggle .mode-toggle-icon {
+    display: none;
+  }
+
+  :root:has(#mode option[value="edit"]:checked) body .titlebar .mode-control > .mobile-choice-toggle {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  /* 手机标题栏很窄，未保存提示只保留圆点 */
+  :root body .titlebar .document-title #dirty {
+    min-height: 0;
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+    font-size: 0;
+    gap: 0;
+  }
+
+  /* Menus anchor to the bar edges instead of the summary so they never leave the screen. */
+  :root body .titlebar .mobile-command-actions {
+    width: auto;
+    max-height: calc(100dvh - var(--titlebar-height) - 16px - env(safe-area-inset-bottom));
+    position: fixed;
+    top: calc(var(--titlebar-height) + 6px);
+    right: auto;
+    left: max(8px, env(safe-area-inset-left));
+    min-width: 248px;
+    max-width: calc(100vw - 20px);
+    display: grid;
+    gap: 2px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  :root body .titlebar .mobile-command-actions button {
+    min-height: 44px;
+    padding: 0 12px;
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-lg);
+    text-align: left;
+  }
+
+  :root body .titlebar .mobile-command-actions button .system-symbol,
+  :root body .titlebar .mobile-command-actions button .system-symbol svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  :root body .titlebar .mobile-menu-separator:last-child {
+    display: none;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 2 · Welcome screen (no skin open)
+ *     Older phone rules target the bare `aside` element, which also matches the welcome
+ *     page's `aside.welcome-aside` and pinned it over the recent list. Without a skin the
+ *     split dock has nothing to switch between, so the welcome page takes the whole window.
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  body:has(.canvas-wrap.empty) .mobile-workspace-tabs {
+    display: none !important;
+  }
+
+  :root body:has(.canvas-wrap.empty) main > .workspace {
+    top: 0 !important;
+    height: 100% !important;
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr);
+    border-top: 0;
+  }
+
+  :root body:has(.canvas-wrap.empty) .preview-zoom-control {
+    display: none;
+  }
+
+  :root body .canvas-wrap.empty .empty-state {
+    display: block;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  :root body .welcome-main {
+    gap: 24px;
+    padding: 20px max(16px, env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    overflow: visible;
+  }
+
+  :root body .welcome-section-head {
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 6px;
+  }
+
+  :root body .welcome-recent .welcome-section-head h2,
+  :root body .welcome-hero h1 {
+    font-size: var(--font-size-xl);
+    line-height: 1.25;
+  }
+
+  :root body .welcome-head-action {
+    margin-left: auto;
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  :root body .recent-grid-empty {
+    flex-wrap: wrap;
+  }
+
+  :root body .recent-grid-empty-copy {
+    flex: 1 1 180px;
+  }
+
+  :root body .recent-grid-empty-copy strong {
+    font-size: var(--font-size-lg);
+  }
+
+  :root body .recent-grid-empty-copy span {
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+  }
+
+  :root body .recent-grid-empty button {
+    min-height: 40px;
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  :root body .welcome-hero p {
+    font-size: var(--font-size-md);
+  }
+
+  :root body .template-grid,
+  :root body .recent-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  :root body .template-card {
+    min-width: 0;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  :root body .template-grid .template-preview,
+  :root body .recent-grid .template-preview {
+    height: 128px;
+  }
+
+  :root body .template-name-row,
+  :root body .template-meta {
+    min-width: 0;
+  }
+
+  :root body .template-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :root body .template-meta {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 3 · Split editor (portrait phones)
+ *     Panes above, dock (pane switch + grab handle) in between, canvas below — or mirrored
+ *     when 「预览位置」 is set to top. The Pen dock is 56px tall; the older budget reserved a
+ *     dock-sized gap above the panes even when the dock sits at the split.
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 760px) and (orientation: portrait) {
+  :root:not([data-mobile-preview-position="top"]) body main > :is(aside, .source) {
+    top: 0;
+    height: calc(100% - var(--mobile-workspace-split, 50%));
+  }
+
+  :root[data-mobile-preview-position="top"] body main > :is(aside, .source) {
+    top: calc(var(--mobile-workspace-split, 50%) + var(--mobile-dock-h));
+    height: calc(100% - var(--mobile-workspace-split, 50%) - var(--mobile-dock-h));
+  }
+
+  :root[data-mobile-preview-position="top"] body main > .workspace {
+    top: 0;
+    height: var(--mobile-workspace-split, 50%);
+  }
+
+  :root[data-mobile-preview-collapsed="true"] body main > :is(aside, .source) {
+    top: var(--mobile-dock-h) !important;
+    height: calc(100% - var(--mobile-dock-h)) !important;
+  }
+
+  :root[data-mobile-preview-collapsed="true"] body .mobile-workspace-tabs {
+    top: 0 !important;
+  }
+
+  :root body main > :is(aside, .source) {
+    border-top: 0;
+    border-bottom: 0;
+    background: var(--material-panel);
+  }
+
+  /* Dock: a thin strip with two page indicators. Panes switch by swiping sideways (or tapping
+     an indicator); the rest of the strip is the grab handle that resizes the split. */
+
+  :root body .mobile-workspace-tabs {
+    height: var(--mobile-dock-h);
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    padding: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  :root body .mobile-workspace-tabs button[data-mobile-pane] {
+    position: relative;
+    z-index: 3;
+    flex: none;
+    width: 30px;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: transparent;
+    font-size: 0;
+  }
+
+  :root body .mobile-workspace-tabs button[data-mobile-pane]::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 14px;
+    height: 4px;
+    margin: -2px 0 0 -8px;
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--secondary) 35%, transparent);
+    transition: width var(--duration-base) var(--ease-standard), margin var(--duration-base) var(--ease-standard), background-color var(--duration-base) var(--ease-standard);
+  }
+
+  :root body .mobile-workspace-tabs button[data-mobile-pane].active {
+    background: transparent;
+  }
+
+  :root body .mobile-workspace-tabs button[data-mobile-pane].active::after {
+    width: 24px;
+    margin-left: -12px;
+    background: var(--accent);
+  }
+
+  :root body .mobile-split-handle {
+    z-index: 2;
+    inset: 0;
+    width: auto;
+    height: auto;
+    border-radius: 0;
+    transform: none;
+  }
+
+  :root body .mobile-split-handle::before,
+  :root body .mobile-split-handle .mobile-split-icon {
+    display: none;
+  }
+
+  :root body .mobile-split-handle.dragging,
+  :root body .mobile-split-handle:focus-visible {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  /* Canvas: compact preview toolbar on top, canvas fills the rest. The desktop grid
+     (48px · 1fr · 30px) used to squeeze the canvas into the 48px toolbar row. */
+  :root body:not(:has(.canvas-wrap.empty)) main > .workspace {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    border-top: 0;
+  }
+
+  :root[data-mobile-preview-collapsed="true"] body main > .workspace {
+    display: none !important;
+  }
+
+  :root body main > .workspace > .workspace-status {
+    display: none;
+  }
+
+  :root body:not(:has(.canvas-wrap.empty)) .preview-toolbar {
+    height: auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 6px max(8px, env(safe-area-inset-right)) 6px max(8px, env(safe-area-inset-left));
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--line);
+    background: var(--material-panel);
+  }
+
+  :root body .preview-toolbar-start,
+  :root body .preview-toolbar-end {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: static;
+  }
+
+  :root body .preview-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  :root body .preview-toolbar #device-control {
+    width: auto;
+    flex: 1 1 auto;
+    min-width: 116px;
+    position: static;
+    transform: none;
+  }
+
+  :root body .preview-toolbar #skin-state-control {
+    width: auto;
+    flex: none;
+  }
+
+  :root body .preview-toolbar #device-control select,
+  :root body .preview-toolbar #device {
+    width: 100%;
+    min-width: 0;
+    height: 30px;
+    padding: 0 16px 0 0;
+    font-size: var(--font-size-md);
+  }
+
+  :root body .preview-toolbar #device-control .device-control-icon {
+    display: none;
+  }
+
+  :root body .preview-toolbar #device-control,
+  :root body .preview-toolbar #skin-state-control {
+    height: 32px;
+    padding: 0 8px;
+  }
+
+  :root body .preview-toolbar #skin-state-control {
+    max-width: 72px;
+    align-items: center;
+  }
+
+  :root body .preview-toolbar #skin-state-control .skin-state-value {
+    line-height: 30px;
+  }
+
+  :root body .preview-toolbar .preview-choice {
+    padding: 2px;
+    gap: 2px;
+  }
+
+  :root body .preview-toolbar .preview-choice > button,
+  :root body .preview-toolbar .preview-tool-toggle {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    padding: 0;
+  }
+
+  :root body .canvas-wrap {
+    min-height: 0;
+    padding: 8px;
+  }
+
+  :root body .preview-zoom-control {
+    right: max(8px, env(safe-area-inset-right));
+    bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+
+  :root body .preview-zoom-control button {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 4 · Panes: overview rail and inspector group rail
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 760px) and (orientation: portrait) {
+  :root body .preview-toolbar #skin-state-control {
+    width: 58px !important;
+    max-width: 58px;
+  }
+
+  /* The rail already names the group; a collapsible summary would only hide its items. */
+  :root body #files .sidebar-overview > .nav-group > .nav-section {
+    display: none;
+  }
+
+  :root body .sidebar-overview > .nav-group.mobile-overview-active > .nav-group-body {
+    padding-top: 6px;
+  }
+}
+
+/* Narrow phones (iPhone SE, 360dp Android): the mode pill drops its label for the icon. */
+@media (max-width: 374px) {
+  :root body .titlebar .mode-control > .mobile-choice-toggle {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  :root body .titlebar .mode-control > .mobile-choice-toggle .mode-toggle-icon {
+    display: block;
+  }
+
+  :root body .titlebar .mode-control > .mobile-choice-toggle .mode-toggle-icon svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+  }
+
+  :root body .titlebar .mode-control > .mobile-choice-toggle .mobile-choice-label {
+    display: none;
+  }
+
+  :root body .titlebar .mobile-quick-actions .titlebar-icon-button {
+    width: 32px;
+    min-width: 32px;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 5 · Landscape phones
+ *     The three-column desktop frame stays, but the canvas row had collapsed to the 48px
+ *     toolbar slot and the 30px status row grew to fill the column.
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 950px) and (max-height: 600px) and (orientation: landscape) {
+  :root body:not(:has(.canvas-wrap.empty)) main > .workspace {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  :root body main > .workspace > .workspace-status {
+    display: none;
+  }
+
+  :root body:not(:has(.canvas-wrap.empty)) .preview-toolbar {
+    height: auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 6px 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  :root body .preview-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  :root body .preview-toolbar-start,
+  :root body .preview-toolbar-end {
+    flex: none;
+    position: static;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  :root body .preview-toolbar #device-control {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 116px;
+    position: static;
+    transform: none;
+  }
+
+  :root body .preview-toolbar #device-control .device-control-icon {
+    display: none;
+  }
+
+  :root body .preview-toolbar .preview-choice > button,
+  :root body .preview-toolbar .preview-tool-toggle {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    padding: 0;
+  }
+
+  :root body .preview-zoom-control {
+    right: max(8px, env(safe-area-inset-right));
+    bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+
+  :root body .sidebar-view-control button {
+    min-width: 0;
+    padding-inline: 4px;
+    white-space: nowrap;
+  }
+
+  :root body .sidebar-view-control button .system-symbol {
+    display: none;
+  }
+
+  :root body .canvas-wrap.empty .empty-state {
+    overflow-y: auto;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 6 · Settings sheet
+ *     Full-screen on phones: one scrolling row of category chips (a 3-column grid from an
+ *     older rule clipped 「安全区与辅助线」), rows that stack long labels, and a footer that
+ *     clears the home indicator.
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .settings-sidebar::-webkit-scrollbar {
+    display: none;
+  }
+
+  :root body #settings-dialog .settings-nav-item::after {
+    display: none !important;
+  }
+
+  /* Labels with a hint stack the hint underneath instead of running into it. */
+
+  :root body #settings-dialog .settings-row > select,
+  :root body #settings-dialog .settings-row > input:not([type="checkbox"]),
+  :root body #settings-dialog .settings-text-row > :last-child,
+  :root body #settings-dialog .settings-row > .settings-secret-control,
+  :root body #settings-dialog .settings-row.settings-range > .settings-range-control {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: none;
+  }
+
+  :root body #settings-dialog input:not([type="checkbox"]):not([type="range"]):not([type="color"]) {
+    min-height: 40px;
+    font-size: var(--font-size-lg); /* ≥16px stops iOS Safari from zooming the sheet on focus */
+  }
+
+  :root body #settings-dialog .settings-switch input[type="checkbox"] {
+    flex: none;
+  }
+
+  :root body #settings-dialog .about-update > div,
+  :root body #settings-dialog .about-contact {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
+
+  :root body #settings-dialog .about-contact {
+    margin-top: 20px;
+  }
+
+  :root body #settings-dialog .about-contact strong {
+    flex: 1 1 100%;
+  }
+
+  :root body #settings-dialog .about-contact .qq-group-copy,
+  :root body #settings-dialog .about-contact a {
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--content);
+    box-shadow: none;
+    font-size: var(--font-size-md);
+    text-decoration: none;
+  }
+
+  :root body #settings-dialog .model-choices-panel {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  :root body #settings-dialog #settings-save-state {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  :root body #settings-dialog #settings-dirty-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 7 · Other sheets on phones
+ *     The new-skin list scrolled inside a dialog that also scrolled (its buttons were below
+ *     the fold), and the layout-image form overlapped its own footer. Both become a column
+ *     with a scrolling middle and a footer that stays reachable and opaque.
+ * ------------------------------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  :root body #new-project-dialog[open] {
+    height: auto;
+    max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  :root body #new-project-form {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :root body #new-project-form > header,
+  :root body #new-project-form > footer {
+    flex: none;
+  }
+
+  :root body #new-project-form > fieldset {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* The form already scrolls under a sticky footer; the footer only needs to be opaque
+     so the options scrolling beneath it stay hidden. */
+  :root body #layout-image-dialog > form > footer {
+    z-index: 1;
+    background: var(--material-panel);
+  }
+
+  :root body .project-dialog footer button,
+  :root body .app-dialog footer button {
+    min-height: 40px;
+  }
 }

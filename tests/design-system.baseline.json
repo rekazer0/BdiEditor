@@ -11,31 +11,18 @@
     "src/atlas-workspace.css": 3,
     "src/design-workbench.css": 5,
     "src/device-preview.css": 1,
-    "src/mobile.css": 12,
-    "src/pen-components.css": 3,
-    "src/pen-design-application.css": 2,
     "src/picker.css": 2,
-    "src/settings.css": 1,
-    "src/source-files-redesign.css": 1,
-    "src/style.css": 15
+    "src/settings.css": 2,
+    "src/style.css": 33
   },
   "css-token-outside-tokens": {},
-  "css-cross-file-selector": {
-    "src/style.css": 80,
-    "src/pen-design-application.css": 7,
-    "src/new-project.css": 1,
-    "src/pen-components.css": 43,
-    "src/picker.css": 5,
-    "src/tokens.css": 2,
-    "src/settings.css": 21,
-    "src/style-performance.css": 9
-  },
+  "css-cross-file-selector": {},
   "icon-outside-registry": {},
   "html-inline-style": {},
   "ts-file-too-long": {
     "src/bda-editor.ts": 29,
     "src/bda.ts": 1214,
-    "src/main.ts": 11700,
+    "src/main.ts": 11697,
     "src/preview.ts": 2061,
     "src/skin.ts": 6
   }

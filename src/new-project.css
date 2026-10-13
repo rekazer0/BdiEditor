@@ -1,28 +1,20 @@
-:root {
+.new-project-window {
   color: var(--text);
   background: var(--material-content);
   font-family: var(--font-ui);
 }
 
-* { box-sizing: border-box; }
-
-html,
-body {
+html, .new-project-window {
   height: 100%;
   margin: 0;
   overflow: hidden;
   background: var(--panel);
 }
 
-body {
+.new-project-window {
   color: inherit;
   font-size: var(--font-size-xl);
-  user-select: none;
-  -webkit-font-smoothing: antialiased;
 }
-
-button,
-input { font: inherit; }
 
 form {
   height: 100%;
@@ -200,12 +192,6 @@ footer .primary {
 footer .primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--accent) 90%, var(--text));
   box-shadow: none;
-}
-
-button:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 @media (max-height: 620px) {

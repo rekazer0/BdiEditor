@@ -471,3 +471,49 @@
   :root[data-mobile-pane="inspector"] .source { transform: translateX(0); }
   :root:not([data-mobile-pane="inspector"]) .source { pointer-events: none; transform: translateX(100%); }
 }
+/*
+ 从 style.css 归并过来的同名规则（含响应式变体）
+ */
+
+.source {
+  min-width: 0;
+}
+
+@media (max-width: 760px) and (orientation: portrait) {
+
+  .source {
+    width: 100%;
+    height: calc(50% - 18px);
+    min-height: 0;
+    position: absolute;
+    right: 0;
+    left: 0;
+    border-right: 0;
+    border-left: 0;
+    touch-action: pan-y;
+    transition: transform var(--duration-base) var(--ease-emphasized);
+    will-change: transform;
+  }
+}
+
+@media (max-width: 950px) and (max-height: 600px) and (orientation: landscape) {
+
+  .source #style-detail-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.source {
+  border-color: var(--line);
+  background: var(--material-panel);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+@media (max-width: 760px) {
+
+  .source {
+    border-color: var(--line);
+  }
+}

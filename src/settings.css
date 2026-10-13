@@ -100,3 +100,156 @@
   :root body #settings-dialog .settings-footer { padding: 0 12px; gap: 6px; }
   #settings-save-state { padding: 4px 6px; font-size: var(--font-size-xs); }
 }
+/* 从 style.css 归并过来的同名规则（含响应式变体） */
+@media (max-width: 760px) {
+  :root body #settings-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: var(--material-panel); /* full-screen sheet: nothing behind it should show through */
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog form {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog header {
+    min-height: 52px;
+    padding: var(--safe-area-top, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .settings-title-cluster {
+    overflow: hidden;
+    white-space: nowrap;
+  } }
+@media (max-width: 760px) {
+  :root body #settings-dialog #settings-close {
+    width: 40px;
+    height: 40px;
+    flex: none;
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .settings-sidebar {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .settings-group-label,
+  :root body #settings-dialog .settings-nav-item small {
+    display: none !important;
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .settings-nav-item {
+    width: auto;
+    min-width: 0;
+    height: 36px;
+    flex: none;
+    padding: 0 12px;
+    scroll-snap-align: start;
+    font-size: var(--font-size-md);
+    white-space: nowrap;
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .settings-content {
+    padding: 20px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .settings-section-heading h3 {
+    font-size: var(--font-size-xl);
+    overflow-wrap: anywhere;
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .settings-row {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    min-height: 52px;
+    font-size: var(--font-size-lg);
+  } }
+@media (max-width: 760px) {
+  :root body #settings-dialog .settings-row > span:first-child {
+    flex: 1 1 140px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .settings-row > span:first-child small {
+    margin: 0;
+    color: var(--tertiary);
+    font-size: var(--font-size-xs);
+    font-weight: 400;
+    line-height: 1.4;
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog select {
+    min-height: 40px;
+    font-size: var(--font-size-lg); /* ≥16px stops iOS Safari from zooming the sheet on focus */
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .settings-segmented {
+    height: 36px;
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .settings-segmented button {
+    height: 28px;
+    min-height: 0;
+    padding: 0 16px;
+    font-size: var(--font-size-md);
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .model-editor .settings-row > :last-child {
+    width: 100%;
+    flex: 1 1 100%;
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .settings-footer {
+    min-height: 60px;
+    padding: 8px max(12px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  } }
+@media (max-width: 760px) {
+
+  :root body #settings-dialog .settings-footer-actions button {
+    height: 40px;
+    min-width: 72px;
+    padding: 0 16px;
+    font-size: var(--font-size-lg);
+  } }

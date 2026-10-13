@@ -361,3 +361,27 @@ input.ui-input, select.ui-input { padding: 0 var(--space-sm); }
 :where(.ui-form) :where(input[type="range"]) { width: 100%; margin: 0; accent-color: var(--accent); }
 .ui-field-pair[data-columns="3"] { --_columns: 3; }
 .ui-field-pair[data-columns="4"] { --_columns: 4; }
+
+/* —— 基础：所有窗口共用（盒模型、字体、表单继承、焦点、滚动条） —— */
+*, ::before, ::after {
+  --_scrollbar-size: 6px;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-user-select: none;
+  user-select: none;
+}
+:where(button, input, select, textarea) { font: inherit; color: inherit; }
+:where(input, textarea) { -webkit-user-select: text; user-select: text; }
+:where(button, select, textarea, input, summary):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  outline-offset: 1px;
+}

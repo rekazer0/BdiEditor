@@ -1,13 +1,10 @@
-:root {
+.picker-window {
   --_toolbar-h: 58px;
   color: var(--text);
   background: var(--material-content);
   font-family: var(--font-ui);
 }
-
-* { box-sizing: border-box; }
-body { margin: 0; background: inherit; user-select: none; }
-button, input { font: inherit; color: inherit; }
+.picker-window { background: inherit; }
 .picker-toolbar {
   height: var(--_toolbar-h);
   display: flex;
