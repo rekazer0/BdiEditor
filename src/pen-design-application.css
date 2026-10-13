@@ -268,8 +268,11 @@ main {
 
 @media (min-width: 761px) {
   main {
-    grid-template-columns: 248px minmax(0, 1fr) 4px var(--inspector-width, 360px);
+    grid-template-columns: var(--sidebar-width, 248px) minmax(0, 1fr) 4px var(--inspector-width, 360px);
   }
+
+  .sidebar { position: relative; }
+  .sidebar-resize-handle { position: absolute; top: 0; right: -2px; bottom: 0; }
 }
 
 @media (min-width: 761px) and (max-width: 1060px) {
@@ -624,6 +627,24 @@ main {
 
 #files .raw-files .source-folder-row {
   color: var(--pen-secondary);
+}
+
+/* 文件数只是辅助信息：等宽小字、常规字重、三级色，不和名字抢视线。 */
+#files .raw-files .source-item-count {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--pen-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+#files .raw-files .source-thumbnail {
+  max-width: 16px;
+  max-height: 16px;
+  border-radius: 2px;
+  object-fit: contain;
 }
 
 /* States ---------------------------------------------------------------------------------------- */

@@ -354,16 +354,19 @@ function renderLibrary(): void {
           libraryCanvasObserver.observe(canvas)
           previews.append(canvas)
         }
-        const badge = document.createElement("span")
-        badge.className = "style-kind-badge"
-        badge.append(inspectorIcon(style.kindIcon, 11), style.kindLabel)
-        previews.append(badge)
       }
       const label = document.createElement("strong")
       label.textContent = imagePath ? imagePath.split("/").pop()! : `样式 ${style!.label}`
       card.title = imagePath || `${label.textContent} · 单击预览，双击应用，Command/Ctrl 单击编辑`
       const note = document.createElement("small")
       note.textContent = image ? (image.referenced ? "已引用" : "图片资源") : `#${style!.label}`
+      if (style && !image) {
+        // 类型徽标放在说明行里，不压在预览图上。
+        const badge = document.createElement("span")
+        badge.className = "style-kind-badge"
+        badge.append(inspectorIcon(style.kindIcon, 11), style.kindLabel)
+        note.prepend(badge)
+      }
       card.append(previews, label, note)
       const target = imagePath ? { imagePath } : { styleID: style!.styleID }
       card.addEventListener("click", (event) => {

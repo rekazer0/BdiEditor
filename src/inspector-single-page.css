@@ -1,0 +1,19 @@
+/* 关闭「侧边分类」：所有分区排成一页，由检查器整体滚动；右侧分类轨吸顶，只负责定位。 */
+:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector[data-inspector-single-page]:not([hidden]) {
+  grid-template-rows: none !important;
+  grid-auto-rows: max-content !important;
+  align-content: start !important;
+  overflow: hidden auto !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector[data-inspector-single-page] > :is(.mobile-inspector-managed, .document-fields, .bda-config-fields, #resource-inspector) {
+  grid-area: auto / 1 !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+/* shortcut: 分类轨跨 20 行，粘性定位才不会被限制在第一行内；检查器直接子元素超过 20 个时再改。 */
+:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector[data-inspector-single-page] > #mobile-inspector-groups:not([hidden]) {
+  grid-row: 1 / span 20 !important;
+  align-self: start !important;
+  position: sticky !important;
+  top: 0 !important;
+}

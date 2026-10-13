@@ -35,6 +35,8 @@ import "./pen-inspector-rows.css"
 import "./pen-inspector-panels.css"
 import "./pen-inspector.css"
 import "./inspector-fidelity.css"
+import "./inspector-single-page.css"
+import "./inspector-clarity.css"
 import { initializeProjectChooser, projectChoice, type ProjectChoice } from "./project-chooser"
 import {
   hydrateTemplateCardPreviews,
@@ -44,7 +46,7 @@ import {
   renderBlobPreview,
 } from "./template-preview"
 import { initInspectorShell, setInspectorKind, syncInspectorRows } from "./inspector-shell.ts"
-import { inspectorIcon, inspectorGroupIcon } from "./inspector-icons"
+import { inspectorIcon, inspectorGroupIcon, inspectorSymbolIcon } from "./inspector-icons"
 import { sourceKeyLabels } from "./config-labels.ts"
 import "./style-library.css"
 import "./design-workbench.css"
@@ -1541,6 +1543,28 @@ const fallbackSymbolPaths: Record<string, string[]> = {
   doc: ["M6 3h8l4 4v14H6z", "M14 3v5h5"],
 }
 
+// 源文件树缩略图按 PNG 字节缓存：文件被改写时换成新的字节对象，旧缓存随之回收。
+// 只保留 16px（按像素比放大）的小图，大图解码后立即释放。
+const sourceThumbnails = new WeakMap<Uint8Array, Promise<string | undefined>>()
+function sourceThumbnail(bytes: Uint8Array): Promise<string | undefined> {
+  let thumbnail = sourceThumbnails.get(bytes)
+  if (!thumbnail) {
+    thumbnail = createImageBitmap(new Blob([bytes as BlobPart], { type: "image/png" })).then((bitmap) => {
+      const scale = Math.min(1, 16 * (window.devicePixelRatio || 1) / Math.max(bitmap.width, bitmap.height))
+      const canvas = document.createElement("canvas")
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+      const context = canvas.getContext("2d")
+      if (context) context.imageSmoothingQuality = "high"
+      context?.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+      bitmap.close()
+      return canvas.toDataURL()
+    }).catch(() => undefined) // 损坏的 PNG 保留图片图标
+    sourceThumbnails.set(bytes, thumbnail)
+  }
+  return thumbnail
+}
+
 function createSystemSymbol(name: string): HTMLSpanElement {
   const symbol = document.createElement("span")
   symbol.className = "system-symbol"
@@ -1723,8 +1747,10 @@ function mobileInspectorGroupKey(group: HTMLElement): string {
 
 function setMobileInspectorGroup(id: string, scroll = true): void {
   quickInspector.dataset.mobileInspectorGroup = id
+  // 一页显示时所有分区都保持展开，分类轨只标记当前位置。
+  const singlePage = !inspectorGroupedDisplay.checked
   for (const group of Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))) {
-    const active = group.dataset.mobileInspectorGroup === id
+    const active = singlePage || group.dataset.mobileInspectorGroup === id
     group.classList.toggle("mobile-inspector-active", active)
   }
   for (const button of Array.from(mobileInspectorGroups.querySelectorAll<HTMLButtonElement>("button"))) {
@@ -1743,8 +1769,47 @@ function setMobileInspectorGroup(id: string, scroll = true): void {
     mobileInspectorGroups.querySelector<HTMLButtonElement>("button.active")?.scrollIntoView({ block: "nearest", inline: "nearest" })
     // 样式引用缩略图只在可见时才量得到卡片尺寸，切到该分组时补绘一次。
     redrawStyleStateCanvases()
+    if (singlePage) scrollToSinglePageInspectorGroup()
   }
 }
+
+/** 一页显示时把当前分区滚到检查器顶部；第一个分区保留顶部留白。 */
+function scrollToSinglePageInspectorGroup(): void {
+  const groups = Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))
+    .filter((group) => group.getClientRects().length > 0)
+  const current = groups.find((group) => group.dataset.mobileInspectorGroup === quickInspector.dataset.mobileInspectorGroup)
+  quickInspector.scrollTop = 0
+  if (current && current !== groups[0]) quickInspector.scrollTop = current.getBoundingClientRect().top - quickInspector.getBoundingClientRect().top
+}
+
+let singlePageInspectorContext = ""
+/** 换了选中对象时停在记住的分区（与分组模式一致）；同一对象重绘时只按滚动位置刷新分类轨。 */
+function revealSinglePageInspectorGroup(context: string): void {
+  if (inspectorGroupedDisplay.checked) return
+  if (context === singlePageInspectorContext) {
+    syncSinglePageInspectorGroup()
+    return
+  }
+  singlePageInspectorContext = context
+  scrollToSinglePageInspectorGroup()
+}
+
+/** 一页显示时按滚动位置点亮分类轨：最后一个顶边越过检查器顶部的分区即为当前分区。 */
+function syncSinglePageInspectorGroup(): void {
+  if (inspectorGroupedDisplay.checked) return
+  const groups = Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))
+    .filter((group) => group.getClientRects().length > 0)
+  if (!groups.length) return
+  const view = quickInspector.getBoundingClientRect()
+  const current = groups.find((group) => group.dataset.mobileInspectorGroup === quickInspector.dataset.mobileInspectorGroup)
+  const atEnd = quickInspector.scrollTop + quickInspector.clientHeight >= quickInspector.scrollHeight - 2
+  // 滚到底时末尾几个短分区到不了顶部：保留刚点选且仍可见的分区，否则点亮最后一个。
+  const currentTop = current?.getBoundingClientRect().top ?? -Infinity
+  if (atEnd && currentTop >= view.top - 8 && currentTop < view.bottom) return
+  const next = atEnd ? groups[groups.length - 1] : groups.filter((group) => group.getBoundingClientRect().top - view.top <= 8).pop() ?? groups[0]
+  if (next !== current) setMobileInspectorGroup(next.dataset.mobileInspectorGroup ?? "", false)
+}
+quickInspector.addEventListener("scroll", syncSinglePageInspectorGroup, { passive: true })
 
 function syncMobileInspectorGroups(): void {
   const combinedBda = archive?.format === "bda" && selectedKeySections.length > 0 && !selectedCandidate
@@ -3782,11 +3847,22 @@ function drawAtlas(): void {
   atlasDrawFrame = 0
   syncAtlasWorkspace()
   if (!workspaceImage.complete || !workspaceImage.naturalWidth) return
-  if (atlasCanvas.width !== workspaceImage.naturalWidth) atlasCanvas.width = workspaceImage.naturalWidth
-  if (atlasCanvas.height !== workspaceImage.naturalHeight) atlasCanvas.height = workspaceImage.naturalHeight
+  const { naturalWidth, naturalHeight } = workspaceImage
+  // 桌面工作区按显示尺寸 × DPR 绘制，避免 CSS 放大导致切片线条和标签模糊；像素上限防止大图超出画布限制
+  const cssWidth = parseFloat(atlasCanvas.style.width)
+  const pixelScale = cssWidth
+    ? Math.max(1, Math.min(cssWidth * devicePixelRatio / naturalWidth, Math.sqrt(16e6 / (naturalWidth * naturalHeight))))
+    : 1
+  const backingWidth = Math.round(naturalWidth * pixelScale)
+  const backingHeight = Math.round(naturalHeight * pixelScale)
+  if (atlasCanvas.width !== backingWidth) atlasCanvas.width = backingWidth
+  if (atlasCanvas.height !== backingHeight) atlasCanvas.height = backingHeight
   const context = atlasCanvas.getContext("2d")
   if (!context) return
-  context.clearRect(0, 0, atlasCanvas.width, atlasCanvas.height)
+  context.setTransform(1, 0, 0, 1, 0, 0)
+  context.clearRect(0, 0, backingWidth, backingHeight)
+  context.setTransform(backingWidth / naturalWidth, 0, 0, backingHeight / naturalHeight, 0, 0)
+  context.imageSmoothingEnabled = pixelScale <= 1
   context.drawImage(workspaceImage, 0, 0)
   drawTilePreview()
   if (!resourceConfigActive || !guidesVisible) return
@@ -3799,13 +3875,13 @@ function drawAtlas(): void {
   const visible = archive?.format === "bda"
     ? allVisible.filter((slice) => slice.index === selectedTileIndex)
     : allVisible
-  const displayScale = Math.max(0.01, atlasCanvas.getBoundingClientRect().width / Math.max(1, atlasCanvas.width))
-  const lineWidth = Math.max(0.5, Math.min(6, 1.5 / displayScale))
-  context.font = `${Math.max(8, 11 / displayScale)}px ui-monospace, monospace`
+  const displayScale = Math.max(0.01, atlasCanvas.getBoundingClientRect().width / Math.max(1, naturalWidth))
+  const lineWidth = Math.min(6, 1.5 / displayScale)
+  context.font = `${11 / displayScale}px ui-monospace, monospace`
   context.textBaseline = "top"
   const accent = getComputedStyle(atlasCanvas).getPropertyValue("--accent").trim() || "#3a6df0"
-  const handle = Math.max(4, 8 / displayScale)
-  const labelHeight = Math.max(10, 17 / displayScale)
+  const handle = 8 / displayScale
+  const labelHeight = 17 / displayScale
   for (const slice of visible) {
     const [x, y, width, height] = slice.source
     const selected = slice.index === selectedTileIndex || slice.source === tileDraft
@@ -3814,7 +3890,7 @@ function drawAtlas(): void {
     context.strokeRect(x + context.lineWidth / 2, y + context.lineWidth / 2, width - context.lineWidth, height - context.lineWidth)
     const usage = bdaTileUsages.find((item) => item.index === slice.index)
     const label = usage?.label ?? `IMG${slice.index}`
-    const labelWidth = context.measureText(label).width + 6
+    const labelWidth = context.measureText(label).width + 6 / displayScale
     context.fillStyle = selected ? accent : "#68758a"
     context.fillRect(x, y, labelWidth, labelHeight)
     context.fillStyle = "#fff"
@@ -3832,7 +3908,7 @@ function drawAtlas(): void {
       const [innerX, innerY, innerWidth, innerHeight] = slice.inner
       if (innerWidth > 0 && innerHeight > 0) {
         context.save()
-        context.lineWidth = Math.max(2, lineWidth * 2)
+        context.lineWidth = lineWidth * 2
         context.strokeStyle = "#ff9500"
         context.setLineDash([lineWidth * 4, lineWidth * 3])
         context.strokeRect(innerX, innerY, innerWidth, innerHeight)
@@ -4317,7 +4393,6 @@ async function renderStyleResourceGallery(): Promise<void> {
       drawVisualPreview(canvas, [await resolver.resolve(styleID, highlighted).catch(() => undefined)], false)
       previews.append(canvas)
     }
-    previews.append(styleKindBadge(styleKind(styleID, stylesDocument)))
     const name = document.createElement("strong")
     name.textContent = `STYLE${styleID}`
     const entries = stylesDocument.entries(`STYLE${styleID}`)
@@ -4326,6 +4401,7 @@ async function renderStyleResourceGallery(): Promise<void> {
       || entries.find((entry) => entry.key === "INFO")?.value
       || entries.find((entry) => entry.key === "SHOW")?.value
       || `${entries.length} 项配置`
+    meta.prepend(styleKindBadge(styleKind(styleID, stylesDocument)))
     button.append(previews, name, meta)
     button.addEventListener("click", () => {
       selectGalleryItem(`STYLE${styleID}`, resourceGallery)
@@ -5288,8 +5364,8 @@ function renderStyleReferenceRows(button: HTMLElement, input: HTMLInputElement, 
       })
       previews.append(item)
     }
-    if (styleID) previews.append(styleKindBadge(styleKind(styleID, styles)))
     wrapper.append(numberInput, previews)
+    if (styleID) wrapper.append(styleKindBadge(styleKind(styleID, styles)))
     button.append(wrapper)
   }
   return styleIDs
@@ -5745,13 +5821,13 @@ async function renderStyleLibraryItems(renderID: number, styleIDs: string[], res
         drawVisualPreview(canvas, [visual], styleReferenceForeground(styleReferenceKey(stylePickerTarget!)))
         previews.append(canvas)
       }
-      previews.append(styleKindBadge(styleKind(styleID, styles)))
     }
     const label = document.createElement("strong")
     label.textContent = imagePath ? imagePath.split("/").pop()! : `样式 ${stylePickerLabel(styleID)}`
     button.title = imagePath || `${label.textContent} · 单击预览，双击应用，Command/Ctrl 单击编辑`
     const meta = document.createElement("small")
     meta.textContent = imagePath ? (imageCategories.has(imagePath) ? "已引用" : "图片资源") : `#${stylePickerLabel(styleID)}`
+    if (!imagePath) meta.prepend(styleKindBadge(styleKind(styleID, styles)))
     button.append(previews, label, meta)
     button.addEventListener("click", (event) => {
       previewStyleLibraryItem(button, imagePath ? { imagePath } : { styleID }, visuals)
@@ -6870,7 +6946,12 @@ function addNavButton(
     "nav-style": "paintpalette",
     "nav-resource": "photo",
   }
-  button.append(createSystemSymbol(icon ?? navigationSystemSymbols[className] ?? "doc"))
+  // 概览与检查器分类轨共用同一套 Lucide 图标（16px、1.5 描边），平台符号只作兜底。
+  const symbolName = icon ?? navigationSystemSymbols[className] ?? "doc"
+  const symbol = createSystemSymbol(symbolName)
+  const lucide = inspectorSymbolIcon(symbolName, 16)
+  if (lucide) symbol.replaceChildren(lucide)
+  button.append(symbol)
   const labelNode = document.createElement("span")
   labelNode.className = "nav-label"
   labelNode.textContent = label
@@ -7225,6 +7306,7 @@ function populateKeyInspector(): void {
     }
   }
   syncMobileInspectorGroups()
+  revealSinglePageInspectorGroup(JSON.stringify([selectedPath, selectedKeySections, selectedCandidate]))
   applyModeState()
   syncInspectorRows(JSON.stringify([selectedPath, selectedKeySections, mode.value]))
 }
@@ -7824,8 +7906,8 @@ function isTextEditingTarget(target: EventTarget | null): boolean {
 function atlasPoint(event: Pick<PointerEvent, "clientX" | "clientY">): TilePoint {
   const bounds = atlasCanvas.getBoundingClientRect()
   return {
-    x: ((event.clientX - bounds.left) / bounds.width) * atlasCanvas.width,
-    y: ((event.clientY - bounds.top) / bounds.height) * atlasCanvas.height,
+    x: ((event.clientX - bounds.left) / bounds.width) * workspaceImage.naturalWidth,
+    y: ((event.clientY - bounds.top) / bounds.height) * workspaceImage.naturalHeight,
   }
 }
 
@@ -7851,7 +7933,7 @@ function commitTile(slice: TileSlice, coalesce = false): void {
   if (
     slice.source.some(value => !Number.isInteger(value)) ||
     width <= 0 || height <= 0 || x < 0 || y < 0 ||
-    x + width > atlasCanvas.width || y + height > atlasCanvas.height
+    x + width > workspaceImage.naturalWidth || y + height > workspaceImage.naturalHeight
   ) return
   const before = tileDocument.toString()
   updateTileSlice(tileDocument, slice)
@@ -7924,12 +8006,12 @@ function moveSelectedTile(deltaX: number, deltaY: number, coalesce = false): voi
   if (!archive || !selectedResourcePath || !isEditing()) return
   const existing = slices.find((slice) => slice.index === selectedTileIndex)
   if (!existing) return
-  const source = moveTileRect(existing.source, deltaX, deltaY, atlasCanvas.width, atlasCanvas.height)
+  const source = moveTileRect(existing.source, deltaX, deltaY, workspaceImage.naturalWidth, workspaceImage.naturalHeight)
   const actualX = source[0] - existing.source[0]
   const actualY = source[1] - existing.source[1]
   if (!actualX && !actualY) return
   const inner = existing.inner
-    ? moveTileRect(existing.inner, actualX, actualY, atlasCanvas.width, atlasCanvas.height)
+    ? moveTileRect(existing.inner, actualX, actualY, workspaceImage.naturalWidth, workspaceImage.naturalHeight)
     : undefined
   commitTile({ index: existing.index, source, ...(inner ? { inner } : {}) }, coalesce)
 }
@@ -8359,7 +8441,8 @@ function selectFile(
 ) && path !== layoutPath && !showsLayoutProperties(path)) {
     inspectorTab = "source"
   }
-  if (preserveCurrentInspectorView) {
+  // 右侧停在源代码时，任何选择操作都不跳回属性面板。
+  if (preserveCurrentInspectorView || previousInspectorTab === "source") {
     inspectorTab = previousInspectorTab
   }
   updateInspectorView()
@@ -8474,12 +8557,12 @@ function renderFiles(): void {
   }
   const entries: NavEntry[] = []
   const bdaConfigGroups = [
-    ["animation", "动画效果", "动画配置", "sparkles"],
-    ["lightAnimation", "轻量动画", "轻量动画", "sparkles"],
-    ["sound", "按键音效", "声音配置", "speaker.wave.2"],
-    ["switch", "开关配置", "开关配置", "gearshape"],
-    ["sticker", "贴纸配置", "贴纸配置", "photo"],
-    ["scene", "场景配置", "场景配置", "gearshape"],
+    ["animation", "动画效果", "动画配置", "film"],
+    ["lightAnimation", "轻量动画", "轻量动画", "wand-sparkles"],
+    ["sound", "按键音效", "声音配置", "volume-2"],
+    ["switch", "开关配置", "开关配置", "toggle-right"],
+    ["sticker", "贴纸配置", "贴纸配置", "sticker"],
+    ["scene", "场景配置", "场景配置", "layers"],
   ] as const
   const overviewPath = archive.names().includes(`${theme.value}/skin/Info.txt`)
     ? `${theme.value}/skin/Info.txt`
@@ -8489,48 +8572,48 @@ function renderFiles(): void {
     label: "皮肤信息",
     path: overviewPath,
     className: "nav-overview",
-    icon: "info.circle",
+    icon: "info",
   })
   // BDA 的 demo 在主题目录下，其他格式放在包根；条目只在文件存在时才显示。
   const demoPath = archive.names().includes(`${theme.value}/skin/demo.png`) ? `${theme.value}/skin/demo.png` : "demo.png"
-  entries.push({ group: archive.format === "bda" ? "皮肤信息" : "皮肤", label: "效果预览", path: demoPath, className: "nav-overview", icon: "photo" })
+  entries.push({ group: archive.format === "bda" ? "皮肤信息" : "皮肤", label: "效果预览", path: demoPath, className: "nav-overview", icon: "image" })
 
   const iniTypes: Record<string, Omit<NavEntry, "path">> = {
-    "bh.ini": { group: "键盘布局", label: "笔画键盘", className: "nav-layout", icon: "pencil" },
-    "def_9.ini": { group: "键盘布局", label: "五笔 9 键", className: "nav-layout", icon: "keyboard" },
-    "def_26.ini": { group: "键盘布局", label: "五笔 26 键", className: "nav-layout", icon: "keyboard" },
-    "def_26_new.ini": { group: "键盘布局", label: "五笔 26 键（无上划）", className: "nav-layout", icon: "keyboard" },
-    "py_9.ini": { group: "键盘布局", label: "拼音 9 键", className: "nav-layout", icon: "keyboard" },
+    "bh.ini": { group: "键盘布局", label: "笔画键盘", className: "nav-layout", icon: "brush" },
+    "def_9.ini": { group: "键盘布局", label: "五笔 9 键", className: "nav-layout", icon: "pen-line" },
+    "def_26.ini": { group: "键盘布局", label: "五笔 26 键", className: "nav-layout", icon: "pen-tool" },
+    "def_26_new.ini": { group: "键盘布局", label: "五笔 26 键（无上划）", className: "nav-layout", icon: "pen-off" },
+    "py_9.ini": { group: "键盘布局", label: "拼音 9 键", className: "nav-layout", icon: "grid-3x3" },
     "py_26.ini": { group: "键盘布局", label: "拼音 26 键", className: "nav-layout", icon: "keyboard" },
-    "en_9.ini": { group: "键盘布局", label: "英文 9 键", className: "nav-layout", icon: "keyboard" },
-    "en_9s.ini": { group: "键盘布局", label: "英文 9 键 Shift", className: "nav-layout", icon: "keyboard" },
-    "en_26.ini": { group: "键盘布局", label: "英文 26 键", className: "nav-layout", icon: "keyboard" },
-    "en_26s.ini": { group: "键盘布局", label: "英文 26 键 Shift", className: "nav-layout", icon: "keyboard" },
-    "en_26_new.ini": { group: "键盘布局", label: "英文 26 键（无上划）", className: "nav-layout", icon: "keyboard" },
-    "en_26s_new.ini": { group: "键盘布局", label: "英文 26 键 Shift（无上划）", className: "nav-layout", icon: "keyboard" },
-    "num_9.ini": { group: "数字与符号", label: "数字键盘", className: "nav-component", icon: "square.grid.2x2" },
-    "num_26.ini": { group: "数字与符号", label: "26 键数字键盘", className: "nav-component", icon: "square.grid.2x2" },
-    "num2.ini": { group: "数字与符号", label: "数字键盘 2", className: "nav-component", icon: "square.grid.2x2" },
+    "en_9.ini": { group: "键盘布局", label: "英文 9 键", className: "nav-layout", icon: "case-lower" },
+    "en_9s.ini": { group: "键盘布局", label: "英文 9 键 Shift", className: "nav-layout", icon: "arrow-big-up" },
+    "en_26.ini": { group: "键盘布局", label: "英文 26 键", className: "nav-layout", icon: "a-large-small" },
+    "en_26s.ini": { group: "键盘布局", label: "英文 26 键 Shift", className: "nav-layout", icon: "arrow-big-up-dash" },
+    "en_26_new.ini": { group: "键盘布局", label: "英文 26 键（无上划）", className: "nav-layout", icon: "type" },
+    "en_26s_new.ini": { group: "键盘布局", label: "英文 26 键 Shift（无上划）", className: "nav-layout", icon: "case-upper" },
+    "num_9.ini": { group: "数字与符号", label: "数字键盘", className: "nav-component", icon: "calculator" },
+    "num_26.ini": { group: "数字与符号", label: "26 键数字键盘", className: "nav-component", icon: "binary" },
+    "num2.ini": { group: "数字与符号", label: "数字键盘 2", className: "nav-component", icon: "hash" },
     "symbol.ini": { group: "数字与符号", label: "符号面板", className: "nav-component", icon: "asterisk" },
-    "sym_26_cn.ini": { group: "数字与符号", label: "中文 26 键符号", className: "nav-component", icon: "asterisk" },
-    "sym_26_en.ini": { group: "数字与符号", label: "英文 26 键符号", className: "nav-component", icon: "asterisk" },
-    "hw_grid.ini": { group: "手写与选择", label: "手写面板", className: "nav-component", icon: "pencil" },
-    "hw_full.ini": { group: "手写与选择", label: "全屏手写", className: "nav-component", icon: "pencil" },
-    "sel_ch.ini": { group: "手写与选择", label: "中文选择栏", className: "nav-component", icon: "list.bullet" },
-    "sel_en.ini": { group: "手写与选择", label: "英文选择栏", className: "nav-component", icon: "list.bullet" },
-    "voice.ini": { group: "键盘组件", label: "语音键盘", className: "nav-component", icon: "keyboard" },
-    "dial.ini": { group: "键盘布局", label: "拨号键盘", className: "nav-layout", icon: "keyboard" },
-    "email.ini": { group: "键盘布局", label: "邮箱键盘", className: "nav-layout", icon: "keyboard" },
-    "net.ini": { group: "键盘布局", label: "网址键盘", className: "nav-layout", icon: "keyboard" },
-    "net_shifts.ini": { group: "键盘布局", label: "网址键盘大写", className: "nav-layout", icon: "keyboard" },
-    "sel_ch_h.ini": { group: "手写与选择", label: "中文选择栏（加高）", className: "nav-component", icon: "list.bullet" },
-    "sel_en_h.ini": { group: "手写与选择", label: "英文选择栏（加高）", className: "nav-component", icon: "list.bullet" },
-    "sym_26_cn_h.ini": { group: "数字与符号", label: "中文 26 键符号（加高）", className: "nav-component", icon: "asterisk" },
-    "sym_26_en_h.ini": { group: "数字与符号", label: "英文 26 键符号（加高）", className: "nav-component", icon: "asterisk" },
-    "symbol_h.ini": { group: "数字与符号", label: "符号面板（加高）", className: "nav-component", icon: "asterisk" },
-    "help.ini": { group: "手写与选择", label: "帮助面板", className: "nav-component", icon: "list.bullet" },
-    "logo.ini": { group: "键盘组件", label: "输入法标识", className: "nav-component", icon: "app" },
-    "gen.ini": { group: "资源配置", label: "通用配置", className: "nav-style", icon: "gearshape" },
+    "sym_26_cn.ini": { group: "数字与符号", label: "中文 26 键符号", className: "nav-component", icon: "quote" },
+    "sym_26_en.ini": { group: "数字与符号", label: "英文 26 键符号", className: "nav-component", icon: "at-sign" },
+    "hw_grid.ini": { group: "手写与选择", label: "手写面板", className: "nav-component", icon: "signature" },
+    "hw_full.ini": { group: "手写与选择", label: "全屏手写", className: "nav-component", icon: "pencil-line" },
+    "sel_ch.ini": { group: "手写与选择", label: "中文选择栏", className: "nav-component", icon: "rows-3" },
+    "sel_en.ini": { group: "手写与选择", label: "英文选择栏", className: "nav-component", icon: "list" },
+    "voice.ini": { group: "键盘组件", label: "语音键盘", className: "nav-component", icon: "mic" },
+    "dial.ini": { group: "键盘布局", label: "拨号键盘", className: "nav-layout", icon: "phone" },
+    "email.ini": { group: "键盘布局", label: "邮箱键盘", className: "nav-layout", icon: "mail" },
+    "net.ini": { group: "键盘布局", label: "网址键盘", className: "nav-layout", icon: "globe" },
+    "net_shifts.ini": { group: "键盘布局", label: "网址键盘大写", className: "nav-layout", icon: "link" },
+    "sel_ch_h.ini": { group: "手写与选择", label: "中文选择栏（加高）", className: "nav-component", icon: "list-ordered" },
+    "sel_en_h.ini": { group: "手写与选择", label: "英文选择栏（加高）", className: "nav-component", icon: "list-checks" },
+    "sym_26_cn_h.ini": { group: "数字与符号", label: "中文 26 键符号（加高）", className: "nav-component", icon: "message-square-quote" },
+    "sym_26_en_h.ini": { group: "数字与符号", label: "英文 26 键符号（加高）", className: "nav-component", icon: "ampersand" },
+    "symbol_h.ini": { group: "数字与符号", label: "符号面板（加高）", className: "nav-component", icon: "percent" },
+    "help.ini": { group: "手写与选择", label: "帮助面板", className: "nav-component", icon: "circle-help" },
+    "logo.ini": { group: "键盘组件", label: "输入法标识", className: "nav-component", icon: "app-window" },
+    "gen.ini": { group: "资源配置", label: "通用配置", className: "nav-style", icon: "settings" },
   }
   const hiddenLayouts = new Set<string>()
   const configPrefix = `${theme.value}/skin/${orientation.value}/`
@@ -8545,7 +8628,7 @@ function renderFiles(): void {
         group: "面板样式",
         label: panelName.replaceAll("_", " "),
         className: "nav-layout",
-        icon: "keyboard",
+        icon: "",
       }
       entries.push({
         ...info,
@@ -8559,7 +8642,7 @@ function renderFiles(): void {
       label: "样式配置",
       path: bdaAppearanceStylePath(selectedBdaStyleGroup),
       className: "nav-style",
-      icon: "paintpalette",
+      icon: "palette",
       navMode: "style",
       meta: "appearanceConfig",
     })
@@ -8568,7 +8651,7 @@ function renderFiles(): void {
       label: "图片资源",
       path: appearancePath!,
       className: "nav-resource",
-      icon: "photo",
+      icon: "images",
       navMode: "resource",
     })
     entries.push({
@@ -8576,7 +8659,7 @@ function renderFiles(): void {
       label: "声音资源",
       path: appearancePath!,
       className: "nav-resource",
-      icon: "speaker.wave.2",
+      icon: "audio-lines",
       navMode: "sound",
     })
   }
@@ -8591,7 +8674,7 @@ function renderFiles(): void {
       group: "扩展布局",
       label: name.replace(/\.ini$/i, "").replaceAll("_", " "),
       className: "nav-layout",
-      icon: "keyboard",
+      icon: "",
     }
     entries.push({
       ...info,
@@ -8602,12 +8685,12 @@ function renderFiles(): void {
 
   const candidatePath = archive.format === "bda" ? undefined : toolbarConfigPath()
   if (candidatePath) {
-    entries.push({ group: "键盘组件", label: "候选栏与工具栏", path: candidatePath, className: "nav-component", icon: "text.bubble" })
+    entries.push({ group: "键盘组件", label: "候选栏与工具栏", path: candidatePath, className: "nav-component", icon: "panel-top" })
   }
   const hintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint1.pop", "hint.pop"])
-  if (hintPath) entries.push({ group: "键盘组件", label: "按键气泡", path: hintPath, className: "nav-component", icon: "rectangle.and.hand.point" })
+  if (hintPath) entries.push({ group: "键盘组件", label: "按键气泡", path: hintPath, className: "nav-component", icon: "message-square" })
   const longHintPath = firstExistingPath(archive.names(), `${theme.value}/skin/${orientation.value}`, ["hint2.pop"])
-  if (longHintPath) entries.push({ group: "键盘组件", label: "长按气泡", path: longHintPath, className: "nav-component", icon: "rectangle.and.hand.point" })
+  if (longHintPath) entries.push({ group: "键盘组件", label: "长按气泡", path: longHintPath, className: "nav-component", icon: "message-square-more" })
   const stylePath = appearancePath ?? (archive.format === "bda" ? undefined : styleConfigPath())
   if (stylePath && archive.format !== "bda") {
     entries.push({
@@ -8615,15 +8698,15 @@ function renderFiles(): void {
       label: "图片资源",
       path: stylePath,
       className: "nav-resource",
-      icon: "photo",
+      icon: "images",
       navMode: "resource",
     })
-    entries.push({ group: "资源配置", label: "样式配置", path: stylePath, className: "nav-style", icon: "paintpalette", navMode: "style" })
-    entries.push({ group: "资源配置", label: "按键音效", path: stylePath, className: "nav-resource", icon: "speaker.wave.2", navMode: "sound" })
+    entries.push({ group: "资源配置", label: "样式配置", path: stylePath, className: "nav-style", icon: "palette", navMode: "style" })
+    entries.push({ group: "资源配置", label: "按键音效", path: stylePath, className: "nav-resource", icon: "volume-2", navMode: "sound" })
   }
   const legacyAnimationPath = archive.format === "bda" ? undefined : legacyAnimationConfigPath()
   if (legacyAnimationPath) {
-    entries.push({ group: "资源配置", label: "粒子动效", path: legacyAnimationPath, className: "nav-style", icon: "sparkles" })
+    entries.push({ group: "资源配置", label: "粒子动效", path: legacyAnimationPath, className: "nav-style", icon: "wand-sparkles" })
   }
   if (archive.format === "bda") {
     for (const [kind, group, label, icon] of bdaConfigGroups) {
@@ -8637,6 +8720,24 @@ function renderFiles(): void {
         navMode: kind === "sound" ? "sound" : undefined,
       })
     }
+  }
+  // 每个文件一个图标：未登记或与前面撞图标的文件按名字归族，取族里还没用过的图标。
+  const iconFamilies: [RegExp, string[]][] = [
+    [/num|数字/i, ["calculator", "binary", "hash", "sigma", "pi"]],
+    [/sym|符号/i, ["asterisk", "percent", "ampersand", "at-sign", "omega", "braces", "slash", "parentheses", "dollar-sign"]],
+    [/sel|选择|list/i, ["rows-3", "list", "list-ordered", "list-checks", "list-tree", "list-filter"]],
+    [/hw|手写/i, ["signature", "pencil-line", "hand", "spline", "scan-line"]],
+    [/emoji|表情/i, ["smile", "laugh", "smile-plus"]],
+  ]
+  const spareIcons = ["keyboard", "layout-template", "panel-bottom", "square-dashed-bottom", "layout-dashboard", "columns-3", "table-2", "component", "box"]
+  const iconOwners = new Map<string, NavEntry>()
+  for (const entry of entries) if (entry.icon && !iconOwners.has(entry.icon)) iconOwners.set(entry.icon, entry)
+  for (const entry of entries) {
+    if (entry.icon && iconOwners.get(entry.icon) === entry) continue
+    const name = `${entry.path.split("/").pop()} ${entry.label}`
+    const family = iconFamilies.find(([pattern]) => pattern.test(name))?.[1] ?? []
+    entry.icon = [...family, ...spareIcons].find((icon) => !iconOwners.has(icon)) ?? (entry.icon || "keyboard")
+    iconOwners.set(entry.icon, entry)
   }
   const groups = archive.format === "bda"
     ? ["皮肤信息", "资源配置", "面板样式", "动画效果", "按键音效", "轻量动画", "开关配置", "贴纸配置", "场景配置"]
@@ -8712,6 +8813,30 @@ function renderFiles(): void {
     }
     node.paths.push(path)
   }
+  // 与概览同一套 Lucide 图标（16px、1.5 描边）；图片行先放图标，滚到附近再换成缩略图。
+  const sourceSymbol = (name: string) => {
+    const symbol = createSystemSymbol(name)
+    const lucide = inspectorSymbolIcon(name, 16)
+    if (lucide) symbol.replaceChildren(lucide)
+    return symbol
+  }
+  const thumbnailObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue
+      const symbol = entry.target as HTMLElement
+      thumbnailObserver.unobserve(symbol)
+      const bytes = archive?.getBytes(symbol.dataset.thumbnailPath ?? "")
+      if (!bytes) continue
+      void sourceThumbnail(bytes).then((url) => {
+        if (!url) return
+        const image = document.createElement("img")
+        image.className = "source-thumbnail"
+        image.alt = ""
+        image.src = url
+        symbol.replaceChildren(image)
+      })
+    }
+  }, { rootMargin: "200px 0px" })
   const sourceFileCount = (node: SourceNode): number =>
     node.paths.length + [...node.folders.values()].reduce((total, child) => total + sourceFileCount(child), 0)
   const selectSourceRow = (row: HTMLElement) => {
@@ -8754,7 +8879,7 @@ function renderFiles(): void {
       const count = document.createElement("span")
       count.className = "nav-meta source-item-count"
       count.textContent = `${sourceFileCount(compactNode)} 项`
-      folderSummary.append(disclosure, createSystemSymbol("folder"), title, count)
+      folderSummary.append(disclosure, sourceSymbol("folder"), title, count)
       const children = document.createElement("div")
       children.className = "source-tree-group"
       children.setAttribute("role", "group")
@@ -8789,12 +8914,17 @@ function renderFiles(): void {
       button.className = "source-tree-row source-file-row"
       button.setAttribute("role", "treeitem")
       button.tabIndex = -1
-      const sourceSymbol = archive?.isText(path) || archive?.isBdaConfig(path)
+      const symbolName = archive?.isText(path) || archive?.isBdaConfig(path)
         ? "doc.text"
         : archive?.isImage(path)
-          ? "photo"
+          ? "image"
           : "doc"
-      button.append(createSystemSymbol(sourceSymbol))
+      const symbol = sourceSymbol(symbolName)
+      if (symbolName === "image") {
+        symbol.dataset.thumbnailPath = path
+        thumbnailObserver.observe(symbol)
+      }
+      button.append(symbol)
       const label = document.createElement("span")
       label.className = "nav-label"
       label.textContent = path.split("/").pop() ?? path
@@ -8849,7 +8979,7 @@ function renderFiles(): void {
   const rootChildren = document.createElement("div")
   rootChildren.className = "source-tree-group source-root-group"
   rootChildren.setAttribute("role", "group")
-  rootSummary.append(rootDisclosure, createSystemSymbol("doc.text"), rootTitle, rootCount)
+  rootSummary.append(rootDisclosure, sourceSymbol("doc.text"), rootTitle, rootCount)
   rootFolder.append(rootSummary, rootChildren)
   rootDisclosure.addEventListener("click", (event) => {
     event.preventDefault()
@@ -11011,13 +11141,19 @@ inspectorTabsVisible.addEventListener("change", () => {
   localStorage.setItem("inspector-tabs-visible", inspectorTabsVisible.checked ? "on" : "off")
   applyInspectorTabsVisibility()
 })
-inspectorGroupedDisplay.checked = true
-inspectorGroupedDisplay.disabled = true
+inspectorGroupedDisplay.checked = localStorage.getItem("inspector-grouped-display") === "on"
 function applyInspectorGroupedDisplay(): void {
   quickInspector.dataset.inspectorGroupDisplay = "grouped"
+  quickInspector.toggleAttribute("data-inspector-single-page", !inspectorGroupedDisplay.checked)
   quickInspector.scrollTop = 0
+  setMobileInspectorGroup(quickInspector.dataset.mobileInspectorGroup ?? "", false)
+  if (!inspectorGroupedDisplay.checked) scrollToSinglePageInspectorGroup()
 }
 applyInspectorGroupedDisplay()
+inspectorGroupedDisplay.addEventListener("change", () => {
+  localStorage.setItem("inspector-grouped-display", inspectorGroupedDisplay.checked ? "on" : "off")
+  applyInspectorGroupedDisplay()
+})
 sourceCompletionEnabled.checked = localStorage.getItem("source-completion-enabled") === "on"
 sourceValueHintsEnabled.checked = localStorage.getItem("source-value-hints-enabled") === "on"
 sourceLineExplanationEnabled.checked = localStorage.getItem("source-line-explanation-enabled") === "on"
@@ -11332,7 +11468,7 @@ inspectorBackButton.addEventListener("click", () => {
   selectedCandidate = false
   preview.setSelected([])
   toolbarPreview.setSelected([])
-  inspectorTab = "properties"
+  if (inspectorTab !== "source") inspectorTab = "properties"
   syncCandidateSelection()
   updateInspectorView()
   populateKeyInspector()
@@ -11493,7 +11629,7 @@ atlasCanvas.addEventListener("pointerdown", (event) => {
   const selected = slices.find(slice => slice.index === selectedTileIndex)
   if (selected && isEditing() && archive?.format !== "bda" && guidesVisible) {
     const [x, y, w, h] = selected.source
-    const radius = 9 * atlasCanvas.width / Math.max(1, atlasCanvas.getBoundingClientRect().width)
+    const radius = 9 * workspaceImage.naturalWidth / Math.max(1, atlasCanvas.getBoundingClientRect().width)
     const corner = [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].findIndex(([cx, cy]) => Math.abs(point.x - cx) <= radius && Math.abs(point.y - cy) <= radius)
     if (corner >= 0) {
       tileResizeCorner = corner
@@ -11520,21 +11656,21 @@ atlasCanvas.addEventListener("pointerdown", (event) => {
 })
 atlasCanvas.addEventListener("pointermove", (event) => {
   if (tileResizeCorner !== undefined && tileDragOriginal) {
-    movingTile = resizeTileSlice(tileDragOriginal, tileResizeCorner, atlasPoint(event), atlasCanvas.width, atlasCanvas.height)
+    movingTile = resizeTileSlice(tileDragOriginal, tileResizeCorner, atlasPoint(event), workspaceImage.naturalWidth, workspaceImage.naturalHeight)
     scheduleAtlasDraw()
     return
   }
   if (tileDragStart && drawingTile) {
-    tileDraft = boundedTileRect(tileDragStart, atlasPoint(event), atlasCanvas.width, atlasCanvas.height)
+    tileDraft = boundedTileRect(tileDragStart, atlasPoint(event), workspaceImage.naturalWidth, workspaceImage.naturalHeight)
     scheduleAtlasDraw()
     return
   }
   if (!moveStart || !moveSource || !movingTile) return
   const point = atlasPoint(event)
-  const source = moveTileRect(moveSource, point.x - moveStart.x, point.y - moveStart.y, atlasCanvas.width, atlasCanvas.height)
+  const source = moveTileRect(moveSource, point.x - moveStart.x, point.y - moveStart.y, workspaceImage.naturalWidth, workspaceImage.naturalHeight)
   const dx = source[0] - moveSource[0]
   const dy = source[1] - moveSource[1]
-  movingTile = { ...movingTile, source, ...(tileDragOriginal?.inner ? { inner: moveTileRect(tileDragOriginal.inner, dx, dy, atlasCanvas.width, atlasCanvas.height) } : {}) }
+  movingTile = { ...movingTile, source, ...(tileDragOriginal?.inner ? { inner: moveTileRect(tileDragOriginal.inner, dx, dy, workspaceImage.naturalWidth, workspaceImage.naturalHeight) } : {}) }
   scheduleAtlasDraw()
 })
 atlasCanvas.addEventListener("pointerup", (event) => {
@@ -11542,7 +11678,7 @@ atlasCanvas.addEventListener("pointerup", (event) => {
   tileResizeCorner = undefined
   tileDragOriginal = undefined
   if (tileDragStart && drawingTile) {
-    tileDraft = boundedTileRect(tileDragStart, atlasPoint(event), atlasCanvas.width, atlasCanvas.height)
+    tileDraft = boundedTileRect(tileDragStart, atlasPoint(event), workspaceImage.naturalWidth, workspaceImage.naturalHeight)
     const source = tileDraft
     setDrawingTile(false)
     if (source) commitTile({ index: nextTileIndex(tileDocument), source })
@@ -12060,59 +12196,42 @@ if (isTauri()) {
   })
 }
 
-// Sidebar resize handle
-{
-  const MIN_W = 200, MAX_W = 420, DEFAULT_W = 264
-  const stored = Number(localStorage.getItem("sidebarWidthV1") || DEFAULT_W)
-  document.documentElement.style.setProperty("--pen-sidebar-w", `${Math.max(MIN_W, Math.min(MAX_W, stored))}px`)
-  let dragging = false, startX = 0, startW = stored
-  sidebarPane.addEventListener("pointerdown", (e) => {
-    if (e.clientX < sidebarPane.getBoundingClientRect().right - 6) return
-    dragging = true; startX = e.clientX; startW = sidebarPane.getBoundingClientRect().width
-    sidebarPane.setPointerCapture(e.pointerId); document.body.classList.add("sidebar-resizing"); e.preventDefault()
-  })
-  sidebarPane.addEventListener("pointermove", (e) => { if (dragging) document.documentElement.style.setProperty("--pen-sidebar-w", `${Math.max(MIN_W, Math.min(MAX_W, startW + e.clientX - startX))}px`) })
-  sidebarPane.addEventListener("pointerup", () => { if (dragging) { dragging = false; document.body.classList.remove("sidebar-resizing"); localStorage.setItem("sidebarWidthV1", getComputedStyle(sidebarPane).width.replace("px", "")) } })
-}
-
-// Inspector resize handle
-{
-  const MIN_W = 220
-  const MAX_W = Math.max(700, window.innerWidth - 720)
-  const DEFAULT_W = 360
-  const storageKey = "inspectorWidthV5"
-  const stored = Number(localStorage.getItem(storageKey) || DEFAULT_W)
-  const initialW = Math.max(MIN_W, Math.min(MAX_W, stored))
-  document.documentElement.style.setProperty("--inspector-width", `${initialW}px`)
+// 左栏与检查器共用的拖动调宽：direction 为 1 时向右拖变宽，-1 时向左拖变宽。
+function bindPaneResize(handle: HTMLElement, cssVar: string, storageKey: string, minW: number, maxW: number, defaultW: number, direction: 1 | -1): void {
+  const stored = Number(localStorage.getItem(storageKey) || defaultW)
+  const initialW = Math.max(minW, Math.min(maxW, stored))
+  document.documentElement.style.setProperty(cssVar, `${initialW}px`)
+  const currentW = () => parseInt(getComputedStyle(document.documentElement).getPropertyValue(cssVar) || String(defaultW), 10)
 
   let dragging = false
   let startX = 0
   let startW = initialW
 
-  inspectorResizeHandle.addEventListener("pointerdown", (e) => {
+  handle.addEventListener("pointerdown", (e) => {
     dragging = true
     startX = e.clientX
-    startW = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--inspector-width") || String(DEFAULT_W), 10)
-    inspectorResizeHandle.classList.add("dragging")
-    inspectorResizeHandle.setPointerCapture(e.pointerId)
+    startW = currentW()
+    handle.classList.add("dragging")
+    handle.setPointerCapture(e.pointerId)
     e.preventDefault()
   })
 
-  inspectorResizeHandle.addEventListener("pointermove", (e) => {
+  handle.addEventListener("pointermove", (e) => {
     if (!dragging) return
-    const delta = startX - e.clientX
-    const newW = Math.max(MIN_W, Math.min(MAX_W, startW + delta))
-    document.documentElement.style.setProperty("--inspector-width", `${newW}px`)
+    const newW = Math.max(minW, Math.min(maxW, startW + (e.clientX - startX) * direction))
+    document.documentElement.style.setProperty(cssVar, `${newW}px`)
   })
 
-  inspectorResizeHandle.addEventListener("pointerup", () => {
+  handle.addEventListener("pointerup", () => {
     if (!dragging) return
     dragging = false
-    inspectorResizeHandle.classList.remove("dragging")
-    const w = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--inspector-width") || String(DEFAULT_W), 10)
-    localStorage.setItem(storageKey, String(w))
+    handle.classList.remove("dragging")
+    localStorage.setItem(storageKey, String(currentW()))
   })
 }
+
+bindPaneResize($("#sidebar-resize-handle"), "--sidebar-width", "sidebarWidthV2", 180, 420, 248, 1)
+bindPaneResize(inspectorResizeHandle, "--inspector-width", "inspectorWidthV5", 220, Math.max(700, window.innerWidth - 720), 360, -1)
 
 function nextStyleID(): string {
   const ids = availableStyleIDs().map(Number).filter(Number.isSafeInteger)

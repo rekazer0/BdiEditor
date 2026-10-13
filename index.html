@@ -138,6 +138,7 @@
           <input id="source-upload-input" type="file" multiple hidden>
         </div>
         <div id="files"></div>
+        <div class="inspector-resize-handle sidebar-resize-handle" id="sidebar-resize-handle" aria-hidden="true"></div>
       </aside>
 
       <section class="workspace">
@@ -568,14 +569,14 @@
           </section>
           <section class="inspector-group key-only key-gesture-fields" data-inspector-group-label="动作">
             <h3>手势与动作</h3>
-            <p class="inspector-group-subtitle">在方向格填写动作码，留空表示未配置。</p>
+            <p class="inspector-group-subtitle">填写动作码或字符，留空表示未配置。</p>
             <div class="direction-editor inspector-gesture-pad" aria-label="点击、滑动与长按动作">
-              <label class="direction-up" data-gesture="UP"><span>上滑</span><input data-key-field="UP" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="UP"></small></label>
-              <label class="direction-left" data-gesture="LEFT"><span>左滑</span><input data-key-field="LEFT" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="LEFT"></small></label>
               <label class="direction-center inspector-gesture-center" data-gesture="CENTER"><span>点击</span><input data-key-field="CENTER" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="CENTER"></small></label>
-              <label class="direction-right" data-gesture="RIGHT"><span>右滑</span><input data-key-field="RIGHT" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="RIGHT"></small></label>
-              <label class="direction-down" data-gesture="DOWN"><span>下滑</span><input data-key-field="DOWN" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="DOWN"></small></label>
               <label class="direction-hold" data-gesture="HOLD"><span>长按</span><input data-key-field="HOLD" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="HOLD"></small></label>
+              <label class="direction-up" data-gesture="UP"><span>上滑</span><input data-key-field="UP" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="UP"></small></label>
+              <label class="direction-down" data-gesture="DOWN"><span>下滑</span><input data-key-field="DOWN" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="DOWN"></small></label>
+              <label class="direction-left" data-gesture="LEFT"><span>左滑</span><input data-key-field="LEFT" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="LEFT"></small></label>
+              <label class="direction-right" data-gesture="RIGHT"><span>右滑</span><input data-key-field="RIGHT" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="RIGHT"></small></label>
             </div>
           </section>
         </div>

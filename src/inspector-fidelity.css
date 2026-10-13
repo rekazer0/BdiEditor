@@ -137,8 +137,8 @@
 :root body .source #quick-inspector#quick-inspector#quick-inspector > #mobile-inspector-groups .inspector-icon {
   display: block !important;
   visibility: visible !important;
-  width: 15px !important;
-  height: 15px !important;
+  width: 16px !important;
+  height: 16px !important;
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector > #mobile-inspector-groups .system-symbol { display: none !important; }
 /* 布局 tool row — the key tools live inside the panel instead of a bottom bar.
@@ -324,7 +324,7 @@
   min-height: 0;
   overflow: auto;
 }
-:root body .source #quick-inspector#quick-inspector#quick-inspector[data-inspector-group-display="grouped"] > .inspector-group.mobile-inspector-active > h3 {
+:root body .source #quick-inspector#quick-inspector#quick-inspector[data-inspector-group-display="grouped"]:not([data-inspector-single-page]) > .inspector-group.mobile-inspector-active > h3 {
   position: absolute !important;
   width: 1px !important;
   height: 1px !important;
@@ -513,103 +513,86 @@
   font-size: 10.5px !important;
   color: var(--pin-ink-faint) !important;
 }
+/* 动作：一列对齐的行（点击、长按，再四个滑动方向），整行宽度留给动作码与释义 */
 :root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor {
   display: grid !important;
-  grid-template: auto auto auto auto / repeat(3, minmax(0, 1fr)) !important;
+  grid-template: none !important;
   grid-template-areas: none !important;
-  gap: 6px !important;
+  grid-auto-rows: auto !important;
+  gap: 2px !important;
   margin: 8px 0 0 !important;
-  padding: 8px !important;
-  border: 1px solid transparent !important;
-  border-radius: 10px !important;
-  background: var(--pin-sunken) !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
   box-shadow: none !important;
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > label {
   position: relative !important;
-  display: flex !important;
-  flex-flow: column nowrap !important;
-  align-items: stretch !important;
-  justify-content: flex-start !important;
+  grid-area: auto !important;
+  display: grid !important;
+  grid-template-columns: 64px minmax(0, 1fr) !important;
+  align-items: center !important;
+  column-gap: 8px !important;
+  row-gap: 2px !important;
   min-width: 0 !important;
   min-height: 0 !important;
-  padding: 7px 6px 8px !important;
-  gap: 4px !important;
-  border: 1px solid transparent !important;
-  border-radius: 8px !important;
-  background: var(--pin-surface) !important;
-  color: var(--pin-ink-faint) !important;
-  font: 10px/1.3 var(--font-ui) !important;
-  text-align: center !important;
-  white-space: normal !important;
+  padding: 3px 0 !important;
+  border: 0 !important;
+  background: none !important;
+  color: var(--pin-ink-muted) !important;
+  font: 11px/1.3 var(--font-ui) !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > [data-gesture="UP"] {
+  margin-top: 6px !important;
+  padding-top: 9px !important;
+  border-top: 1px solid var(--pin-line) !important;
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > label > span {
-  flex: 0 0 auto !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
-  gap: 3px !important;
+  gap: 6px !important;
   color: inherit !important;
-  font: 10.5px/1.2 var(--font-ui) !important;
+  font: inherit !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > label > span > svg {
+  box-sizing: content-box !important;
+  flex: 0 0 auto !important;
+  padding: 4px !important;
+  border-radius: 6px !important;
+  background: var(--pin-sunken) !important;
+  color: var(--pin-ink-faint) !important;
+}
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > label.configured > span { color: var(--pin-ink) !important; }
+:root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > label.configured > span > svg {
+  background: var(--pin-accent-soft) !important;
+  color: var(--pin-accent) !important;
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > label > input {
   box-sizing: border-box !important;
-  flex: 0 0 auto !important;
+  grid-column: 2 !important;
   min-width: 0 !important;
   width: 100% !important;
   max-width: none !important;
   height: 28px !important;
   min-height: 28px !important;
   margin: 0 !important;
-  padding: 0 6px !important;
-  text-align: center !important;
+  padding: 0 8px !important;
+  font-family: var(--font-mono) !important;
+  text-align: left !important;
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > label > small {
+  grid-column: 2 !important;
   min-height: 0 !important;
   overflow: hidden !important;
+  padding-left: 8px !important;
   color: var(--pin-ink-faint) !important;
-  font: 10px/1.3 var(--font-mono) !important;
+  font: 10.5px/1.3 var(--font-ui) !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > label > small:empty { display: none !important; }
-:root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .pin-reset { top: 2px; right: 2px; transform: none; z-index: 6; }
-:root body .source #quick-inspector#quick-inspector#quick-inspector label.pin-modified > .pin-reset { opacity: 1 !important; pointer-events: auto !important; }
-:root body .source #quick-inspector#quick-inspector#quick-inspector [data-gesture="UP"] { grid-area: 1 / 2 !important; }
-:root body .source #quick-inspector#quick-inspector#quick-inspector [data-gesture="LEFT"] { grid-area: 2 / 1 !important; }
-:root body .source #quick-inspector#quick-inspector#quick-inspector [data-gesture="CENTER"] { grid-area: 2 / 2 !important; }
-:root body .source #quick-inspector#quick-inspector#quick-inspector [data-gesture="RIGHT"] { grid-area: 2 / 3 !important; }
-:root body .source #quick-inspector#quick-inspector#quick-inspector [data-gesture="DOWN"] { grid-area: 3 / 2 !important; }
-:root body .source #quick-inspector#quick-inspector#quick-inspector [data-gesture="HOLD"] { grid-area: 4 / 1 / 5 / -1 !important; }
-:root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > label.configured {
-  border-color: color-mix(in srgb, var(--pin-accent) 28%, var(--pin-line)) !important;
-  color: var(--pin-accent);
-  background: var(--pin-accent-soft);
-}
-:root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > label:focus-within {
-  border-color: var(--pin-accent) !important;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pin-accent) 16%, transparent) !important;
-}
-:root body .source #quick-inspector#quick-inspector#quick-inspector .inspector-gesture-center {
-  background: color-mix(in srgb, var(--pin-accent) 8%, var(--pin-surface));
-}
-:root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > .direction-hold {
-  flex-direction: row !important;
-  align-items: center !important;
-  padding: 6px 28px 6px 10px !important;
-  text-align: left !important;
-}
-:root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > .direction-hold > span { flex: 0 0 auto !important; }
-:root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > .direction-hold > input { flex: 1 1 auto !important; }
-:root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > .direction-hold > small {
-  flex: 0 1 88px !important;
-  text-align: left !important;
-}
-:root body .source #quick-inspector#quick-inspector#quick-inspector .key-gesture-fields .direction-editor > .direction-hold .pin-reset {
-  top: 50%;
-  right: 4px;
-  transform: translateY(-50%);
-}
 :root body .source #quick-inspector#quick-inspector#quick-inspector .inspector-padding-box {
   display: grid;
   grid-template: 30px 42px 30px / 54px minmax(0, 1fr) 54px;
@@ -799,6 +782,13 @@
   & .style-ref-row small { font: 10px var(--font-mono); }
   & .style-reference-row { height: 84px !important; border-radius: var(--pin-radius-lg) !important; }
   & .style-reference-row > .style-reference-number { flex-basis: 28% !important; width: 28% !important; font: 600 19px var(--font-mono) !important; }
+  /* 类型标签和编号作为一组在编号列里居中：编号上移 8px，标签紧贴其下，不用胶囊底，只用弱化文字。 */
+  & .style-reference-row { position: relative !important; }
+  & .style-reference-row:has(> .style-kind-badge) > .style-reference-number { padding-bottom: 16px !important; }
+  & .style-reference-row > .style-kind-badge {
+    position: absolute; left: 0; top: calc(50% + 8px); width: 28%; height: 12px; margin: 0; padding: 0;
+    justify-content: center; background: none; box-shadow: none; color: var(--pin-ink-faint); font: 500 10px var(--font-ui);
+  }
   /* 马赛克只做底，铺满整张卡：预览图自己撑满容器高度，不再留 8px 内边距的相框。 */
   & .style-reference-row > .style-picker-states {
     padding: 0 !important;
@@ -1031,7 +1021,7 @@
 }
 
 /* 侧边分类已经写明分组名称，分区标题（「气泡 · 2 项」「面板」）不再重复显示 */
-:root body .source #quick-inspector#quick-inspector#quick-inspector[data-inspector-group-display="grouped"]:has(> #mobile-inspector-groups:not([hidden]):not(:empty)) :is(.document-property-section > .document-section-heading, #bda-config-fields:not([data-bda-scope="key"]) > .bda-inspector-section > h3:first-child) {
+:root body .source #quick-inspector#quick-inspector#quick-inspector[data-inspector-group-display="grouped"]:not([data-inspector-single-page]):has(> #mobile-inspector-groups:not([hidden]):not(:empty)) :is(.document-property-section > .document-section-heading, #bda-config-fields:not([data-bda-scope="key"]) > .bda-inspector-section > h3:first-child) {
   display: none !important;
 }
 
@@ -1046,18 +1036,6 @@
 }
 :root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector > #mobile-inspector-groups button {
   padding-inline: 2px !important;
-}
-
-/* 长按一行的输入框占满方向格宽度 */
-:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector .direction-editor > .direction-hold > input {
-  flex: 1 1 auto !important;
-  width: auto !important;
-  min-width: 0 !important;
-}
-
-/* 没有动作释义时不为它预留宽度 */
-:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector .direction-editor > .direction-hold > small:empty {
-  display: none !important;
 }
 
 /* 四值区域（x / y / 宽 / 高）放不进标签右侧：标签在上，四个输入占满整行 */
@@ -1083,4 +1061,12 @@
  * 曾让按键没有文字样式时仍显示一排「未配置」的字体 / 字号 / 颜色字段。 */
 :root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector#quick-inspector#quick-inspector [hidden] {
   display: none !important;
+}
+
+/* 概览与检查器分类轨的图标：1.75 描边、圆头圆角，比默认 1.5 稍实，用浅灰显得柔和。 */
+:root body #files .sidebar-overview button.nav-item > .system-symbol svg,
+:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector#quick-inspector > #mobile-inspector-groups button > .inspector-icon {
+  stroke-width: 1.75 !important;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }

@@ -1308,15 +1308,14 @@
   display: grid !important;
   place-items: center !important;
   width: 100% !important;
-  height: 104px !important;
-  aspect-ratio: auto;
+  height: auto !important;
+  aspect-ratio: 1;
   grid-template-rows: minmax(0, 1fr);
   margin: 0 !important;
   overflow: hidden !important;
   border: 1px solid var(--pin-line) !important;
   border-radius: var(--pin-radius, 10px) !important;
-  background-color: transparent !important;
-  background-image: none !important;
+  background: repeating-conic-gradient(var(--checker-dark) 0 25%, var(--checker-light) 0 50%) 0 0 / 12px 12px !important;
 }
 
 :root body .source #resource-inspector #tile-preview {

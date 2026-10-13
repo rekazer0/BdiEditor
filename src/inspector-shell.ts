@@ -434,7 +434,7 @@ function decorateInspectorDetails(): void {
     text.replaceChildren(inspectorIcon(icon, 12), document.createTextNode(caption))
   }
   const gestureHint = gestures?.querySelector(".inspector-group-subtitle")
-  if (gestureHint) gestureHint.textContent = "方向格即输入区，留空表示未配置。"
+  if (gestureHint) gestureHint.textContent = "填写动作码或字符，留空表示未配置。"
   decorateSections()
   root.addEventListener("input", syncGestureCells)
   syncInspectorDetails()

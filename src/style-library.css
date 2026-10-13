@@ -48,12 +48,9 @@
   :root body .style-library-preview { gap: 10px; padding: 10px 12px; }
 }
 
-/* 样式类型徽标：样式库卡片、检查器样式引用、样式配置列表共用。 */
-:root body :is(.style-picker-states, .style-picker-previews, .resource-style-previews) { position: relative !important; }
-:root body .style-kind-badge { position: absolute; left: 4px; bottom: 4px; z-index: 1; display: inline-flex; align-items: center; gap: 3px; height: 16px; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--pen-raised) 90%, transparent); color: var(--pen-secondary); font-size: 9.5px; font-weight: 500; line-height: 1; pointer-events: none; box-shadow: 0 0 0 1px var(--pen-line); }
+/* 样式类型徽标：样式库卡片、样式配置列表放在说明行里，检查器样式引用的位置见 inspector-fidelity.css，都不压在预览图上。 */
+:root body .style-kind-badge { display: inline-flex; align-items: center; gap: 3px; height: 16px; margin-right: 4px; padding: 0 5px; border-radius: 4px; vertical-align: -3px; background: var(--pen-surface-subtle); color: var(--pen-secondary); font-size: 9.5px; font-weight: 500; line-height: 1; white-space: nowrap; pointer-events: none; box-shadow: 0 0 0 1px var(--pen-line); }
 :root body .style-kind-badge :is(svg) { width: 11px; height: 11px; flex: none; }
-/* 样式列表的缩略图很小，徽标只留图标并移到角落，不再盖住预览内容。 */
-:root body .resource-style-previews .style-kind-badge { top: 3px; bottom: auto; left: 3px; gap: 0; padding: 0 2px; font-size: 0; }
 :root body .style-kind-badge:is([data-style-kind=color],[data-style-kind=anim]) { color: var(--pen-accent); }
 :root body .style-library-kinds { padding-right: 10px; border-right: 1px solid var(--pen-line); }
 :root body .style-library-kinds[hidden] { display: none; }
