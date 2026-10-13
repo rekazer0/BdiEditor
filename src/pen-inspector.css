@@ -28,17 +28,17 @@
   --pin-ctrl-radius: 6px;
   --pin-ctrl-min: 84px;
   --pin-ctrl-wide: 132px;
-  --pin-ctrl-surface: var(--pen-surface-subtle, #f4f5f8);
-  --pin-line: var(--pen-line, #e6e8ee);
-  --pin-line-strong: var(--pen-line-strong, #d2d6df);
-  --pin-ink: var(--pen-text, #14161b);
-  --pin-ink-muted: var(--pen-secondary, #5a6070);
-  --pin-ink-faint: var(--pen-tertiary, #8c93a1);
-  --pin-accent: var(--pen-accent, #3a6df0);
-  --pin-accent-soft: var(--pen-accent-soft, #ebf1ff);
-  --pin-surface: var(--pen-surface, #fff);
-  --pin-sunken: var(--pen-surface-subtle, #f4f5f8);
-  --pin-hover: var(--pen-surface-subtle, #f4f5f8);
+  --pin-ctrl-surface: var(--material-content);
+  --pin-line: var(--line);
+  --pin-line-strong: var(--line-strong);
+  --pin-ink: var(--text);
+  --pin-ink-muted: var(--secondary);
+  --pin-ink-faint: var(--tertiary);
+  --pin-accent: var(--accent);
+  --pin-accent-soft: var(--accent-soft);
+  --pin-surface: var(--material-panel);
+  --pin-sunken: var(--material-content);
+  --pin-hover: var(--material-content);
   --pin-radius: 10px;
   --pin-shadow-raised: 0 1px 3px rgb(18 20 40 / 12%);
 }

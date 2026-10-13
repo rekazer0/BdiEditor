@@ -7,69 +7,12 @@
  */
 
 :root {
-  /* Pen document tokens: $ui-font / $mono-font / $display-font */
-  --font-ui: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --font-display: Inter, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-
-  /* $bg-* */
-  --pen-surface: #ffffff;          /* $bg-surface  */
-  --pen-raised: #ffffff;           /* $bg-raised   */
-  --pen-surface-subtle: #f4f5f8;   /* $bg-sunken   */
-  --pen-tertiary-bg: #ebebeb;      /* $bg-tertiary */
-  --pen-canvas: #f4f5f8;
-  --pen-window: #e9ebef;           /* $bg-app      */
-  /* $line / $line-strong */
-  --pen-line: #e3e6eb;
-  --pen-line-strong: #cdd2db;
-  /* $ink / $ink-muted / $ink-faint */
-  --pen-text: #121419;
-  --pen-secondary: #5b616e;
-  --pen-tertiary: #8b919e;
-  /* $brand / $brand-soft / $on-brand */
-  /* 跟随设置中的强调色（--accent），未自定义时即为品牌蓝 */
-  --pen-accent: var(--accent);
-  --pen-accent-soft: var(--accent-soft);
-  --pen-on-brand: #ffffff;
-  /* $key-sel / $key-sel-soft */
-  --pen-selection: #ff6b2c;
-  --pen-selection-soft: #ffefe6;
-  /* $state-* */
-  --pen-state-ok: #12a150;
-  --pen-state-warn: #b87a00;
-  --pen-state-danger: #e5484d;
-
   --inspector-width: 360px;
-  --pen-radius-xs: 5px;
-  --pen-radius-sm: 8px;
-  --pen-radius-md: 12px;
-  --pen-radius-lg: 16px;
-  --pen-radius-pill: 999px;
-}
-
-:root[data-app-theme="dark"] {
-  --pen-surface: #15171b;
-  --pen-raised: #1e2126;
-  --pen-surface-subtle: #1a1d21;
-  --pen-tertiary-bg: #2e2e2e;
-  --pen-canvas: #0c0d10;
-  --pen-window: #0c0d10;
-  --pen-line: #282c33;
-  --pen-line-strong: #3a3f48;
-  --pen-text: #f3f5f8;
-  --pen-secondary: #a1a8b3;
-  --pen-tertiary: #6c737e;
-  --pen-on-brand: #ffffff;
-  --pen-selection: #ff8a55;
-  --pen-selection-soft: #3a2418;
-  --pen-state-ok: #3dd68c;
-  --pen-state-warn: #f5c445;
-  --pen-state-danger: #ff6b6b;
 }
 
 html,
 body {
-  background: var(--pen-window);
+  background: var(--material-window);
 }
 
 body,
@@ -88,8 +31,8 @@ textarea {
   height: var(--titlebar-height);
   gap: 10px;
   padding: calc(5px + var(--safe-area-top)) max(16px, env(safe-area-inset-right)) 5px max(16px, env(safe-area-inset-left));
-  border-bottom: 1px solid var(--pen-line);
-  background: var(--pen-surface);
+  border-bottom: 1px solid var(--line);
+  background: var(--material-panel);
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -99,9 +42,9 @@ textarea {
 .toolbar-more > summary {
   width: 28px;
   height: 28px;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -116,13 +59,13 @@ textarea {
 
 .toolbar-button:hover:not(:disabled),
 .toolbar-more > summary:hover {
-  background: color-mix(in srgb, var(--pen-surface-subtle) 82%, var(--pen-line));
-  color: var(--pen-text);
+  background: color-mix(in srgb, var(--material-content) 82%, var(--line));
+  color: var(--text);
 }
 
 .toolbar-button:active:not(:disabled),
 .toolbar-more > summary:active {
-  background: color-mix(in srgb, var(--pen-surface-subtle) 72%, var(--pen-line));
+  background: color-mix(in srgb, var(--material-content) 72%, var(--line));
 }
 
 .toolbar-button:disabled,
@@ -147,9 +90,9 @@ textarea {
 .app-actions,
 .mobile-command-actions {
   padding: 6px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-md);
-  background: var(--pen-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--material-panel);
   box-shadow: 0 12px 28px rgb(18 20 25 / 12%);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -157,18 +100,18 @@ textarea {
 
 .toolbar-menu button {
   min-height: 32px;
-  border-radius: var(--pen-radius-sm);
-  color: var(--pen-text);
+  border-radius: var(--radius-md);
+  color: var(--text);
   font-size: 12px;
 }
 
 .toolbar-menu button:hover:not(:disabled) {
-  background: var(--pen-surface-subtle);
+  background: var(--material-content);
 }
 
 .toolbar-menu-separator,
 .mobile-menu-separator {
-  background: var(--pen-line);
+  background: var(--line);
 }
 
 .document-title {
@@ -179,14 +122,14 @@ textarea {
   gap: 8px;
   min-height: 34px;
   padding: 5px 10px;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
   pointer-events: auto;
 }
 
 .document-title strong {
   max-width: 330px;
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 13px;
   font-weight: 600;
   line-height: 18px;
@@ -199,9 +142,9 @@ textarea {
   min-height: 22px;
   margin: 0;
   padding: 2px 7px;
-  border-radius: var(--pen-radius-pill);
-  background: var(--pen-surface);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-full);
+  background: var(--material-panel);
+  color: var(--secondary);
   font-size: 11px;
 }
 
@@ -214,7 +157,7 @@ textarea {
   height: 5px;
   border-radius: 50%;
   /* 未保存是提醒，不是成功状态 */
-  background: var(--pen-state-warn);
+  background: var(--state-warn);
   content: "";
 }
 
@@ -225,8 +168,8 @@ textarea {
   gap: 2px;
   padding: 3px;
   border: 0;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -236,16 +179,16 @@ textarea {
 .preview-choice button {
   height: 28px;
   padding: 0 11px;
-  border-radius: var(--pen-radius-xs);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-sm);
+  color: var(--secondary);
   font-size: 12px;
   font-weight: 400;
 }
 
 .mode-control button.active,
 .preview-choice button.active {
-  color: var(--pen-text);
-  background: var(--pen-surface);
+  color: var(--text);
+  background: var(--material-panel);
   box-shadow: none;
   animation: none;
 }
@@ -263,7 +206,7 @@ textarea {
  * ------------------------------------------------------------------------------------------------- */
 
 main {
-  background: var(--pen-canvas);
+  background: var(--canvas-surface);
 }
 
 @media (min-width: 761px) {
@@ -283,8 +226,8 @@ main {
 
 .sidebar,
 .source {
-  border-color: var(--pen-line);
-  background: var(--pen-surface);
+  border-color: var(--line);
+  background: var(--material-panel);
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -315,14 +258,14 @@ main {
 
 .sidebar-view-control button {
   height: 28px;
-  border-radius: var(--pen-radius-xs);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-sm);
+  color: var(--secondary);
   font-size: 12px;
 }
 
 .sidebar-view-control button.active {
-  color: var(--pen-text);
-  background: var(--pen-surface);
+  color: var(--text);
+  background: var(--material-panel);
   box-shadow: none;
 }
 
@@ -367,8 +310,8 @@ main {
   gap: 4px;
   margin: 0 8px 10px;
   padding: 2px 0;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
   border-bottom: 0;
 }
 
@@ -382,30 +325,30 @@ main {
   height: 28px;
   max-width: 28px;
   border: 0;
-  border-radius: var(--pen-radius-xs);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-sm);
+  color: var(--secondary);
   background: transparent;
 }
 
 /* The rail itself is --pen-surface-subtle, so the shared hover token disappears on it:
    hovering instead lifts the button onto the raised surface (same read as the key toolbar). */
 .source-file-toolbar .toolbar-button:hover:not(:disabled):not(.active) {
-  color: var(--pen-text);
-  background: var(--pen-surface);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--pen-line) 80%, transparent),
-    0 1px 3px color-mix(in srgb, var(--pen-text) 16%, transparent);
+  color: var(--text);
+  background: var(--material-panel);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 80%, transparent),
+    0 1px 3px color-mix(in srgb, var(--text) 16%, transparent);
   transform: none;
 }
 
 .source-file-toolbar .toolbar-button:active:not(:disabled):not(.active) {
-  background: color-mix(in srgb, var(--pen-surface) 78%, var(--pen-line));
+  background: color-mix(in srgb, var(--material-panel) 78%, var(--line));
   box-shadow: none;
 }
 
 #source-file-toolbar .toolbar-button.active {
-  color: var(--pen-accent);
-  background: var(--pen-accent-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen-accent) 24%, transparent);
+  color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
 }
 
 #source-file-toolbar .toolbar-button.active :is(.icon, .system-symbol) {
@@ -413,7 +356,7 @@ main {
 }
 
 #source-file-toolbar .toolbar-button.active:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--pen-accent) 16%, var(--pen-surface));
+  background: color-mix(in srgb, var(--accent) 16%, var(--material-panel));
 }
 
 .source-file-toolbar .toolbar-button:disabled {
@@ -433,8 +376,8 @@ main {
   /* 3px keeps a two-line row inside the same 34px box as a one-line tree row. */
   padding: 3px 8px;
   border: 0;
-  border-radius: var(--pen-radius-sm);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-md);
+  color: var(--secondary);
   background: transparent;
   box-shadow: none;
   font-size: 12px;
@@ -468,10 +411,10 @@ main {
   gap: 8px;
   padding: 0 8px;
   border: 0;
-  border-radius: var(--pen-radius-sm);
+  border-radius: var(--radius-md);
   /* 描边只留给键盘焦点，列表因此不再是一叠卡片。 */
   outline: none;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   background: transparent;
   box-shadow: none;
   font-size: 12px;
@@ -494,7 +437,7 @@ main {
   display: grid;
   place-items: center;
   border-radius: 0;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   background: none;
   font-size: 15px;
   transform: none;
@@ -528,13 +471,13 @@ main {
   flex: 0 0 16px;
   display: grid;
   place-items: center;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-size: 16px;
   transform: none;
 }
 
 #files .raw-files .source-folder-row > .system-symbol {
-  color: var(--pen-accent);
+  color: var(--accent);
 }
 /* The disclosure chevron is the same glyph in a group heading and in a folder row. */
 #files .source-disclosure {
@@ -544,14 +487,14 @@ main {
   margin: 0;
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   transform: rotate(-45deg);
   transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #files .nav-group[open] > .nav-section > .source-disclosure,
 #files .raw-folder[open] > .source-folder-row > .source-disclosure {
-  color: var(--pen-accent);
+  color: var(--accent);
   transform: rotate(45deg);
 }
 
@@ -574,7 +517,7 @@ main {
   min-width: 0;
   margin-top: 0;
   overflow: hidden;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-size: 11px;
   font-weight: 400;
   line-height: 1.2;
@@ -592,8 +535,8 @@ main {
   gap: 8px;
   margin: 0;
   padding: 3px 8px;
-  border-radius: var(--pen-radius-sm);
-  color: var(--pen-tertiary);
+  border-radius: var(--radius-md);
+  color: var(--tertiary);
   font-size: 12px;
   font-weight: 600;
 }
@@ -603,7 +546,7 @@ main {
   min-height: 26px;
   margin-top: 12px;
   padding: 3px 8px;
-  border-radius: var(--pen-radius-sm);
+  border-radius: var(--radius-md);
 }
 
 #files .sidebar-overview > .nav-group:first-child > .nav-section {
@@ -615,9 +558,9 @@ main {
   min-width: 20px;
   margin-left: auto;
   padding: 0 6px;
-  border-radius: var(--pen-radius-pill);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-tertiary);
+  border-radius: var(--radius-full);
+  background: var(--material-content);
+  color: var(--tertiary);
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
@@ -626,14 +569,14 @@ main {
 }
 
 #files .raw-files .source-folder-row {
-  color: var(--pen-secondary);
+  color: var(--secondary);
 }
 
 /* 文件数只是辅助信息：等宽小字、常规字重、三级色，不和名字抢视线。 */
 #files .raw-files .source-item-count {
   flex: 0 0 auto;
   margin-left: auto;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 400;
@@ -651,19 +594,19 @@ main {
 
 /* 三种状态只换颜色，不换几何：平铺行 → 悬停下沉色 → 选中品牌色浅底。 */
 #files .sidebar-overview button.nav-item:hover {
-  background: var(--pen-surface-subtle);
-  color: var(--pen-text);
+  background: var(--material-content);
+  color: var(--text);
   transform: none;
 }
 
 #files .sidebar-overview button.nav-item:hover > .system-symbol {
-  color: var(--pen-text);
+  color: var(--text);
 }
 
 #files .sidebar-overview button.nav-item.selected,
 #files .sidebar-overview button.nav-item.selected:hover {
-  background: var(--pen-accent-soft);
-  color: var(--pen-accent);
+  background: var(--accent-soft);
+  color: var(--accent);
   box-shadow: none;
   transform: none;
   font-weight: 600;
@@ -671,7 +614,7 @@ main {
 
 #files .sidebar-overview button.nav-item.selected > .nav-label,
 #files .sidebar-overview button.nav-item.selected > .system-symbol {
-  color: var(--pen-accent);
+  color: var(--accent);
 }
 
 /* 选中只换图标颜色，不再换底砖。 */
@@ -680,33 +623,33 @@ main {
 }
 
 #files .sidebar-overview button.nav-item.selected > .nav-meta {
-  color: color-mix(in srgb, var(--pen-accent) 62%, var(--pen-tertiary));
+  color: color-mix(in srgb, var(--accent) 62%, var(--tertiary));
 }
 
 /* 键盘可达性：焦点环画在行内，几何不变。 */
 #files .sidebar-overview button.nav-item:focus-visible {
-  outline: 2px solid var(--pen-accent);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
 #files .sidebar-overview .nav-section:hover,
 #files .raw-files .source-tree-row:hover:not(.selected) {
-  color: var(--pen-text);
-  background: var(--pen-surface-subtle);
+  color: var(--text);
+  background: var(--material-content);
   transform: none;
 }
 
 #files .raw-files .source-tree-row.selected,
 #files .raw-files .source-tree-row.selected:hover {
-  color: var(--pen-accent);
-  background: var(--pen-accent-soft);
+  color: var(--accent);
+  background: var(--accent-soft);
   box-shadow: none;
   transform: none;
   font-weight: 600;
 }
 
 #files .raw-files .source-tree-row.selected > .system-symbol {
-  color: var(--pen-accent);
+  color: var(--accent);
 }
 
 #files button:disabled {
@@ -720,13 +663,13 @@ main {
 .workspace {
   grid-template-rows: 48px minmax(0, 1fr) 30px;
   border: 0;
-  background: var(--pen-canvas);
+  background: var(--canvas-surface);
 }
 
 .preview-toolbar {
   padding: 8px 12px;
-  border-bottom: 1px solid var(--pen-line);
-  background: var(--pen-surface);
+  border-bottom: 1px solid var(--line);
+  background: var(--material-panel);
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -735,15 +678,15 @@ main {
 .preview-tool-toggle {
   width: 28px;
   height: 28px;
-  border-radius: var(--pen-radius-sm);
-  color: var(--pen-secondary);
-  background: var(--pen-surface-subtle);
+  border-radius: var(--radius-md);
+  color: var(--secondary);
+  background: var(--material-content);
   box-shadow: none;
 }
 
 .preview-tool-toggle.active {
   color: #fff;
-  background: var(--pen-accent);
+  background: var(--accent);
   box-shadow: none;
 }
 
@@ -754,10 +697,10 @@ main {
 #theme,
 #skin-state {
   min-height: 30px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface);
-  color: var(--pen-text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-panel);
+  color: var(--text);
   font-size: 12px;
 }
 
@@ -767,14 +710,14 @@ main {
 
 .canvas-wrap {
   padding: 24px;
-  background: var(--pen-canvas);
+  background: var(--canvas-surface);
 }
 
 .workspace-status {
   min-height: 30px;
-  border-top: 1px solid var(--pen-line);
-  background: var(--pen-surface);
-  color: var(--pen-secondary);
+  border-top: 1px solid var(--line);
+  background: var(--material-panel);
+  color: var(--secondary);
   font-size: 11px;
 }
 
@@ -783,20 +726,20 @@ main {
  * ------------------------------------------------------------------------------------------------- */
 
 .source {
-  border-left: 1px solid var(--pen-line);
+  border-left: 1px solid var(--line);
 }
 
 .source > .pane-heading {
   min-height: 48px;
   padding: 0 14px;
-  border-bottom: 1px solid var(--pen-line);
+  border-bottom: 1px solid var(--line);
 }
 
 .inspector-tabs {
   gap: 18px;
   padding: 0 12px;
   border-radius: 0;
-  border-bottom: 1px solid var(--pen-line);
+  border-bottom: 1px solid var(--line);
   background: transparent;
 }
 
@@ -807,14 +750,14 @@ main {
   border: 0;
   border-bottom: 2px solid transparent;
   border-radius: 0;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   background: transparent;
   font-size: 12px;
 }
 
 .inspector-tabs button.active {
-  color: var(--pen-text);
-  border-bottom-color: var(--pen-accent);
+  color: var(--text);
+  border-bottom-color: var(--accent);
   background: transparent;
   box-shadow: none;
   animation: none;
@@ -831,7 +774,7 @@ main {
 .skin-fields,
 .toolbar-fields,
 .appearance-section {
-  border-bottom: 1px solid var(--pen-line);
+  border-bottom: 1px solid var(--line);
   background: transparent;
 }
 
@@ -842,13 +785,13 @@ main {
 .inspector-group h3,
 .inspector-card-heading,
 .appearance-section-heading {
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 12px;
   font-weight: 600;
 }
 
 .inspector-group-subtitle {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-size: 11px;
 }
 
@@ -863,10 +806,10 @@ main {
 .field-control select,
 .search-control input {
   min-height: 28px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-xs);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--material-content);
+  color: var(--text);
   font-size: 12px;
 }
 
@@ -876,15 +819,15 @@ main {
 .field-control input:focus,
 .field-control select:focus,
 .search-control input:focus {
-  border-color: var(--pen-accent);
+  border-color: var(--accent);
   outline: 0;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pen-accent) 18%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .inspector-grid label,
 .inspector-grid span,
 .inspector-note {
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 11px;
 }
 
@@ -901,8 +844,8 @@ main {
   gap: 2px;
   padding: 2px;
   border: 1px solid transparent;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -911,7 +854,7 @@ main {
 .preview-tool-toggle {
   width: 30px;
   height: 30px;
-  border-radius: var(--pen-radius-sm);
+  border-radius: var(--radius-md);
 }
 
 .preview-tool-toggle .system-symbol,
@@ -926,21 +869,21 @@ main {
   width: 26px;
   height: 26px;
   padding: 0;
-  border-radius: var(--pen-radius-xs);
-  color: var(--pen-tertiary);
+  border-radius: var(--radius-sm);
+  color: var(--tertiary);
   background: transparent;
   box-shadow: none;
 }
 
 .preview-choice button:hover:not(:disabled) {
-  color: var(--pen-text);
+  color: var(--text);
 }
 
 .preview-choice button.active,
 .preview-tool-toggle.active {
-  color: var(--pen-accent);
-  background: var(--pen-surface);
-  box-shadow: inset 0 0 0 1px var(--pen-line);
+  color: var(--accent);
+  background: var(--material-panel);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 
 /* The device pill carries the model name next to a leading glyph. */
@@ -949,8 +892,8 @@ main {
   min-height: 30px;
   padding: 0 10px;
   border: 1px solid transparent;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
 }
 
 #device-control > span {
@@ -966,7 +909,7 @@ main {
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 11.5px;
   font-weight: 500;
 }
@@ -994,9 +937,9 @@ main {
   align-items: center;
   gap: 2px;
   padding: 6px 8px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-md);
-  background: var(--pen-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--material-panel);
   box-shadow: 0 14px 34px -8px rgb(18 20 25 / 26%);
   transform: translateX(-50%);
 }
@@ -1012,7 +955,7 @@ main {
 
 .canvas-multi-count {
   padding: 0 8px;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
@@ -1022,7 +965,7 @@ main {
   width: 1px;
   height: 16px;
   margin: 0 4px;
-  background: var(--pen-line);
+  background: var(--line);
 }
 
 .canvas-multi-toolbar button {
@@ -1032,15 +975,15 @@ main {
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: var(--pen-radius-sm);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   cursor: pointer;
 }
 
 .canvas-multi-toolbar button:hover:not(:disabled) {
-  background: var(--pen-surface-subtle);
-  color: var(--pen-text);
+  background: var(--material-content);
+  color: var(--text);
 }
 
 .canvas-multi-toolbar button:disabled {
@@ -1071,9 +1014,9 @@ main {
 
 .project-dialog,
 .app-dialog {
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-lg);
-  background: var(--pen-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--material-panel);
   box-shadow: 0 24px 60px rgb(18 20 25 / 18%);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -1088,12 +1031,12 @@ main {
 
 .project-dialog header,
 .app-dialog header {
-  border-bottom: 1px solid var(--pen-line);
+  border-bottom: 1px solid var(--line);
 }
 
 .project-dialog header h2,
 .app-dialog header h2 {
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 15px;
   font-weight: 600;
 }
@@ -1106,7 +1049,7 @@ main {
   .titlebar {
     height: var(--titlebar-height);
     padding: calc(4px + var(--safe-area-top)) 12px 4px;
-    background: var(--pen-surface);
+    background: var(--material-panel);
     box-shadow: none;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -1114,30 +1057,30 @@ main {
 
   .mobile-workspace-tabs {
     display: flex;
-    background: var(--pen-surface);
-    border-bottom: 1px solid var(--pen-line);
+    background: var(--material-panel);
+    border-bottom: 1px solid var(--line);
   }
 
   .mobile-workspace-tabs button {
-    color: var(--pen-secondary);
+    color: var(--secondary);
     font-size: 12px;
   }
 
   .mobile-workspace-tabs button.active {
-    color: var(--pen-text);
-    border-bottom-color: var(--pen-accent);
+    color: var(--text);
+    border-bottom-color: var(--accent);
   }
 
   .mobile-workspace-tabs,
   .sidebar,
   .workspace,
   .source {
-    border-color: var(--pen-line);
+    border-color: var(--line);
   }
 
   .preview-toolbar {
     padding: 6px 10px;
-    background: var(--pen-surface);
+    background: var(--material-panel);
   }
 
   .canvas-multi-toolbar {
@@ -1173,8 +1116,8 @@ main {
 }
 
 .toolbar-more.pen-file-menu[open] > summary {
-  background: color-mix(in srgb, var(--pen-surface-subtle) 78%, var(--pen-line));
-  color: var(--pen-text);
+  background: color-mix(in srgb, var(--material-content) 78%, var(--line));
+  color: var(--text);
 }
 
 .pen-file-menu .toolbar-menu {
@@ -1208,7 +1151,7 @@ main {
 .toolbar-menu-label {
   display: block;
   padding: 5px 9px 3px;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -1243,34 +1186,9 @@ main {
  * 中性色，100% 时合成结果与设计稿一致，20% 时也仍然保留同样的块面对比。
  * ------------------------------------------------------------------------------------------------- */
 
-:root[data-window-material-kind="glass"][data-window-material="on"] {
-  /* 系统材质本身就是窗口背景，所以外壳保持全透明，各区域只画自己那一层淡填充。 */
-  --pen-window: transparent;
-  --pen-canvas: rgb(244 245 248 / var(--window-material-sunken));
-  --pen-surface: rgb(255 255 255 / var(--window-material-layer));
-  --pen-raised: rgb(255 255 255 / var(--window-material-floating));
-  /* 控件色差：+4.4% / +8.6% 的中性色等于 #f4f5f8 / #ebebeb 叠在白底上的暗度，
-     11% / 19.8% 等于 #e3e6eb / #cdd2db。色差固定，滑杆只影响玻璃本身的通透度。 */
-  --pen-surface-subtle: rgb(19 24 38 / 4.4%);
-  --pen-tertiary-bg: rgb(19 24 38 / 8.6%);
-  --pen-line: rgb(19 24 38 / 11%);
-  --pen-line-strong: rgb(19 24 38 / 19.8%);
-}
-
 /* Dark material is dimmer, so text and icons sit on the same layer roles with darker colors.
    深色下控件是「比容器亮一档」，同样用固定色差的白：+2.5% 等于 #1a1d21 叠在 #15171b 上的亮度，
    10% / 9.2% / 17.1% 分别等于 --pen-tertiary-bg / --pen-line / --pen-line-strong。 */
-:root[data-app-theme="dark"][data-window-material-kind="glass"][data-window-material="on"] {
-  --pen-window: transparent;
-  --pen-canvas: rgb(12 13 16 / var(--window-material-sunken));
-  --pen-surface: rgb(21 23 27 / var(--window-material-layer));
-  --pen-raised: rgb(30 33 38 / var(--window-material-floating));
-  --pen-surface-subtle: rgb(255 255 255 / 2.5%);
-  --pen-tertiary-bg: rgb(255 255 255 / 10%);
-  --pen-line: rgb(255 255 255 / 9.2%);
-  --pen-line-strong: rgb(255 255 255 / 17.1%);
-}
-
 /* 属性检查器
  *
  * inspector-fidelity.css 是最后加载的 1:1 锁定层，把 --pin-surface / --pin-sunken 写成固定的

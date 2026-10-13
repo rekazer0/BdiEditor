@@ -25,6 +25,7 @@ import {
   createElement as createLucideElement,
   type IconNode,
 } from "lucide"
+import "./tokens.css"
 import "./style.css"
 import "./pen-design-application.css"
 import "./pen-sidebar.css"

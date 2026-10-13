@@ -10,225 +10,6 @@
   font-display: swap;
 }
 
-:root {
-  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #121419;
-  color-scheme: light;
-  background: transparent;
-  --font-mono: "JetBrains Mono", var(--font-mono);
-  --safe-area-top: env(safe-area-inset-top, 0px);
-  --titlebar-height: calc(54px + var(--safe-area-top));
-
-  /* 间距系统 */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 12px;
-  --space-lg: 16px;
-  --space-xl: 24px;
-
-  /* 字号系统 */
-  --text-xs: 9px;
-  --text-sm: 10px;
-  --text-base: 11px;
-  --text-md: 12px;
-  --text-lg: 13px;
-  --text-xl: 14px;
-
-  /* 圆角系统 */
-  --radius-xs: 5px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 16px;
-  --radius-pill: 999px;
-
-  /* 阴影系统：只用于浮层，表面用 1px 描边区分层级 */
-  --shadow-sm: 0 1px 2px rgb(18 24 40 / 6%);
-  --shadow-md: 0 6px 18px rgb(18 24 40 / 10%);
-  --shadow-lg: 0 16px 40px rgb(18 24 40 / 16%);
-
-  --line: #e3e6eb;
-  --line-soft: #eef1f5;
-  --line-strong: #cdd2db;
-  --text: #121419;
-  --secondary: #5b616e;
-  --muted: #5b616e;
-  --tertiary: #8b919e;
-  --scrollbar-thumb: rgb(18 20 25 / 30%);
-  --scrollbar-thumb-hover: rgb(18 20 25 / 52%);
-  --scrollbar-thumb-border: rgb(0 0 0 / 10%);
-  --scrollbar-thumb-highlight: rgb(255 255 255 / 45%);
-  --accent: #3a6df0;
-  --accent-soft: #e9effe;
-  --selection: #ff6b2c;
-  --selection-soft: #ffefe6;
-  --state-ok: #12a150;
-  --state-warn: #b87a00;
-  --state-danger: #e5484d;
-  --search-font-size: 13px;
-  --material-window: #e9ebef;
-  --material-toolbar: #ffffff;
-  --material-sidebar: #ffffff;
-  --material-inspector: #ffffff;
-  --material-panel: #ffffff;
-  --material-menu: #ffffff;
-  --material-content: #f4f5f8;
-  --canvas: #e9ebef;
-  --material-control: #ffffff;
-  --hover: rgb(18 20 25 / 5%);
-  --material-glass-surface: #ffffff;
-  /* 窗口材质填充系数（0 – 1，1 即完全不透明）：由设置里的材质滑杆写入，见 applyWindowMaterialOpacity。
-     单层表面用 --window-material-layer，叠在已填充表面上的下沉层用 -sunken，浮层用 -floating。 */
-  --window-material-layer: 1;
-  --window-material-sunken: 1;
-  --window-material-floating: 1;
-  --glass-border: #e3e6eb;
-  --glass-highlight: rgb(255 255 255 / 70%);
-  --glass-shadow: 0 8px 28px rgb(18 24 40 / 10%), inset 0 1px rgb(255 255 255 / 78%);
-  --window: var(--material-window);
-  --toolbar: var(--material-toolbar);
-  --sidebar: var(--material-sidebar);
-  --inspector: var(--material-inspector);
-  --panel: var(--material-panel);
-  --menu: var(--material-menu);
-  --content: var(--material-content);
-  --control: var(--material-control);
-  --glass-surface: var(--material-glass-surface);
-  /* 透明马赛克：画布与各预览缩略图共用同一套方格，避免两处样式漂移 */
-  --checker-light: #f7f7f8;
-  --checker-dark: #dfe1e5;
-  --checker-size: 24px;
-  --checker-image:
-    linear-gradient(45deg, var(--checker-dark) 25%, transparent 25%, transparent 75%, var(--checker-dark) 75%),
-    linear-gradient(45deg, var(--checker-dark) 25%, transparent 25%, transparent 75%, var(--checker-dark) 75%);
-}
-
-:root.macos {
-  --titlebar-height: calc(86px + var(--safe-area-top));
-}
-
-:root[data-app-theme="dark"] {
-  color: #f2f3f4;
-  color-scheme: dark;
-  background: transparent;
-  --line: #282c33;
-  --line-soft: #1f2329;
-  --line-strong: #3a3f48;
-  --text: #f3f5f8;
-  --secondary: #a1a8b3;
-  --muted: #a1a8b3;
-  --tertiary: #6c737e;
-  --scrollbar-thumb: rgb(243 245 248 / 32%);
-  --scrollbar-thumb-hover: rgb(243 245 248 / 56%);
-  --scrollbar-thumb-border: rgb(255 255 255 / 12%);
-  --scrollbar-thumb-highlight: rgb(255 255 255 / 20%);
-  --accent: #7a9bff;
-  --accent-soft: #1d2740;
-  --selection: #ff8a55;
-  --selection-soft: #3a2418;
-  --state-ok: #3dd68c;
-  --state-warn: #f5c445;
-  --state-danger: #ff6b6b;
-  --material-window: #0c0d10;
-  --material-toolbar: #15171b;
-  --material-sidebar: #15171b;
-  --material-inspector: #15171b;
-  --material-panel: #15171b;
-  --material-menu: #1e2126;
-  --material-content: #1a1d21;
-  --canvas: #0c0d10;
-  --material-control: #1e2126;
-  --hover: rgb(255 255 255 / 8%);
-  --material-glass-surface: #1e2126;
-  --glass-border: #282c33;
-  --glass-highlight: rgb(255 255 255 / 10%);
-  --glass-shadow: 0 10px 32px rgb(0 0 0 / 32%), inset 0 1px rgb(255 255 255 / 8%);
-}
-
-:root.windows[data-window-material="on"] {
-  --material-window: #e9ebef;
-  --material-toolbar: #ffffff;
-  --material-sidebar: #ffffff;
-  --material-inspector: #ffffff;
-  --material-panel: #ffffff;
-  --material-menu: #ffffff;
-  --material-content: #f4f5f8;
-  --material-control: #ffffff;
-  --material-glass-surface: #ffffff;
-}
-
-:root.windows[data-app-theme="dark"][data-window-material="on"] {
-  --material-window: #0c0d10;
-  --material-toolbar: #15171b;
-  --material-sidebar: #15171b;
-  --material-inspector: #15171b;
-  --material-panel: #15171b;
-  --material-menu: #1e2126;
-  --material-content: #1a1d21;
-  --material-control: #1e2126;
-  --material-glass-surface: #1e2126;
-}
-
-/* 玻璃材质：滑杆值就是材质填充强度，100% 时每个表面都合成到完全不透明，所以拖动滑杆既能得到
-   薄玻璃，也能得到实心窗口。各表面不再按固定系数缩放，而是按层角色取值，避免外壳/工作区/内容区
-   层层叠加后比滑杆更实（旧写法把系数乘在滑杆上，100% 也只有半透明）。
-   单层：直接压在系统材质上的表面（外壳、工具栏、侧栏、检查器、面板）取滑杆值。
-   下沉层：总叠在已填充表面之上的大块区域（内容区、画布）取 1-√(1-f)，两层合成后正好等于滑杆值。
-   浮层：压在编辑器内容之上的对话框取 1-(1-f)²，保证正文始终落在接近实心的底上。
-   控件块面和分隔线不走这套系数，它们在 pen-design-application.css 的材质段里换成固定色差，
-   否则滑杆一拉低，按钮/输入框的底色就会和玻璃融成一片。 */
-:root[data-window-material-kind="glass"][data-window-material="on"] {
-  --window: rgb(233 235 239 / var(--window-material-layer));
-  --toolbar: rgb(255 255 255 / var(--window-material-layer));
-  --sidebar: rgb(255 255 255 / var(--window-material-layer));
-  --inspector: rgb(255 255 255 / var(--window-material-layer));
-  --panel: rgb(255 255 255 / var(--window-material-layer));
-  --menu: var(--material-menu);
-  --canvas: rgb(233 235 239 / var(--window-material-sunken));
-  --content: rgb(244 245 248 / var(--window-material-sunken));
-  --control: rgb(255 255 255 / var(--window-material-sunken));
-  --glass-surface: rgb(255 255 255 / var(--window-material-layer));
-}
-
-/* 深色模式沿用同一套层系数，只是底色更深，浅色文字压在深色玻璃上仍然够清晰。 */
-:root[data-app-theme="dark"][data-window-material-kind="glass"][data-window-material="on"] {
-  --window: rgb(12 13 16 / var(--window-material-layer));
-  --toolbar: rgb(21 23 27 / var(--window-material-layer));
-  --sidebar: rgb(21 23 27 / var(--window-material-layer));
-  --inspector: rgb(21 23 27 / var(--window-material-layer));
-  --panel: rgb(21 23 27 / var(--window-material-layer));
-  --menu: var(--material-menu);
-  --canvas: rgb(12 13 16 / var(--window-material-sunken));
-  --content: rgb(26 29 33 / var(--window-material-sunken));
-  --control: rgb(30 33 38 / var(--window-material-sunken));
-  --glass-surface: rgb(30 33 38 / var(--window-material-layer));
-}
-
-:root[data-window-material="off"] {
-  background: #e9ebef;
-  --window: #e9ebef;
-  --toolbar: #ffffff;
-  --sidebar: #ffffff;
-  --inspector: #ffffff;
-  --panel: #ffffff;
-  --menu: #ffffff;
-  --content: #f4f5f8;
-  --control: #ffffff;
-  --glass-surface: #ffffff;
-}
-
-:root[data-app-theme="dark"][data-window-material="off"] {
-  background: #0c0d10;
-  --window: #0c0d10;
-  --toolbar: #15171b;
-  --sidebar: #15171b;
-  --inspector: #15171b;
-  --panel: #15171b;
-  --menu: #1e2126;
-  --content: #1a1d21;
-  --control: #1e2126;
-  --glass-surface: #1e2126;
-}
 
 * {
   --scrollbar-size: 6px;
@@ -825,7 +606,7 @@ h2 {
   margin-top: 3px;
   overflow: hidden;
   color: var(--secondary);
-  font-size: var(--text-sm);
+  font-size: 10px;
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2411,7 +2192,7 @@ body:has(.canvas-wrap.empty) .workspace {
   margin-left: auto;
   padding: 6px 12px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--panel);
   color: var(--secondary);
   font: inherit;
@@ -2451,7 +2232,7 @@ body:has(.canvas-wrap.empty) .workspace {
   gap: 12px;
   padding: 14px;
   border: 1px dashed var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--panel);
 }
 
@@ -2489,7 +2270,7 @@ body:has(.canvas-wrap.empty) .workspace {
   flex: none;
   padding: 7px 14px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--panel);
   color: var(--text);
   font: inherit;
@@ -2521,7 +2302,7 @@ body:has(.canvas-wrap.empty) .workspace {
   gap: 12px;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--panel);
   text-align: left;
   cursor: pointer;
@@ -2541,7 +2322,7 @@ body:has(.canvas-wrap.empty) .workspace {
   height: 104px;
   padding: 10px;
   overflow: hidden;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--tone-bg, #f1f3f5);
 }
 
@@ -2585,7 +2366,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .template-meta em {
   padding: 2px 6px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   background: var(--content);
   font-family: var(--font-mono);
   font-size: 9px;
@@ -2597,7 +2378,7 @@ body:has(.canvas-wrap.empty) .workspace {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--content);
 }
 
@@ -2823,7 +2604,7 @@ body:has(.canvas-wrap.empty) .workspace {
   align-self: end;
   padding: var(--space-xs);
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   background: color-mix(in srgb, var(--sidebar) 92%, transparent);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
@@ -2840,10 +2621,10 @@ body:has(.canvas-wrap.empty) .workspace {
   flex: 1;
   min-height: 38px;
   padding: var(--space-sm) var(--space-xs);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   color: var(--secondary);
   background: transparent;
-  font-size: var(--text-base);
+  font-size: var(--font-size-xs);
   font-weight: 500;
   line-height: 1.3;
   transition: all 160ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -3439,7 +3220,7 @@ body:has(.canvas-wrap.empty) .workspace {
 }
 
 .inspector-title strong {
-  font-size: var(--text-xl);
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.3;
 }
@@ -3447,7 +3228,7 @@ body:has(.canvas-wrap.empty) .workspace {
 .inspector-title span {
   margin-top: 3px;
   color: var(--secondary);
-  font-size: var(--text-base);
+  font-size: var(--font-size-xs);
   line-height: 1.4;
   opacity: 0.85;
 }
@@ -3534,7 +3315,7 @@ body:has(.canvas-wrap.empty) .workspace {
 .inspector-group h3 {
   margin: 0 0 var(--space-sm);
   color: var(--text);
-  font-size: var(--text-lg);
+  font-size: var(--font-size-md);
   font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.3;
@@ -3544,7 +3325,7 @@ body:has(.canvas-wrap.empty) .workspace {
   margin-top: -8px;
   margin-bottom: var(--space-md);
   color: var(--secondary);
-  font-size: var(--text-base);
+  font-size: var(--font-size-xs);
   line-height: 1.4;
   opacity: 0.85;
 }
@@ -3901,7 +3682,7 @@ body:has(.canvas-wrap.empty) .workspace {
   gap: 1px;
   margin-bottom: var(--space-sm);
   background: var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   overflow: hidden;
   box-shadow: none;
 }
@@ -3912,7 +3693,7 @@ body:has(.canvas-wrap.empty) .workspace {
   padding: 10px 8px;
   background: var(--control);
   color: var(--secondary);
-  font-size: var(--text-sm);
+  font-size: 10px;
   font-weight: 500;
   text-align: center;
   transition: background 0.15s ease;
@@ -3933,7 +3714,7 @@ body:has(.canvas-wrap.empty) .workspace {
   border: none;
   background: transparent;
   color: var(--text);
-  font-size: var(--text-md);
+  font-size: var(--font-size-sm);
   font-weight: 500;
   text-align: center;
   font-variant-numeric: tabular-nums;
@@ -3951,7 +3732,7 @@ body:has(.canvas-wrap.empty) .workspace {
   margin-bottom: var(--space-md);
   overflow: hidden;
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   background: var(--line);
   box-shadow: none;
 }
@@ -3962,7 +3743,7 @@ body:has(.canvas-wrap.empty) .workspace {
   padding: 10px 12px;
   background: var(--control);
   color: var(--secondary);
-  font-size: var(--text-sm);
+  font-size: 10px;
   font-weight: 500;
   text-align: center;
   transition: background 0.15s ease;
@@ -3985,13 +3766,13 @@ body:has(.canvas-wrap.empty) .workspace {
   border-radius: 0;
   background: transparent;
   color: var(--text);
-  font-size: var(--text-md);
+  font-size: var(--font-size-sm);
   font-weight: 500;
   text-align: center;
   font-variant-numeric: tabular-nums;
   text-align: center;
   font-weight: 500;
-  font-size: var(--text-md);
+  font-size: var(--font-size-sm);
   transition: color 0.15s ease;
 }
 
@@ -4072,10 +3853,10 @@ body:has(.canvas-wrap.empty) .workspace {
   height: 32px;
   padding: 6px 10px;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   color: var(--text);
   background: color-mix(in srgb, var(--control) 80%, transparent);
-  font-size: var(--text-base);
+  font-size: var(--font-size-xs);
   font-weight: 500;
   transition: all 0.15s ease;
 }
@@ -4393,7 +4174,7 @@ body:has(.canvas-wrap.empty) .workspace {
   gap: var(--space-sm);
   padding: var(--space-md) 10px;
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   background: color-mix(in srgb, var(--control) 50%, transparent);
   transition: border-color 180ms ease, background-color 180ms ease;
 }
@@ -4423,13 +4204,13 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .appearance-section-heading strong {
   color: var(--text);
-  font-size: var(--text-base);
+  font-size: var(--font-size-xs);
   font-weight: 600;
 }
 
 .appearance-section-heading span {
   color: var(--tertiary);
-  font-size: var(--text-xs);
+  font-size: 9px;
 }
 
 .appearance-reference-grid {
@@ -4452,7 +4233,7 @@ body:has(.canvas-wrap.empty) .workspace {
   display: grid;
   gap: var(--space-sm);
   color: var(--text);
-  font-size: var(--text-base);
+  font-size: var(--font-size-xs);
 }
 
 .typography-property-grid .color-pair-field {
@@ -5759,7 +5540,7 @@ body:has(.canvas-wrap.empty) .workspace {
   align-content: start;
   gap: var(--space-sm);
   color: var(--text);
-  font-size: var(--text-base);
+  font-size: var(--font-size-xs);
   font-weight: 500;
   line-height: 1.3;
 }
@@ -5783,7 +5564,7 @@ body:has(.canvas-wrap.empty) .workspace {
   height: 28px;
   padding: 2px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--control);
 }
 
@@ -5801,7 +5582,7 @@ body:has(.canvas-wrap.empty) .workspace {
   color: var(--text);
   background: transparent;
   font-family: inherit;
-  font-size: var(--text-md);
+  font-size: var(--font-size-sm);
   font-weight: 500;
   text-align: center;
   font-variant-numeric: tabular-nums;
@@ -5833,7 +5614,7 @@ body:has(.canvas-wrap.empty) .workspace {
   min-height: 13px;
   overflow: hidden;
   color: var(--tertiary);
-  font-size: var(--text-xs);
+  font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -5851,7 +5632,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .layout-action-label {
   color: var(--secondary);
-  font-size: var(--text-base);
+  font-size: var(--font-size-xs);
   font-weight: 500;
   line-height: 1.3;
 }
@@ -5868,10 +5649,10 @@ body:has(.canvas-wrap.empty) .workspace {
   height: 36px;
   padding: 0 12px;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--control);
   color: var(--text);
-  font-size: var(--text-base);
+  font-size: var(--font-size-xs);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -5960,7 +5741,7 @@ body:has(.canvas-wrap.empty) .workspace {
 .inspector-group h3 {
   margin: 0 0 var(--space-md);
   color: var(--text);
-  font-size: var(--text-lg);
+  font-size: var(--font-size-md);
   font-weight: 600;
   line-height: 1.4;
 }
@@ -5979,7 +5760,7 @@ body:has(.canvas-wrap.empty) .workspace {
   margin-top: 6px;
   padding: 0 2px;
   color: var(--tertiary);
-  font-size: var(--text-xs);
+  font-size: 9px;
   text-align: center;
   line-height: 1.4;
 }
@@ -8999,7 +8780,7 @@ input[type="search"]:focus {
 *:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
 }
 
 button:focus-visible,
@@ -9040,7 +8821,7 @@ select:disabled {
   }
   
   .inspector-grid label {
-    font-size: var(--text-sm);
+    font-size: 10px;
   }
   
   .inspector-card-heading {
@@ -12241,7 +12022,7 @@ dialog[open]::backdrop {
 
 .sidebar-view-control button {
   height: 26px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   font-size: 12px;
 }
 
@@ -12259,7 +12040,7 @@ dialog[open]::backdrop {
 .preview-tool-toggle,
 .preview-choice button {
   height: 28px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   font-size: 12px;
 }
 
@@ -12331,7 +12112,7 @@ dialog[open]::backdrop {
 .layout-actions button,
 .tile-toolbar button {
   height: 28px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   font-size: 11px;
 }
 
@@ -12350,7 +12131,7 @@ dialog[open]::backdrop {
 .search-control {
   height: 28px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--control);
 }
 
@@ -12359,7 +12140,7 @@ dialog[open]::backdrop {
 }
 
 .source-find-fab {
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   box-shadow: var(--shadow-md);
 }
 
@@ -12379,7 +12160,7 @@ dialog[open]::backdrop {
 .project-dialog,
 .app-dialog {
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   background: var(--panel);
   box-shadow: var(--shadow-lg);
 }
@@ -12405,7 +12186,7 @@ dialog[open]::backdrop {
   height: 32px;
   padding: 0 14px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--control);
   font-size: 12px;
 }
@@ -12420,7 +12201,7 @@ dialog[open]::backdrop {
 
 .project-template-option {
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--panel);
 }
 
@@ -12443,7 +12224,7 @@ dialog[open]::backdrop {
 .settings-nav-item {
   height: 34px;
   padding: 0 10px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   font-size: 12px;
   color: var(--secondary);
 }
@@ -12479,7 +12260,7 @@ dialog[open]::backdrop {
 /* ── 顶部栏控件 ── */
 .toolbar-button,
 .toolbar-more summary {
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--secondary);
 }
 

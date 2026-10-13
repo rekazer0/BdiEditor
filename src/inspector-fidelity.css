@@ -11,18 +11,18 @@
 }
 :root body .source {
   /* 与全局 Pen 色板一致，深浅色由 --pen-* 自动切换 */
-  --pin-ink: var(--pen-text);
-  --pin-ink-muted: var(--pen-secondary);
-  --pin-ink-faint: var(--pen-tertiary);
-  --pin-accent: var(--pen-accent);
-  --pin-accent-soft: var(--pen-accent-soft);
-  --pin-sel: var(--pen-selection);
-  --pin-sel-soft: var(--pen-selection-soft);
-  --pin-ok: var(--pen-state-ok);
-  --pin-danger: var(--pen-state-danger);
-  --pin-surface: var(--pen-surface);
-  --pin-sunken: var(--pen-surface-subtle);
-  --pin-line: var(--pen-line);
+  --pin-ink: var(--text);
+  --pin-ink-muted: var(--secondary);
+  --pin-ink-faint: var(--tertiary);
+  --pin-accent: var(--accent);
+  --pin-accent-soft: var(--accent-soft);
+  --pin-sel: var(--selection);
+  --pin-sel-soft: var(--selection-soft);
+  --pin-ok: var(--state-ok);
+  --pin-danger: var(--state-danger);
+  --pin-surface: var(--material-panel);
+  --pin-sunken: var(--material-content);
+  --pin-line: var(--line);
   --pin-gutter: 14px;
   --pin-rail-w: 64px;
   --pin-row-h: 30px;

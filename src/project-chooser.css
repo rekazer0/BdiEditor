@@ -6,12 +6,12 @@
   border-radius: 14px;
 }
 :root body form.project-chooser {
-  --chooser-bg: var(--pen-raised, #fff);
-  --chooser-well: var(--pen-surface-subtle, #f4f5f8);
-  --chooser-line: var(--pen-line, #e6e8ee);
-  --chooser-text: var(--pen-text, #14161b);
-  --chooser-muted: var(--pen-secondary, #5a6070);
-  --chooser-accent: var(--pen-accent, #3a6df0);
+  --chooser-bg: var(--material-control);
+  --chooser-well: var(--material-content);
+  --chooser-line: var(--line);
+  --chooser-text: var(--text);
+  --chooser-muted: var(--secondary);
+  --chooser-accent: var(--accent);
   height: 100%; min-height: 0; padding: 0; gap: 0;
   display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
   background: var(--chooser-bg); color: var(--chooser-text);

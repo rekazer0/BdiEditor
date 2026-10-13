@@ -23,10 +23,10 @@
 
 :root {
   /* Semantic aliases the panels need; the shell only carries the base palette. */
-  --pin-on-brand: var(--pen-on-brand, #ffffff);
-  --pin-sel: var(--pen-selection, #ff6b2c);
-  --pin-sel-soft: var(--pen-selection-soft, #ffefe7);
-  --pin-ok: var(--pen-state-ok, #10a15a);
+  --pin-on-brand: var(--on-accent);
+  --pin-sel: var(--selection);
+  --pin-sel-soft: var(--selection-soft);
+  --pin-ok: var(--state-ok);
   /* Concentric with the 2px padding of the tool tracks: an 8px button sits in a 10px track. */
   --pin-toolbar-radius: 10px;
   --pin-toolbar-btn: 8px;

@@ -1,0 +1,281 @@
+/*
+ * 键设设计规范 · 唯一的设计 token 来源（规则见 DESIGN.md，由 tests/design-system.test.mjs 强制）。
+ * 其它 CSS 只能通过 var(--…) 引用这里的值：不得写色值、字号、圆角、时长、缓动的字面量，
+ * 也不得另起一套同义 token。新增 token 先改 DESIGN.md，再改这里。
+ */
+
+:root {
+  /* 字体 */
+  --font-ui: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-display: Inter, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+
+  /* 字号：5 档，正文 12，最小 11 */
+  --font-size-xs: 11px;  /* 辅助说明、角标、单位 */
+  --font-size-sm: 12px;  /* 正文、控件、列表行 */
+  --font-size-md: 13px;  /* 分组标题、强调、搜索框 */
+  --font-size-lg: 15px;  /* 面板/对话框标题 */
+  --font-size-xl: 20px;  /* 页面标题 */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  /* 圆角：按层级逐级增大，内层圆角 ≤ 外层 */
+  --radius-sm: 6px;      /* 角标、色块、控件内的小块 */
+  --radius-md: 8px;      /* 按钮、输入框、列表行、分段控件 */
+  --radius-lg: 12px;     /* 卡片、菜单、浮层 */
+  --radius-xl: 16px;     /* 对话框、底部 sheet */
+  --radius-full: 999px;  /* 胶囊、圆点 */
+
+  /* 间距：4px 网格（2/6 只用于控件内部的紧凑排布） */
+  --space-2xs: 2px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+
+  /* 控件高度：3 档 */
+  --control-height-sm: 24px;  /* 行内小按钮、角标按钮 */
+  --control-height-md: 28px;  /* 默认：按钮、输入框、下拉、分段控件 */
+  --control-height-lg: 32px;  /* 主要操作、对话框底部按钮 */
+
+  /* 图标：只用 Lucide（src/icons.ts），描边 1.5 */
+  --icon-size-sm: 14px;
+  --icon-size-md: 16px;
+  --icon-size-lg: 20px;
+
+  /* 动效：3 档时长 + 2 条曲线 */
+  --duration-fast: 120ms;   /* hover、按下、颜色变化 */
+  --duration-base: 200ms;   /* 展开收起、浮层出现 */
+  --duration-slow: 320ms;   /* 对话框、sheet、页面切换 */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* 交互状态 */
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent);
+  --disabled-opacity: 0.4;
+  /* —— 以下为颜色与材质 —— */
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #121419;
+  color-scheme: light;
+  background: transparent;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --titlebar-height: calc(54px + var(--safe-area-top));
+
+  /* 阴影系统：只用于浮层，表面用 1px 描边区分层级 */
+  --shadow-sm: 0 1px 2px rgb(18 24 40 / 6%);
+  --shadow-md: 0 6px 18px rgb(18 24 40 / 10%);
+  --shadow-lg: 0 16px 40px rgb(18 24 40 / 16%);
+
+  --line: #e3e6eb;
+  --line-soft: #eef1f5;
+  --line-strong: #cdd2db;
+  --text: #121419;
+  --secondary: #5b616e;
+  --muted: #5b616e;
+  --tertiary: #8b919e;
+  --scrollbar-thumb: rgb(18 20 25 / 30%);
+  --scrollbar-thumb-hover: rgb(18 20 25 / 52%);
+  --scrollbar-thumb-border: rgb(0 0 0 / 10%);
+  --scrollbar-thumb-highlight: rgb(255 255 255 / 45%);
+  --accent: #3a6df0;
+  --accent-soft: #e9effe;
+  --selection: #ff6b2c;
+  --selection-soft: #ffefe6;
+  --state-ok: #12a150;
+  --state-warn: #b87a00;
+  --state-danger: #e5484d;
+  --search-font-size: 13px;
+  --material-window: #e9ebef;
+  --material-toolbar: #ffffff;
+  --material-sidebar: #ffffff;
+  --material-inspector: #ffffff;
+  --material-panel: #ffffff;
+  --material-menu: #ffffff;
+  --material-content: #f4f5f8;
+  --canvas: #e9ebef;
+  --material-control: #ffffff;
+  --hover: rgb(18 20 25 / 5%);
+  --material-glass-surface: #ffffff;
+  /* 窗口材质填充系数（0 – 1，1 即完全不透明）：由设置里的材质滑杆写入，见 applyWindowMaterialOpacity。
+     单层表面用 --window-material-layer，叠在已填充表面上的下沉层用 -sunken，浮层用 -floating。 */
+  --window-material-layer: 1;
+  --window-material-sunken: 1;
+  --window-material-floating: 1;
+  --glass-border: #e3e6eb;
+  --glass-highlight: rgb(255 255 255 / 70%);
+  --glass-shadow: 0 8px 28px rgb(18 24 40 / 10%), inset 0 1px rgb(255 255 255 / 78%);
+  --window: var(--material-window);
+  --toolbar: var(--material-toolbar);
+  --sidebar: var(--material-sidebar);
+  --inspector: var(--material-inspector);
+  --panel: var(--material-panel);
+  --menu: var(--material-menu);
+  --content: var(--material-content);
+  --control: var(--material-control);
+  --glass-surface: var(--material-glass-surface);
+  /* 透明马赛克：画布与各预览缩略图共用同一套方格，避免两处样式漂移 */
+  --on-accent: #ffffff;        /* 强调色底上的文字/图标 */
+  --canvas-surface: #f4f5f8;   /* 画布区底色 */
+  --checker-light: #f7f7f8;
+  --checker-dark: #dfe1e5;
+  --checker-size: 24px;
+  --checker-image:
+    linear-gradient(45deg, var(--checker-dark) 25%, transparent 25%, transparent 75%, var(--checker-dark) 75%),
+    linear-gradient(45deg, var(--checker-dark) 25%, transparent 25%, transparent 75%, var(--checker-dark) 75%);
+}
+
+:root.macos {
+  --titlebar-height: calc(86px + var(--safe-area-top));
+}
+
+:root[data-app-theme="dark"] {
+  color: #f2f3f4;
+  color-scheme: dark;
+  background: transparent;
+  --line: #282c33;
+  --line-soft: #1f2329;
+  --line-strong: #3a3f48;
+  --text: #f3f5f8;
+  --secondary: #a1a8b3;
+  --muted: #a1a8b3;
+  --tertiary: #6c737e;
+  --scrollbar-thumb: rgb(243 245 248 / 32%);
+  --scrollbar-thumb-hover: rgb(243 245 248 / 56%);
+  --scrollbar-thumb-border: rgb(255 255 255 / 12%);
+  --scrollbar-thumb-highlight: rgb(255 255 255 / 20%);
+  --accent: #7a9bff;
+  --accent-soft: #1d2740;
+  --selection: #ff8a55;
+  --selection-soft: #3a2418;
+  --state-ok: #3dd68c;
+  --state-warn: #f5c445;
+  --state-danger: #ff6b6b;
+  --material-window: #0c0d10;
+  --material-toolbar: #15171b;
+  --material-sidebar: #15171b;
+  --material-inspector: #15171b;
+  --material-panel: #15171b;
+  --material-menu: #1e2126;
+  --material-content: #1a1d21;
+  --canvas: #0c0d10;
+  --material-control: #1e2126;
+  --hover: rgb(255 255 255 / 8%);
+  --material-glass-surface: #1e2126;
+  --glass-border: #282c33;
+  --glass-highlight: rgb(255 255 255 / 10%);
+  --glass-shadow: 0 10px 32px rgb(0 0 0 / 32%), inset 0 1px rgb(255 255 255 / 8%);
+  --canvas-surface: #0c0d10;
+}
+
+:root.windows[data-window-material="on"] {
+  --material-window: #e9ebef;
+  --material-toolbar: #ffffff;
+  --material-sidebar: #ffffff;
+  --material-inspector: #ffffff;
+  --material-panel: #ffffff;
+  --material-menu: #ffffff;
+  --material-content: #f4f5f8;
+  --material-control: #ffffff;
+  --material-glass-surface: #ffffff;
+}
+
+:root.windows[data-app-theme="dark"][data-window-material="on"] {
+  --material-window: #0c0d10;
+  --material-toolbar: #15171b;
+  --material-sidebar: #15171b;
+  --material-inspector: #15171b;
+  --material-panel: #15171b;
+  --material-menu: #1e2126;
+  --material-content: #1a1d21;
+  --material-control: #1e2126;
+  --material-glass-surface: #1e2126;
+}
+
+/* 玻璃材质：滑杆值就是材质填充强度，100% 时每个表面都合成到完全不透明，所以拖动滑杆既能得到
+   薄玻璃，也能得到实心窗口。各表面不再按固定系数缩放，而是按层角色取值，避免外壳/工作区/内容区
+   层层叠加后比滑杆更实（旧写法把系数乘在滑杆上，100% 也只有半透明）。
+   单层：直接压在系统材质上的表面（外壳、工具栏、侧栏、检查器、面板）取滑杆值。
+   下沉层：总叠在已填充表面之上的大块区域（内容区、画布）取 1-√(1-f)，两层合成后正好等于滑杆值。
+   浮层：压在编辑器内容之上的对话框取 1-(1-f)²，保证正文始终落在接近实心的底上。
+   控件块面和分隔线不走这套系数，它们在 pen-design-application.css 的材质段里换成固定色差，
+   否则滑杆一拉低，按钮/输入框的底色就会和玻璃融成一片。 */
+:root[data-window-material-kind="glass"][data-window-material="on"] {
+  --window: rgb(233 235 239 / var(--window-material-layer));
+  --toolbar: rgb(255 255 255 / var(--window-material-layer));
+  --sidebar: rgb(255 255 255 / var(--window-material-layer));
+  --inspector: rgb(255 255 255 / var(--window-material-layer));
+  --panel: rgb(255 255 255 / var(--window-material-layer));
+  --menu: var(--material-menu);
+  --canvas: rgb(233 235 239 / var(--window-material-sunken));
+  --content: rgb(244 245 248 / var(--window-material-sunken));
+  --control: rgb(255 255 255 / var(--window-material-sunken));
+  --glass-surface: rgb(255 255 255 / var(--window-material-layer));
+  /* 系统材质本身就是窗口背景，所以外壳保持全透明，各区域只画自己那一层淡填充。 */
+  --material-window: transparent;
+  --canvas-surface: rgb(244 245 248 / var(--window-material-sunken));
+  --material-panel: rgb(255 255 255 / var(--window-material-layer));
+  --material-control: rgb(255 255 255 / var(--window-material-floating));
+  /* 控件色差：+4.4% / +8.6% 的中性色等于 #f4f5f8 / #ebebeb 叠在白底上的暗度，
+     11% / 19.8% 等于 #e3e6eb / #cdd2db。色差固定，滑杆只影响玻璃本身的通透度。 */
+  --material-content: rgb(19 24 38 / 4.4%);
+  --line: rgb(19 24 38 / 11%);
+  --line-strong: rgb(19 24 38 / 19.8%);
+}
+
+/* 深色模式沿用同一套层系数，只是底色更深，浅色文字压在深色玻璃上仍然够清晰。 */
+:root[data-app-theme="dark"][data-window-material-kind="glass"][data-window-material="on"] {
+  --window: rgb(12 13 16 / var(--window-material-layer));
+  --toolbar: rgb(21 23 27 / var(--window-material-layer));
+  --sidebar: rgb(21 23 27 / var(--window-material-layer));
+  --inspector: rgb(21 23 27 / var(--window-material-layer));
+  --panel: rgb(21 23 27 / var(--window-material-layer));
+  --menu: var(--material-menu);
+  --canvas: rgb(12 13 16 / var(--window-material-sunken));
+  --content: rgb(26 29 33 / var(--window-material-sunken));
+  --control: rgb(30 33 38 / var(--window-material-sunken));
+  --glass-surface: rgb(30 33 38 / var(--window-material-layer));
+  --material-window: transparent;
+  --canvas-surface: rgb(12 13 16 / var(--window-material-sunken));
+  --material-panel: rgb(21 23 27 / var(--window-material-layer));
+  --material-control: rgb(30 33 38 / var(--window-material-floating));
+  --material-content: rgb(255 255 255 / 2.5%);
+  --line: rgb(255 255 255 / 9.2%);
+  --line-strong: rgb(255 255 255 / 17.1%);
+}
+
+:root[data-window-material="off"] {
+  background: #e9ebef;
+  --window: #e9ebef;
+  --toolbar: #ffffff;
+  --sidebar: #ffffff;
+  --inspector: #ffffff;
+  --panel: #ffffff;
+  --menu: #ffffff;
+  --content: #f4f5f8;
+  --control: #ffffff;
+  --glass-surface: #ffffff;
+}
+
+:root[data-app-theme="dark"][data-window-material="off"] {
+  background: #0c0d10;
+  --window: #0c0d10;
+  --toolbar: #15171b;
+  --sidebar: #15171b;
+  --inspector: #15171b;
+  --panel: #15171b;
+  --menu: #1e2126;
+  --content: #1a1d21;
+  --control: #1e2126;
+  --glass-surface: #1e2126;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+}

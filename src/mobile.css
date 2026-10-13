@@ -78,13 +78,13 @@
     border: 0;
     border-radius: 10px;
     background: transparent;
-    color: var(--pen-text);
+    color: var(--text);
     box-shadow: none;
     font-size: 0;
   }
 
   :root body .titlebar .mobile-command-menu > summary {
-    background: var(--pen-surface-subtle);
+    background: var(--material-content);
   }
 
   :root body .titlebar .titlebar-icon-button:disabled {
@@ -153,8 +153,8 @@
     gap: 6px;
     border: 0;
     border-radius: 999px;
-    background: var(--pen-surface-subtle);
-    color: var(--pen-text);
+    background: var(--material-content);
+    color: var(--text);
     box-shadow: none;
     font-size: 13px;
     font-weight: 600;
@@ -166,8 +166,8 @@
   }
 
   :root:has(#mode option[value="edit"]:checked) body .titlebar .mode-control > .mobile-choice-toggle {
-    background: var(--pen-accent-soft);
-    color: var(--pen-accent);
+    background: var(--accent-soft);
+    color: var(--accent);
   }
 
   /* 手机标题栏很窄，未保存提示只保留圆点 */
@@ -373,7 +373,7 @@
   :root body main > :is(aside, .source) {
     border-top: 0;
     border-bottom: 0;
-    background: var(--pen-surface);
+    background: var(--material-panel);
   }
 
   /* Dock: a thin strip with two page indicators. Panes switch by swiping sideways (or tapping
@@ -388,7 +388,7 @@
     align-items: center;
     gap: 2px;
     padding: 0;
-    border-top: 1px solid var(--pen-line);
+    border-top: 1px solid var(--line);
   }
 
   :root body .mobile-workspace-tabs button[data-mobile-pane] {
@@ -414,8 +414,8 @@
     width: 14px;
     height: 4px;
     margin: -2px 0 0 -7px;
-    border-radius: var(--pen-radius-pill, 999px);
-    background: color-mix(in srgb, var(--pen-secondary) 35%, transparent);
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--secondary) 35%, transparent);
     transition: width 180ms ease, margin 180ms ease, background-color 180ms ease;
   }
 
@@ -426,7 +426,7 @@
   :root body .mobile-workspace-tabs button[data-mobile-pane].active::after {
     width: 24px;
     margin-left: -12px;
-    background: var(--pen-accent);
+    background: var(--accent);
   }
 
   :root body .mobile-split-handle {
@@ -445,7 +445,7 @@
 
   :root body .mobile-split-handle.dragging,
   :root body .mobile-split-handle:focus-visible {
-    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--pen-accent) 45%, transparent);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
   }
 
   /* Canvas: compact preview toolbar on top, canvas fills the rest. The desktop grid
@@ -476,8 +476,8 @@
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
-    border-bottom: 1px solid var(--pen-line);
-    background: var(--pen-surface);
+    border-bottom: 1px solid var(--line);
+    background: var(--material-panel);
   }
 
   :root body .preview-toolbar-start,
@@ -961,7 +961,7 @@
      so the options scrolling beneath it stay hidden. */
   :root body #layout-image-dialog > form > footer {
     z-index: 1;
-    background: var(--pen-surface);
+    background: var(--material-panel);
   }
 
   :root body .project-dialog footer button,

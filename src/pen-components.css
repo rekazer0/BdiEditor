@@ -35,9 +35,9 @@
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
   box-shadow: none;
   transform: none;
 }
@@ -46,7 +46,7 @@
 :root body .toolbar-button .system-symbol,
 :root body .toolbar-more > summary .icon,
 :root body .toolbar-more > summary .system-symbol {
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 15px;
   line-height: 1;
 }
@@ -64,23 +64,23 @@
 
 :root body .toolbar-button:hover:not(:disabled),
 :root body .toolbar-more > summary:hover {
-  background: color-mix(in srgb, var(--pen-surface-subtle) 82%, var(--pen-line));
-  color: var(--pen-text);
+  background: color-mix(in srgb, var(--material-content) 82%, var(--line));
+  color: var(--text);
 }
 
 :root body .toolbar-button:active:not(:disabled),
 :root body .toolbar-more > summary:active {
-  background: color-mix(in srgb, var(--pen-surface-subtle) 72%, var(--pen-line));
+  background: color-mix(in srgb, var(--material-content) 72%, var(--line));
 }
 
 :root body .toolbar-button:disabled {
   opacity: 0.38;
-  color: var(--pen-secondary);
+  color: var(--secondary);
 }
 
 :root body .toolbar-button:disabled .icon,
 :root body .toolbar-button:disabled .system-symbol {
-  color: var(--pen-secondary);
+  color: var(--secondary);
 }
 
 /* The title bar keeps the 28px control the 组件 / 标题栏 component draws. */
@@ -110,8 +110,8 @@
   gap: 2px;
   padding: 3px;
   border: 0;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -122,8 +122,8 @@
   gap: 2px;
   padding: 2px;
   border: 0;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -134,9 +134,9 @@
   height: 28px;
   padding: 0 11px;
   border: 0;
-  border-radius: var(--pen-radius-xs);
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   box-shadow: none;
   font-size: 12px;
   font-weight: 400;
@@ -156,9 +156,9 @@
   height: 26px;
   padding: 0;
   border: 0;
-  border-radius: var(--pen-radius-xs);
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   box-shadow: none;
 }
 
@@ -171,25 +171,25 @@
 
 :root body .mode-control button.active,
 :root body .sidebar-view-control button.active {
-  color: var(--pen-text);
-  background: var(--pen-surface);
-  box-shadow: inset 0 0 0 1px var(--pen-line);
+  color: var(--text);
+  background: var(--material-panel);
+  box-shadow: inset 0 0 0 1px var(--line);
   font-weight: 500;
   animation: none;
 }
 
 :root body .preview-choice button.active {
-  color: var(--pen-accent);
-  background: var(--pen-raised);
-  box-shadow: inset 0 0 0 1px var(--pen-line);
+  color: var(--accent);
+  background: var(--material-control);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 
 :root body .preview-choice button:hover:not(.active):not(:disabled) {
-  color: var(--pen-text);
+  color: var(--text);
 }
 
 :root body .mode-control button:hover:not(.active) {
-  color: var(--pen-text);
+  color: var(--text);
 }
 
 /* =================================================================================================
@@ -201,7 +201,7 @@
   gap: 18px;
   padding: 0 12px;
   border: 0;
-  border-bottom: 1px solid var(--pen-line);
+  border-bottom: 1px solid var(--line);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -214,7 +214,7 @@
   gap: 18px;
   padding: 0 12px;
   border: 0;
-  border-bottom: 1px solid var(--pen-line);
+  border-bottom: 1px solid var(--line);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -232,7 +232,7 @@
   border-bottom: 2px solid transparent;
   border-radius: 0;
   background: transparent;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   box-shadow: none;
   font-size: 12.5px;
   font-weight: 400;
@@ -240,14 +240,14 @@
 }
 
 :root body .inspector-tabs button:hover:not(.active):not(:disabled) {
-  color: var(--pen-secondary);
+  color: var(--secondary);
   background: transparent;
 }
 
 :root body .inspector-tabs button.active,
 :root body .source .inspector-tabs button.active {
-  color: var(--pen-text);
-  border-bottom-color: var(--pen-accent);
+  color: var(--text);
+  border-bottom-color: var(--accent);
   background: transparent;
   box-shadow: none;
   font-weight: 600;
@@ -261,7 +261,7 @@
 
 :root body #quick-inspector .inspector-grid label,
 :root body #quick-inspector .inspector-grid > label > span:first-child {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-size: 11px;
   font-weight: 400;
 }
@@ -277,10 +277,10 @@
   min-height: 30px;
   height: 30px;
   padding: 0 9px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--text);
   font-size: 12px;
   font-weight: 400;
   box-shadow: none;
@@ -298,14 +298,14 @@
 :root body #quick-inspector textarea:focus,
 :root body .app-dialog select:focus,
 :root body .app-dialog input[type="number"]:focus {
-  border-color: var(--pen-accent);
+  border-color: var(--accent);
   outline: 0;
   box-shadow: none;
 }
 
 :root body #quick-inspector input::placeholder,
 :root body #quick-inspector textarea::placeholder {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
 }
 
 /* Search box: one sunken capsule, the inner input is bare. */
@@ -313,10 +313,10 @@
   height: 30px;
   padding: 0 10px;
   gap: 8px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-secondary);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
   box-shadow: none;
 }
 
@@ -324,7 +324,7 @@
 :root body .search-control .system-symbol svg {
   width: 13px;
   height: 13px;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
 }
 
 :root body .search-control input {
@@ -334,7 +334,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 12px;
   box-shadow: none;
 }
@@ -367,9 +367,9 @@
   flex: none;
   appearance: none;
   -webkit-appearance: none;
-  border: 1px solid var(--pen-line-strong);
-  border-radius: var(--pen-radius-pill);
-  background: var(--pen-surface-subtle);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
+  background: var(--material-content);
   box-shadow: none;
   transition: background 160ms cubic-bezier(0.4, 0, 0.2, 1), border-color 160ms cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -387,7 +387,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--pen-on-brand);
+  background: var(--on-accent);
   box-shadow: 0 1px 2px rgb(0 0 0 / 20%);
   transition: transform 160ms cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -399,7 +399,7 @@
 :root body #quick-inspector .inspector-switch input:checked,
 :root body #quick-inspector input[role="switch"][type="checkbox"]:checked {
   border-color: transparent;
-  background: var(--pen-accent);
+  background: var(--accent);
 }
 
 :root body .settings-switch input:checked::after,
@@ -425,10 +425,10 @@
   min-height: 32px;
   height: 32px;
   padding: 0 14px;
-  border: 1px solid var(--pen-line-strong);
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface);
-  color: var(--pen-text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--material-panel);
+  color: var(--text);
   font-size: 12px;
   font-weight: 500;
   box-shadow: none;
@@ -440,27 +440,27 @@
   justify-content: flex-start;
   border-color: transparent;
   background: transparent;
-  color: var(--pen-text);
+  color: var(--text);
   font-weight: 400;
 }
 
 :root body .toolbar-menu button:hover:not(:disabled) {
-  background: var(--pen-surface-subtle);
+  background: var(--material-content);
 }
 
 :root body .app-dialog button.primary,
 :root body .project-dialog button.primary {
   border-color: transparent;
-  background: var(--pen-accent);
-  color: var(--pen-on-brand);
+  background: var(--accent);
+  color: var(--on-accent);
   font-weight: 500;
 }
 
 :root body .app-dialog button.secondary,
 :root body .project-dialog button.secondary {
-  border-color: var(--pen-line-strong);
-  background: var(--pen-surface);
-  color: var(--pen-text);
+  border-color: var(--line-strong);
+  background: var(--material-panel);
+  color: var(--text);
 }
 
 /* The sheet header close affordance is the quiet ghost button. */
@@ -470,16 +470,16 @@
   height: 28px;
   padding: 0 12px;
   border: 0;
-  border-radius: var(--pen-radius-xs);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-sm);
+  background: var(--material-content);
+  color: var(--secondary);
   font-size: 12px;
   font-weight: 400;
 }
 
 :root body .app-dialog header button:hover,
 :root body .project-dialog header button:hover {
-  color: var(--pen-text);
+  color: var(--text);
 }
 
 /* =================================================================================================
@@ -487,10 +487,10 @@
  * ================================================================================================= */
 
 :root body .app-dialog {
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-lg);
-  background: var(--pen-surface);
-  color: var(--pen-text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--material-panel);
+  color: var(--text);
   box-shadow: 0 24px 60px rgb(18 20 25 / 18%);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -503,13 +503,13 @@
   padding: 0 20px;
   gap: 10px;
   align-items: center;
-  border-bottom: 1px solid var(--pen-line);
+  border-bottom: 1px solid var(--line);
 }
 
 :root body .app-dialog header h2,
 :root body .project-dialog header h2 {
   margin: 0;
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 15px;
   font-weight: 600;
   line-height: 1.35;
@@ -519,7 +519,7 @@
  * 头部 / 内容 / 底部节奏——标题与正文左对齐 20px，头尾各有一条分隔线，按钮靠右。 */
 :root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) {
   padding: 0;
-  border-radius: var(--pen-radius-lg);
+  border-radius: var(--radius-xl);
 }
 
 :root body :is(#panel-scale-dialog, #ios26-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) {
@@ -544,7 +544,7 @@
 
 :root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) > form > header :is(p, small) {
   margin: 0;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -555,7 +555,7 @@
   gap: 8px;
   margin: 4px -20px -20px;
   padding: 12px 20px;
-  border-top: 1px solid var(--pen-line);
+  border-top: 1px solid var(--line);
 }
 
 :root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) > form > footer button {
@@ -565,34 +565,34 @@
 :root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) label:not(.project-template-option) {
   display: grid;
   gap: 6px;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 12px;
 }
 
 :root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) input:not([type="checkbox"]) {
   height: 32px;
   padding: 0 10px;
-  border: 1px solid var(--pen-line-strong);
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface);
-  color: var(--pen-text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--material-panel);
+  color: var(--text);
   font-size: 12px;
 }
 
 :root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) input:not([type="checkbox"]):focus {
-  border-color: var(--pen-accent);
+  border-color: var(--accent);
   outline: none;
-  box-shadow: 0 0 0 3px var(--pen-accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 :root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) input:disabled {
-  background: var(--pen-surface-subtle);
-  color: var(--pen-tertiary);
+  background: var(--material-content);
+  color: var(--tertiary);
 }
 
 :root body #panel-scale-summary {
   margin: 0;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
@@ -615,9 +615,9 @@
 :root body .dialog-note {
   margin: 0;
   padding: 10px 12px;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -625,8 +625,8 @@
 :root body .settings-sidebar {
   padding: 12px 10px;
   gap: 2px;
-  border-right: 1px solid var(--pen-line);
-  background: var(--pen-surface-subtle);
+  border-right: 1px solid var(--line);
+  background: var(--material-content);
 }
 
 /* 172px is the pen's category rail; narrow sheets keep their stacked layout. */
@@ -646,9 +646,9 @@
   align-items: center;
   justify-content: flex-start;
   border: 1px solid transparent;
-  border-radius: var(--pen-radius-sm);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   box-shadow: none;
   font-size: 12px;
   font-weight: 400;
@@ -659,24 +659,24 @@
   flex: 0 0 14px;
   width: 14px;
   height: 14px;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
 }
 
 :root body .settings-nav-item:hover:not([aria-selected="true"]) {
-  background: color-mix(in srgb, var(--pen-surface-subtle) 76%, var(--pen-line));
-  color: var(--pen-text);
+  background: color-mix(in srgb, var(--material-content) 76%, var(--line));
+  color: var(--text);
 }
 
 :root body .settings-nav-item[aria-selected="true"] {
-  border-color: var(--pen-line);
-  background: var(--pen-surface);
-  color: var(--pen-text);
+  border-color: var(--line);
+  background: var(--material-panel);
+  color: var(--text);
   font-weight: 500;
   box-shadow: none;
 }
 
 :root body .settings-nav-item[aria-selected="true"] .system-symbol {
-  color: var(--pen-accent);
+  color: var(--accent);
 }
 
 :root body .settings-content {
@@ -685,18 +685,18 @@
 }
 
 :root body .settings-section-heading h3 {
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 15px;
   font-weight: 600;
 }
 
 :root body .settings-section-heading p {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-size: 11px;
 }
 
 :root body .settings-list > h4 {
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 11px;
   font-weight: 500;
 }
@@ -706,19 +706,19 @@
   min-height: 40px;
   padding: 0 2px;
   gap: 16px;
-  border-top: 1px solid var(--pen-line);
+  border-top: 1px solid var(--line);
   border-bottom: 0;
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 13px;
 }
 
 :root body .settings-row > span:first-child {
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 13px;
 }
 
 :root body .settings-row small {
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 12px;
   font-family: var(--font-mono);
 }
@@ -731,9 +731,9 @@
 :root body .canvas-multi-toolbar {
   gap: 4px;
   padding: 8px 10px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-md);
-  background: var(--pen-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--material-control);
   box-shadow: 0 14px 34px -8px rgb(18 20 25 / 26%);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -744,9 +744,9 @@
   display: inline-flex;
   align-items: center;
   padding: 0 7px;
-  border-radius: var(--pen-radius-pill);
-  background: var(--pen-selection-soft);
-  color: var(--pen-selection);
+  border-radius: var(--radius-full);
+  background: var(--selection-soft);
+  color: var(--selection);
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
@@ -757,7 +757,7 @@
   width: 1px;
   height: 16px;
   margin: 0 2px;
-  background: var(--pen-line);
+  background: var(--line);
 }
 
 :root body .canvas-multi-toolbar button {
@@ -765,14 +765,14 @@
   height: 28px;
   padding: 0;
   border: 0;
-  border-radius: var(--pen-radius-xs);
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--pen-secondary);
+  color: var(--secondary);
 }
 
 :root body .canvas-multi-toolbar button:hover:not(:disabled) {
-  background: var(--pen-surface-subtle);
-  color: var(--pen-text);
+  background: var(--material-content);
+  color: var(--text);
 }
 
 :root body .canvas-multi-toolbar button:disabled {
@@ -795,8 +795,8 @@
   min-height: 44px;
   padding: 0 16px;
   gap: 12px;
-  border-bottom: 1px solid var(--pen-line);
-  background: var(--pen-surface);
+  border-bottom: 1px solid var(--line);
+  background: var(--material-panel);
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -843,9 +843,9 @@
   display: grid;
   place-items: center;
   border: 1px solid transparent;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
   box-shadow: none;
 }
 
@@ -858,9 +858,9 @@
 
 :root body .preview-tool-toggle.active,
 :root body .preview-tool-toggle[aria-pressed="true"] {
-  color: var(--pen-accent);
-  background: var(--pen-raised);
-  box-shadow: inset 0 0 0 1px var(--pen-line);
+  color: var(--accent);
+  background: var(--material-control);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 
 :root body #device-control,
@@ -870,9 +870,9 @@
   height: 28px;
   padding: 0 10px;
   border: 1px solid transparent;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-text);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--text);
   box-shadow: none;
 }
 
@@ -885,7 +885,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 11.5px;
   font-weight: 500;
   box-shadow: none;
@@ -896,7 +896,7 @@
 }
 
 :root body #skin-state-control .skin-state-value {
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 11.5px;
   font-weight: 500;
   line-height: 26px;
@@ -911,21 +911,21 @@
   min-height: 30px;
   padding: 0 14px;
   gap: 16px;
-  border-top: 1px solid var(--pen-line);
-  background: var(--pen-surface);
-  color: var(--pen-tertiary);
+  border-top: 1px solid var(--line);
+  background: var(--material-panel);
+  color: var(--tertiary);
   font-family: var(--font-ui);
   font-size: 11px;
 }
 
 :root body #event-log {
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-family: var(--font-ui);
   font-size: 11px;
 }
 
 :root body #panel-status {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-family: var(--font-mono);
   font-size: 11px;
 }
@@ -936,13 +936,13 @@
  * ================================================================================================= */
 
 :root body #files .raw-files .source-tree-row {
-  border-radius: var(--pen-radius-xs);
+  border-radius: var(--radius-sm);
   font-size: 12.5px;
 }
 
 /* 概览条目与源文件树同一套行语言：单行平铺行，无卡片描边与图标底砖。 */
 :root body #files .sidebar-overview button.nav-item {
-  border-radius: var(--pen-radius-sm);
+  border-radius: var(--radius-md);
   font-size: 12px;
 }
 
@@ -957,7 +957,7 @@
 }
 
 :root body #files .sidebar-overview .nav-section {
-  border-radius: var(--pen-radius-sm);
+  border-radius: var(--radius-md);
   font-size: 12.5px;
 }
 
@@ -969,7 +969,7 @@
 }
 
 :root body #files .sidebar-overview > .nav-group[open] > .nav-section > .source-disclosure {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
 }
 
 /* 两行条目：名字在上、文件名在下，图标跨两行居中；窄栏里两行各自截断，完整内容见行的 title。 */
@@ -996,7 +996,7 @@
 }
 
 :root body #files .raw-files .source-folder-row {
-  border-radius: var(--pen-radius-xs);
+  border-radius: var(--radius-sm);
   font-size: 12.5px;
 }
 
@@ -1008,12 +1008,12 @@
   gap: 8px;
   min-height: 34px;
   padding: 5px 10px;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
 }
 
 :root body .document-title strong {
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 13px;
   font-weight: 600;
   line-height: 18px;
@@ -1023,10 +1023,10 @@
   min-height: 22px;
   padding: 2px 7px;
   gap: 5px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-pill);
-  background: var(--pen-surface);
-  color: var(--pen-secondary);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--material-panel);
+  color: var(--secondary);
   font-size: 10px;
   font-weight: 400;
 }
@@ -1038,9 +1038,9 @@
 :root body .source-toolbar {
   padding: 8px 10px;
   gap: 8px;
-  border-top: 1px solid var(--pen-line);
-  border-bottom: 1px solid var(--pen-line);
-  background: var(--pen-surface);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--material-panel);
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -1058,41 +1058,41 @@
   gap: 2px;
   padding: 3px;
   border: 0;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
   box-shadow: none;
 }
 
 /* The selected segment keeps the design-system 1px $line hairline. */
 :root body #quick-inspector .inspector-state-switch button.active {
-  box-shadow: inset 0 0 0 1px var(--pen-line) !important;
+  box-shadow: inset 0 0 0 1px var(--line) !important;
 }
 
 /* Property fields — the design-system Field box. */
 :root body #quick-inspector .document-property-field input:where(:not([role="switch"])) {
   height: 30px;
   padding: 0 9px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--text);
   font-size: 12px;
   font-weight: 400;
 }
 
 :root body #quick-inspector .document-property-field input:where(:not([role="switch"])):hover {
-  background: var(--pen-surface-subtle);
+  background: var(--material-content);
 }
 
 :root body #quick-inspector .document-property-field input:where(:not([role="switch"])):focus {
-  border-color: var(--pen-accent);
-  background: var(--pen-surface-subtle);
+  border-color: var(--accent);
+  background: var(--material-content);
   outline: 0;
   box-shadow: none;
 }
 
 :root body #quick-inspector .document-property-field > span {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-size: 11px;
   font-weight: 400;
 }
@@ -1102,21 +1102,21 @@
   width: 28px;
   height: 28px;
   padding: 2px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
 }
 
 /* Toggle label colour and the inline style-preview surface — both still carried
    the retired card palette ($card-tertiary / $card-control / $card-border). */
 :root body #quick-inspector .inspector-switch input {
-  color: var(--pen-secondary);
+  color: var(--secondary);
 }
 
 :root body #quick-inspector .style-picker-state canvas {
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-xs);
-  background: var(--pen-surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--material-content);
 }
 
 /* =================================================================================================
@@ -1137,8 +1137,8 @@
     height: var(--mobile-dock-h);
     gap: 6px;
     padding: 8px 12px;
-    border-bottom: 1px solid var(--pen-line);
-    background: var(--pen-surface);
+    border-bottom: 1px solid var(--line);
+    background: var(--material-panel);
     box-shadow: none;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -1150,8 +1150,8 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    border-radius: var(--pen-radius-sm);
-    color: var(--pen-secondary);
+    border-radius: var(--radius-md);
+    color: var(--secondary);
     background: transparent;
     font-size: 12px;
     font-weight: 400;
@@ -1164,8 +1164,8 @@
   }
 
   :root body .mobile-workspace-tabs button[data-mobile-pane].active {
-    color: var(--pen-accent);
-    background: var(--pen-accent-soft);
+    color: var(--accent);
+    background: var(--accent-soft);
     box-shadow: none;
     font-weight: 500;
   }
@@ -1176,7 +1176,7 @@
     height: 12px;
     top: auto;
     bottom: 0;
-    border-radius: var(--pen-radius-pill);
+    border-radius: var(--radius-full);
   }
 
   :root body .mobile-split-handle::before {
@@ -1184,8 +1184,8 @@
     height: 3px;
     top: 50%;
     margin-top: -1.5px;
-    border-radius: var(--pen-radius-pill);
-    background: var(--pen-line-strong);
+    border-radius: var(--radius-full);
+    background: var(--line-strong);
   }
 
   /* Layout budgets below used to hard-code the retired 18px strip. */
@@ -1243,8 +1243,8 @@
   align-items: center;
   gap: 0;
   padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
-  border-bottom: 1px solid var(--pen-line);
-  background: var(--pen-surface);
+  border-bottom: 1px solid var(--line);
+  background: var(--material-panel);
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -1294,9 +1294,9 @@
   gap: 6px;
   padding: 6px 10px;
   border: 0;
-  border-radius: var(--pen-radius-sm);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 400;
@@ -1309,17 +1309,17 @@
 }
 
 :root body .titlebar .titlebar-actions .titlebar-action:hover:not(:disabled) {
-  background: var(--pen-surface-subtle);
-  color: var(--pen-text);
+  background: var(--material-content);
+  color: var(--text);
 }
 
 :root body .titlebar .titlebar-actions .titlebar-action:active:not(:disabled) {
-  background: color-mix(in srgb, var(--pen-surface-subtle) 72%, var(--pen-line));
+  background: color-mix(in srgb, var(--material-content) 72%, var(--line));
 }
 
 :root body .titlebar .titlebar-actions .titlebar-action:disabled {
   opacity: 0.42;
-  color: var(--pen-secondary);
+  color: var(--secondary);
 }
 
 :root body .titlebar .titlebar-action .icon,
@@ -1344,16 +1344,16 @@
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
   cursor: pointer;
   box-shadow: none;
 }
 
 :root body .titlebar-icon-button:hover {
-  background: color-mix(in srgb, var(--pen-surface-subtle) 82%, var(--pen-line));
-  color: var(--pen-text);
+  background: color-mix(in srgb, var(--material-content) 82%, var(--line));
+  color: var(--text);
 }
 
 :root body .titlebar-icon-button .system-symbol,
@@ -1372,8 +1372,8 @@
   height: auto;
   padding: 5px 10px;
   border: 0;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
   box-shadow: none;
 }
 
@@ -1382,11 +1382,11 @@
   width: 14px;
   height: 14px;
   display: block;
-  color: var(--pen-secondary);
+  color: var(--secondary);
 }
 
 :root body .titlebar .document-title strong {
-  color: var(--pen-text);
+  color: var(--text);
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 600;
@@ -1412,7 +1412,7 @@
     min-width: 30px;
     flex: none;
     border-radius: 8px;
-    background: var(--pen-surface-subtle);
+    background: var(--material-content);
   }
 
   :root body .titlebar .titlebar-icon-button .system-symbol,
@@ -1473,7 +1473,7 @@
   gap: 26px;
   /* 内容限宽居中；滚动条仍贴窗口右缘 */
   padding: 40px max(48px, calc((100% - 1100px) / 2));
-  background: var(--pen-window);
+  background: var(--material-window);
 }
 
 :root body .welcome-hero {
@@ -1481,7 +1481,7 @@
 }
 
 :root body .welcome-hero h1 {
-  color: var(--pen-text);
+  color: var(--text);
   font-family: var(--font-ui);
   font-size: 26px;
   font-weight: 600;
@@ -1490,7 +1490,7 @@
 
 :root body .welcome-hero p {
   max-width: none;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 400;
@@ -1506,13 +1506,13 @@
 }
 
 :root body .welcome-section-head h2 {
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 15px;
   font-weight: 600;
 }
 
 :root body .welcome-section-head span {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-size: 12px;
 }
 
@@ -1522,7 +1522,7 @@
 
 /* 与「新建皮肤」标题同级，字号对齐 hero。 */
 :root body .welcome-recent .welcome-section-head h2 {
-  color: var(--pen-text);
+  color: var(--text);
   font-family: var(--font-ui);
   font-size: 26px;
   font-weight: 600;
@@ -1530,7 +1530,7 @@
 }
 
 :root body .recent-card-folder {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-family: var(--font-mono);
   font-size: 10px;
 }
@@ -1538,17 +1538,17 @@
 :root body .welcome-head-action {
   padding: 6px 12px;
   border: 0;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 500;
 }
 
 :root body .welcome-head-action:hover {
-  background: color-mix(in srgb, var(--pen-accent) 12%, var(--pen-surface-subtle));
-  color: var(--pen-accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--material-content));
+  color: var(--accent);
 }
 
 :root body .recent-grid {
@@ -1561,8 +1561,8 @@
   height: 160px;
   padding: 0;
   align-items: center;
-  background: var(--pen-surface-subtle);
-  color: var(--pen-tertiary);
+  background: var(--material-content);
+  color: var(--tertiary);
   font-size: 11px;
 }
 
@@ -1574,58 +1574,58 @@
 }
 
 :root body .recent-grid .template-name {
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 13px;
   font-weight: 500;
 }
 
 :root body .recent-grid .template-go {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
 }
 
 :root body .recent-grid .template-meta {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-size: 11px;
 }
 
 :root body .recent-grid .template-meta em {
-  border-radius: var(--pen-radius-xs);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-sm);
+  background: var(--material-content);
+  color: var(--secondary);
   font-size: 9px;
 }
 
 :root body .recent-grid-empty {
-  border: 1px dashed var(--pen-line);
-  border-radius: var(--pen-radius-md);
-  background: var(--pen-surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--material-panel);
 }
 
 :root body .recent-grid-empty-copy strong {
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 12px;
   font-weight: 500;
 }
 
 :root body .recent-grid-empty-copy span {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-size: 11px;
 }
 
 :root body .recent-grid-empty button {
   padding: 7px 14px;
   border: 0;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 500;
 }
 
 :root body .recent-grid-empty button:hover {
-  background: color-mix(in srgb, var(--pen-accent) 12%, var(--pen-surface-subtle));
-  color: var(--pen-accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--material-content));
+  color: var(--accent);
 }
 
 :root body .template-grid {
@@ -1642,30 +1642,30 @@
   gap: 12px;
   padding: 14px;
   border: 0;
-  border-radius: var(--pen-radius-md);
-  outline: 1px solid var(--pen-line);
+  border-radius: var(--radius-lg);
+  outline: 1px solid var(--line);
   outline-offset: -1px;
-  background: var(--pen-surface);
+  background: var(--material-panel);
   box-shadow: none;
   transition: outline-color 160ms ease, box-shadow 160ms ease;
 }
 
 :root body .template-card:hover {
   border-color: transparent;
-  outline-color: var(--pen-accent);
+  outline-color: var(--accent);
   box-shadow: 0 4px 14px -4px rgb(18 20 25 / 14%);
 }
 
 :root body .template-preview {
-  border-radius: var(--pen-radius-sm);
+  border-radius: var(--radius-md);
 }
 
 :root body .template-grid .template-preview {
   height: 160px;
   padding: 0;
   align-items: center;
-  background: var(--pen-surface-subtle);
-  color: var(--pen-tertiary);
+  background: var(--material-content);
+  color: var(--tertiary);
   font-size: 11px;
 }
 
@@ -1677,41 +1677,41 @@
 }
 
 :root body .template-name {
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 13px;
   font-weight: 500;
 }
 
 :root body .template-go {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
 }
 
 :root body .template-meta {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-size: 11px;
 }
 
 :root body .template-meta em {
-  border-radius: var(--pen-radius-xs);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-secondary);
+  border-radius: var(--radius-sm);
+  background: var(--material-content);
+  color: var(--secondary);
   font-size: 9px;
 }
 :root body .welcome-note {
   gap: 8px;
   padding: 10px 12px;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
 }
 
 :root body .welcome-note p {
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 11px;
   line-height: 1.5;
 }
 
 :root body .welcome-note .system-symbol {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
 }
 /* File operation sheet: bounded icon and a compact, readable progress layout. */
 :root body #file-operation-dialog {
@@ -1734,8 +1734,8 @@
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: var(--pen-accent-soft, var(--control));
-  color: var(--pen-accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 :root body #file-operation-dialog .file-operation-icon svg { width: 24px; height: 24px; }
 :root body #file-operation-dialog .file-operation-subtitle { font-size: 12px; line-height: 1.5; }
@@ -1746,7 +1746,7 @@
   gap: 12px;
   margin-bottom: 10px;
   font-size: 12px;
-  color: var(--pen-secondary);
+  color: var(--secondary);
 }
 :root body #file-operation-detail { margin: 0; overflow-wrap: anywhere; }
 :root body #file-operation-percent { flex-shrink: 0; font-variant-numeric: tabular-nums; }
@@ -1759,7 +1759,7 @@
   gap: 12px;
   padding-top: 16px;
 }
-:root body #file-operation-dialog .file-operation-hint { font-size: 11px; color: var(--pen-secondary); }
+:root body #file-operation-dialog .file-operation-hint { font-size: 11px; color: var(--secondary); }
 :root body #file-operation-close { flex-shrink: 0; min-width: 64px; }
 
 /* =================================================================================================
@@ -1783,7 +1783,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--pen-surface);
+  background: var(--material-panel);
 }
 
 :root body #layout-image-dialog > form > footer {
@@ -1794,7 +1794,7 @@
   justify-content: flex-end;
   gap: 8px;
   padding-top: 12px;
-  background: var(--pen-surface);
+  background: var(--material-panel);
 }
 
 /* ── 投放区 ── */
@@ -1808,10 +1808,10 @@
   justify-content: center;
   gap: 7px;
   padding: 18px;
-  border: 1px dashed var(--pen-line-strong);
-  border-radius: var(--pen-radius-md);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-text);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--material-content);
+  color: var(--text);
   font-size: 13px;
   font-weight: 500;
   text-align: center;
@@ -1820,31 +1820,31 @@
 
 :root body #layout-image-dialog .layout-image-file-icon {
   font-size: 22px;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
 }
 
 :root body #layout-image-dialog .layout-image-file:hover {
-  border-color: var(--pen-accent);
-  background: var(--pen-accent-soft);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 :root body #layout-image-dialog .layout-image-file.drop-target {
   border-style: solid;
-  border-color: var(--pen-accent);
-  background: var(--pen-accent-soft);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pen-accent) 18%, transparent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 :root body #layout-image-dialog .layout-image-file.has-image {
   min-height: 0;
   padding: 10px;
   border-style: solid;
-  border-color: var(--pen-line);
-  background: var(--pen-surface);
+  border-color: var(--line);
+  background: var(--material-panel);
 }
 
 :root body #layout-image-dialog .layout-image-file.has-image:hover {
-  border-color: var(--pen-accent);
+  border-color: var(--accent);
 }
 
 :root body #layout-image-dialog .layout-image-file.has-image .layout-image-file-icon {
@@ -1854,13 +1854,13 @@
 :root body #layout-image-dialog .layout-image-file img {
   max-width: 100%;
   max-height: 168px;
-  border-radius: var(--pen-radius-xs);
+  border-radius: var(--radius-sm);
   object-fit: contain;
 }
 
 :root body #layout-image-dialog .layout-image-file small,
 :root body #layout-image-dialog header small {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-size: 11px;
   font-weight: 400;
 }
@@ -1880,7 +1880,7 @@
 :root body #layout-image-dialog .layout-image-targets legend {
   margin-bottom: 8px;
   padding: 0;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 12px;
   font-weight: 500;
 }
@@ -1891,9 +1891,9 @@
   gap: 10px;
   min-height: 64px;
   padding: 10px 12px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-panel);
   cursor: pointer;
 }
 
@@ -1902,30 +1902,30 @@
   flex: 0 0 14px;
   width: 14px;
   height: 14px;
-  border: 1px solid var(--pen-line-strong);
+  border: 1px solid var(--line-strong);
   border-radius: 50%;
-  background: var(--pen-surface);
-  box-shadow: inset 0 0 0 3px var(--pen-surface);
+  background: var(--material-panel);
+  box-shadow: inset 0 0 0 3px var(--material-panel);
 }
 
 :root body #layout-image-dialog .layout-image-targets label:hover {
-  border-color: var(--pen-line-strong);
-  background: var(--pen-surface-subtle);
+  border-color: var(--line-strong);
+  background: var(--material-content);
 }
 
 :root body #layout-image-dialog .layout-image-targets label:has(input:checked) {
-  border-color: var(--pen-accent);
-  background: var(--pen-accent-soft);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 :root body #layout-image-dialog .layout-image-targets label:has(input:checked)::before {
-  border-color: var(--pen-accent);
-  background: var(--pen-accent);
-  box-shadow: inset 0 0 0 3px var(--pen-accent-soft);
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 3px var(--accent-soft);
 }
 
 :root body #layout-image-dialog .layout-image-targets label:has(input:focus-visible) {
-  outline: 2px solid var(--pen-accent);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -1944,13 +1944,13 @@
 }
 
 :root body #layout-image-dialog .layout-image-targets label strong {
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 13px;
   font-weight: 500;
 }
 
 :root body #layout-image-dialog .layout-image-targets label small {
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 11px;
   line-height: 1.35;
 }
@@ -1969,9 +1969,9 @@
   display: flex;
   gap: 3px;
   padding: 3px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
   /* 容器带 glass-module 类：去掉它的投影与毛玻璃，保持扁平细线风格 */
   box-shadow: none;
   -webkit-backdrop-filter: none;
@@ -1987,20 +1987,20 @@
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 12px;
   font-weight: 400;
   box-shadow: none;
 }
 
 :root body #layout-image-dialog .layout-image-config-control button:hover:not(.active) {
-  color: var(--pen-text);
-  background: var(--pen-surface);
+  color: var(--text);
+  background: var(--material-panel);
 }
 
 :root body #layout-image-dialog .layout-image-config-control button.active {
-  background: var(--pen-raised);
-  color: var(--pen-text);
+  background: var(--material-control);
+  color: var(--text);
   font-weight: 500;
   box-shadow: 0 1px 3px rgb(18 20 25 / 12%);
 }
@@ -2014,7 +2014,7 @@
 }
 
 :root body #layout-image-dialog .layout-image-config small {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-size: 11px;
   line-height: 1.5;
 }
@@ -2022,13 +2022,13 @@
 /* ── 说明 · 错误 · 底部按钮 ── */
 
 :root body #layout-image-dialog .layout-image-scope {
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 12px;
   line-height: 1.5;
 }
 
 :root body #layout-image-dialog .field-error {
-  color: var(--pen-state-danger);
+  color: var(--state-danger);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -2038,9 +2038,9 @@
 }
 
 :root body #layout-image-dialog footer button.primary:disabled {
-  border-color: var(--pen-line);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-tertiary);
+  border-color: var(--line);
+  background: var(--material-content);
+  color: var(--tertiary);
   cursor: not-allowed;
 }
 

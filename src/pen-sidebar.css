@@ -24,7 +24,6 @@
 /* $on-brand now lives with the rest of the Pen tokens in
    pen-design-application.css; this alias keeps the older name in sync. */
 :root {
-  --pen-on-accent: var(--pen-on-brand);
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -33,8 +32,8 @@
 
 .source {
   grid-template-rows: auto minmax(0, 1fr);
-  border-left: 1px solid var(--pen-line);
-  background: var(--pen-surface);
+  border-left: 1px solid var(--line);
+  background: var(--material-panel);
   box-shadow: none;
 }
 
@@ -43,7 +42,7 @@
   min-height: 42px;
   padding: 0;
   border-bottom: 0;
-  background: var(--pen-surface);
+  background: var(--material-panel);
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -89,7 +88,7 @@
     margin: 0;
     padding: 0 8px;
     border: 0;
-    border-bottom: 1px solid var(--pen-line);
+    border-bottom: 1px solid var(--line);
     border-radius: 0;
     background: transparent;
     box-shadow: none;
@@ -107,7 +106,7 @@
     border: 0;
     border-bottom: 2px solid transparent;
     border-radius: 0;
-    color: var(--pen-tertiary);
+    color: var(--tertiary);
     background: transparent;
     box-shadow: none;
     font-size: 12px;
@@ -115,12 +114,12 @@
   }
 
   .source .source-heading .inspector-tabs button:hover {
-    color: var(--pen-secondary);
+    color: var(--secondary);
   }
 
   .source .source-heading .inspector-tabs button.active {
-    color: var(--pen-text);
-    border-bottom-color: var(--pen-accent);
+    color: var(--text);
+    border-bottom-color: var(--accent);
     background: transparent;
     box-shadow: none;
     animation: none;
@@ -138,7 +137,7 @@
     margin: 0;
     padding: 0 14px;
     border: 0;
-    border-bottom: 1px solid var(--pen-line);
+    border-bottom: 1px solid var(--line);
     border-radius: 0;
     background: transparent;
     box-shadow: none;
@@ -152,10 +151,10 @@
     display: grid;
     place-items: center;
     overflow: hidden;
-    border: 1.5px solid var(--pen-selection);
-    border-radius: var(--pen-radius-sm);
-    background: var(--pen-selection-soft);
-    color: var(--pen-text);
+    border: 1.5px solid var(--selection);
+    border-radius: var(--radius-md);
+    background: var(--selection-soft);
+    color: var(--text);
     font-family: "Inter", var(--font-ui);
     font-size: 15px;
     font-weight: 600;
@@ -181,14 +180,14 @@
   }
 
   .source .source-heading .key-inspector-copy strong {
-    color: var(--pen-text);
+    color: var(--text);
     font-size: 13px;
     font-weight: 600;
     line-height: 1.35;
   }
 
   .source .source-heading .key-inspector-copy span {
-    color: var(--pen-tertiary);
+    color: var(--tertiary);
     font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 400;
@@ -208,13 +207,13 @@
     border: 0;
     border-radius: 6px;
     background: transparent;
-    color: var(--pen-tertiary);
+    color: var(--tertiary);
     box-shadow: none;
   }
 
   .source .source-heading .inspector-view-controls > #inspector-back:hover:not(:disabled) {
-    background: var(--pen-surface-subtle);
-    color: var(--pen-text);
+    background: var(--material-content);
+    color: var(--text);
   }
 
   .source .source-heading #inspector-back .system-symbol,
@@ -231,7 +230,7 @@
     min-width: 0;
     min-height: 62px;
     padding: 0 14px;
-    border-bottom: 1px solid var(--pen-line);
+    border-bottom: 1px solid var(--line);
   }
 
   /* A hidden context stays hidden: both rules below outrank the `display: none`
@@ -252,7 +251,7 @@
 
   .source .source-heading > .inspector-context h2 {
     margin: 0;
-    color: var(--pen-text);
+    color: var(--text);
     font-size: 13px;
     font-weight: 600;
     line-height: 1.35;
@@ -261,7 +260,7 @@
   .source .source-heading > .inspector-context #source-name {
     max-width: none;
     margin: 0;
-    color: var(--pen-tertiary);
+    color: var(--tertiary);
     font-family: var(--font-mono);
     font-size: 11px;
     line-height: 1.35;
@@ -269,13 +268,13 @@
   }
 
   .source .source-heading > .ai-design-heading strong {
-    color: var(--pen-text);
+    color: var(--text);
     font-size: 14px;
     font-weight: 600;
   }
 
   .source .source-heading > .ai-design-heading span {
-    color: var(--pen-tertiary);
+    color: var(--tertiary);
     font-size: 11px;
   }
 }
@@ -317,8 +316,8 @@
     margin: 10px 14px !important;
     padding: 3px !important;
     border: 0 !important;
-    border-radius: var(--pen-radius-sm) !important;
-    background: var(--pen-surface-subtle) !important;
+    border-radius: var(--radius-md) !important;
+    background: var(--material-content) !important;
     box-shadow: none !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
@@ -346,8 +345,8 @@
     gap: 0 !important;
     padding: 0 10px !important;
     border: 1px solid transparent !important;
-    border-radius: var(--pen-radius-xs) !important;
-    color: var(--pen-secondary) !important;
+    border-radius: var(--radius-sm) !important;
+    color: var(--secondary) !important;
     background: transparent !important;
     box-shadow: none !important;
     font-size: 12px !important;
@@ -368,14 +367,14 @@
   }
 
   .source #quick-inspector > #mobile-inspector-groups button:hover:not(.active) {
-    color: var(--pen-text) !important;
+    color: var(--text) !important;
     background: transparent !important;
   }
 
   .source #quick-inspector > #mobile-inspector-groups button.active {
-    color: var(--pen-text) !important;
-    border-color: var(--pen-line) !important;
-    background: var(--pen-surface) !important;
+    color: var(--text) !important;
+    border-color: var(--line) !important;
+    background: var(--material-panel) !important;
     box-shadow: none !important;
     font-weight: 500 !important;
     transform: none !important;
@@ -419,7 +418,7 @@
   margin: 0 !important;
   padding: 12px 14px !important;
   border: 0 !important;
-  border-bottom: 1px solid var(--pen-line) !important;
+  border-bottom: 1px solid var(--line) !important;
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -449,7 +448,7 @@
 .source #quick-inspector .appearance-section + .appearance-section {
   margin: 10px 0 0 !important;
   padding: 10px 0 0 !important;
-  border-top: 1px solid var(--pen-line) !important;
+  border-top: 1px solid var(--line) !important;
 }
 
 /* Section Head — 12px/600 label with a 10.5px mono hint on the far side.
@@ -475,7 +474,7 @@
   padding: 0 !important;
   border: 0 !important;
   background: transparent !important;
-  color: var(--pen-text) !important;
+  color: var(--text) !important;
   font-size: 12px !important;
   font-weight: 600 !important;
   letter-spacing: 0 !important;
@@ -484,7 +483,7 @@
 
 .source #quick-inspector .inspector-card-heading strong,
 .source #quick-inspector .appearance-section-heading strong {
-  color: var(--pen-text) !important;
+  color: var(--text) !important;
   font-size: 12px !important;
   font-weight: 600 !important;
 }
@@ -498,7 +497,7 @@
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
-  color: var(--pen-tertiary) !important;
+  color: var(--tertiary) !important;
   font-family: var(--font-mono) !important;
   font-size: 10.5px !important;
   font-weight: 400 !important;
@@ -508,7 +507,7 @@
 .source #quick-inspector .inspector-group-subtitle,
 .source #quick-inspector .mobile-inspector-managed > h3 + .inspector-group-subtitle {
   margin: 0 !important;
-  color: var(--pen-tertiary) !important;
+  color: var(--tertiary) !important;
   font-size: 10.5px !important;
   font-weight: 400 !important;
   line-height: 1.55 !important;
@@ -517,7 +516,7 @@
 
 .source #quick-inspector .inspector-note {
   margin: 0 !important;
-  color: var(--pen-tertiary) !important;
+  color: var(--tertiary) !important;
   font-size: 10.5px !important;
   font-weight: 400 !important;
   line-height: 1.55 !important;
@@ -574,7 +573,7 @@
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-  color: var(--pen-tertiary) !important;
+  color: var(--tertiary) !important;
   font-size: 10.5px !important;
   font-weight: 400 !important;
   line-height: 1.4 !important;
@@ -602,10 +601,10 @@
   min-height: 30px !important;
   margin: 0 !important;
   padding: 0 9px !important;
-  border: 1px solid var(--pen-line) !important;
-  border-radius: var(--pen-radius-sm) !important;
-  background: var(--pen-surface-subtle) !important;
-  color: var(--pen-text) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--material-content) !important;
+  color: var(--text) !important;
   box-shadow: none !important;
   font-family: var(--font-mono) !important;
   font-size: 12px !important;
@@ -632,9 +631,9 @@
     select,
     textarea
   ):focus {
-  border-color: var(--pen-accent) !important;
+  border-color: var(--accent) !important;
   outline: 0 !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pen-accent) 18%, transparent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent) !important;
 }
 
 .source #quick-inspector .inspector-group :is(
@@ -642,14 +641,14 @@
     select,
     textarea
   ):disabled {
-  color: var(--pen-tertiary) !important;
+  color: var(--tertiary) !important;
   background: transparent !important;
 }
 
 /* Secondary text inside a field */
 .source #quick-inspector .inspector-grid small,
 .source #quick-inspector .inspector-group small {
-  color: var(--pen-tertiary) !important;
+  color: var(--tertiary) !important;
   font-size: 10.5px !important;
   font-weight: 400 !important;
   line-height: 1.5 !important;
@@ -676,7 +675,7 @@
   align-items: center !important;
   justify-content: space-between !important;
   gap: 10px !important;
-  color: var(--pen-secondary) !important;
+  color: var(--secondary) !important;
   font-size: 12.5px !important;
   font-weight: 400 !important;
 }
@@ -702,10 +701,10 @@
   justify-content: center !important;
   gap: 6px !important;
   padding: 0 10px !important;
-  border: 1px solid var(--pen-line) !important;
-  border-radius: var(--pen-radius-sm) !important;
-  background: var(--pen-surface-subtle) !important;
-  color: var(--pen-secondary) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--material-content) !important;
+  color: var(--secondary) !important;
   box-shadow: none !important;
   font-size: 11.5px !important;
   font-weight: 400 !important;
@@ -717,15 +716,15 @@
 
 .source #quick-inspector .mobile-inspector-managed :is(button, summary):hover:not(:disabled),
 .source #quick-inspector .inspector-group :is(button, summary):hover:not(:disabled) {
-  color: var(--pen-text) !important;
-  border-color: var(--pen-line-strong) !important;
-  background: var(--pen-surface-subtle) !important;
+  color: var(--text) !important;
+  border-color: var(--line-strong) !important;
+  background: var(--material-content) !important;
   transform: none !important;
 }
 
 .source #quick-inspector .mobile-inspector-managed :is(button, summary):disabled,
 .source #quick-inspector .inspector-group :is(button, summary):disabled {
-  color: var(--pen-tertiary) !important;
+  color: var(--tertiary) !important;
   background: transparent !important;
   opacity: 0.5 !important;
   cursor: not-allowed !important;
@@ -750,8 +749,8 @@
   margin: 0 !important;
   padding: 2px !important;
   border: 0 !important;
-  border-radius: var(--pen-radius-sm) !important;
-  background: var(--pen-surface-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--material-content) !important;
   box-shadow: none !important;
 }
 
@@ -763,22 +762,22 @@
   min-height: 26px !important;
   padding: 0 !important;
   border: 1px solid transparent !important;
-  border-radius: var(--pen-radius-xs) !important;
+  border-radius: var(--radius-sm) !important;
   background: transparent !important;
-  color: var(--pen-tertiary) !important;
+  color: var(--tertiary) !important;
 }
 
 .source #quick-inspector .tile-toolbar .toolbar-button:hover:not(:disabled),
 .source #quick-inspector .key-toolbar .toolbar-button:hover:not(:disabled) {
-  color: var(--pen-text) !important;
+  color: var(--text) !important;
   background: transparent !important;
 }
 
 .source #quick-inspector .tile-toolbar .toolbar-button.active,
 .source #quick-inspector .key-toolbar .toolbar-button.active {
-  color: var(--pen-text) !important;
-  border-color: var(--pen-line) !important;
-  background: var(--pen-surface) !important;
+  color: var(--text) !important;
+  border-color: var(--line) !important;
+  background: var(--material-panel) !important;
 }
 
 .source #quick-inspector .tile-toolbar .tile-mode-control,
@@ -806,7 +805,7 @@
   gap: 10px !important;
   margin: 0 !important;
   padding: 10px 0 0 !important;
-  border-top: 1px solid var(--pen-line) !important;
+  border-top: 1px solid var(--line) !important;
 }
 
 .source #quick-inspector .key-layout-fields .layout-actions {
@@ -825,7 +824,7 @@
 
 .source #quick-inspector .key-layout-fields .layout-action-label {
   margin: 0 !important;
-  color: var(--pen-tertiary) !important;
+  color: var(--tertiary) !important;
   font-size: 10.5px !important;
   font-weight: 400 !important;
 }
@@ -842,8 +841,8 @@
   min-height: 28px !important;
   gap: 5px !important;
   padding: 0 8px !important;
-  color: var(--pen-secondary) !important;
-  background: var(--pen-surface-subtle) !important;
+  color: var(--secondary) !important;
+  background: var(--material-content) !important;
   font-size: 11px !important;
   font-weight: 400 !important;
 }
@@ -854,8 +853,8 @@
   gap: 2px !important;
   padding: 3px !important;
   border: 0 !important;
-  border-radius: var(--pen-radius-sm) !important;
-  background: var(--pen-surface-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--material-content) !important;
 }
 
 .source #quick-inspector .inspector-state-switch button {
@@ -863,17 +862,17 @@
   min-height: 26px !important;
   padding: 0 12px !important;
   border: 1px solid transparent !important;
-  border-radius: var(--pen-radius-xs) !important;
+  border-radius: var(--radius-sm) !important;
   background: transparent !important;
-  color: var(--pen-secondary) !important;
+  color: var(--secondary) !important;
   font-size: 12px !important;
   font-weight: 400 !important;
 }
 
 .source #quick-inspector .inspector-state-switch button.active {
-  color: var(--pen-text) !important;
-  border-color: var(--pen-line) !important;
-  background: var(--pen-surface) !important;
+  color: var(--text) !important;
+  border-color: var(--line) !important;
+  background: var(--material-panel) !important;
   font-weight: 500 !important;
 }
 
@@ -892,7 +891,7 @@
 }
 
 .source #quick-inspector .direction-editor label > span {
-  color: var(--pen-tertiary) !important;
+  color: var(--tertiary) !important;
   font-size: 10.5px !important;
   font-weight: 400 !important;
 }
@@ -900,7 +899,7 @@
 .source #quick-inspector .direction-editor label small {
   grid-column: auto !important;
   min-height: 0 !important;
-  color: var(--pen-tertiary) !important;
+  color: var(--tertiary) !important;
   font-size: 10.5px !important;
 }
 
@@ -915,19 +914,19 @@
   align-items: center;
   gap: 10px;
   padding: 0 14px;
-  border-bottom: 1px solid var(--pen-line);
+  border-bottom: 1px solid var(--line);
 }
 
 .source #resource-inspector .inspector-title strong,
 .source #resource-inspector .resource-detail-heading strong {
-  color: var(--pen-text);
+  color: var(--text);
   font-size: 13px;
   font-weight: 600;
 }
 
 .source #resource-inspector .inspector-title #resource-count,
 .source #resource-inspector .resource-detail-heading small {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-family: var(--font-mono);
   font-size: 11px;
 }
@@ -937,7 +936,7 @@
   flex-direction: column;
   gap: 10px;
   padding: 12px 14px;
-  border-bottom: 1px solid var(--pen-line);
+  border-bottom: 1px solid var(--line);
 }
 
 .source #resource-inspector .tile-toolbar {
@@ -946,8 +945,8 @@
   gap: 2px;
   margin: 0;
   padding: 2px;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
 }
 
 .source #resource-inspector .tile-toolbar .toolbar-button {
@@ -955,15 +954,15 @@
   height: 26px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: var(--pen-radius-xs);
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
 }
 
 .source #resource-inspector .tile-toolbar .toolbar-button.active {
-  color: var(--pen-text);
-  border-color: var(--pen-line);
-  background: var(--pen-surface);
+  color: var(--text);
+  border-color: var(--line);
+  background: var(--material-panel);
 }
 
 .source #resource-inspector .geometry-fields {
@@ -983,7 +982,7 @@
   flex-direction: column;
   gap: 5px;
   padding: 0;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-size: 10.5px;
   font-weight: 400;
 }
@@ -994,10 +993,10 @@
   height: 30px;
   min-height: 30px;
   padding: 0 9px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--text);
   font-family: var(--font-mono);
   font-size: 12px;
 }
@@ -1006,12 +1005,12 @@
 .source #source-editor,
 .source #source .cm-editor,
 .source #source .cm-gutters {
-  background: var(--pen-surface);
+  background: var(--material-panel);
 }
 
 .source #source .cm-gutters {
   border-right: 0;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
 }
 
 .source #source .cm-scroller {
@@ -1029,38 +1028,38 @@
 
 .source #source .cm-line {
   padding: 0 16px 0 12px;
-  color: var(--pen-secondary);
+  color: var(--secondary);
 }
 
 .source #source .cm-lineNumbers .cm-gutterElement {
   min-width: 42px;
   padding: 0 10px 0 12px;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
 }
 
 .source #source .cm-activeLine,
 .source #source .cm-activeLineGutter {
-  background: var(--pen-accent-soft);
+  background: var(--accent-soft);
   box-shadow: none;
 }
 
 .source #source .cm-selectionBackground,
 .source #source .cm-content ::selection {
-  background: color-mix(in srgb, var(--pen-accent) 22%, transparent) !important;
+  background: color-mix(in srgb, var(--accent) 22%, transparent) !important;
 }
 
 .source #source .cm-cursor {
-  border-left-color: var(--pen-text);
+  border-left-color: var(--text);
 }
 
 /* Search matches reuse the brand tint so results read as annotations. */
 .source #source .cm-source-search-match {
   border-radius: 2px;
-  background: color-mix(in srgb, var(--pen-accent) 16%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .source #source .cm-source-search-active {
-  background: color-mix(in srgb, var(--pen-accent) 34%, transparent);
+  background: color-mix(in srgb, var(--accent) 34%, transparent);
 }
 
 /* 查找按钮 */
@@ -1069,17 +1068,17 @@
   bottom: calc(14px + var(--source-find-bar-height, 0px));
   width: 26px;
   height: 26px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-xs);
-  background: var(--pen-surface-subtle);
-  color: var(--pen-tertiary);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--material-content);
+  color: var(--tertiary);
   box-shadow: none;
 }
 
 .source #source-find-toggle.source-find-fab:hover {
-  color: var(--pen-text);
-  border-color: var(--pen-line-strong);
-  background: var(--pen-surface-subtle);
+  color: var(--text);
+  border-color: var(--line-strong);
+  background: var(--material-content);
   box-shadow: none;
   transform: none;
 }
@@ -1089,8 +1088,8 @@
 }
 
 .source #source-find-toggle.source-find-fab:focus-visible {
-  border-radius: var(--pen-radius-xs);
-  outline: 2px solid color-mix(in srgb, var(--pen-accent) 40%, transparent);
+  border-radius: var(--radius-sm);
+  outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
   outline-offset: 2px;
 }
 
@@ -1105,22 +1104,22 @@
 .source .source-toolbar {
   gap: 8px;
   padding: 10px 12px;
-  border-top: 1px solid var(--pen-line);
-  background: var(--pen-surface);
+  border-top: 1px solid var(--line);
+  background: var(--material-panel);
   box-shadow: 0 -8px 20px -12px rgb(18 20 25 / 24%);
 }
 
 .source .source-toolbar .search-control {
   height: 30px;
-  border: 1px solid var(--pen-line);
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
 }
 
 .source .source-toolbar .search-control > input {
   height: 28px;
   min-height: 28px;
-  color: var(--pen-text);
+  color: var(--text);
   font-family: var(--font-mono);
   font-size: 12px;
 }
@@ -1129,11 +1128,11 @@
 .source .source-toolbar .search-control .system-symbol svg {
   width: 13px;
   height: 13px;
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
 }
 
 .source #source-search-count {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   font-family: var(--font-mono);
   font-size: 10.5px;
 }
@@ -1142,8 +1141,8 @@
   gap: 2px;
   padding: 2px;
   border: 0;
-  border-radius: var(--pen-radius-sm);
-  background: var(--pen-surface-subtle);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
 }
 
 .source .source-search-actions button,
@@ -1151,9 +1150,9 @@
   height: 26px;
   padding: 0 10px;
   border: 1px solid transparent;
-  border-radius: var(--pen-radius-xs);
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--pen-secondary);
+  color: var(--secondary);
   font-size: 11.5px;
 }
 
@@ -1167,18 +1166,18 @@
 }
 
 .source .source-toolbar button:hover:not(:disabled) {
-  color: var(--pen-text);
+  color: var(--text);
   background: transparent;
 }
 
 .source .source-search-actions button[aria-expanded="true"] {
-  color: var(--pen-text);
-  border-color: var(--pen-line);
-  background: var(--pen-surface);
+  color: var(--text);
+  border-color: var(--line);
+  background: var(--material-panel);
 }
 
 .source .source-toolbar button:disabled {
-  color: var(--pen-tertiary);
+  color: var(--tertiary);
   opacity: 0.5;
 }
 

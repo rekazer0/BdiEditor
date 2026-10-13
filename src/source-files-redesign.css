@@ -59,7 +59,7 @@
   padding: var(--space-xl);
   text-align: center;
   color: var(--tertiary);
-  font-size: var(--text-md);
+  font-size: var(--font-size-sm);
 }
 
 /* 焦点样式 */
@@ -78,12 +78,12 @@
   transform: translateY(-50%);
   margin-left: var(--space-sm);
   padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--glass-surface);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   color: var(--text);
-  font-size: var(--text-sm);
+  font-size: 10px;
   white-space: nowrap;
   z-index: 100;
   pointer-events: none;

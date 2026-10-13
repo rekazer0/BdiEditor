@@ -28,7 +28,7 @@
 .atlas-workspace .workspace { position: relative; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 .atlas-workspace .workspace > .preview-toolbar { display: none !important; }
 .atlas-workspace .workspace-status { display: none !important; }
-.atlas-workspace .atlas-header { display: flex; flex-shrink: 0; height: 44px; padding: 0 12px; gap: 10px; align-items: center; border-bottom: 1px solid var(--line); background: var(--pen-surface); }
+.atlas-workspace .atlas-header { display: flex; flex-shrink: 0; height: 44px; padding: 0 12px; gap: 10px; align-items: center; border-bottom: 1px solid var(--line); background: var(--material-panel); }
 .atlas-image-title { min-width: 70px; max-width: 180px; flex: 1; display: grid; gap: 2px; }
 .atlas-image-title strong { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .atlas-image-title small { font: 10px var(--font-mono); color: var(--secondary); white-space: nowrap; }
@@ -36,12 +36,12 @@
 .atlas-workspace .tile-toolbar button { width: 26px; height: 28px; min-width: 26px; }
 .atlas-workspace #delete-tile { margin-left: 0; }
 .atlas-selection { margin-left: auto; font: 10px var(--font-mono); padding: 4px 6px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
-.atlas-workspace .canvas-wrap { flex: 1; min-height: 0; padding: 0; overflow: auto; display: grid; background: var(--pen-canvas); }
+.atlas-workspace .canvas-wrap { flex: 1; min-height: 0; padding: 0; overflow: auto; display: grid; background: var(--canvas-surface); }
 .atlas-workspace #workspace-image-figure { width: max-content; height: max-content; min-width: 100%; min-height: 100%; max-height: none; padding: 32px; box-sizing: border-box; }
 .atlas-workspace #atlas-canvas { max-width: none; max-height: none; touch-action: none; box-shadow: 0 16px 40px #1214281f; background: transparent; }
-.atlas-workspace .atlas-zoom { position: absolute; right: 20px; bottom: 42px; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 24px; background: var(--pen-surface); box-shadow: 0 2px 8px #00000012; }
+.atlas-workspace .atlas-zoom { position: absolute; right: 20px; bottom: 42px; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 24px; background: var(--material-panel); box-shadow: 0 2px 8px #00000012; }
 .atlas-zoom output { min-width: 42px; text-align: center; font: 11px var(--font-mono); }
-.atlas-workspace .atlas-status { display: block; flex-shrink: 0; height: 26px; padding: 5px 12px; box-sizing: border-box; font: 10px var(--font-mono); color: var(--secondary); border-top: 1px solid var(--line); background: var(--pen-surface); }
+.atlas-workspace .atlas-status { display: block; flex-shrink: 0; height: 26px; padding: 5px 12px; box-sizing: border-box; font: 10px var(--font-mono); color: var(--secondary); border-top: 1px solid var(--line); background: var(--material-panel); }
 .atlas-workspace #resource-inspector { padding: 0; }
 .atlas-workspace .resource-detail-heading { margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .atlas-workspace #resource-back { display: none; }

@@ -7,7 +7,7 @@
   padding: 0 !important;
   overflow: hidden auto !important;
   scroll-padding-top: 52px;
-  background: var(--pen-surface);
+  background: var(--material-panel);
 }
 /* Desktop categories stay on the right, editing fields use the remaining width. */
 @media (min-width: 761px) {
@@ -25,9 +25,9 @@
     padding: 10px 5px !important;
     gap: 5px !important;
     border: 0 !important;
-    border-left: 1px solid var(--pen-line) !important;
+    border-left: 1px solid var(--line) !important;
     border-radius: 0 !important;
-    background: var(--pen-surface-subtle) !important;
+    background: var(--material-content) !important;
   }
   :root body .source #quick-inspector > #mobile-inspector-groups button {
     flex: 0 0 38px !important;
@@ -39,7 +39,7 @@
   }
   :root body .source #quick-inspector > #mobile-inspector-groups button.active {
     color: var(--accent) !important;
-    background: color-mix(in srgb, var(--accent) 10%, var(--pen-surface)) !important;
+    background: color-mix(in srgb, var(--accent) 10%, var(--material-panel)) !important;
     font-weight: 600 !important;
   }
   :root body .source #quick-inspector[data-inspector-group-display="grouped"] > .mobile-inspector-managed,
@@ -67,10 +67,10 @@
   gap: 8px !important;
   padding: 0 10px !important;
   min-height: 38px !important;
-  border: 1px solid var(--pen-line) !important;
+  border: 1px solid var(--line) !important;
   border-radius: 8px !important;
-  background: var(--pen-surface-subtle) !important;
-  color: var(--pen-secondary) !important;
+  background: var(--material-content) !important;
+  color: var(--secondary) !important;
 }
 :root body .source #quick-inspector .key-layout-fields.mobile-inspector-managed.inspector-group.key-only :is(.geometry-fields, .gap-fields) label input[type=number] {
   flex: 1;
