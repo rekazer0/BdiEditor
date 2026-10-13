@@ -29,7 +29,7 @@ textarea {
 
 .titlebar {
   height: var(--titlebar-height);
-  gap: 10px;
+  gap: 12px;
   padding: calc(5px + var(--safe-area-top)) max(16px, env(safe-area-inset-right)) 5px max(16px, env(safe-area-inset-left));
   border-bottom: 1px solid var(--line);
   background: var(--material-panel);
@@ -102,7 +102,7 @@ textarea {
   min-height: 32px;
   border-radius: var(--radius-md);
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .toolbar-menu button:hover:not(:disabled) {
@@ -121,7 +121,7 @@ textarea {
   align-items: center;
   gap: 8px;
   min-height: 34px;
-  padding: 5px 10px;
+  padding: 6px 12px;
   border-radius: var(--radius-md);
   background: var(--material-content);
   pointer-events: auto;
@@ -130,7 +130,7 @@ textarea {
 .document-title strong {
   max-width: 330px;
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 600;
   line-height: 18px;
 }
@@ -138,14 +138,14 @@ textarea {
 #dirty {
   display: none;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   min-height: 22px;
   margin: 0;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border-radius: var(--radius-full);
   background: var(--material-panel);
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 #dirty:not([hidden]) {
@@ -165,7 +165,7 @@ textarea {
 .preview-choice,
 .sidebar-view-control {
   gap: 2px;
-  padding: 3px;
+  padding: 4px;
   border: 0;
   border-radius: var(--radius-md);
   background: var(--material-content);
@@ -177,10 +177,10 @@ textarea {
 .mode-control button,
 .preview-choice button {
   height: 28px;
-  padding: 0 11px;
+  padding: 0 12px;
   border-radius: var(--radius-sm);
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 400;
 }
 
@@ -239,7 +239,7 @@ main {
 
 .pane-heading {
   min-height: 42px;
-  padding: 0 8px 10px;
+  padding: 0 8px 12px;
   border-bottom: 0;
 }
 
@@ -259,7 +259,7 @@ main {
   height: 28px;
   border-radius: var(--radius-sm);
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .sidebar-view-control button.active {
@@ -307,7 +307,7 @@ main {
   align-items: center;
   justify-items: center;
   gap: 4px;
-  margin: 0 8px 10px;
+  margin: 0 8px 12px;
   padding: 2px 0;
   border-radius: var(--radius-md);
   background: var(--material-content);
@@ -373,13 +373,13 @@ main {
   align-items: center;
   gap: 8px;
   /* 3px keeps a two-line row inside the same 34px box as a one-line tree row. */
-  padding: 3px 8px;
+  padding: 4px 8px;
   border: 0;
   border-radius: var(--radius-md);
   color: var(--secondary);
   background: transparent;
   box-shadow: none;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   line-height: 1.25;
   text-align: left;
@@ -416,7 +416,7 @@ main {
   color: var(--secondary);
   background: transparent;
   box-shadow: none;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   line-height: 1.2;
   text-align: left;
@@ -424,7 +424,7 @@ main {
   white-space: nowrap;
   overflow: hidden;
   transform: none;
-  transition: background-color 140ms ease, color 140ms ease;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
 
 /* 图标与源文件树同尺寸同色，去掉底砖后列表更安静。 */
@@ -438,16 +438,16 @@ main {
   border-radius: 0;
   color: var(--tertiary);
   background: none;
-  font-size: 15px;
+  font-size: var(--font-size-lg);
   transform: none;
-  transition: color 140ms ease;
+  transition: color var(--duration-fast) var(--ease-standard);
 }
 
 /* 名字占剩余宽度并可截断；文件名贴右边缘用等宽，和检查器的值列同一种读法。 */
 #files .sidebar-overview button.nav-item > .nav-label {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   line-height: 1.2;
 }
@@ -458,7 +458,7 @@ main {
   max-width: 46%;
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--font-size-xs);
   font-weight: 400;
   line-height: 1.2;
 }
@@ -471,7 +471,7 @@ main {
   display: grid;
   place-items: center;
   color: var(--tertiary);
-  font-size: 16px;
+  font-size: var(--font-size-lg);
   transform: none;
 }
 
@@ -488,7 +488,7 @@ main {
   border-bottom: 1.5px solid currentColor;
   color: var(--tertiary);
   transform: rotate(-45deg);
-  transition: transform 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--duration-fast) var(--ease-standard);
 }
 
 #files .nav-group[open] > .nav-section > .source-disclosure,
@@ -505,7 +505,7 @@ main {
   min-width: 0;
   overflow: hidden;
   color: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -517,7 +517,7 @@ main {
   margin-top: 0;
   overflow: hidden;
   color: var(--tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   font-weight: 400;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -533,10 +533,10 @@ main {
   align-items: center;
   gap: 8px;
   margin: 0;
-  padding: 3px 8px;
+  padding: 4px 8px;
   border-radius: var(--radius-md);
   color: var(--tertiary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
 }
 
@@ -544,7 +544,7 @@ main {
 #files .sidebar-overview > .nav-group > .nav-section {
   min-height: 26px;
   margin-top: 12px;
-  padding: 3px 8px;
+  padding: 4px 8px;
   border-radius: var(--radius-md);
 }
 
@@ -561,7 +561,7 @@ main {
   background: var(--material-content);
   color: var(--tertiary);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-weight: 500;
   line-height: 17px;
   text-align: center;
@@ -577,7 +577,7 @@ main {
   margin-left: auto;
   color: var(--tertiary);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--font-size-xs);
   font-weight: 400;
   opacity: 0.75;
 }
@@ -585,7 +585,7 @@ main {
 #files .raw-files .source-thumbnail {
   max-width: 16px;
   max-height: 16px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   object-fit: contain;
 }
 
@@ -700,7 +700,7 @@ main {
   border-radius: var(--radius-md);
   background: var(--material-panel);
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 #skin-state-control .skin-state-value {
@@ -717,7 +717,7 @@ main {
   border-top: 1px solid var(--line);
   background: var(--material-panel);
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -732,7 +732,7 @@ main {
   border-radius: var(--radius-sm);
   background: var(--material-content);
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .field-control input:focus,
@@ -802,7 +802,7 @@ main {
 #device-control {
   gap: 6px;
   min-height: 30px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: var(--material-content);
@@ -816,13 +816,13 @@ main {
 #device {
   height: 28px;
   min-height: 28px;
-  padding: 0 22px 0 0;
+  padding: 0 24px 0 0;
   border: 0;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
   color: var(--text);
-  font-size: 11.5px;
+  font-size: var(--font-size-xs);
   font-weight: 500;
 }
 
@@ -868,7 +868,7 @@ main {
 .canvas-multi-count {
   padding: 0 8px;
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -949,7 +949,7 @@ main {
 .project-dialog header h2,
 .app-dialog header h2 {
   color: var(--text);
-  font-size: 15px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
 }
 
@@ -975,7 +975,7 @@ main {
 
   .mobile-workspace-tabs button {
     color: var(--secondary);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
   }
 
   .mobile-workspace-tabs button.active {
@@ -991,7 +991,7 @@ main {
   }
 
   .preview-toolbar {
-    padding: 6px 10px;
+    padding: 6px 12px;
     background: var(--material-panel);
   }
 
@@ -1003,7 +1003,7 @@ main {
 
   .canvas-multi-count {
     padding: 0 6px;
-    font-size: 10.5px;
+    font-size: var(--font-size-xs);
   }
 }
 
@@ -1062,9 +1062,9 @@ main {
 
 .toolbar-menu-label {
   display: block;
-  padding: 5px 9px 3px;
+  padding: 6px 8px 4px;
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   font-weight: 500;
   letter-spacing: 0.02em;
 }

@@ -16,7 +16,7 @@ body {
 
 body {
   color: inherit;
-  font-size: 18px;
+  font-size: var(--font-size-xl);
   user-select: none;
   -webkit-font-smoothing: antialiased;
 }
@@ -30,12 +30,12 @@ form {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
-header { padding: var(--space-xl) var(--space-xl) 18px; }
+header { padding: var(--space-xl) var(--space-xl) 20px; }
 
 h1 {
   margin: 0;
-  font-size: 24px;
-  font-weight: 700;
+  font-size: var(--font-size-xl);
+  font-weight: 600;
   line-height: 1.25;
   letter-spacing: -0.02em;
 }
@@ -59,7 +59,7 @@ header .usage-note {
 
 .templates {
   min-height: 0;
-  padding: 0 18px 18px 24px;
+  padding: 0 20px 20px 24px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -68,12 +68,12 @@ header .usage-note {
 .template-heading {
   display: flex;
   justify-content: space-between;
-  padding-bottom: 9px;
+  padding-bottom: 8px;
   color: var(--secondary);
-  font-size: 14px;
+  font-size: var(--font-size-lg);
 }
 
-.template-heading span { font-size: 13px; }
+.template-heading span { font-size: var(--font-size-md); }
 
 .template-list {
   display: grid;
@@ -91,7 +91,7 @@ header .usage-note {
   border-radius: var(--radius-lg);
   background: var(--control);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--duration-base) var(--ease-standard);
   box-shadow: none;
 }
 
@@ -175,7 +175,7 @@ footer button {
   font-size: var(--font-size-md);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--duration-base) var(--ease-standard);
   box-shadow: none;
 }
 
@@ -209,14 +209,14 @@ input:focus-visible {
 }
 
 @media (max-height: 620px) {
-  header { padding-block: 18px 14px; }
+  header { padding-block: 20px 16px; }
   header p { margin-top: 4px; }
-  .template-option { padding-block: 11px; }
+  .template-option { padding-block: 12px; }
   footer { padding-block: 12px; }
 }
 
 @media (max-width: 420px) {
   header { padding-inline: 16px; }
-  .templates { padding-inline: 16px 10px; }
+  .templates { padding-inline: 16px 12px; }
   footer { padding-inline: 16px; }
 }

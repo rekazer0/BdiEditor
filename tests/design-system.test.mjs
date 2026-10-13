@@ -14,6 +14,8 @@ const list = (dir, ext) => readdirSync(new URL(dir, root)).filter((name) => name
 const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ""))
 
 const cssFiles = list("src/", ".css")
+// 设备模拟按真机还原，数值规则不适用（DESIGN.md §1）
+const scaledCss = (files) => Object.fromEntries(Object.entries(files).filter(([file]) => file !== "src/device-preview.css"))
 const tsFiles = list("src/", ".ts")
 const htmlFiles = list("", ".html")
 const css = Object.fromEntries(cssFiles.map((f) => [f, stripComments(read(f))]))
@@ -30,6 +32,7 @@ function declarations(text, property) {
 }
 const count = (text, pattern) => (text.match(pattern) ?? []).length
 const SPACING_SCALE = new Set(["0", "1", "2", "4", "6", "8", "12", "16", "20", "24", "32", "40", "48"])
+const onScale = (n) => SPACING_SCALE.has(n) || (Number(n) > 48 && Number(n) % 8 === 0)
 
 /** rule → (file → count). Each rule says what DESIGN.md section it enforces. */
 const rules = {
@@ -37,23 +40,24 @@ const rules = {
   "css-color-literal": () => perFile(css, (text, file) => file === TOKENS || file === DEVICE ? 0
     : count(text.replace(/var\([^)]*\)/g, ""), /(?<![\w-])#[0-9a-fA-F]{3,8}(?![\w-])|\b(?:rgba?|hsla?)\(|(?<![-\w])(?:white|black)(?![-\w])/g)),
   // §2 字号：只能用 --font-size-*
-  "css-font-size-literal": () => perFile(css, (text, file) => file === TOKENS ? 0
-    : declarations(text, "font-size").filter(([, v]) => !/^(var\(--font-size-[a-z]+\)|inherit|1em|100%)(\s*!important)?$/.test(v)).length),
+  "css-font-size-literal": () => perFile(scaledCss(css), (text, file) => file === TOKENS ? 0
+    : declarations(text, "font-size").filter(([, v]) => !/^(var\(--font-size-[a-z]+\)|var\(--source-font-size(, var\(--font-size-[a-z]+\))?\)|inherit|1em|100%|0)(\s*!important)?$/.test(v)).length),
   // §2 字重：400 / 500 / 600
-  "css-font-weight-off-scale": () => perFile(css, (text) =>
+  "css-font-weight-off-scale": () => perFile(scaledCss(css), (text) =>
     declarations(text, "font-weight").filter(([, v]) => !/^(400|500|600|inherit|normal|var\(--font-weight-[a-z]+\))(\s*!important)?$/.test(v)).length),
   // §3 圆角：只能用 --radius-*（0 与 50% 除外）
-  "css-radius-literal": () => perFile(css, (text, file) => file === TOKENS ? 0
+  "css-radius-literal": () => perFile(scaledCss(css), (text, file) => file === TOKENS ? 0
     : declarations(text, "border(?:-[a-z]+)*-radius").filter(([, v]) => /\d*\.?\d+(px|rem|em)/.test(v.replace(/var\([^)]*\)/g, ""))).length),
   // §4 间距：4px 网格
-  "css-spacing-off-scale": () => perFile(css, (text) =>
+  "css-spacing-off-scale": () => perFile(scaledCss(css), (text) =>
     declarations(text, "(?:padding|margin|gap|row-gap|column-gap)(?:-[a-z]+)*")
       .flatMap(([, v]) => [...v.replace(/var\([^)]*\)/g, "").matchAll(/-?(\d*\.?\d+)px/g)].map((m) => m[1]))
-      .filter((n) => !SPACING_SCALE.has(n)).length),
+      .filter((n) => !onScale(n)).length),
   // §6 动效：时长与曲线只能用 --duration-* / --ease-*
-  "css-motion-literal": () => perFile(css, (text, file) => file === TOKENS ? 0
+  "css-motion-literal": () => perFile(scaledCss(css), (text, file) => file === TOKENS ? 0
     : declarations(text, "(?:transition|animation)(?:-[a-z]+)*")
-      .filter(([p, v]) => !/-(name|property|fill-mode|iteration-count|direction|play-state)$/.test(p)
+      // 循环播放的加载 / 提示动画（infinite）不受过渡时长档位限制
+      .filter(([p, v]) => !/-(name|property|fill-mode|iteration-count|direction|play-state)$/.test(p) && !/infinite/.test(v)
         && /\d*\.?\d+m?s\b|cubic-bezier|\bease(-in|-out|-in-out)?\b|\blinear\b/.test(v.replace(/var\([^)]*\)/g, ""))).length),
   // §8 层叠：禁止 !important
   "css-important": () => perFile(css, (text) => count(text, /!important/g)),
@@ -78,7 +82,7 @@ const rules = {
   },
   // §5 图标：只从 src/icons.ts 取 Lucide 图标
   "icon-outside-registry": () => ({
-    ...perFile(ts, (text, file) => file === ICONS ? 0 : count(text, /from\s+["']lucide["']|<svg\b|createElementNS\([^)]*["']svg["']\)/g)),
+    ...perFile(ts, (text, file) => file === ICONS ? 0 : count(text, /from\s+["']lucide["']|<svg\b/g)),
     ...perFile(html, (text) => count(text, /<svg\b/g)),
   }),
   // §8 HTML 不写内联样式

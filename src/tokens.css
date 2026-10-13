@@ -36,6 +36,9 @@
   --space-xl: 24px;
   --space-2xl: 32px;
 
+  /* 版式 */
+  --content-max-width: 1100px;  /* 欢迎页等整页内容的最大宽度 */
+
   /* 控件高度：3 档 */
   --control-height-sm: 24px;  /* 行内小按钮、角标按钮 */
   --control-height-md: 28px;  /* 默认：按钮、输入框、下拉、分段控件 */

@@ -27,7 +27,7 @@
 
 ::-webkit-scrollbar-thumb {
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: transparent;
 }
 
@@ -89,7 +89,7 @@ body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-font-smoothing: antialiased;
-  transition: color 180ms ease, background-color 180ms ease;
+  transition: color var(--duration-base) var(--ease-standard), background-color var(--duration-base) var(--ease-standard);
 }
 
 button,
@@ -151,7 +151,7 @@ summary:focus-visible {
   height: var(--titlebar-height);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: calc(6px + var(--safe-area-top)) max(12px, env(safe-area-inset-right)) 6px max(12px, env(safe-area-inset-left));
   border-bottom: 1px solid var(--line);
   background: var(--toolbar);
@@ -169,11 +169,11 @@ summary:focus-visible {
   height: 32px;
   display: grid;
   place-items: center;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: transparent;
   border: none;
   box-shadow: none;
-  transition: all 0.15s ease;
+  transition: all var(--duration-base) var(--ease-standard);
 }
 
 .toolbar-button > span:not(.icon):not(.system-symbol) {
@@ -182,7 +182,7 @@ summary:focus-visible {
 
 .toolbar-button .icon {
   color: var(--text);
-  font-size: 20px;
+  font-size: var(--font-size-xl);
   font-weight: 400;
   line-height: 1;
 }
@@ -213,14 +213,14 @@ summary:focus-visible {
 .toolbar-menu button:hover:not(:disabled) {
   background: var(--hover);
   transform: none;
-  transition: all 0.15s ease;
+  transition: all var(--duration-base) var(--ease-standard);
 }
 
 .toolbar-button:active:not(:disabled),
 .toolbar-more summary:active {
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   transform: none;
-  transition: all 0.08s ease;
+  transition: all var(--duration-fast) var(--ease-standard);
 }
 
 .toolbar-button:disabled,
@@ -244,7 +244,7 @@ summary:focus-visible {
   display: block;
   max-width: 330px;
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -258,11 +258,11 @@ summary:focus-visible {
   width: min(330px, 42vw);
   min-width: 120px;
   border: 1px solid var(--accent);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   padding: 2px 6px;
   color: var(--text);
   background: var(--control);
-  font-size: 14px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
   text-align: center;
   outline: 0;
@@ -271,7 +271,7 @@ summary:focus-visible {
 
 #dirty {
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 .spacer {
@@ -285,7 +285,7 @@ summary:focus-visible {
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--glass-border);
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: var(--glass-surface);
   box-shadow: var(--glass-shadow);
   -webkit-backdrop-filter: saturate(180%) blur(14px);
@@ -295,17 +295,17 @@ summary:focus-visible {
 .mode-control button,
 .preview-choice button,
 .sidebar-view-control button {
-  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  transition: color var(--duration-base) var(--ease-standard), background-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard);
 }
 
 .mode-control button,
 .preview-choice button {
   height: 25px;
-  padding: 0 10px;
-  border-radius: 6px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
   color: var(--secondary);
   background: transparent;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 .mode-control button.active,
@@ -337,7 +337,7 @@ summary:focus-visible {
 .mobile-choice-icons {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
 }
 
 .mobile-choice-icon {
@@ -347,8 +347,8 @@ summary:focus-visible {
   height: 22px;
   color: var(--secondary);
   opacity: 0.45;
-  border-radius: 5px;
-  transition: color 160ms ease, background-color 160ms ease, opacity 160ms ease;
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-base) var(--ease-standard), background-color var(--duration-base) var(--ease-standard), opacity var(--duration-base) var(--ease-standard);
 }
 
 .mobile-choice-icon.active {
@@ -366,11 +366,11 @@ summary:focus-visible {
 
 select {
   height: 28px;
-  padding: 0 26px 0 9px;
+  padding: 0 24px 0 8px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--control);
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 
 select option {
@@ -387,9 +387,9 @@ select option {
   height: 32px;
   display: grid;
   place-items: center;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   cursor: default;
-  font-size: 20px;
+  font-size: var(--font-size-xl);
   list-style: none;
 }
 
@@ -408,15 +408,15 @@ select option {
   top: 37px;
   right: 0;
   width: 214px;
-  padding: 5px;
+  padding: 6px;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: var(--menu);
   box-shadow: var(--shadow-sm), inset 0 1px var(--glass-highlight);
   -webkit-backdrop-filter: saturate(180%) blur(28px);
   backdrop-filter: saturate(180%) blur(28px);
   transform-origin: top right;
-  animation: glass-menu-in 140ms ease-out;
+  animation: glass-menu-in var(--duration-fast) var(--ease-standard);
 }
 
 .file-menu {
@@ -432,11 +432,11 @@ select option {
 .toolbar-menu button {
   width: 100%;
   height: 29px;
-  padding: 0 9px;
-  border-radius: 6px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   text-align: left;
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 
 .file-actions button {
@@ -464,7 +464,7 @@ select option {
 
 .toolbar-menu-separator {
   height: 1px;
-  margin: 4px 7px;
+  margin: 4px 8px;
   background: var(--line);
 }
 
@@ -516,7 +516,7 @@ aside,
   width: 4px;
   cursor: col-resize;
   background: transparent;
-  transition: background 120ms ease;
+  transition: background var(--duration-fast) var(--ease-standard);
   z-index: 10;
   position: relative;
 }
@@ -549,7 +549,7 @@ aside {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px var(--space-md);
+  padding: 8px var(--space-md);
   border-bottom: 1px solid var(--line-soft);
 }
 
@@ -558,7 +558,7 @@ aside {
   display: flex;
   gap: 2px;
   padding: 2px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
 }
 
 .sidebar > .pane-heading[hidden] {
@@ -568,10 +568,10 @@ aside {
 .sidebar-view-control button {
   height: 25px;
   flex: 1;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--secondary);
   background: transparent;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 .sidebar-view-control button.active {
@@ -582,13 +582,13 @@ aside {
 
 h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
 }
 
 h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
 }
 
@@ -600,7 +600,7 @@ h2 {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 6px 7px 16px;
+  padding: 6px 8px 16px;
 }
 
 /* 旧的源文件样式已移至 source-files-redesign.css */
@@ -652,10 +652,10 @@ h2 {
   min-height: 24px;
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin: 8px 9px 2px;
+  gap: 8px;
+  margin: 8px 8px 2px;
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   font-weight: 600;
   cursor: pointer;
   list-style: none;
@@ -764,15 +764,15 @@ h2 {
 #files button {
   width: 100%;
   min-height: 29px;
-  padding: 5px 8px 5px 28px;
+  padding: 6px 8px 6px 32px;
   overflow: hidden;
   position: relative;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 #files button > .system-symbol {
@@ -780,23 +780,23 @@ h2 {
   top: 50%;
   left: 9px;
   color: var(--tertiary);
-  font-size: 14px;
+  font-size: var(--font-size-lg);
   transform: translateY(-50%);
 }
 
 .sidebar-overview button.nav-item {
   min-height: 42px;
-  padding: 5px 8px 5px 38px;
+  padding: 6px 8px 6px 40px;
 }
 
 .sidebar-overview button.nav-item > .system-symbol {
   left: 11px;
   color: var(--secondary);
-  font-size: 18px;
+  font-size: var(--font-size-xl);
 }
 
 .sidebar-overview button.nav-item .nav-label {
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 600;
   line-height: 1.2;
 }
@@ -815,7 +815,7 @@ h2 {
 .nav-meta {
   margin-top: 2px;
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   line-height: 1.2;
 }
 
@@ -856,9 +856,9 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 7px;
+  gap: 8px;
   position: relative;
-  padding: 7px 11px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--line);
   background: var(--toolbar);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -900,7 +900,7 @@ h2 {
   right: 26px;
   overflow: hidden;
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   line-height: 28px;
   pointer-events: none;
   white-space: nowrap;
@@ -912,10 +912,10 @@ h2 {
   height: 27px;
   margin-right: auto;
   padding: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   color: var(--secondary);
-  font-size: 16px;
-  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  font-size: var(--font-size-lg);
+  transition: color var(--duration-base) var(--ease-standard), background-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) var(--ease-standard);
 }
 
 .preview-tool-toggle.active {
@@ -930,7 +930,7 @@ h2 {
   place-items: center;
   justify-items: center;
   position: relative;
-  padding: 18px;
+  padding: 20px;
   overflow-x: auto;
   overflow-y: auto;
   background: var(--canvas);
@@ -1083,9 +1083,9 @@ h2 {
   left: 0;
   top: 0;
   width: 112px;
-  padding: 5px 8px;
+  padding: 6px 8px;
   border: 1px solid var(--glass-border);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   transform: translate3d(var(--coordinate-label-x), calc(var(--coordinate-label-y) - 50%), 0);
   background: var(--glass-surface);
   box-shadow: var(--glass-shadow);
@@ -1115,7 +1115,7 @@ h2 {
   gap: 2px;
   padding: 4px;
   border: 1px solid var(--glass-border);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--glass-surface);
   box-shadow: var(--glass-shadow);
   -webkit-backdrop-filter: saturate(180%) blur(16px);
@@ -1125,8 +1125,8 @@ h2 {
 .preview-zoom-control button {
   width: 30px;
   height: 30px;
-  padding: 5px;
-  border-radius: 8px;
+  padding: 6px;
+  border-radius: var(--radius-md);
   color: var(--text);
   background: transparent;
 }
@@ -1413,7 +1413,7 @@ body:has(.canvas-wrap.empty) .workspace {
 .welcome-main {
   display: flex;
   flex-direction: column;
-  gap: 26px;
+  gap: 24px;
   min-width: 0;
   min-height: 0;
   padding: 40px 48px;
@@ -1429,7 +1429,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .welcome-hero h1 {
   margin: 0;
-  font-size: 26px;
+  font-size: var(--font-size-xl);
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text);
@@ -1438,7 +1438,7 @@ body:has(.canvas-wrap.empty) .workspace {
 .welcome-hero p {
   margin: 0;
   max-width: 720px;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   line-height: 1.6;
   color: var(--secondary);
 }
@@ -1446,24 +1446,24 @@ body:has(.canvas-wrap.empty) .workspace {
 .welcome-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .welcome-section-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .welcome-section-head h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
   color: var(--text);
 }
 
 .welcome-section-head span {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   color: var(--tertiary);
 }
 
@@ -1474,7 +1474,7 @@ body:has(.canvas-wrap.empty) .workspace {
 }
 
 .welcome-recent .welcome-section-head h2 {
-  font-size: 26px;
+  font-size: var(--font-size-xl);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -1487,7 +1487,7 @@ body:has(.canvas-wrap.empty) .workspace {
   min-width: 0;
   overflow: hidden;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1503,9 +1503,9 @@ body:has(.canvas-wrap.empty) .workspace {
   background: var(--panel);
   color: var(--secondary);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   cursor: pointer;
-  transition: border-color 160ms ease, color 160ms ease;
+  transition: border-color var(--duration-base) var(--ease-standard), color var(--duration-base) var(--ease-standard);
 }
 
 .welcome-head-action:hover {
@@ -1537,7 +1537,7 @@ body:has(.canvas-wrap.empty) .workspace {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px;
+  padding: 16px;
   border: 1px dashed var(--line);
   border-radius: var(--radius-lg);
   background: var(--panel);
@@ -1557,33 +1557,33 @@ body:has(.canvas-wrap.empty) .workspace {
 .recent-grid-empty-copy {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   flex: 1 1 auto;
   min-width: 0;
 }
 
 .recent-grid-empty-copy strong {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   color: var(--text);
 }
 
 .recent-grid-empty-copy span {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   color: var(--tertiary);
 }
 
 .recent-grid-empty button {
   flex: none;
-  padding: 7px 14px;
+  padding: 8px 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--panel);
   color: var(--text);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   cursor: pointer;
-  transition: border-color 160ms ease, color 160ms ease;
+  transition: border-color var(--duration-base) var(--ease-standard), color var(--duration-base) var(--ease-standard);
 }
 
 .recent-grid-empty button:hover {
@@ -1607,13 +1607,13 @@ body:has(.canvas-wrap.empty) .workspace {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 14px;
+  padding: 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--panel);
   text-align: left;
   cursor: pointer;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  transition: border-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) var(--ease-standard);
 }
 
 .template-card:hover {
@@ -1625,9 +1625,9 @@ body:has(.canvas-wrap.empty) .workspace {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
   height: 104px;
-  padding: 10px;
+  padding: 12px;
   overflow: hidden;
   border-radius: var(--radius-md);
   background: var(--tone-bg, #f1f3f5);
@@ -1636,7 +1636,7 @@ body:has(.canvas-wrap.empty) .workspace {
 .template-foot {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -1648,7 +1648,7 @@ body:has(.canvas-wrap.empty) .workspace {
 }
 
 .template-name {
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 500;
   color: var(--text);
   overflow: hidden;
@@ -1667,7 +1667,7 @@ body:has(.canvas-wrap.empty) .workspace {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   color: var(--tertiary);
 }
 
@@ -1676,7 +1676,7 @@ body:has(.canvas-wrap.empty) .workspace {
   border-radius: var(--radius-sm);
   background: var(--content);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-xs);
   font-style: normal;
   color: var(--secondary);
 }
@@ -1684,7 +1684,7 @@ body:has(.canvas-wrap.empty) .workspace {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 12px 12px;
   border-radius: var(--radius-md);
   background: var(--content);
 }
@@ -1698,7 +1698,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .welcome-note p {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   line-height: 1.5;
   color: var(--secondary);
 }
@@ -1710,7 +1710,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 #event-log {
   min-width: 0;
-  padding: 7px 0;
+  padding: 8px 0;
   overflow: hidden;
   background: transparent;
   color: inherit;
@@ -1744,7 +1744,7 @@ body:has(.canvas-wrap.empty) .workspace {
   background: var(--accent);
   box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 38%, transparent), var(--shadow-sm);
   cursor: pointer;
-  transition: bottom 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 140ms ease, box-shadow 140ms ease;
+  transition: bottom var(--duration-base) var(--ease-emphasized), transform var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .source-find-fab:hover {
@@ -1793,7 +1793,7 @@ body:has(.canvas-wrap.empty) .workspace {
   color: var(--text);
   background: var(--glass-highlight);
   box-shadow: var(--shadow-sm), inset 0 1px var(--glass-highlight);
-  animation: glass-select 180ms ease-out;
+  animation: glass-select var(--duration-base) var(--ease-standard);
 }
 
 @keyframes glass-select {
@@ -1812,7 +1812,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 #resource-inspector {
   min-height: 0;
-  padding: 14px 13px 24px;
+  padding: 16px 12px 24px;
   overflow: auto;
 }
 
@@ -1852,16 +1852,16 @@ body:has(.canvas-wrap.empty) .workspace {
   display: grid;
   grid-template-rows: 60px auto auto;
   gap: 4px;
-  padding: 7px;
+  padding: 8px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text);
   background: var(--control);
   text-align: left;
 }
 
 .style-resource-item.has-sound :is(strong, small) {
-  padding-right: 30px;
+  padding-right: 32px;
 }
 
 .resource-item:hover {
@@ -1879,7 +1879,7 @@ body:has(.canvas-wrap.empty) .workspace {
   width: 100%;
   height: 60px;
   object-fit: contain;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background-color: var(--checker-light);
   background-image:
     var(--checker-image);
@@ -1890,7 +1890,7 @@ body:has(.canvas-wrap.empty) .workspace {
 .resource-style-previews {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 3px;
+  gap: 4px;
 }
 
 .resource-style-previews canvas {
@@ -1902,7 +1902,7 @@ body:has(.canvas-wrap.empty) .workspace {
 .style-detail-previews {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 16px;
 }
 
@@ -1912,14 +1912,14 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .style-detail-previews button {
   margin: 0;
-  padding: 5px;
+  padding: 6px;
   display: grid;
   gap: 4px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--control);
   color: var(--secondary);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   text-align: center;
   cursor: pointer;
 }
@@ -1937,9 +1937,9 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .style-detail-field {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 .style-detail-field-row {
@@ -1960,7 +1960,7 @@ body:has(.canvas-wrap.empty) .workspace {
   grid-template-columns: 34px minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--control);
 }
 
@@ -1997,12 +1997,12 @@ body:has(.canvas-wrap.empty) .workspace {
 }
 
 .resource-item strong {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 .resource-item small {
   color: var(--secondary);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
 }
 
 .sound-resource-item {
@@ -2014,7 +2014,7 @@ body:has(.canvas-wrap.empty) .workspace {
   height: 60px;
   display: grid;
   place-items: center;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, var(--control));
 }
@@ -2028,13 +2028,13 @@ body:has(.canvas-wrap.empty) .workspace {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 9px;
+  margin-bottom: 8px;
 }
 
 .tile-heading {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 7px;
+  gap: 8px;
 }
 
 .tile-heading h3 {
@@ -2048,8 +2048,8 @@ body:has(.canvas-wrap.empty) .workspace {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: -14px -13px 10px;
-  padding: 14px 13px 10px;
+  margin: -16px -12px 12px;
+  padding: 16px 12px 12px;
   background: var(--inspector);
   -webkit-backdrop-filter: saturate(180%) blur(12px);
   backdrop-filter: saturate(180%) blur(12px);
@@ -2065,7 +2065,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .resource-detail-heading small {
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   margin-top: 2px;
 }
 
@@ -2073,10 +2073,10 @@ body:has(.canvas-wrap.empty) .workspace {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px;
-  margin-bottom: 10px;
+  padding: 8px;
+  margin-bottom: 12px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--control);
 }
 
@@ -2114,7 +2114,7 @@ body:has(.canvas-wrap.empty) .workspace {
   margin-bottom: 12px;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background-color: var(--checker-light);
   background-image:
     var(--checker-image);
@@ -2142,8 +2142,8 @@ body:has(.canvas-wrap.empty) .workspace {
   grid-template-rows: auto auto;
   align-items: start;
   column-gap: 6px;
-  margin: -14px -13px 15px;
-  padding: 14px 13px 10px;
+  margin: -16px -12px 16px;
+  padding: 16px 12px 12px;
   background: var(--inspector);
   -webkit-backdrop-filter: saturate(180%) blur(12px);
   backdrop-filter: saturate(180%) blur(12px);
@@ -2212,7 +2212,7 @@ body:has(.canvas-wrap.empty) .workspace {
   padding: 1px 2px;
   overflow: hidden;
   color: var(--secondary);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-weight: 500;
   line-height: 1.2;
   text-align: center;
@@ -2223,13 +2223,13 @@ body:has(.canvas-wrap.empty) .workspace {
 .bda-frame-resource-button {
   min-width: 0;
   display: grid;
-  gap: 5px;
+  gap: 6px;
   padding: 0;
   border: 0;
   color: var(--secondary);
   background: transparent;
   font: inherit;
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   cursor: pointer;
 }
 
@@ -2259,23 +2259,23 @@ body:has(.canvas-wrap.empty) .workspace {
 .style-detail-group {
   min-width: 0;
   margin: 0;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid var(--line-soft);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--control) 72%, transparent);
 }
 
 .style-detail-group legend {
   padding: 0 4px;
   color: var(--text);
-  font-size: 11px;
-  font-weight: 650;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
 }
 
 .style-detail-group-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px 8px;
+  gap: 8px 8px;
 }
 
 #style-resource-detail {
@@ -2293,12 +2293,12 @@ body:has(.canvas-wrap.empty) .workspace {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 9px;
+  padding: 8px 8px;
   border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--secondary);
   background: color-mix(in srgb, var(--accent) 7%, var(--control));
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 .fore-styles-reference-field {
@@ -2327,7 +2327,7 @@ body:has(.canvas-wrap.empty) .workspace {
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   background: var(--menu);
   color: var(--text);
   box-shadow: var(--shadow-sm), inset 0 1px var(--glass-highlight);
@@ -2352,36 +2352,36 @@ body:has(.canvas-wrap.empty) .workspace {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 14px 18px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--line);
   background: var(--toolbar);
 }
 
 .style-picker-header > div:first-child {
   display: grid;
-  gap: 3px;
+  gap: 4px;
 }
 
 .style-picker-header h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--font-size-lg);
 }
 
 .style-picker-header small {
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 .style-picker-hint {
   color: var(--tertiary);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
 }
 
 .style-picker-tools {
   width: min(390px, 58%);
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
 }
 
 .style-picker-tools .search-control {
@@ -2401,22 +2401,22 @@ body:has(.canvas-wrap.empty) .workspace {
   align-content: start;
   gap: 12px;
   overflow-y: auto;
-  padding: 16px 18px 20px;
+  padding: 16px 20px 20px;
 }
 
 .style-picker-item {
   min-width: 0;
   display: grid;
-  gap: 9px;
-  padding: 10px;
+  gap: 8px;
+  padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--glass-surface);
   color: var(--text);
   text-align: left;
   cursor: pointer;
   box-shadow: inset 0 1px var(--glass-highlight);
-  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
 }
 
 .style-picker-item:hover {
@@ -2433,7 +2433,7 @@ body:has(.canvas-wrap.empty) .workspace {
 }
 
 .style-picker-item strong {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .style-picker-sound {
@@ -2449,7 +2449,7 @@ body:has(.canvas-wrap.empty) .workspace {
   grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
   gap: 0 8px;
-  padding: 10px;
+  padding: 12px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -2495,7 +2495,7 @@ body:has(.canvas-wrap.empty) .workspace {
   gap: 0;
   overflow: hidden;
   border: 1px solid var(--line-soft);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
 }
 
 .style-picker-previews canvas {
@@ -2533,7 +2533,7 @@ body:has(.canvas-wrap.empty) .workspace {
   display: flex;
   flex-direction: column;
   overflow: auto;
-  padding: 18px;
+  padding: 20px;
 }
 
 #style-image-picker-canvas {
@@ -2541,7 +2541,7 @@ body:has(.canvas-wrap.empty) .workspace {
   margin: auto auto 0;
   display: block;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background-color: var(--checker-light);
   background-image:
     var(--checker-image);
@@ -2552,9 +2552,9 @@ body:has(.canvas-wrap.empty) .workspace {
 
 #style-image-picker-meta {
   display: block;
-  margin: 7px auto auto;
+  margin: 8px auto auto;
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 .style-image-dialog {
@@ -2569,7 +2569,7 @@ body:has(.canvas-wrap.empty) .workspace {
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   background: var(--menu);
   color: var(--text);
   box-shadow: var(--shadow-sm), inset 0 1px var(--glass-highlight);
@@ -2599,14 +2599,14 @@ body:has(.canvas-wrap.empty) .workspace {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 14px 18px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--line);
   background: var(--toolbar);
 }
 
 .style-image-title-wrap {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -2615,7 +2615,7 @@ body:has(.canvas-wrap.empty) .workspace {
   margin: 0;
   overflow: hidden;
   color: var(--text);
-  font-size: 16px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -2633,10 +2633,10 @@ body:has(.canvas-wrap.empty) .workspace {
   height: 34px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--control);
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   cursor: pointer;
 }
 
@@ -2659,7 +2659,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .style-image-subtitle {
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   white-space: nowrap;
 }
 
@@ -2686,7 +2686,7 @@ body:has(.canvas-wrap.empty) .workspace {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 14px 18px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -2696,12 +2696,12 @@ body:has(.canvas-wrap.empty) .workspace {
 }
 
 .style-image-resource-header strong {
-  font-size: 18px;
+  font-size: var(--font-size-xl);
 }
 
 .style-image-resource-header small {
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .style-image-resource-tools {
@@ -2722,7 +2722,7 @@ body:has(.canvas-wrap.empty) .workspace {
   height: 36px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--control);
   color: var(--text);
   cursor: pointer;
@@ -2740,21 +2740,21 @@ body:has(.canvas-wrap.empty) .workspace {
   gap: 12px;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 18px 22px;
+  padding: 16px 20px 24px;
 }
 
 .style-image-img-list button {
   min-width: 0;
   display: grid;
   grid-template-rows: 120px auto;
-  gap: 7px;
+  gap: 8px;
   padding: 8px;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--control);
   color: var(--text);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   text-align: left;
   cursor: pointer;
 }
@@ -2772,7 +2772,7 @@ body:has(.canvas-wrap.empty) .workspace {
   width: 100%;
   height: 120px;
   object-fit: contain;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background-color: var(--checker-light);
   background-image:
     var(--checker-image);
@@ -2794,7 +2794,7 @@ body:has(.canvas-wrap.empty) .workspace {
   place-items: center;
   margin: 0;
   color: var(--secondary);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   pointer-events: none;
 }
 
@@ -2805,9 +2805,9 @@ body:has(.canvas-wrap.empty) .workspace {
 .app-dialog {
   width: min(420px, calc(100vw - 32px));
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   background: var(--panel);
   box-shadow: var(--shadow-sm);
 }
@@ -2820,7 +2820,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .app-dialog form {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .app-dialog header {
@@ -2831,26 +2831,26 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .app-dialog h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
   line-height: 1.2;
 }
 
 .app-dialog header button {
   height: 28px;
-  padding: 0 9px;
+  padding: 0 8px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--control);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.2;
 }
 
 .app-dialog label {
   display: grid;
-  gap: 5px;
+  gap: 6px;
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.3;
 }
 
@@ -2867,9 +2867,9 @@ body:has(.canvas-wrap.empty) .workspace {
   position: relative;
   appearance: none;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--control);
-  transition: background 160ms ease;
+  transition: background var(--duration-base) var(--ease-standard);
 }
 
 .settings-switch input::after {
@@ -2882,7 +2882,7 @@ body:has(.canvas-wrap.empty) .workspace {
   border-radius: 50%;
   background: var(--material-control);
   box-shadow: var(--shadow-sm);
-  transition: transform 160ms ease;
+  transition: transform var(--duration-base) var(--ease-standard);
 }
 
 .settings-switch input:checked {
@@ -2898,16 +2898,16 @@ body:has(.canvas-wrap.empty) .workspace {
   height: 30px;
   padding: 0 8px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--control);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   line-height: 1.2;
 }
 
 .app-dialog label > small {
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 #settings-dialog {
@@ -2926,7 +2926,7 @@ body:has(.canvas-wrap.empty) .workspace {
 }
 
 #settings-dialog header {
-  padding: 16px 18px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--line-soft);
 }
 
@@ -2941,8 +2941,8 @@ body:has(.canvas-wrap.empty) .workspace {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 12px 10px;
+  gap: 4px;
+  padding: 12px 12px;
   border-right: 1px solid var(--line-soft);
   background: color-mix(in srgb, var(--control) 34%, transparent);
 }
@@ -2954,12 +2954,12 @@ body:has(.canvas-wrap.empty) .workspace {
   grid-template-columns: 18px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   text-align: left;
 }
 
@@ -3003,19 +3003,19 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .settings-section-heading {
   display: grid;
-  gap: 3px;
-  margin-bottom: 7px;
+  gap: 4px;
+  margin-bottom: 8px;
 }
 
 .settings-section-heading h3 {
   margin: 0;
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 600;
 }
 
 .settings-section-heading p {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   line-height: 1.35;
 }
 
@@ -3028,7 +3028,7 @@ body:has(.canvas-wrap.empty) .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   border-top: 1px solid var(--line-soft);
   color: var(--text);
 }
@@ -3057,10 +3057,10 @@ body:has(.canvas-wrap.empty) .workspace {
   height: 30px;
   padding: 0 8px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--control);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 
 .settings-secret-control {
@@ -3083,7 +3083,7 @@ body:has(.canvas-wrap.empty) .workspace {
   padding: 0;
   place-items: center;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--control);
   color: var(--text);
 }
@@ -3092,7 +3092,7 @@ body:has(.canvas-wrap.empty) .workspace {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 14px;
+  gap: 16px;
   padding-top: 16px;
   border-top: 1px solid var(--line-soft);
 }
@@ -3106,7 +3106,7 @@ body:has(.canvas-wrap.empty) .workspace {
 #model-configuration-status {
   margin: 0;
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 #model-configuration-status[data-state="busy"] { color: var(--accent); }
@@ -3117,7 +3117,7 @@ body:has(.canvas-wrap.empty) .workspace {
   max-width: 330px;
   overflow: hidden;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3125,12 +3125,12 @@ body:has(.canvas-wrap.empty) .workspace {
 #test-model-connection {
   flex: 0 0 auto;
   min-height: 30px;
-  padding: 0 11px;
+  padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text);
   background: var(--control);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 #test-model-connection:disabled,
@@ -3149,7 +3149,7 @@ body:has(.canvas-wrap.empty) .workspace {
 .settings-inline-control {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   color: var(--secondary);
 }
 
@@ -3158,14 +3158,14 @@ body:has(.canvas-wrap.empty) .workspace {
 }
 
 .settings-inline-control small {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 .settings-range-control {
   display: grid;
   grid-template-columns: 112px 34px;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
 }
 
 .settings-range-control input {
@@ -3175,7 +3175,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .settings-range-control output {
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   text-align: right;
 }
 
@@ -3194,10 +3194,10 @@ body:has(.canvas-wrap.empty) .workspace {
   height: 30px;
   padding: 0 8px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--control);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 
 .settings-path-control button {
@@ -3207,7 +3207,7 @@ body:has(.canvas-wrap.empty) .workspace {
   padding: 0;
   place-items: center;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--control);
   color: var(--text);
 }
@@ -3215,7 +3215,7 @@ body:has(.canvas-wrap.empty) .workspace {
 .source-directory-setting small {
   min-height: 17px;
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 .source-directory-setting[data-invalid="true"] small {
@@ -3225,7 +3225,7 @@ body:has(.canvas-wrap.empty) .workspace {
 .app-dialog p {
   margin: 0;
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
@@ -3248,12 +3248,12 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .about-update button {
   height: 28px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--control);
   color: inherit;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.2;
 }
 
@@ -3268,7 +3268,7 @@ body:has(.canvas-wrap.empty) .workspace {
 .app-dialog a {
   width: fit-content;
   color: var(--accent);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   text-decoration: none;
 }
 
@@ -3280,7 +3280,7 @@ body:has(.canvas-wrap.empty) .workspace {
   padding: 0;
   color: var(--accent);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   cursor: pointer;
 }
 
@@ -3303,7 +3303,7 @@ body:has(.canvas-wrap.empty) .workspace {
   font-size: var(--font-size-xs);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--duration-base) var(--ease-standard);
   box-shadow: none;
 }
 
@@ -3345,11 +3345,11 @@ body:has(.canvas-wrap.empty) .workspace {
   min-width: 0;
   display: grid;
   gap: 6px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border-top: 1px solid var(--line-soft);
   background: var(--toolbar);
   box-shadow: var(--shadow-sm);
-  animation: source-find-slide-up 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: source-find-slide-up var(--duration-base) var(--ease-emphasized);
 }
 
 @keyframes source-find-slide-up {
@@ -3397,7 +3397,7 @@ body:has(.canvas-wrap.empty) .workspace {
   min-width: 30px;
   flex: none;
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   text-align: right;
 }
 
@@ -3405,17 +3405,17 @@ body:has(.canvas-wrap.empty) .workspace {
   display: flex;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--control);
 }
 
 .source-toolbar button {
   height: 28px;
-  padding: 0 9px;
-  border-radius: 8px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
   color: var(--text);
   background: var(--control);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 .source-search-actions button {
@@ -3457,7 +3457,7 @@ body:has(.canvas-wrap.empty) .workspace {
   width: 100%;
   height: 100%;
   position: relative;
-  font-size: var(--source-font-size, 11px);
+  font-size: var(--source-font-size, var(--font-size-xs));
   line-height: 1.6;
   font-family: "Source JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -3484,12 +3484,12 @@ body:has(.canvas-wrap.empty) .workspace {
 #source .cm-content {
   min-height: 100%;
   /* 给右下角悬浮查找按钮和底部弹出的搜索栏留出空间。 */
-  padding: 15px 0 68px;
+  padding: 16px 0 72px;
   caret-color: var(--text);
 }
 
 #source .cm-line {
-  padding: 0 16px 0 10px;
+  padding: 0 16px 0 12px;
 }
 
 #source .cm-gutters {
@@ -3500,7 +3500,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 #source .cm-lineNumbers .cm-gutterElement {
   min-width: 42px;
-  padding: 0 10px 0 8px;
+  padding: 0 12px 0 8px;
 }
 
 #source .cm-activeLine,
@@ -3550,7 +3550,7 @@ body:has(.canvas-wrap.empty) .workspace {
   margin-right: 0.35em;
   vertical-align: -0.08em;
   border: 1px solid color-mix(in srgb, var(--text) 35%, transparent);
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   pointer-events: none;
 }
 
@@ -3562,7 +3562,7 @@ body:has(.canvas-wrap.empty) .workspace {
   vertical-align: -0.12em;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--text) 35%, transparent);
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   background-color: var(--checker-light);
   background-image:
     var(--checker-image);
@@ -3578,7 +3578,7 @@ body:has(.canvas-wrap.empty) .workspace {
 }
 
 .cm-source-explanation {
-  padding: 0 16px 0 52px;
+  padding: 0 16px 0 56px;
   color: var(--syntax-explanation);
   background: color-mix(in srgb, var(--syntax-explanation) 9%, transparent);
   font-style: italic;
@@ -3591,9 +3591,9 @@ body:has(.canvas-wrap.empty) .workspace {
   min-width: 150px;
   max-height: 220px;
   overflow: auto;
-  padding: 3px;
+  padding: 4px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--window);
   box-shadow: var(--shadow-sm);
 }
@@ -3601,9 +3601,9 @@ body:has(.canvas-wrap.empty) .workspace {
 #source .cm-source-completion button {
   display: block;
   width: 100%;
-  padding: 4px 7px;
+  padding: 4px 8px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: var(--text);
   background: transparent;
   text-align: left;
@@ -3644,7 +3644,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .cm-source-search-match {
   padding: 0 1px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: inherit;
   background: color-mix(in srgb, var(--search-match) 58%, transparent);
   box-shadow: var(--shadow-sm);
@@ -3672,7 +3672,7 @@ body:has(.canvas-wrap.empty) .workspace {
   grid-template-columns: 28px 1fr 28px;
   align-items: center;
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   text-align: center;
 }
 
@@ -3685,7 +3685,7 @@ body:has(.canvas-wrap.empty) .workspace {
   border-radius: 50%;
   color: var(--text);
   background: var(--control);
-  font-size: 24px;
+  font-size: var(--font-size-xl);
   line-height: 1;
 }
 
@@ -3700,7 +3700,7 @@ body:has(.canvas-wrap.empty) .workspace {
   width: min(440px, calc(100% - 32px));
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   color: var(--text);
   background: var(--panel);
   box-shadow: var(--shadow-sm);
@@ -3714,8 +3714,8 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .project-dialog form {
   display: grid;
-  gap: 18px;
-  padding: 22px;
+  gap: 20px;
+  padding: 24px;
 }
 
 .new-project-dialog {
@@ -3731,7 +3731,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .new-project-dialog fieldset {
   display: grid;
-  gap: 7px;
+  gap: 8px;
   min-height: 0;
   padding-right: 8px;
   overflow-y: auto;
@@ -3740,14 +3740,14 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .file-operation-dialog {
   width: min(400px, calc(100% - 32px));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .file-operation-dialog progress {
   width: 100%;
   height: 8px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   accent-color: var(--accent);
 }
@@ -3760,7 +3760,7 @@ body:has(.canvas-wrap.empty) .workspace {
 #file-operation-result {
   margin: 0;
   color: var(--secondary);
-  font-size: 14px;
+  font-size: var(--font-size-lg);
 }
 
 .file-operation-dialog[data-outcome="success"] #file-operation-result { color: color-mix(in srgb, var(--state-ok) 75%, var(--text)); }
@@ -3782,7 +3782,7 @@ body:has(.canvas-wrap.empty) .workspace {
   display: grid;
   gap: 6px;
   color: var(--secondary);
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 
 .panel-copy-fields input,
@@ -3790,7 +3790,7 @@ body:has(.canvas-wrap.empty) .workspace {
   box-sizing: border-box;
   width: 100%;
   height: 34px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid var(--line);
   background: var(--control);
   color: var(--text);
@@ -3808,7 +3808,7 @@ body:has(.canvas-wrap.empty) .workspace {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  padding: 0 11px;
+  padding: 0 12px;
   border-top: 1px solid var(--line);
   color: var(--secondary);
   background: var(--toolbar);
@@ -3820,7 +3820,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 #panel-status {
   flex: none;
-  padding: 7px 0;
+  padding: 8px 0;
   color: inherit;
   font: inherit;
   font-variant-numeric: tabular-nums;
@@ -3837,13 +3837,13 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .project-dialog h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--font-size-xl);
 }
 
 .project-dialog header p {
-  margin: 5px 0 0;
+  margin: 6px 0 0;
   color: var(--secondary);
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 
 .project-dialog fieldset {
@@ -3854,17 +3854,17 @@ body:has(.canvas-wrap.empty) .workspace {
 .project-dialog legend {
   margin-bottom: 8px;
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .project-template-option {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--control);
 }
 
@@ -3880,16 +3880,16 @@ body:has(.canvas-wrap.empty) .workspace {
 
 .project-template-option span {
   display: grid;
-  gap: 3px;
+  gap: 4px;
 }
 
 .project-template-option strong {
-  font-size: 14px;
+  font-size: var(--font-size-lg);
 }
 
 .project-template-option small {
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .project-dialog footer {
@@ -3901,9 +3901,9 @@ body:has(.canvas-wrap.empty) .workspace {
 .project-dialog footer button,
 .new-style-dialog footer button {
   height: 30px;
-  padding: 0 14px;
+  padding: 0 16px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--control);
   cursor: pointer;
 }
@@ -3918,27 +3918,27 @@ body:has(.canvas-wrap.empty) .workspace {
 .new-style-dialog input[type="number"] {
   width: 100%;
   height: 30px;
-  padding: 0 9px;
+  padding: 0 8px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--control);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 
 .new-style-dialog .field-error {
   color: var(--state-danger);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]):not([type="file"]) {
-  border-radius: 9px;
+  border-radius: var(--radius-md);
 }
 
 input[type="search"] {
-  padding-inline: 13px;
+  padding-inline: 12px;
   border-color: transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   color: var(--text);
   background: color-mix(in srgb, var(--secondary) 12%, transparent);
   box-shadow: none;
@@ -3962,7 +3962,7 @@ input[type="search"]:focus {
   gap: 8px;
   padding: 0 12px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   color: var(--secondary);
   background: color-mix(in srgb, var(--secondary) 12%, transparent);
 }
@@ -4025,7 +4025,7 @@ input[type="search"]:focus {
     width: calc(100vw - 16px);
     height: calc(100dvh - 16px);
     max-height: none;
-    border-radius: 16px;
+    border-radius: var(--radius-xl);
   }
 
   #settings-dialog form {
@@ -4033,7 +4033,7 @@ input[type="search"]:focus {
   }
 
   #settings-dialog header {
-    padding: 12px 14px;
+    padding: 12px 16px;
   }
 
   .settings-layout {
@@ -4062,7 +4062,7 @@ input[type="search"]:focus {
   }
 
   .settings-storage {
-    padding-bottom: 11px;
+    padding-bottom: 12px;
   }
 
   .app-dialog .settings-row {
@@ -4077,7 +4077,7 @@ input[type="search"]:focus {
   .app-dialog .settings-row:not(.settings-switch):not(:has(.settings-inline-control)) {
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
-    padding: 9px 0;
+    padding: 8px 0;
   }
 
   .settings-text-row > input,
@@ -4138,8 +4138,8 @@ input[type="search"]:focus {
   }
 
   .preview-toolbar {
-    gap: 5px;
-    padding-inline: 7px;
+    gap: 6px;
+    padding-inline: 8px;
   }
 
   .preview-toolbar .field-control {
@@ -4197,11 +4197,11 @@ input[type="search"]:focus {
     padding: 0 8px;
     display: flex !important;
     align-items: center;
-    gap: 7px;
+    gap: 8px;
     border: 1px solid var(--glass-border);
     background: var(--glass-surface);
     box-shadow: var(--glass-shadow);
-    font-size: 14px;
+    font-size: var(--font-size-lg);
   }
 
   .mobile-command-menu > summary .system-symbol {
@@ -4228,8 +4228,8 @@ input[type="search"]:focus {
     display: grid;
     grid-template-columns: 22px minmax(0, 1fr);
     align-items: center;
-    gap: 10px;
-    font-size: 15px;
+    gap: 12px;
+    font-size: var(--font-size-lg);
   }
 
   .mobile-command-actions button .system-symbol {
@@ -4286,16 +4286,16 @@ input[type="search"]:focus {
     min-width: 34px;
     height: 34px;
     padding: 2px 4px;
-    border-radius: 7px;
+    border-radius: var(--radius-sm);
     background: transparent;
   }
 
   .mode-control > .mobile-choice-toggle {
     width: 100%;
     min-width: 0;
-    padding-inline: 10px;
+    padding-inline: 12px;
     color: var(--text);
-    font-size: 13px;
+    font-size: var(--font-size-md);
     font-weight: 600;
   }
 
@@ -4310,7 +4310,7 @@ input[type="search"]:focus {
 
   .mode-control > select {
     height: 34px;
-    font-size: 14px;
+    font-size: var(--font-size-lg);
   }
 
   main {
@@ -4360,7 +4360,7 @@ input[type="search"]:focus {
     width: 28px;
     height: 3px;
     position: absolute;
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     background: color-mix(in srgb, var(--secondary) 48%, transparent);
   }
 
@@ -4420,9 +4420,9 @@ input[type="search"]:focus {
     right: 0;
     top: 7px;
     left: 0;
-    border-radius: 999px;
+    border-radius: var(--radius-full);
     background: color-mix(in srgb, var(--secondary) 30%, transparent);
-    transition: background-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+    transition: background-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) var(--ease-standard), opacity var(--duration-base) var(--ease-standard);
   }
 
   .mobile-workspace-tabs button[data-mobile-pane].active {
@@ -4443,7 +4443,7 @@ input[type="search"]:focus {
     left: 0;
     grid-template-rows: minmax(0, 1fr) 24px;
     border-top: 1px solid var(--line);
-    transition: opacity 180ms ease;
+    transition: opacity var(--duration-base) var(--ease-standard);
   }
 
   aside,
@@ -4457,7 +4457,7 @@ input[type="search"]:focus {
     border-right: 0;
     border-left: 0;
     touch-action: pan-y;
-    transition: transform 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    transition: transform var(--duration-base) var(--ease-emphasized);
     will-change: transform;
   }
 
@@ -4564,8 +4564,8 @@ input[type="search"]:focus {
     width: 100%;
     min-width: 0;
     height: 34px;
-    padding-inline: 8px 22px;
-    font-size: 13px;
+    padding-inline: 8px 24px;
+    font-size: var(--font-size-md);
   }
 
   .canvas-wrap {
@@ -4589,12 +4589,12 @@ input[type="search"]:focus {
 
   .workspace-status {
     gap: 8px;
-    padding-inline: 7px;
+    padding-inline: 8px;
   }
 
   #event-log,
   #panel-status {
-    padding-block: 5px;
+    padding-block: 6px;
   }
 
   #panel-status {
@@ -4606,7 +4606,7 @@ input[type="search"]:focus {
 
   .pane-heading {
     min-height: 36px;
-    padding: 3px 7px;
+    padding: 4px 8px;
   }
 
   /* Keep key actions beside the file name, with the view switch at the edge. */
@@ -4614,7 +4614,7 @@ input[type="search"]:focus {
   #mobile-inspector-selection {
     display: block;
     overflow: hidden;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -4651,7 +4651,7 @@ input[type="search"]:focus {
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
     padding: 4px;
     overflow-y: auto;
     border-right: 1px solid var(--line-soft);
@@ -4665,10 +4665,10 @@ input[type="search"]:focus {
     display: grid;
     place-items: center;
     overflow: visible;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     color: var(--secondary);
     background: transparent;
-    font-size: 11px;
+    font-size: var(--font-size-xs);
     line-height: 1.15;
     text-align: center;
     text-overflow: clip;
@@ -4709,7 +4709,7 @@ input[type="search"]:focus {
 
   .app-dialog :is(input:not([type="checkbox"]), textarea, select) {
     min-height: 36px;
-    font-size: 18px;
+    font-size: var(--font-size-xl);
   }
 
   .app-dialog button {
@@ -4729,7 +4729,7 @@ input[type="search"]:focus {
   }
 
   #resource-inspector {
-    padding: 7px 8px 16px;
+    padding: 8px 8px 16px;
   }
 
 }
@@ -4763,7 +4763,7 @@ input[type="search"]:focus {
 
   .mode-control button {
     height: 30px;
-    padding-inline: 7px;
+    padding-inline: 8px;
   }
 
   main {
@@ -4812,7 +4812,7 @@ input[type="search"]:focus {
 
   #files,
   #resource-inspector {
-    padding: 7px;
+    padding: 8px;
   }
 
   #files button,
@@ -4827,7 +4827,7 @@ input[type="search"]:focus {
 
   #event-log,
   #panel-status {
-    padding-block: 5px;
+    padding-block: 6px;
   }
 
   .source #style-detail-fields {
@@ -5087,11 +5087,11 @@ summary,
 .source-tree-row,
 .template-card {
   transition:
-    background-color 120ms cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 120ms cubic-bezier(0.4, 0, 0.2, 1),
-    color 150ms cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 120ms cubic-bezier(0.4, 0, 0.2, 1);
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard),
+    opacity var(--duration-fast) var(--ease-standard);
 }
 
 /* 面板 / 标签 / 设备切换：标准档 */
@@ -5101,60 +5101,50 @@ summary,
 .device-shell,
 .canvas-wrap {
   transition:
-    background-color 200ms cubic-bezier(0.2, 0, 0, 1),
-    color 200ms cubic-bezier(0.2, 0, 0, 1),
-    box-shadow 200ms cubic-bezier(0.2, 0, 0, 1),
-    opacity 240ms cubic-bezier(0.2, 0, 0, 1);
+    background-color var(--duration-base) var(--ease-standard),
+    color var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard),
+    opacity var(--duration-base) var(--ease-standard);
 }
 
 /* 画布按键：悬停描边 + 按下反馈 */
 .device-shell .key,
 .keyboard-dock [data-key] {
   transition:
-    box-shadow 120ms cubic-bezier(0.4, 0, 0.2, 1),
-    transform 120ms cubic-bezier(0.4, 0, 0.2, 1),
-    background-color 160ms cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-base) var(--ease-standard);
 }
 
 /* 弹层 / 抽屉 / 菜单：强调档 */
 dialog[open] {
-  animation: ui-pop 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: ui-pop var(--duration-base) var(--ease-emphasized);
 }
 
 dialog[open]::backdrop {
-  animation: ui-fade 160ms ease-out;
+  animation: ui-fade var(--duration-base) var(--ease-standard);
 }
 
 .toolbar-menu,
 #files .source-tree {
-  animation: ui-rise 160ms cubic-bezier(0.2, 0, 0, 1);
+  animation: ui-rise var(--duration-base) var(--ease-standard);
 }
 
 .app-dialog[open] {
-  animation: ui-pop 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: ui-pop var(--duration-slow) var(--ease-emphasized);
 }
 
 .preview-zoom-control,
 .workspace-status,
 .empty-state {
-  animation: ui-fade 200ms ease-out;
+  animation: ui-fade var(--duration-base) var(--ease-standard);
 }
 
 [data-ai-draft="pending"] {
-  animation: ui-draft-pulse 320ms ease-in-out;
+  animation: ui-draft-pulse var(--duration-slow) var(--ease-standard);
 }
 
 /* 可访问性：系统开启「减弱动态效果」时全部退化为瞬时淡入 */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 1ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 1ms !important;
-    scroll-behavior: auto !important;
-  }
-}
 
 /* ══════════════════════════════════════════════════════════════
    设计层 · Design layer
@@ -5181,9 +5171,9 @@ dialog[open]::backdrop {
 
 #files section > h3,
 #files legend {
-  margin: 10px 0 4px;
+  margin: 12px 0 4px;
   padding: 0 8px;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   font-weight: 500;
   letter-spacing: 0.06em;
   color: var(--tertiary);
@@ -5192,7 +5182,7 @@ dialog[open]::backdrop {
 .sidebar-view-control button {
   height: 26px;
   border-radius: var(--radius-sm);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 /* ── 画布工具条 ── */
@@ -5210,14 +5200,14 @@ dialog[open]::backdrop {
 .preview-choice button {
   height: 28px;
   border-radius: var(--radius-md);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .workspace-status {
   padding: 0 12px;
   border-top: 1px solid var(--line);
   background: var(--toolbar);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   color: var(--tertiary);
 }
 
@@ -5230,7 +5220,7 @@ dialog[open]::backdrop {
 .tile-toolbar button {
   height: 28px;
   border-radius: var(--radius-sm);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 .tile-mode-control button.active {
@@ -5253,7 +5243,7 @@ dialog[open]::backdrop {
 }
 
 .search-control input {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .source-find-fab {
@@ -5279,7 +5269,7 @@ dialog[open]::backdrop {
 
 .project-dialog header h2,
 .app-dialog header h2 {
-  font-size: 16px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
   color: var(--text);
 }
@@ -5291,11 +5281,11 @@ dialog[open]::backdrop {
 .project-dialog button,
 .app-dialog button {
   height: 32px;
-  padding: 0 14px;
+  padding: 0 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--control);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 .project-dialog button.primary,
@@ -5318,21 +5308,21 @@ dialog[open]::backdrop {
 }
 
 .settings-section-heading h3 {
-  font-size: 15px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
   color: var(--text);
 }
 
 .settings-section-heading p {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   color: var(--tertiary);
 }
 
 .settings-nav-item {
   height: 34px;
-  padding: 0 10px;
+  padding: 0 12px;
   border-radius: var(--radius-md);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   color: var(--secondary);
 }
 
@@ -5347,7 +5337,7 @@ dialog[open]::backdrop {
   min-height: 40px;
   padding: 0 4px;
   border-bottom: 1px solid var(--line);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   color: var(--text);
 }
 
@@ -5378,13 +5368,13 @@ dialog[open]::backdrop {
 }
 
 .document-title strong {
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 600;
   color: var(--text);
 }
 
 .document-title span {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   color: var(--tertiary);
 }
 
@@ -5395,7 +5385,7 @@ dialog[open]::backdrop {
 }
 
 .mobile-workspace-tabs button {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   color: var(--tertiary);
 }
 
@@ -5435,7 +5425,7 @@ dialog[open]::backdrop {
   scrollbar-width: none;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 160ms ease;
+  transition: opacity var(--duration-base) var(--ease-standard);
 }
 
 :root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"]:has(.cm-scroller.scrollbar-active) > .source-section-scrollbar,
@@ -5468,15 +5458,15 @@ dialog[open]::backdrop {
   display: block;
   transform: translateY(-50%);
   padding: 2px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--accent);
   color: var(--on-accent);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 18px;
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 160ms ease;
+  transition: opacity var(--duration-base) var(--ease-standard);
 }
 
 :root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"]:has(.cm-scroller.scrollbar-active) > .source-section-label,
@@ -5489,7 +5479,7 @@ dialog[open]::backdrop {
   min-height: 8px;
   width: 20px;
   border: 0;
-  padding: 0 3px;
+  padding: 0 4px;
   background: transparent;
   cursor: pointer;
   display: flex;
@@ -5501,11 +5491,11 @@ dialog[open]::backdrop {
   content: "";
   width: 10px;
   height: 2px;
-  border-radius: 1px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--text) 18%, transparent);
   transform: scaleX(0.4);
   transform-origin: right center;
-  transition: width 160ms ease, height 160ms ease, transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), background-color 120ms ease;
+  transition: width var(--duration-base) var(--ease-standard), height var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-emphasized), background-color var(--duration-fast) var(--ease-standard);
 }
 
 /* Grow in when the rail appears, then magnify around the active marker while hovering or dragging. */

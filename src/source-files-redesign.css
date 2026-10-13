@@ -23,7 +23,7 @@
 
 /* 嵌套层级缩进 */
 .source-tree-group {
-  margin-left: 22px;
+  margin-left: 24px;
   padding-left: var(--space-sm);
   margin-top: var(--space-xs);
   margin-bottom: var(--space-xs);
@@ -83,12 +83,12 @@
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   color: var(--text);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   white-space: nowrap;
   z-index: 100;
   pointer-events: none;
   backdrop-filter: saturate(180%) blur(16px);
-  animation: tooltip-appear 0.2s ease;
+  animation: tooltip-appear var(--duration-base) var(--ease-standard);
 }
 
 @keyframes tooltip-appear {

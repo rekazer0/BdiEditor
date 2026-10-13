@@ -47,7 +47,7 @@
 :root body .toolbar-more > summary .icon,
 :root body .toolbar-more > summary .system-symbol {
   color: var(--secondary);
-  font-size: 15px;
+  font-size: var(--font-size-lg);
   line-height: 1;
 }
 
@@ -108,7 +108,7 @@
 :root body .mode-control,
 :root body .sidebar-view-control {
   gap: 2px;
-  padding: 3px;
+  padding: 4px;
   border: 0;
   border-radius: var(--radius-md);
   background: var(--material-content);
@@ -132,13 +132,13 @@
 :root body .mode-control button,
 :root body .sidebar-view-control button {
   height: 28px;
-  padding: 0 11px;
+  padding: 0 12px;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--secondary);
   box-shadow: none;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 400;
 }
 
@@ -209,12 +209,12 @@
 :root body .settings-path-control input {
   min-height: 30px;
   height: 30px;
-  padding: 0 9px;
+  padding: 0 8px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--material-content);
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 400;
   box-shadow: none;
 }
@@ -229,7 +229,7 @@
 /* Search box: one sunken capsule, the inner input is bare. */
 :root body .search-control {
   height: 30px;
-  padding: 0 10px;
+  padding: 0 12px;
   gap: 8px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -253,7 +253,7 @@
   border-radius: 0;
   background: transparent;
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   box-shadow: none;
 }
 
@@ -286,7 +286,7 @@
   border-radius: var(--radius-full);
   background: var(--material-content);
   box-shadow: none;
-  transition: background 160ms cubic-bezier(0.4, 0, 0.2, 1), border-color 160ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard);
 }
 
 :root body .settings-switch input::after,
@@ -301,7 +301,7 @@
   border-radius: 50%;
   background: var(--on-accent);
   box-shadow: var(--shadow-sm);
-  transition: transform 160ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--duration-base) var(--ease-standard);
 }
 
 :root body .settings-switch input:checked,
@@ -330,12 +330,12 @@
 :root body .toolbar-menu button {
   min-height: 32px;
   height: 32px;
-  padding: 0 14px;
+  padding: 0 16px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
   background: var(--material-panel);
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   box-shadow: none;
 }
@@ -379,7 +379,7 @@
   border-radius: var(--radius-sm);
   background: var(--material-content);
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 400;
 }
 
@@ -407,7 +407,7 @@
 :root body :is(#settings-dialog, #about-dialog, #new-style-dialog, #layout-image-dialog, #unsaved-dialog, #file-operation-dialog, #panel-scale-dialog, #ios26-dialog, #new-project-dialog) header {
   min-height: 56px;
   padding: 0 20px;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   border-bottom: 1px solid var(--line);
 }
@@ -416,7 +416,7 @@
 :root body .project-dialog header h2 {
   margin: 0;
   color: var(--text);
-  font-size: 15px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
   line-height: 1.35;
 }
@@ -445,13 +445,13 @@
   gap: 4px;
   min-height: 0;
   margin: 0 -20px;
-  padding: 16px 20px 14px;
+  padding: 16px 20px 16px;
 }
 
 :root body :is(#panel-scale-dialog, #ios26-dialog, #layout-image-dialog, #new-style-dialog, #unsaved-dialog, #atlas-create-dialog) > form > header :is(p, small) {
   margin: 0;
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
@@ -472,17 +472,17 @@
   display: grid;
   gap: 6px;
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 :root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) input:not([type="checkbox"]) {
   height: 32px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
   background: var(--material-panel);
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 :root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) input:not([type="checkbox"]):focus {
@@ -499,7 +499,7 @@
 :root body #panel-scale-summary {
   margin: 0;
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   overflow-wrap: anywhere;
 }
 
@@ -520,16 +520,16 @@
 
 :root body .dialog-note {
   margin: 0;
-  padding: 10px 12px;
+  padding: 12px 12px;
   border-radius: var(--radius-md);
   background: var(--material-content);
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.6;
 }
 
 :root body .settings-sidebar {
-  padding: 12px 10px;
+  padding: 12px 12px;
   gap: 2px;
   border-right: 1px solid var(--line);
   background: var(--material-content);
@@ -546,8 +546,8 @@
   width: 100%;
   height: 34px;
   min-height: 34px;
-  padding: 0 10px;
-  gap: 9px;
+  padding: 0 12px;
+  gap: 8px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -556,7 +556,7 @@
   background: transparent;
   color: var(--secondary);
   box-shadow: none;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 400;
 }
 
@@ -586,24 +586,24 @@
 }
 
 :root body .settings-content {
-  padding: 22px 24px;
+  padding: 24px 24px;
   gap: 16px;
 }
 
 :root body .settings-section-heading h3 {
   color: var(--text);
-  font-size: 15px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
 }
 
 :root body .settings-section-heading p {
   color: var(--tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 :root body .settings-list > h4 {
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   font-weight: 500;
 }
 
@@ -615,17 +615,17 @@
   border-top: 1px solid var(--line);
   border-bottom: 0;
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 
 :root body .settings-row > span:first-child {
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
 }
 
 :root body .settings-row small {
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-family: var(--font-mono);
 }
 
@@ -636,7 +636,7 @@
 
 :root body .canvas-multi-toolbar {
   gap: 4px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--material-control);
@@ -649,13 +649,13 @@
   height: 20px;
   display: inline-flex;
   align-items: center;
-  padding: 0 7px;
+  padding: 0 8px;
   border-radius: var(--radius-full);
   background: var(--selection-soft);
   color: var(--selection);
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -774,7 +774,7 @@
   gap: 6px;
   min-height: 28px;
   height: 28px;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: var(--material-content);
@@ -792,7 +792,7 @@
   border-radius: 0;
   background: transparent;
   color: var(--text);
-  font-size: 11.5px;
+  font-size: var(--font-size-xs);
   font-weight: 500;
   box-shadow: none;
 }
@@ -803,7 +803,7 @@
 
 :root body #skin-state-control .skin-state-value {
   color: var(--text);
-  font-size: 11.5px;
+  font-size: var(--font-size-xs);
   font-weight: 500;
   line-height: 26px;
 }
@@ -815,25 +815,25 @@
 
 :root body .workspace-status {
   min-height: 30px;
-  padding: 0 14px;
+  padding: 0 16px;
   gap: 16px;
   border-top: 1px solid var(--line);
   background: var(--material-panel);
   color: var(--tertiary);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 :root body #event-log {
   color: var(--secondary);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 :root body #panel-status {
   color: var(--tertiary);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 /* =================================================================================================
@@ -843,34 +843,34 @@
 
 :root body #files .raw-files .source-tree-row {
   border-radius: var(--radius-sm);
-  font-size: 12.5px;
+  font-size: var(--font-size-sm);
 }
 
 /* 概览条目与源文件树同一套行语言：单行平铺行，无卡片描边与图标底砖。 */
 :root body #files .sidebar-overview button.nav-item {
   border-radius: var(--radius-md);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 /* 概览条目以中文名为主，原始文件名退为小号注脚。 */
 :root body #files .sidebar-overview button.nav-item > .nav-label {
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 :root body #files .sidebar-overview .nav-label,
 :root body #files .raw-files .nav-label {
-  font-size: 12.5px;
+  font-size: var(--font-size-sm);
 }
 
 :root body #files .sidebar-overview .nav-section {
   border-radius: var(--radius-md);
-  font-size: 12.5px;
+  font-size: var(--font-size-sm);
 }
 
 /* 分组标题比条目小一档、字距放开，层级靠字号而不是颜色；展开的箭头不再用品牌色抢选中行的注意力。 */
 :root body #files .sidebar-overview > .nav-group > .nav-section {
   min-height: 24px;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   letter-spacing: 0.04em;
 }
 
@@ -884,7 +884,7 @@
   min-height: 44px;
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
-  column-gap: 10px;
+  column-gap: 12px;
   row-gap: 2px;
   align-content: center;
   padding: 6px 8px;
@@ -898,12 +898,12 @@
   grid-column: 2;
   max-width: none;
   margin-left: 0;
-  font-size: 9.5px;
+  font-size: var(--font-size-xs);
 }
 
 :root body #files .raw-files .source-folder-row {
   border-radius: var(--radius-sm);
-  font-size: 12.5px;
+  font-size: var(--font-size-sm);
 }
 
 /* =================================================================================================
@@ -913,27 +913,27 @@
 :root body .document-title {
   gap: 8px;
   min-height: 34px;
-  padding: 5px 10px;
+  padding: 6px 12px;
   border-radius: var(--radius-md);
   background: var(--material-content);
 }
 
 :root body .document-title strong {
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 600;
   line-height: 18px;
 }
 
 :root body #dirty {
   min-height: 22px;
-  padding: 2px 7px;
-  gap: 5px;
+  padding: 2px 8px;
+  gap: 6px;
   border: 1px solid var(--line);
   border-radius: var(--radius-full);
   background: var(--material-panel);
   color: var(--secondary);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-weight: 400;
 }
 
@@ -942,7 +942,7 @@
  * ================================================================================================= */
 
 :root body .source-toolbar {
-  padding: 8px 10px;
+  padding: 8px 12px;
   gap: 8px;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
@@ -1004,7 +1004,7 @@
     border-radius: var(--radius-md);
     color: var(--secondary);
     background: transparent;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 400;
     line-height: 1;
   }
@@ -1034,7 +1034,7 @@
     width: 32px;
     height: 3px;
     top: 50%;
-    margin-top: -1.5px;
+    margin-top: -2px;
     border-radius: var(--radius-full);
     background: var(--line-strong);
   }
@@ -1107,11 +1107,11 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 
 :root body .titlebar-right {
-  gap: 10px;
+  gap: 12px;
   justify-content: flex-end;
 }
 
@@ -1143,13 +1143,13 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--secondary);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 400;
   line-height: 1.2;
   cursor: pointer;
@@ -1182,7 +1182,7 @@
   min-width: 14px;
   display: block;
   color: currentColor;
-  font-size: 14px;
+  font-size: var(--font-size-lg);
   line-height: 1;
 }
 
@@ -1221,7 +1221,7 @@
   align-items: center;
   gap: 8px;
   height: auto;
-  padding: 5px 10px;
+  padding: 6px 12px;
   border: 0;
   border-radius: var(--radius-md);
   background: var(--material-content);
@@ -1239,7 +1239,7 @@
 :root body .titlebar .document-title strong {
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 600;
   line-height: 1.2;
 }
@@ -1262,7 +1262,7 @@
     height: 30px;
     min-width: 30px;
     flex: none;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: var(--material-content);
   }
 
@@ -1282,15 +1282,15 @@
   :root body .sidebar-view-control {
     gap: 2px;
     padding: 2px;
-    border-radius: 10px;
+    border-radius: var(--radius-md);
   }
 
   :root body .titlebar .mode-control button,
   :root body .sidebar-view-control button {
     height: 28px;
-    padding: 0 11px;
-    border-radius: 8px;
-    font-size: 11px;
+    padding: 0 12px;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
   }
 
   :root body .titlebar .mode-control button.active,
@@ -1321,9 +1321,9 @@
 }
 
 :root body .welcome-main {
-  gap: 26px;
+  gap: 24px;
   /* 内容限宽居中；滚动条仍贴窗口右缘 */
-  padding: 40px max(48px, calc((100% - 1100px) / 2));
+  padding: 40px max(48px, calc((100% - var(--content-max-width)) / 2));
   background: var(--material-window);
 }
 
@@ -1334,7 +1334,7 @@
 :root body .welcome-hero h1 {
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 26px;
+  font-size: var(--font-size-xl);
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -1343,28 +1343,28 @@
   max-width: none;
   color: var(--secondary);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 400;
   line-height: 21px;
 }
 
 :root body .welcome-section {
-  gap: 10px;
+  gap: 12px;
 }
 
 :root body .welcome-section-head {
-  gap: 10px;
+  gap: 12px;
 }
 
 :root body .welcome-section-head h2 {
   color: var(--text);
-  font-size: 15px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
 }
 
 :root body .welcome-section-head span {
   color: var(--tertiary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
 }
 
 :root body .welcome-recent .welcome-section-head {
@@ -1375,7 +1375,7 @@
 :root body .welcome-recent .welcome-section-head h2 {
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 26px;
+  font-size: var(--font-size-xl);
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -1383,7 +1383,7 @@
 :root body .recent-card-folder {
   color: var(--tertiary);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
 }
 
 :root body .welcome-head-action {
@@ -1393,7 +1393,7 @@
   background: var(--material-content);
   color: var(--secondary);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
 }
 
@@ -1414,7 +1414,7 @@
   align-items: center;
   background: var(--material-content);
   color: var(--tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 :root body .recent-grid .template-preview img {
@@ -1426,7 +1426,7 @@
 
 :root body .recent-grid .template-name {
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 500;
 }
 
@@ -1436,14 +1436,14 @@
 
 :root body .recent-grid .template-meta {
   color: var(--tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 :root body .recent-grid .template-meta em {
   border-radius: var(--radius-sm);
   background: var(--material-content);
   color: var(--secondary);
-  font-size: 9px;
+  font-size: var(--font-size-xs);
 }
 
 :root body .recent-grid-empty {
@@ -1454,23 +1454,23 @@
 
 :root body .recent-grid-empty-copy strong {
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
 }
 
 :root body .recent-grid-empty-copy span {
   color: var(--tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 :root body .recent-grid-empty button {
-  padding: 7px 14px;
+  padding: 8px 16px;
   border: 0;
   border-radius: var(--radius-md);
   background: var(--material-content);
   color: var(--secondary);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
 }
 
@@ -1491,14 +1491,14 @@
 
 :root body .template-card {
   gap: 12px;
-  padding: 14px;
+  padding: 16px;
   border: 0;
   border-radius: var(--radius-lg);
   outline: 1px solid var(--line);
   outline-offset: -1px;
   background: var(--material-panel);
   box-shadow: none;
-  transition: outline-color 160ms ease, box-shadow 160ms ease;
+  transition: outline-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) var(--ease-standard);
 }
 
 :root body .template-card:hover {
@@ -1517,7 +1517,7 @@
   align-items: center;
   background: var(--material-content);
   color: var(--tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 :root body .template-grid .template-preview img {
@@ -1529,7 +1529,7 @@
 
 :root body .template-name {
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 500;
 }
 
@@ -1539,25 +1539,25 @@
 
 :root body .template-meta {
   color: var(--tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 :root body .template-meta em {
   border-radius: var(--radius-sm);
   background: var(--material-content);
   color: var(--secondary);
-  font-size: 9px;
+  font-size: var(--font-size-xs);
 }
 :root body .welcome-note {
   gap: 8px;
-  padding: 10px 12px;
+  padding: 12px 12px;
   border-radius: var(--radius-md);
   background: var(--material-content);
 }
 
 :root body .welcome-note p {
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   line-height: 1.5;
 }
 
@@ -1584,25 +1584,25 @@
   flex: 0 0 40px;
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--accent-soft);
   color: var(--accent);
 }
 :root body #file-operation-dialog .file-operation-icon svg { width: 24px; height: 24px; }
-:root body #file-operation-dialog .file-operation-subtitle { font-size: 12px; line-height: 1.5; }
+:root body #file-operation-dialog .file-operation-subtitle { font-size: var(--font-size-sm); line-height: 1.5; }
 :root body #file-operation-dialog .file-operation-progress-label {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
-  font-size: 12px;
+  margin-bottom: 12px;
+  font-size: var(--font-size-sm);
   color: var(--secondary);
 }
 :root body #file-operation-detail { margin: 0; overflow-wrap: anywhere; }
 :root body #file-operation-percent { flex-shrink: 0; font-variant-numeric: tabular-nums; }
 :root body #file-operation-dialog progress { display: block; height: 6px; }
-:root body #file-operation-result { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+:root body #file-operation-result { font-size: var(--font-size-sm); line-height: 1.6; overflow-wrap: anywhere; }
 :root body #file-operation-dialog[data-outcome="success"] #file-operation-result { display: none; }
 :root body #file-operation-dialog footer {
   align-items: center;
@@ -1610,7 +1610,7 @@
   gap: 12px;
   padding-top: 16px;
 }
-:root body #file-operation-dialog .file-operation-hint { font-size: 11px; color: var(--secondary); }
+:root body #file-operation-dialog .file-operation-hint { font-size: var(--font-size-xs); color: var(--secondary); }
 :root body #file-operation-close { flex-shrink: 0; min-width: 64px; }
 
 /* =================================================================================================
@@ -1627,7 +1627,7 @@
 :root body #layout-image-dialog > form {
   max-height: calc(100dvh - 64px);
   overflow-y: auto;
-  gap: 14px;
+  gap: 16px;
 }
 
 :root body #layout-image-dialog > form > header {
@@ -1657,20 +1657,20 @@
   align-content: center;
   place-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 18px;
+  gap: 8px;
+  padding: 20px;
   border: 1px dashed var(--line-strong);
   border-radius: var(--radius-lg);
   background: var(--material-content);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 500;
   text-align: center;
   cursor: pointer;
 }
 
 :root body #layout-image-dialog .layout-image-file-icon {
-  font-size: 22px;
+  font-size: var(--font-size-xl);
   color: var(--tertiary);
 }
 
@@ -1688,7 +1688,7 @@
 
 :root body #layout-image-dialog .layout-image-file.has-image {
   min-height: 0;
-  padding: 10px;
+  padding: 12px;
   border-style: solid;
   border-color: var(--line);
   background: var(--material-panel);
@@ -1712,7 +1712,7 @@
 :root body #layout-image-dialog .layout-image-file small,
 :root body #layout-image-dialog header small {
   color: var(--tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   font-weight: 400;
 }
 
@@ -1732,16 +1732,16 @@
   margin-bottom: 8px;
   padding: 0;
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
 }
 
 :root body #layout-image-dialog .layout-image-targets label {
   display: flex; /* 覆盖 .app-dialog label 的 grid，否则标题与说明会被拉开 */
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-height: 64px;
-  padding: 10px 12px;
+  padding: 12px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--material-panel);
@@ -1790,19 +1790,19 @@
 
 :root body #layout-image-dialog .layout-image-targets label span {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
 }
 
 :root body #layout-image-dialog .layout-image-targets label strong {
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--font-size-md);
   font-weight: 500;
 }
 
 :root body #layout-image-dialog .layout-image-targets label small {
   color: var(--secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   line-height: 1.35;
 }
 
@@ -1818,8 +1818,8 @@
 
 :root body #layout-image-dialog .layout-image-config-control {
   display: flex;
-  gap: 3px;
-  padding: 3px;
+  gap: 4px;
+  padding: 4px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--material-content);
@@ -1836,10 +1836,10 @@
   min-height: 28px;
   padding: 0 8px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 400;
   box-shadow: none;
 }
@@ -1866,7 +1866,7 @@
 
 :root body #layout-image-dialog .layout-image-config small {
   color: var(--tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   line-height: 1.5;
 }
 
@@ -1874,13 +1874,13 @@
 
 :root body #layout-image-dialog .layout-image-scope {
   color: var(--secondary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 
 :root body #layout-image-dialog .field-error {
   color: var(--state-danger);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
 }
 

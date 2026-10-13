@@ -70,7 +70,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding-right: 44px;
+  padding-right: 48px;
   overscroll-behavior: contain;
 }
 .source #quick-inspector[hidden] { display: none; }
@@ -83,7 +83,7 @@
   display: grid;
   gap: var(--space-2xs);
   width: 40px;
-  margin-right: -44px;
+  margin-right: -48px;
   padding: var(--space-sm) var(--space-xs);
 }
 .source #mobile-inspector-groups[hidden] { display: none; }
@@ -463,3 +463,11 @@
 .source .bda-style-reference-label { overflow: hidden; color: var(--secondary); text-overflow: ellipsis; white-space: nowrap; }
 .source #primary-css-fields:empty { display: none; }
 .source :is(.document-quad-inputs, .particle-range-inputs) input { padding: 0 var(--space-xs); }
+
+/* 手机竖屏：侧栏与检查器叠在同一区域，检查器必须不透明，不能让下面的侧栏透出来。 */
+@media (max-width: 760px) and (orientation: portrait) {
+  .source { background: var(--material-panel); transition: transform var(--duration-slow) var(--ease-emphasized); }
+  /* 两个面板左右滑动切换：不在当前页时滑出屏幕并且不接收点击 */
+  :root[data-mobile-pane="inspector"] .source { transform: translateX(0); }
+  :root:not([data-mobile-pane="inspector"]) .source { pointer-events: none; transform: translateX(100%); }
+}

@@ -1,67 +1,17 @@
 {
   "css-color-literal": {},
   "css-font-size-literal": {
-    "src/ai-design-panel.css": 13,
-    "src/atlas-workspace.css": 10,
-    "src/device-preview.css": 11,
-    "src/mobile.css": 20,
-    "src/new-project.css": 4,
-    "src/pen-components.css": 73,
-    "src/pen-design-application.css": 25,
-    "src/picker.css": 12,
-    "src/project-chooser.css": 10,
-    "src/settings.css": 20,
-    "src/source-files-redesign.css": 1,
-    "src/style-library.css": 9,
-    "src/style.css": 115
-  },
-  "css-font-weight-off-scale": {
-    "src/device-preview.css": 1,
-    "src/new-project.css": 1,
-    "src/pen-components.css": 1,
     "src/style.css": 1
   },
-  "css-radius-literal": {
-    "src/ai-design-panel.css": 2,
-    "src/atlas-workspace.css": 3,
-    "src/device-preview.css": 10,
-    "src/mobile.css": 4,
-    "src/pen-components.css": 5,
-    "src/pen-design-application.css": 1,
-    "src/picker.css": 11,
-    "src/project-chooser.css": 5,
-    "src/settings.css": 18,
-    "src/style-library.css": 8,
-    "src/style.css": 69
-  },
+  "css-font-weight-off-scale": {},
+  "css-radius-literal": {},
   "css-spacing-off-scale": {
-    "src/ai-design-panel.css": 21,
-    "src/atlas-workspace.css": 10,
-    "src/device-preview.css": 16,
-    "src/inspector.css": 2,
-    "src/mobile.css": 16,
-    "src/new-project.css": 8,
-    "src/pen-components.css": 48,
-    "src/pen-design-application.css": 20,
-    "src/picker.css": 16,
-    "src/project-chooser.css": 7,
-    "src/settings.css": 16,
-    "src/source-files-redesign.css": 1,
-    "src/style-library.css": 15,
-    "src/style.css": 141
+    "src/mobile.css": 6,
+    "src/pen-design-application.css": 2
   },
-  "css-motion-literal": {
-    "src/device-preview.css": 1,
-    "src/mobile.css": 1,
-    "src/new-project.css": 2,
-    "src/pen-components.css": 3,
-    "src/pen-design-application.css": 3,
-    "src/source-files-redesign.css": 2,
-    "src/style-performance.css": 2,
-    "src/style.css": 36
-  },
+  "css-motion-literal": {},
   "css-important": {
-    "src/ai-design-panel.css": 2,
+    "src/ai-design-panel.css": 1,
     "src/atlas-workspace.css": 3,
     "src/design-workbench.css": 5,
     "src/device-preview.css": 1,
@@ -71,8 +21,7 @@
     "src/picker.css": 2,
     "src/settings.css": 1,
     "src/source-files-redesign.css": 1,
-    "src/style-performance.css": 3,
-    "src/style.css": 19
+    "src/style.css": 15
   },
   "css-token-outside-tokens": {
     "src/design-workbench.css": 4,
@@ -92,11 +41,9 @@
     "src/style.css": 80,
     "src/tokens.css": 2,
     "src/settings.css": 21,
-    "src/style-performance.css": 10
+    "src/style-performance.css": 9
   },
-  "icon-outside-registry": {
-    "src/preview.ts": 1
-  },
+  "icon-outside-registry": {},
   "html-inline-style": {
     "index.html": 7
   },

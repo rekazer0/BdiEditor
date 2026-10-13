@@ -177,6 +177,8 @@ for (const viewport of portraitPhones) {
 
   await check(`${tag} pane switching and collapse`, () => withPage(viewport, async (page) => {
     await openTemplate(page)
+    const hidden = await rect(page, "main > .source")
+    assert.ok(hidden.x >= viewport.width - 1, `inspector stays off screen on the layout pane (x ${hidden.x})`)
     await page.locator('button[data-mobile-pane="inspector"]').click()
     await page.waitForTimeout(350)
     const source = await rect(page, "main > .source")
