@@ -1,0 +1,151 @@
+# 键设设计规范
+
+本规范是界面、交互、图标、动效和代码组织的唯一标准，适用于所有开发者和 AI agent。
+`tests/design-system.test.mjs` 会强制检查（`npm test`）。违反规范的改动不能合入。
+
+> 冲突时以本文为准。旧代码里与本文不符的写法属于待清理的历史遗留，不能当作先例照抄。
+
+## 0. 原则
+
+1. **一个来源**：设计值只在 `src/tokens.css` 定义，组件只在 `src/components.css` 定义，图标只从 `src/icons.ts` 取。
+2. **组件优先**：新界面先用现有 `.ui-*` 组件拼装，组件不够用就扩展组件本身，不要在页面里复刻一个相似的控件。
+3. **少即是多**：同一类信息只用一种呈现方式。层级靠字号、字重和间距区分，不靠更多的卡片、描边和底色。
+4. **不留死代码**：不用的样式、函数、文件、开关直接删除，不注释保留，也不加“以防万一”的兼容层。
+
+## 1. 颜色
+
+只能写 `var(--token)`，禁止在 `tokens.css` 之外写 `#hex`、`rgb()`、`hsl()`、`white`、`black`。
+派生色用 `color-mix(in srgb, var(--token) N%, transparent)`。
+
+| 用途 | token |
+|---|---|
+| 文字：主 / 次 / 弱 | `--text` / `--secondary` / `--tertiary` |
+| 分隔线：弱 / 常规 / 强 | `--line-soft` / `--line` / `--line-strong` |
+| 表面：窗口 / 工具栏 / 侧栏 / 检查器 / 面板 / 菜单 / 内容区 / 控件 | `--window` / `--toolbar` / `--sidebar` / `--inspector` / `--panel` / `--menu` / `--content` / `--control` |
+| 强调（跟随用户设置） | `--accent`、`--accent-soft`、文字 `--on-accent` |
+| 画布上的选中（按键、切片） | `--selection`、`--selection-soft` |
+| 状态 | `--state-ok` / `--state-warn` / `--state-danger` |
+| 悬停 | `--hover` |
+
+- `--accent` 只用于当前选中项、主要按钮、焦点和开关的开启态。一个区域内最多一个强调色元素抢眼。
+- `--selection`（橙）只用于画布上的选中对象，界面控件不得使用。
+- 深色、玻璃材质、窗口材质都由 `tokens.css` 切换 token 值实现，组件里不写 `[data-app-theme="dark"]` 分支。
+
+## 2. 文字
+
+| token | 字号 | 用途 |
+|---|---|---|
+| `--font-size-xs` | 11px | 辅助说明、单位、角标、文件名注脚 |
+| `--font-size-sm` | 12px | **默认**：正文、控件、列表行、属性值 |
+| `--font-size-md` | 13px | 分组标题、搜索框、强调正文 |
+| `--font-size-lg` | 15px | 面板标题、对话框标题 |
+| `--font-size-xl` | 20px | 页面标题（欢迎页） |
+
+- 字重只用 400（正文）、500（控件文字、行标签）、600（标题）。
+- 字体：界面 `--font-ui`，数值、文件名、代码 `--font-mono`。
+- 不小于 11px，不使用 `letter-spacing` 制造层级。
+
+## 3. 圆角
+
+| token | 值 | 用途 |
+|---|---|---|
+| `--radius-sm` | 6px | 角标、色块、控件内部的小块 |
+| `--radius-md` | 8px | 按钮、输入框、下拉、分段控件、列表行 |
+| `--radius-lg` | 12px | 卡片、菜单、浮层、缩略图 |
+| `--radius-xl` | 16px | 对话框、底部 sheet |
+| `--radius-full` | 999px | 胶囊、圆点、开关 |
+
+嵌套时内层圆角不大于外层。只有 `0` 和 `50%` 可以写字面量。
+
+## 4. 间距与尺寸
+
+- 间距用 4px 网格：`0 2 4 6 8 12 16 20 24 32 40 48`（2 和 6 只用于控件内部）。优先用 `--space-*`。
+- 控件高度三档：`--control-height-sm` 24、`--control-height-md` 28（默认）、`--control-height-lg` 32。同一行的控件高度必须一致。
+- 面板内边距 16，分组之间 24，分组内行距 8，行内元素间距 8。
+
+## 5. 图标
+
+- **只用 Lucide**，一律通过 `src/icons.ts` 的 `icon(name, size)` 创建。禁止在 HTML/TS 里手写 `<svg>`，禁止在其他文件 `import "lucide"`，禁止使用 SF Symbol 名称或自绘路径。
+- 尺寸：`--icon-size-sm` 14（控件内、行内）、`--icon-size-md` 16（工具栏、导航）、`--icon-size-lg` 20（空状态、大按钮）。
+- 描边统一 1.5，颜色 `currentColor`，由所在控件的文字颜色决定。
+- 新增图标：在 `icons.ts` 的注册表里按 Lucide 原名登记，同一含义全项目只用一个图标。
+
+## 6. 动效
+
+| token | 值 | 用途 |
+|---|---|---|
+| `--duration-fast` | 120ms | 悬停、按下、颜色变化 |
+| `--duration-base` | 200ms | 展开收起、浮层出现、切换 |
+| `--duration-slow` | 320ms | 对话框、sheet、页面切换 |
+| `--ease-standard` | cubic-bezier(0.2, 0, 0, 1) | 默认 |
+| `--ease-emphasized` | cubic-bezier(0.16, 1, 0.3, 1) | 进入画面的浮层、sheet |
+
+- 只对 `opacity`、`transform`、颜色类属性做过渡，不对 `width/height/top/left` 做过渡。
+- `tokens.css` 在 `prefers-reduced-motion` 下把时长归零，组件不需要单独处理。
+- 不做装饰性动画，动效只用来说明状态变化。
+
+## 7. 交互状态
+
+每个可交互组件都必须具备以下状态，并且全项目表现一致：
+
+| 状态 | 表现 |
+|---|---|
+| 悬停 | 背景叠 `--hover`（仅 `(hover: hover)` 设备） |
+| 按下 | 背景再加深一档：`color-mix(in srgb, var(--text) 10%, transparent)` |
+| 选中 | 背景 `--accent-soft`，文字/图标 `--accent` |
+| 焦点 | 仅 `:focus-visible` 显示 `box-shadow: var(--focus-ring)` |
+| 禁用 | `opacity: var(--disabled-opacity)`，`pointer-events: none` |
+
+- 光标：桌面端控件保持 `default`，只有链接用 `pointer`；画布上的拖拽对象用 `grab` / `grabbing`。
+- 即时生效：属性修改立即作用于画布，并进入撤销栈，不出现“应用”按钮。
+- 破坏性操作（删除、覆盖）必须可撤销；撤销不了的才弹确认框。
+- 键盘：所有操作可用键盘完成；`Esc` 关闭浮层，或在没有浮层时取消选择。
+
+## 8. CSS 组织
+
+- 加载顺序：`tokens.css` → `components.css` → 各区域样式。每个窗口的第一个样式表必须是 `tokens.css`。
+- 一个选择器只在一个文件中定义；要改某个区域就改它所属的文件，不要另开一层文件去覆盖它。
+- 禁止 `!important`。优先级冲突用 `:where()` 降低优先级来解决，而不是继续往上加。
+- 自定义属性只在 `tokens.css` 定义；组件内部的私有变量以 `--_` 开头（如 `--_row-height`）。
+- 组件类以 `ui-` 开头，变体用 `data-variant`、`data-size` 属性，状态用 `aria-*` 或 `:disabled` 等原生状态，不新增 `.is-xxx` 状态类。
+- HTML 不写 `style=""`；TS 只允许写运行时计算出来的几何值（位置、尺寸、变换）。
+
+## 9. 组件（`src/components.css`）
+
+| 组件 | 类名 | 说明 |
+|---|---|---|
+| 按钮 | `.ui-button` | `data-variant="primary｜quiet｜danger"`，`data-size="sm｜lg"` |
+| 图标按钮 | `.ui-icon-button` | 正方形，尺寸等于控件高度，必须带 `aria-label` |
+| 输入框 | `.ui-input` | 可带前后缀（单位、图标） |
+| 下拉 | `.ui-select` | 原生 `<select>` 加统一外观 |
+| 分段控件 | `.ui-segmented` | 2–4 个互斥选项 |
+| 开关 | `.ui-switch` | `input[type=checkbox][role=switch]` |
+| 滑块 | `.ui-slider` | 原生 `input[type=range]` |
+| 属性行 | `.ui-field` | 左标签右控件，标签宽度固定 |
+| 分组 | `.ui-section` | 可折叠，标题 13/600，内容行距 8 |
+| 列表行 | `.ui-list-item` | 图标 + 标题 + 次要文字 + 尾部附件 |
+| 菜单 | `.ui-menu` | 浮层，`--radius-lg`，`--shadow-md` |
+| 角标 | `.ui-badge` | 计数、状态 |
+
+新组件要先在本表登记，写进 `components.css`，再在页面中使用。
+
+## 10. 属性检查器
+
+- 结构固定为三段：**对象头**（显示当前对象，可切换同组对象）→ **分组**（`.ui-section`）→ **属性行**（`.ui-field`）。不使用卡片套卡片，不使用侧边分类栏。
+- 一屏内优先显示最常用的属性；高级属性收进分组底部的“更多”，默认折叠。
+- 所有对象类型（按键、面板、候选栏、资源……）复用同一套分组和属性行，只是内容不同。
+- 多选时只显示共同属性；值不一致的显示为“混合”。
+
+## 11. 代码
+
+- 单个 TS 文件不超过 800 行；超出就按职责拆分（测试按超出行数做“只减不增”检查）。
+- 不导出没人用的函数；不保留注释掉的代码、废弃的开关和兼容旧版的分支。
+- 先复用已有的 helper（DOM 构建、图标、ini 读写、历史记录），找不到再新建，并放在最贴近使用方的模块里。
+- 修 bug 改根因所在的共享代码，不在调用处打补丁。
+
+## 12. 执行
+
+- `npm test`：单元测试 + 规范检查。规范检查按文件统计违规数，与 `tests/design-system.baseline.json` 比对：数量上升则失败；数量下降也会失败，并提示运行 `npm run design:baseline` 收紧基线。
+- `npm run test:e2e`：Playwright 端到端测试。
+- `npm run test:ui`：界面快照比对（先用 `node scripts/ui-snapshot.mjs save` 记录基线），报告每个界面中哪些元素的哪些样式发生了变化。
+- 改样式的提交必须附上 `test:ui` 的结果，确认所有变化都是有意为之。

@@ -4,7 +4,7 @@ import { LogicalSize } from "@tauri-apps/api/dpi"
 import { bindSlicePickerZoom, drawSlicePicker, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM, pickableSlices } from "./slice-picker-canvas.ts"
 import { tileSliceAt, type TilePoint, type TileSlice } from "./tiles.ts"
 import { drawVisualPreview, retinaThumbnail, type Visual } from "./atlas.ts"
-import { inspectorIcon } from "./inspector-icons.ts"
+import { inspectorIcon } from "./icons.ts"
 
 type ImagePayload = {
   path: string

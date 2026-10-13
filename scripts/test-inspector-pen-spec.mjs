@@ -12,7 +12,7 @@ const css = [
 const palette = readFileSync(new URL('../src/tokens.css', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8')
 const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8')
-const icons = readFileSync(new URL('../src/inspector-icons.ts', import.meta.url), 'utf8')
+const icons = readFileSync(new URL('../src/icons.ts', import.meta.url), 'utf8')
 
 test('inspector shell maps Pen spec kinds and section hints', () => {
   assert.match(shell, /export function setInspectorKind/)

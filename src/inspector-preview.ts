@@ -1,4 +1,4 @@
-import { inspectorIcon, inspectorGroupIcon } from "./inspector-icons"
+import { inspectorIcon, inspectorGroupIcon } from "./icons"
 import "./inspector-fidelity.css"
 /*
  * Inspector preview harness (development only).

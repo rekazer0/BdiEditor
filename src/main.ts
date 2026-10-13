@@ -47,7 +47,7 @@ import {
   renderBlobPreview,
 } from "./template-preview"
 import { initInspectorShell, setInspectorKind, syncInspectorRows } from "./inspector-shell.ts"
-import { inspectorIcon, inspectorGroupIcon, inspectorSymbolIcon } from "./inspector-icons"
+import { inspectorIcon, inspectorGroupIcon, inspectorSymbolIcon } from "./icons"
 import { sourceKeyLabels } from "./config-labels.ts"
 import "./style-library.css"
 import "./design-workbench.css"

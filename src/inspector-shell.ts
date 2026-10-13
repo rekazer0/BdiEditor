@@ -9,7 +9,7 @@
  * restores a value the user changed in this session back to its session baseline.
  */
 
-import { inspectorIcon, inspectorSymbolIcon } from "./inspector-icons"
+import { inspectorIcon, inspectorSymbolIcon } from "./icons"
 
 type InspectorInput = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
 
