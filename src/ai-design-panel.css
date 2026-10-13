@@ -83,7 +83,9 @@
   stroke-width: 1.5;
   stroke-linecap: round;
 }
+@media (hover: hover) {
 #ai-design-panel .ai-new-session:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+}
 
 /* —— 结果提示：只报告结果，过程在对话时间线里 —— */
 #ai-design-panel .ai-design-status {
@@ -148,7 +150,9 @@
   cursor: pointer;
 }
 #ai-design-panel .ai-design-toolbar select:is(:focus, :focus-visible) { outline: none; }
+@media (hover: hover) {
 #ai-design-panel .ai-design-toolbar select:hover:not(:disabled) { background-color: var(--material-content); color: var(--text); }
+}
 #ai-design-panel .ai-design-toolbar select[hidden],
 #ai-design-panel .ai-design-settings[hidden] { display: none; }
 #ai-design-panel .ai-design-settings {
@@ -161,7 +165,9 @@
   font: 500 var(--font-size-xs) var(--font-ui);
   cursor: pointer;
 }
+@media (hover: hover) {
 #ai-design-panel .ai-design-settings:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+}
 
 /* —— 修改草稿：唯一需要用户做决定的地方 —— */
 #ai-design-panel .ai-draft-panel:not([hidden]) {
@@ -261,7 +267,9 @@
   text-align: left;
   cursor: pointer;
 }
+@media (hover: hover) {
 #ai-design-panel .ai-variant-select:hover { background: var(--accent-soft); }
+}
 #ai-design-panel .ai-variant-index {
   display: grid;
   flex: 0 0 22px;
@@ -299,9 +307,13 @@
   cursor: pointer;
 }
 #ai-design-panel .ai-draft-actions > .ai-draft-cancel { margin-left: auto; }
+@media (hover: hover) {
 #ai-design-panel .ai-draft-actions > button:hover:not(:disabled) { background: var(--hover); }
+}
 #ai-design-panel .ai-draft-actions > .ai-draft-apply { border-color: transparent; background: var(--accent); color: var(--on-accent); }
+@media (hover: hover) {
 #ai-design-panel .ai-draft-actions > .ai-draft-apply:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, var(--text)); }
+}
 
 @container (max-width: 300px) {
   #ai-design-panel .ai-draft-note { display: none; }

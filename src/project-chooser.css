@@ -20,7 +20,9 @@
 :root body .project-chooser-title small { color: var(--secondary); font-size: var(--font-size-xs); }
 :root body .project-chooser button { font: inherit; cursor: pointer; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--material-control); color: inherit; box-shadow: none; }
 :root body .project-chooser button:disabled { cursor: default; opacity: .65; }
+@media (hover: hover) {
 :root body .project-chooser button:hover:not(:disabled) { background: var(--material-content); }
+}
 :root body .project-chooser .project-close { width: 30px; padding: 0; font-size: var(--font-size-xl); }
 :root body .project-chooser-body { overflow: auto; min-height: 0; padding: 20px 20px; }
 :root body .project-chooser fieldset { display: block; margin: 0 0 16px; padding: 0; border: 0; min-width: 0; }
@@ -47,7 +49,9 @@
 :root body .project-name-well input { width: 100%; min-width: 0; padding: 0; height: auto; font: inherit; font-size: var(--font-size-sm); border: 0; background: transparent; color: var(--text); box-shadow: none; }
 :root body .project-chooser .project-location { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; background: var(--material-content); }
 :root body .project-chooser footer .primary { color: var(--on-accent); background: var(--accent); border-color: transparent; }
+@media (hover: hover) {
 :root body .project-chooser footer .primary:hover { background: color-mix(in srgb, var(--accent) 90%, var(--text)); }
+}
 :root body .project-chooser #project-error { flex-basis: 100%; color: var(--state-danger); }
 @media(max-width: 640px) {
   :root body .project-template-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }

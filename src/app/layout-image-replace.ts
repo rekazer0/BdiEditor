@@ -13,6 +13,7 @@ import { refreshPreview } from "./preview-render"
 import { detectGridCells } from "../layout-scan.ts"
 import { populateKeyInspector } from "./key-inspector"
 import { type LayoutImageConfig } from "./types"
+import { styleConfigDocument } from "./style-picker"
 
 // 替换键盘样式
 export function resourceRootPath(): string {
@@ -24,11 +25,6 @@ export function currentLayoutDocument(): IniDocument | undefined {
   if (appState.archive.isText(appState.layoutPath)) return IniDocument.parse(appState.archive.getText(appState.layoutPath))
   const path = currentConfigPath(layout.value)
   return appState.archive.isText(path) ? IniDocument.parse(appState.archive.getText(path)) : appState.layoutDocument
-}
-
-export function currentStyleDocument(): IniDocument | undefined {
-  const path = styleConfigPath()
-  return appState.archive?.isText(path) ? IniDocument.parse(appState.archive.getText(path)) : undefined
 }
 
 export function currentGenDocument(): IniDocument | undefined {
@@ -68,7 +64,7 @@ export function setLayoutImageHighlight(active: boolean): void {
 export function openLayoutImageDialog(): void {
   if (!appState.archive || appState.archive.format === "bda") return
   const layout = currentLayoutDocument()
-  const styles = currentStyleDocument()
+  const styles = styleConfigDocument()
   if (!layout || !styles) return
   const themeLabel = theme.value === "dark" ? "深色" : "浅色"
   const orientationLabel = orientation.value === "land" ? "横屏" : "竖屏"
@@ -143,7 +139,7 @@ export async function applyLayoutImage(): Promise<void> {
 
 export async function runLayoutImageReplace(): Promise<void> {
   const layout = currentLayoutDocument()
-  const styles = currentStyleDocument()
+  const styles = styleConfigDocument()
   const gen = currentGenDocument()
   if (!appState.archive || !layout || !styles || !gen || !appState.layoutImageBytes || !appState.layoutImageTarget) return
   // 每次都从最初选中的图片开始切片；复用上一次缩放后的字节会逐次降采样。

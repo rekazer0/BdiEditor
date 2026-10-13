@@ -131,3 +131,25 @@ test("design system: every var(--x) used in CSS is defined", () => {
   }
   assert.deepEqual([...missing], [], "引用了不存在的变量（多半是删掉旧 token 后遗留的引用）")
 })
+
+// §7 交互状态
+test("design system: hover styles only apply on devices that can hover", () => {
+  const offenders = []
+  for (const file of cssFiles) postcss.parse(read(file)).walkRules((rule) => {
+    if (!rule.selectors.some((s) => s.includes(":hover"))) return
+    for (let p = rule.parent; p; p = p.parent) if (p.type === "atrule" && /hover:\s*hover/.test(p.params)) return
+    offenders.push(`${file}: ${rule.selector.slice(0, 80)}`)
+  })
+  assert.deepEqual(offenders, [], ":hover 必须写在 @media (hover: hover) 里")
+})
+
+test("design system: every interactive component has the shared focus ring and disabled state", () => {
+  const components = read("src/components.css")
+  const interactive = [".ui-button", ".ui-icon-button", ".ui-segmented > button", ".ui-switch", ".ui-list-item", ".ui-section-toggle"]
+  const focus = components.match(/:where\(([^)]*)\):focus-visible/)?.[1] ?? ""
+  const disabled = components.match(/:where\(([^)]*)\):is\(:disabled/)?.[1] ?? ""
+  for (const c of interactive) {
+    assert.ok(focus.includes(c), `${c} 缺少统一的焦点样式`)
+    if (c !== ".ui-list-item" && c !== ".ui-section-toggle") assert.ok(disabled.includes(c), `${c} 缺少统一的禁用样式`)
+  }
+})

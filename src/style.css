@@ -110,6 +110,7 @@ canvas {
 }
 
 /* 工具提示 */
+@media (hover: hover) {
 .source-tree-row[title]:hover::after {
   content: attr(title);
   position: absolute;
@@ -129,6 +130,7 @@ canvas {
   pointer-events: none;
   backdrop-filter: saturate(180%) blur(16px);
   animation: tooltip-appear var(--duration-base) var(--ease-standard);
+}
 }
 
 @keyframes tooltip-appear {
@@ -322,12 +324,15 @@ canvas {
   backdrop-filter: saturate(180%) blur(20px);
 }
 
+@media (hover: hover) {
+
 .toolbar-button:hover:not(:disabled),
 .toolbar-more summary:hover,
 .toolbar-menu button:hover:not(:disabled) {
   background: var(--hover);
   transform: none;
   transition: all var(--duration-base) var(--ease-standard);
+}
 }
 
 .toolbar-button:active:not(:disabled),
@@ -588,8 +593,11 @@ select option {
   pointer-events: auto;
 }
 
+@media (hover: hover) {
+
 .file-actions button:hover:not(:disabled) {
   background: var(--hover);
+}
 }
 
 .file-actions button:active:not(:disabled),
@@ -634,9 +642,15 @@ aside {
   position: relative;
 }
 
-.inspector-resize-handle:hover,
 .inspector-resize-handle.dragging {
   background: var(--accent);
+}
+
+@media (hover: hover) {
+
+.inspector-resize-handle:hover {
+  background: var(--accent);
+}
 }
 
 aside {
@@ -816,8 +830,11 @@ h2 {
   line-height: 1.2;
 }
 
+@media (hover: hover) {
+
 #files button:hover:not(:disabled) {
   background: var(--hover);
+}
 }
 
 #files button.selected {
@@ -825,8 +842,11 @@ h2 {
   background: var(--accent);
 }
 
+@media (hover: hover) {
+
 #files button.selected:hover {
   background: var(--accent);
+}
 }
 
 #files button.selected > .system-symbol,
@@ -1128,8 +1148,11 @@ h2 {
   background: transparent;
 }
 
+@media (hover: hover) {
+
 .preview-zoom-control button:hover:not(:disabled) {
   background: color-mix(in srgb, var(--text) 14%, transparent);
+}
 }
 
 .preview-zoom-control button[aria-pressed="true"] {
@@ -1505,9 +1528,12 @@ body:has(.canvas-wrap.empty) .workspace {
   transition: border-color var(--duration-base) var(--ease-standard), color var(--duration-base) var(--ease-standard);
 }
 
+@media (hover: hover) {
+
 .welcome-head-action:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
 }
 
 .welcome-head-action .system-symbol {
@@ -1583,9 +1609,12 @@ body:has(.canvas-wrap.empty) .workspace {
   transition: border-color var(--duration-base) var(--ease-standard), color var(--duration-base) var(--ease-standard);
 }
 
+@media (hover: hover) {
+
 .recent-grid-empty button:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
 }
 
 .template-grid {
@@ -1613,9 +1642,12 @@ body:has(.canvas-wrap.empty) .workspace {
   transition: border-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) var(--ease-standard);
 }
 
+@media (hover: hover) {
+
 .template-card:hover {
   border-color: var(--accent);
   box-shadow: var(--shadow-md);
+}
 }
 
 .template-preview {
@@ -1744,9 +1776,12 @@ body:has(.canvas-wrap.empty) .workspace {
   transition: bottom var(--duration-base) var(--ease-emphasized), transform var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 
+@media (hover: hover) {
+
 .source-find-fab:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 46%, transparent), var(--shadow-sm);
+}
 }
 
 .source-find-fab:active {
@@ -1861,8 +1896,11 @@ body:has(.canvas-wrap.empty) .workspace {
   padding-right: 32px;
 }
 
+@media (hover: hover) {
+
 .resource-item:hover {
   background: var(--hover);
+}
 }
 
 .resource-item.selected {
@@ -1921,9 +1959,12 @@ body:has(.canvas-wrap.empty) .workspace {
   cursor: pointer;
 }
 
+@media (hover: hover) {
+
 .style-detail-previews button:hover {
   border-color: var(--accent);
   background: var(--hover);
+}
 }
 
 .style-detail-previews canvas {
@@ -2230,9 +2271,15 @@ body:has(.canvas-wrap.empty) .workspace {
   cursor: pointer;
 }
 
-.bda-frame-resource-button:not(:disabled):hover canvas,
 .bda-frame-resource-button:not(:disabled):focus-visible canvas {
   box-shadow: 0 0 0 2px var(--accent);
+}
+
+@media (hover: hover) {
+
+.bda-frame-resource-button:not(:disabled):hover canvas {
+  box-shadow: 0 0 0 2px var(--accent);
+}
 }
 
 .bda-frame-resource-button:disabled {
@@ -2416,11 +2463,14 @@ body:has(.canvas-wrap.empty) .workspace {
   transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
 }
 
+@media (hover: hover) {
+
 .style-picker-item:hover {
   border-color: var(--accent);
   background: var(--hover);
   box-shadow: var(--shadow-sm), inset 0 1px var(--glass-highlight);
   transform: translateY(-1px);
+}
 }
 
 .style-picker-item.selected {
@@ -2481,9 +2531,12 @@ body:has(.canvas-wrap.empty) .workspace {
   cursor: pointer;
 }
 
+@media (hover: hover) {
+
 .style-picker-sound-select:hover,
 .style-picker-sound-play:hover:not(:disabled) {
   background: var(--hover);
+}
 }
 
 .style-picker-previews {
@@ -2650,8 +2703,11 @@ body:has(.canvas-wrap.empty) .workspace {
   height: 15px;
 }
 
+@media (hover: hover) {
+
 .style-image-header button:hover {
   background: var(--hover);
+}
 }
 
 .style-image-subtitle {
@@ -2725,8 +2781,11 @@ body:has(.canvas-wrap.empty) .workspace {
   cursor: pointer;
 }
 
+@media (hover: hover) {
+
 .style-image-resource-tools button:hover {
   background: var(--hover);
+}
 }
 
 .style-image-img-list {
@@ -2756,8 +2815,11 @@ body:has(.canvas-wrap.empty) .workspace {
   cursor: pointer;
 }
 
+@media (hover: hover) {
+
 .style-image-img-list button:hover {
   background: var(--hover);
+}
 }
 
 .style-image-img-list button.active {
@@ -2965,8 +3027,11 @@ body:has(.canvas-wrap.empty) .workspace {
   display: none;
 }
 
+@media (hover: hover) {
+
 .settings-nav-item:hover {
   background: color-mix(in srgb, var(--control) 72%, transparent);
+}
 }
 
 .settings-nav-item[aria-selected="true"] {
@@ -3269,8 +3334,11 @@ body:has(.canvas-wrap.empty) .workspace {
   text-decoration: none;
 }
 
+@media (hover: hover) {
+
 .app-dialog a:hover {
   text-decoration: underline;
+}
 }
 
 .qq-group-copy {
@@ -3281,8 +3349,11 @@ body:has(.canvas-wrap.empty) .workspace {
   cursor: pointer;
 }
 
+@media (hover: hover) {
+
 .qq-group-copy:hover {
   text-decoration: underline;
+}
 }
 
 #style-image-picker[hidden] {
@@ -3304,10 +3375,13 @@ body:has(.canvas-wrap.empty) .workspace {
   box-shadow: none;
 }
 
+@media (hover: hover) {
+
 #replace-asset:hover {
   background: var(--hover);
   color: var(--text);
   transform: translateY(-1px);
+}
 }
 
 /* 对齐与分布部分样式 */
@@ -3431,8 +3505,11 @@ body:has(.canvas-wrap.empty) .workspace {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
+@media (hover: hover) {
+
 .source-toolbar button:hover:not(:disabled) {
   background: var(--hover);
+}
 }
 
 .source-toolbar button:disabled {
@@ -3607,8 +3684,12 @@ body:has(.canvas-wrap.empty) .workspace {
   font: inherit;
 }
 
-#source .cm-source-completion button.active,
+#source .cm-source-completion button.active { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+@media (hover: hover) {
+
 #source .cm-source-completion button:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+}
 
 .token-comment {
   color: var(--syntax-comment);
@@ -5345,10 +5426,13 @@ dialog[open]::backdrop {
   color: var(--secondary);
 }
 
+@media (hover: hover) {
+
 .toolbar-button:hover,
 .toolbar-more summary:hover {
   background: var(--hover);
   color: var(--text);
+}
 }
 
 .document-title strong {
@@ -5413,12 +5497,19 @@ dialog[open]::backdrop {
 }
 
 :root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"]:has(.cm-scroller.scrollbar-active) > .source-section-scrollbar,
-:root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"]:hover > .source-section-scrollbar,
 :root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"][data-section-dragging] > .source-section-scrollbar,
-:root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"] > .source-section-scrollbar:hover,
 :root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"] > .source-section-scrollbar:focus-within {
   opacity: 1;
   pointer-events: auto;
+}
+
+@media (hover: hover) {
+
+:root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"]:hover > .source-section-scrollbar,
+:root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"] > .source-section-scrollbar:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
 }
 
 .source-section-scrollbar {
@@ -5483,21 +5574,32 @@ dialog[open]::backdrop {
 }
 
 /* Grow in when the rail appears, then magnify around the active marker while hovering or dragging. */
+@media (hover: hover) {
 :root:not([data-source-section-scrollbar="false"]) [data-section-scrollbar="true"]:is(:hover, [data-section-dragging], :has(.cm-scroller.scrollbar-active)) > .source-section-scrollbar > button::before {
   transform: scaleX(1);
 }
+}
+
+@media (hover: hover) {
 
 .source-section-scrollbar:is(:hover, [data-section-dragging] > *) > button::before {
   width: 12px;
 }
+}
+
+@media (hover: hover) {
 
 .source-section-scrollbar:is(:hover, [data-section-dragging] > *) > button:is(:has(+ [aria-current="true"]), [aria-current="true"] + button)::before {
   width: 15px;
 }
+}
+
+@media (hover: hover) {
 
 .source-section-scrollbar > button:hover::before {
   width: 14px;
   background: color-mix(in srgb, var(--text) 45%, transparent);
+}
 }
 
 .source-section-scrollbar > button[aria-current="true"]::before {
@@ -5506,9 +5608,12 @@ dialog[open]::backdrop {
   background: var(--accent);
 }
 
+@media (hover: hover) {
+
 .source-section-scrollbar:is(:hover, [data-section-dragging] > *) > button[aria-current="true"]::before {
   width: 17px;
   height: 4px;
+}
 }
 
 .source-section-scrollbar > button:focus-visible {
@@ -5563,10 +5668,13 @@ dialog[open]::backdrop {
   height: 16px;
 }
 
+@media (hover: hover) {
+
 .toolbar-button:hover:not(:disabled),
 .toolbar-more > summary:hover {
   background: color-mix(in srgb, var(--material-content) 82%, var(--line));
   color: var(--text);
+}
 }
 
 .toolbar-button:active:not(:disabled),
@@ -5611,8 +5719,11 @@ dialog[open]::backdrop {
   font-size: var(--font-size-sm);
 }
 
+@media (hover: hover) {
+
 .toolbar-menu button:hover:not(:disabled) {
   background: var(--material-content);
+}
 }
 
 .toolbar-menu-separator,
@@ -5836,12 +5947,14 @@ main {
 
 /* The rail itself is --pen-surface-subtle, so the shared hover token disappears on it:
    hovering instead lifts the button onto the raised surface (same read as the key toolbar). */
+@media (hover: hover) {
 .source-file-toolbar .toolbar-button:hover:not(:disabled):not(.active) {
   color: var(--text);
   background: var(--material-panel);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 80%, transparent),
     0 1px 3px color-mix(in srgb, var(--text) 16%, transparent);
   transform: none;
+}
 }
 
 .source-file-toolbar .toolbar-button:active:not(:disabled):not(.active) {
@@ -5859,8 +5972,11 @@ main {
   color: inherit;
 }
 
+@media (hover: hover) {
+
 #source-file-toolbar .toolbar-button.active:hover:not(:disabled) {
   background: color-mix(in srgb, var(--accent) 16%, var(--material-panel));
+}
 }
 
 .source-file-toolbar .toolbar-button:disabled {
@@ -6097,23 +6213,38 @@ main {
 /* States ---------------------------------------------------------------------------------------- */
 
 /* 三种状态只换颜色，不换几何：平铺行 → 悬停下沉色 → 选中品牌色浅底。 */
+@media (hover: hover) {
 #files .sidebar-overview button.nav-item:hover {
   background: var(--material-content);
   color: var(--text);
   transform: none;
 }
+}
+
+@media (hover: hover) {
 
 #files .sidebar-overview button.nav-item:hover > .system-symbol {
   color: var(--text);
 }
+}
 
-#files .sidebar-overview button.nav-item.selected,
+#files .sidebar-overview button.nav-item.selected {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: none;
+  transform: none;
+  font-weight: 600;
+}
+
+@media (hover: hover) {
+
 #files .sidebar-overview button.nav-item.selected:hover {
   background: var(--accent-soft);
   color: var(--accent);
   box-shadow: none;
   transform: none;
   font-weight: 600;
+}
 }
 
 #files .sidebar-overview button.nav-item.selected > .nav-label,
@@ -6136,20 +6267,33 @@ main {
   outline-offset: -2px;
 }
 
+@media (hover: hover) {
+
 #files .sidebar-overview .nav-section:hover,
 #files .raw-files .source-tree-row:hover:not(.selected) {
   color: var(--text);
   background: var(--material-content);
   transform: none;
 }
+}
 
-#files .raw-files .source-tree-row.selected,
+#files .raw-files .source-tree-row.selected {
+  color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: none;
+  transform: none;
+  font-weight: 600;
+}
+
+@media (hover: hover) {
+
 #files .raw-files .source-tree-row.selected:hover {
   color: var(--accent);
   background: var(--accent-soft);
   box-shadow: none;
   transform: none;
   font-weight: 600;
+}
 }
 
 #files .raw-files .source-tree-row.selected > .system-symbol {
@@ -6292,8 +6436,11 @@ main {
   box-shadow: none;
 }
 
+@media (hover: hover) {
+
 .preview-choice button:hover:not(:disabled) {
   color: var(--text);
+}
 }
 
 .preview-choice button.active,
@@ -6390,9 +6537,12 @@ main {
   cursor: pointer;
 }
 
+@media (hover: hover) {
+
 .canvas-multi-toolbar button:hover:not(:disabled) {
   background: var(--material-content);
   color: var(--text);
+}
 }
 
 .canvas-multi-toolbar button:disabled {
@@ -6684,10 +6834,13 @@ main {
   display: block;
 }
 
+@media (hover: hover) {
+
 :root body .toolbar-button:hover:not(:disabled),
 :root body .toolbar-more > summary:hover {
   background: color-mix(in srgb, var(--material-content) 82%, var(--line));
   color: var(--text);
+}
 }
 
 :root body .toolbar-button:active:not(:disabled),
@@ -6806,12 +6959,18 @@ main {
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
+@media (hover: hover) {
+
 :root body .preview-choice button:hover:not(.active):not(:disabled) {
   color: var(--text);
 }
+}
+
+@media (hover: hover) {
 
 :root body .mode-control button:hover:not(.active) {
   color: var(--text);
+}
 }
 
 /* =================================================================================================
@@ -6972,8 +7131,11 @@ main {
   font-weight: 400;
 }
 
+@media (hover: hover) {
+
 :root body .toolbar-menu button:hover:not(:disabled) {
   background: var(--material-content);
+}
 }
 
 :root body .app-dialog button.primary,
@@ -7005,9 +7167,12 @@ main {
   font-weight: 400;
 }
 
+@media (hover: hover) {
+
 :root body .app-dialog header button:hover,
 :root body .project-dialog header button:hover {
   color: var(--text);
+}
 }
 
 /* =================================================================================================
@@ -7190,9 +7355,12 @@ main {
   color: var(--tertiary);
 }
 
+@media (hover: hover) {
+
 :root body .settings-nav-item:hover:not([aria-selected="true"]) {
   background: color-mix(in srgb, var(--material-content) 76%, var(--line));
   color: var(--text);
+}
 }
 
 :root body .settings-nav-item[aria-selected="true"] {
@@ -7298,9 +7466,12 @@ main {
   color: var(--secondary);
 }
 
+@media (hover: hover) {
+
 :root body .canvas-multi-toolbar button:hover:not(:disabled) {
   background: var(--material-content);
   color: var(--text);
+}
 }
 
 :root body .canvas-multi-toolbar button:disabled {
@@ -7778,9 +7949,12 @@ main {
   backdrop-filter: none;
 }
 
+@media (hover: hover) {
+
 :root body .titlebar .titlebar-actions .titlebar-action:hover:not(:disabled) {
   background: var(--material-content);
   color: var(--text);
+}
 }
 
 :root body .titlebar .titlebar-actions .titlebar-action:active:not(:disabled) {
@@ -7821,9 +7995,12 @@ main {
   box-shadow: none;
 }
 
+@media (hover: hover) {
+
 :root body .titlebar-icon-button:hover {
   background: color-mix(in srgb, var(--material-content) 82%, var(--line));
   color: var(--text);
+}
 }
 
 :root body .titlebar-icon-button .system-symbol,
@@ -8016,9 +8193,12 @@ main {
   font-weight: 500;
 }
 
+@media (hover: hover) {
+
 :root body .welcome-head-action:hover {
   background: color-mix(in srgb, var(--accent) 12%, var(--material-content));
   color: var(--accent);
+}
 }
 
 :root body .recent-grid {
@@ -8093,9 +8273,12 @@ main {
   font-weight: 500;
 }
 
+@media (hover: hover) {
+
 :root body .recent-grid-empty button:hover {
   background: color-mix(in srgb, var(--accent) 12%, var(--material-content));
   color: var(--accent);
+}
 }
 
 :root body .template-grid {
@@ -8120,10 +8303,13 @@ main {
   transition: outline-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) var(--ease-standard);
 }
 
+@media (hover: hover) {
+
 :root body .template-card:hover {
   border-color: transparent;
   outline-color: var(--accent);
   box-shadow: var(--shadow-sm);
+}
 }
 
 :root body .template-preview {
@@ -8293,9 +8479,12 @@ main {
   color: var(--tertiary);
 }
 
+@media (hover: hover) {
+
 :root body #layout-image-dialog .layout-image-file:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
+}
 }
 
 :root body #layout-image-dialog .layout-image-file.drop-target {
@@ -8313,8 +8502,11 @@ main {
   background: var(--material-panel);
 }
 
+@media (hover: hover) {
+
 :root body #layout-image-dialog .layout-image-file.has-image:hover {
   border-color: var(--accent);
+}
 }
 
 :root body #layout-image-dialog .layout-image-file.has-image .layout-image-file-icon {
@@ -8378,9 +8570,12 @@ main {
   box-shadow: inset 0 0 0 3px var(--material-panel);
 }
 
+@media (hover: hover) {
+
 :root body #layout-image-dialog .layout-image-targets label:hover {
   border-color: var(--line-strong);
   background: var(--material-content);
+}
 }
 
 :root body #layout-image-dialog .layout-image-targets label:has(input:checked) {
@@ -8463,9 +8658,12 @@ main {
   box-shadow: none;
 }
 
+@media (hover: hover) {
+
 :root body #layout-image-dialog .layout-image-config-control button:hover:not(.active) {
   color: var(--text);
   background: var(--material-panel);
+}
 }
 
 :root body #layout-image-dialog .layout-image-config-control button.active {

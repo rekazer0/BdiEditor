@@ -87,10 +87,13 @@ header .usage-note {
   box-shadow: none;
 }
 
+@media (hover: hover) {
+
 .template-option:hover {
   background: var(--hover);
   transform: none;
   box-shadow: none;
+}
 }
 
 .template-option:has(input:checked) {
@@ -171,10 +174,13 @@ footer button {
   box-shadow: none;
 }
 
+@media (hover: hover) {
+
 footer button:hover:not(:disabled) {
   background: var(--hover);
   transform: none;
   box-shadow: none;
+}
 }
 
 footer button:active:not(:disabled) {
@@ -189,9 +195,12 @@ footer .primary {
   box-shadow: none;
 }
 
+@media (hover: hover) {
+
 footer .primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--accent) 90%, var(--text));
   box-shadow: none;
+}
 }
 
 @media (max-height: 620px) {
