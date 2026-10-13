@@ -235,8 +235,9 @@ import { checkForUpdate } from "./update.ts"
 import { clientLog, clientLogZip, flushClientLogs, installClientLogging } from "./client-log.ts"
 import { installSafeAreaLock } from "./safe-area.ts"
 import { bindSlicePickerZoom, drawSlicePicker, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM, pickableSlices, WHOLE_IMAGE_INDEX } from "./slice-picker-canvas.ts"
-import { appState } from "./app/state"
+import { mobileCommandMenu, settingsDialog, $, sidebarViewControl, sidebarProjectName, documentName, aiDesignThinking, device, resourceSearch, editorCrosshair, previewCoordinates, canvasWrap, previewCanvas, toolbarCanvas, editorCoordinateSnap, previewCoordinateX, previewCoordinateY, deviceShell, toolbarStrip, candidateBackgroundCanvas, skinState, skinStateValue, eventLog, theme, orientation, simulatedOutput, mobileShareButton, deviceControlIcon, mobileUndoButton, undoButton, mobileRedoButton, redoButton, desktopUndoButton, desktopRedoButton, mode, modeChoiceButtons, themeChoiceButtons, orientationChoiceButtons, mobileChoiceButtons, mobileInspectorSelection, selectedKeyName, sourceHeading, quickInspector, mobileInspectorGroups, keyTypographyFieldsGroup, bdaConfigFieldsGroup, documentFieldsGroup, documentFields, bdaConfigFields, bdaSelectedStyleHeading, inspectorBackButton, bdaInspectorStateButtons, mobilePaneButtons, sidebarPane, inspectorPane, mobileSplitHandle, files, mainWorkspace, mobilePreviewPosition, panelScaleButton, replaceLayoutImageButton, adaptIos26Button, replaceAssetButton, keyFields, styleFields, toolbarFields, skinFields, gapFields, unsavedDialog, dirty, sourceName, layout, candidateComposition, candidateInput, candidateWords, candidateArea, hintPreviewEnabled, panelStatus, previewZoomOut, previewZoomIn, previewZoomFit, previewPanelViewport, skinStateControl, panelCopySource, panelSourceWidth, panelSourceHeight, panelTargetWidth, panelTargetHeight, panelScaleEnabled, panelScaleOptions, panelCopyTarget, panelScaleSummary, panelCopySourceOptions, panelCopyTargetOptions, panelScaleDialog, newButton, openButton, saveButton, fileOperationDialog, fileOperationProgress, fileOperationPercent, fileOperationDetail, fileOperationTitle, fileOperationResult, fileOperationClose, workspaceImage, assetImage, workspaceImageFigure, sourceEditor, asset, assetBackButton, atlasCanvas, tilePreviewWrap, tilePreview, tileInspector, bdaTileUsage, tileSourceFieldsGroup, tileInnerTitle, newTileButton, duplicateTileButton, deleteTileButton, moveTileButton, tileTitle, tileSourceFields, tileInnerFields, styleDetailImageButtons, resourceName, resourceMeta, imageResourceDetail, styleResourceDetail, styleDetailPreviews, styleDetailFields, styleDetailNormal, styleDetailHighlighted, resourceListView, resourceDetail, resourceInspector, tileModeButtons, resourceGallery, resourceCategory, resourceListTitle, resourceCount, resourceUploadButton, styleAddButton, resourceDownloadButton, resourceDeleteButton, resourceUploadInput, workspaceImageError, aiDesignPanel, sourceToolbar, sourceFindToggle, sourceSearch, sourceValueHintsEnabled, sourceCompletionEnabled, sourceLineExplanationEnabled, sourceSearchCount, sourceSearchPrevious, sourceSearchNext, sourceReplacement, sourceReplace, sourceReplaceAll, colorPickers, colorAlphas, sourceColorPicker, styleImageDialog, sourceStyleProxy, stylePickerDialog, stylePickerGrid, styleLibraryPreviewImage, styleLibraryApply, styleLibraryPreview, styleLibraryEdit, stylePickerSearch, stylePickerCount, stylePickerEmpty, stylePickerAdd, stylePickerClose, newStyleDialog, baiduActionCodes, primaryCssFields, skinFieldsGroup, toolbarFieldsGroup, keyboardFieldsGroup, keyOnlyGroups, selectedKeyPreview, selectedKeyContext, textStyleLabels, canvasMultiToolbar, canvasMultiCount, keyLayoutFieldsGroup, keyModeButtons, keyActionButtons, styleImageResourcePicker, styleImageResourceSearch, styleImageImgList, styleImageResourceCount, styleImageResourceEmpty, styleImageSource, styleImagePicker, styleImageResourceOpen, styleImageTitle, styleImageSubtitle, styleImagePickerCanvas, styleImagePickerMeta, sidebarViewButtons, sourceFileToolbar, sourceUploadButton, sourceDownloadButton, sourceCopyButton, sourcePasteButton, sourceMoveButton, sourceDeleteButton, sourceUploadInput, toggleGuides, mobileToggleGuides, aiDesignStatus, canvasBackground, newProjectForm, newProjectDialog, toolbarMenus, browserOpen, welcomeScroller, checkUpdateButton, updateStatus, downloadUpdate, aboutUpdate, aboutDiagnostics, exportLogsButton, exportLogsStatus, copyQqGroupButton, appDialogButtons, settingsStorageNav, settingsModelNav, settingsStorageSection, settingsModelSection, aiContextKey, aiContextPreview, aiDesignModel, aiDraftPanel, aiDesignChat, aiDraftFiles, aiDraftSummary, aiNewSession, aiDraftApply, aiDraftCancel, sourceDirectory, sourceDirectoryStatus, sourceDirectoryEnabled, chooseSourceDirectory, resetSourceDirectory, aiModelSettings, defaultDevice, editorCoordinateSnapSetting, appTheme, sourceFontSize, windowMaterialOpacity, windowMaterialOpacityValue, windowMaterial, windowMaterialOpacitySetting, sidebarViewVisible, inspectorTabsVisible, inspectorTabs, imageOpen, sourceReplaceToggle, sourceReplaceRow, resourceBackButton, ios26Dialog, ios26Form, layoutImageSize, layoutImagePreview, layoutImageFileLabel, layoutImageFile, layoutImageApply, layoutImageLayout, layoutImageScope, layoutImageError, layoutImageTargetInputs, layoutImageDialog, layoutImageOpen, layoutImageConfigButtons, layoutImageConfigDesc, layoutImageConfigFieldset, layoutImageForm, panelScaleForm, styleImageClose, styleImageResourceClose, inspectorResizeHandle, newStyleError, newStyleID, newStyleForm, clearSimulationButton } from "./app/dom"
 import { type AiDraft, type LayoutImageConfig, type StyleImagePickerTarget, type SourceTransfer, type BdaTileUsage, type SourceFilePayload, type SourceChangePayload, type SoundEntry, type StyleKind, type NativeResourcePickerPayload, type SourceUpload, type SourceReadFilePayload, type ChosenFileData, type BrowserSaveFileHandle, type RecentFile, type RecentThumb, type AiDraftVariant, type WindowMaterialKind } from "./app/types"
+import { appState } from "./app/state"
 
 installClientLogging(document.querySelector<HTMLElement>("#about-update")?.dataset.currentVersion ?? "unknown")
 installSafeAreaLock()
@@ -298,182 +299,30 @@ window.addEventListener("pointerdown", (event) => {
     return
   }
 }, true)
-
-const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
-const newButton = $("#new") as HTMLButtonElement
-const newProjectDialog = $("#new-project-dialog") as HTMLDialogElement
-const newProjectForm = $("#new-project-form") as HTMLFormElement
-const unsavedDialog = $("#unsaved-dialog") as HTMLDialogElement
-const openButton = $("#open") as HTMLButtonElement
-const saveButton = $("#save") as HTMLButtonElement
-const mobileShareButton = $("#mobile-share") as HTMLButtonElement
-const undoButton = $("#undo") as HTMLButtonElement
-const redoButton = $("#redo") as HTMLButtonElement
-const toolbarMenus = Array.from(document.querySelectorAll<HTMLDetailsElement>(".toolbar-more"))
-const mobileCommandMenu = $(".mobile-command-menu") as HTMLDetailsElement
-const mobileUndoButton = $("#mobile-undo") as HTMLButtonElement
-const mobileRedoButton = $("#mobile-redo") as HTMLButtonElement
-const desktopUndoButton = $("#desktop-undo") as HTMLButtonElement
-const desktopRedoButton = $("#desktop-redo") as HTMLButtonElement
 const mobileCommandButtons = Array.from(
   mobileCommandMenu.querySelectorAll<HTMLButtonElement>("[data-mobile-command], [data-mobile-export-format]"),
 )
 const mobileShareMenuLabel = mobileCommandMenu.querySelector<HTMLElement>(
   '[data-mobile-command="mobile-share"] span:last-child',
 )!
-const appDialogButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-app-dialog]"))
-const settingsDialog = $("#settings-dialog") as HTMLDialogElement
 const settingsNavItems = Array.from(settingsDialog.querySelectorAll<HTMLButtonElement>("[data-settings-page]"))
 const settingsPages = Array.from(settingsDialog.querySelectorAll<HTMLElement>("[data-settings-panel]"))
-const settingsStorageNav = $("#settings-storage-nav") as HTMLButtonElement
-const settingsModelNav = $("#settings-model-nav") as HTMLButtonElement
-const settingsModelSection = $("#settings-model-section")
-const copyQqGroupButton = $("#copy-qq-group") as HTMLButtonElement
-const aboutUpdate = $("#about-update")
-const checkUpdateButton = $("#check-update") as HTMLButtonElement
-const updateStatus = $("#update-status")
-const downloadUpdate = $("#download-update") as HTMLAnchorElement
-const aboutDiagnostics = $("#about-diagnostics")
-const exportLogsButton = $("#export-logs") as HTMLButtonElement
-const exportLogsStatus = $("#export-logs-status")
-const defaultDevice = $("#default-device") as HTMLSelectElement
-const canvasBackground = $("#canvas-background") as HTMLSelectElement
-const appTheme = $("#app-theme") as HTMLSelectElement
-const sourceFontSize = $("#source-font-size") as HTMLInputElement
-const windowMaterial = $("#window-material") as HTMLInputElement
-const windowMaterialOpacitySetting = $("#window-material-opacity-setting")
-const windowMaterialOpacity = $("#window-material-opacity") as HTMLInputElement
-const windowMaterialOpacityValue = $("#window-material-opacity-value") as HTMLOutputElement
-const sidebarViewVisible = $("#sidebar-view-visible") as HTMLInputElement
-const inspectorTabsVisible = $("#inspector-tabs-visible") as HTMLInputElement
-const sourceCompletionEnabled = $("#source-completion-enabled") as HTMLInputElement
-const sourceValueHintsEnabled = $("#source-value-hints-enabled") as HTMLInputElement
-const sourceLineExplanationEnabled = $("#source-line-explanation-enabled") as HTMLInputElement
-const mobilePreviewPosition = $("#mobile-preview-position") as HTMLSelectElement
-const hintPreviewEnabled = $("#hint-preview-enabled") as HTMLInputElement
-const editorCrosshair = $("#editor-crosshair") as HTMLInputElement
-const editorCoordinateSnapSetting = $("#editor-coordinate-snap-setting")
-const editorCoordinateSnap = $("#editor-coordinate-snap") as HTMLInputElement
-const settingsStorageSection = $("#settings-storage-section")
-const sourceDirectoryEnabled = $("#source-directory-enabled") as HTMLInputElement
-const sourceDirectory = $("#source-directory") as HTMLInputElement
-const chooseSourceDirectory = $("#choose-source-directory") as HTMLButtonElement
-const resetSourceDirectory = $("#reset-source-directory") as HTMLButtonElement
-const sourceDirectoryStatus = $("#source-directory-status")
-const mobilePaneButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mobile-pane]"))
-const mobileSplitHandle = $("#mobile-split-handle") as HTMLButtonElement
 const mobilePortraitQuery = matchMedia("(max-width: 760px) and (orientation: portrait)")
 const exportButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-export-format]"),
 )
 const source = new LazySourceCodeEditor($("#source"))
 source.setValuePreviewRenderer(renderSourceValueThumbnail)
-const sourceColorPicker = $("#source-color-picker") as HTMLInputElement
-const sourceEditor = $("#source-editor")
-const sourceToolbar = $(".source-toolbar")
-const sourceFindToggle = $("#source-find-toggle") as HTMLButtonElement
-const sourceSearch = $("#source-search") as HTMLInputElement
-const sourceSearchCount = $("#source-search-count")
-const sourceSearchPrevious = $("#source-search-previous") as HTMLButtonElement
-const sourceSearchNext = $("#source-search-next") as HTMLButtonElement
-const sourceReplaceToggle = $("#source-replace-toggle") as HTMLButtonElement
-const sourceReplaceRow = $(".source-replace-row")
-const sourceReplacement = $("#source-replacement") as HTMLInputElement
-const sourceReplace = $("#source-replace") as HTMLButtonElement
-const sourceReplaceAll = $("#source-replace-all") as HTMLButtonElement
-const canvasWrap = $(".canvas-wrap")
-const previewCanvas = $("#preview") as HTMLCanvasElement
-const previewPanelViewport = $("#panel-viewport")
-const mainWorkspace = $("main")
-const sidebarPane = $("aside.sidebar")
-const inspectorPane = $("section.source")
-const sourceHeading = $(".source-heading")
-const mobileInspectorSelection = $("#mobile-inspector-selection")
-const asset = $("#asset")
-const assetImage = $("#asset-image") as HTMLImageElement
-const replaceAssetButton = $("#replace-asset") as HTMLButtonElement
-const assetBackButton = $("#asset-back") as HTMLButtonElement
-const files = $("#files")
-const sourceFileToolbar = $("#source-file-toolbar")
-const sourceUploadButton = $("#source-upload") as HTMLButtonElement
-const sourceDownloadButton = $("#source-download") as HTMLButtonElement
-const sourceCopyButton = $("#source-copy") as HTMLButtonElement
-const sourcePasteButton = $("#source-paste") as HTMLButtonElement
-const sourceMoveButton = $("#source-move") as HTMLButtonElement
-const sourceDeleteButton = $("#source-delete") as HTMLButtonElement
-const sourceUploadInput = $("#source-upload-input") as HTMLInputElement
-const sidebarViewButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-sidebar-view]"))
-const sidebarViewControl = $(".sidebar-view-control")
 const sidebarViewHeading = sidebarViewControl.closest<HTMLElement>(".pane-heading")!
-const documentName = $("#document-name")
-const sidebarProjectName = $("#sidebar-project-name")
 if (sidebarProjectName) {
   const syncSidebarProjectName = () => { sidebarProjectName.textContent = documentName?.textContent?.trim() || "未打开皮肤" }
   syncSidebarProjectName()
   new MutationObserver(syncSidebarProjectName).observe(documentName, { childList: true, characterData: true, subtree: true })
 }
-const sourceName = $("#source-name")
-const dirty = $("#dirty")
-const eventLog = $("#event-log")
-const fileOperationDialog = $("#file-operation-dialog") as HTMLDialogElement
-const fileOperationTitle = $("#file-operation-title")
-const fileOperationDetail = $("#file-operation-detail")
-const fileOperationProgress = $("#file-operation-progress") as HTMLProgressElement
-const fileOperationPercent = $("#file-operation-percent")
-const fileOperationResult = $("#file-operation-result")
-const fileOperationClose = $("#file-operation-close") as HTMLButtonElement
 const LARGE_SKIN_BYTES = 5 * 1024 * 1024
-const panelStatus = $("#panel-status")
-const previewCoordinates = $("#preview-coordinates")
-const previewCoordinateX = $("#preview-coordinate-x")
-const previewCoordinateY = $("#preview-coordinate-y")
-const previewZoomOut = $("#preview-zoom-out") as HTMLButtonElement
-const previewZoomFit = $("#preview-zoom-fit") as HTMLButtonElement
-const previewZoomIn = $("#preview-zoom-in") as HTMLButtonElement
-const panelScaleButton = $("#panel-scale") as HTMLButtonElement
-const adaptIos26Button = $("#adapt-ios26") as HTMLButtonElement
-const ios26Dialog = $("#ios26-dialog") as HTMLDialogElement
-const ios26Form = $("#ios26-form") as HTMLFormElement
-const panelScaleDialog = $("#panel-scale-dialog") as HTMLDialogElement
-const panelScaleForm = $("#panel-scale-form") as HTMLFormElement
-const panelCopySource = $("#panel-copy-source") as HTMLInputElement
-const panelCopySourceOptions = $("#panel-copy-source-options") as HTMLDataListElement
-const panelCopyTarget = $("#panel-copy-target") as HTMLInputElement
-const panelCopyTargetOptions = $("#panel-copy-target-options") as HTMLDataListElement
-const panelScaleEnabled = $("#panel-scale-enabled") as HTMLInputElement
-const panelScaleOptions = $("#panel-scale-options")
-const panelSourceWidth = $("#panel-source-width") as HTMLInputElement
-const panelSourceHeight = $("#panel-source-height") as HTMLInputElement
-const panelTargetWidth = $("#panel-target-width") as HTMLInputElement
-const panelTargetHeight = $("#panel-target-height") as HTMLInputElement
-const panelScaleSummary = $("#panel-scale-summary")
-const quickInspector = $("#quick-inspector")
-const mobileInspectorGroups = $("#mobile-inspector-groups")
-const selectedKeyName = $("#selected-key")
-const selectedKeyPreview = $("#selected-key-preview")
-const selectedKeyContext = $("#selected-key-context")
-const keyFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-key-field]"))
-const styleFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-style-field]"))
-const primaryCssFields = $("#primary-css-fields")
 const keyboardFields = Array.from(
   document.querySelectorAll<HTMLInputElement>("[data-keyboard-field]"),
 )
-const skinFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-skin-field]"))
-const keyboardFieldsGroup = $(".keyboard-fields")
-const toolbarFieldsGroup = $(".toolbar-fields")
-const toolbarFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-toolbar-field]"))
-const skinFieldsGroup = $(".skin-fields")
-const documentFieldsGroup = $(".document-fields")
-const documentFields = $("#document-fields")
-const bdaConfigFieldsGroup = $(".bda-config-fields")
-const bdaConfigFields = $("#bda-config-fields")
-const bdaSelectedStyleHeading = $("#bda-selected-style-heading")
-const bdaInspectorStateButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-bda-inspector-state]"))
-const colorPickers = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-picker-for]"))
-const colorAlphas = Array.from(document.querySelectorAll<HTMLInputElement>("[data-color-alpha-for]"))
-const keyOnlyGroups = Array.from(document.querySelectorAll<HTMLElement>(".key-only"))
-const keyLayoutFieldsGroup = $(".key-layout-fields")
-const keyTypographyFieldsGroup = $(".key-typography-fields")
 const bdaKeyFieldLabels: Record<string, string> = {
   BACK_STYLE: "背景样式（backStyle）",
   FORE_STYLE: "前景样式（foreStyles）",
@@ -483,156 +332,23 @@ const bdaKeyFieldLabels: Record<string, string> = {
   NM_COLOR: "正常文字颜色（normalColor）",
   HL_COLOR: "高亮文字颜色（highlightColor）",
 }
-const gapFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-gap-field]"))
-const canvasMultiToolbar = $("#canvas-multi-toolbar") as HTMLElement
-const canvasMultiCount = $("#canvas-multi-count") as HTMLElement
 const layoutActionButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-layout-action]"),
 )
-const keyModeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-key-mode]"))
-const keyActionButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-key-action]"))
 const actionMeaningNodes = Array.from(
   document.querySelectorAll<HTMLElement>("[data-action-meaning]"),
 )
-const baiduActionCodes = $("#baidu-action-codes") as HTMLDataListElement
 const actionFieldNames = new Set(actionMeaningNodes.map((node) => node.dataset.actionMeaning ?? ""))
 const inspectorTabButtons = Array.from(
   document.querySelectorAll<HTMLButtonElement>("[data-inspector-tab]"),
 )
-const inspectorTabs = $(".inspector-tabs")
-const inspectorBackButton = $("#inspector-back") as HTMLButtonElement
-const aiDesignPanel = $("#ai-design-panel")
-const aiDesignStatus = $("#ai-design-status")
-const aiDesignChat = $("#ai-design-chat")
-const aiDesignModel = $("#ai-design-model") as HTMLSelectElement
-const aiDesignThinking = $("#ai-design-thinking") as HTMLSelectElement
 aiDesignThinking.value = localStorage.getItem("ai-thinking-level") || "off"
 if (!aiDesignThinking.value) aiDesignThinking.value = "off"
 aiDesignThinking.addEventListener("change", () => localStorage.setItem("ai-thinking-level", aiDesignThinking.value))
-const aiContextKey = $("#ai-context-key")
-const aiContextPreview = $("#ai-context-preview")
-const aiDraftPanel = $("#ai-draft-panel") as HTMLElement
-const aiDraftSummary = $("#ai-draft-summary") as HTMLElement
-const aiDraftFiles = $("#ai-draft-files") as HTMLElement
-const aiDraftApply = $("#ai-draft-apply") as HTMLButtonElement
-const aiDraftCancel = $("#ai-draft-cancel") as HTMLButtonElement
-const aiNewSession = $("#ai-new-session") as HTMLButtonElement
-const aiModelSettings = $(".ai-design-settings") as HTMLButtonElement
-const browserOpen = $("#browser-open") as HTMLInputElement
-const imageOpen = $("#image-open") as HTMLInputElement
-const theme = $("#theme") as HTMLSelectElement
-const orientation = $("#orientation") as HTMLSelectElement & { value: "port" | "land" }
-const layout = $("#layout") as HTMLSelectElement
-const mode = $("#mode") as HTMLSelectElement
-const device = $("#device") as HTMLSelectElement
-const deviceControlIcon = $("#device-control .device-control-icon")
 function currentDeviceValue(): string {
   return effectiveDeviceValue(device.value)
 }
-const toggleGuides = $("#toggle-guides") as HTMLButtonElement
-const mobileToggleGuides = document.createElement("button")
-const skinStateControl = $("#skin-state-control")
-const skinState = $("#skin-state") as HTMLSelectElement
-const skinStateValue = $(".skin-state-value")
-const deviceShell = $("#device-shell")
-const workspaceImageFigure = $("#workspace-image-figure")
-const workspaceImage = $("#workspace-image") as HTMLImageElement
-const atlasCanvas = $("#atlas-canvas") as HTMLCanvasElement
-const workspaceImageError = $("#workspace-image-error")
-const resourceInspector = $("#resource-inspector")
-const resourceListView = $("#resource-list-view")
-const resourceListTitle = $("#resource-list-title")
-const resourceDetail = $("#resource-detail")
-const imageResourceDetail = $("#image-resource-detail")
-const styleResourceDetail = $("#style-resource-detail")
-const styleDetailPreviews = $("#style-detail-previews")
-const styleDetailFields = $("#style-detail-fields")
-const styleDetailNormal = $("#style-detail-normal") as HTMLCanvasElement
-const styleDetailHighlighted = $("#style-detail-highlighted") as HTMLCanvasElement
-const styleDetailImageButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-style-image-property]"))
-const resourceBackButton = $("#resource-back") as HTMLButtonElement
-const resourceName = $("#resource-name")
-const resourceMeta = $("#resource-meta")
-const resourceCount = $("#resource-count")
-const resourceSearch = $("#resource-search") as HTMLInputElement
 const resourceSearchControl = resourceSearch.closest("label")!
-const resourceCategory = $("#resource-category") as HTMLSelectElement
-const resourceGallery = $("#resource-gallery")
-const resourceUploadButton = $("#resource-upload") as HTMLButtonElement
-const styleAddButton = $("#style-add") as HTMLButtonElement
-const newStyleDialog = $("#new-style-dialog") as HTMLDialogElement
-const newStyleForm = $("#new-style-form") as HTMLFormElement
-const newStyleID = $("#new-style-id") as HTMLInputElement
-const newStyleError = $("#new-style-error")
-const resourceDownloadButton = $("#resource-download") as HTMLButtonElement
-const resourceDeleteButton = $("#resource-delete") as HTMLButtonElement
-const resourceUploadInput = $("#resource-upload-input") as HTMLInputElement
-const replaceLayoutImageButton = $("#replace-layout-image") as HTMLButtonElement
-const layoutImageDialog = $("#layout-image-dialog") as HTMLDialogElement
-const layoutImageForm = $("#layout-image-form") as HTMLFormElement
-const layoutImageFile = $("#layout-image-file") as HTMLButtonElement
-const layoutImagePreview = $("#layout-image-preview") as HTMLImageElement
-const layoutImageFileLabel = $("#layout-image-file-label") as HTMLElement
-const layoutImageSize = $("#layout-image-size") as HTMLElement
-const layoutImageLayout = $("#layout-image-layout") as HTMLElement
-const layoutImageScope = $("#layout-image-scope") as HTMLElement
-const layoutImageError = $("#layout-image-error") as HTMLElement
-const layoutImageApply = $("#layout-image-apply") as HTMLButtonElement
-const layoutImageTargetInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="layout-image-target"]'))
-const layoutImageOpen = $("#layout-image-open") as HTMLInputElement
-const layoutImageConfigFieldset = $("#layout-image-config") as HTMLFieldSetElement
-const layoutImageConfigDesc = $("#layout-image-config-desc") as HTMLElement
-const layoutImageConfigButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-layout-image-config]"))
-const inspectorResizeHandle = $("#inspector-resize-handle") as HTMLDivElement
-const tileInspector = $("#tile-inspector")
-const tileTitle = $("#tile-title")
-const bdaTileUsage = $("#bda-tile-usage") as HTMLSelectElement
-const tileInnerTitle = $("#tile-inner-title")
-const tileSourceFieldsGroup = $("#tile-source-fields")
-const tilePreviewWrap = $("#tile-preview-wrap")
-const tilePreview = $("#tile-preview") as HTMLCanvasElement
-const newTileButton = $("#new-tile") as HTMLButtonElement
-const duplicateTileButton = $("#duplicate-tile") as HTMLButtonElement
-const deleteTileButton = $("#delete-tile") as HTMLButtonElement
-const moveTileButton = $("#move-tile") as HTMLButtonElement
-const tileModeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-tile-mode]"))
-const tileSourceFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-tile-source]"))
-const tileInnerFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-tile-inner]"))
-const textStyleLabels = Array.from(document.querySelectorAll<HTMLElement>("[data-text-style]"))
-const simulatedOutput = $("#simulated-output") as HTMLTextAreaElement
-const clearSimulationButton = $("#clear-simulation") as HTMLButtonElement
-const toolbarStrip = $("#toolbar-strip") as HTMLDivElement
-const candidateArea = $("#candidate-area")
-const candidateBackgroundCanvas = $("#candidate-background") as HTMLCanvasElement
-const toolbarCanvas = $("#toolbar-preview") as HTMLCanvasElement
-const candidateComposition = $("#candidate-composition")
-const candidateInput = $("#candidate-input")
-const candidateWords = $("#candidate-words")
-const modeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mode-choice]"))
-const themeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-theme-choice]"))
-const orientationChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-orientation-choice]"))
-const mobileChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mobile-choice]"))
-const styleImageDialog = $("#style-image-dialog") as HTMLDialogElement
-const styleImageClose = $("#style-image-close") as HTMLButtonElement
-const styleImageSource = $("#style-image-source") as HTMLButtonElement
-const styleImageTitle = $("#style-image-title") as HTMLElement
-const styleImageSubtitle = $("#style-image-subtitle") as HTMLElement
-const styleImageResourceOpen = $("#style-image-resource-open") as HTMLButtonElement
-const styleImageResourcePicker = $("#style-image-resource-picker") as HTMLElement
-const styleImageResourceClose = $("#style-image-resource-close") as HTMLButtonElement
-const styleImageResourceSearch = $("#style-image-resource-search") as HTMLInputElement
-const styleImageResourceCount = $("#style-image-resource-count") as HTMLElement
-const styleImageResourceEmpty = $("#style-image-resource-empty") as HTMLElement
-const styleImageImgList = $("#style-image-img-list") as HTMLDivElement
-const styleImagePicker = $("#style-image-picker")
-const styleImagePickerCanvas = $("#style-image-picker-canvas") as HTMLCanvasElement
-const styleImagePickerMeta = $("#style-image-picker-meta")
-const stylePickerDialog = $("#style-picker-dialog") as HTMLDialogElement
-const stylePickerSearch = $("#style-picker-search") as HTMLInputElement
-const stylePickerCount = $("#style-picker-count")
-const stylePickerGrid = $("#style-picker-grid")
-const stylePickerEmpty = $("#style-picker-empty")
-const stylePickerClose = $("#style-picker-close") as HTMLButtonElement
 const LAST_SOURCE_WORKSPACE_KEY = "last-source-workspace"
 
 function sourceDirectoryEnabledBySettings(): boolean {
@@ -4786,9 +4502,6 @@ function openSourceStyleDefinition(styleID = ""): void {
   if (mobilePortraitQuery.matches) setMobilePane("inspector")
   void source.load().then(() => source.focus())
 }
-
-// 源码里的样式引用借用一个隐藏输入框接入属性检查器的样式库，选择结果写回源码。
-const sourceStyleProxy = document.createElement("input")
 sourceStyleProxy.hidden = true
 document.body.append(sourceStyleProxy)
 sourceStyleProxy.addEventListener("change", () => {
@@ -5220,10 +4933,6 @@ function styleKindForKey(key: string): StyleKind | "all" {
   if (key === "HW_FORE_STYLE") return "color"
   return "all"
 }
-const styleLibraryPreview = $("#style-library-preview")
-const styleLibraryPreviewImage = $("#style-library-preview-image")
-const styleLibraryApply = $("#style-library-apply") as HTMLButtonElement
-const styleLibraryEdit = $("#style-library-edit") as HTMLButtonElement
 
 function styleLibraryCategories(styleID: string): Set<string> {
   const categories = new Set<string>()
@@ -5633,7 +5342,6 @@ for (const input of [...keyboardFields, ...toolbarFields, ...keyFields]) decorat
 stylePickerSearch.addEventListener("input", () => { styleLibraryPreview.hidden = true; void renderStylePicker() })
 stylePickerDialog.addEventListener("close", () => { ++appState.stylePickerRenderID; appState.styleLibrarySelected = undefined })
 stylePickerClose.addEventListener("click", () => stylePickerDialog.close())
-const stylePickerAdd = $("#style-picker-add") as HTMLButtonElement
 newStyleDialog.addEventListener("close", () => { appState.newStyleApplyTarget = undefined })
 function addStyleFromLibrary(): void {
   appState.newStyleApplyTarget = appState.stylePickerTarget
@@ -9567,9 +9275,6 @@ function queueRecentPreview(card: HTMLButtonElement): void {
   recentPreviewQueue.push(card)
   void drainRecentPreviews()
 }
-
-// 只渲染真正滚进视野的卡片：9 张十几 MB 的皮肤不该在启动时全部读一遍。
-const welcomeScroller = document.querySelector<HTMLElement>(".welcome-main")
 const recentPreviewObserver = welcomeScroller && "IntersectionObserver" in window
   ? new IntersectionObserver((entries) => {
     for (const entry of entries) {
