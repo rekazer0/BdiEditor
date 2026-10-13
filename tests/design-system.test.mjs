@@ -1,10 +1,6 @@
-// 设计规范的强制执行（规则见 DESIGN.md）。
-// 每条规则按文件计数，结果与 tests/design-system.baseline.json 比对：
-//   计数上升 → 失败（新代码不得违反规范）；
-//   计数下降 → 失败并提示更新基线（棘轮只能往下走，避免回退）。
-// 更新基线：npm run design:baseline
+// 设计规范的强制执行（规则见 DESIGN.md）。每条规则按文件统计违规，任何违规都直接失败。
 import assert from "node:assert/strict"
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import test from "node:test"
 import postcss from "postcss"
 
@@ -103,29 +99,12 @@ function perFile(files, measure) {
   return out
 }
 
-const baselinePath = new URL("tests/design-system.baseline.json", root)
-const current = Object.fromEntries(Object.entries(rules).map(([name, measure]) => [name, measure()]))
-
-if (process.env.UPDATE_DESIGN_BASELINE) {
-  writeFileSync(baselinePath, `${JSON.stringify(current, null, 2)}\n`)
-}
-const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, "utf8")) : {}
-
-for (const [name, counts] of Object.entries(current)) {
+for (const [name, measure] of Object.entries(rules)) {
   test(`design system: ${name}`, () => {
-    const allowed = baseline[name] ?? {}
-    const worse = [], better = []
-    for (const file of new Set([...Object.keys(counts), ...Object.keys(allowed)])) {
-      const now = counts[file] ?? 0, was = allowed[file] ?? 0
-      if (now > was) worse.push(`${file}: ${was} → ${now}`)
-      if (now < was) better.push(`${file}: ${was} → ${now}`)
-    }
-    assert.deepEqual(worse, [], `违反 DESIGN.md「${name}」：计数上升。改用规范 token / 组件，不要新增违规。`)
-    assert.deepEqual(better, [], `「${name}」计数下降了，运行 npm run design:baseline 收紧基线。`)
+    assert.deepEqual(measure(), {}, `违反 DESIGN.md「${name}」：改用规范 token / 组件 / 图标注册表，不要加例外。`)
   })
 }
 
-// 绝对规则：没有基线，任何时候都必须成立。
 test("design system: every CSS file is loaded somewhere", () => {
   const loaders = [...Object.values(ts), ...Object.values(html), ...Object.values(css)].join("\n")
   const orphans = cssFiles.filter((file) => !loaders.includes(file.replace("src/", "")))

@@ -152,7 +152,7 @@
 
 ## 12. 执行
 
-- `npm test`：单元测试 + 规范检查。规范检查按文件统计违规数，与 `tests/design-system.baseline.json` 比对：数量上升则失败；数量下降也会失败，并提示运行 `npm run design:baseline` 收紧基线。
+- `npm test`：单元测试 + 规范检查。规范检查对每条规则按文件统计违规，任何违规都直接失败，没有基线、没有豁免清单（唯一的例外写在本文 §1）。
 - `npm run test:e2e`：Playwright 端到端测试。
 - `npm run test:ui`：界面快照比对（先用 `node scripts/ui-snapshot.mjs save` 记录基线），报告每个界面中哪些元素的哪些样式发生了变化。
 - 改样式的提交必须附上 `test:ui` 的结果，确认所有变化都是有意为之。

@@ -1,7 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { strToU8, zipSync } from 'fflate'
-import { readArchiveEntry, SkinArchive } from '../src/skin.ts'
+import { SkinArchive } from "../src/skin.ts"
+import { readArchiveEntry } from "../src/skin-zip.ts"
 
 const LOCAL_SIGNATURE = 0x04034b50
 const CENTRAL_SIGNATURE = 0x02014b50

@@ -3,7 +3,7 @@ import { resolveSourceArchivePath, type SourceWriteSnapshot, writePendingSourceP
 import { sourceWriteSnapshots, pendingSourcePaths, pendingSourceWatchPaths, isAndroidTauri, isTauri, LAST_SOURCE_WORKSPACE_KEY, sourceDirectoryEnabledBySettings } from "./canvas-interaction"
 import { SkinArchive } from "../skin.ts"
 import { type SourceFilePayload, type SourceChangePayload } from "./types"
-import { decodedBdaSource, applyDecodedBdaSource } from "../bda.ts"
+import { decodedBdaSource, applyDecodedBdaSource } from "../bda-source.ts"
 import { discardAiDesignDraft } from "./ai-panel"
 import { invoke, Channel } from "@tauri-apps/api/core"
 import { showError, showStatus } from "./file-operations"

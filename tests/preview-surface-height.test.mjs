@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { IniDocument } from '../src/ini.ts'
-import { previewItems, previewSurfaceHeight } from '../src/preview.ts'
+import { previewItems, previewSurfaceHeight } from "../src/preview-items.ts"
 
 test('keys below PANEL.SIZE extend the preview surface (Xiaomi bottom bar)', () => {
   const document = IniDocument.parse([

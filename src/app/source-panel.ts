@@ -19,7 +19,7 @@ import { setMobilePane } from "./mobile-layout"
 import { isEditing } from "./edit-history"
 import { openStylePicker } from "./style-picker"
 import { openStyleReferenceStateImage } from "./style-references"
-import { previewItems } from "../preview.ts"
+import { previewItems } from "../preview-items.ts"
 
 export function updateInspectorView(): void {
   syncAtlasWorkspace()

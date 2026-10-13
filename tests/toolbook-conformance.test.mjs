@@ -2,7 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { IniDocument } from '../src/ini.ts'
 import { removeTileSlice, updateTileSlice } from '../src/tiles.ts'
-import { legacyHintCandidates, legacyHintText, persistVisible } from '../src/preview.ts'
+import { legacyHintCandidates, legacyHintText } from "../src/preview-hints.ts"
+import { persistVisible } from "../src/preview-items.ts"
 
 // 依据《百度手机输入法皮肤工具书 V6》属性表。
 

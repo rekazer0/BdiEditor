@@ -1,6 +1,7 @@
 import { SkinArchive } from "../skin.ts"
 import { type AiSkinEditableFile, type AiSkinDraftChange } from "../ai-skin-workspace.ts"
-import { bdaConfigPath, bdaDecodedSourceEditable, decodedBdaEditorSource, applyDecodedBdaSource } from "../bda.ts"
+import { bdaConfigPath } from "../bda.ts"
+import { bdaDecodedSourceEditable, decodedBdaEditorSource, applyDecodedBdaSource } from "../bda-source.ts"
 import { theme, orientation, previewCanvas, candidateBackgroundCanvas, toolbarCanvas, toolbarStrip, selectedKeyName, aiContextKey, aiContextPreview, aiDesignModel, aiDesignPanel, aiDesignStatus, documentName, layout, device, aiDesignThinking, aiDraftPanel, aiDesignChat, aiDraftFiles, aiDraftSummary, aiNewSession, aiDraftApply, aiDraftCancel, aiModelSettings, $ } from "./dom"
 import { appState } from "./state"
 import { preferredPath, refreshBdaLayout } from "./bda-documents"

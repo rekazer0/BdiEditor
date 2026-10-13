@@ -21,7 +21,7 @@ import { renderFiles } from "./file-tree"
 import { isBdaAppearancePartPath, refreshBdaLayout } from "./bda-documents"
 import { selectFile } from "./navigation"
 import { selectResourceImage, renderResourceInspector } from "./resource-inspector"
-import { decodedBdaEditorSource } from "../bda.ts"
+import { decodedBdaEditorSource } from "../bda-source.ts"
 
 export function isEditing(): boolean {
   return mode.value === "edit"

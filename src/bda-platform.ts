@@ -1,11 +1,6 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate"
-import {
-  convertBdaAppearancePlatform,
-  convertBdaSoundPlatform,
-  decodeBdaAppearance,
-  decodeBdaSoundConfig,
-  IOS_BDA_PANELS,
-} from "./bda.ts"
+import { convertBdaAppearancePlatform, convertBdaSoundPlatform, IOS_BDA_PANELS } from "./bda-encode.ts"
+import { decodeBdaAppearance, decodeBdaSoundConfig } from "./bda-decode.ts"
 import { SkinArchive } from "./skin.ts"
 
 export type BdaPlatform = "ios" | "android" | "unknown"

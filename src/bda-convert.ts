@@ -1,17 +1,7 @@
 import { strToU8, zipSync } from "fflate"
-import {
-  bdaAppearancePath,
-  bdaColorHex,
-  bdaConfigPath,
-  bdaLayoutDocument,
-  bdaStyleID,
-  decodeBdaAnimation,
-  decodeBdaAppearance,
-  decodeBdaSoundConfig,
-  bdaPanelKeyName,
-  type BdaAnimation,
-  type BdaImageAtom,
-} from "./bda.ts"
+import { bdaAppearancePath, bdaConfigPath, bdaLayoutDocument, bdaStyleID, bdaPanelKeyName, type BdaAnimation, type BdaImageAtom } from "./bda.ts"
+import { bdaColorHex } from "./bda-resolver.ts"
+import { decodeBdaAnimation, decodeBdaAppearance, decodeBdaSoundConfig } from "./bda-decode.ts"
 import { IniDocument } from "./ini.ts"
 import { SkinArchive } from "./skin.ts"
 import { soundPathForFilename } from "./sounds.ts"
