@@ -145,6 +145,10 @@
         <div class="preview-toolbar">
           <div class="preview-toolbar-start">
             <button id="toggle-guides" class="preview-tool-toggle glass-module" aria-label="辅助线" title="辅助线" aria-pressed="false"><span class="system-symbol" data-system-symbol="lucide-crosshair" aria-hidden="true"></span></button>
+            <div class="preview-choice glass-module key-mode-control" role="group" aria-label="指针模式">
+              <button class="active" type="button" data-key-mode="select" title="选择按键" aria-label="选择按键" aria-pressed="true" data-icon="mouse-pointer-2"></button>
+              <button type="button" data-key-mode="move" title="拖动按键" aria-label="拖动按键" aria-pressed="false" data-icon="move"></button>
+            </div>
             <label id="skin-state-control" class="field-control" hidden>
               <span class="skin-state-value" aria-hidden="true">默认</span>
               <select id="skin-state" aria-label="皮肤 S 状态"><option value="">默认</option></select>
@@ -373,177 +377,120 @@
           </div>
           <div class="ai-design-heading"><strong>AI 设计</strong><span>描述想法，一起完善皮肤</span></div>
           <div class="inspector-view-controls">
+            <div class="inspector-tabs ui-segmented" data-fill role="tablist" aria-label="检查器视图">
+              <button class="active" type="button" role="tab" data-inspector-tab="properties" aria-pressed="true">属性</button>
+              <button type="button" role="tab" data-inspector-tab="source" aria-pressed="false">源代码</button>
+              <button type="button" role="tab" data-inspector-tab="ai" aria-pressed="false">AI 设计</button>
+            </div>
             <div class="inspector-title key-inspector-title">
-              <span id="selected-key-preview" class="key-inspector-preview" aria-hidden="true" hidden>ABC</span>
+              <span id="selected-key-preview" class="key-inspector-preview" aria-hidden="true" hidden></span>
               <div class="key-inspector-copy">
+                <button id="inspector-back" class="inspector-crumb" type="button" title="返回面板属性" aria-label="返回面板属性" data-icon="chevron-left" data-icon-size="12" disabled>返回上级</button>
                 <strong id="selected-key">选择画布中的按键</strong>
                 <span id="selected-key-context">更改会自动写回配置</span>
               </div>
-            </div>
-            <button id="inspector-back" class="toolbar-button" type="button" title="返回面板属性" aria-label="返回面板属性" disabled><span class="icon system-symbol" data-system-symbol="chevron.left" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="m12 4-6 6 6 6"/></svg></span></button>
-            <div class="inspector-tabs" aria-label="检查器视图">
-              <button class="active" data-inspector-tab="properties">属性</button>
-              <button data-inspector-tab="source">源代码</button>
-              <button data-inspector-tab="ai" type="button">AI 设计</button>
+              <div class="inspector-object-actions" aria-label="对象操作">
+                <button class="ui-icon-button" type="button" data-key-action="copy" title="复制按键" aria-label="复制按键" data-icon="copy"></button>
+                <button class="ui-icon-button" type="button" data-key-action="swap" title="交换位置" aria-label="交换位置" data-icon="arrow-left-right"></button>
+                <button class="ui-icon-button" type="button" data-key-action="delete" title="删除按键" aria-label="删除按键" data-icon="trash-2"></button>
+              </div>
             </div>
           </div>
         </div>
-        <div id="quick-inspector" hidden>
+        <div id="quick-inspector" class="ui-form" hidden>
           <nav id="mobile-inspector-groups" aria-label="属性分组"></nav>
-          <div class="inspector-group skin-fields" hidden>
+          <section class="inspector-group skin-fields" hidden>
             <h3>皮肤信息</h3>
             <div class="inspector-grid action-fields">
-              <label>名称 <input data-skin-field="Name" /></label>
-              <label>描述 <input data-skin-field="Description" /></label>
-              <label>作者 <input data-skin-field="Author" /></label>
-              <label>版本 <input data-skin-field="Version" /></label>
-              <label>最低输入法版本 <input data-skin-field="MinImeCode" /></label>
-              <label>支持平台 <input data-skin-field="SupportPlatform" /></label>
-              <label>支持深色模式 <input data-skin-field="SupportDarkMode" /></label>
+              <label class="ui-field"><span>名称</span><input data-skin-field="Name" /></label>
+              <label class="ui-field"><span>描述</span><input data-skin-field="Description" /></label>
+              <label class="ui-field"><span>作者</span><input data-skin-field="Author" /></label>
+              <label class="ui-field"><span>版本</span><input data-skin-field="Version" /></label>
+              <label class="ui-field"><span>最低输入法版本</span><input data-skin-field="MinImeCode" /></label>
+              <label class="ui-field"><span>支持平台</span><input data-skin-field="SupportPlatform" /></label>
+              <label class="ui-field"><span>支持深色模式</span><input data-skin-field="SupportDarkMode" /></label>
             </div>
-          </div>
+          </section>
           <div class="keyboard-fields" hidden></div>
-          <div class="inspector-group toolbar-fields" hidden>
+          <section class="inspector-group toolbar-fields" hidden>
             <h3>候选栏与工具栏</h3>
             <div class="inspector-grid action-fields">
-              <label>显示区域 <input data-toolbar-field="VIEW_RECT" /></label>
-              <label>背景样式 <span class="style-field"><input data-toolbar-field="BACK_STYLE" /></span></label>
-              <label>前景样式 <span class="style-field"><input data-toolbar-field="FORE_STYLE" /></span></label>
-              <label>内边距 <input data-toolbar-field="PADDING" /></label>
-              <label>首个候选前景 <span class="style-field"><input data-toolbar-field="FIRST_FORE" /></span></label>
-              <label>首个候选背景 <span class="style-field"><input data-toolbar-field="FIRST_BACK" /></span></label>
+              <label class="ui-field"><span>显示区域</span><input data-toolbar-field="VIEW_RECT" /></label>
+              <label class="ui-field"><span>背景样式</span><span class="style-field"><input data-toolbar-field="BACK_STYLE" /></span></label>
+              <label class="ui-field"><span>前景样式</span><span class="style-field"><input data-toolbar-field="FORE_STYLE" /></span></label>
+              <label class="ui-field"><span>内边距</span><input data-toolbar-field="PADDING" /></label>
+              <label class="ui-field"><span>首个候选前景</span><span class="style-field"><input data-toolbar-field="FIRST_FORE" /></span></label>
+              <label class="ui-field"><span>首个候选背景</span><span class="style-field"><input data-toolbar-field="FIRST_BACK" /></span></label>
             </div>
-          </div>
+          </section>
           <div class="inspector-group document-fields" hidden>
             <div id="document-fields"></div>
           </div>
           <div class="inspector-group bda-config-fields" hidden>
             <div id="bda-selected-style-heading" class="bda-selected-style-heading" hidden>
-              <div>
-                <h3>样式</h3>
-                <p>正常与按下状态</p>
-              </div>
-              <div class="inspector-state-switch" role="group" aria-label="按键状态">
+              <h3>样式</h3>
+              <div class="inspector-state-switch ui-segmented" data-size="sm" role="group" aria-label="按键状态">
                 <button class="active" type="button" data-bda-inspector-state="normal" aria-pressed="true">正常</button>
                 <button type="button" data-bda-inspector-state="pressed" aria-pressed="false">按下</button>
               </div>
             </div>
             <div id="bda-config-fields"></div>
           </div>
+          <section class="inspector-group inspector-arrange" id="inspector-multi-layout" data-available="false" data-inspector-group-label="排列" hidden>
+            <h3>排列 <small role="status">选择 2 个或更多按键</small></h3>
+            <div class="layout-actions inspector-tools" aria-label="对齐与分布">
+              <button class="ui-icon-button" type="button" data-layout-action="left" title="左对齐" aria-label="左对齐" data-icon="align-start-vertical"></button>
+              <button class="ui-icon-button" type="button" data-layout-action="right" title="右对齐" aria-label="右对齐" data-icon="align-end-vertical"></button>
+              <button class="ui-icon-button" type="button" data-layout-action="top" title="顶对齐" aria-label="顶对齐" data-icon="align-start-horizontal"></button>
+              <button class="ui-icon-button" type="button" data-layout-action="bottom" title="底对齐" aria-label="底对齐" data-icon="align-end-horizontal"></button>
+              <button class="ui-icon-button" type="button" data-layout-action="horizontal-gap" title="水平等间距" aria-label="水平等间距" data-icon="fold-horizontal"></button>
+              <button class="ui-icon-button" type="button" data-layout-action="vertical-gap" title="垂直等间距" aria-label="垂直等间距" data-icon="fold-vertical"></button>
+            </div>
+            <div class="ui-field"><span>尺寸</span><div class="ui-field-pair">
+              <button class="ui-button" type="button" data-layout-action="same-width" title="统一宽度">等宽</button>
+              <button class="ui-button" type="button" data-layout-action="same-height" title="统一高度">等高</button>
+            </div></div>
+            <div class="ui-field gap-fields"><span>间距</span><div class="ui-field-pair">
+              <label class="ui-input"><span class="ui-input-affix">水平</span><input data-gap-field="horizontal" type="number" aria-label="水平间距" /></label>
+              <label class="ui-input"><span class="ui-input-affix">垂直</span><input data-gap-field="vertical" type="number" aria-label="垂直间距" /></label>
+            </div></div>
+            <div class="ui-field"><span>两个按键</span><div class="ui-field-pair">
+              <button class="ui-button" type="button" data-layout-action="swap" title="交换位置（仅限 2 个按键）" data-icon="arrow-left-right">交换</button>
+              <button class="ui-button" type="button" data-layout-action="merge" title="合并按键（仅限 2 个按键）" data-icon="square-stack">合并</button>
+            </div></div>
+          </section>
           <section class="inspector-group key-only key-layout-fields" data-inspector-group-label="布局">
             <h3>布局</h3>
-            <div class="tile-toolbar key-toolbar key-only">
-              <div class="tile-mode-control key-mode-control" aria-label="按键操作模式">
-                <button class="toolbar-button active" type="button" data-key-mode="select" title="点击选择" aria-label="点击选择"><span class="icon system-symbol" data-system-symbol="cursorarrow" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 2.5 15.5 11l-5 .8 2.8 5-2.5 1.4-2.7-5L4 16z"/></svg></span></button>
-                <button class="toolbar-button" type="button" data-key-mode="move" title="拖动按键" aria-label="拖动按键"><span class="icon system-symbol" data-system-symbol="arrow.up.and.down.and.arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M10 2v16m0-16L7 5m3-3 3 3M2 10h16m-16 0 3-3m-3 3 3 3m13-3-3-3m3 3-3 3m-5 5-3-3m3 3 3-3"/></svg></span></button>
-              </div>
-              <button class="toolbar-button" type="button" data-key-action="copy" title="复制按键" aria-label="复制按键"><span class="icon system-symbol" data-system-symbol="doc.on.doc" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="6" y="3" width="10" height="12" rx="1.5"/><path d="M13 15v2H4V6h2"/></svg></span></button>
-              <button class="toolbar-button" type="button" data-key-action="swap" title="交换位置" aria-label="交换位置"><span class="icon system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M3 6h14M3 6l3-3M3 6l3 3M17 14H3m14 0-3-3m3 3-3 3"/></svg></span></button>
-              <button class="toolbar-button" type="button" data-key-action="delete" title="删除按键" aria-label="删除按键"><span class="icon system-symbol" data-system-symbol="trash" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 6h12M8 3h4l1 3H7zm-2 3 1 9h8l1-9M8 9v6m4-6v6"/></svg></span></button>
-            </div>
             <div class="inspector-grid geometry-fields">
-              <div class="inspector-card-heading"><strong>位置与尺寸</strong></div>
-              <label>X 位置 <input data-key-field="x" type="number" /></label>
-              <label>Y 位置 <input data-key-field="y" type="number" /></label>
-              <label>W 宽度 <input data-key-field="width" type="number" min="1" /></label>
-              <label>H 高度 <input data-key-field="height" type="number" min="1" /></label>
-
-              <p class="inspector-note">方向键移动 1 px · Shift + 方向键移动 10 px</p>
+              <div class="ui-field"><span>位置</span><div class="ui-field-pair">
+                <label class="ui-input"><span class="ui-input-affix">X</span><input data-key-field="x" type="number" aria-label="X 位置" /></label>
+                <label class="ui-input"><span class="ui-input-affix">Y</span><input data-key-field="y" type="number" aria-label="Y 位置" /></label>
+              </div></div>
+              <div class="ui-field"><span>尺寸</span><div class="ui-field-pair">
+                <label class="ui-input"><span class="ui-input-affix">W</span><input data-key-field="width" type="number" min="1" aria-label="W 宽度" /></label>
+                <label class="ui-input"><span class="ui-input-affix">H</span><input data-key-field="height" type="number" min="1" aria-label="H 高度" /></label>
+              </div></div>
+              <div class="ui-field inspector-padding-section"><span>内边距</span><div class="ui-field-pair" data-columns="4">
+                <label class="ui-input"><span class="ui-input-affix">上</span><input data-key-field="PADDING.1" type="number" aria-label="上内边距" /></label>
+                <label class="ui-input"><span class="ui-input-affix">右</span><input data-key-field="PADDING.2" type="number" aria-label="右内边距" /></label>
+                <label class="ui-input"><span class="ui-input-affix">下</span><input data-key-field="PADDING.3" type="number" aria-label="下内边距" /></label>
+                <label class="ui-input"><span class="ui-input-affix">左</span><input data-key-field="PADDING.0" type="number" aria-label="左内边距" /></label>
+              </div></div>
+              <p class="inspector-note ui-field-note">方向键移动 1 px · Shift + 方向键移动 10 px</p>
             </div>
-            <section class="inspector-padding-section">
-              <h4>内边距 <small>padding</small></h4>
-              <div class="inspector-padding-box">
-                <label class="padding-top">上<input data-key-field="PADDING.1" type="number" aria-label="上内边距" /></label>
-                <label class="padding-right">右<input data-key-field="PADDING.2" type="number" aria-label="右内边距" /></label>
-                <label class="padding-bottom">下<input data-key-field="PADDING.3" type="number" aria-label="下内边距" /></label>
-                <label class="padding-left">左<input data-key-field="PADDING.0" type="number" aria-label="左内边距" /></label>
-                <span class="padding-content">内容区</span>
-              </div>
-            </section>
-            <section class="inspector-advanced" id="inspector-multi-layout" data-available="false">
-              <h4>批量布局 <span role="status">选择 2 个或更多按键</span></h4>
-            <div class="inspector-grid gap-fields">
-              <div class="inspector-card-heading"><strong>间距</strong><span>px</span></div>
-              <label>水平 <input data-gap-field="horizontal" type="number" /></label>
-              <label>垂直 <input data-gap-field="vertical" type="number" /></label>
-            </div>
-            <div class="layout-actions" aria-label="对齐与分布">
-              <div class="layout-action-group" aria-label="对齐">
-                <span class="layout-action-label">对齐</span>
-                <div class="layout-action-buttons">
-                  <button data-layout-action="left" title="左对齐"><span class="system-symbol" data-system-symbol="align.horizontal.left" aria-hidden="true"></span><span>左对齐</span></button>
-                  <button data-layout-action="right" title="右对齐"><span class="system-symbol" data-system-symbol="align.horizontal.right" aria-hidden="true"></span><span>右对齐</span></button>
-                  <button data-layout-action="top" title="顶对齐"><span class="system-symbol" data-system-symbol="align.vertical.top" aria-hidden="true"></span><span>顶对齐</span></button>
-                  <button data-layout-action="bottom" title="底对齐"><span class="system-symbol" data-system-symbol="align.vertical.bottom" aria-hidden="true"></span><span>底对齐</span></button>
-                </div>
-              </div>
-              <div class="layout-action-group" aria-label="尺寸">
-                <span class="layout-action-label">尺寸</span>
-                <div class="layout-action-buttons">
-                  <button data-layout-action="same-width" title="统一宽度"><span class="system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"></span><span>等宽</span></button>
-                  <button data-layout-action="same-height" title="统一高度"><span class="system-symbol" data-system-symbol="arrow.up.and.down" aria-hidden="true"></span><span>等高</span></button>
-                </div>
-              </div>
-              <div class="layout-action-group" aria-label="分布">
-                <span class="layout-action-label">分布</span>
-                <div class="layout-action-buttons">
-                  <button data-layout-action="horizontal-gap" title="水平等间距"><span class="system-symbol" data-system-symbol="arrow.left.and.right.righttriangle.left.righttriangle.right" aria-hidden="true"></span><span>水平均分</span></button>
-                  <button data-layout-action="vertical-gap" title="垂直等间距"><span class="system-symbol" data-system-symbol="arrow.up.and.down.righttriangle.up.righttriangle.down" aria-hidden="true"></span><span>垂直均分</span></button>
-                </div>
-              </div>
-              <div class="layout-action-group" aria-label="操作">
-                <span class="layout-action-label">操作</span>
-                <div class="layout-action-buttons">
-                  <button data-layout-action="swap" title="交换位置（仅限 2 个按键）"><span class="system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"></span><span>交换</span></button>
-                  <button data-layout-action="merge" title="合并按键（仅限 2 个按键）"><span class="system-symbol" data-system-symbol="square.2.layers.3d" aria-hidden="true"></span><span>合并</span></button>
-                </div>
-              </div>
-            </div>
-            </section>
           </section>
           <section class="inspector-group key-only key-appearance-fields" data-inspector-group-label="样式">
             <h3>样式</h3>
             <div class="inspector-grid appearance-fields">
-              <div class="appearance-section appearance-visual-styles">
-                <div class="appearance-section-heading"><strong>样式引用</strong></div>
-                <div class="appearance-reference-grid">
-                  <label class="style-ref-row" title="按键引用的共享背景样式编号（BACK_STYLE）"><span>背景样式</span>
-                    <span class="style-field">
-                      <input data-key-field="BACK_STYLE" />
-                    </span>
-                  </label>
-                  <label class="style-ref-row" title="按键引用的共享前景样式编号（FORE_STYLE）"><span>前景样式</span>
-                    <span class="style-field">
-                      <input data-key-field="FORE_STYLE" />
-                    </span>
-                  </label>
-                </div>
-              </div>
-              <div class="appearance-section appearance-sound-field">
-                <label title="按键引用的按键音效样式编号（SOUND_STYLE）">按键音效
-                  <span class="style-field">
-                    <input data-key-field="SOUND_STYLE" />
-                  </span>
-                </label>
-              </div>
-              <details class="appearance-section appearance-layout-fields inspector-advanced">
-                <summary><strong>高级排布</strong></summary>
+              <label class="ui-field style-ref-row" title="按键引用的共享背景样式编号（BACK_STYLE）"><span>背景</span><span class="style-field"><input data-key-field="BACK_STYLE" /></span></label>
+              <label class="ui-field style-ref-row" title="按键引用的共享前景样式编号（FORE_STYLE）"><span>前景</span><span class="style-field"><input data-key-field="FORE_STYLE" /></span></label>
+              <label class="ui-field appearance-sound-field" title="按键引用的按键音效样式编号（SOUND_STYLE）"><span>音效</span><span class="style-field"><input data-key-field="SOUND_STYLE" /></span></label>
+              <details class="appearance-layout-fields inspector-advanced">
+                <summary data-icon="chevron-right" data-icon-size="12">更多排布</summary>
                 <div class="appearance-property-grid">
-                  <label title="STAT_STYLE：S状态_样式，多组用 | 分隔；S0 表示无状态样式">状态样式
-                    <span class="style-field">
-                      <input data-key-field="STAT_STYLE" />
-                    </span>
-                  </label>
-                  <label title="FORE_OFFSET：每层前景偏移 x,y，多组用 ; 分隔">前景偏移
-                    <span class="style-field">
-                      <input data-key-field="FORE_OFFSET" />
-                    </span>
-                  </label>
-                  <label title="POS_TYPE：每层前景位置类型，逗号分隔">位置类型
-                    <span class="style-field">
-                      <input data-key-field="POS_TYPE" />
-                    </span>
-                  </label>
+                  <label class="ui-field" title="STAT_STYLE：S状态_样式，多组用 | 分隔；S0 表示无状态样式"><span>状态样式</span><span class="style-field"><input data-key-field="STAT_STYLE" /></span></label>
+                  <label class="ui-field" title="FORE_OFFSET：每层前景偏移 x,y，多组用 ; 分隔"><span>前景偏移</span><span class="style-field"><input data-key-field="FORE_OFFSET" /></span></label>
+                  <label class="ui-field" title="POS_TYPE：每层前景位置类型，逗号分隔"><span>位置类型</span><span class="style-field"><input data-key-field="POS_TYPE" /></span></label>
                 </div>
               </details>
             </div>
@@ -552,31 +499,28 @@
             <h3><span class="typography-heading-default">文字</span><span class="typography-heading-override">文字覆盖</span></h3>
             <p class="inspector-group-subtitle"><span class="typography-subtitle-default">显示内容与字体颜色</span><span class="typography-subtitle-override">仅当前状态</span></p>
             <div class="inspector-grid typography-content-fields">
-              <label>显示内容 <input data-key-field="SHOW" /></label>
+              <label class="ui-field"><span>内容</span><input data-key-field="SHOW" /></label>
               <div id="primary-css-fields" class="primary-css-fields"></div>
             </div>
-            <div class="appearance-section appearance-typography-fields">
-              <div class="appearance-property-grid typography-property-grid">
-                <label data-text-style>字体 <input data-style-field="FONT_NAME" /></label>
-                <label data-text-style>字重 <input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
-                <label data-text-style>字号 <input data-style-field="FONT_SIZE" type="number" /></label>
-                <div class="color-pair-field" data-text-style>
-                  <label>正常颜色 <span class="color-control"><input data-style-field="NM_COLOR" /><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色"><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度"></span></label>
-                  <label>按下颜色 <span class="color-control"><input data-style-field="HL_COLOR" /><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色"><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度"></span></label>
-                </div>
+            <div class="appearance-typography-fields">
+              <label class="ui-field" data-text-style><span>字体</span><input data-style-field="FONT_NAME" /></label>
+              <label class="ui-field" data-text-style><span>字重</span><input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
+              <label class="ui-field" data-text-style><span>字号</span><input data-style-field="FONT_SIZE" type="number" /></label>
+              <div class="color-pair-field" data-text-style>
+                <label class="ui-field"><span>颜色</span><span class="color-control ui-input ui-color"><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色"><input data-style-field="NM_COLOR" aria-label="文字正常颜色值" /><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度"></span></label>
+                <label class="ui-field"><span>按下颜色</span><span class="color-control ui-input ui-color"><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色"><input data-style-field="HL_COLOR" aria-label="文字按下颜色值" /><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度"></span></label>
               </div>
             </div>
           </section>
           <section class="inspector-group key-only key-gesture-fields" data-inspector-group-label="动作">
-            <h3>手势与动作</h3>
-            <p class="inspector-group-subtitle">填写动作码或字符，留空表示未配置。</p>
-            <div class="direction-editor inspector-gesture-pad" aria-label="点击、滑动与长按动作">
-              <label class="direction-center inspector-gesture-center" data-gesture="CENTER"><span>点击</span><input data-key-field="CENTER" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="CENTER"></small></label>
-              <label class="direction-hold" data-gesture="HOLD"><span>长按</span><input data-key-field="HOLD" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="HOLD"></small></label>
-              <label class="direction-up" data-gesture="UP"><span>上滑</span><input data-key-field="UP" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="UP"></small></label>
-              <label class="direction-down" data-gesture="DOWN"><span>下滑</span><input data-key-field="DOWN" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="DOWN"></small></label>
-              <label class="direction-left" data-gesture="LEFT"><span>左滑</span><input data-key-field="LEFT" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="LEFT"></small></label>
-              <label class="direction-right" data-gesture="RIGHT"><span>右滑</span><input data-key-field="RIGHT" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="RIGHT"></small></label>
+            <h3>手势</h3>
+            <div class="direction-editor inspector-gestures" aria-label="点击、滑动与长按动作">
+              <label class="inspector-gesture" data-gesture="CENTER"><span data-icon="circle-dot">点击</span><input data-key-field="CENTER" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="CENTER"></small></label>
+              <label class="inspector-gesture" data-gesture="HOLD"><span data-icon="hand">长按</span><input data-key-field="HOLD" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="HOLD"></small></label>
+              <label class="inspector-gesture" data-gesture="UP"><span data-icon="arrow-up">上滑</span><input data-key-field="UP" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="UP"></small></label>
+              <label class="inspector-gesture" data-gesture="DOWN"><span data-icon="arrow-down">下滑</span><input data-key-field="DOWN" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="DOWN"></small></label>
+              <label class="inspector-gesture" data-gesture="LEFT"><span data-icon="arrow-left">左滑</span><input data-key-field="LEFT" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="LEFT"></small></label>
+              <label class="inspector-gesture" data-gesture="RIGHT"><span data-icon="arrow-right">右滑</span><input data-key-field="RIGHT" list="baidu-action-codes" placeholder="未配置" /><small data-action-meaning="RIGHT"></small></label>
             </div>
           </section>
         </div>
@@ -968,7 +912,6 @@
               <p>编辑器界面与源代码功能</p>
             </div>
             <div class="settings-list">
-              <label class="settings-row settings-switch"><span>检查器使用侧边分类</span><input id="inspector-grouped-display" type="checkbox" role="switch"></label>
               <label class="settings-row"><span>源代码字号</span><span class="settings-inline-control"><input id="source-font-size" type="number" min="8" max="32" step="1" value="11" inputmode="numeric" aria-describedby="source-font-size-hint"><small id="source-font-size-hint">px</small></span></label>
               <label class="settings-row settings-switch"><span>分节定位滚动条<small>按 [节标题] 显示短线，点击跳转</small></span><input id="source-section-scrollbar" type="checkbox" role="switch" checked></label>
               <label class="settings-row settings-switch"><span>源代码补全</span><input id="source-completion-enabled" type="checkbox" role="switch"></label>

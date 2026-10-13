@@ -188,5 +188,5 @@ test('pan and crosshair use the latest pointer snapshot in a single frame', () =
 test('per-field undo buttons are no longer created', () => {
   const shell = readFileSync(new URL('../src/inspector-shell.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(shell, /reset\.className = "pin-reset"/)
-  assert.match(shell, /pin-reset-all/)
+  assert.match(shell, /inspector-reset/)
 })

@@ -163,8 +163,7 @@ textarea {
 
 .mode-control,
 .preview-choice,
-.sidebar-view-control,
-.inspector-tabs {
+.sidebar-view-control {
   gap: 2px;
   padding: 3px;
   border: 0;
@@ -725,83 +724,6 @@ main {
  * Inspector / source
  * ------------------------------------------------------------------------------------------------- */
 
-.source {
-  border-left: 1px solid var(--line);
-}
-
-.source > .pane-heading {
-  min-height: 48px;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--line);
-}
-
-.inspector-tabs {
-  gap: 18px;
-  padding: 0 12px;
-  border-radius: 0;
-  border-bottom: 1px solid var(--line);
-  background: transparent;
-}
-
-.inspector-tabs button {
-  min-width: 0;
-  height: 42px;
-  padding: 0;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  color: var(--secondary);
-  background: transparent;
-  font-size: 12px;
-}
-
-.inspector-tabs button.active {
-  color: var(--text);
-  border-bottom-color: var(--accent);
-  background: transparent;
-  box-shadow: none;
-  animation: none;
-}
-
-#quick-inspector {
-  padding: 0;
-}
-
-.inspector-group,
-.keyboard-fields,
-.bda-config-fields,
-.document-fields,
-.skin-fields,
-.toolbar-fields,
-.appearance-section {
-  border-bottom: 1px solid var(--line);
-  background: transparent;
-}
-
-.inspector-group {
-  padding: 10px 14px;
-}
-
-.inspector-group h3,
-.inspector-card-heading,
-.appearance-section-heading {
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.inspector-group-subtitle {
-  color: var(--tertiary);
-  font-size: 11px;
-}
-
-.inspector-grid {
-  gap: 5px;
-}
-
-.inspector-grid input,
-.inspector-grid select,
-.inspector-grid textarea,
 .field-control input,
 .field-control select,
 .search-control input {
@@ -813,22 +735,12 @@ main {
   font-size: 12px;
 }
 
-.inspector-grid input:focus,
-.inspector-grid select:focus,
-.inspector-grid textarea:focus,
 .field-control input:focus,
 .field-control select:focus,
 .search-control input:focus {
   border-color: var(--accent);
   outline: 0;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
-}
-
-.inspector-grid label,
-.inspector-grid span,
-.inspector-note {
-  color: var(--secondary);
-  font-size: 11px;
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -1199,17 +1111,6 @@ main {
  * 同时必须显式写上 #quick-inspector，因为它自己也声明了这两个令牌，光靠从 .source 继承不够。
  * 卡片用单层系数；输入框等控件用和上面同一套固定色差，控件叠在卡片上时合成后的色差仍然存在，
  * 滑杆拉低也不会糊在玻璃上。 */
-:root[data-window-material-kind="glass"][data-window-material="on"] body .source,
-:root[data-window-material-kind="glass"][data-window-material="on"] body .source #quick-inspector {
-  --pin-surface: rgb(255 255 255 / var(--window-material-layer)) !important;
-  --pin-sunken: rgb(19 24 38 / 4.4%) !important;
-}
-
-:root[data-app-theme="dark"][data-window-material-kind="glass"][data-window-material="on"] body .source,
-:root[data-app-theme="dark"][data-window-material-kind="glass"][data-window-material="on"] body .source #quick-inspector {
-  --pin-surface: rgb(21 23 27 / var(--window-material-layer)) !important;
-  --pin-sunken: rgb(255 255 255 / 2.5%) !important;
-}
 
 /* 未打开皮肤时画布承载的是应用级欢迎页，而不是文档画布；此时不能沿用「画布背景」那张
    不透明的纸，否则欢迎页整片盖住系统材质，看起来和没有玻璃一样。 */

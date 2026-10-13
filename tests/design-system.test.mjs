@@ -6,6 +6,7 @@
 import assert from "node:assert/strict"
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import test from "node:test"
+import postcss from "postcss"
 
 const root = new URL("..", import.meta.url)
 const read = (path) => readFileSync(new URL(path, root), "utf8")
@@ -32,7 +33,7 @@ const SPACING_SCALE = new Set(["0", "1", "2", "4", "6", "8", "12", "16", "20", "
 const rules = {
   // §1 颜色：只能引用 tokens.css 中的颜色 token
   "css-color-literal": () => perFile(css, (text, file) => file === TOKENS ? 0
-    : count(text.replace(/var\([^)]*\)/g, ""), /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(|(?<![-\w])(?:white|black)(?![-\w])/g)),
+    : count(text.replace(/var\([^)]*\)/g, ""), /(?<![\w-])#[0-9a-fA-F]{3,8}(?![\w-])|\b(?:rgba?|hsla?)\(|(?<![-\w])(?:white|black)(?![-\w])/g)),
   // §2 字号：只能用 --font-size-*
   "css-font-size-literal": () => perFile(css, (text, file) => file === TOKENS ? 0
     : declarations(text, "font-size").filter(([, v]) => !/^(var\(--font-size-[a-z]+\)|inherit|1em|100%)(\s*!important)?$/.test(v)).length),
@@ -59,16 +60,15 @@ const rules = {
   // §8 同一个选择器只在一个文件里定义
   "css-cross-file-selector": () => {
     const owners = new Map()
-    for (const [file, text] of Object.entries(css)) {
-      const plain = text.replace(/@(keyframes|font-face)[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, "")
-      for (const m of plain.matchAll(/([^{}@;]+)\{/g)) {
-        for (const raw of m[1].split(",")) {
-          const selector = raw.trim().replace(/\s+/g, " ")
-          if (!selector || /^(from|to|\d+%)$/.test(selector)) continue
-          if (!owners.has(selector)) owners.set(selector, new Set())
-          owners.get(selector).add(file)
+    for (const file of cssFiles) {
+      postcss.parse(read(file)).walkRules((rule) => {
+        if (rule.parent?.type === "atrule" && /keyframes/.test(rule.parent.name)) return
+        for (const selector of rule.selectors) {
+          const key = selector.replace(/\s+/g, " ")
+          if (!owners.has(key)) owners.set(key, new Set())
+          owners.get(key).add(file)
         }
-      }
+      })
     }
     const out = {}
     for (const files of owners.values()) if (files.size > 1) for (const file of [...files].slice(1)) out[file] = (out[file] ?? 0) + 1

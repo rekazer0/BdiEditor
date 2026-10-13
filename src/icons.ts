@@ -119,3 +119,14 @@ export function symbolIcon(symbol: string, size?: number): SVGElement | null {
   const entry = symbolIcons[symbol] ?? (icons[symbol] ? [symbol, 14] : undefined)
   return entry ? createIcon(entry[0], size ?? entry[1]) : null
 }
+
+/**
+ * HTML 里不写 <svg>：需要图标的元素标上 data-icon="lucide 名"（可选 data-icon-size），
+ * 启动时由这里统一插入，作为元素的第一个子节点。
+ */
+export function hydrateIcons(root: ParentNode = document): void {
+  for (const el of Array.from(root.querySelectorAll<HTMLElement>("[data-icon]"))) {
+    if (el.querySelector(":scope > .ui-icon")) continue
+    el.prepend(createIcon(el.dataset.icon ?? "", Number(el.dataset.iconSize) || 14))
+  }
+}

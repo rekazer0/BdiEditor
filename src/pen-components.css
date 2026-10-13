@@ -197,78 +197,11 @@
  *     active 12.5/600 $ink + 2px $brand, idle 12.5/400 $ink-faint)
  * ================================================================================================= */
 
-:root body .inspector-tabs {
-  gap: 18px;
-  padding: 0 12px;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-:root body .source .inspector-tabs,
-:root body .source .source-heading .inspector-tabs {
-  gap: 18px;
-  padding: 0 12px;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-:root body .inspector-tabs button,
-:root body .source .inspector-tabs button {
-  min-width: 0;
-  height: 42px;
-  min-height: 42px;
-  padding: 0 12px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  background: transparent;
-  color: var(--tertiary);
-  box-shadow: none;
-  font-size: 12.5px;
-  font-weight: 400;
-  transition: color 200ms cubic-bezier(0.2, 0, 0, 1), border-color 200ms cubic-bezier(0.2, 0, 0, 1);
-}
-
-:root body .inspector-tabs button:hover:not(.active):not(:disabled) {
-  color: var(--secondary);
-  background: transparent;
-}
-
-:root body .inspector-tabs button.active,
-:root body .source .inspector-tabs button.active {
-  color: var(--text);
-  border-bottom-color: var(--accent);
-  background: transparent;
-  box-shadow: none;
-  font-weight: 600;
-  animation: none;
-}
-
 /* =================================================================================================
  * 4 · Field / input  (设计系统: label 11/400 $ink-faint · gap 5;
  *     box 30px · padding 0 9 · r8 · $bg-sunken · 1px $line · value 12 $ink)
  * ================================================================================================= */
 
-:root body #quick-inspector .inspector-grid label,
-:root body #quick-inspector .inspector-grid > label > span:first-child {
-  color: var(--tertiary);
-  font-size: 11px;
-  font-weight: 400;
-}
-
-:root body #quick-inspector input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
-:root body #quick-inspector select,
-:root body #quick-inspector textarea,
 :root body .source .source-toolbar input:not([type="checkbox"]):not([type="radio"]),
 :root body .source .source-toolbar select,
 :root body .app-dialog select,
@@ -286,26 +219,11 @@
   box-shadow: none;
 }
 
-:root body #quick-inspector textarea {
-  height: auto;
-  min-height: 30px;
-  padding: 6px 9px;
-  line-height: 1.5;
-}
-
-:root body #quick-inspector input:focus,
-:root body #quick-inspector select:focus,
-:root body #quick-inspector textarea:focus,
 :root body .app-dialog select:focus,
 :root body .app-dialog input[type="number"]:focus {
   border-color: var(--accent);
   outline: 0;
   box-shadow: none;
-}
-
-:root body #quick-inspector input::placeholder,
-:root body #quick-inspector textarea::placeholder {
-  color: var(--tertiary);
 }
 
 /* Search box: one sunken capsule, the inner input is bare. */
@@ -355,11 +273,8 @@
  * inspector layer in style.css pins these controls with an ID selector, and an
  * ID outranks any number of `:root body` class selectors. */
 :root body .settings-switch input,
-:root body .inspector-switch input,
 :root body input[role="switch"][type="checkbox"],
-:root body #settings-dialog .settings-switch input,
-:root body #quick-inspector .inspector-switch input,
-:root body #quick-inspector input[role="switch"][type="checkbox"] {
+:root body #settings-dialog .settings-switch input {
   width: 36px;
   height: 20px;
   margin: 0;
@@ -375,11 +290,8 @@
 }
 
 :root body .settings-switch input::after,
-:root body .inspector-switch input::after,
 :root body input[role="switch"][type="checkbox"]::after,
-:root body #settings-dialog .settings-switch input::after,
-:root body #quick-inspector .inspector-switch input::after,
-:root body #quick-inspector input[role="switch"][type="checkbox"]::after {
+:root body #settings-dialog .settings-switch input::after {
   content: "";
   position: absolute;
   top: 1px;
@@ -393,21 +305,15 @@
 }
 
 :root body .settings-switch input:checked,
-:root body .inspector-switch input:checked,
 :root body input[role="switch"][type="checkbox"]:checked,
-:root body #settings-dialog .settings-switch input:checked,
-:root body #quick-inspector .inspector-switch input:checked,
-:root body #quick-inspector input[role="switch"][type="checkbox"]:checked {
+:root body #settings-dialog .settings-switch input:checked {
   border-color: transparent;
   background: var(--accent);
 }
 
 :root body .settings-switch input:checked::after,
-:root body .inspector-switch input:checked::after,
 :root body input[role="switch"][type="checkbox"]:checked::after,
-:root body #settings-dialog .settings-switch input:checked::after,
-:root body #quick-inspector .inspector-switch input:checked::after,
-:root body #quick-inspector input[role="switch"][type="checkbox"]:checked::after {
+:root body #settings-dialog .settings-switch input:checked::after {
   transform: translateX(16px);
 }
 
@@ -1054,70 +960,15 @@
 /* 按下 / 正常 state switch — the design-system segmented control.
    Segment metrics (26px, 0/12 padding, r5) already come from the pen layer in
    style.css; only the container still carried the retired card chrome. */
-:root body #quick-inspector .inspector-state-switch {
-  gap: 2px;
-  padding: 3px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: var(--material-content);
-  box-shadow: none;
-}
 
 /* The selected segment keeps the design-system 1px $line hairline. */
-:root body #quick-inspector .inspector-state-switch button.active {
-  box-shadow: inset 0 0 0 1px var(--line) !important;
-}
 
 /* Property fields — the design-system Field box. */
-:root body #quick-inspector .document-property-field input:where(:not([role="switch"])) {
-  height: 30px;
-  padding: 0 9px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--material-content);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 400;
-}
-
-:root body #quick-inspector .document-property-field input:where(:not([role="switch"])):hover {
-  background: var(--material-content);
-}
-
-:root body #quick-inspector .document-property-field input:where(:not([role="switch"])):focus {
-  border-color: var(--accent);
-  background: var(--material-content);
-  outline: 0;
-  box-shadow: none;
-}
-
-:root body #quick-inspector .document-property-field > span {
-  color: var(--tertiary);
-  font-size: 11px;
-  font-weight: 400;
-}
 
 /* Colour swatch input. */
-:root body #quick-inspector .bda-color-controls input[type="color"] {
-  width: 28px;
-  height: 28px;
-  padding: 2px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--material-content);
-}
 
 /* Toggle label colour and the inline style-preview surface — both still carried
    the retired card palette ($card-tertiary / $card-control / $card-border). */
-:root body #quick-inspector .inspector-switch input {
-  color: var(--secondary);
-}
-
-:root body #quick-inspector .style-picker-state canvas {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--material-content);
-}
 
 /* =================================================================================================
  * 15 · Mobile — 组件 / 移动 · 底部导航 rendered as the pane switcher.

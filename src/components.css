@@ -4,6 +4,9 @@
  * 不要在别的文件里覆盖这里的规则。
  */
 
+/* —— 全局禁用态（DESIGN.md §7）。优先级为 0，组件可以覆盖 —— */
+:where(button, input, select, textarea):disabled { opacity: var(--disabled-opacity); cursor: not-allowed; pointer-events: none; }
+
 /* —— 图标：尺寸由 createIcon(name, size) 写在属性上 —— */
 .ui-icon { flex: none; stroke: currentColor; }
 
@@ -297,3 +300,64 @@ input.ui-input, select.ui-input { padding: 0 var(--space-sm); }
   opacity: var(--disabled-opacity);
   pointer-events: none;
 }
+
+/* —— 表单作用域：容器加 .ui-form，内部原生控件统一成上面的组件外观（优先级为 0，组件规则可覆盖） —— */
+:where(.ui-form) :where(input:not([type="checkbox"], [type="radio"], [type="color"], [type="range"], [type="file"], [type="hidden"]), select, textarea) {
+  width: 100%;
+  min-width: 0;
+  height: var(--control-height-md);
+  margin: 0;
+  padding: 0 var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  outline: 0;
+  background: var(--material-content);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+:where(.ui-form) :where(textarea) { height: auto; min-height: 64px; padding: var(--space-xs) var(--space-sm); resize: vertical; }
+:where(.ui-form) :where(input[type="number"]) { font-family: var(--font-mono); font-size: var(--font-size-xs); }
+:where(.ui-form) :where(select) {
+  appearance: none;
+  padding-right: var(--space-xl);
+  background-image: linear-gradient(45deg, transparent 50%, var(--tertiary) 50%), linear-gradient(135deg, var(--tertiary) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 50%, calc(100% - 10px) 50%;
+  background-size: 4px 4px;
+  background-repeat: no-repeat;
+}
+@media (hover: hover) {
+  :where(.ui-form) :where(input, select, textarea):hover:not(:focus, :disabled) { border-color: var(--line); }
+}
+:where(.ui-form) :where(input, select, textarea):focus { border-color: var(--accent); background-color: var(--control); }
+:where(.ui-form) :where(input, select, textarea):disabled { border-color: transparent; background-color: transparent; color: var(--secondary); opacity: 1; }
+:where(.ui-form) :where(input::placeholder) { color: var(--tertiary); }
+:where(.ui-form) :where(input[type="checkbox"][role="switch"]) {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 32px;
+  height: 20px;
+  margin: 0;
+  border-radius: var(--radius-full);
+  background: var(--line-strong);
+  transition: background-color var(--duration-base) var(--ease-standard);
+}
+:where(.ui-form) :where(input[type="checkbox"][role="switch"])::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--on-accent);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-base) var(--ease-standard);
+}
+:where(.ui-form) :where(input[type="checkbox"][role="switch"]:checked) { background: var(--accent); }
+:where(.ui-form) :where(input[type="checkbox"][role="switch"]:checked)::after { transform: translateX(12px); }
+:where(.ui-form) :where(input[type="range"]) { width: 100%; margin: 0; accent-color: var(--accent); }
+.ui-field-pair[data-columns="3"] { --_columns: 3; }
+.ui-field-pair[data-columns="4"] { --_columns: 4; }

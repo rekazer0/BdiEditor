@@ -581,25 +581,6 @@
   :root body .sidebar-overview > .nav-group.mobile-overview-active > .nav-group-body {
     padding-top: 6px;
   }
-
-  :root body #mobile-inspector-groups {
-    width: 60px;
-  }
-
-  :root body #mobile-inspector-groups button {
-    width: 100%;
-    min-width: 0;
-    padding-inline: 2px;
-  }
-
-  :root body #mobile-inspector-groups .inspector-group-label {
-    max-width: 100%;
-    font-size: 11px;
-    line-height: 1.25;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
 }
 
 /* Narrow phones (iPhone SE, 360dp Android): the mode pill drops its label for the icon. */

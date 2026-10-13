@@ -29,16 +29,8 @@ import "./tokens.css"
 import "./components.css"
 import "./style.css"
 import "./pen-design-application.css"
-import "./pen-sidebar.css"
 import "./pen-components.css"
 import "./inspector.css"
-import "./pen-inspector-sections.css"
-import "./pen-inspector-rows.css"
-import "./pen-inspector-panels.css"
-import "./pen-inspector.css"
-import "./inspector-fidelity.css"
-import "./inspector-single-page.css"
-import "./inspector-clarity.css"
 import { initializeProjectChooser, projectChoice, type ProjectChoice } from "./project-chooser"
 import {
   hydrateTemplateCardPreviews,
@@ -48,7 +40,7 @@ import {
   renderBlobPreview,
 } from "./template-preview"
 import { initInspectorShell, setInspectorKind, syncInspectorRows } from "./inspector-shell.ts"
-import { createIcon, groupIcon, symbolIcon } from "./icons"
+import { createIcon, groupIcon, hydrateIcons, symbolIcon } from "./icons"
 import { sourceKeyLabels } from "./config-labels.ts"
 import "./style-library.css"
 import "./design-workbench.css"
@@ -379,7 +371,6 @@ const windowMaterialOpacity = $("#window-material-opacity") as HTMLInputElement
 const windowMaterialOpacityValue = $("#window-material-opacity-value") as HTMLOutputElement
 const sidebarViewVisible = $("#sidebar-view-visible") as HTMLInputElement
 const inspectorTabsVisible = $("#inspector-tabs-visible") as HTMLInputElement
-const inspectorGroupedDisplay = $("#inspector-grouped-display") as HTMLInputElement
 const sourceCompletionEnabled = $("#source-completion-enabled") as HTMLInputElement
 const sourceValueHintsEnabled = $("#source-value-hints-enabled") as HTMLInputElement
 const sourceLineExplanationEnabled = $("#source-line-explanation-enabled") as HTMLInputElement
@@ -1604,6 +1595,7 @@ function syncDeviceControlIcon(): void {
   deviceControlIcon.replaceChildren(...rendered.childNodes)
 }
 
+hydrateIcons()
 for (const symbol of Array.from(document.querySelectorAll<HTMLElement>(".system-symbol[data-system-symbol]:empty"))) {
   const rendered = createSystemSymbol(symbol.dataset.systemSymbol ?? "doc")
   symbol.replaceChildren(...rendered.childNodes)
@@ -1720,22 +1712,6 @@ function mobileInspectorGroupLabel(group: HTMLElement): string {
   return label.split(/[、与（(]/)[0]
 }
 
-function mobileInspectorGroupSymbol(label: string): string {
-  if (/提示栏|气泡|候选栏/.test(label)) return "text.bubble"
-  if (/粒子|动画|动效/.test(label)) return "sparkles"
-  if (/扩展区域/.test(label)) return "square.2.layers.3d"
-  if (/基本信息|全局/.test(label)) return "info.circle"
-  if (/布局|面板|输入区/.test(label)) return "rectangle.3.group"
-  if (/样式|外观|颜色/.test(label)) return "paintbrush"
-  if (/文字|字体|内容/.test(label)) return "doc.text"
-  if (/手势|动作|按键/.test(label)) return "rectangle.and.hand.point"
-  if (/列表/.test(label)) return "list.bullet"
-  if (/声音|音效/.test(label)) return "speaker.wave.2"
-  if (/动画/.test(label)) return "play"
-  if (/皮肤/.test(label)) return "paintpalette"
-  return "app"
-}
-
 /**
  * 分类轨当前分组。属性面板每次重绘都会重建分区元素，DOM 上的高亮无法跨重绘留住，
  * 所以记住一个稳定的分组标识：文档分区用分区代码，其余分组用分组标签。
@@ -1749,12 +1725,6 @@ function mobileInspectorGroupKey(group: HTMLElement): string {
 
 function setMobileInspectorGroup(id: string, scroll = true): void {
   quickInspector.dataset.mobileInspectorGroup = id
-  // 一页显示时所有分区都保持展开，分类轨只标记当前位置。
-  const singlePage = !inspectorGroupedDisplay.checked
-  for (const group of Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))) {
-    const active = singlePage || group.dataset.mobileInspectorGroup === id
-    group.classList.toggle("mobile-inspector-active", active)
-  }
   for (const button of Array.from(mobileInspectorGroups.querySelectorAll<HTMLButtonElement>("button"))) {
     const active = button.dataset.mobileInspectorGroup === id
     button.classList.toggle("active", active)
@@ -1771,7 +1741,7 @@ function setMobileInspectorGroup(id: string, scroll = true): void {
     mobileInspectorGroups.querySelector<HTMLButtonElement>("button.active")?.scrollIntoView({ block: "nearest", inline: "nearest" })
     // 样式引用缩略图只在可见时才量得到卡片尺寸，切到该分组时补绘一次。
     redrawStyleStateCanvases()
-    if (singlePage) scrollToSinglePageInspectorGroup()
+    scrollToSinglePageInspectorGroup()
   }
 }
 
@@ -1787,7 +1757,6 @@ function scrollToSinglePageInspectorGroup(): void {
 let singlePageInspectorContext = ""
 /** 换了选中对象时停在记住的分区（与分组模式一致）；同一对象重绘时只按滚动位置刷新分类轨。 */
 function revealSinglePageInspectorGroup(context: string): void {
-  if (inspectorGroupedDisplay.checked) return
   if (context === singlePageInspectorContext) {
     syncSinglePageInspectorGroup()
     return
@@ -1798,7 +1767,6 @@ function revealSinglePageInspectorGroup(context: string): void {
 
 /** 一页显示时按滚动位置点亮分类轨：最后一个顶边越过检查器顶部的分区即为当前分区。 */
 function syncSinglePageInspectorGroup(): void {
-  if (inspectorGroupedDisplay.checked) return
   const groups = Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))
     .filter((group) => group.getClientRects().length > 0)
   if (!groups.length) return
@@ -6762,15 +6730,13 @@ function populateDocumentInspector(): void {
     sectionPanel.dataset.inspectorGroupLabel = sectionName
     const heading = document.createElement("h3")
     heading.className = "document-section-heading"
-    const icon = createSystemSymbol(mobileInspectorGroupSymbol(sectionName))
-    icon.classList.add("document-section-icon")
     const title = document.createElement("span")
     title.className = "document-section-title"
     title.textContent = sectionName
     const meta = document.createElement("span")
     meta.className = "document-section-meta"
     meta.textContent = `${sectionEntries.length} 项`
-    heading.append(icon, title)
+    heading.append(title)
     if (section && sectionName !== section) {
       const code = document.createElement("span")
       code.className = "document-section-code"
@@ -7237,11 +7203,12 @@ function populateKeyInspector(): void {
   const multiLayout = $("#inspector-multi-layout")
   const multiAvailable = sections.length > 1 && archive?.format !== "bda" && !sections.some(isListCell)
   multiLayout.dataset.available = String(multiAvailable)
+  multiLayout.hidden = !multiAvailable
   canvasMultiToolbar.dataset.available = String(multiAvailable)
   const multiLabel = archive?.format === "bda"
     ? "此格式不支持布局编辑" : sections.some(isListCell) ? "列表单元不支持批量布局"
       : multiAvailable ? `将修改 ${sections.length} 个按键` : "选择 2 个或更多按键"
-  multiLayout.querySelector("h4 span")!.textContent = multiLabel
+  multiLayout.querySelector("[role=status]")!.textContent = multiLabel
   canvasMultiCount.textContent = multiLabel
   const layoutNote = keyLayoutFieldsGroup.querySelector<HTMLElement>(".inspector-note")!
   layoutNote.textContent = archive?.format === "bda"
@@ -7257,7 +7224,7 @@ function populateKeyInspector(): void {
   }
   if (!keyToolsAvailable && keyMode === "move") {
     keyMode = "select"
-    keyModeButtons.forEach((button) => button.classList.toggle("active", button.dataset.keyMode === keyMode))
+    keyModeButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.keyMode === keyMode)))
     preview.setEditTool(keyMode)
   }
   for (const button of layoutActionButtons) {
@@ -11143,19 +11110,6 @@ inspectorTabsVisible.addEventListener("change", () => {
   localStorage.setItem("inspector-tabs-visible", inspectorTabsVisible.checked ? "on" : "off")
   applyInspectorTabsVisibility()
 })
-inspectorGroupedDisplay.checked = localStorage.getItem("inspector-grouped-display") === "on"
-function applyInspectorGroupedDisplay(): void {
-  quickInspector.dataset.inspectorGroupDisplay = "grouped"
-  quickInspector.toggleAttribute("data-inspector-single-page", !inspectorGroupedDisplay.checked)
-  quickInspector.scrollTop = 0
-  setMobileInspectorGroup(quickInspector.dataset.mobileInspectorGroup ?? "", false)
-  if (!inspectorGroupedDisplay.checked) scrollToSinglePageInspectorGroup()
-}
-applyInspectorGroupedDisplay()
-inspectorGroupedDisplay.addEventListener("change", () => {
-  localStorage.setItem("inspector-grouped-display", inspectorGroupedDisplay.checked ? "on" : "off")
-  applyInspectorGroupedDisplay()
-})
 sourceCompletionEnabled.checked = localStorage.getItem("source-completion-enabled") === "on"
 sourceValueHintsEnabled.checked = localStorage.getItem("source-value-hints-enabled") === "on"
 sourceLineExplanationEnabled.checked = localStorage.getItem("source-line-explanation-enabled") === "on"
@@ -11452,7 +11406,7 @@ for (const button of layoutActionButtons) {
 for (const button of keyModeButtons) {
   button.addEventListener("click", () => {
     keyMode = button.dataset.keyMode === "move" ? "move" : "select"
-    keyModeButtons.forEach((item) => item.classList.toggle("active", item === button))
+    keyModeButtons.forEach((item) => item.setAttribute("aria-pressed", String(item === button)))
     preview.setEditTool(keyMode)
   })
 }

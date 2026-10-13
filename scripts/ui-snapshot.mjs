@@ -43,7 +43,7 @@ async function capture(page, name) {
       if (rect.width < 1 || rect.height < 1) continue
       const style = getComputedStyle(el)
       if (style.visibility === "hidden" || style.display === "none") continue
-      const entry = { box: [rect.x, rect.y, rect.width, rect.height].map(Math.round).join(",") }
+      const entry = { box: [rect.x, rect.y, rect.width, rect.height].map(Math.round).join(","), pane: el.closest("section.source") ? 1 : 0 }
       for (const prop of props) entry[prop] = style[prop]
       out[pathOf(el)] = entry
     }
@@ -109,6 +109,12 @@ await withPage(async (page) => {
   await railTabs(page, "bds-key")
   await page.locator(".titlebar-preferences").click()
   await capture(page, "settings")
+  await page.keyboard.press("Escape")
+  // 图片编辑：资源列表与切片工具栏会挪进画布工作区
+  await page.locator(".sidebar-overview button[data-path]", { hasText: "图片资源" }).first().click()
+  await capture(page, "bds-images")
+  await page.locator("#resource-gallery > *").first().click()
+  await capture(page, "bds-image")
 })
 await withPage(async (page) => {
   await openTemplate(page, "default-android")
@@ -133,6 +139,12 @@ await withPage(async (page) => { await page.waitForTimeout(800); await capture(p
 await browser.close()
 await server.close()
 
+// 右侧面板里的元素：快照里带 pane 标记；旧基线没有标记时按面板内的 id 和路径判断。
+const indexHtml = readFileSync(join(root, "index.html"), "utf8")
+const paneHtml = indexHtml.slice(indexHtml.indexOf('<section class="source">'), indexHtml.indexOf("</main>"))
+const paneIDs = new Set([...paneHtml.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]))
+const inPane = (key, entry) => entry?.pane === 1 || key.startsWith("body>main>section:2") || paneIDs.has(key.match(/^#([^>]+)/)?.[1])
+
 if (mode === "compare") {
   let total = 0
   for (const file of (await import("node:fs")).readdirSync(outDir).filter((f) => f.endsWith(".json"))) {
@@ -141,9 +153,11 @@ if (mode === "compare") {
     const after = JSON.parse(readFileSync(join(outDir, file), "utf8"))
     const lines = []
     for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+      // OUTSIDE_PANE=1：只看右侧面板以外的元素（重做检查器时确认其他区域不受影响）
+      if (process.env.OUTSIDE_PANE && (inPane(key, after[key]) || inPane(key, before[key]))) continue
       if (!before[key]) { lines.push(`  + ${key}`); continue }
       if (!after[key]) { lines.push(`  - ${key}`); continue }
-      const diff = Object.keys(before[key]).filter((p) => before[key][p] !== after[key][p]).map((p) => `${p}: ${before[key][p]} → ${after[key][p]}`)
+      const diff = Object.keys(before[key]).filter((p) => p !== "pane").filter((p) => before[key][p] !== after[key][p]).map((p) => `${p}: ${before[key][p]} → ${after[key][p]}`)
       if (diff.length) lines.push(`  ~ ${key}\n      ${diff.join("\n      ")}`)
     }
     total += lines.length

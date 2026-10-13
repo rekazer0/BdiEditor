@@ -1,10 +1,8 @@
 /* CSS 性能优化 */
 
 /* 优化滚动性能（侧栏自身不滚动，由 #files 承担滚动） */
-.source,
 .resource-gallery,
-#files,
-.inspector-group {
+#files {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
@@ -38,7 +36,6 @@ canvas {
 
 /* 避免布局抖动 */
 .empty-state,
-.inspector-title,
 .resource-detail-heading {
   contain: layout;
 }
