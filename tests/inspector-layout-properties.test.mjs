@@ -48,7 +48,7 @@ test("document inspector labels cover the keys real skins use", () => {
     assert.match(labels, new RegExp(`^\\s{2}${key}: "[^"]+"`, "m"), `${key} 缺少中文标签`)
   }
   // 侧边栏分组名与源码标签表共用，避免同一概念出现两种写法。
-  assert.match(main, /^import \{ sourceKeyLabels \} from "\.\/config-labels\.ts"$/m)
+  assert.match(main, /^import \{ sourceKeyLabels \} from "\.\.?\/config-labels\.ts"$/m)
   // 按 id 绑定布局文件的键（SYM_LAYOUT / NUM_9_LAYOUT…）沿用侧边栏名称。
   assert.match(main, /const layoutIDLabels: Record<string, string> = \{/)
   assert.match(main, /const layout = key\.match\(\/\^\(\[A-Z0-9_\]\+\)_LAYOUT\$\/\)/)

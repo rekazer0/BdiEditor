@@ -14,7 +14,7 @@
   "ts-file-too-long": {
     "src/bda-editor.ts": 29,
     "src/bda.ts": 1214,
-    "src/main.ts": 11093,
+    "src/main.ts": 1169,
     "src/preview.ts": 2058,
     "src/skin.ts": 6
   }
