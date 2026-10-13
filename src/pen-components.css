@@ -1393,7 +1393,7 @@
   line-height: 1.2;
 }
 
-:root body .titlebar .document-title #dirty {
+:root body .titlebar .document-title #dirty[hidden] {
   display: none;
 }
 

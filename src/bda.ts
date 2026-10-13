@@ -1042,7 +1042,7 @@ function pngSize(bytes: Uint8Array): { width: number; height: number } | undefin
 
 export class BdaResolver implements VisualResolver {
   private readonly appearance: BdaAppearance
-  private readonly images = new Map<string, Promise<ImageBitmap>>()
+  private readonly images = new Map<string, Promise<ImageBitmap | undefined>>()
   private readonly archive: SkinArchive
   private readonly fallback?: SkinArchive
   private readonly theme: string
@@ -1076,10 +1076,11 @@ export class BdaResolver implements VisualResolver {
     }
   }
 
-  private bitmap(archive: SkinArchive, path: string): Promise<ImageBitmap> {
+  private bitmap(archive: SkinArchive, path: string): Promise<ImageBitmap | undefined> {
     let image = this.images.get(path)
     if (!image) {
-      image = createImageBitmap(pngBlob(archive.getBytes(path)!))
+      // 损坏的 PNG 按缺图处理，不抛出未处理的解码错误。
+      image = createImageBitmap(pngBlob(archive.getBytes(path)!)).catch(() => undefined)
       this.images.set(path, image)
     }
     return image
@@ -1125,6 +1126,7 @@ export class BdaResolver implements VisualResolver {
     const found = atom?.resource?.resourceID ? this.resource(atom.resource.resourceID) : undefined
     if (!found) return { filterColor: bdaFilterColor(atom?.filterColor ?? 0) }
     const image = await this.bitmap(found.archive, found.path)
+    if (!image) return { filterColor: bdaFilterColor(atom?.filterColor ?? 0) }
     return {
       image,
       imagePath: found.archive === this.archive ? found.path : undefined,
@@ -1140,6 +1142,7 @@ export class BdaResolver implements VisualResolver {
     const found = this.resource(resourceID)
     if (!found) return
     const image = await this.bitmap(found.archive, found.path)
+    if (!image) return
     return { image, imagePath: found.path, source: [0, 0, image.width, image.height] }
   }
 

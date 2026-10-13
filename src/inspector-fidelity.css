@@ -1060,6 +1060,12 @@
   display: none !important;
 }
 
+/* 四值区域（x / y / 宽 / 高）放不进标签右侧：标签在上，四个输入占满整行 */
+:root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector#quick-inspector :is(#document-fields, #bda-config-fields) .document-property-field:has(> .document-quad-inputs) {
+  grid-template-columns: minmax(0, 1fr) !important;
+  row-gap: 6px !important;
+}
+
 /* 成对数值（尺寸 宽 × 高）平分控件列，与其他行同宽 */
 :root body .source #quick-inspector#quick-inspector#quick-inspector#quick-inspector :is(.document-pair-inputs, .document-quad-inputs) {
   display: flex !important;

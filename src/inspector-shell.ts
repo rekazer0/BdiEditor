@@ -348,7 +348,14 @@ export function syncInspectorRows(context: string): void {
   if (context !== selectionContext) {
     selectionContext = context
     refreshBaselines()
-  } else collectRows()
+  } else {
+    // 撤销 / 重做把值改回原样时不触发 input 事件：已标记的行回到基线就清除标记，计数才不会停在「已改」。
+    collectRows()
+    for (const row of rows) {
+      if (row.el.classList.contains("pin-modified") && rowValue(row) === (baselines.get(row.el) ?? row.baseline)) markRow(row, false)
+    }
+    updateMeta()
+  }
   syncInspectorDetails()
 }
 

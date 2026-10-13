@@ -1977,10 +1977,10 @@ export class Preview {
     } else if (this.mode === "edit" && isAdditiveSelection(event)) {
       if (this.itemSelected(key)) key.sections.forEach((section) => this.selected.delete(section))
       else this.selected.add(key.section)
-    } else if (!this.itemSelected(key) || this.mode === "preview") {
+    } else if (!this.itemSelected(key) || this.mode === "preview" || this.editTool === "select") {
+      // 普通单击只选中这一个键（已选中也不取消）；取消选择点空白处或按 Esc。
+      // 移动工具下保留多选，便于整体拖动。
       this.selected = new Set([key.section])
-    } else if (this.mode === "edit" && this.editTool === "select") {
-      key.sections.forEach((section) => this.selected.delete(section))
     }
     if (this.mobileMultiSelect && !this.selected.size) this.mobileMultiSelect = false
     if (this.mode === "edit" && !event.shiftKey) this.selectionAnchor = key.section

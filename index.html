@@ -7,6 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; connect-src 'self' https://api.github.com https://*.openai.com https://*.anthropic.com; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'"
     />
+    <link rel="icon" type="image/png" href="./favicon.png" />
     <title>键设-bdiEditor v2.0.0alpha</title>
     <!-- 预连接优化 -->
     <link rel="dns-prefetch" href="https://api.github.com" />
@@ -67,7 +68,7 @@
         <div class="document-title" data-tauri-drag-region>
           <span class="icon system-symbol document-icon" data-system-symbol="keyboard" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><rect x="2" y="5.5" width="16" height="9" rx="2"/><path d="M5 8.5h1M8 8.5h1M11 8.5h1M14 8.5h1M5 11.5h10"/></svg></span>
           <strong id="document-name" role="button" tabindex="0" title="点击修改皮肤名称">未打开皮肤</strong>
-          <span id="dirty" hidden>已编辑</span>
+          <span id="dirty" hidden>未保存</span>
         </div>
       </div>
       <div class="titlebar-right">

@@ -213,7 +213,8 @@ textarea {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--pen-state-ok);
+  /* 未保存是提醒，不是成功状态 */
+  background: var(--pen-state-warn);
   content: "";
 }
 

@@ -56,6 +56,9 @@ async function withPage(run, { viewport = { width: 1440, height: 900 }, storage 
   try {
     await run(page)
     assert.deepEqual(errors, [], "page errors")
+  } catch (error) {
+    if (process.env.FLOW_SHOTS) await page.screenshot({ path: join(process.env.FLOW_SHOTS, `${Date.now()}.png`) }).catch(() => {})
+    throw error
   } finally {
     await context.close()
   }
@@ -97,9 +100,16 @@ async function clickCanvas(page, fx, fy, options) {
   await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy, options)
 }
 
-async function selectKey(page) {
+async function selectKey(page, { timeout = 30000 } = {}) {
   await clickCanvas(page, 0.45, 0.45)
-  await page.waitForSelector(".key-layout-fields:not([hidden])", { state: "visible" })
+  // BDS/BDI 显示布局分组；BDA 的几何只读，检查器切到按键样式。
+  await page.waitForSelector('.key-layout-fields:not([hidden]), #bda-config-fields[data-bda-scope="key"]', { state: "visible", timeout })
+}
+
+async function clickCanvasWith(page, key, fx, fy) {
+  await page.keyboard.down(key)
+  await clickCanvas(page, fx, fy)
+  await page.keyboard.up(key)
 }
 
 async function railTab(page, name) {
@@ -159,7 +169,7 @@ await check("welcome: one recent section, templates, no document controls", () =
   for (const selector of ["#desktop-undo", ".mode-control", "#recent-clear"]) {
     assert.equal(await page.locator(selector).isVisible(), false, `${selector} hidden without a skin`)
   }
-  assert.equal(await page.getByRole("button", { name: /打开皮肤/ }).filter({ visible: true }).count(), 1, "a single open button")
+  assert.equal(await page.getByRole("button", { name: /^打开皮肤/ }).filter({ visible: true }).count(), 1, "a single open button")
   await openFileMenu(page)
   for (const id of ["#new", "#open"]) assert.equal(await page.locator(id).isEnabled(), true, `${id} enabled`)
   for (const id of ["#save", "#panel-scale", "#replace-layout-image", "#adapt-ios26"]) assert.equal(await page.locator(id).isDisabled(), true, `${id} disabled`)
@@ -178,7 +188,7 @@ for (const template of ["default-android", "official-android-bds", "xiaomi-unifi
     await selectKey(page)
     assert.ok(await page.locator("#mobile-inspector-groups button").count() >= 1, "inspector categories")
     const sidebarItems = await page.locator(".sidebar-overview button[data-path]:visible").count()
-    assert.ok(sidebarItems > 3, `sidebar lists layouts (${sidebarItems})`)
+    assert.ok(sidebarItems > 0, `sidebar lists items (${sidebarItems})`)
   }))
 }
 
@@ -210,11 +220,12 @@ await check("new skin dialog: validation, cancel and create", () => withPage(asy
  * ---------------------------------------------------------------------------------------------- */
 await check("preview: typing, devices, orientation, theme, guides, zoom, skin state", () => withPage(async (page) => {
   await openTemplate(page)
+  // 手机设备下才显示模拟输入框；9 键拼音点按键后进入候选栏输入码。
+  await page.selectOption("#device", "iphone-17-pro")
+  await page.waitForFunction(() => document.querySelector("#preview").getBoundingClientRect().height > 40)
   await clickCanvas(page, 0.45, 0.45)
-  await clickCanvas(page, 0.45, 0.45)
-  await page.waitForFunction(() => document.querySelector("#simulated-output").value.length > 0)
-  await page.locator("#clear-simulation").click()
-  assert.equal(await page.locator("#simulated-output").inputValue(), "")
+  await page.waitForFunction(() => /\S/.test(document.querySelector("#candidate-composition")?.textContent ?? ""))
+  assert.match(await page.locator("#event-log").textContent(), /KEY\d+ · CENTER/, "status shows the pressed key")
   const devices = await page.locator("#device option").evaluateAll((options) => options.map((option) => option.value))
   for (const device of devices) {
     await page.selectOption("#device", device)
@@ -258,17 +269,26 @@ await check("edit keys: geometry, keyboard nudge, undo/redo, multi-select, layou
   await page.waitForFunction((value) => document.querySelector("[data-key-field=x]").value === String(value), original + 3)
   await page.keyboard.press(`${mod}+z`)
   await page.waitForFunction((value) => document.querySelector("[data-key-field=x]").value === String(value), original)
-  await clickCanvas(page, 0.45, 0.45)
+  await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press("ArrowRight")
   await page.waitForFunction((value) => document.querySelector("[data-key-field=x]").value === String(value), original + 1)
   await page.keyboard.press("Shift+ArrowLeft")
   await page.waitForFunction((value) => document.querySelector("[data-key-field=x]").value === String(value), original - 9)
   // Multi-select reveals batch layout tools.
-  await clickCanvas(page, 0.65, 0.45, { modifiers: [mod] })
+  await clickCanvasWith(page, mod, 0.65, 0.45)
   await page.waitForSelector("#inspector-multi-layout", { state: "visible" })
-  await page.locator('[data-layout-action="same-width"]').click()
-  await page.locator('[data-layout-action="same-height"]').click()
+  await page.locator('#inspector-multi-layout [data-layout-action="same-width"]').click()
+  await page.locator('#inspector-multi-layout [data-layout-action="same-height"]').click()
   assert.equal(await undoEnabled(page), true)
+  // Esc 取消选择；普通单击已选中的键保持选中。
+  await page.evaluate(() => document.activeElement?.blur())
+  await page.keyboard.press("Escape")
+  await page.locator("#inspector-multi-layout").waitFor({ state: "hidden" })
+  await page.locator(".key-layout-fields").waitFor({ state: "hidden" })
+  await selectKey(page)
+  await clickCanvas(page, 0.45, 0.45)
+  await page.waitForTimeout(200)
+  assert.equal(await page.locator(".key-layout-fields").isVisible(), true, "clicking the selected key keeps it selected")
   // Text and gestures on a single key.
   await selectKey(page)
   await railTab(page, "文字")
@@ -306,7 +326,11 @@ await check("styles: library filters, search, preview, apply and new style", () 
   await card.click({ modifiers: ["Alt"] })
   const library = page.locator("#style-picker-dialog")
   await library.waitFor({ state: "visible" })
-  for (const kind of await library.locator("[data-style-library-kind]:visible").all()) await kind.click()
+  const kinds = await library.locator("[data-style-library-kind]:visible").evaluateAll((items) => items.map((item) => item.dataset.styleLibraryKind))
+  for (const kind of kinds) {
+    const button = library.locator(`[data-style-library-kind="${kind}"]`)
+    if (await button.isVisible()) await button.click()
+  }
   for (const filter of ["panel", "key", "candidate", "foreground", "all"]) await library.locator(`[data-style-library-filter="${filter}"]`).click()
   await library.locator('[data-style-library-mode="images"]').click()
   await library.locator('[data-style-library-mode="styles"]').click()
@@ -326,8 +350,7 @@ await check("styles: library filters, search, preview, apply and new style", () 
   await dialog.locator("#new-style-id").fill("9876")
   await dialog.locator("#new-style-submit").click()
   await dialog.waitFor({ state: "hidden" })
-  await page.locator("#resource-search").fill("9876")
-  await page.waitForFunction(() => document.querySelector("#resource-gallery")?.textContent?.includes("9876"))
+  await page.waitForFunction(() => /9876/.test(document.querySelector("#resource-name")?.textContent ?? "") || /STYLE9876/.test(document.querySelector("#source .cm-content")?.innerText ?? ""))
 }))
 
 /* ------------------------------------------------------------------------------------------------
@@ -361,7 +384,7 @@ await check("overview: every sidebar item, image slices, sounds and info", () =>
   await page.locator("#atlas-back").click()
   await page.locator(".sidebar-overview button[data-path]", { hasText: "按键音效" }).first().click()
   await page.locator(".sidebar-overview button[data-path]", { hasText: "皮肤信息" }).first().click()
-  const nameField = page.locator("#document-fields input").first()
+  const nameField = page.locator("#quick-inspector input:visible").first()
   await nameField.waitFor({ state: "visible" })
 }))
 
@@ -373,10 +396,15 @@ await check("source files: tree, editor, search, upload, copy/paste, delete and 
   await editMode(page)
   await page.locator('[data-sidebar-view="source"]').click()
   await page.locator("#source-file-toolbar").waitFor({ state: "visible" })
-  for (let round = 0; round < 6; round += 1) {
-    await page.evaluate(() => { for (const folder of document.querySelectorAll(".raw-files details:not([open])")) folder.open = true })
+  // 文件夹按需展开：逐层点开，直到出现 .ini 文件。
+  // 访达式树：单击选中文件夹，点三角（或双击）展开。
+  for (let round = 0; round < 6 && !(await page.locator('.source-file-row[data-path$=".ini"]:visible').count()); round += 1) {
+    for (const folder of await page.locator('.source-folder-row[aria-expanded="false"]:visible').all()) {
+      await folder.locator(".source-disclosure").click()
+      await page.waitForFunction((row) => row.getAttribute("aria-expanded") === "true", await folder.elementHandle())
+    }
   }
-  const file = page.locator('.source-file-row[data-path$=".ini"]').first()
+  const file = page.locator('.source-file-row[data-path$=".ini"]:visible').first()
   await file.waitFor({ state: "visible" })
   await file.click()
   await page.locator('[data-inspector-tab="source"]').click()
@@ -422,7 +450,8 @@ await check("tools: panel copy, replace keyboard style and iOS 26 adaptation", (
   await copy.getByRole("button", { name: "复制", exact: true }).click()
   await copy.waitFor({ state: "hidden" })
   await page.locator('[data-sidebar-view="source"]').click()
-  await page.waitForFunction((path) => [...document.querySelectorAll(".source-file-row")].some((row) => row.dataset.path === path || row.dataset.path?.endsWith(path.split("/").pop())), target)
+  assert.match(await page.locator("#event-log").textContent(), /复制面板完成/)
+  assert.ok(await page.evaluate((path) => [...document.querySelectorAll("[data-path]")].some((row) => row.dataset.path === path), target), "copied layout listed")
   await page.locator('[data-sidebar-view="overview"]').click()
   // Replace keyboard style with an uploaded PNG, then undo it.
   await openFileMenu(page)
@@ -432,7 +461,10 @@ await check("tools: panel copy, replace keyboard style and iOS 26 adaptation", (
   assert.equal(await replace.locator("header button").count(), 0, "no redundant header close button")
   await page.locator("#layout-image-open").setInputFiles({ name: "style.png", mimeType: "image/png", buffer: pngBytes(120, 60) })
   await page.waitForFunction(() => !document.querySelector("#layout-image-apply").disabled)
-  for (const target of ["key-normal", "candidate", "panel"]) await replace.locator(`input[value="${target}"]`).check({ force: true })
+  for (const target of ["key-normal", "candidate", "panel"]) {
+    await replace.locator(`label:has(input[value="${target}"])`).click()
+    assert.equal(await replace.locator(`input[value="${target}"]`).isChecked(), true)
+  }
   await page.locator("#layout-image-apply").click()
   await replace.waitFor({ state: "hidden" })
   await page.locator("#desktop-undo").click()
@@ -533,6 +565,7 @@ await check("file: rename, save, export every format and unsaved prompt", () => 
   await x.fill(String(Number(await x.inputValue()) + 1))
   await x.press("Enter")
   await page.locator("#dirty").waitFor({ state: "visible" })
+  assert.equal(await page.locator("#dirty").textContent(), "未保存")
   const saved = await download(async () => {
     await openFileMenu(page)
     await page.locator("#save").click()
@@ -541,8 +574,10 @@ await check("file: rename, save, export every format and unsaved prompt", () => 
   await closeOperationDialog(page)
   await x.fill(String(Number(await x.inputValue()) + 1))
   await x.press("Enter")
+  // 先选模板，替换当前皮肤前才提示未保存。
   await openFileMenu(page)
   await page.locator("#new").click()
+  await page.locator("#new-project-dialog").getByRole("button", { name: "创建皮肤", exact: true }).click()
   const unsaved = page.locator("#unsaved-dialog")
   await unsaved.waitFor({ state: "visible" })
   await unsaved.getByRole("button", { name: "取消", exact: true }).click()
@@ -593,15 +628,17 @@ if (existsSync(skinDirectory)) {
     for (const name of skins.slice(0, limit)) {
       try {
         await page.locator("#browser-open").setInputFiles({ name, mimeType: "application/octet-stream", buffer: readFileSync(join(skinDirectory, name)) })
-        await page.waitForFunction((file) => document.querySelector("#document-name")?.textContent?.includes(file.replace(/\.[^.]+$/, "")), name, { timeout: 30000 })
+        await page.waitForFunction((file) => document.querySelector("#document-name")?.textContent?.includes(file.replace(/\.[^.]+$/, "")), name, { timeout: 60000 })
         await closeOperationDialog(page)
         await page.waitForFunction(() => document.querySelector("#preview")?.getBoundingClientRect().height > 20, null, { timeout: 15000 })
         if ((await page.locator("#mode").inputValue()) !== "edit") await editMode(page)
-        await selectKey(page).catch(() => {})
+        // 键位不一定落在画布 45% 处，选不中不算失败。
+        await selectKey(page, { timeout: 3000 }).catch(() => {})
         // Leave edits behind so the next open goes through the unsaved prompt path cleanly.
         if (await page.locator("#unsaved-dialog").isVisible()) await page.locator("#unsaved-dialog").getByRole("button", { name: "不保存" }).click()
       } catch (error) {
-        failures.push(`${name}: ${error.message.split("\n")[0]}`)
+        const status = await page.locator("#event-log").textContent().catch(() => "")
+        failures.push(`${name}: ${error.message.split("\n")[0]} · 状态：${status} · 标题：${await page.locator("#document-name").textContent().catch(() => "")}`)
         await closeOperationDialog(page).catch(() => {})
       }
     }

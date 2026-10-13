@@ -8281,10 +8281,15 @@ function selectFile(
       !/(^|\/)gen\.ini$/i.test(path) &&
       previewItems(selectedDocument).some((item) => item.editable)
     if (previewLayout) {
+      // 撤销 / 重做会重新选中同一个布局：保留仍然存在的按键选择，检查器不跳回面板。
+      const existing = new Set(selectedDocument.sections())
+      const kept = path === layoutPath
+        ? selectedKeySections.filter((section) => existing.has(section) || isListCell(section))
+        : []
       layoutPath = path
       layoutDocument = selectedDocument
-      selectedKeySections = []
-      preview.setSelected([])
+      selectedKeySections = kept
+      preview.setSelected(kept)
       inspectorTab = "properties"
     } else if (preferredSidebarView === "overview" || showsLayoutProperties(path)) {
       // INI/CND/POP 布局文件始终打开属性面板，不论从哪个侧边栏点进来。
@@ -9597,7 +9602,16 @@ for (const menu of toolbarMenus) {
 }
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape" || event.isComposing) return
+  const menuOpen = toolbarMenus.some((menu) => menu.open)
   for (const menu of toolbarMenus) menu.open = false
+  // Esc 取消画布上的按键选择（与点空白处一致）；输入框、弹窗和菜单里的 Esc 留给它们自己。
+  const target = event.target as Element | null
+  if (menuOpen || !isEditing() || !selectedKeySections.length || document.querySelector("dialog[open]")) return
+  if (target?.closest?.("input, textarea, select, [contenteditable], .cm-editor")) return
+  preview.setSelected([])
+  selectedKeySections = []
+  source.collapseSelection()
+  scheduleSelectionInspectorSync(preview)
 })
 newButton.addEventListener("click", () => void startNewDocument())
 openButton.addEventListener("click", () => {

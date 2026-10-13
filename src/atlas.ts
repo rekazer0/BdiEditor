@@ -356,7 +356,7 @@ export class AtlasResolver {
   private readonly theme: string
   private readonly resourceRoots: string[]
   private readonly styles?: IniDocument
-  private readonly images = new Map<string, Promise<ImageBitmap>>()
+  private readonly images = new Map<string, Promise<ImageBitmap | undefined>>()
   private readonly tiles = new Map<string, IniDocument>()
   private readonly embeddedFontFamily?: string
   private readonly embeddedFontReady: Promise<void>
@@ -384,12 +384,13 @@ export class AtlasResolver {
     return this.embeddedFontReady
   }
 
-  private bitmap(path: string): Promise<ImageBitmap> | undefined {
+  private bitmap(path: string): Promise<ImageBitmap | undefined> | undefined {
     const bytes = this.archive.getBytes(path)
     if (!bytes) return
     let image = this.images.get(path)
     if (!image) {
-      image = createImageBitmap(pngBlob(bytes))
+      // 损坏的 PNG 按缺图处理（回退到样式颜色），不抛出未处理的解码错误。
+      image = createImageBitmap(pngBlob(bytes)).catch(() => undefined)
       this.images.set(path, image)
     }
     return image
@@ -452,7 +453,9 @@ export class AtlasResolver {
         ] as [number, number, number, number])
       : undefined
     const scale = scaleNumbers(tiles.get(`IMG${spec.tile}`, "SCALE"))
-    return { image: await image, imagePath, source, inner, scale, color: spec.color, borderColor: spec.borderColor }
+    const bitmap = await image
+    if (!bitmap) return { color: spec.color, borderColor: spec.borderColor }
+    return { image: bitmap, imagePath, source, inner, scale, color: spec.color, borderColor: spec.borderColor }
   }
 
   async resolveToolbarImages(limit?: number): Promise<Visual[]> {

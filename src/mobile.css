@@ -170,6 +170,16 @@
     color: var(--pen-accent);
   }
 
+  /* 手机标题栏很窄，未保存提示只保留圆点 */
+  :root body .titlebar .document-title #dirty {
+    min-height: 0;
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+    font-size: 0;
+    gap: 0;
+  }
+
   /* Menus anchor to the bar edges instead of the summary so they never leave the screen. */
   :root body .titlebar .mobile-command-actions {
     width: auto;
