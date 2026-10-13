@@ -24,7 +24,7 @@
 :root body #style-picker-grid .previewing .style-picker-previews { outline: 2px solid var(--accent); outline-offset: -2px; }
 :root body #style-picker-grid .style-picker-item:hover .style-picker-previews { border-color: var(--accent); }
 :root body #style-picker-grid .style-picker-item strong { width: 100%; font-size: var(--font-size-xs); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-:root body #style-picker-grid .style-picker-item small { font: 9.5px var(--font-mono); color: var(--secondary); }
+:root body #style-picker-grid .style-picker-item small { font: var(--font-size-xs) var(--font-mono); color: var(--secondary); }
 :root body #style-picker-empty { margin: 0; padding: 64px 20px; text-align: center; color: var(--secondary); }
 :root body .style-library-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; min-height: 26px; padding: 6px 12px; border-top: 1px solid var(--line); color: var(--secondary); font-size: var(--font-size-xs); }
 :root body #style-library-source { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 50%; font-family: var(--font-mono); }

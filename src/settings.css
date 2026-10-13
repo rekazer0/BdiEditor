@@ -10,7 +10,7 @@
 /* 侧栏与内部控件跟随 --content：材质打开时它是玻璃下沉层，材质关闭时仍是原来的 #f4f5f8，
    设置窗口才不会在玻璃界面上留下一列不透明的导航。 */
 :root body #settings-dialog .settings-sidebar { padding: 12px 12px; gap: 2px; border-right: 1px solid var(--line); background: var(--content); overflow-y: auto; }
-:root body #settings-dialog .settings-group-label { padding: 12px 12px 6px; color: var(--tertiary); font: 10.5px var(--font-mono); letter-spacing: .5px; }
+:root body #settings-dialog .settings-group-label { padding: 12px 12px 6px; color: var(--tertiary); font: var(--font-size-xs) var(--font-mono); letter-spacing: .5px; }
 :root body #settings-dialog .settings-nav-item { display: flex; align-items: center; flex: 0 0 auto; height: 36px; padding: 0 12px; gap: 8px; font-size: var(--font-size-sm); border-radius: var(--radius-md); box-shadow: none; }
 :root body #settings-dialog .settings-nav-item[hidden], :root body #settings-dialog [hidden] { display: none !important; }
 :root body #settings-dialog .settings-nav-item > span:nth-child(2) { white-space: nowrap; }
@@ -24,7 +24,7 @@
 :root body #settings-dialog .settings-section-heading p { margin: 0; color: var(--secondary); font-size: var(--font-size-sm); line-height: 1.6; }
 :root body #settings-dialog .settings-subheading { display: flex; align-items: center; gap: 8px; margin: 0; padding-bottom: 8px; font-size: var(--font-size-md); font-weight: 600; }
 :root body #settings-dialog .settings-subheading:not(:first-child) { margin-top: 20px; }
-:root body #settings-dialog .settings-subheading small { color: var(--tertiary); font: 10.5px var(--font-mono); letter-spacing: .4px; }
+:root body #settings-dialog .settings-subheading small { color: var(--tertiary); font: var(--font-size-xs) var(--font-mono); letter-spacing: .4px; }
 :root body #settings-dialog .settings-row { display: flex; justify-content: space-between; gap: 16px; min-height: 50px; padding: 12px 0; border: 0; border-bottom: 1px solid var(--line); font-size: var(--font-size-md); }
 :root body #settings-dialog .settings-row > span:first-child { font-weight: 500; }
 :root body #settings-dialog .settings-row > span:first-child small { display: block; margin-top: 2px; color: var(--tertiary); font-size: var(--font-size-xs); font-weight: 400; }
@@ -32,15 +32,15 @@
 :root body #settings-dialog .settings-segmented { display: flex; align-items: center; width: fit-content; height: 32px; gap: 2px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--content); }
 :root body #settings-dialog .settings-segmented button { height: 24px; padding: 0 12px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--secondary); font-size: var(--font-size-xs); white-space: nowrap; }
 :root body #settings-dialog .settings-segmented button[aria-pressed="true"] { background: var(--panel); color: var(--text); box-shadow: var(--shadow-sm); }
-:root body #settings-dialog .settings-color-field { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--content); font: 11.5px var(--font-mono); }
+:root body #settings-dialog .settings-color-field { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--content); font: var(--font-size-xs) var(--font-mono); }
 :root body #settings-dialog input[type="color"] { width: 20px; height: 24px; padding: 0; border: 0; background: transparent; cursor: pointer; }
-:root body #settings-dialog .settings-storage-note { margin: 20px 0 0; padding: 12px 12px; border-radius: var(--radius-md); background: var(--content); color: var(--secondary); font: 10.5px/1.6 var(--font-mono); }
+:root body #settings-dialog .settings-storage-note { margin: 20px 0 0; padding: 12px 12px; border-radius: var(--radius-md); background: var(--content); color: var(--secondary); font: var(--font-size-xs)/1.6 var(--font-mono); }
 :root body #settings-dialog .settings-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px; border-top: 1px solid var(--line); }
 #settings-save-state { display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: var(--radius-full); background: var(--content); font-size: var(--font-size-xs); }
 #settings-save-state[data-dirty="true"] { background: var(--accent-soft); color: var(--accent); }
 #settings-save-state .settings-state-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--state-ok); }
 #settings-save-state[data-dirty="true"] .settings-state-dot { background: var(--accent); }
-#settings-saved-at { color: var(--secondary); font: 10.5px var(--font-mono); }
+#settings-saved-at { color: var(--secondary); font: var(--font-size-xs) var(--font-mono); }
 :root body #settings-dialog .settings-footer-actions { display: flex; gap: 8px; }
 :root body #settings-dialog .settings-footer-actions button { height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-md); }
 :root body #settings-dialog .settings-footer-actions .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
@@ -53,7 +53,7 @@
 :root body #settings-dialog .model-profile { flex: 1; min-width: 0; height: auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; row-gap: 2px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--content); color: var(--text); text-align: left; }
 :root body #settings-dialog .model-profile[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 .model-profile strong, .model-profile small { grid-column: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.model-profile strong { font: 600 12.5px var(--font-mono); }
+.model-profile strong { font: 600 var(--font-size-sm) var(--font-mono); }
 .model-profile small { color: var(--secondary); font-size: var(--font-size-xs); }
 .model-profile em { grid-column: 2; grid-row: 1 / 3; align-self: center; padding: 1px 8px; border: 1px solid var(--line); border-radius: var(--radius-full); background: var(--panel); color: var(--secondary); font-size: var(--font-size-xs); font-style: normal; }
 :root body #settings-dialog .model-profile-remove { display: grid; flex: none; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--tertiary); }
@@ -77,7 +77,7 @@
 .model-choices-panel { display: grid; gap: 6px; }
 :root body #settings-dialog .model-choices-panel .settings-model-control { width: 100%; grid-template-columns: minmax(0, 1fr) 30px 30px; }
 .model-choices { display: grid; max-height: 184px; margin: 0; padding: 4px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--content); list-style: none; }
-.model-choices label { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: var(--radius-sm); font: 12px var(--font-mono); cursor: pointer; }
+.model-choices label { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: var(--radius-sm); font: var(--font-size-sm) var(--font-mono); cursor: pointer; }
 .model-choices label:hover { background: var(--hover); }
 .model-choices label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 :root body #settings-dialog .model-choices input[type="checkbox"] { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }

@@ -981,7 +981,6 @@
 
 @media (max-width: 760px) {
   :root {
-    --mobile-dock-h: 56px;
   }
 
   :root body .mobile-workspace-tabs {

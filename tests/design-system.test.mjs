@@ -42,6 +42,9 @@ const rules = {
   // §2 字号：只能用 --font-size-*
   "css-font-size-literal": () => perFile(scaledCss(css), (text, file) => file === TOKENS ? 0
     : declarations(text, "font-size").filter(([, v]) => !/^(var\(--font-size-[a-z]+\)|var\(--source-font-size(, var\(--font-size-[a-z]+\))?\)|inherit|1em|100%|0)(\s*!important)?$/.test(v)).length),
+  // §2 font 简写里的字号同样只能用 token
+  "css-font-shorthand-literal": () => perFile(scaledCss(css), (text) =>
+    declarations(text, "font").filter(([, v]) => /\d*\.?\d+px/.test(v.replace(/var\([^)]*\)/g, ""))).length),
   // §2 字重：400 / 500 / 600
   "css-font-weight-off-scale": () => perFile(scaledCss(css), (text) =>
     declarations(text, "font-weight").filter(([, v]) => !/^(400|500|600|inherit|normal|var\(--font-weight-[a-z]+\))(\s*!important)?$/.test(v)).length),

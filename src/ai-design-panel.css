@@ -72,7 +72,7 @@
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--secondary);
-  font: 500 11.5px var(--font-ui);
+  font: 500 var(--font-size-xs) var(--font-ui);
   cursor: pointer;
 }
 #ai-design-panel .ai-new-session svg {
@@ -158,7 +158,7 @@
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--accent) 9%, transparent);
   color: var(--accent);
-  font: 500 11.5px var(--font-ui);
+  font: 500 var(--font-size-xs) var(--font-ui);
   cursor: pointer;
 }
 #ai-design-panel .ai-design-settings:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
@@ -215,7 +215,7 @@
   cursor: pointer;
 }
 #ai-design-panel .ai-draft-file-head > span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: var(--font-mono); }
-#ai-design-panel .ai-draft-file-head > em { flex: none; color: var(--tertiary); font: normal 10px var(--font-mono); }
+#ai-design-panel .ai-draft-file-head > em { flex: none; color: var(--tertiary); font: normal var(--font-size-xs) var(--font-mono); }
 #ai-design-panel .ai-draft-diff {
   max-height: 200px;
   margin: 6px 0 0;
@@ -224,7 +224,7 @@
   border-radius: var(--radius-sm);
   background: var(--material-content);
   color: var(--secondary);
-  font: 10px/1.6 var(--font-mono);
+  font: var(--font-size-xs)/1.6 var(--font-mono);
   white-space: pre;
 }
 #ai-design-panel .ai-draft-diff > ins { color: var(--state-ok); text-decoration: none; }
@@ -243,7 +243,7 @@
   overflow: auto;
   border-radius: var(--radius-sm);
   background: var(--material-content);
-  font: 10px/1.7 var(--font-mono);
+  font: var(--font-size-xs)/1.7 var(--font-mono);
 }
 
 /* 设计方向：先选一个，再进入逐文件审阅。 */
@@ -270,7 +270,7 @@
   border-radius: 50%;
   background: var(--accent);
   color: var(--on-accent);
-  font: 600 11px var(--font-mono);
+  font: 600 var(--font-size-xs) var(--font-mono);
 }
 #ai-design-panel .ai-variant-copy { display: grid; flex: 1; gap: 2px; min-width: 0; }
 #ai-design-panel .ai-variant-copy strong { font-size: var(--font-size-sm); font-weight: 600; }
@@ -295,7 +295,7 @@
   border-radius: var(--radius-md);
   background: var(--material-panel);
   color: var(--text);
-  font: 500 12px var(--font-ui);
+  font: 500 var(--font-size-sm) var(--font-ui);
   cursor: pointer;
 }
 #ai-design-panel .ai-draft-actions > .ai-draft-cancel { margin-left: auto; }

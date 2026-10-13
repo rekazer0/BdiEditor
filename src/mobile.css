@@ -21,14 +21,13 @@
 @media (max-width: 760px) {
   :root,
   :root.macos {
-    --titlebar-height: calc(52px + var(--safe-area-top));
   }
 
   :root body .titlebar {
     height: var(--titlebar-height);
     min-height: var(--titlebar-height);
     gap: 6px;
-    padding: var(--safe-area-top) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));
+    padding: var(--safe-area-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
   }
 
   :root body .titlebar-left,
@@ -187,7 +186,7 @@
     position: fixed;
     top: calc(var(--titlebar-height) + 6px);
     right: auto;
-    left: max(10px, env(safe-area-inset-left));
+    left: max(8px, env(safe-area-inset-left));
     min-width: 248px;
     max-width: calc(100vw - 20px);
     display: grid;
@@ -252,7 +251,7 @@
   }
   :root body .welcome-main {
     gap: 24px;
-    padding: 20px max(16px, env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    padding: 20px max(16px, env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
     overflow: visible;
   }
 
@@ -379,7 +378,6 @@
   /* Dock: a thin strip with two page indicators. Panes switch by swiping sideways (or tapping
      an indicator); the rest of the strip is the grab handle that resizes the split. */
   :root {
-    --mobile-dock-h: 22px;
   }
 
   :root body .mobile-workspace-tabs {
@@ -472,7 +470,7 @@
     align-items: center;
     justify-content: flex-start;
     gap: 6px;
-    padding: 6px max(10px, env(safe-area-inset-right)) 6px max(10px, env(safe-area-inset-left));
+    padding: 6px max(8px, env(safe-area-inset-right)) 6px max(8px, env(safe-area-inset-left));
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -553,7 +551,7 @@
   }
 
   :root body .preview-zoom-control {
-    right: max(10px, env(safe-area-inset-right));
+    right: max(8px, env(safe-area-inset-right));
     bottom: calc(10px + env(safe-area-inset-bottom));
   }
 
@@ -772,7 +770,7 @@
   }
 
   :root body #settings-dialog .settings-content {
-    padding: 18px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
+    padding: 20px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }

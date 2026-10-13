@@ -7,7 +7,6 @@
  */
 
 :root {
-  --inspector-width: 360px;
 }
 
 html,
@@ -30,7 +29,7 @@ textarea {
 .titlebar {
   height: var(--titlebar-height);
   gap: 12px;
-  padding: calc(5px + var(--safe-area-top)) max(16px, env(safe-area-inset-right)) 5px max(16px, env(safe-area-inset-left));
+  padding: calc(6px + var(--safe-area-top)) max(16px, env(safe-area-inset-right)) 6px max(16px, env(safe-area-inset-left));
   border-bottom: 1px solid var(--line);
   background: var(--material-panel);
   box-shadow: none;

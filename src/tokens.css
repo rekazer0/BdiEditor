@@ -151,6 +151,19 @@
   --titlebar-height: calc(86px + var(--safe-area-top));
 }
 
+/* 版式尺寸随窗口变化：检查器宽度、标题栏高度、手机底栏高度 */
+:root { --inspector-width: 360px; }
+@media (max-width: 950px) and (max-height: 600px) and (orientation: landscape) {
+  :root, :root.macos { --titlebar-height: calc(44px + var(--safe-area-top)); }
+}
+@media (max-width: 760px) {
+  :root, :root.macos { --titlebar-height: calc(52px + var(--safe-area-top)); }
+  :root { --mobile-dock-h: 56px; }
+}
+@media (max-width: 760px) and (orientation: portrait) {
+  :root { --mobile-dock-h: 22px; }
+}
+
 :root[data-app-theme="dark"] {
   color: #f2f3f4;
   color-scheme: dark;

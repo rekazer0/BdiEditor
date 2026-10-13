@@ -1,14 +1,10 @@
 {
   "css-color-literal": {},
-  "css-font-size-literal": {
-    "src/style.css": 1
-  },
+  "css-font-size-literal": {},
+  "css-font-shorthand-literal": {},
   "css-font-weight-off-scale": {},
   "css-radius-literal": {},
-  "css-spacing-off-scale": {
-    "src/mobile.css": 6,
-    "src/pen-design-application.css": 2
-  },
+  "css-spacing-off-scale": {},
   "css-motion-literal": {},
   "css-important": {
     "src/ai-design-panel.css": 1,
@@ -23,30 +19,19 @@
     "src/source-files-redesign.css": 1,
     "src/style.css": 15
   },
-  "css-token-outside-tokens": {
-    "src/design-workbench.css": 4,
-    "src/device-preview.css": 22,
-    "src/mobile.css": 2,
-    "src/pen-components.css": 1,
-    "src/pen-design-application.css": 1,
-    "src/project-chooser.css": 6,
-    "src/style.css": 8
-  },
+  "css-token-outside-tokens": {},
   "css-cross-file-selector": {
-    "src/mobile.css": 1,
+    "src/style.css": 80,
+    "src/pen-design-application.css": 7,
     "src/new-project.css": 1,
     "src/pen-components.css": 43,
-    "src/pen-design-application.css": 7,
     "src/picker.css": 5,
-    "src/style.css": 80,
     "src/tokens.css": 2,
     "src/settings.css": 21,
     "src/style-performance.css": 9
   },
   "icon-outside-registry": {},
-  "html-inline-style": {
-    "index.html": 7
-  },
+  "html-inline-style": {},
   "ts-file-too-long": {
     "src/bda-editor.ts": 29,
     "src/bda.ts": 1214,
