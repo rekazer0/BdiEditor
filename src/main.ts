@@ -8,6 +8,7 @@ import { readFile, watch, writeFile, type UnwatchFn } from "@tauri-apps/plugin-f
 import "./tokens.css"
 import "./components.css"
 import "./style.css"
+import "./device-preview.css"
 import "./pen-design-application.css"
 import "./pen-components.css"
 import "./inspector.css"

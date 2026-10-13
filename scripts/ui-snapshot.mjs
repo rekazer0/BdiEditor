@@ -117,6 +117,14 @@ await withPage(async (page) => {
   await capture(page, "bds-image")
 })
 await withPage(async (page) => {
+  // 设备外框预览（浅色 / 深色系统主题）
+  await openTemplate(page, "official-android-bds")
+  await page.locator("#device").selectOption("iphone-17-pro")
+  await capture(page, "device-iphone")
+  await page.locator("#device").selectOption("pixel-10-pro")
+  await capture(page, "device-pixel")
+})
+await withPage(async (page) => {
   await openTemplate(page, "default-android")
   await editAndSelectKey(page)
   await capture(page, "bda-key")

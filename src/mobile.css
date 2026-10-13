@@ -708,11 +708,7 @@
     margin: 0;
     border: 0;
     border-radius: 0;
-    background: #ffffff; /* full-screen sheet: nothing behind it should show through */
-  }
-
-  :root[data-app-theme="dark"] body #settings-dialog {
-    background: #15171b;
+    background: var(--material-panel); /* full-screen sheet: nothing behind it should show through */
   }
 
   :root body #settings-dialog form {

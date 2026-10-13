@@ -14,12 +14,12 @@
   min-height: 0;
   overflow: hidden;
   container-type: inline-size;
-  background: var(--pin-surface);
+  background: var(--material-panel);
 }
 #ai-design-panel[hidden] { display: none; }
 
 #ai-design-panel :is(button, select, summary):focus-visible {
-  outline: 2px solid var(--pin-accent);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 #ai-design-panel button:disabled { opacity: .45; cursor: not-allowed; }
@@ -43,8 +43,8 @@
   padding: 0 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--pin-sunken);
-  color: var(--pin-ink-muted);
+  background: var(--material-content);
+  color: var(--secondary);
   font-size: 11px;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -55,10 +55,10 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--pin-ok);
+  background: var(--state-ok);
 }
-#ai-design-panel .ai-chip[data-off="true"]::before { background: var(--pin-ink-faint); }
-#ai-design-panel #ai-context-key::before { border-radius: 2px; background: var(--pin-accent); }
+#ai-design-panel .ai-chip[data-off="true"]::before { background: var(--tertiary); }
+#ai-design-panel #ai-context-key::before { border-radius: 2px; background: var(--accent); }
 #ai-design-panel .ai-chip[hidden] { display: none; }
 
 #ai-design-panel .ai-new-session {
@@ -69,9 +69,9 @@
   height: 26px;
   padding: 0 8px 0 6px;
   border: 0;
-  border-radius: var(--pin-radius-md, 8px);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--pin-ink-muted);
+  color: var(--secondary);
   font: 500 11.5px var(--font-ui);
   cursor: pointer;
 }
@@ -83,28 +83,28 @@
   stroke-width: 1.5;
   stroke-linecap: round;
 }
-#ai-design-panel .ai-new-session:hover:not(:disabled) { background: var(--pin-hover, var(--pin-sunken)); color: var(--pin-ink); }
+#ai-design-panel .ai-new-session:hover:not(:disabled) { background: var(--hover); color: var(--text); }
 
 /* —— 结果提示：只报告结果，过程在对话时间线里 —— */
 #ai-design-panel .ai-design-status {
   flex: none;
   margin: 2px 14px 4px;
   padding: 6px 10px;
-  border-radius: var(--pin-radius-md, 8px);
-  background: var(--pin-sunken);
-  color: var(--pin-ink-muted);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--secondary);
   font-size: 11.5px;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
 #ai-design-panel .ai-design-status:empty { display: none; }
 #ai-design-panel[data-state="done"] .ai-design-status {
-  background: color-mix(in srgb, var(--pin-ok) 9%, var(--pin-surface));
-  color: var(--pin-ok);
+  background: color-mix(in srgb, var(--state-ok) 9%, var(--material-panel));
+  color: var(--state-ok);
 }
 #ai-design-panel[data-state="error"] .ai-design-status {
-  background: color-mix(in srgb, var(--pin-danger) 9%, var(--pin-surface));
-  color: var(--pin-danger);
+  background: color-mix(in srgb, var(--state-danger) 9%, var(--material-panel));
+  color: var(--state-danger);
 }
 
 /* —— 对话 + 输入框 —— */
@@ -137,9 +137,9 @@
   height: 26px;
   padding: 0 22px 0 8px;
   border: 0;
-  border-radius: var(--pin-radius-sm, 6px);
+  border-radius: var(--radius-sm);
   background-color: transparent;
-  color: var(--pin-ink-muted);
+  color: var(--secondary);
   font-size: 11.5px;
   text-overflow: ellipsis;
   /* Size to the chosen option, not the longest one, so the chevron hugs the label. */
@@ -148,20 +148,20 @@
   cursor: pointer;
 }
 #ai-design-panel .ai-design-toolbar select:is(:focus, :focus-visible) { outline: none; }
-#ai-design-panel .ai-design-toolbar select:hover:not(:disabled) { background-color: var(--pin-sunken); color: var(--pin-ink); }
+#ai-design-panel .ai-design-toolbar select:hover:not(:disabled) { background-color: var(--material-content); color: var(--text); }
 #ai-design-panel .ai-design-toolbar select[hidden],
 #ai-design-panel .ai-design-settings[hidden] { display: none; }
 #ai-design-panel .ai-design-settings {
   height: 26px;
   padding: 0 8px;
   border: 0;
-  border-radius: var(--pin-radius-sm, 6px);
-  background: color-mix(in srgb, var(--pin-accent) 9%, transparent);
-  color: var(--pin-accent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: var(--accent);
   font: 500 11.5px var(--font-ui);
   cursor: pointer;
 }
-#ai-design-panel .ai-design-settings:hover { background: color-mix(in srgb, var(--pin-accent) 15%, transparent); }
+#ai-design-panel .ai-design-settings:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
 
 /* —— 修改草稿：唯一需要用户做决定的地方 —— */
 #ai-design-panel .ai-draft-panel:not([hidden]) {
@@ -172,10 +172,10 @@
   max-height: 62%;
   margin: 0 14px 14px;
   overflow: hidden;
-  border: 1px solid var(--pin-line-strong);
-  border-radius: var(--pin-radius-lg, 12px);
-  background: var(--pin-surface);
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--pin-ink) 8%, transparent);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--material-panel);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--text) 8%, transparent);
 }
 #ai-design-panel .ai-draft-head {
   display: flex;
@@ -185,8 +185,8 @@
   gap: 8px;
   padding: 10px 12px 8px;
 }
-#ai-design-panel .ai-draft-head h3 { margin: 0; color: var(--pin-ink); font-size: 12.5px; font-weight: 600; }
-#ai-design-panel #ai-draft-summary { color: var(--pin-ink-muted); font-size: 11px; }
+#ai-design-panel .ai-draft-head h3 { margin: 0; color: var(--text); font-size: 12.5px; font-weight: 600; }
+#ai-design-panel #ai-draft-summary { color: var(--secondary); font-size: 11px; }
 
 #ai-design-panel .ai-draft-files {
   display: grid;
@@ -201,48 +201,48 @@
 }
 #ai-design-panel .ai-draft-files > li {
   min-width: 0;
-  border: 1px solid var(--pin-line);
-  border-radius: var(--pin-radius-md, 8px);
-  background: var(--pin-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--material-panel);
 }
 #ai-design-panel .ai-draft-files > li > details { padding: 7px 9px; }
 #ai-design-panel .ai-draft-file-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--pin-ink);
+  color: var(--text);
   font-size: 11px;
   cursor: pointer;
 }
 #ai-design-panel .ai-draft-file-head > span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: var(--font-mono); }
-#ai-design-panel .ai-draft-file-head > em { flex: none; color: var(--pin-ink-faint); font: normal 10px var(--font-mono); }
+#ai-design-panel .ai-draft-file-head > em { flex: none; color: var(--tertiary); font: normal 10px var(--font-mono); }
 #ai-design-panel .ai-draft-diff {
   max-height: 200px;
   margin: 6px 0 0;
   padding: 6px 8px;
   overflow: auto;
-  border-radius: var(--pin-radius-sm, 6px);
-  background: var(--pin-sunken);
-  color: var(--pin-ink-muted);
+  border-radius: var(--radius-sm);
+  background: var(--material-content);
+  color: var(--secondary);
   font: 10px/1.6 var(--font-mono);
   white-space: pre;
 }
-#ai-design-panel .ai-draft-diff > ins { color: var(--pin-ok); text-decoration: none; }
-#ai-design-panel .ai-draft-diff > del { color: var(--pin-danger); text-decoration: none; }
+#ai-design-panel .ai-draft-diff > ins { color: var(--state-ok); text-decoration: none; }
+#ai-design-panel .ai-draft-diff > del { color: var(--state-danger); text-decoration: none; }
 #ai-design-panel .ai-draft-images { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
-#ai-design-panel .ai-draft-images figure { margin: 0; padding: 6px; border-radius: var(--pin-radius-sm, 6px); background: var(--pin-sunken); text-align: center; }
+#ai-design-panel .ai-draft-images figure { margin: 0; padding: 6px; border-radius: var(--radius-sm); background: var(--material-content); text-align: center; }
 #ai-design-panel .ai-draft-images img { display: block; width: 100%; max-height: 140px; object-fit: contain; }
-#ai-design-panel .ai-draft-images figcaption { margin-top: 4px; color: var(--pin-ink-faint); font-size: 10px; }
-#ai-design-panel .ai-draft-full { margin-top: 6px; color: var(--pin-ink-muted); font-size: 11px; }
-#ai-design-panel .ai-draft-full > summary { color: var(--pin-accent); cursor: pointer; }
+#ai-design-panel .ai-draft-images figcaption { margin-top: 4px; color: var(--tertiary); font-size: 10px; }
+#ai-design-panel .ai-draft-full { margin-top: 6px; color: var(--secondary); font-size: 11px; }
+#ai-design-panel .ai-draft-full > summary { color: var(--accent); cursor: pointer; }
 #ai-design-panel .ai-draft-full h4 { margin: 10px 0 4px; font-size: 10px; }
 #ai-design-panel .ai-draft-full pre {
   max-height: 240px;
   margin: 0;
   padding: 8px;
   overflow: auto;
-  border-radius: var(--pin-radius-sm, 6px);
-  background: var(--pin-sunken);
+  border-radius: var(--radius-sm);
+  background: var(--material-content);
   font: 10px/1.7 var(--font-mono);
 }
 
@@ -257,25 +257,25 @@
   padding: 8px 10px;
   border: 0;
   background: transparent;
-  color: var(--pin-ink);
+  color: var(--text);
   text-align: left;
   cursor: pointer;
 }
-#ai-design-panel .ai-variant-select:hover { background: var(--pin-accent-soft); }
+#ai-design-panel .ai-variant-select:hover { background: var(--accent-soft); }
 #ai-design-panel .ai-variant-index {
   display: grid;
   flex: 0 0 22px;
   place-items: center;
   height: 22px;
   border-radius: 50%;
-  background: var(--pin-accent);
-  color: var(--pin-on-brand);
+  background: var(--accent);
+  color: var(--on-accent);
   font: 600 11px var(--font-mono);
 }
 #ai-design-panel .ai-variant-copy { display: grid; flex: 1; gap: 2px; min-width: 0; }
 #ai-design-panel .ai-variant-copy strong { font-size: 12px; font-weight: 600; }
-#ai-design-panel .ai-variant-copy small { color: var(--pin-ink-muted); font-size: 10.5px; }
-#ai-design-panel .ai-variant-note { margin: 0; padding: 0 10px 10px 41px; color: var(--pin-ink-muted); font-size: 10.5px; line-height: 1.5; }
+#ai-design-panel .ai-variant-copy small { color: var(--secondary); font-size: 10.5px; }
+#ai-design-panel .ai-variant-note { margin: 0; padding: 0 10px 10px 41px; color: var(--secondary); font-size: 10.5px; line-height: 1.5; }
 
 #ai-design-panel .ai-draft-actions {
   display: flex;
@@ -283,25 +283,25 @@
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  border-top: 1px solid var(--pin-line);
-  background: var(--pin-sunken);
+  border-top: 1px solid var(--line);
+  background: var(--material-content);
 }
-#ai-design-panel .ai-draft-note { flex: 1; min-width: 0; margin: 0; color: var(--pin-ink-faint); font-size: 10.5px; line-height: 1.4; }
+#ai-design-panel .ai-draft-note { flex: 1; min-width: 0; margin: 0; color: var(--tertiary); font-size: 10.5px; line-height: 1.4; }
 #ai-design-panel .ai-draft-actions > button {
   flex: none;
   height: 28px;
   padding: 0 12px;
-  border: 1px solid var(--pin-line-strong);
-  border-radius: var(--pin-radius-md, 8px);
-  background: var(--pin-surface);
-  color: var(--pin-ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--material-panel);
+  color: var(--text);
   font: 500 12px var(--font-ui);
   cursor: pointer;
 }
 #ai-design-panel .ai-draft-actions > .ai-draft-cancel { margin-left: auto; }
-#ai-design-panel .ai-draft-actions > button:hover:not(:disabled) { background: var(--pin-hover, var(--pin-sunken)); }
-#ai-design-panel .ai-draft-actions > .ai-draft-apply { border-color: transparent; background: var(--pin-accent); color: var(--pin-on-brand); }
-#ai-design-panel .ai-draft-actions > .ai-draft-apply:hover:not(:disabled) { background: color-mix(in srgb, var(--pin-accent) 88%, #000); }
+#ai-design-panel .ai-draft-actions > button:hover:not(:disabled) { background: var(--hover); }
+#ai-design-panel .ai-draft-actions > .ai-draft-apply { border-color: transparent; background: var(--accent); color: var(--on-accent); }
+#ai-design-panel .ai-draft-actions > .ai-draft-apply:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, var(--text)); }
 
 @container (max-width: 300px) {
   #ai-design-panel .ai-draft-note { display: none; }

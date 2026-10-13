@@ -87,7 +87,6 @@
   --state-ok: #12a150;
   --state-warn: #b87a00;
   --state-danger: #e5484d;
-  --search-font-size: 13px;
   --material-window: #e9ebef;
   --material-toolbar: #ffffff;
   --material-sidebar: #ffffff;
@@ -118,6 +117,24 @@
   --glass-surface: var(--material-glass-surface);
   /* 透明马赛克：画布与各预览缩略图共用同一套方格，避免两处样式漂移 */
   --on-accent: #ffffff;        /* 强调色底上的文字/图标 */
+  --backdrop: rgb(18 20 25 / 28%);   /* 对话框遮罩 */
+  /* 画布参考线 */
+  --guide: #ff9500;            /* 十字光标、吸附线 */
+  --guide-layout: #ef3e52;     /* 布局辅助线 */
+  --guide-selected: #087ff5;   /* 选中按键的辅助线 */
+  /* 代码高亮 */
+  --syntax-comment: #8b93a3;
+  --syntax-section: #376bff;
+  --syntax-key: #9147e8;
+  --syntax-operator: #606575;
+  --syntax-action: #00a85a;
+  --syntax-number: #b77708;
+  --syntax-value-action: #c04a13;
+  --syntax-value-style: #2459a9;
+  --syntax-value-color: #087f8c;
+  --syntax-explanation: #3f7f4f;
+  --search-match: #ffd60a;
+  --search-match-ink: #2c2100;
   --canvas-surface: #f4f5f8;   /* 画布区底色 */
   --checker-light: #f7f7f8;
   --checker-dark: #dfe1e5;
@@ -168,6 +185,15 @@
   --glass-highlight: rgb(255 255 255 / 10%);
   --glass-shadow: 0 10px 32px rgb(0 0 0 / 32%), inset 0 1px rgb(255 255 255 / 8%);
   --canvas-surface: #0c0d10;
+  --backdrop: rgb(0 0 0 / 45%);
+  --syntax-section: #7a9bff;
+  --syntax-key: #c792ff;
+  --syntax-operator: #a1a8b3;
+  --syntax-action: #3dd68c;
+  --syntax-number: #f5c445;
+  --syntax-value-action: #ff9a5c;
+  --syntax-value-style: #7aa7ff;
+  --syntax-value-color: #4fd1db;
 }
 
 :root.windows[data-window-material="on"] {
@@ -213,6 +239,8 @@
   --content: rgb(244 245 248 / var(--window-material-sunken));
   --control: rgb(255 255 255 / var(--window-material-sunken));
   --glass-surface: rgb(255 255 255 / var(--window-material-layer));
+  /* 压在内容上的浮层（对话框、菜单）：滑杆还没拉满时就接近不透明 */
+  --floating: rgb(255 255 255 / max(var(--window-material-floating), 0.96));
   /* 系统材质本身就是窗口背景，所以外壳保持全透明，各区域只画自己那一层淡填充。 */
   --material-window: transparent;
   --canvas-surface: rgb(244 245 248 / var(--window-material-sunken));
@@ -237,6 +265,7 @@
   --content: rgb(26 29 33 / var(--window-material-sunken));
   --control: rgb(30 33 38 / var(--window-material-sunken));
   --glass-surface: rgb(30 33 38 / var(--window-material-layer));
+  --floating: rgb(21 23 27 / max(var(--window-material-floating), 0.96));
   --material-window: transparent;
   --canvas-surface: rgb(12 13 16 / var(--window-material-sunken));
   --material-panel: rgb(21 23 27 / var(--window-material-layer));

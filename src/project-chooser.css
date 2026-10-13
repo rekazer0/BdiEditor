@@ -52,9 +52,9 @@
 :root body .project-name-well { display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 30px; border: 1px solid var(--chooser-line); border-radius: 8px; background: var(--chooser-well); }
 :root body .project-name-well input { width: 100%; min-width: 0; padding: 0; height: auto; font: inherit; font-size: 12.5px; border: 0; background: transparent; color: var(--chooser-text); box-shadow: none; }
 :root body .project-chooser .project-location { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; background: var(--chooser-well); }
-:root body .project-chooser footer .primary { color: #fff; background: var(--chooser-accent); border-color: transparent; }
-:root body .project-chooser footer .primary:hover { background: color-mix(in srgb, var(--chooser-accent) 90%, #000); }
-:root body .project-chooser #project-error { flex-basis: 100%; color: #e5484d; }
+:root body .project-chooser footer .primary { color: var(--on-accent); background: var(--chooser-accent); border-color: transparent; }
+:root body .project-chooser footer .primary:hover { background: color-mix(in srgb, var(--chooser-accent) 90%, var(--text)); }
+:root body .project-chooser #project-error { flex-basis: 100%; color: var(--state-danger); }
 @media(max-width: 640px) {
   :root body .project-template-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   :root body .project-chooser-title small { display: none; }

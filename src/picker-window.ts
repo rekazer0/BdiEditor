@@ -50,6 +50,11 @@ export type StyleLibraryPayload = {
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 hydrateIcons()
+// 取色器窗口跟随系统深浅色，与主窗口一样通过 data-app-theme 切换 token。
+const systemDark = matchMedia("(prefers-color-scheme: dark)")
+const syncTheme = () => { document.documentElement.dataset.appTheme = systemDark.matches ? "dark" : "light" }
+syncTheme()
+systemDark.addEventListener("change", syncTheme)
 const title = $("#picker-title")
 const styleName = $("#picker-style")
 const subtitle = $("#picker-subtitle")

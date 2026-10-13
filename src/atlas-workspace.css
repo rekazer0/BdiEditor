@@ -38,8 +38,8 @@
 .atlas-selection { margin-left: auto; font: 10px var(--font-mono); padding: 4px 6px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
 .atlas-workspace .canvas-wrap { flex: 1; min-height: 0; padding: 0; overflow: auto; display: grid; background: var(--canvas-surface); }
 .atlas-workspace #workspace-image-figure { width: max-content; height: max-content; min-width: 100%; min-height: 100%; max-height: none; padding: 32px; box-sizing: border-box; }
-.atlas-workspace #atlas-canvas { max-width: none; max-height: none; touch-action: none; box-shadow: 0 16px 40px #1214281f; background: transparent; }
-.atlas-workspace .atlas-zoom { position: absolute; right: 20px; bottom: 42px; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 24px; background: var(--material-panel); box-shadow: 0 2px 8px #00000012; }
+.atlas-workspace #atlas-canvas { max-width: none; max-height: none; touch-action: none; box-shadow: var(--shadow-sm); background: transparent; }
+.atlas-workspace .atlas-zoom { position: absolute; right: 20px; bottom: 42px; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 24px; background: var(--material-panel); box-shadow: var(--shadow-sm); }
 .atlas-zoom output { min-width: 42px; text-align: center; font: 11px var(--font-mono); }
 .atlas-workspace .atlas-status { display: block; flex-shrink: 0; height: 26px; padding: 5px 12px; box-sizing: border-box; font: 10px var(--font-mono); color: var(--secondary); border-top: 1px solid var(--line); background: var(--material-panel); }
 .atlas-workspace #resource-inspector { padding: 0; }
@@ -53,7 +53,7 @@
 .atlas-workspace .resource-item img,
 .atlas-workspace .canvas-wrap,
 .atlas-workspace #tile-preview-wrap {
-  background: repeating-conic-gradient(#e3e5e8 0 25%, #f7f7f8 0 50%) 0 0 / 12px 12px;
+  background: repeating-conic-gradient(var(--checker-dark) 0 25%, var(--checker-light) 0 50%) 0 0 / 12px 12px;
 }
 .atlas-workspace #tile-inspector h3 { font-size: 11px; font-weight: 600; margin: 12px 0 10px; }
 .atlas-workspace #tile-inspector .geometry-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

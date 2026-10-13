@@ -93,7 +93,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--material-panel);
-  box-shadow: 0 12px 28px rgb(18 20 25 / 12%);
+  box-shadow: var(--shadow-sm);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -684,7 +684,7 @@ main {
 }
 
 .preview-tool-toggle.active {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
   box-shadow: none;
 }
@@ -852,7 +852,7 @@ main {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--material-panel);
-  box-shadow: 0 14px 34px -8px rgb(18 20 25 / 26%);
+  box-shadow: var(--shadow-sm);
   transform: translateX(-50%);
 }
 
@@ -929,14 +929,14 @@ main {
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   background: var(--material-panel);
-  box-shadow: 0 24px 60px rgb(18 20 25 / 18%);
+  box-shadow: var(--shadow-sm);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
 
 .project-dialog::backdrop,
 .app-dialog::backdrop {
-  background: rgb(18 20 25 / 34%);
+  background: var(--backdrop);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -1098,20 +1098,6 @@ main {
  * 中性色，100% 时合成结果与设计稿一致，20% 时也仍然保留同样的块面对比。
  * ------------------------------------------------------------------------------------------------- */
 
-/* Dark material is dimmer, so text and icons sit on the same layer roles with darker colors.
-   深色下控件是「比容器亮一档」，同样用固定色差的白：+2.5% 等于 #1a1d21 叠在 #15171b 上的亮度，
-   10% / 9.2% / 17.1% 分别等于 --pen-tertiary-bg / --pen-line / --pen-line-strong。 */
-/* 属性检查器
- *
- * inspector-fidelity.css 是最后加载的 1:1 锁定层，把 --pin-surface / --pin-sunken 写成固定的
- * 不透明色，检查器于是整块盖住窗口材质。这里按层角色覆盖这两个令牌；材质关闭时那一层继续用它的
- * 锁定值，观感不变。
- *
- * 用 !important 是因为该层用了 `#quick-inspector` 重复 ID 这类抬高权重的写法，普通声明压不过；
- * 同时必须显式写上 #quick-inspector，因为它自己也声明了这两个令牌，光靠从 .source 继承不够。
- * 卡片用单层系数；输入框等控件用和上面同一套固定色差，控件叠在卡片上时合成后的色差仍然存在，
- * 滑杆拉低也不会糊在玻璃上。 */
-
 /* 未打开皮肤时画布承载的是应用级欢迎页，而不是文档画布；此时不能沿用「画布背景」那张
    不透明的纸，否则欢迎页整片盖住系统材质，看起来和没有玻璃一样。 */
 :root[data-window-material-kind="glass"][data-window-material="on"] .canvas-wrap.empty {
@@ -1134,16 +1120,5 @@ main {
   .app-actions,
   .mobile-command-actions
 ) {
-  background: rgb(255 255 255 / max(var(--window-material-floating), 0.96)) !important;
-}
-
-:root[data-app-theme="dark"][data-window-material-kind="glass"][data-window-material="on"] :is(
-  .app-dialog,
-  .project-dialog,
-  .toolbar-menu,
-  .file-actions,
-  .app-actions,
-  .mobile-command-actions
-) {
-  background: rgb(21 23 27 / max(var(--window-material-floating), 0.96)) !important;
+  background: var(--floating) !important;
 }

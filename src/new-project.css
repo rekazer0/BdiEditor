@@ -1,47 +1,7 @@
 :root {
-  font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #121419;
-  color-scheme: light;
-  background: #f4f5f6;
-
-  /* 间距系统 */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 12px;
-  --space-lg: 16px;
-  --space-xl: 24px;
-
-  /* 字号系统 */
-  --text-xs: 10px;
-  --text-sm: 11px;
-  --text-base: 12px;
-  --text-md: 13px;
-  --text-lg: 14px;
-
-  /* 圆角系统 */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 10px;
-
-  --line: rgb(0 0 0 / 10%);
-  --panel: #f4f5f6;
-  --secondary: #5b616e;
-  --control: #fff;
-  --hover: rgb(0 0 0 / 4%);
-  --accent: #3a6df0;
-}
-
-:root[data-app-theme="dark"] {
-  color: #f2f3f4;
-  color-scheme: dark;
-  background: #202225;
-  --line: rgb(255 255 255 / 14%);
-  --panel: #282b2e;
-  --secondary: #a6a9ae;
-  --control: #34373b;
-  --hover: rgb(255 255 255 / 8%);
-  --accent: #7a9bff;
+  color: var(--text);
+  background: var(--material-content);
+  font-family: var(--font-ui);
 }
 
 * { box-sizing: border-box; }
@@ -83,7 +43,7 @@ h1 {
 header p {
   margin: var(--space-sm) 0 0;
   color: var(--secondary);
-  font-size: var(--text-lg);
+  font-size: var(--font-size-md);
   line-height: 1.6;
 }
 
@@ -93,7 +53,7 @@ header .usage-note {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--control) 50%, transparent);
-  font-size: var(--text-base);
+  font-size: var(--font-size-sm);
   line-height: 1.65;
 }
 
@@ -128,7 +88,7 @@ header .usage-note {
   align-items: center;
   padding: var(--space-md) var(--space-lg);
   border: 1px solid var(--line);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   background: var(--control);
   cursor: pointer;
   transition: all 0.15s ease;
@@ -168,14 +128,14 @@ header .usage-note {
 
 .template-option strong {
   overflow-wrap: anywhere;
-  font-size: var(--text-lg);
+  font-size: var(--font-size-md);
   font-weight: 600;
   line-height: 1.4;
 }
 
 .template-option small {
   color: var(--secondary);
-  font-size: var(--text-md);
+  font-size: var(--font-size-md);
   line-height: 1.4;
 }
 
@@ -193,8 +153,8 @@ footer {
 #project-error {
   flex-basis: 100%;
   margin: 0;
-  color: #d14343;
-  font-size: var(--text-base);
+  color: var(--state-danger);
+  font-size: var(--font-size-sm);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -212,7 +172,7 @@ footer button {
   border-radius: var(--radius-lg);
   color: inherit;
   background: var(--control);
-  font-size: var(--text-md);
+  font-size: var(--font-size-md);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -232,13 +192,13 @@ footer button:active:not(:disabled) {
 
 footer .primary {
   border: none;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
   box-shadow: none;
 }
 
 footer .primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 90%, #000);
+  background: color-mix(in srgb, var(--accent) 90%, var(--text));
   box-shadow: none;
 }
 

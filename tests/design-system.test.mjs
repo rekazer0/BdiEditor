@@ -21,6 +21,8 @@ const ts = Object.fromEntries(tsFiles.map((f) => [f, read(f)]))
 const html = Object.fromEntries(htmlFiles.map((f) => [f, read(f)]))
 const TOKENS = "src/tokens.css"
 const ICONS = "src/icons.ts"
+// 设备模拟（真机外框与画布背景选项）必须与真机一致，是唯一允许写色值的文件（DESIGN.md §1）
+const DEVICE = "src/device-preview.css"
 
 /** Declarations of the given properties: [property, value] pairs. */
 function declarations(text, property) {
@@ -32,7 +34,7 @@ const SPACING_SCALE = new Set(["0", "1", "2", "4", "6", "8", "12", "16", "20", "
 /** rule → (file → count). Each rule says what DESIGN.md section it enforces. */
 const rules = {
   // §1 颜色：只能引用 tokens.css 中的颜色 token
-  "css-color-literal": () => perFile(css, (text, file) => file === TOKENS ? 0
+  "css-color-literal": () => perFile(css, (text, file) => file === TOKENS || file === DEVICE ? 0
     : count(text.replace(/var\([^)]*\)/g, ""), /(?<![\w-])#[0-9a-fA-F]{3,8}(?![\w-])|\b(?:rgba?|hsla?)\(|(?<![-\w])(?:white|black)(?![-\w])/g)),
   // §2 字号：只能用 --font-size-*
   "css-font-size-literal": () => perFile(css, (text, file) => file === TOKENS ? 0
@@ -130,4 +132,16 @@ test("design system: tokens.css is the first stylesheet of every window", () => 
   for (const page of ["picker.html", "new-project.html"]) {
     assert.match(html[page].match(/<link rel="stylesheet"[^>]*>/)?.[0] ?? "", /tokens\.css/, `${page} 必须先加载 tokens.css`)
   }
+})
+
+test("design system: every var(--x) used in CSS is defined", () => {
+  const defined = new Set()
+  for (const text of Object.values(css)) for (const m of text.matchAll(/(--[\w-]+)\s*:/g)) defined.add(m[1])
+  // 运行时由 TS 写入的变量（style.setProperty("--x", …) 等）
+  for (const text of Object.values(ts)) for (const m of text.matchAll(/["`](--[\w-]+)["`]/g)) defined.add(m[1])
+  const missing = new Set()
+  for (const [file, text] of Object.entries(css)) {
+    for (const m of text.matchAll(/var\(\s*(--[\w-]+)\s*(,)?/g)) if (!defined.has(m[1]) && !m[2]) missing.add(`${file}: ${m[1]}`)
+  }
+  assert.deepEqual([...missing], [], "引用了不存在的变量（多半是删掉旧 token 后遗留的引用）")
 })
