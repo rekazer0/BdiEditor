@@ -9,7 +9,7 @@ const css = [
   fidelity,
   readFileSync(new URL('../src/pen-design-application.css', import.meta.url), 'utf8'),
 ].join('\n')
-const palette = readFileSync(new URL('../src/pen-design-application.css', import.meta.url), 'utf8')
+const palette = readFileSync(new URL('../src/tokens.css', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8')
 const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8')
 const icons = readFileSync(new URL('../src/inspector-icons.ts', import.meta.url), 'utf8')
@@ -34,7 +34,7 @@ test('CSS locks 30px rows and BDS/BDA chips from 属性检查器.pen', () => {
   assert.match(css, /data-inspector-kind="bds"/)
   assert.match(css, /data-inspector-kind="bda"/)
   // 检查器跟随全局 Pen 色板：选中橙与品牌蓝只在 pen-design-application.css 定义一次。
-  assert.match(css, /--pin-sel: var\(--pen-selection\)/)
+  assert.match(css, /--pin-sel: var\(--selection\)/)
   assert.match(css, /--pin-accent: var\(--pen-accent\)/)
   assert.match(palette, /--pen-selection: #ff6b2c/)
   assert.match(palette, /--pen-accent: var\(--accent\)/)
