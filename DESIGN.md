@@ -65,7 +65,7 @@
 
 ## 5. 图标
 
-- **只用 Lucide**，一律通过 `src/icons.ts` 的 `icon(name, size)` 创建。禁止在 HTML/TS 里手写 `<svg>`，禁止在其他文件 `import "lucide"`，禁止使用 SF Symbol 名称或自绘路径。
+- **只用 Lucide**，一律通过 `src/icons.ts` 的 `createIcon(name, size)` 创建。禁止在 HTML/TS 里手写 `<svg>`，禁止在其他文件 `import "lucide"`，禁止使用 SF Symbol 名称或自绘路径。
 - 尺寸：`--icon-size-sm` 14（控件内、行内）、`--icon-size-md` 16（工具栏、导航）、`--icon-size-lg` 20（空状态、大按钮）。
 - 描边统一 1.5，颜色 `currentColor`，由所在控件的文字颜色决定。
 - 新增图标：在 `icons.ts` 的注册表里按 Lucide 原名登记，同一含义全项目只用一个图标。

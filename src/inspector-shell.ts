@@ -9,7 +9,7 @@
  * restores a value the user changed in this session back to its session baseline.
  */
 
-import { inspectorIcon, inspectorSymbolIcon } from "./icons"
+import { createIcon, symbolIcon } from "./icons"
 
 type InspectorInput = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
 
@@ -74,7 +74,7 @@ function decorateKeyToolbar(toolbar: HTMLElement): void {
   for (const button of toolbar.querySelectorAll<HTMLButtonElement>("button[data-key-mode], button[data-key-action]")) {
     const key = button.dataset.keyMode ? `mode:${button.dataset.keyMode}` : `action:${button.dataset.keyAction}`
     const [name, size] = TOOL_ICONS[key] ?? ["move", 14]
-    const icon = inspectorIcon(name, size)
+    const icon = createIcon(name, size)
     const system = button.querySelector(":scope > .system-symbol")
     if (system) system.replaceWith(icon)
     else if (!button.querySelector(".inspector-icon")) button.prepend(icon)
@@ -106,7 +106,7 @@ function decoratePanelIcons(): void {
   for (const view of Array.from(document.querySelectorAll<HTMLElement>(PANEL_ICON_VIEWS))) {
     for (const symbol of Array.from(view.querySelectorAll<HTMLElement>(".system-symbol[data-system-symbol]"))) {
       if (symbol.dataset.inspectorGlyph === "true") continue
-      const icon = inspectorSymbolIcon(symbol.dataset.systemSymbol ?? "")
+      const icon = symbolIcon(symbol.dataset.systemSymbol ?? "")
       if (!icon) continue
       // Keep the fallback class: main.ts clones an existing symbol out of the document when it
       // builds a new one, and a panel glyph is a better source than the platform default.
@@ -255,7 +255,7 @@ function decorateHead(head: HTMLElement, fallback = ""): void {
   if (head.tagName === "SUMMARY" && !head.querySelector(".pin-chevron")) {
     const chevron = document.createElement("span")
     chevron.className = "pin-chevron"
-    chevron.append(inspectorIcon("chevron-down", 12))
+    chevron.append(createIcon("chevron-down", 12))
     head.append(chevron)
   }
 }
@@ -374,7 +374,7 @@ function decorateInspectorDetails(): void {
     empty.className = "inspector-empty"
     const ring = document.createElement("div")
     ring.className = "inspector-empty-ring"
-    ring.append(inspectorIcon("mouse-pointer-2", 22))
+    ring.append(createIcon("mouse-pointer-2", 22))
     const title = document.createElement("strong")
     title.textContent = "未选择对象"
     const hint = document.createElement("p")
@@ -401,7 +401,7 @@ function decorateInspectorDetails(): void {
   const layouts: Record<string, string> = { left: "align-start-vertical", right: "align-end-vertical", top: "align-start-horizontal", bottom: "align-end-horizontal", "same-width": "arrow-left-right", "same-height": "arrow-up-down", "horizontal-gap": "fold-horizontal", "vertical-gap": "fold-vertical", swap: "arrow-left-right", merge: "square-stack" }
   for (const button of root.querySelectorAll<HTMLElement>("[data-layout-action]")) {
     const old = button.querySelector(".system-symbol")
-    if (old) old.replaceWith(inspectorIcon(layouts[button.dataset.layoutAction!] ?? "move", 14))
+    if (old) old.replaceWith(createIcon(layouts[button.dataset.layoutAction!] ?? "move", 14))
   }
   const layout = root.querySelector(".key-layout-fields")
   if (layout && !layout.querySelector(".inspector-selection-chips")) {
@@ -431,7 +431,7 @@ function decorateInspectorDetails(): void {
       text = document.createElement("span")
       label.prepend(text)
     }
-    text.replaceChildren(inspectorIcon(icon, 12), document.createTextNode(caption))
+    text.replaceChildren(createIcon(icon, 12), document.createTextNode(caption))
   }
   const gestureHint = gestures?.querySelector(".inspector-group-subtitle")
   if (gestureHint) gestureHint.textContent = "填写动作码或字符，留空表示未配置。"

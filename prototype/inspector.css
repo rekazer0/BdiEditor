@@ -1,0 +1,41 @@
+/* 原型外壳（画布区仅用于演示）。检查器自身的样式就是将来 src/inspector.css 的内容。 */
+html, body { height: 100%; margin: 0; }
+body {
+  display: grid;
+  grid-template-rows: 44px 1fr;
+  background: var(--window);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+}
+.proto-titlebar { display: flex; align-items: center; gap: var(--space-md); padding: 0 var(--space-lg); border-bottom: 1px solid var(--line); background: var(--toolbar); }
+.proto-hint { flex: 1; color: var(--tertiary); font-size: var(--font-size-xs); }
+.proto-main { display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
+.proto-canvas { display: grid; place-items: center; overflow: auto; background: var(--checker-image), var(--checker-light); background-position: 0 0, 12px 12px; background-size: 24px 24px; }
+.proto-keyboard { display: grid; grid-template-columns: 56px repeat(3, 104px) 64px; gap: var(--space-sm); padding: var(--space-md); border-radius: var(--radius-lg); background: var(--_kb, #d3d6dc); }
+.proto-key { display: grid; place-items: center; min-height: 64px; border: 0; border-radius: var(--radius-md); background: var(--_bg); color: var(--_fg); font-size: var(--_size); font-weight: var(--_weight); box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 25%, transparent); }
+.proto-key[aria-selected="true"] { outline: 2px solid var(--selection); outline-offset: 2px; }
+
+/* —— 检查器 —— */
+.inspector { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--inspector); }
+.inspector-mode { padding: var(--space-md) var(--space-lg) 0; }
+.inspector-object { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-md) var(--space-sm) var(--space-md) var(--space-lg); border-bottom: 1px solid var(--line); }
+.inspector-object-icon { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: var(--radius-md); background: var(--accent-soft); color: var(--accent); }
+.inspector-object-text { display: grid; flex: 1; min-width: 0; }
+.inspector-object-text strong { overflow: hidden; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
+.inspector-object-text small { overflow: hidden; color: var(--tertiary); font-family: var(--font-mono); font-size: var(--font-size-xs); text-overflow: ellipsis; white-space: nowrap; }
+.inspector-crumb { display: inline-flex; align-items: center; gap: var(--space-2xs); width: fit-content; margin: 0; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: var(--font-size-xs); }
+.inspector-body { flex: 1; overflow: auto; }
+.inspector-asset { display: flex; align-items: center; gap: var(--space-sm); min-width: 0; }
+.inspector-asset-text { display: grid; flex: 1; min-width: 0; }
+.inspector-asset small { color: var(--tertiary); font-size: var(--font-size-xs); }
+.inspector-gesture { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: center; gap: var(--space-sm); }
+.inspector-gesture > .ui-icon { color: var(--tertiary); }
+.inspector-gesture > small { color: var(--tertiary); font-size: var(--font-size-xs); }
+.inspector-tools { display: flex; flex-wrap: wrap; gap: var(--space-2xs); }
+.inspector-more { display: flex; align-items: center; gap: var(--space-xs); width: fit-content; margin: 0; padding: 0; border: 0; background: none; color: var(--secondary); font: inherit; font-size: var(--font-size-xs); }
+.inspector-empty { display: grid; place-items: center; gap: var(--space-sm); padding: var(--space-2xl) var(--space-lg); color: var(--tertiary); text-align: center; }
+.proto-ref .inspector-asset { position: relative; }
+.proto-menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 2; }
+.proto-sound { display: grid; place-items: center; color: var(--tertiary); }
+.proto-source { margin: 0; padding: var(--space-lg); color: var(--secondary); font-family: var(--font-mono); font-size: var(--font-size-xs); white-space: pre-wrap; }

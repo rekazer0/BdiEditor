@@ -4,7 +4,7 @@ import { LogicalSize } from "@tauri-apps/api/dpi"
 import { bindSlicePickerZoom, drawSlicePicker, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM, pickableSlices } from "./slice-picker-canvas.ts"
 import { tileSliceAt, type TilePoint, type TileSlice } from "./tiles.ts"
 import { drawVisualPreview, retinaThumbnail, type Visual } from "./atlas.ts"
-import { inspectorIcon } from "./icons.ts"
+import { createIcon } from "./icons.ts"
 
 type ImagePayload = {
   path: string
@@ -267,14 +267,14 @@ function renderLibrarySounds(payload: StyleLibraryPayload, query: string): numbe
     label.textContent = `STYLE${styleID}`
     const name = document.createElement("small")
     name.textContent = filename
-    select.append(inspectorIcon("music", 16), label, name)
+    select.append(createIcon("music", 16), label, name)
     select.addEventListener("click", (event) => emitLibrary(event.metaKey || event.ctrlKey ? "style-library-edit" : "style-library-apply", { styleID }))
     const play = document.createElement("button")
     play.type = "button"
     play.disabled = !playable
     play.title = playable ? `播放 ${filename}` : "声音文件不存在"
     play.setAttribute("aria-label", play.title)
-    play.append(inspectorIcon("play", 14))
+    play.append(createIcon("play", 14))
     play.addEventListener("click", () => emitLibrary("style-library-play", { filename }))
     card.append(select, play)
     libraryGrid.append(card)
@@ -364,7 +364,7 @@ function renderLibrary(): void {
         // 类型徽标放在说明行里，不压在预览图上。
         const badge = document.createElement("span")
         badge.className = "style-kind-badge"
-        badge.append(inspectorIcon(style.kindIcon, 11), style.kindLabel)
+        badge.append(createIcon(style.kindIcon, 11), style.kindLabel)
         note.prepend(badge)
       }
       card.append(previews, label, note)

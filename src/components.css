@@ -1,0 +1,299 @@
+/*
+ * 组件层：全项目共用的 .ui-* 控件（规范见 DESIGN.md §9）。
+ * 只引用 tokens.css 的 token；选择器保持单个类的优先级，页面需要微调时改 data-variant / data-size，
+ * 不要在别的文件里覆盖这里的规则。
+ */
+
+/* —— 图标：尺寸由 createIcon(name, size) 写在属性上 —— */
+.ui-icon { flex: none; stroke: currentColor; }
+
+/* —— 按钮 —— */
+.ui-button,
+.ui-icon-button {
+  --_height: var(--control-height-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  height: var(--_height);
+  min-width: var(--_height);
+  padding: 0 var(--space-md);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  cursor: default;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.ui-icon-button { padding: 0; width: var(--_height); background: transparent; color: var(--secondary); }
+.ui-button[data-size="sm"], .ui-icon-button[data-size="sm"] { --_height: var(--control-height-sm); font-size: var(--font-size-xs); }
+.ui-button[data-size="lg"], .ui-icon-button[data-size="lg"] { --_height: var(--control-height-lg); }
+.ui-button[data-variant="primary"] { background: var(--accent); color: var(--on-accent); }
+.ui-button[data-variant="quiet"] { background: transparent; color: var(--secondary); }
+.ui-button[data-variant="danger"] { background: transparent; color: var(--state-danger); }
+@media (hover: hover) {
+  .ui-button:hover, .ui-icon-button:hover { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
+  .ui-button[data-variant="primary"]:hover { background: color-mix(in srgb, var(--accent) 88%, var(--text)); color: var(--on-accent); }
+  .ui-button[data-variant="danger"]:hover { background: color-mix(in srgb, var(--state-danger) 10%, transparent); color: var(--state-danger); }
+}
+.ui-button:active, .ui-icon-button:active { background: color-mix(in srgb, var(--text) 12%, transparent); }
+.ui-button[aria-pressed="true"], .ui-icon-button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+
+/* —— 输入框 —— */
+.ui-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+  height: var(--control-height-md);
+  padding: 0 var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.ui-input > input,
+.ui-input > select,
+input.ui-input,
+select.ui-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+input.ui-input, select.ui-input { padding: 0 var(--space-sm); }
+.ui-input[data-mono], .ui-input > input[type="number"] { font-family: var(--font-mono); font-size: var(--font-size-xs); }
+.ui-input > input[type="number"] { appearance: textfield; }
+.ui-input > input::-webkit-inner-spin-button { appearance: none; }
+.ui-input-affix { flex: none; color: var(--tertiary); font-size: var(--font-size-xs); }
+@media (hover: hover) { .ui-input:hover { border-color: var(--line); } }
+.ui-input:focus-within { border-color: var(--accent); background: var(--control); }
+.ui-input[data-mixed] > input::placeholder { color: var(--tertiary); }
+
+/* —— 下拉 —— */
+.ui-select { position: relative; }
+.ui-select > select { appearance: none; padding-right: var(--space-lg); }
+.ui-select::after {
+  content: "";
+  position: absolute;
+  right: var(--space-sm);
+  width: 6px;
+  height: 6px;
+  border: solid var(--tertiary);
+  border-width: 0 1.5px 1.5px 0;
+  transform: translateY(-2px) rotate(45deg);
+  pointer-events: none;
+}
+
+/* —— 颜色 —— */
+.ui-color { padding-left: var(--space-xs); }
+.ui-color > input[type="color"] {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: none;
+}
+.ui-color > input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.ui-color > input[type="color"]::-webkit-color-swatch { border: 0; border-radius: var(--radius-sm); }
+
+/* —— 分段控件 —— */
+.ui-segmented {
+  display: inline-flex;
+  gap: var(--space-2xs);
+  height: var(--control-height-md);
+  padding: var(--space-2xs);
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+}
+.ui-segmented[data-size="sm"] { height: var(--control-height-sm); }
+.ui-segmented[data-fill] { display: flex; }
+.ui-segmented > button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-width: 0;
+  padding: 0 var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--secondary);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+@media (hover: hover) { .ui-segmented > button:hover { color: var(--text); } }
+.ui-segmented > button[aria-pressed="true"],
+.ui-segmented > button[aria-selected="true"] {
+  background: var(--control);
+  color: var(--text);
+  box-shadow: var(--shadow-sm), 0 0 0 1px var(--line);
+}
+
+/* —— 开关 —— */
+.ui-switch {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 32px;
+  height: 20px;
+  margin: 0;
+  border-radius: var(--radius-full);
+  background: var(--line-strong);
+  transition: background-color var(--duration-base) var(--ease-standard);
+}
+.ui-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--on-accent);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-base) var(--ease-standard);
+}
+.ui-switch:checked { background: var(--accent); }
+.ui-switch:checked::after { transform: translateX(12px); }
+
+/* —— 滑块 —— */
+.ui-slider { width: 100%; height: var(--control-height-sm); margin: 0; accent-color: var(--accent); }
+
+/* —— 属性行：左标签右控件 —— */
+.ui-field {
+  display: grid;
+  grid-template-columns: var(--_label-width, 64px) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--control-height-md);
+}
+.ui-field > :first-child { color: var(--secondary); font-size: var(--font-size-sm); }
+.ui-field[data-stack] { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
+.ui-field-pair { display: grid; grid-template-columns: repeat(var(--_columns, 2), minmax(0, 1fr)); gap: var(--space-sm); }
+.ui-field-note { margin: 0; color: var(--tertiary); font-size: var(--font-size-xs); }
+
+/* —— 分组 —— */
+.ui-section { border-top: 1px solid var(--line-soft); }
+.ui-section:first-child { border-top: 0; }
+.ui-section > header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+  padding: 0 var(--space-lg);
+}
+.ui-section > header > h3 { flex: 1; margin: 0; font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); }
+.ui-section > header > .ui-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 1;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  text-align: left;
+}
+.ui-section-toggle > .ui-icon { color: var(--tertiary); transition: transform var(--duration-base) var(--ease-standard); }
+.ui-section[data-collapsed] .ui-section-toggle > .ui-icon { transform: rotate(-90deg); }
+.ui-section > .ui-section-body { display: grid; gap: var(--space-sm); padding: 0 var(--space-lg) var(--space-lg); }
+.ui-section[data-collapsed] > .ui-section-body { display: none; }
+.ui-subsection { display: grid; gap: var(--space-sm); }
+.ui-subsection + .ui-subsection { margin-top: var(--space-sm); }
+.ui-subsection > h4 { margin: 0; color: var(--tertiary); font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); }
+
+/* —— 列表行 —— */
+.ui-list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: var(--control-height-lg);
+  padding: var(--space-xs) var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-align: left;
+}
+.ui-list-item > .ui-list-item-text { display: grid; flex: 1; min-width: 0; }
+.ui-list-item-text > small { overflow: hidden; color: var(--tertiary); font-size: var(--font-size-xs); text-overflow: ellipsis; white-space: nowrap; }
+@media (hover: hover) { .ui-list-item:hover { background: var(--hover); } }
+.ui-list-item[aria-selected="true"], .ui-list-item[aria-current="true"] { background: var(--accent-soft); color: var(--accent); }
+
+/* —— 缩略图 —— */
+.ui-thumb {
+  display: inline-block;
+  flex: none;
+  width: var(--_size, 32px);
+  height: var(--_size, 32px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--checker-image), var(--checker-light);
+  background-position: 0 0, 4px 4px;
+  background-size: 8px 8px;
+  object-fit: contain;
+}
+
+/* —— 角标 —— */
+.ui-badge {
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  height: 18px;
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: var(--material-content);
+  color: var(--secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
+.ui-badge[data-variant="accent"] { background: var(--accent-soft); color: var(--accent); }
+
+/* —— 菜单 —— */
+.ui-menu {
+  display: grid;
+  min-width: 180px;
+  padding: var(--space-xs);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--menu);
+  box-shadow: var(--shadow-md);
+}
+.ui-menu[hidden] { display: none; }
+
+/* —— 统一的焦点与禁用 —— */
+:where(.ui-button, .ui-icon-button, .ui-segmented > button, .ui-switch, .ui-list-item, .ui-section-toggle):focus-visible {
+  outline: 0;
+  box-shadow: var(--focus-ring);
+}
+:where(.ui-button, .ui-icon-button, .ui-input, .ui-switch, .ui-segmented > button):is(:disabled, [aria-disabled="true"]) {
+  opacity: var(--disabled-opacity);
+  pointer-events: none;
+}

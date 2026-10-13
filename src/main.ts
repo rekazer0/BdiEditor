@@ -26,6 +26,7 @@ import {
   type IconNode,
 } from "lucide"
 import "./tokens.css"
+import "./components.css"
 import "./style.css"
 import "./pen-design-application.css"
 import "./pen-sidebar.css"
@@ -47,7 +48,7 @@ import {
   renderBlobPreview,
 } from "./template-preview"
 import { initInspectorShell, setInspectorKind, syncInspectorRows } from "./inspector-shell.ts"
-import { inspectorIcon, inspectorGroupIcon, inspectorSymbolIcon } from "./icons"
+import { createIcon, groupIcon, symbolIcon } from "./icons"
 import { sourceKeyLabels } from "./config-labels.ts"
 import "./style-library.css"
 import "./design-workbench.css"
@@ -1881,7 +1882,7 @@ function syncMobileInspectorGroups(): void {
     const text = document.createElement("span")
     text.className = "inspector-group-label"
     text.textContent = label
-    button.append(inspectorGroupIcon(label), text)
+    button.append(groupIcon(label), text)
     button.title = railCodes.has(group) ? `${label}（${railCodes.get(group)}）` : label
     button.dataset.mobileInspectorGroup = group.dataset.mobileInspectorGroup
     button.addEventListener("click", () => setMobileInspectorGroup(group.dataset.mobileInspectorGroup ?? "0"))
@@ -1893,7 +1894,7 @@ function syncMobileInspectorGroups(): void {
       const button = document.createElement("button")
       button.type = "button"
       button.title = label
-      button.append(inspectorGroupIcon(label), Object.assign(document.createElement("span"), { className: "inspector-group-label", textContent: label }))
+      button.append(groupIcon(label), Object.assign(document.createElement("span"), { className: "inspector-group-label", textContent: label }))
       button.addEventListener("click", action)
       mobileInspectorGroups.append(button)
     }
@@ -5267,7 +5268,7 @@ function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferen
     soundMain.setAttribute("role", "button")
     soundMain.tabIndex = 0
     soundMain.setAttribute("aria-label", "播放按键音效")
-    const musicIcon = inspectorIcon("music", 13)
+    const musicIcon = createIcon("music", 13)
     musicIcon.classList.add("sound-style-main-icon")
     const soundMeta = document.createElement("span")
     soundMeta.className = "sound-style-main-meta"
@@ -5292,7 +5293,7 @@ function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferen
     play.type = "button"
     play.className = "inspector-sound-play"
     play.setAttribute("aria-label", "播放按键音效")
-    play.append(inspectorIcon("play", 12))
+    play.append(createIcon("play", 12))
     play.addEventListener("click", playCurrent)
     wrapper.append(soundMain, play)
   } else {
@@ -5305,7 +5306,7 @@ function decorateStyleReferenceInput(input: HTMLInputElement, key = styleReferen
   if (soundStyle) {
     button.title = "点击更换样式；Command/Ctrl 点击编辑样式"
     button.setAttribute("aria-label", "更换或编辑引用样式")
-    button.append(inspectorIcon("ellipsis", 14))
+    button.append(createIcon("ellipsis", 14))
 
   }
   if (button instanceof HTMLButtonElement) button.addEventListener("click", (event) => {
@@ -5627,7 +5628,7 @@ function styleKindBadge(kind: StyleKind): HTMLElement {
   badge.className = "style-kind-badge"
   badge.dataset.styleKind = kind
   badge.title = `${styleKinds[kind].label}样式`
-  badge.append(inspectorIcon(styleKinds[kind].icon, 11), styleKinds[kind].label)
+  badge.append(createIcon(styleKinds[kind].icon, 11), styleKinds[kind].label)
   return badge
 }
 
@@ -6950,7 +6951,7 @@ function addNavButton(
   // 概览与检查器分类轨共用同一套 Lucide 图标（16px、1.5 描边），平台符号只作兜底。
   const symbolName = icon ?? navigationSystemSymbols[className] ?? "doc"
   const symbol = createSystemSymbol(symbolName)
-  const lucide = inspectorSymbolIcon(symbolName, 16)
+  const lucide = symbolIcon(symbolName, 16)
   if (lucide) symbol.replaceChildren(lucide)
   button.append(symbol)
   const labelNode = document.createElement("span")
@@ -7069,7 +7070,7 @@ function populateKeyInspector(): void {
     : selectedPath !== layoutPath
       ? selectedPath.split("/").pop() ?? "文档配置"
       : `${selectedPath.split("/").pop() ?? "键盘"} · 整体布局`
-  selectedKeyPreview.replaceChildren(inspectorIcon(hasSelection ? bdaSelected ? "component" : sections.length > 1 ? "layers" : "key-round" : "panel-top"))
+  selectedKeyPreview.replaceChildren(createIcon(hasSelection ? bdaSelected ? "component" : sections.length > 1 ? "layers" : "key-round" : "panel-top"))
   selectedKeyPreview.hidden = false
   selectedKeyName.title = selectedKeyName.textContent ?? ""
   selectedKeyContext.textContent = hasSelection
@@ -8817,7 +8818,7 @@ function renderFiles(): void {
   // 与概览同一套 Lucide 图标（16px、1.5 描边）；图片行先放图标，滚到附近再换成缩略图。
   const sourceSymbol = (name: string) => {
     const symbol = createSystemSymbol(name)
-    const lucide = inspectorSymbolIcon(name, 16)
+    const lucide = symbolIcon(name, 16)
     if (lucide) symbol.replaceChildren(lucide)
     return symbol
   }

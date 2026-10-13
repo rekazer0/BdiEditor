@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN" data-app-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>检查器原型</title>
+  <link rel="stylesheet" href="/src/tokens.css" />
+  <link rel="stylesheet" href="/src/components.css" />
+  <link rel="stylesheet" href="./inspector.css" />
+</head>
+<body>
+  <header class="proto-titlebar">
+    <strong>检查器原型</strong>
+    <span class="proto-hint">点击按键选中 · ⌘/Shift 点击多选 · 点击空白处选中面板</span>
+    <div class="ui-segmented" data-size="sm" id="theme-switch">
+      <button type="button" data-theme="light" aria-pressed="true">浅色</button>
+      <button type="button" data-theme="dark" aria-pressed="false">深色</button>
+    </div>
+  </header>
+  <main class="proto-main">
+    <section class="proto-canvas" id="canvas"><div class="proto-keyboard" id="keyboard"></div></section>
+    <aside class="inspector" id="inspector" aria-label="检查器"></aside>
+  </main>
+  <script type="module" src="./inspector.ts"></script>
+</body>
+</html>

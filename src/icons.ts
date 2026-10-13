@@ -54,15 +54,15 @@ const icons: Record<string, IconNode> = {
   folder: Folder, file: File,
 }
 
-export function inspectorIcon(name: string, size = 14): SVGElement {
+export function createIcon(name: string, size = 14): SVGElement {
   const node = icons[name]
-  if (!node) throw new Error(`Unknown inspector icon: ${name}`)
-  const svg = createElement(node, { width: size, height: size, "stroke-width": 1.5, "aria-hidden": "true", class: "inspector-icon" })
+  if (!node) throw new Error(`Unknown icon: ${name}`)
+  const svg = createElement(node, { width: size, height: size, "stroke-width": 1.5, "aria-hidden": "true", class: "inspector-icon ui-icon" })
   svg.dataset.penIcon = name
   return svg
 }
 
-export function inspectorGroupIcon(label: string): SVGElement {
+export function groupIcon(label: string): SVGElement {
   const name = /资源|图片/.test(label) ? "images"
     : /动画|动效|粒子/.test(label) ? "clapperboard"
     : /声音|音效/.test(label) ? "volume-2"
@@ -74,7 +74,7 @@ export function inspectorGroupIcon(label: string): SVGElement {
     : /样式|外观|颜色|皮肤/.test(label) ? "palette"
     : /文字|字体|内容/.test(label) ? "type"
     : /动作|手势|按键/.test(label) ? "zap" : "panel-top"
-  return inspectorIcon(name, 16)
+  return createIcon(name, 16)
 }
 
 /*
@@ -114,8 +114,8 @@ const symbolIcons: Record<string, [string, number]> = {
 }
 
 /** The panel icon for a platform symbol name, or null when the panel has no equivalent. */
-export function inspectorSymbolIcon(symbol: string, size?: number): SVGElement | null {
+export function symbolIcon(symbol: string, size?: number): SVGElement | null {
   // 概览条目里也直接写 Lucide 名（palette、images…），同样走这套图标。
   const entry = symbolIcons[symbol] ?? (icons[symbol] ? [symbol, 14] : undefined)
-  return entry ? inspectorIcon(entry[0], size ?? entry[1]) : null
+  return entry ? createIcon(entry[0], size ?? entry[1]) : null
 }
