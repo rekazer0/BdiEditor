@@ -483,7 +483,9 @@ export function renderBdaLayoutEditor(container: HTMLElement, options: LayoutEdi
         field,
       )
     })
-    control.append(keyInput, preview)
+    const meta = element("span", "style-reference-meta")
+    meta.append(keyInput)
+    control.append(meta, preview)
     field.append(caption, control)
     return field
   }

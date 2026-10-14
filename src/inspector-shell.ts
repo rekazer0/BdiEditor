@@ -201,28 +201,20 @@ function bindFilter(root: HTMLElement): void {
   })
 }
 
-/* —— 改动标记与恢复 —— */
-function objectActions(): HTMLElement | null {
-  return document.querySelector<HTMLElement>(".inspector-object-actions")
-}
-
-function ensureResetControls(): void {
-  const actions = objectActions()
-  if (!actions || actions.querySelector(".inspector-changes")) return
-  const status = document.createElement("span")
-  status.className = "inspector-changes ui-badge"
-  status.setAttribute("role", "status")
-  status.hidden = true
-  const reset = document.createElement("button")
-  reset.type = "button"
-  reset.className = "inspector-reset ui-button"
-  reset.dataset.size = "sm"
-  reset.dataset.variant = "quiet"
-  reset.title = "恢复本次选择后的所有修改"
-  reset.textContent = "重置"
-  reset.hidden = true
-  reset.addEventListener("click", resetAll)
-  actions.prepend(status, reset)
+/* —— 改动标记与恢复：侧栏底部显示「已改 n · 重置」 —— */
+function resetButton(): HTMLButtonElement | null {
+  const rail = document.querySelector<HTMLElement>(".inspector-rail")
+  if (!rail) return null
+  let reset = rail.querySelector<HTMLButtonElement>(".inspector-reset")
+  if (!reset) {
+    reset = document.createElement("button")
+    reset.type = "button"
+    reset.className = "inspector-reset"
+    reset.hidden = true
+    reset.addEventListener("click", resetAll)
+    rail.append(reset)
+  }
+  return reset
 }
 
 function rowValue(row: Row): string {
@@ -270,14 +262,15 @@ function markRow(row: Row, modified: boolean): void {
 
 function updateStatus(): void {
   const count = rows.filter((row) => row.el.hasAttribute("data-modified")).length
-  const actions = objectActions()
-  const status = actions?.querySelector<HTMLElement>(".inspector-changes")
-  const reset = actions?.querySelector<HTMLElement>(".inspector-reset")
-  if (status) {
-    status.hidden = count === 0
-    status.textContent = `已改 ${count}`
+  const reset = resetButton()
+  if (reset) {
+    reset.hidden = count === 0
+    reset.title = `本次选择后改了 ${count} 项，点击全部恢复`
+    const badge = document.createElement("span")
+    badge.className = "inspector-changes"
+    badge.textContent = `已改 ${count}`
+    reset.replaceChildren(badge, "重置")
   }
-  if (reset) reset.hidden = count === 0
   // 折叠起来的分组也能看出里面有改动。
   const root = inspector()
   if (!root) return
@@ -368,7 +361,6 @@ function syncGestures(): void {
 
 export function initInspectorShell(): void {
   renderEmptyState()
-  ensureResetControls()
   decorateSections()
   collectRows()
   const root = inspector()

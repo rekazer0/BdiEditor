@@ -148,8 +148,12 @@ export function renderStyleReferenceRows(button: HTMLElement, input: HTMLInputEl
       })
       previews.append(item)
     }
-    wrapper.append(numberInput, previews)
-    if (styleID) wrapper.append(styleKindBadge(styleKind(styleID, styles)))
+    // 卡片左侧：编号在上、样式类型在下；右侧并排两个状态预览（DESIGN.md §10）。
+    const meta = document.createElement("span")
+    meta.className = "style-reference-meta"
+    meta.append(numberInput)
+    if (styleID) meta.append(styleKindBadge(styleKind(styleID, styles)))
+    wrapper.append(meta, previews)
     button.append(wrapper)
   }
   return styleIDs

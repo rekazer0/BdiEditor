@@ -8,6 +8,7 @@
 .source {
   --_gutter: var(--space-lg);
   --_label: 80px;
+  --_rail: 56px;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -70,74 +71,71 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+  padding-right: var(--_rail);
   overscroll-behavior: contain;
 }
 .source #quick-inspector[hidden] { display: none; }
 
-/* —— 分组导航：吸顶的一行文字标签，只做导航（点击滚动到分组，滚动时高亮当前分组）；右端是筛选 —— */
-.source .inspector-jumpbar {
+/* —— 右侧分类栏：顶部筛选，中间分组（图标 + 文字，点击滚动到分组），底部「已改 n · 重置」 —— */
+.source .inspector-rail {
   position: sticky;
   top: 0;
   z-index: 1;
+  float: right;
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: var(--space-xs);
-  height: 40px;
-  padding: 0 var(--space-sm) 0 var(--_gutter);
-  /* 压住下面第一个分组的顶线，两条线不叠成一条粗线 */
-  margin-bottom: -1px;
-  border-bottom: 1px solid var(--line-soft);
-  /* 玻璃材质下 --inspector 半透明：叠两层再模糊，滚到下面的内容不会透上来 */
-  background: linear-gradient(var(--inspector), var(--inspector)), var(--inspector);
-  -webkit-backdrop-filter: blur(24px);
-  backdrop-filter: blur(24px);
+  width: var(--_rail);
+  height: 100%;
+  margin-right: calc(-1 * var(--_rail));
+  padding: var(--space-sm) var(--space-xs);
+  border-left: 1px solid var(--line-soft);
 }
+.source .inspector-rail > .inspector-filter-open { flex: none; width: 100%; }
 .source #mobile-inspector-groups {
-  position: relative;
-  display: flex;
-  flex: 1;
-  gap: var(--space-2xs);
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
+  display: grid;
+  gap: var(--space-xs);
+  width: 100%;
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--line-soft);
 }
-.source #mobile-inspector-groups[hidden] { visibility: hidden; }
-.source #mobile-inspector-groups > button {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
+.source #mobile-inspector-groups[hidden] { display: none; }
+.source :is(#mobile-inspector-groups > button, .inspector-reset) {
+  display: grid;
+  justify-items: center;
   gap: var(--space-2xs);
-  height: var(--control-height-sm);
-  padding: 0 var(--space-sm);
+  width: 100%;
+  padding: var(--space-xs) 0;
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   background: none;
   color: var(--secondary);
   font: inherit;
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  white-space: nowrap;
   transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
-.source #mobile-inspector-groups > button:focus-visible { outline: 0; box-shadow: var(--focus-ring); }
-@media (hover: hover) { .source #mobile-inspector-groups > button:hover { background: var(--hover); color: var(--text); } }
-.source #mobile-inspector-groups > button:active { background: color-mix(in srgb, var(--text) 10%, transparent); }
-.source #mobile-inspector-groups > button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
-/* 跳到别的对象（BDA 的面板、动画、声音）：与本对象的分组用细线隔开，尾部带箭头 */
-.source #mobile-inspector-groups > button[data-destination] { color: var(--tertiary); }
-.source #mobile-inspector-groups > :not([data-destination]) + button[data-destination] { margin-left: var(--space-sm); }
-.source #mobile-inspector-groups > :not([data-destination]) + button[data-destination]::before {
-  content: "";
-  width: 1px;
-  height: 12px;
-  margin: 0 var(--space-sm) 0 calc(-1 * var(--space-md));
-  background: var(--line);
-}
+.source .inspector-group-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.source :is(#mobile-inspector-groups > button, .inspector-reset):focus-visible { outline: 0; box-shadow: var(--focus-ring); }
+@media (hover: hover) { .source :is(#mobile-inspector-groups > button, .inspector-reset):hover { background: var(--hover); color: var(--text); } }
+.source :is(#mobile-inspector-groups > button, .inspector-reset):active { background: color-mix(in srgb, var(--text) 10%, transparent); }
+.source #mobile-inspector-groups > button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: var(--font-weight-medium); }
+.source .inspector-reset { margin-top: auto; }
+.source :is(#mobile-inspector-groups > button, .inspector-reset)[hidden] { display: none; }
+.source .inspector-changes { padding: 0 var(--space-xs); border-radius: var(--radius-full); background: var(--accent-soft); color: var(--accent); font-weight: var(--font-weight-medium); white-space: nowrap; }
 
-/* 筛选：平时只是一个放大镜按钮，打开后输入框占满这一行 */
-.source .inspector-filter { display: none; flex: 1; height: var(--control-height-sm); padding-right: 0; }
+/* 筛选：点侧栏的放大镜后，输入框吸在内容顶部 */
+.source .inspector-filter {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: none;
+  margin: var(--space-sm) var(--_gutter);
+  padding-right: 0;
+  /* 玻璃材质下 --inspector 半透明：叠一层底色，滚到下面的内容不会透上来 */
+  background: linear-gradient(var(--material-content), var(--material-content)), var(--inspector);
+}
 .source #quick-inspector[data-filter-open] .inspector-filter { display: flex; }
-.source #quick-inspector[data-filter-open] :is(#mobile-inspector-groups, .inspector-filter-open) { display: none; }
 .source .inspector-filter > input { font-size: var(--font-size-xs); }
 .source .inspector-filter > .ui-icon-button { flex: none; }
 .source .inspector-filter-empty { margin: 0; padding: var(--space-2xl) var(--_gutter); color: var(--tertiary); font-size: var(--font-size-xs); text-align: center; }
@@ -211,7 +209,6 @@
 .source .style-field { display: block; min-width: 0; }
 
 /* 改动标记：本次选择后改过的行在左侧留白里有一个点；悬停或聚焦时变成「恢复」按钮（Godot 的做法） */
-.source .inspector-gesture { position: relative; }
 .source .inspector-revert {
   position: absolute;
   top: 50%;
@@ -261,7 +258,6 @@
 .source #quick-inspector[data-readonly="true"] [data-scrub] { cursor: default; }
 @media (hover: hover) { .source .ui-input > [data-scrub]:hover { color: var(--text); } }
 .source [data-scrub][data-scrubbing] { color: var(--accent); }
-.source .inspector-changes[hidden], .source .inspector-reset[hidden] { display: none; }
 
 /* —— 成对 / 四格数值 —— */
 .source :is(.document-pair-inputs, .document-quad-inputs, .particle-range-inputs) { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: center; gap: var(--space-xs); }
@@ -278,25 +274,50 @@
 .source .color-control > input[type="number"] { flex: none; width: 44px; text-align: right; }
 .source .bda-color-controls { display: flex; align-items: center; gap: var(--space-xs); min-width: 0; }
 
-/* —— 样式引用：编号 + 两个状态缩略图 + 类型角标，一行 —— */
-.source :is(.style-reference-input, .bda-style-reference-input) { display: flex; align-items: center; gap: var(--space-xs); min-width: 0; }
-.source :is(.style-reference-input, .bda-style-reference-input) > input:not(.style-reference-number):not(.sound-style-value) { display: none; }
+/* —— 样式卡片：左侧编号 + 类型，右侧并排「正常 | 按下」两个预览；标签在卡片上方。
+   按键、整体布局、BDA 共用同一张卡片（style-references.ts / bda-editor.ts 生成同样的结构）。 —— */
+.source :is(.ui-field, .document-property-field, .fore-style-reference-field):has(.style-reference-row, .bda-style-reference-input, .sound-style-reference) { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
+.source .style-reference-input { display: flex; align-items: center; gap: var(--space-xs); min-width: 0; }
+.source .style-reference-input > input:not(.style-reference-number):not(.sound-style-value) { display: none; }
 .source .style-picker-trigger { display: grid; flex: 1; gap: var(--space-xs); min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; }
-.source .style-reference-row { display: flex; align-items: center; gap: var(--space-xs); min-width: 0; }
-.source .style-reference-number { flex: none; width: 52px; }
-.source .style-picker-states { display: grid; flex: 1; grid-template-columns: 1fr 1fr; gap: var(--space-xs); min-width: 0; }
+.source :is(.style-reference-row, .bda-style-reference-input) {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  height: 64px;
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--material-content);
+}
+.source .bda-style-reference-input > .style-picker-trigger { height: 100%; }
+.source .style-reference-meta { display: grid; place-content: center; justify-items: center; gap: var(--space-2xs); min-width: 0; padding: 0 var(--space-xs); }
+.source .style-reference-meta > input {
+  width: 100%;
+  height: auto;
+  padding: 0;
+  border-color: transparent;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
+.source .style-reference-meta > input:focus { background: var(--control); }
+.source .style-reference-meta > .style-kind-badge { padding: 0; background: none; box-shadow: none; color: var(--tertiary); }
+.source .style-picker-states { display: grid; flex: 1; grid-template-columns: 1fr 1fr; gap: 1px; height: 100%; min-width: 0; background: var(--line-soft); }
 .source .style-picker-state {
-  height: var(--control-height-lg);
+  height: 100%;
   padding: 0;
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border: 0;
+  border-radius: 0;
   background: var(--checker-image), var(--checker-light);
   background-position: 0 0, 4px 4px;
   background-size: 8px 8px;
 }
 .source .style-picker-state > canvas { display: block; width: 100%; height: 100%; }
-@media (hover: hover) { .source .style-picker-state:hover { border-color: var(--accent); } }
+@media (hover: hover) { .source .style-picker-state:hover { box-shadow: inset 0 0 0 2px var(--accent); } }
 .source :is(.style-kind-badge, .sound-style-badge, .bda-inspector-context-badge) {
   flex: none;
   padding: 0 var(--space-xs);
@@ -351,25 +372,61 @@
 /* —— 排列（多选） —— */
 .source .inspector-tools { display: flex; flex-wrap: wrap; gap: var(--space-2xs); }
 
-/* —— 手势：一行一个方向，释义放在输入框尾部 —— */
-.source .inspector-gestures { display: grid; gap: var(--space-xs); }
-.source .inspector-gesture {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  height: var(--control-height-md);
-  padding: 0 var(--space-sm);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: var(--material-content);
-  color: var(--tertiary);
-  transition: border-color var(--duration-fast) var(--ease-standard);
+/* —— 手势：十字。中间点击，上下左右对应滑动方向；长按不是方向，单独一条放在下面。
+   每格：动作码（可直接输入）→ 方向名 → 释义；没配置的格子是虚线框加「+」 —— */
+.source .inspector-gestures {
+  display: grid;
+  grid-template-areas: ". up ." "left center right" ". down ." "hold hold hold";
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-xs);
 }
-.source .inspector-gesture > span { display: inline-flex; flex: none; align-items: center; gap: var(--space-xs); width: 52px; font-size: var(--font-size-xs); }
-.source .inspector-gesture > input { flex: 1; height: 100%; padding: 0; border: 0; background: none; color: var(--text); font-family: var(--font-mono); font-size: var(--font-size-xs); }
-.source .inspector-gesture > small { flex: none; max-width: 45%; overflow: hidden; font-size: var(--font-size-xs); text-overflow: ellipsis; white-space: nowrap; }
-.source .inspector-gesture.configured > span { color: var(--accent); }
-.source .inspector-gesture:focus-within { border-color: var(--accent); background: var(--control); }
+.source .inspector-gesture[data-gesture="UP"] { grid-area: up; }
+.source .inspector-gesture[data-gesture="LEFT"] { grid-area: left; }
+.source .inspector-gesture[data-gesture="CENTER"] { grid-area: center; }
+.source .inspector-gesture[data-gesture="RIGHT"] { grid-area: right; }
+.source .inspector-gesture[data-gesture="DOWN"] { grid-area: down; }
+.source .inspector-gesture[data-gesture="HOLD"] { grid-area: hold; }
+.source .inspector-gesture {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-2xs);
+  min-width: 0;
+  height: 72px;
+  padding: 0 var(--space-xs);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-lg);
+  color: var(--tertiary);
+  font-size: var(--font-size-xs);
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+.source .inspector-gesture.configured { border-style: solid; border-color: transparent; background: var(--material-content); }
+.source .inspector-gesture > span { display: inline-flex; align-items: center; gap: var(--space-2xs); }
+.source .inspector-gesture > input {
+  order: -1;
+  width: 100%;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  /* 焦点由整个格子表示（:focus-within） */
+  outline: 0;
+}
+.source .inspector-gesture > small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.source .inspector-gesture > small:empty { display: none; }
+.source .inspector-gesture:focus-within { border-style: solid; border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+/* 改过的格子：恢复按钮放在格子左上角 */
+.source .inspector-gesture { position: relative; }
+.source .inspector-gesture > .inspector-revert { top: var(--space-2xs); left: var(--space-2xs); margin-top: 0; }
+/* 长按：一条横排，标签 · 动作码 · 释义 */
+.source .inspector-gesture[data-gesture="HOLD"] { display: flex; gap: var(--space-sm); height: var(--control-height-lg); padding: 0 var(--space-md); }
+.source .inspector-gesture[data-gesture="HOLD"] > input { order: 0; flex: 1; font-size: var(--font-size-sm); text-align: left; }
+.source .inspector-gesture[data-gesture="HOLD"] > small { max-width: 45%; }
 
 /* —— BDA：样式标题行、卡片压平为分区 —— */
 .source .bda-selected-style-heading { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-md) var(--_gutter) 0; }

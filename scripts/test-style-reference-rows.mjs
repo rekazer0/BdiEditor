@@ -55,7 +55,8 @@ for (const key of ['FORE_STYLE', 'BACK_STYLE']) {
   await context.refreshStyleReferenceThumbnail(button, input, key)
   assert.equal(button.children.length, 3)
   assert.deepEqual(drawn.map(layers => layers.map(visual => visual.id).join(',')), ['11', '11', '22', '22', '11', '11'])
-  assert.deepEqual(Array.from(button.children, row => row.children[0].value), ['11', '22', '11'])
+  // 卡片：左侧 meta（编号 + 类型），右侧两个状态预览
+  assert.deepEqual(Array.from(button.children, row => row.children[0].children[0].value), ['11', '22', '11'])
   const stateCard = button.children[1].children[1].children[0]
   // 预览图点击打开该状态图片的切片选择器，而不是样式选择器。
   stateCard.listeners.click({})
@@ -66,7 +67,7 @@ for (const key of ['FORE_STYLE', 'BACK_STYLE']) {
   pickerTarget.value = '33'
   pickerTarget.dispatchEvent(new Event('change'))
   assert.equal(input.value, '11,33,11')
-  const numberInput = button.children[0].children[0]
+  const numberInput = button.children[0].children[0].children[0]
   numberInput.value = '55'
   numberInput.dispatchEvent(new Event('change'))
   assert.equal(input.value, '55,33,11')
