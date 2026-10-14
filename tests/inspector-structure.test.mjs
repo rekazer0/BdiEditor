@@ -70,6 +70,11 @@ test("style references are one shared card: number and kind on the left, normal 
   assert.match(read("src/inspector.css"), /:is\(\.style-reference-row, \.bda-style-reference-input\) \{/)
 })
 
+test("the text group picks one of the skin's font files as GLOBAL FONT_PATH", () => {
+  assert.match(pane, /<select id="font-file-select"/)
+  assert.match(read("src/app/key-inspector.ts"), /document\.set\("GLOBAL", "FONT_PATH", value\)/)
+})
+
 test("gestures form a cross: tap in the middle, swipes around it, long press below", () => {
   const css = read("src/inspector.css")
   assert.match(css, /grid-template-areas: "\. up \." "left center right" "\. down \." "hold hold hold";/)

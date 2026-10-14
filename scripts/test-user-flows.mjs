@@ -305,6 +305,8 @@ await check("edit keys: geometry, keyboard nudge, undo/redo, multi-select, layou
   await page.locator('[data-inspector-tab="source"]').click()
   await page.waitForFunction(() => /SHOW=测/.test(document.querySelector("#source .cm-content")?.innerText ?? ""))
   await page.locator('[data-inspector-tab="properties"]').click()
+  // The font is picked from the skin's own font files; the system font is always offered.
+  assert.equal(await page.locator("#font-file-select option").first().textContent(), "系统默认")
   await railTab(page, "手势")
   const up = page.locator("[data-key-field=UP]")
   await up.fill("F12")

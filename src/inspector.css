@@ -353,21 +353,7 @@
 @media (hover: hover) { .source :is(.inspector-sound-play, .sound-style-trigger):hover:not(:disabled) { background: var(--hover); color: var(--text); } }
 .source .inspector-sound-play:disabled { opacity: var(--disabled-opacity); }
 
-/* —— 更多（折叠的高级属性） —— */
-.source .inspector-advanced > summary {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  width: fit-content;
-  min-height: var(--control-height-sm);
-  color: var(--secondary);
-  font-size: var(--font-size-xs);
-  list-style: none;
-}
-.source .inspector-advanced > summary::-webkit-details-marker { display: none; }
-.source .inspector-advanced > summary > .ui-icon { transition: transform var(--duration-base) var(--ease-standard); }
-.source .inspector-advanced[open] > summary > .ui-icon { transform: rotate(90deg); }
-.source .inspector-advanced[open] > summary { margin-bottom: var(--space-sm); }
+.source #font-file-field[hidden] { display: none; }
 
 /* —— 排列（多选） —— */
 .source .inspector-tools { display: flex; flex-wrap: wrap; gap: var(--space-2xs); }

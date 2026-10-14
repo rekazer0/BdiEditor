@@ -13,7 +13,7 @@ import { refreshPreview } from "./preview-render"
 import { refreshBdaStyleReferenceField } from "../bda-editor.ts"
 import { actionFieldNames, bdaKeyFieldLabels, preview, keyboardFields, layoutActionButtons, actionMeaningNodes } from "./canvas-interaction"
 import { shouldSuggestActionCodes, actionDescription } from "../actions.ts"
-import { keyFields, styleFields, primaryCssFields, inspectorBackButton, skinFieldsGroup, toolbarFieldsGroup, keyboardFieldsGroup, keyOnlyGroups, keyTypographyFieldsGroup, selectedKeyName, selectedKeyPreview, selectedKeyContext, quickInspector, skinFields, toolbarFields, textStyleLabels, $, canvasMultiToolbar, canvasMultiCount, keyLayoutFieldsGroup, keyModeButtons, keyActionButtons, gapFields, mode, theme } from "./dom"
+import { keyFields, styleFields, primaryCssFields, fontFileField, fontFileSelect, inspectorBackButton, skinFieldsGroup, toolbarFieldsGroup, keyboardFieldsGroup, keyOnlyGroups, keyTypographyFieldsGroup, selectedKeyName, selectedKeyPreview, selectedKeyContext, quickInspector, skinFields, toolbarFields, textStyleLabels, $, canvasMultiToolbar, canvasMultiCount, keyLayoutFieldsGroup, keyModeButtons, keyActionButtons, gapFields, mode, theme } from "./dom"
 import { deferNumberInputRefresh } from "../number-input-wheel.ts"
 import { effectivePanelSection } from "../panel-tools.ts"
 import { createIcon } from "../icons"
@@ -214,6 +214,52 @@ export function populatePrimaryCssFields(hasSelection: boolean, sections: string
   }
 }
 
+function fontStyles(): { path: string; text: string } | undefined {
+  const path = styleConfigPath()
+  if (appState.archive?.format === "bda" || !appState.archive?.isText(path)) return
+  return { path, text: appState.archive.getText(path) }
+}
+
+/** 皮肤内可作 FONT_PATH 的字体：值是相对样式表目录（找不到时相对 skin 目录）的路径，与 atlas 的解析规则一致。 */
+function skinFontFiles(stylePath: string): { value: string; path: string }[] {
+  const roots = [stylePath.slice(0, stylePath.lastIndexOf("/") + 1), stylePath.match(/^(.*\/skin\/)/)?.[1] ?? ""].filter(Boolean)
+  return (appState.archive?.names() ?? []).flatMap((path) => {
+    const root = /\.(?:ttf|otf|ttc)$/i.test(path) ? roots.find((item) => path.startsWith(item)) : undefined
+    return root ? [{ value: path.slice(root.length), path }] : []
+  })
+}
+
+/** 字体是整套皮肤共用的 [GLOBAL] FONT_PATH，只能从皮肤里已有的字体文件中选。 */
+function populateFontFileField(hasSelection: boolean): void {
+  const styles = hasSelection ? fontStyles() : undefined
+  fontFileField.hidden = !styles
+  if (!styles) return
+  const current = IniDocument.parse(styles.text).get("GLOBAL", "FONT_PATH")?.trim() ?? ""
+  const fonts = skinFontFiles(styles.path)
+  const options = [new Option("系统默认", ""), ...fonts.map((font) => new Option(font.value, font.value))]
+  // 配置里写了但皮肤里找不到的字体也列出来，免得误显示成系统默认
+  if (current && !fonts.some((font) => font.value === current)) options.push(new Option(`${current}（缺失）`, current))
+  fontFileSelect.replaceChildren(...options)
+  fontFileSelect.value = current
+  fontFileSelect.disabled = !isEditing()
+}
+
+/** value 为空表示改回系统默认。 */
+export function setFontFile(value: string): void {
+  const styles = fontStyles()
+  if (!styles || !isEditing()) return
+  const document = IniDocument.parse(styles.text)
+  if (!value) document.remove("GLOBAL", "FONT_PATH")
+  // 样式表没有 [GLOBAL] 节时 set 返回 false，在文件头补一节
+  const after = !value || document.set("GLOBAL", "FONT_PATH", value) || document.get("GLOBAL", "FONT_PATH") === value
+    ? document.toString()
+    : `[GLOBAL]\nFONT_PATH=${value}\n${styles.text}`
+  commitText(styles.path, styles.text, after)
+  refreshPreview()
+  populateKeyInspector()
+  updateDirty()
+}
+
 export function populateKeyInspector(): void {
   if (deferNumberInputRefresh(populateKeyInspector, populateKeyInspector)) return
   if (appState.selectedPath !== appState.layoutPath && appState.selectedKeySections.length) {
@@ -355,6 +401,7 @@ export function populateKeyInspector(): void {
     if (!common && new Set(values).size > 1) field.placeholder = "混合"
   }
   populatePrimaryCssFields(hasSelection, sections)
+  populateFontFileField(hasSelection)
   const bdaKeyProperties = new Set(["FORE_OFFSET"])
   for (const field of keyFields) {
     if (!field.closest(".key-appearance-fields")) continue

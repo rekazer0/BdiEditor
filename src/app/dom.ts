@@ -273,6 +273,9 @@ export const styleFields = Array.from(document.querySelectorAll<HTMLInputElement
 
 export const primaryCssFields = $("#primary-css-fields")
 
+export const fontFileField = $("#font-file-field")
+export const fontFileSelect = $("#font-file-select") as HTMLSelectElement
+
 export const skinFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-skin-field]"))
 
 export const keyboardFieldsGroup = $(".keyboard-fields")
