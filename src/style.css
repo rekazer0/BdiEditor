@@ -4003,8 +4003,8 @@ input[type="search"]::placeholder {
 
 input[type="search"]:focus {
   outline: none;
-  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 .search-control {
@@ -4020,8 +4020,8 @@ input[type="search"]:focus {
 }
 
 .search-control:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 .search-control .system-symbol {
@@ -4906,7 +4906,7 @@ input[type="search"]:focus {
 /* ===== 深色模式增强 ===== */
 
 /* ===== 聚焦指示器优化 ===== */
-*:focus-visible {
+*:focus-visible:not(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]), select, textarea) {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius-md);
@@ -6363,7 +6363,7 @@ main {
 .search-control input:focus {
   border-color: var(--accent);
   outline: 0;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: var(--focus-ring);
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -6978,7 +6978,7 @@ main {
 :root body .app-dialog input[type="number"]:focus {
   border-color: var(--accent);
   outline: 0;
-  box-shadow: none;
+  box-shadow: var(--focus-ring);
 }
 
 /* Search box: one sunken capsule, the inner input is bare. */
@@ -7249,7 +7249,7 @@ main {
 :root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) input:not([type="checkbox"]):focus {
   border-color: var(--accent);
   outline: none;
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--focus-ring);
 }
 
 :root body :is(#panel-scale-dialog, #new-style-dialog, #atlas-create-dialog) input:disabled {

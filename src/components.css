@@ -82,7 +82,9 @@ input.ui-input, select.ui-input { padding: 0 var(--space-sm); }
 .ui-input > input::-webkit-inner-spin-button { appearance: none; }
 .ui-input-affix { flex: none; color: var(--tertiary); font-size: var(--font-size-xs); }
 @media (hover: hover) { .ui-input:hover { border-color: var(--line); } }
-.ui-input:focus-within { border-color: var(--accent); background: var(--control); }
+.ui-input:focus-within { border-color: var(--accent); background: var(--control); box-shadow: var(--focus-ring); }
+/* 焦点只画在外框上，内层输入框不再自带边框和光晕 */
+.ui-input > :is(input, select, textarea):focus { border-color: transparent; background: transparent; box-shadow: none; }
 .ui-input[data-mixed] > input::placeholder { color: var(--tertiary); }
 
 /* —— 下拉 —— */
@@ -330,7 +332,7 @@ input.ui-input, select.ui-input { padding: 0 var(--space-sm); }
 @media (hover: hover) {
   :where(.ui-form) :where(input, select, textarea):hover:not(:focus, :disabled) { border-color: var(--line); }
 }
-:where(.ui-form) :where(input, select, textarea):focus { border-color: var(--accent); background-color: var(--control); }
+:where(.ui-form) :where(input, select, textarea):focus { border-color: var(--accent); background-color: var(--control); box-shadow: var(--focus-ring); }
 :where(.ui-form) :where(input, select, textarea):disabled { border-color: transparent; background-color: transparent; color: var(--secondary); opacity: 1; }
 :where(.ui-form) :where(input::placeholder) { color: var(--tertiary); }
 :where(.ui-form) :where(input[type="checkbox"][role="switch"]) {
@@ -385,3 +387,5 @@ body {
   outline: 3px solid color-mix(in srgb, var(--accent) 25%, transparent);
   outline-offset: 1px;
 }
+/* 文本框的焦点由边框 + 贴边光晕表示，不再叠一圈有间隙的 outline */
+:where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]), select, textarea):focus-visible { outline: 0; }

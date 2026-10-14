@@ -94,7 +94,7 @@
 | 悬停 | 背景叠 `--hover`（仅 `(hover: hover)` 设备） |
 | 按下 | 背景再加深一档：`color-mix(in srgb, var(--text) 10%, transparent)` |
 | 选中 | 背景 `--accent-soft`，文字/图标 `--accent` |
-| 焦点 | 仅 `:focus-visible` 显示 `box-shadow: var(--focus-ring)` |
+| 焦点 | 仅 `:focus-visible` 显示 `box-shadow: var(--focus-ring)`；输入框统一为 `--accent` 边框 + `--focus-ring` 光晕、无 outline，带前后缀的 `.ui-input` 只在外框显示，内层输入框不画 |
 | 禁用 | `opacity: var(--disabled-opacity)`，`pointer-events: none` |
 | 只读（表单字段在预览模式下禁用） | 透明底、`--secondary` 文字，不降低不透明度：值仍要看得清 |
 
