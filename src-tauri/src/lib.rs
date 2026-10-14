@@ -1390,6 +1390,7 @@ mod tests {
 
     #[test]
     fn file_commands_report_success_and_missing_file_errors() {
+        use tauri::async_runtime::block_on;
         let path = std::env::temp_dir().join(format!(
             "bdi-edit-file-command-{}-{}.bdi",
             std::process::id(),
@@ -1398,14 +1399,14 @@ mod tests {
         let path_text = path.to_string_lossy().into_owned();
         let data = vec![1, 2, 3, 4];
 
-        write_file(path_text.clone(), data.clone()).expect("write should succeed");
-        assert!(read_file(path_text.clone()).is_ok());
+        block_on(write_file(path_text.clone(), data.clone())).expect("write should succeed");
+        assert!(block_on(read_file(path_text.clone())).is_ok());
         assert_eq!(
             read_file_bytes(&path_text).expect("read should succeed"),
             data
         );
         fs::remove_file(&path).expect("cleanup should succeed");
-        assert!(read_file(path_text.clone()).is_err());
+        assert!(block_on(read_file(path_text.clone())).is_err());
         assert!(read_file_bytes(&path_text).is_err());
 
         let oversized = std::env::temp_dir().join(format!(
@@ -1417,7 +1418,7 @@ mod tests {
             .expect("create sparse test file")
             .set_len(MAX_ARCHIVE_BYTES + 1)
             .expect("size sparse test file");
-        assert!(read_file(oversized.to_string_lossy().into_owned()).is_err());
+        assert!(block_on(read_file(oversized.to_string_lossy().into_owned())).is_err());
         assert!(read_file_bytes(&oversized.to_string_lossy()).is_err());
         fs::remove_file(oversized).expect("cleanup sparse test file");
     }
