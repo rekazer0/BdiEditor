@@ -223,8 +223,11 @@ export function selectKey(self: Preview, key: PreviewItem, event: Pick<PointerEv
   } else if (self.mode === "edit" && isAdditiveSelection(event)) {
     if (self.itemSelected(key)) key.sections.forEach((section) => self.selected.delete(section))
     else self.selected.add(key.section)
+  } else if (self.mode === "edit" && self.editTool === "select" && self.selected.size === 1 && self.itemSelected(key)) {
+    // 再次单击唯一选中的键即取消选中
+    self.selected = new Set()
   } else if (!self.itemSelected(key) || self.mode === "preview" || self.editTool === "select") {
-    // 普通单击只选中这一个键（已选中也不取消）；取消选择点空白处或按 Esc。
+    // 普通单击只选中这一个键；多选时单击收为单选。
     // 移动工具下保留多选，便于整体拖动。
     self.selected = new Set([key.section])
   }

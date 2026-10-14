@@ -288,15 +288,14 @@ await check("edit keys: geometry, keyboard nudge, undo/redo, multi-select, layou
   await page.locator('#inspector-multi-layout [data-layout-action="same-width"]').click()
   await page.locator('#inspector-multi-layout [data-layout-action="same-height"]').click()
   assert.equal(await undoEnabled(page), true)
-  // Esc 取消选择；普通单击已选中的键保持选中。
+  // Esc 取消选择；再次单击唯一选中的键也取消选中。
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press("Escape")
   await page.locator("#inspector-multi-layout").waitFor({ state: "hidden" })
   await page.locator(".key-layout-fields").waitFor({ state: "hidden" })
   await selectKey(page)
   await clickCanvas(page, 0.45, 0.45)
-  await page.waitForTimeout(200)
-  assert.equal(await page.locator(".key-layout-fields").isVisible(), true, "clicking the selected key keeps it selected")
+  await page.locator(".key-layout-fields").waitFor({ state: "hidden" })
   // Text and gestures on a single key.
   await selectKey(page)
   await railTab(page, "文字")
