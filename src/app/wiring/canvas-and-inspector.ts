@@ -3,9 +3,9 @@ import { installSafeAreaLock } from "../../safe-area.ts"
 import { isTauri, scrollbarIdleTimers, source, schedulePointerCoordinates, mobileShareLabel, mobileShareMenuLabel, mobileCommandButtons, mobileCommandTarget, syncMobileCommands, mobilePortraitQuery, preview, toolbarPreview, keyboardFields } from "../canvas-interaction"
 import { installNumberInputWheel } from "../../number-input-wheel.ts"
 import { mixedCoordinateDelta } from "../../mixed-input.ts"
-import { moveSelectedKeys } from "../key-editing"
+import { moveSelectedKeys, selectParentObject } from "../key-editing"
 import { renderSourceValueThumbnail, updateSourceFindVisibility } from "../source-panel"
-import { sidebarProjectName, documentName, aiDesignThinking, canvasWrap, deviceShell, toolbarStrip, previewCanvas, toolbarCanvas, editorCrosshair, previewCoordinates, previewCoordinateX, previewCoordinateY, mobileShareButton, mobileCommandMenu, mobileUndoButton, undoButton, mobileRedoButton, redoButton, desktopUndoButton, desktopRedoButton, quickInspector, mobileInspectorGroups, bdaInspectorStateButtons, bdaConfigFieldsGroup, mobilePaneButtons, files, mainWorkspace, mobileSplitHandle, mobilePreviewPosition, previewZoomOut, previewZoomFit, previewZoomIn, previewPanelViewport, candidateArea, inspectorBackButton, styleDetailImageButtons, workspaceImage, sourceStyleProxy, styleLibraryApply, styleLibraryEdit, $, styleLibraryPreview, stylePickerDialog, stylePickerSearch, toolbarFields, keyFields, stylePickerClose, newStyleDialog, stylePickerAdd, baiduActionCodes, sourceUploadButton, sourceUploadInput, sourceDownloadButton, sourceCopyButton } from "../dom"
+import { sidebarProjectName, documentName, aiDesignThinking, canvasWrap, deviceShell, toolbarStrip, previewCanvas, toolbarCanvas, editorCrosshair, previewCoordinates, previewCoordinateX, previewCoordinateY, mobileShareButton, mobileCommandMenu, mobileUndoButton, undoButton, mobileRedoButton, redoButton, desktopUndoButton, desktopRedoButton, quickInspector, mobileInspectorGroups, bdaInspectorStateButtons, bdaConfigFieldsGroup, mobilePaneButtons, files, mainWorkspace, mobileSplitHandle, mobilePreviewPosition, previewZoomOut, previewZoomFit, previewZoomIn, previewPanelViewport, candidateArea, styleDetailImageButtons, workspaceImage, sourceStyleProxy, styleLibraryApply, styleLibraryEdit, $, styleLibraryPreview, stylePickerDialog, stylePickerSearch, toolbarFields, keyFields, stylePickerClose, newStyleDialog, stylePickerAdd, baiduActionCodes, sourceUploadButton, sourceUploadInput, sourceDownloadButton, sourceCopyButton } from "../dom"
 import { appState } from "../state"
 import { hydrateIcons } from "../../icons"
 import { syncSinglePageInspectorGroup, setMobileSplit, setMobilePane, syncMobileInspectorHeader, setMobilePreviewCollapsed } from "../mobile-layout"
@@ -364,7 +364,7 @@ export function wireCanvasAndInspector(): void {
       candidateArea.contains(target) ||
       target.closest("canvas, button, input, select, label, [role=button]")
     ) return
-    if (appState.selectedKeySections.length || appState.selectedToolbarSections.length || appState.selectedCandidate) inspectorBackButton.click()
+    if (appState.selectedKeySections.length || appState.selectedToolbarSections.length || appState.selectedCandidate) selectParentObject()
   })
   canvasWrap.addEventListener("pointerup", finishPreviewPan)
   canvasWrap.addEventListener("pointercancel", finishPreviewPan)

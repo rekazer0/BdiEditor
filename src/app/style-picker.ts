@@ -44,7 +44,7 @@ export function availableStyleIDs(): string[] {
 }
 
 export const styleKinds: Record<StyleKind, { label: string; icon: string }> = {
-  image: { label: "图片", icon: "images" },
+  image: { label: "图片", icon: "image" },
   color: { label: "颜色", icon: "palette" },
   anim: { label: "动画", icon: "clapperboard" },
   text: { label: "文字", icon: "type" },

@@ -1,7 +1,7 @@
-import { source, keyboardFields, layoutActionButtons, preview, toolbarPreview, inspectorTabButtons, mobilePortraitQuery, activateSkinState } from "../canvas-interaction"
+import { source, keyboardFields, layoutActionButtons, preview, inspectorTabButtons, mobilePortraitQuery, activateSkinState } from "../canvas-interaction"
 import { type SourceEditorValueClick } from "../../lazy-source-editor.ts"
 import { openSourceColorPicker, openSourceStyleDefinition, openSourceStylePicker, scheduleSourceSearch, closeSourceFind, findSourceMatch, openSourceFind, syncSourceFindBarOffset, replaceSourceMatches, updateInspectorView, updateSourceHighlight } from "../source-panel"
-import { sourceSearch, sourceSearchPrevious, sourceSearchNext, sourceFindToggle, sourceEditor, sourceReplaceToggle, sourceReplaceRow, sourceReplacement, sourceReplace, sourceReplaceAll, keyFields, styleFields, toolbarFields, skinFields, gapFields, quickInspector, colorPickers, colorAlphas, keyModeButtons, keyActionButtons, inspectorBackButton, aiDesignPanel, aiDesignStatus, theme, orientation, layout, mode, eventLog, modeChoiceButtons, themeChoiceButtons, orientationChoiceButtons, mobileChoiceButtons, toggleGuides, mobileToggleGuides, newTileButton, duplicateTileButton, deleteTileButton, resourceBackButton, resourceSearch, resourceCategory, bdaTileUsage, tileModeButtons, atlasCanvas, workspaceImage, tileSourceFields, tileInnerFields, skinState, panelScaleButton, adaptIos26Button, ios26Dialog, ios26Form, replaceLayoutImageButton, layoutImageFile, layoutImageOpen, layoutImageDialog, layoutImageTargetInputs, layoutImageScope, layoutImageError, layoutImageConfigButtons, layoutImageConfigFieldset, layoutImageForm, panelCopySource, panelTargetWidth, panelTargetHeight, panelCopyTarget, panelScaleEnabled, panelScaleForm, panelScaleDialog, candidateArea, toolbarCanvas, toolbarStrip, styleImagePicker, styleImagePickerCanvas, styleImageClose, styleImageSource, styleImageDialog, fontFileSelect } from "../dom"
+import { sourceSearch, sourceSearchPrevious, sourceSearchNext, sourceFindToggle, sourceEditor, sourceReplaceToggle, sourceReplaceRow, sourceReplacement, sourceReplace, sourceReplaceAll, keyFields, styleFields, toolbarFields, skinFields, gapFields, quickInspector, colorPickers, colorAlphas, keyModeButtons, keyActionButtons, aiDesignPanel, aiDesignStatus, theme, orientation, layout, mode, eventLog, modeChoiceButtons, themeChoiceButtons, orientationChoiceButtons, mobileChoiceButtons, toggleGuides, mobileToggleGuides, newTileButton, duplicateTileButton, deleteTileButton, resourceBackButton, resourceSearch, resourceCategory, bdaTileUsage, tileModeButtons, atlasCanvas, workspaceImage, tileSourceFields, tileInnerFields, skinState, panelScaleButton, adaptIos26Button, ios26Dialog, ios26Form, replaceLayoutImageButton, layoutImageFile, layoutImageOpen, layoutImageDialog, layoutImageTargetInputs, layoutImageScope, layoutImageError, layoutImageConfigButtons, layoutImageConfigFieldset, layoutImageForm, panelCopySource, panelTargetWidth, panelTargetHeight, panelCopyTarget, panelScaleEnabled, panelScaleForm, panelScaleDialog, candidateArea, toolbarCanvas, toolbarStrip, styleImagePicker, styleImagePickerCanvas, styleImageClose, styleImageSource, styleImageDialog, fontFileSelect } from "../dom"
 import { appState } from "../state"
 import { syncActionCodeSuggestions, updateSelectedKey, updateSelectedStyle, updateKeyboard, updateToolbar, updateSkinInfo, populateKeyInspector, setFontFile } from "../key-inspector"
 import { syncColorControl, writeColorControl, scrollSelectedSource } from "../config-context"
@@ -146,20 +146,6 @@ export function wireEditingControls(): void {
       else deleteSelectedKeys()
     })
   }
-  inspectorBackButton.addEventListener("click", () => {
-    source.commit()
-    appState.selectedKeySections = []
-    appState.selectedToolbarSections = []
-    appState.selectedCandidate = false
-    preview.setSelected([])
-    toolbarPreview.setSelected([])
-    if (appState.inspectorTab !== "source") appState.inspectorTab = "properties"
-    syncCandidateSelection()
-    updateInspectorView()
-    populateKeyInspector()
-    updateSourceHighlight()
-    scrollSelectedSource()
-  })
   for (const button of inspectorTabButtons) {
     button.addEventListener("click", () => {
       const tab = button.dataset.inspectorTab

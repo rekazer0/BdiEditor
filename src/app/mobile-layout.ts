@@ -1,10 +1,11 @@
-import { modeChoiceButtons, mode, themeChoiceButtons, theme, orientationChoiceButtons, orientation, mobileChoiceButtons, mobileInspectorSelection, selectedKeyName, sourceHeading, quickInspector, mobileInspectorGroups, keyTypographyFieldsGroup, bdaConfigFieldsGroup, documentFieldsGroup, documentFields, bdaConfigFields, bdaSelectedStyleHeading, inspectorBackButton, mobilePaneButtons, sidebarPane, inspectorPane, mobileSplitHandle, panelScaleButton, replaceLayoutImageButton, adaptIos26Button, editorCrosshair, previewCoordinates, deviceShell, replaceAssetButton, editModeDialog, keyFields, styleFields, toolbarFields, skinFields, gapFields } from "./dom"
+import { modeChoiceButtons, mode, themeChoiceButtons, theme, orientationChoiceButtons, orientation, mobileChoiceButtons, mobileInspectorSelection, selectedKeyName, sourceHeading, quickInspector, mobileInspectorGroups, keyTypographyFieldsGroup, bdaConfigFieldsGroup, documentFieldsGroup, documentFields, bdaConfigFields, bdaSelectedStyleHeading, mobilePaneButtons, sidebarPane, inspectorPane, mobileSplitHandle, panelScaleButton, replaceLayoutImageButton, adaptIos26Button, editorCrosshair, previewCoordinates, deviceShell, replaceAssetButton, editModeDialog, keyFields, styleFields, toolbarFields, skinFields, gapFields } from "./dom"
 import { appState } from "./state"
 import { redrawStyleStateCanvases } from "./style-references"
 import { groupIcon } from "../icons"
 import { bdaConfigPath } from "../bda.ts"
 import { selectFile } from "./navigation"
 import { mobilePortraitQuery, preview, toolbarPreview, source, keyboardFields, layoutActionButtons } from "./canvas-interaction"
+import { selectParentObject } from "./key-editing"
 import { isEditing } from "./edit-history"
 import { updateSourceFileActions } from "./source-files"
 import { updateSourceSearchStatus } from "./source-panel"
@@ -214,7 +215,7 @@ export function syncMobileInspectorGroups(): void {
       mobileInspectorGroups.append(button)
     }
     if (appState.archive.format === "bda") {
-      addDestination("面板", () => inspectorBackButton.click())
+      addDestination("面板", selectParentObject)
       for (const [kind, label] of [["animation", "动画"], ["sound", "声音"]] as const) {
         const path = bdaConfigPath(appState.archive, theme.value, orientation.value, kind)
         if (path) addDestination(label, () => selectFile(path, "overview"))

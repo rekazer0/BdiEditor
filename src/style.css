@@ -6896,6 +6896,7 @@ main {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  white-space: nowrap;
 }
 
 :root body .preview-choice button {
@@ -6912,7 +6913,9 @@ main {
 }
 
 :root body .preview-choice button .system-symbol,
-:root body .preview-choice button .system-symbol svg {
+:root body .preview-choice button .system-symbol svg,
+:root body .sidebar-view-control button .system-symbol,
+:root body .sidebar-view-control button .system-symbol svg {
   width: 14px;
   height: 14px;
   display: block;
@@ -7665,7 +7668,7 @@ main {
   grid-column: 2;
   max-width: none;
   margin-left: 0;
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-xxs);
 }
 
 :root body #files .raw-files .source-folder-row {
@@ -9368,7 +9371,6 @@ main {
   :root body .sidebar-view-control button {
     min-width: 0;
     padding-inline: 4px;
-    white-space: nowrap;
   }
 
   :root body .sidebar-view-control button .system-symbol {

@@ -1,6 +1,6 @@
 /*
  * 检查器的通用交互（结构规范见 DESIGN.md §10）：
- *   · 分组标题可折叠，折叠状态按分组名记住；Alt + 点击标题一次折叠 / 展开全部分组；
+ *   · 分组标题悬停时提示对应的配置字段；
  *   · 筛选框按标签、属性名过滤属性行，换选择对象后仍然生效；
  *   · 本次选择后改过的属性行带标记，点标记恢复这一行，对象头里的「重置」一次恢复全部；
  *   · 数值的标签与单位前缀可以左右拖动调整（交互在 number-input-wheel.ts，这里只标出把手）；
@@ -26,15 +26,9 @@ const SECTION_SELECTOR = ":is(.inspector-group, .document-property-section, .bda
 /** 一条属性行：筛选、改动标记和恢复都以它为单位。 */
 const ROW_SELECTOR = ".ui-field, .document-property-field, .bda-text-field, .bda-readonly-field, .bda-range-field, .bda-color-field, .fore-style-reference-field, .inspector-gesture"
 const SCRUB_HANDLES = ".ui-input > .ui-input-affix, .ui-field > span:first-child, .document-field-caption"
-const COLLAPSED_KEY = "inspector-collapsed-sections"
-const collapsed = new Set<string>(readCollapsed())
 const baselines = new WeakMap<HTMLElement, string>()
 let rows: Row[] = []
 let filterQuery = ""
-
-function readCollapsed(): string[] {
-  try { return JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "[]") as string[] } catch { return [] }
-}
 
 function inspector(): HTMLElement | null {
   return document.getElementById("quick-inspector")
@@ -49,7 +43,7 @@ function isHidden(el: Element, within: Element): boolean {
   return Boolean(hidden && within.contains(hidden))
 }
 
-/* —— 分组折叠 —— */
+/* —— 分组标题 —— */
 function sectionName(section: HTMLElement): string {
   return section.dataset.inspectorGroupLabel
     || section.querySelector(":scope > h3 .document-section-title")?.textContent?.trim()
@@ -66,43 +60,11 @@ function decorateSections(): void {
   if (!root) return
   for (const section of headedSections(root)) {
     const heading = section.querySelector<HTMLElement>(":scope > h3")
-    if (!heading) continue
-    const name = sectionName(section)
-    section.toggleAttribute("data-collapsed", collapsed.has(name))
-    heading.setAttribute("aria-expanded", String(!collapsed.has(name)))
-    if (heading.dataset.collapsible) continue
-    heading.dataset.collapsible = "true"
-    heading.tabIndex = 0
-    heading.setAttribute("role", "button")
-    heading.title = [SECTION_HINTS[name], "Alt + 点击：折叠或展开全部分组"].filter(Boolean).join("\n")
-    heading.prepend(createIcon("chevron-down", 12))
+    if (heading && !heading.title) heading.title = SECTION_HINTS[sectionName(section)] ?? ""
   }
   for (const handle of Array.from(root.querySelectorAll<HTMLElement>(SCRUB_HANDLES))) {
     handle.toggleAttribute("data-scrub", Boolean(scrubbableField(handle)))
   }
-}
-
-function toggleSection(heading: HTMLElement, all: boolean): void {
-  const section = heading.parentElement
-  const root = inspector()
-  if (!root || !section?.matches(SECTION_SELECTOR)) return
-  const collapse = !collapsed.has(sectionName(section))
-  const targets = all ? headedSections(root).filter((item) => !isHidden(item, root)) : [section]
-  for (const name of targets.map(sectionName)) {
-    if (collapse) collapsed.add(name)
-    else collapsed.delete(name)
-  }
-  localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsed]))
-  decorateSections()
-}
-
-function onSectionHeading(event: Event): void {
-  const heading = (event.target as Element | null)?.closest<HTMLElement>("h3[data-collapsible]")
-  // 标题里的控件（状态切换、按钮）自己处理点击，不触发折叠。
-  if (!heading || (event.target as Element).closest("button, input, select, a")) return
-  if (event instanceof KeyboardEvent && event.key !== "Enter" && event.key !== " ") return
-  event.preventDefault()
-  toggleSection(heading, (event as MouseEvent | KeyboardEvent).altKey)
 }
 
 /* —— 筛选：按标签文字、属性名（INI 键）与分组名过滤属性行 —— */
@@ -111,7 +73,7 @@ function filterInput(): HTMLInputElement | null {
 }
 
 function rowText(row: HTMLElement): string {
-  const parts = [row.textContent ?? "", row.title]
+  const parts = [row.textContent ?? "", row.title, row.dataset.documentKey ?? ""]
   for (const input of Array.from(row.querySelectorAll<HTMLElement>("input, select, textarea"))) {
     parts.push(input.getAttribute("aria-label") ?? "", ...Object.values(input.dataset).map(String))
   }
@@ -238,26 +200,17 @@ function collectRows(): void {
   })
 }
 
-function rowLabel(row: HTMLElement): string {
-  return row.querySelector(":scope > span:first-child, .document-field-caption")?.textContent?.trim()
-    || row.querySelector("[aria-label]")?.getAttribute("aria-label")
-    || "这一项"
-}
-
 function markRow(row: Row, modified: boolean): void {
   row.el.toggleAttribute("data-modified", modified)
-  let revert = row.el.querySelector<HTMLButtonElement>(":scope > .inspector-revert")
-  if (modified && !revert) {
-    revert = document.createElement("button")
-    revert.type = "button"
-    revert.className = "inspector-revert"
-    revert.title = "已修改。点击恢复为选择时的值"
-    revert.setAttribute("aria-label", `恢复${rowLabel(row.el)}`)
-    revert.append(createIcon("undo-2", 12))
+  let dot = row.el.querySelector<HTMLElement>(":scope > .inspector-modified")
+  if (modified && !dot) {
+    dot = document.createElement("span")
+    dot.className = "inspector-modified"
+    dot.title = "本次选择后已修改"
     // 绝对定位在行左侧的留白里，追加在末尾，不打乱标签列。
-    row.el.append(revert)
+    row.el.append(dot)
   }
-  if (revert) revert.hidden = !modified
+  if (dot) dot.hidden = !modified
 }
 
 function updateStatus(): void {
@@ -271,7 +224,6 @@ function updateStatus(): void {
     badge.textContent = `已改 ${count}`
     reset.replaceChildren(badge, "重置")
   }
-  // 折叠起来的分组也能看出里面有改动。
   const root = inspector()
   if (!root) return
   for (const section of headedSections(root)) {
@@ -298,17 +250,6 @@ function revertRow(row: Row): void {
 function resetAll(): void {
   for (const row of rows.filter((item) => item.el.hasAttribute("data-modified"))) revertRow(row)
   updateStatus()
-}
-
-function onRevertClick(event: Event): void {
-  const button = (event.target as Element | null)?.closest?.(".inspector-revert")
-  if (!button) return
-  event.preventDefault()
-  const row = rows.find((candidate) => candidate.el === button.parentElement)
-  if (!row) return
-  revertRow(row)
-  updateStatus()
-  syncGestures()
 }
 
 function onInspectorInput(event: Event): void {
@@ -353,10 +294,13 @@ function renderEmptyState(): void {
 }
 
 function syncGestures(): void {
-  for (const cell of Array.from(document.querySelectorAll<HTMLElement>("#quick-inspector [data-gesture]"))) {
+  const cells = Array.from(document.querySelectorAll<HTMLElement>("#quick-inspector [data-gesture]"))
+  for (const cell of cells) {
     const code = cell.querySelector<HTMLInputElement>("input")?.value ?? ""
     cell.classList.toggle("configured", Boolean(code && code !== "None"))
   }
+  const count = document.querySelector(".inspector-gesture-count")
+  if (count) count.textContent = `${cells.filter((cell) => cell.classList.contains("configured")).length} / ${cells.length}`
 }
 
 export function initInspectorShell(): void {
@@ -366,9 +310,6 @@ export function initInspectorShell(): void {
   const root = inspector()
   if (!root) return
   bindFilter(root)
-  root.addEventListener("click", onRevertClick)
-  root.addEventListener("click", onSectionHeading)
-  root.addEventListener("keydown", onSectionHeading)
   root.addEventListener("pointerover", revealTruncatedLabel)
   root.addEventListener("pointerdown", collectRows, true)
   root.addEventListener("focusin", collectRows)

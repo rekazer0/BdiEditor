@@ -8,7 +8,7 @@ export const sourceKeyLabels: Readonly<Record<string, string>> = {
   KEY: "按键动作",
   STAT_STYLE: "状态补丁",
   VIEW_RECT: "显示区域",
-  NON_SPLIT_PANEL_REGION: "非分屏面板区域",
+  NON_SPLIT_PANEL_REGION: "非分屏区域",
   TOUCH_RECT: "实际点击范围",
   SOURCE_RECT: "切片素材区域",
   INNER_RECT: "内切拉伸区域",

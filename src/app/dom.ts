@@ -322,7 +322,6 @@ export const baiduActionCodes = $("#baidu-action-codes") as HTMLDataListElement
 
 export const inspectorTabs = $(".inspector-tabs")
 
-export const inspectorBackButton = $("#inspector-back") as HTMLButtonElement
 
 export const aiDesignPanel = $("#ai-design-panel")
 

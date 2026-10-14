@@ -147,10 +147,6 @@
         <div class="preview-toolbar">
           <div class="preview-toolbar-start">
             <button id="toggle-guides" class="preview-tool-toggle glass-module" aria-label="辅助线" title="辅助线" aria-pressed="false"><span class="system-symbol" data-icon="crosshair" aria-hidden="true"></span></button>
-            <div class="preview-choice glass-module key-mode-control" role="group" aria-label="指针模式">
-              <button class="active" type="button" data-key-mode="select" title="选择按键" aria-label="选择按键" aria-pressed="true" data-icon="mouse-pointer-2"></button>
-              <button type="button" data-key-mode="move" title="拖动按键" aria-label="拖动按键" aria-pressed="false" data-icon="move"></button>
-            </div>
             <label id="skin-state-control" class="field-control" hidden>
               <span class="skin-state-value" aria-hidden="true">默认</span>
               <select id="skin-state" aria-label="皮肤 S 状态"><option value="">默认</option></select>
@@ -387,11 +383,12 @@
             <div class="inspector-title key-inspector-title">
               <span id="selected-key-preview" class="key-inspector-preview" aria-hidden="true" hidden></span>
               <div class="key-inspector-copy">
-                <button id="inspector-back" class="inspector-crumb" type="button" title="返回面板属性" aria-label="返回面板属性" data-icon="chevron-left" data-icon-size="12" disabled>返回上级</button>
                 <strong id="selected-key">选择画布中的按键</strong>
                 <span id="selected-key-context">更改会自动写回配置</span>
               </div>
               <div class="inspector-object-actions" aria-label="对象操作">
+                <button class="ui-icon-button" type="button" data-key-mode="select" title="选择按键" aria-label="选择按键" aria-pressed="true" data-icon="mouse-pointer-2"></button>
+                <button class="ui-icon-button" type="button" data-key-mode="move" title="拖动按键" aria-label="拖动按键" aria-pressed="false" data-icon="move"></button>
                 <button class="ui-icon-button" type="button" data-key-action="copy" title="复制按键" aria-label="复制按键" data-icon="copy"></button>
                 <button class="ui-icon-button" type="button" data-key-action="swap" title="交换位置" aria-label="交换位置" data-icon="arrow-left-right"></button>
                 <button class="ui-icon-button" type="button" data-key-action="delete" title="删除按键" aria-label="删除按键" data-icon="trash-2"></button>
@@ -478,12 +475,12 @@
                 <label class="ui-input"><span class="ui-input-affix">H</span><input data-key-field="height" type="number" min="1" aria-label="H 高度" /></label>
               </div></div>
               <div class="ui-field inspector-padding-section"><span>内边距</span><div class="ui-field-pair" data-columns="4">
-                <label class="ui-input"><span class="ui-input-affix">上</span><input data-key-field="PADDING.1" type="number" aria-label="上内边距" /></label>
-                <label class="ui-input"><span class="ui-input-affix">右</span><input data-key-field="PADDING.2" type="number" aria-label="右内边距" /></label>
-                <label class="ui-input"><span class="ui-input-affix">下</span><input data-key-field="PADDING.3" type="number" aria-label="下内边距" /></label>
-                <label class="ui-input"><span class="ui-input-affix">左</span><input data-key-field="PADDING.0" type="number" aria-label="左内边距" /></label>
+                <label class="ui-input"><span class="ui-input-affix">↑</span><input data-key-field="PADDING.1" type="number" aria-label="上内边距" /></label>
+                <label class="ui-input"><span class="ui-input-affix">→</span><input data-key-field="PADDING.2" type="number" aria-label="右内边距" /></label>
+                <label class="ui-input"><span class="ui-input-affix">↓</span><input data-key-field="PADDING.3" type="number" aria-label="下内边距" /></label>
+                <label class="ui-input"><span class="ui-input-affix">←</span><input data-key-field="PADDING.0" type="number" aria-label="左内边距" /></label>
               </div></div>
-              <p class="inspector-note ui-field-note">方向键移动 1 px · Shift + 方向键移动 10 px</p>
+              <p class="inspector-note ui-field-note" hidden>此格式的位置与尺寸仅供查看。外观和文字可在对应分类中修改。</p>
             </div>
           </section>
           <section class="inspector-group key-only key-appearance-fields" data-inspector-group-label="样式">
@@ -492,14 +489,11 @@
               <label class="ui-field style-ref-row" title="按键引用的共享背景样式编号（BACK_STYLE）"><span>背景</span><span class="style-field"><input data-key-field="BACK_STYLE" /></span></label>
               <label class="ui-field style-ref-row" title="按键引用的共享前景样式编号（FORE_STYLE）"><span>前景</span><span class="style-field"><input data-key-field="FORE_STYLE" /></span></label>
               <label class="ui-field appearance-sound-field" title="按键引用的按键音效样式编号（SOUND_STYLE）"><span>音效</span><span class="style-field"><input data-key-field="SOUND_STYLE" /></span></label>
-              <details class="appearance-layout-fields inspector-advanced">
-                <summary data-icon="chevron-right" data-icon-size="12">更多排布</summary>
-                <div class="appearance-property-grid">
+              <div class="appearance-layout-fields appearance-property-grid">
                   <label class="ui-field" title="STAT_STYLE：S状态_样式，多组用 | 分隔；S0 表示无状态样式"><span>状态样式</span><span class="style-field"><input data-key-field="STAT_STYLE" /></span></label>
                   <label class="ui-field" title="FORE_OFFSET：每层前景偏移 x,y，多组用 ; 分隔"><span>前景偏移</span><span class="style-field"><input data-key-field="FORE_OFFSET" /></span></label>
                   <label class="ui-field" title="POS_TYPE：每层前景位置类型，逗号分隔"><span>位置类型</span><span class="style-field"><input data-key-field="POS_TYPE" /></span></label>
-                </div>
-              </details>
+              </div>
             </div>
           </section>
           <section class="inspector-group key-only key-typography-fields" data-inspector-group-label="文字">
@@ -521,10 +515,10 @@
             </div>
           </section>
           <section class="inspector-group key-only key-gesture-fields" data-inspector-group-label="手势">
-            <h3>手势</h3>
+            <h3>手势 <small class="inspector-gesture-count"></small></h3>
             <div class="direction-editor inspector-gestures" aria-label="点击、滑动与长按动作">
-              <label class="inspector-gesture" data-gesture="CENTER"><span data-icon="circle-dot">点击</span><input data-key-field="CENTER" list="baidu-action-codes" placeholder="+" /><small data-action-meaning="CENTER"></small></label>
-              <label class="inspector-gesture" data-gesture="HOLD"><span data-icon="hand">长按</span><input data-key-field="HOLD" list="baidu-action-codes" placeholder="+" /><small data-action-meaning="HOLD"></small></label>
+              <label class="inspector-gesture" data-gesture="CENTER"><span data-icon="pointer">点击</span><input data-key-field="CENTER" list="baidu-action-codes" placeholder="+" /><small data-action-meaning="CENTER"></small></label>
+              <label class="inspector-gesture" data-gesture="HOLD"><span data-icon="timer">长按</span><input data-key-field="HOLD" list="baidu-action-codes" placeholder="未设置" /><small data-action-meaning="HOLD"></small></label>
               <label class="inspector-gesture" data-gesture="UP"><span data-icon="arrow-up">上滑</span><input data-key-field="UP" list="baidu-action-codes" placeholder="+" /><small data-action-meaning="UP"></small></label>
               <label class="inspector-gesture" data-gesture="DOWN"><span data-icon="arrow-down">下滑</span><input data-key-field="DOWN" list="baidu-action-codes" placeholder="+" /><small data-action-meaning="DOWN"></small></label>
               <label class="inspector-gesture" data-gesture="LEFT"><span data-icon="arrow-left">左滑</span><input data-key-field="LEFT" list="baidu-action-codes" placeholder="+" /><small data-action-meaning="LEFT"></small></label>

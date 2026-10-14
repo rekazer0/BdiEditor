@@ -17,7 +17,7 @@ import {
   HardDrive, Smartphone, Crosshair, Moon, Sun, RectangleHorizontal, RectangleVertical, Scissors, ClipboardPaste,
   Undo2, Redo2, RotateCw, Share, Menu, Eye, EyeOff, Wifi, Signal, BatteryFull, Lightbulb, SlidersHorizontal,
   Paperclip, Sparkles, VolumeX, Check, ChevronsUpDown, CodeXml, FileDown, Minus, Scan, Paintbrush,
-  CircleAlert, FolderInput, Grid2x2, Maximize,
+  CircleAlert, FolderInput, Grid2x2, Maximize, Pointer, Timer, Frame, LayoutPanelTop, FlaskConical,
 } from "lucide"
 
 // Exact Lucide names from 属性检查器.pen, read through Pen MCP.
@@ -55,7 +55,7 @@ const icons: Record<string, IconNode> = {
   "panel-bottom": PanelBottom, "square-dashed-bottom": SquareDashedBottom,
   "layout-dashboard": LayoutDashboard, "columns-3": Columns3, "table-2": Table2, box: Box,
   // 源文件树
-  folder: Folder, file: File,
+  folder: Folder, file: File, "flask-conical": FlaskConical,
   // 工具栏、菜单与状态
   "hard-drive": HardDrive, smartphone: Smartphone, crosshair: Crosshair, moon: Moon, sun: Sun,
   "rectangle-horizontal": RectangleHorizontal, "rectangle-vertical": RectangleVertical, scissors: Scissors,
@@ -65,6 +65,7 @@ const icons: Record<string, IconNode> = {
   "volume-x": VolumeX, check: Check, "chevrons-up-down": ChevronsUpDown, "code-xml": CodeXml,
   "file-down": FileDown, minus: Minus, scan: Scan, paintbrush: Paintbrush,
   "circle-alert": CircleAlert, "folder-input": FolderInput, "grid-2x2": Grid2x2, maximize: Maximize,
+  pointer: Pointer, timer: Timer, frame: Frame, "layout-panel-top": LayoutPanelTop,
 }
 
 export function createIcon(name: string, size = 14): SVGElement {
@@ -76,7 +77,8 @@ export function createIcon(name: string, size = 14): SVGElement {
 }
 
 export function groupIcon(label: string): SVGElement {
-  const name = /资源|图片/.test(label) ? "images"
+  const name = label === "布局" ? "frame"
+    : /资源|图片/.test(label) ? "images"
     : /动画|动效|粒子/.test(label) ? "clapperboard"
     : /声音|音效/.test(label) ? "volume-2"
     : /气泡/.test(label) ? "message-square"

@@ -31,15 +31,14 @@
   min-width: 0;
   margin: 0 calc(-1 * var(--_gutter));
   padding: 0 var(--space-sm) var(--space-md) var(--_gutter);
-  border-bottom: 1px solid var(--line);
 }
 .source:has(#quick-inspector[hidden]) .key-inspector-title { display: none; }
 .source .key-inspector-preview {
   display: grid;
   place-items: center;
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-md);
   background: var(--accent-soft);
   color: var(--accent);
@@ -48,22 +47,8 @@
 .source .key-inspector-copy { display: grid; flex: 1; min-width: 0; }
 .source #selected-key { overflow: hidden; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
 .source #selected-key-context { overflow: hidden; color: var(--tertiary); font-family: var(--font-mono); font-size: var(--font-size-xs); text-overflow: ellipsis; white-space: nowrap; }
-.source .inspector-crumb {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2xs);
-  width: fit-content;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  font-size: var(--font-size-xs);
-}
-.source .inspector-crumb:is(:disabled, [hidden]) { display: none; }
 .source .inspector-object-actions { display: flex; flex: none; align-items: center; gap: var(--space-2xs); }
-.source .inspector-object-actions > :is(:disabled, [hidden]) { display: none; }
+.source .inspector-object-actions:not(:has(> :enabled)) { display: none; }
 
 /* ================================ 属性视图 ================================ */
 .source #quick-inspector {
@@ -73,7 +58,9 @@
   overflow: auto;
   padding-right: var(--_rail);
   overscroll-behavior: contain;
+  scrollbar-width: none;
 }
+.source #quick-inspector::-webkit-scrollbar { display: none; }
 .source #quick-inspector[hidden] { display: none; }
 
 /* —— 右侧分类栏：顶部筛选，中间分组（图标 + 文字，点击滚动到分组），底部「已改 n · 重置」 —— */
@@ -151,7 +138,6 @@
   margin: 0;
   padding: var(--space-md) var(--_gutter) var(--space-lg);
   border: 0;
-  border-top: 1px solid var(--line-soft);
   border-radius: 0;
   background: none;
   box-shadow: none;
@@ -160,7 +146,6 @@
 /* 文档与 BDA 分组是外层容器里的多个分区：外层不画边和留白。 */
 .source :is(.document-fields, .bda-config-fields) { display: block; padding: 0; border: 0; }
 .source :is(.document-fields, .bda-config-fields)[hidden] { display: none; }
-.source :is(#document-fields, #bda-config-fields) > :first-child { border-top: 0; }
 .source :is(.inspector-group, .document-property-section, .bda-inspector-section) > h3 {
   display: flex;
   align-items: center;
@@ -172,16 +157,14 @@
   cursor: default;
   user-select: none;
 }
-.source h3[data-collapsible] > .ui-icon:first-child { color: var(--tertiary); transition: transform var(--duration-base) var(--ease-standard); }
-.source [data-collapsed] > h3 > .ui-icon:first-child { transform: rotate(-90deg); }
-.source [data-collapsed]:not([data-filtering] *) > :not(h3) { display: none; }
-.source h3 small, .source .document-section-meta, .source .document-section-code { margin-left: auto; color: var(--tertiary); font-family: var(--font-mono); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); }
-.source .document-section-code + .document-section-meta { margin-left: var(--space-xs); }
+.source h3 small, .source .document-section-code { margin-left: auto; color: var(--tertiary); font-family: var(--font-mono); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); }
+.source .inspector-gesture-count { font-family: var(--font-ui); }
 .source .inspector-group-subtitle { margin: 0; color: var(--tertiary); font-size: var(--font-size-xs); }
 .source :is(.typography-heading-override, .typography-subtitle-override) { display: none; }
 .source .inspector-grid,
 .source .appearance-typography-fields,
 .source .appearance-property-grid,
+.source #primary-css-fields,
 .source .document-property-grid,
 .source .color-pair-field { display: grid; gap: var(--space-sm); }
 .source :is(.inspector-grid, .document-property-grid) > [hidden], .source .color-pair-field[hidden] { display: none; }
@@ -203,13 +186,14 @@
 .source .ui-field > span:first-child,
 .source .document-field-caption { overflow: hidden; color: var(--secondary); text-overflow: ellipsis; white-space: nowrap; }
 .source .document-field-caption { display: grid; }
-.source .document-field-code { color: var(--tertiary); font-family: var(--font-mono); font-size: var(--font-size-xs); }
 .source .ui-field-note, .source .inspector-note { margin: 0; color: var(--tertiary); font-size: var(--font-size-xs); }
 .source .ui-field-pair > .ui-input > input { height: 100%; }
+.source .ui-field-pair[data-columns="4"] { gap: var(--space-xs); }
+.source .ui-field-pair[data-columns="4"] > .ui-input { padding: 0 var(--space-xs); }
 .source .style-field { display: block; min-width: 0; }
 
-/* 改动标记：本次选择后改过的行在左侧留白里有一个点；悬停或聚焦时变成「恢复」按钮（Godot 的做法） */
-.source .inspector-revert {
+/* 改动标记：本次选择后改过的行在左侧留白里有一个点 */
+.source .inspector-modified {
   position: absolute;
   top: 50%;
   left: calc(-1 * var(--_gutter));
@@ -218,31 +202,15 @@
   width: var(--_gutter);
   height: var(--_gutter);
   margin-top: calc(-0.5 * var(--_gutter));
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--accent);
 }
-.source .inspector-revert[hidden] { display: none; }
-.source .inspector-revert > .ui-icon { opacity: 0; transition: opacity var(--duration-fast) var(--ease-standard); }
-.source .inspector-revert::after {
+.source .inspector-modified[hidden] { display: none; }
+.source .inspector-modified::after {
   content: "";
-  position: absolute;
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--accent);
-  transition: opacity var(--duration-fast) var(--ease-standard);
 }
-.source .inspector-revert:focus-visible { outline: 0; box-shadow: var(--focus-ring); }
-.source .inspector-revert:focus-visible > .ui-icon { opacity: 1; }
-.source .inspector-revert:focus-visible::after { opacity: 0; }
-@media (hover: hover) {
-  .source [data-modified]:hover > .inspector-revert > .ui-icon { opacity: 1; }
-  .source [data-modified]:hover > .inspector-revert::after { opacity: 0; }
-}
-.source .inspector-revert:active { background: color-mix(in srgb, var(--text) 10%, transparent); }
 /* 分组里有改动时标题尾部也带一个点，折叠后仍看得到 */
 .source h3[data-modified]::after {
   content: "";
@@ -260,11 +228,7 @@
 .source [data-scrub][data-scrubbing] { color: var(--accent); }
 
 /* —— 成对 / 四格数值 —— */
-.source :is(.document-pair-inputs, .document-quad-inputs, .particle-range-inputs) { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: center; gap: var(--space-xs); }
-.source .document-pair-separator { color: var(--tertiary); font-size: var(--font-size-xs); }
-.source .document-pair-inputs { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-auto-flow: row; }
-.source .document-subfield { display: grid; gap: var(--space-2xs); }
-.source .document-subfield > small { color: var(--tertiary); font-size: var(--font-size-xs); }
+.source .particle-range-inputs { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: center; gap: var(--space-xs); }
 .source .document-switch-control { display: flex; align-items: center; gap: var(--space-sm); }
 .source .document-switch-state { color: var(--tertiary); font-size: var(--font-size-xs); }
 
@@ -277,20 +241,25 @@
 /* —— 样式卡片：左侧编号 + 类型，右侧并排「正常 | 按下」两个预览；标签在卡片上方。
    按键、整体布局、BDA 共用同一张卡片（style-references.ts / bda-editor.ts 生成同样的结构）。 —— */
 .source :is(.ui-field, .document-property-field, .fore-style-reference-field):has(.style-reference-row, .bda-style-reference-input, .sound-style-reference) { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
+/* 卡片上方的标签：小号弱化，和属性行标签区分开；「+ 添加」靠右 */
+.source :is(.ui-field, .document-property-field, .fore-style-reference-field):has(.style-reference-row, .bda-style-reference-input, .sound-style-reference) > :first-child { display: flex; align-items: center; color: var(--tertiary); font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); }
+.source .style-reference-add { display: inline-flex; align-items: center; gap: var(--space-2xs); margin-left: auto; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; }
+.source .style-reference-add:focus-visible { outline: 0; border-radius: var(--radius-sm); box-shadow: var(--focus-ring); }
+.source #quick-inspector[data-readonly="true"] .style-reference-add { display: none; }
 .source .style-reference-input { display: flex; align-items: center; gap: var(--space-xs); min-width: 0; }
 .source .style-reference-input > input:not(.style-reference-number):not(.sound-style-value) { display: none; }
 .source .style-picker-trigger { display: grid; flex: 1; gap: var(--space-xs); min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; }
 .source :is(.style-reference-row, .bda-style-reference-input) {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr);
-  height: 64px;
+  grid-template-columns: 84px minmax(0, 1fr);
+  height: 88px;
   overflow: hidden;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   background: var(--material-content);
 }
 .source .bda-style-reference-input > .style-picker-trigger { height: 100%; }
-.source .style-reference-meta { display: grid; place-content: center; justify-items: center; gap: var(--space-2xs); min-width: 0; padding: 0 var(--space-xs); }
+.source .style-reference-meta { display: grid; place-content: center; justify-items: center; gap: var(--space-2xs); min-width: 0; padding: 0 var(--space-xs); background: var(--content); }
 .source .style-reference-meta > input {
   width: 100%;
   height: auto;
@@ -305,10 +274,10 @@
 }
 .source .style-reference-meta > input:focus { background: var(--control); }
 .source .style-reference-meta > .style-kind-badge { padding: 0; background: none; box-shadow: none; color: var(--tertiary); }
-.source .style-picker-states { display: grid; flex: 1; grid-template-columns: 1fr 1fr; gap: 1px; height: 100%; min-width: 0; background: var(--line-soft); }
+.source .style-picker-states { display: grid; flex: 1; grid-template-columns: 1fr 1fr; gap: var(--space-2xs); height: 100%; min-width: 0; background: var(--line-soft); }
 .source .style-picker-state {
   height: 100%;
-  padding: 0;
+  padding: var(--space-xs);
   overflow: hidden;
   border: 0;
   border-radius: 0;
@@ -330,12 +299,18 @@
 
 /* —— 音效引用 —— */
 .source .sound-style-reference { gap: var(--space-xs); }
-.source .sound-style-main { display: flex; flex: 1; align-items: center; gap: var(--space-sm); min-width: 0; height: var(--control-height-md); padding: 0 var(--space-sm); border-radius: var(--radius-md); background: var(--material-content); }
-.source .sound-style-main-icon { color: var(--tertiary); }
+.source .sound-style-main { display: flex; flex: 1; align-items: center; gap: var(--space-sm); min-width: 0; height: 40px; padding: 0 var(--space-md); border: 1px solid var(--line); border-radius: var(--radius-lg); color: var(--secondary); transition: background-color var(--duration-fast) var(--ease-standard); }
+.source .sound-style-main:not(.has-sound) { justify-content: center; gap: var(--space-xs); }
+.source .sound-style-main:not(.has-sound) > .sound-style-main-meta { flex: none; }
+@media (hover: hover) { .source .sound-style-main:hover { background: var(--hover); } }
+.source .sound-style-main:focus-visible { outline: 0; box-shadow: var(--focus-ring); }
+.source #quick-inspector[data-readonly="true"] .sound-style-main:not(.has-sound) { pointer-events: none; }
 .source .sound-style-main-meta { display: grid; flex: 1; min-width: 0; }
 .source :is(.sound-style-name, .sound-style-file) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.source .sound-style-name { font-weight: var(--font-weight-medium); }
+.source .sound-style-name { font-weight: var(--font-weight-regular); }
+.source .has-sound .sound-style-name { color: var(--text); font-weight: var(--font-weight-medium); }
 .source .sound-style-file { color: var(--tertiary); font-size: var(--font-size-xs); }
+.source .sound-style-file:empty { display: none; }
 .source .sound-style-value { display: none; }
 .source :is(.inspector-sound-play, .sound-style-trigger) {
   display: grid;
@@ -351,7 +326,7 @@
 }
 .source .sound-style-trigger { flex: none; }
 @media (hover: hover) { .source :is(.inspector-sound-play, .sound-style-trigger):hover:not(:disabled) { background: var(--hover); color: var(--text); } }
-.source .inspector-sound-play:disabled { opacity: var(--disabled-opacity); }
+.source :is(.inspector-sound-play, .sound-style-trigger)[hidden] { display: none; }
 
 .source #font-file-field[hidden] { display: none; }
 
@@ -359,7 +334,7 @@
 .source .inspector-tools { display: flex; flex-wrap: wrap; gap: var(--space-2xs); }
 
 /* —— 手势：十字。中间点击，上下左右对应滑动方向；长按不是方向，单独一条放在下面。
-   每格：动作码（可直接输入）→ 方向名 → 释义；没配置的格子是虚线框加「+」 —— */
+   每格：动作码（可直接输入）→ 方向名 → 释义；没配置的格子是空心描边加「+」 —— */
 .source .inspector-gestures {
   display: grid;
   grid-template-areas: ". up ." "left center right" ". down ." "hold hold hold";
@@ -378,15 +353,15 @@
   align-content: center;
   gap: var(--space-2xs);
   min-width: 0;
-  height: 72px;
+  height: 60px;
   padding: 0 var(--space-xs);
-  border: 1px dashed var(--line);
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   color: var(--tertiary);
   font-size: var(--font-size-xs);
   transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
 }
-.source .inspector-gesture.configured { border-style: solid; border-color: transparent; background: var(--material-content); }
+.source .inspector-gesture.configured { border-color: transparent; background: var(--material-content); }
 .source .inspector-gesture > span { display: inline-flex; align-items: center; gap: var(--space-2xs); }
 .source .inspector-gesture > input {
   order: -1;
@@ -405,13 +380,16 @@
 }
 .source .inspector-gesture > small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .source .inspector-gesture > small:empty { display: none; }
-.source .inspector-gesture:focus-within { border-style: solid; border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-/* 改过的格子：恢复按钮放在格子左上角 */
+.source .inspector-gesture:focus-within { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+/* 改过的格子：改动点放在格子左上角 */
 .source .inspector-gesture { position: relative; }
-.source .inspector-gesture > .inspector-revert { top: var(--space-2xs); left: var(--space-2xs); margin-top: 0; }
-/* 长按：一条横排，标签 · 动作码 · 释义 */
-.source .inspector-gesture[data-gesture="HOLD"] { display: flex; gap: var(--space-sm); height: var(--control-height-lg); padding: 0 var(--space-md); }
-.source .inspector-gesture[data-gesture="HOLD"] > input { order: 0; flex: 1; font-size: var(--font-size-sm); text-align: left; }
+.source .inspector-gesture > .inspector-modified { top: var(--space-2xs); left: var(--space-2xs); margin-top: 0; }
+/* 长按：一条横排，标签 · 动作码（靠右，未设置时尾部带「+」）· 释义 */
+.source .inspector-gesture[data-gesture="HOLD"] { display: flex; align-items: center; gap: var(--space-sm); height: 36px; padding: 0 var(--space-md); }
+.source .inspector-gesture[data-gesture="HOLD"] > span { color: var(--secondary); font-size: var(--font-size-sm); }
+.source .inspector-gesture[data-gesture="HOLD"] > input { order: 0; flex: 1; font-size: var(--font-size-sm); text-align: right; }
+.source .inspector-gesture[data-gesture="HOLD"] > input::placeholder { font-family: var(--font-ui); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); }
+.source .inspector-gesture[data-gesture="HOLD"]:not(.configured)::after { content: "+"; font-size: var(--font-size-md); }
 .source .inspector-gesture[data-gesture="HOLD"] > small { max-width: 45%; }
 
 /* —— BDA：样式标题行、卡片压平为分区 —— */
@@ -574,9 +552,6 @@
 .source .inspector-empty dt { text-align: right; }
 .source .inspector-empty dd { margin: 0; color: var(--secondary); font-family: var(--font-mono); text-align: left; }
 
-/* ================================ 画布工具栏：指针模式 ================================ */
-.key-mode-control:has(> button:disabled) { display: none; }
-
 /* —— BDA 按键：上下文行、按键子块、主 / 辅前景样式 —— */
 .source .bda-inspector-context { padding: var(--space-md) var(--_gutter) 0; font-size: var(--font-size-xs); }
 .source .bda-key-style-block > h4 { margin: 0; color: var(--tertiary); font-family: var(--font-mono); font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); }
@@ -585,7 +560,7 @@
 .source .fore-style-reference-field { display: grid; grid-template-columns: var(--_label) minmax(0, 1fr); align-items: center; gap: var(--space-sm); }
 .source .bda-style-reference-label { overflow: hidden; color: var(--secondary); text-overflow: ellipsis; white-space: nowrap; }
 .source #primary-css-fields:empty { display: none; }
-.source :is(.document-quad-inputs, .particle-range-inputs) input { padding: 0 var(--space-xs); }
+.source .particle-range-inputs input { padding: 0 var(--space-xs); }
 
 /* 手机竖屏：侧栏与检查器叠在同一区域，检查器必须不透明，不能让下面的侧栏透出来。 */
 @media (max-width: 760px) and (orientation: portrait) {

@@ -151,6 +151,11 @@ export const documentQuadFieldLabels: Record<string, [string, string, string, st
   PADDING: ["左", "上", "右", "下"],
 }
 
+/** 成对 / 四格数值框里的前缀，与按键布局区的 X / Y / W / H 一致。 */
+const documentPartAffixes: Record<string, string> = {
+  横向: "X", 纵向: "Y", 宽度: "W", 高度: "H", 左: "←", 上: "↑", 右: "→", 下: "↓",
+}
+
 export const documentSwitchFields = new Set(["NO_BLUR"])
 
 export const documentNumericFields = new Set([
@@ -201,9 +206,9 @@ export const layoutIDLabels: Record<string, string> = {
   net: "网址键盘",
   net_shifts: "网址键盘大写",
   logo: "输入法标识",
-  en_26_new: "英文 26 键（无上划）",
-  en_26s_new: "英文 26 键 Shift（无上划）",
-  def_26_new: "五笔 26 键（无上划）",
+  en_26_new: "英文 26 键",
+  en_26s_new: "英文 26 键 Shift",
+  def_26_new: "五笔 26 键",
   en_9_pad: "英文 9 键加高",
   en_9s_pad: "英文 9 键 Shift 加高",
 }
@@ -356,12 +361,6 @@ export function populateDocumentInspector(): void {
     captionName.className = "document-field-name"
     captionName.textContent = captionLabel
     caption.append(captionName)
-    if (documentFieldLabels[entry.key]) {
-      const code = document.createElement("span")
-      code.className = "document-field-code"
-      code.textContent = entry.key
-      caption.append(code)
-    }
     label.append(caption)
 
     if (specialized && (particlePairFields.has(entry.key) || entry.key === "EMIT_REGION")) {
@@ -389,62 +388,32 @@ export function populateDocumentInspector(): void {
       return label
     }
 
-    const pairLabels = documentPairFieldLabels[entry.key]
-    const pairValues = entry.value.split(",").map((value) => value.trim())
-    if (!specialized && pairLabels && pairValues.length === pairLabels.length) {
+    const partLabels: readonly string[] | undefined = documentPairFieldLabels[entry.key] ?? documentQuadFieldLabels[entry.key]
+    const partValues = entry.value.split(",").map((value) => value.trim())
+    if (!specialized && partLabels && partValues.length === partLabels.length) {
       const row = document.createElement("span")
-      row.className = "document-pair-inputs"
-      const separator = /SIZE$/.test(entry.key) ? "×" : ","
-      pairLabels.forEach((name, index) => {
-        if (index > 0) {
-          const mark = document.createElement("span")
-          mark.className = "document-pair-separator"
-          mark.textContent = separator
-          row.append(mark)
-        }
+      row.className = "ui-field-pair"
+      if (partLabels.length === 4) row.dataset.columns = "4"
+      partLabels.forEach((name, index) => {
+        const box = document.createElement("span")
+        box.className = "ui-input"
+        const affix = document.createElement("span")
+        affix.className = "ui-input-affix"
+        affix.textContent = documentPartAffixes[name]
+        affix.title = name
         const input = document.createElement("input")
         input.type = "number"
         input.step = "1"
-        input.value = pairValues[index] ?? ""
-        input.placeholder = name
+        input.value = partValues[index] ?? ""
         input.disabled = !isEditing()
         input.setAttribute("aria-label", `${translatedConfigLabel(entry.key)} ${name}`)
         input.addEventListener("change", () => {
-          pairValues[index] = input.value
-          update(entry.section, entry.key, pairValues.join(","))
+          partValues[index] = input.value
+          update(entry.section, entry.key, partValues.join(","))
         })
-        row.append(input)
+        box.append(affix, input)
+        row.append(box)
       })
-      label.classList.add("document-pair-field")
-      label.append(row)
-      return label
-    }
-
-    const quadLabels = documentQuadFieldLabels[entry.key]
-    const quadValues = entry.value.split(",").map((value) => value.trim())
-    if (!specialized && quadLabels && quadValues.length === quadLabels.length) {
-      const row = document.createElement("span")
-      row.className = "document-quad-inputs"
-      quadLabels.forEach((name, index) => {
-        const item = document.createElement("span")
-        item.className = "document-subfield"
-        const small = document.createElement("small")
-        small.textContent = name
-        const input = document.createElement("input")
-        input.type = "number"
-        input.step = "1"
-        input.value = quadValues[index] ?? ""
-        input.placeholder = name
-        input.disabled = !isEditing()
-        input.setAttribute("aria-label", `${translatedConfigLabel(entry.key)} ${name}`)
-        input.addEventListener("change", () => {
-          quadValues[index] = input.value
-          update(entry.section, entry.key, quadValues.join(","))
-        })
-        item.append(small, input)
-        row.append(item)
-      })
-      label.classList.add("wide", "document-quad-field")
       label.append(row)
       return label
     }
@@ -538,9 +507,6 @@ export function populateDocumentInspector(): void {
     const title = document.createElement("span")
     title.className = "document-section-title"
     title.textContent = sectionName
-    const meta = document.createElement("span")
-    meta.className = "document-section-meta"
-    meta.textContent = `${sectionEntries.length} 项`
     heading.append(title)
     if (section && sectionName !== section) {
       const code = document.createElement("span")
@@ -548,7 +514,6 @@ export function populateDocumentInspector(): void {
       code.textContent = section
       heading.append(code)
     }
-    heading.append(meta)
     sectionPanel.append(heading)
     if (particle) {
       const toolbar = document.createElement("div")

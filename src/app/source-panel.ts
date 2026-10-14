@@ -1,5 +1,5 @@
 import { syncAtlasWorkspace } from "./tile-editing"
-import { inspectorBackButton, files, sourceName, quickInspector, asset, resourceInspector, sourceEditor, aiDesignPanel, sourceToolbar, sourceFindToggle, sourceSearch, sourceValueHintsEnabled, sourceCompletionEnabled, sourceLineExplanationEnabled, sourceSearchCount, sourceSearchPrevious, sourceSearchNext, sourceReplacement, sourceReplace, sourceReplaceAll, sourceColorPicker, styleImageDialog, sourceStyleProxy } from "./dom"
+import { files, sourceName, quickInspector, asset, resourceInspector, sourceEditor, aiDesignPanel, sourceToolbar, sourceFindToggle, sourceSearch, sourceValueHintsEnabled, sourceCompletionEnabled, sourceLineExplanationEnabled, sourceSearchCount, sourceSearchPrevious, sourceSearchNext, sourceReplacement, sourceReplace, sourceReplaceAll, sourceColorPicker, styleImageDialog, sourceStyleProxy } from "./dom"
 import { appState } from "./state"
 import { showsLayoutProperties, selectedSourceSections, styleConfigPath } from "./config-context"
 import { isBdaLayoutPath, bdaAppearancePart, isBdaVirtualTextPath, isBdaAppearancePartPath, commitBdaSourceEdit, visualResolver, bdaAppearanceStylePath } from "./bda-documents"
@@ -23,7 +23,6 @@ import { previewItems } from "../preview-items.ts"
 
 export function updateInspectorView(): void {
   syncAtlasWorkspace()
-  inspectorBackButton.hidden = appState.resourceConfigActive || Boolean(appState.archive?.isImage(appState.selectedPath)) || appState.inspectorTab === "ai"
   const imageSelected = Boolean(appState.archive?.isImage(appState.selectedPath))
   const overviewSelected = Boolean(
     files.querySelector(`.sidebar-overview button[data-path="${CSS.escape(appState.selectedPath)}"]`),

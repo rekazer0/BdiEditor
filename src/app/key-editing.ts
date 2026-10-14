@@ -1,11 +1,11 @@
 import { appState } from "./state"
-import { preview } from "./canvas-interaction"
+import { preview, source, toolbarPreview } from "./canvas-interaction"
 import { normalizeKeySections } from "../ini.ts"
 import { commitText, updateDirty } from "./edit-history"
-import { setSourceValue } from "./config-context"
+import { setSourceValue, scrollSelectedSource } from "./config-context"
 import { populateKeyInspector } from "./key-inspector"
-import { updateSourceHighlight } from "./source-panel"
-import { refreshPreview } from "./preview-render"
+import { updateSourceHighlight, updateInspectorView } from "./source-panel"
+import { refreshPreview, syncCandidateSelection } from "./preview-render"
 import { type LayoutRect, isListCell, listCellRect, applyLayoutAction as transformLayout, type LayoutAction, mergeLayoutRects, setExactGap, moveRects } from "../layout.ts"
 import { mixedCoordinateDelta } from "../mixed-input.ts"
 
@@ -63,6 +63,22 @@ export function deleteSelectedKeys(): void {
   populateKeyInspector()
   updateSourceHighlight()
   updateDirty()
+}
+
+/** 取消按键、工具栏与候选栏的选择，检查器回到所在面板的属性。 */
+export function selectParentObject(): void {
+  source.commit()
+  appState.selectedKeySections = []
+  appState.selectedToolbarSections = []
+  appState.selectedCandidate = false
+  preview.setSelected([])
+  toolbarPreview.setSelected([])
+  if (appState.inspectorTab !== "source") appState.inspectorTab = "properties"
+  syncCandidateSelection()
+  updateInspectorView()
+  populateKeyInspector()
+  updateSourceHighlight()
+  scrollSelectedSource()
 }
 
 export function selectedRects(): LayoutRect[] {

@@ -17,13 +17,12 @@ test("pane header: segmented mode switch above the object header", () => {
   for (const tab of ["properties", "source", "ai"]) assert.match(pane, new RegExp(`data-inspector-tab="${tab}"`))
 })
 
-test("object-level actions live in the object header, pointer modes on the canvas toolbar", () => {
+test("object-level actions and pointer modes live in the object header", () => {
   const actions = pane.slice(pane.indexOf("inspector-object-actions"), pane.indexOf('<div id="quick-inspector"'))
   for (const action of ["copy", "swap", "delete"]) assert.match(actions, new RegExp(`data-key-action="${action}"`))
-  assert.doesNotMatch(pane, /data-key-mode=/, "选择 / 移动属于画布工具栏")
+  for (const mode of ["select", "move"]) assert.match(actions, new RegExp(`data-key-mode="${mode}"`))
   const toolbar = html.slice(html.indexOf('class="preview-toolbar-start"'), html.indexOf('class="preview-toolbar-end"'))
-  assert.match(toolbar, /data-key-mode="select"/)
-  assert.match(toolbar, /data-key-mode="move"/)
+  assert.doesNotMatch(toolbar, /data-key-mode=/, "选择 / 移动不再放在画布工具栏")
 })
 
 test("properties are flat sections of rows inside one form scope", () => {
@@ -45,8 +44,9 @@ test("the category rail only navigates: there is no grouped display mode", () =>
   assert.doesNotMatch(main, /inspectorGroupedDisplay/)
 })
 
-test("sections collapse and remember it; edits can be reset from the rail", () => {
-  assert.match(shell, /inspector-collapsed-sections/)
+test("sections are always expanded; edits can be reset from the rail", () => {
+  assert.doesNotMatch(shell, /collapse|chevron/)
+  assert.doesNotMatch(pane, /<details|<summary/)
   assert.match(shell, /function resetAll/)
   assert.match(shell, /export function setInspectorKind/)
   assert.match(main, /setInspectorKind\(appState\.archive\?\.format === "bda" \? "bda" : appState\.archive \? "bds" : ""\)/)
@@ -81,11 +81,10 @@ test("gestures form a cross: tap in the middle, swipes around it, long press bel
   for (const gesture of ["CENTER", "HOLD", "UP", "DOWN", "LEFT", "RIGHT"]) assert.match(pane, new RegExp(`data-gesture="${gesture}"`))
 })
 
-test("filter, collapse-all, per-row revert and scrub handles live in the shared inspector shell", () => {
+test("filter, modified marker and scrub handles live in the shared inspector shell", () => {
   assert.match(shell, /function applyFilter/)
   assert.match(shell, /data-filter-miss/)
-  assert.match(shell, /toggleSection\(heading, \(event as MouseEvent \| KeyboardEvent\)\.altKey\)/)
   assert.match(shell, /function revertRow/)
-  assert.match(shell, /className = "inspector-revert"/)
+  assert.match(shell, /className = "inspector-modified"/)
   assert.match(shell, /toggleAttribute\("data-scrub", Boolean\(scrubbableField\(handle\)\)\)/)
 })

@@ -49,8 +49,7 @@ export function decorateStyleReferenceInput(input: HTMLInputElement, key = style
     soundMain.className = "sound-style-main"
     soundMain.setAttribute("role", "button")
     soundMain.tabIndex = 0
-    soundMain.setAttribute("aria-label", "播放按键音效")
-    const musicIcon = createIcon("music", 13)
+    const musicIcon = createIcon("volume-2", 14)
     musicIcon.classList.add("sound-style-main-icon")
     const soundMeta = document.createElement("span")
     soundMeta.className = "sound-style-main-meta"
@@ -67,9 +66,14 @@ export function decorateStyleReferenceInput(input: HTMLInputElement, key = style
       const path = soundPathForStyle(input.value.split(",")[0]?.trim() ?? "")
       if (path) playSoundPath(path)
     }
-    soundMain.addEventListener("click", playCurrent)
+    // 没有音效时整条就是「选择音效」按钮，有音效时点击试听。
+    const activate = () => {
+      if (soundPathForStyle(input.value.split(",")[0]?.trim() ?? "")) playCurrent()
+      else openStylePicker(input)
+    }
+    soundMain.addEventListener("click", activate)
     soundMain.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); playCurrent() }
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); activate() }
     })
     const play = document.createElement("button")
     play.type = "button"
@@ -100,6 +104,27 @@ export function decorateStyleReferenceInput(input: HTMLInputElement, key = style
   void refreshStyleReferenceThumbnail(button, input, key)
   wrapper.append(button)
   if (soundStyle) void refreshStyleReferenceThumbnail(button, input, key)
+  // 按键可以叠多层前景：标签行尾部「+ 添加」选一个样式追加为新的一张卡片。
+  const caption = input.dataset.keyField === "FORE_STYLE" ? input.closest(".ui-field")?.querySelector(":scope > span:first-child") : null
+  if (caption) {
+    const add = document.createElement("button")
+    add.type = "button"
+    add.className = "style-reference-add"
+    add.append(createIcon("plus", 12), "添加")
+    add.addEventListener("click", (event) => {
+      event.preventDefault()
+      const target = input.cloneNode(false) as HTMLInputElement
+      target.value = ""
+      target.addEventListener("change", () => {
+        if (!target.value.trim()) return
+        input.value = [...input.value.split(",").map((value) => value.trim()).filter(Boolean), target.value.trim()].join(",")
+        input.dispatchEvent(new Event("input", { bubbles: true }))
+        input.dispatchEvent(new Event("change", { bubbles: true }))
+      })
+      openStylePicker(target)
+    })
+    caption.append(add)
+  }
 }
 
 export function renderStyleReferenceRows(button: HTMLElement, input: HTMLInputElement, key: string): string[] {
@@ -179,15 +204,15 @@ export async function refreshStyleReferenceThumbnail(
     const main = button.parentElement?.querySelector<HTMLElement>(".sound-style-main")
     const title = main?.querySelector<HTMLElement>(".sound-style-name")
     const file = main?.querySelector<HTMLElement>(".sound-style-file")
-    if (title) title.textContent = path?.split("/").pop() || (styleID ? `STYLE${styleID}` : "未选择音效")
-    if (file) file.textContent = path ? `STYLE${styleID} · 点击试听` : "选择一个音乐文件"
+    if (title) title.textContent = path?.split("/").pop() || "选择音效"
+    if (file) file.textContent = path ? `STYLE${styleID} · 点击试听` : ""
     const play = button.parentElement?.querySelector<HTMLButtonElement>(".inspector-sound-play")
-    if (play) play.disabled = !path
+    if (play) play.hidden = !path
     if (main) {
       main.classList.toggle("has-sound", Boolean(path))
-      main.setAttribute("aria-disabled", String(!path))
+      main.setAttribute("aria-label", path ? "播放按键音效" : "选择音效")
     }
-    button.classList.toggle("has-sound", Boolean(path))
+    button.hidden = !path
     return
   }
   const styleIDs = renderStyleReferenceRows(button, input, key)

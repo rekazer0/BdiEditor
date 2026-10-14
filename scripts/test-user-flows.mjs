@@ -313,7 +313,6 @@ await check("edit keys: geometry, keyboard nudge, undo/redo, multi-select, layou
   await up.press("Tab")
   assert.match(await page.locator('[data-gesture="UP"]').getAttribute("class"), /configured/)
   await railTab(page, "样式")
-  await page.locator(".appearance-layout-fields > summary").click()
   await page.locator("[data-key-field=FORE_OFFSET]").waitFor({ state: "visible" })
   // Rows share one label column and fill the inspector.
   const rows = await page.locator(".appearance-property-grid > label:visible").evaluateAll((labels) => labels.map((label) => {

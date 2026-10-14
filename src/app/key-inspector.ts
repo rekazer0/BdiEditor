@@ -13,7 +13,7 @@ import { refreshPreview } from "./preview-render"
 import { refreshBdaStyleReferenceField } from "../bda-editor.ts"
 import { actionFieldNames, bdaKeyFieldLabels, preview, keyboardFields, layoutActionButtons, actionMeaningNodes } from "./canvas-interaction"
 import { shouldSuggestActionCodes, actionDescription } from "../actions.ts"
-import { keyFields, styleFields, primaryCssFields, fontFileField, fontFileSelect, inspectorBackButton, skinFieldsGroup, toolbarFieldsGroup, keyboardFieldsGroup, keyOnlyGroups, keyTypographyFieldsGroup, selectedKeyName, selectedKeyPreview, selectedKeyContext, quickInspector, skinFields, toolbarFields, textStyleLabels, $, canvasMultiToolbar, canvasMultiCount, keyLayoutFieldsGroup, keyModeButtons, keyActionButtons, gapFields, mode, theme } from "./dom"
+import { keyFields, styleFields, primaryCssFields, fontFileField, fontFileSelect, skinFieldsGroup, toolbarFieldsGroup, keyboardFieldsGroup, keyOnlyGroups, keyTypographyFieldsGroup, selectedKeyName, selectedKeyPreview, selectedKeyContext, quickInspector, skinFields, toolbarFields, textStyleLabels, $, canvasMultiToolbar, canvasMultiCount, keyLayoutFieldsGroup, keyModeButtons, keyActionButtons, gapFields, mode, theme } from "./dom"
 import { deferNumberInputRefresh } from "../number-input-wheel.ts"
 import { effectivePanelSection } from "../panel-tools.ts"
 import { createIcon } from "../icons"
@@ -192,11 +192,15 @@ export function populatePrimaryCssFields(hasSelection: boolean, sections: string
   const sources = [...new Map(
     resolveStylePropertyLayers(styles, foreground, "SHOW").map((source) => [source.section, source]),
   ).values()]
-  for (const source of sources) {
+  for (const [index, source] of sources.entries()) {
     const label = document.createElement("label")
+    label.className = "ui-field"
     const caption = `显示内容（来自 CSS · ${source.section}）`
     label.title = `${path} [${source.section}] SHOW`
-    label.append(`${caption} `)
+    const name = document.createElement("span")
+    // 前景有多层时按层区分，否则几行同名分不清
+    name.textContent = sources.length > 1 ? `第 ${index + 1} 层` : "样式内容"
+    label.append(name)
     const input = document.createElement("input")
     input.value = source.value
     input.disabled = !isEditing()
@@ -280,7 +284,6 @@ export function populateKeyInspector(): void {
   const bdaConfigSelected = Boolean(appState.archive?.isBdaConfig(appState.selectedPath))
   const bdaSelected = appState.archive?.format === "bda"
   const candidateSelected = Boolean(bdaSelected && appState.selectedCandidate && appState.selectedPath === appState.layoutPath)
-  inspectorBackButton.disabled = !(hasSelection || toolbarHasSelection || candidateSelected)
   syncBdaKeyFieldLabels(bdaSelected)
   skinFieldsGroup.hidden = !skinSelected || bdaSelected
   toolbarFieldsGroup.hidden = !toolbarSelected || bdaSelected || toolbarHasSelection
@@ -290,7 +293,7 @@ export function populateKeyInspector(): void {
     group.hidden = skinSelected || bdaConfigSelected || !hasSelection || bdaSelected && !availableForBda
   }
   selectedKeyName.textContent = hasSelection
-    ? sections.length > 1 ? `已选 ${sections.length} 个按键` : "按键"
+    ? sections.length > 1 ? `已选 ${sections.length} 个按键` : `按键 ${sections[0]?.match(/\d+$/)?.[0] ?? ""}`.trim()
     : skinSelected
     ? "皮肤信息"
     : bdaConfigSelected
@@ -303,8 +306,8 @@ export function populateKeyInspector(): void {
       ? "候选栏与工具栏"
     : appState.selectedPath !== appState.layoutPath
       ? appState.selectedPath.split("/").pop() ?? "文档配置"
-      : `${appState.selectedPath.split("/").pop() ?? "键盘"} · 整体布局`
-  selectedKeyPreview.replaceChildren(createIcon(hasSelection ? bdaSelected ? "component" : sections.length > 1 ? "layers" : "key-round" : "panel-top"))
+      : "整体布局"
+  selectedKeyPreview.replaceChildren(createIcon(hasSelection ? bdaSelected ? "component" : sections.length > 1 ? "layers" : "key-round" : "layout-panel-top", 16))
   selectedKeyPreview.hidden = false
   selectedKeyName.title = selectedKeyName.textContent ?? ""
   selectedKeyContext.textContent = hasSelection
@@ -360,7 +363,7 @@ export function populateKeyInspector(): void {
     // BDA 样式引用由源码结构控件编辑，旧格式按键字段只负责非 BDA 皮肤。
     field.disabled = !hasSelection || appState.archive?.format === "bda"
     // 手势格子没配置时显示「+」（十字布局，DESIGN.md §10）。
-    field.placeholder = actionFieldNames.has(name) ? "+" : ""
+    field.placeholder = name === "HOLD" ? "未设置" : actionFieldNames.has(name) ? "+" : ""
     if (!hasSelection || bdaSelected) {
       field.value = ""
       continue
@@ -451,8 +454,13 @@ export function populateKeyInspector(): void {
       continue
     }
     if (appState.archive?.format !== "bda") {
-      label.hidden = false
-      for (const fieldLabel of Array.from(label.querySelectorAll<HTMLLabelElement>("label"))) fieldLabel.hidden = false
+      // 样式里没有的属性无法编辑，整行隐藏，避免留下没有输入框的空行
+      const field = label.querySelector<HTMLInputElement>("[data-style-field]")
+      label.hidden = Boolean(field?.disabled)
+      for (const fieldLabel of Array.from(label.querySelectorAll<HTMLLabelElement>("label"))) {
+        fieldLabel.hidden = Boolean(fieldLabel.querySelector<HTMLInputElement>("[data-style-field]")?.disabled)
+      }
+      if (label.classList.contains("color-pair-field")) label.hidden = Array.from(label.querySelectorAll<HTMLLabelElement>("label")).every((fieldLabel) => fieldLabel.hidden)
       continue
     }
     if (label.classList.contains("color-pair-field")) {
@@ -481,9 +489,7 @@ export function populateKeyInspector(): void {
   multiLayout.querySelector("[role=status]")!.textContent = multiLabel
   canvasMultiCount.textContent = multiLabel
   const layoutNote = keyLayoutFieldsGroup.querySelector<HTMLElement>(".inspector-note")!
-  layoutNote.textContent = appState.archive?.format === "bda"
-    ? "此格式的位置与尺寸仅供查看。外观和文字可在对应分类中修改。"
-    : "方向键移动 1 px · Shift + 方向键移动 10 px"
+  layoutNote.hidden = appState.archive?.format !== "bda"
   const listSelected = sections.some(isListCell)
   const keyToolsAvailable = hasSelection && isEditing() && appState.archive?.format !== "bda" && !listSelected
   for (const button of keyModeButtons) button.disabled = !keyToolsAvailable
