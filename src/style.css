@@ -3596,7 +3596,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 #source .cm-source-value-action { color: var(--syntax-value-action); }
 #source .cm-source-value-style { color: var(--syntax-value-style); }
-#source .cm-source-value-color { color: var(--syntax-value-color); }
+#source .cm-source-value-color { color: var(--syntax-constant); }
 
 .source-color-picker {
   position: fixed;
@@ -3683,29 +3683,11 @@ body:has(.canvas-wrap.empty) .workspace {
 #source .cm-source-completion button:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 }
 
-.token-comment {
-  color: var(--syntax-comment);
-}
-
-.token-section {
-  color: var(--syntax-section);
-}
-
-.token-key {
-  color: var(--syntax-key);
-}
-
-.token-operator {
-  color: var(--syntax-operator);
-}
-
-.token-action {
-  color: var(--syntax-action);
-}
-
-.token-number {
-  color: var(--syntax-number);
-}
+#source .tok-comment { color: var(--syntax-comment); font-style: italic; }
+#source .tok-heading { color: var(--syntax-section); font-weight: var(--font-weight-semibold); }
+#source :is(.tok-definition, .tok-propertyName) { color: var(--syntax-key); }
+#source .tok-string { color: var(--syntax-string); }
+#source :is(.tok-number, .tok-bool, .tok-atom, .tok-literal) { color: var(--syntax-constant); }
 
 .cm-source-selected {
   background: color-mix(in srgb, var(--accent) 16%, transparent);

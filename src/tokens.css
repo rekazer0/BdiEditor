@@ -126,16 +126,14 @@
   --guide: #ff9500;            /* 十字光标、吸附线 */
   --guide-layout: #ef3e52;     /* 布局辅助线 */
   --guide-selected: #087ff5;   /* 选中按键的辅助线 */
-  /* 代码高亮 */
-  --syntax-comment: #8b93a3;
-  --syntax-section: #376bff;
-  --syntax-key: #9147e8;
-  --syntax-operator: #606575;
-  --syntax-action: #00a85a;
-  --syntax-number: #b77708;
-  --syntax-value-action: #c04a13;
-  --syntax-value-style: #2459a9;
-  --syntax-value-color: #087f8c;
+  /* 代码高亮：GitHub Primer（prettylights）配色 */
+  --syntax-comment: #6e7781;
+  --syntax-section: #6639ba;
+  --syntax-key: #116329;
+  --syntax-string: #0a3069;
+  --syntax-constant: #0550ae;
+  --syntax-value-action: #953800;
+  --syntax-value-style: #cf222e;
   --syntax-explanation: #3f7f4f;
   --search-match: #ffd60a;
   --search-match-ink: #2c2100;
@@ -203,14 +201,13 @@
   --glass-shadow: 0 10px 32px rgb(0 0 0 / 32%), inset 0 1px rgb(255 255 255 / 8%);
   --canvas-surface: #0c0d10;
   --backdrop: rgb(0 0 0 / 45%);
-  --syntax-section: #7a9bff;
-  --syntax-key: #c792ff;
-  --syntax-operator: #a1a8b3;
-  --syntax-action: #3dd68c;
-  --syntax-number: #f5c445;
-  --syntax-value-action: #ff9a5c;
-  --syntax-value-style: #7aa7ff;
-  --syntax-value-color: #4fd1db;
+  --syntax-comment: #8b949e;
+  --syntax-section: #d2a8ff;
+  --syntax-key: #7ee787;
+  --syntax-string: #a5d6ff;
+  --syntax-constant: #79c0ff;
+  --syntax-value-action: #ffa657;
+  --syntax-value-style: #ff7b72;
 }
 
 :root.windows[data-window-material="on"] {

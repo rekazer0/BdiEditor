@@ -1,6 +1,5 @@
 import { defaultKeymap, indentWithTab } from "@codemirror/commands"
 import {
-  HighlightStyle,
   StreamLanguage,
   bracketMatching,
   indentOnInput,
@@ -33,7 +32,7 @@ import {
   lineNumbers,
   type DecorationSet,
 } from "@codemirror/view"
-import { tags } from "@lezer/highlight"
+import { classHighlighter } from "@lezer/highlight"
 import { actionDescription } from "./actions.ts"
 import { sourceCompletions, type SourceCompletionItem } from "./source-completion.ts"
 
@@ -189,16 +188,6 @@ const sourceDecorations = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field),
 })
 
-const sourceHighlightStyle = HighlightStyle.define([
-  { tag: tags.comment, class: "token-comment" },
-  { tag: tags.heading, class: "token-section" },
-  { tag: [tags.propertyName, tags.definition(tags.variableName)], class: "token-key" },
-  { tag: [tags.number, tags.integer, tags.float], class: "token-number" },
-  { tag: [tags.bool, tags.null, tags.atom], class: "token-section" },
-  { tag: [tags.string, tags.character, tags.regexp], class: "token-action" },
-  { tag: [tags.operator, tags.punctuation, tags.separator], class: "token-operator" },
-])
-
 const iniLanguage = StreamLanguage.define({
   ...properties,
   token(stream, state) {
@@ -223,7 +212,7 @@ const baseExtensions: Extension[] = [
   bracketMatching(),
   highlightActiveLine(),
   keymap.of([...defaultKeymap, indentWithTab]),
-  syntaxHighlighting(sourceHighlightStyle),
+  syntaxHighlighting(classHighlighter),
   sourceDecorations,
   explanationField,
   EditorView.contentAttributes.of({
