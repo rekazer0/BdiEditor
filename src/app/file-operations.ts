@@ -11,7 +11,7 @@ import { updateDirty, commitBatch } from "./edit-history"
 import { updateDevicePreview, refreshPreview } from "./preview-render"
 import { updateSourceFileActions } from "./source-files"
 import { exportButtons, isTauri, LARGE_SKIN_BYTES } from "./canvas-interaction"
-import { type ExportTarget } from "../export.ts"
+import { canExport, type ExportFormat } from "../export.ts"
 import { operationError } from "../operations.ts"
 import { clientLog, flushClientLogs } from "../client-log.ts"
 import { message } from "@tauri-apps/plugin-dialog"
@@ -198,9 +198,9 @@ export function setFileOperationBusy(busy: boolean): void {
   updatePanelToolButtons()
   updateSourceFileActions()
   for (const button of exportButtons) {
-    const format = button.dataset.exportFormat as ExportTarget
-    // 只有 BDA 皮肤能导出 BDA；其他格式直接隐藏这两项，不留一排无法解释的灰色菜单。
-    button.hidden = Boolean(appState.archive) && appState.archive!.format !== "bda" && format === "bda"
+    const format = button.dataset.exportFormat as ExportFormat
+    // 不能导出的格式直接隐藏，不留一排无法解释的灰色菜单。
+    button.hidden = Boolean(appState.archive) && !canExport(appState.archive!.format, format)
     button.disabled = busy || !appState.archive || button.hidden
   }
 }

@@ -197,12 +197,12 @@
                 <div id="welcome-recent-grid" class="recent-grid" hidden></div>
                 <div id="welcome-recent-empty" class="recent-grid-empty">
                   <span class="icon system-symbol" data-icon="folder" aria-hidden="true"></span>
-                  <span class="recent-grid-empty-copy"><strong>还没有打开过皮肤</strong><span>拖入或选择 .bdi / .bds / .bda 文件，最近打开的皮肤会显示在这里。</span></span>
+                  <span class="recent-grid-empty-copy"><strong>还没有打开过皮肤</strong><span>拖入或选择 .bdi / .bds / .bda / .sxi 文件，最近打开的皮肤会显示在这里。</span></span>
                 </div>
               </section>
               <header class="welcome-hero">
                 <h1>新建皮肤</h1>
-                <p>从一个模板开始，或导入已有的 .bdi / .bds / .bda 文件继续编辑。新建项目会完整保留官方基础布局与资源结构。</p>
+                <p>从一个模板开始，或导入已有的 .bdi / .bds / .bda / .sxi 文件继续编辑。新建项目会完整保留官方基础布局与资源结构。</p>
               </header>
 
               <section class="welcome-section">
@@ -992,7 +992,7 @@
               <p>百度输入法 iOS 与 Android 皮肤可视化编辑器</p>
             </div>
             <div class="settings-list">
-              <p class="settings-about-note">支持读取、编辑和导出 BDI、BDS、BDA 皮肤包，并可将三种格式导出手心皮肤 (.sxi)。</p>
+              <p class="settings-about-note">支持读取、编辑和导出 BDI、BDS、BDA 皮肤包与手心皮肤 (.sxi)，并可将前三种格式导出为 .sxi。</p>
               <p class="settings-about-note">Beta 版本：功能基本完整，可能仍有问题，欢迎反馈。</p>
             </div>
             <section id="about-update" class="about-update" data-current-version="2.0.0-beta">
@@ -1016,7 +1016,7 @@
       </form>
     </dialog>
 
-    <input id="browser-open" type="file" accept=".bdi,.bds,.bda" hidden />
+    <input id="browser-open" type="file" accept=".bdi,.bds,.bda,.sxi" hidden />
     <input id="image-open" type="file" accept=".png" hidden />
     <input id="layout-image-open" type="file" accept=".png,image/png" hidden />
     <script type="module" src="/src/main.ts"></script>

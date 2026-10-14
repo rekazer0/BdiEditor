@@ -1,3 +1,4 @@
+import type { ExportFormat } from "./export.ts"
 import { Agent, type AgentEvent, type AgentMessage, type AgentTool, type ThinkingLevel } from "@earendil-works/pi-agent-core"
 import {
   Type,
@@ -28,7 +29,7 @@ type AiDesignConfiguration = {
 }
 
 type AiDesignProject = {
-  format: "bdi" | "bds" | "bda"
+  format: ExportFormat
   skinName: string
   skinPath: string
   theme: string

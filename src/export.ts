@@ -1,25 +1,24 @@
-export type ExportFormat = "bdi" | "bds" | "bda"
+export type ExportFormat = "bdi" | "bds" | "bda" | "sxi"
 
-// `.sxi` is a read-only export target: it is produced by the Palm skin converter,
-// never edited in place, so it is not a `SkinArchive` package format.
-export type ExportTarget = ExportFormat | "sxi"
-
-export function isExportFormat(format: ExportTarget): format is ExportFormat {
-  return format !== "sxi"
+// BDI/BDS skins export to each other and to `.sxi`; BDA also exports to BDA; an opened `.sxi`
+// is edited natively and only saves as `.sxi`.
+export function canExport(source: ExportFormat, target: ExportFormat): boolean {
+  if (source === "sxi") return target === "sxi"
+  return target !== "bda" || source === "bda"
 }
 
 export function exportFormatFromPath(path: string): ExportFormat | undefined {
   const match = path.match(/\.([^.\\/]+)$/)
   const extension = match?.[1].toLowerCase()
-  return extension === "bdi" || extension === "bds" || extension === "bda"
+  return extension === "bdi" || extension === "bds" || extension === "bda" || extension === "sxi"
     ? extension
     : undefined
 }
 
-function exportPath(path: string, format: ExportTarget): string {
+function exportPath(path: string, format: ExportFormat): string {
   return /\.[^.\\/]+$/.test(path) ? path.replace(/\.[^.\\/]+$/, `.${format}`) : `${path}.${format}`
 }
 
-export function exportName(name: string, format: ExportTarget): string {
+export function exportName(name: string, format: ExportFormat): string {
   return exportPath(name || "未命名皮肤", format).split(/[\\/]/).pop()!
 }

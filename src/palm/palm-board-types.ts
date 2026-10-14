@@ -73,6 +73,10 @@ export function boardTypeFromIniCode(code: string): PalmBoardType | undefined {
   return BOARD_CODES[code]
 }
 
+export function iniCodeFromBoardType(type: PalmBoardType): string | undefined {
+  return Object.keys(BOARD_CODES).find((code) => !code.includes("*") && BOARD_CODES[code] === type)
+}
+
 export function boardTypeFromIniFileName(fileName: string): PalmBoardType | undefined {
   return boardTypeFromIniCode(fileName.replace(/\.ini/g, ""))
 }

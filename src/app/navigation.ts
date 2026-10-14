@@ -13,6 +13,7 @@ import { isListCell } from "../layout.ts"
 import { updateInspectorView, updateSourceSearchStatus } from "./source-panel"
 import { resourceImagePaths } from "../resources.ts"
 import { populateKeyInspector } from "./key-inspector"
+import { isSxiSourcePath, showSxiSource } from "./sxi-documents"
 import { ensureSourcePathRendered, setSidebarView, updateSourceFileActions } from "./source-files"
 
 export function selectFile(
@@ -133,6 +134,7 @@ export function selectFile(
     } else if (path !== appState.layoutPath) {
       appState.inspectorTab = "source"
     }
+    if (isSxiSourcePath(path)) showSxiSource(path)
   } else if (appState.archive?.isBdaConfig(path)) {
     hideImageWorkspace()
     appState.selectedDocument = undefined

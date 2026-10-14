@@ -1,3 +1,4 @@
+import type { ExportFormat } from "./export.ts"
 // 注入 AI 设计系统提示的皮肤格式知识；规则须与 atlas.ts / keyboard.ts 的实际解析保持一致。
 const INI_SKILL = `## 皮肤格式技能（BDI/BDS）
 
@@ -29,6 +30,6 @@ const BDA_SKILL = `## 皮肤格式技能（BDA）
 - 按键通过样式引用（type 为 image/text/color，key 为样式表中的序号）指向样式；按键显示文字、字体、颜色要到被引用的 textStyles / colorStyles 条目中修改，不要改按键的动作字段。
 - 用 read_project_file 读取后，用 replace_project_text 做唯一、精确的小片段替换；同一样式可能被多个按键共享，需在总结中说明影响范围。`
 
-export function aiSkinSkill(format: "bdi" | "bds" | "bda"): string {
+export function aiSkinSkill(format: ExportFormat): string {
   return format === "bda" ? BDA_SKILL : INI_SKILL
 }

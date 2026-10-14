@@ -28,6 +28,9 @@ export function aiEditableProjectFiles(target: SkinArchive, scope: "panel" | "pr
     : appState.layoutPath || appState.selectedPath || preferredPath()
   // 面板范围同时授权它引用的全局配置与样式表：按键文字、字体、颜色都定义在样式表里。
   const panelFiles = new Set([panelConfig, ...target.format === "bda" ? [] : [genConfigPath(), styleConfigPath()]])
+  // shortcut: SXI layouts are read-only views and skin.json is too large for a prompt; AI edits
+  // for .sxi need fragment-sized JSON files first.
+  if (target.format === "sxi") return []
   return target.names().flatMap((path) => {
     if (scope === "panel" && !panelFiles.has(path)) return []
     if (target.format === "bda") {
@@ -47,7 +50,7 @@ export function aiEditableProjectFiles(target: SkinArchive, scope: "panel" | "pr
 
 /** PNGs beside the panel's style sheet (or every PNG for project scope), with their .til slices. */
 export function aiEditableProjectImages(target: SkinArchive, scope: "panel" | "project" = "project"): AiSkinImageFile[] {
-  if (target.format === "bda") return []
+  if (target.format === "bda" || target.format === "sxi") return []
   const folders = [styleConfigPath().replace(/[^/]*$/, ""), `${theme.value}/skin/res/`]
   return target.names().flatMap((path) => {
     if (!target.isImage(path) || scope === "panel" && !folders.some((folder) => path.startsWith(folder) && !path.slice(folder.length).includes("/"))) return []

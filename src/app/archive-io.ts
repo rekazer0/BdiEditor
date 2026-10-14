@@ -4,7 +4,7 @@ import { flushSourceAutosave, activateSourceWorkspace, sourceFilesPayload, decod
 import { appState } from "./state"
 import { releaseKeySound, keySoundBuffers, sourceDirectoryEnabledBySettings, isTauri, isAndroidTauri, exportButtons, pendingSourcePaths, LAST_SOURCE_WORKSPACE_KEY, isIOSWeb, isAndroidWeb } from "./canvas-interaction"
 import { SkinArchive } from "../skin.ts"
-import { exportFormatFromPath, exportName, isExportFormat, type ExportFormat, type ExportTarget } from "../export.ts"
+import { canExport, exportFormatFromPath, exportName, type ExportFormat } from "../export.ts"
 import { buildSxiZip } from "../palm/palm-export.ts"
 import { bdaCompatibilityWarnings, type BdaPlatform, convertBdaPlatform } from "../bda-platform.ts"
 import { releaseImagePreviewURL } from "../image-preview.ts"
@@ -115,8 +115,8 @@ export async function loadArchive(
   if (!isNew && isTauri() && path) recordRecentFile(path, documentName.textContent)
   saveButton.disabled = false
   for (const button of exportButtons) {
-    const format = button.dataset.exportFormat as ExportTarget
-    button.hidden = appState.archive.format !== "bda" && format === "bda"
+    const format = button.dataset.exportFormat as ExportFormat
+    button.hidden = !canExport(appState.archive.format, format)
     button.disabled = button.hidden
   }
   updateFileOperationProgress(68, "正在生成文件列表…")
@@ -187,7 +187,7 @@ export async function openNative(): Promise<boolean> {
   if (!(await prepareDocumentReplacement())) return false
   const path = await open({
     multiple: false,
-    filters: [{ name: "百度输入法皮肤", extensions: ["bdi", "bds", "bda"] }],
+    filters: [{ name: "输入法皮肤", extensions: ["bdi", "bds", "bda", "sxi"] }],
   })
   if (typeof path !== "string") return false
   await loadNativePath(path)
@@ -246,7 +246,7 @@ export async function restoreLastSourceWorkspace(): Promise<void> {
 }
 
 export async function loadNativePath(path: string): Promise<boolean> {
-  if (!isSupportedSkinPath(path)) throw new Error("仅支持 .bda、.bdi 或 .bds 皮肤文件")
+  if (!isSupportedSkinPath(path)) throw new Error("仅支持 .bda、.bdi、.bds 或 .sxi 皮肤文件")
   const bytes = path.startsWith("content://")
     ? await readFile(path)
     : await readNativeSkinFile(path)
@@ -255,7 +255,7 @@ export async function loadNativePath(path: string): Promise<boolean> {
 }
 
 export function isSupportedSkinPath(path: string): boolean {
-  return path.startsWith("content://") || /\.(bdi|bds|bda)$/i.test(path)
+  return path.startsWith("content://") || /\.(bdi|bds|bda|sxi)$/i.test(path)
 }
 
 export async function loadDroppedFile(file: File): Promise<boolean> {
@@ -281,7 +281,7 @@ export function currentExportFormat(): ExportFormat {
 }
 
 export function mobileShareFormat(): ExportFormat {
-  if (appState.archive?.format === "bda") return "bda"
+  if (appState.archive?.format === "bda" || appState.archive?.format === "sxi") return appState.archive.format
   if (isIOSWeb()) return "bdi"
   if (isAndroidTauri() || isAndroidWeb()) return "bds"
   return currentExportFormat()
@@ -289,18 +289,19 @@ export function mobileShareFormat(): ExportFormat {
 
 // `.sxi` is a Palm converter artifact rather than a skin package, so save dialogs label
 // it separately.
-function exportTargetLabel(format: ExportTarget): string {
+function exportTargetLabel(format: ExportFormat): string {
   return format === "sxi" ? "手心皮肤" : `${format.toUpperCase()} 皮肤`
 }
 
-export async function exportArchive(format: ExportTarget, targetBdaPlatform?: Exclude<BdaPlatform, "unknown">): Promise<{
+export async function exportArchive(format: ExportFormat, targetBdaPlatform?: Exclude<BdaPlatform, "unknown">): Promise<{
   bytes: Uint8Array
   converted: boolean
   warnings: string[]
 } | undefined> {
   if (!appState.archive) throw new Error("当前没有可保存的皮肤")
   if (appState.aiDraftPreview) throw new Error("请先应用或丢弃 AI 修改草稿")
-  if (format === "sxi") {
+  if (!canExport(appState.archive.format, format)) throw new Error(`${appState.archive.format.toUpperCase()} 皮肤不能导出为 ${format.toUpperCase()}`)
+  if (format === "sxi" && appState.archive.format !== "sxi") {
     updateFileOperationProgress(22, "正在导出手心皮肤…")
     await waitForInterfacePaint()
     let source: SkinArchive = appState.archive
@@ -323,7 +324,7 @@ export async function exportArchive(format: ExportTarget, targetBdaPlatform?: Ex
     const result = convertBdaPlatform(appState.archive, targetBdaPlatform)
     return { bytes: await result.toBytesAsync(), converted: true, warnings: bdaCompatibilityWarnings(appState.archive) }
   }
-  if (appState.archive.format !== "bda" || format === "bda") {
+  if (appState.archive.format !== "bda" || format === "bda" || format === "sxi") {
     const soundWarnings: string[] = []
     const bytes = await appState.archive.toBytesAsync(format, soundWarnings)
     reportSoundWarnings(soundWarnings)
@@ -349,7 +350,7 @@ export function reportSoundWarnings(warnings: string[]): void {
   window.alert(`以下按键音未能转换为目标平台格式，导出包中仍引用原文件，目标平台可能没有声音：\n\n${warnings.join("\n")}`)
 }
 
-export async function saveNative(saveAs: boolean, format: ExportTarget, suggestedName: string): Promise<boolean> {
+export async function saveNative(saveAs: boolean, format: ExportFormat, suggestedName: string): Promise<boolean> {
   if (!appState.archive) throw new Error("当前没有可保存的皮肤")
   let exported: Awaited<ReturnType<typeof exportArchive>>
   let path = appState.currentPath
@@ -365,7 +366,7 @@ export async function saveNative(saveAs: boolean, format: ExportTarget, suggeste
     if (!exported) return false
     await writeNativePath(path, exported.bytes)
   }
-  if (!exported.converted && isExportFormat(format)) {
+  if (!exported.converted) {
     appState.currentPath = path
     appState.unsavedNew = false
     appState.archive.markSaved(exported.bytes, format)
@@ -476,7 +477,7 @@ export async function writeToChosenFile(
   return file.name
 }
 
-export async function downloadArchive(format: ExportTarget, suggestedName: string): Promise<boolean> {
+export async function downloadArchive(format: ExportFormat, suggestedName: string): Promise<boolean> {
   if (!appState.archive) throw new Error("当前没有可保存的皮肤")
   let exported: Awaited<ReturnType<typeof exportArchive>>
   const path = await writeToChosenFile(suggestedName, async () => {
@@ -484,7 +485,7 @@ export async function downloadArchive(format: ExportTarget, suggestedName: strin
     return exported?.bytes
   }, exportTargetLabel(format))
   if (!path || !exported) return false
-  if (!exported.converted && isExportFormat(format)) {
+  if (!exported.converted) {
     appState.currentPath = path
     documentName.textContent = suggestedName
     appState.archive.markSaved(exported.bytes, format)
@@ -496,7 +497,7 @@ export async function downloadArchive(format: ExportTarget, suggestedName: strin
 
 export async function saveArchive(
   saveAs: boolean,
-  format: ExportTarget,
+  format: ExportFormat,
   targetBdaPlatform?: Exclude<BdaPlatform, "unknown">,
 ): Promise<boolean> {
   flushNumberInputWheel()

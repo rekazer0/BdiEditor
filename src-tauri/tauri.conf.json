@@ -79,6 +79,17 @@
           "identifier": "io.github.rekazer0.bdiedit.bda",
           "conformsTo": ["public.data"]
         }
+      },
+      {
+        "ext": ["sxi"],
+        "name": "手心输入法皮肤",
+        "mimeType": "application/octet-stream",
+        "role": "Editor",
+        "rank": "Alternate",
+        "exportedType": {
+          "identifier": "io.github.rekazer0.bdiedit.sxi",
+          "conformsTo": ["public.data"]
+        }
       }
     ]
   }
