@@ -1,7 +1,7 @@
 import { sourceKeyLabels } from "../config-labels.ts"
 import { IniDocument } from "../ini.ts"
 import { visualResolver, isBdaLayoutPath, currentBdaAppearance, bdaAppearancePart, refreshBdaLayout, refreshSelectedBdaSource } from "./bda-documents"
-import { retinaThumbnail, drawVisualPreview } from "../atlas.ts"
+import { thumbnailRecycler, drawVisualPreview } from "../atlas.ts"
 import { documentFields, documentFieldsGroup, skinFields, toolbarFields, bdaConfigFields, bdaConfigFieldsGroup } from "./dom"
 import { appState } from "./state"
 import { preview } from "./canvas-interaction"
@@ -263,6 +263,7 @@ export function isParticleSection(document: IniDocument, section: string): boole
 export async function renderParticleImages(container: HTMLElement, value: string): Promise<void> {
   const resolver = visualResolver()
   const styleIDs = value.split(",").map((item) => item.trim()).filter(Boolean)
+  const thumbnail = thumbnailRecycler(container)
   container.replaceChildren()
   if (!resolver) return
   const visuals = await Promise.all(styleIDs.map((styleID) => resolver.resolve(styleID, false).catch(() => undefined)))
@@ -270,7 +271,7 @@ export async function renderParticleImages(container: HTMLElement, value: string
   container.replaceChildren(...styleIDs.map((styleID, index) => {
     const item = document.createElement("span")
     item.className = "particle-image-preview"
-    const canvas = retinaThumbnail(document.createElement("canvas"), 56, 56)
+    const canvas = thumbnail(56, 56)
     drawVisualPreview(canvas, [visuals[index]], false)
     const caption = document.createElement("small")
     caption.textContent = styleID

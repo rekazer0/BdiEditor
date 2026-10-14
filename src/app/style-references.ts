@@ -104,7 +104,9 @@ export function decorateStyleReferenceInput(input: HTMLInputElement, key = style
 
 export function renderStyleReferenceRows(button: HTMLElement, input: HTMLInputElement, key: string): string[] {
   const styleIDs = input.value.split(",").map((value) => value.trim()).filter(Boolean)
-  for (const canvas of Array.from(button.querySelectorAll("canvas"))) styleStateCanvasObserver.unobserve(canvas)
+  // 每次编辑都会重建这些行；复用旧画布（保留已按卡片量好的位图尺寸），不再每次新建。
+  const spare = Array.from(button.querySelectorAll("canvas")).reverse()
+  for (const canvas of spare) styleStateCanvasObserver.unobserve(canvas)
   button.replaceChildren()
   const styles = styleConfigDocument()
   for (const [styleIndex, styleID] of (styleIDs.length ? styleIDs : [""]).entries()) {
@@ -138,7 +140,7 @@ export function renderStyleReferenceRows(button: HTMLElement, input: HTMLInputEl
       // 更换引用的样式挪到 Alt 点击，编号框仍可直接输入。
       item.title = `点击选择${highlighted ? "按下" : "正常"}图片切片；Alt 点击更换样式；Command/Ctrl 点击编辑样式`
       item.setAttribute("aria-label", item.title)
-      const canvas = retinaThumbnail(document.createElement("canvas"), 152, 76)
+      const canvas = spare.pop() ?? retinaThumbnail(document.createElement("canvas"), 152, 76)
       canvas.setAttribute("aria-hidden", "true")
       item.append(canvas)
       item.addEventListener("click", (event) => {

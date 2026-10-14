@@ -11,7 +11,7 @@ import { updateBdaRefs } from "./key-inspector"
 import { bdaImageResourceID } from "./tile-editing"
 import { stylePickerDialog, stylePickerGrid, styleLibraryPreviewImage, $, styleLibraryApply, styleLibraryPreview, stylePickerSearch, theme, orientation, stylePickerCount, stylePickerEmpty, styleLibraryEdit, stylePickerAdd, styleAddButton, newStyleError } from "./dom"
 import { openImageSlicePicker, imageDataURL, showPickerWindow } from "./image-pickers"
-import { type Visual, retinaThumbnail, drawVisualPreview, type VisualResolver } from "../atlas.ts"
+import { type Visual, retinaThumbnail, drawVisualPreview, thumbnailRecycler, type VisualResolver } from "../atlas.ts"
 import { isTauri, playSoundPath, afterNextPaint } from "./canvas-interaction"
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { selectFile } from "./navigation"
@@ -204,6 +204,7 @@ export async function renderStyleLibraryItems(renderID: number, styleIDs: string
   for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-kind]")) {
     button.hidden = button.dataset.styleLibraryKind !== "all" && !kinds.has(button.dataset.styleLibraryKind as StyleKind)
   }
+  const thumbnail = thumbnailRecycler(stylePickerGrid)
   stylePickerGrid.replaceChildren()
   stylePickerCount.textContent = `${allItems.length} 个样式 · ${paths.length} 张图片`
   stylePickerEmpty.hidden = items.length > 0
@@ -228,7 +229,7 @@ export async function renderStyleLibraryItems(renderID: number, styleIDs: string
       previews.append(image)
     } else {
       for (const [index, visual] of visuals.entries()) {
-        const canvas = retinaThumbnail(document.createElement("canvas"), 128, 88)
+        const canvas = thumbnail(128, 88)
         canvas.setAttribute("aria-label", index ? "按下状态" : "正常状态")
         drawVisualPreview(canvas, [visual], styleReferenceForeground(styleReferenceKey(appState.stylePickerTarget!)))
         previews.append(canvas)

@@ -152,6 +152,12 @@ export function retinaThumbnail(canvas: HTMLCanvasElement, cssWidth: number, css
   return canvas
 }
 
+/** 重建列表前先收走容器里的旧画布，按顺序复用；必须在清空容器之前调用。 */
+export function thumbnailRecycler(container: Element): (cssWidth: number, cssHeight: number) => HTMLCanvasElement {
+  const spare = Array.from(container.querySelectorAll("canvas")).reverse()
+  return (cssWidth, cssHeight) => retinaThumbnail(spare.pop() ?? document.createElement("canvas"), cssWidth, cssHeight)
+}
+
 export function drawVisualPreview(canvas: HTMLCanvasElement, visuals: Array<Visual | undefined>, foreground: boolean): void {
   const context = canvas.getContext("2d")
   if (!context) return
@@ -244,10 +250,18 @@ function resolveVisualSpec(
   }
 }
 
-function pngBlob(bytes: Uint8Array): Blob {
-  const copy = new Uint8Array(bytes.byteLength)
-  copy.set(bytes)
-  return new Blob([copy.buffer], { type: "image/png" })
+// 编辑任一文件都会新建解析器；按字节对象共享位图，未改动的 PNG 不重复解码，
+// 否则旧位图只能等 GC，而 WebKit 不把位图显存计入 GC 压力，长时间编辑后显存涨到数百 MB。
+const pngBitmaps = new WeakMap<Uint8Array, Promise<ImageBitmap | undefined>>()
+
+export function pngBitmap(bytes: Uint8Array): Promise<ImageBitmap | undefined> {
+  let image = pngBitmaps.get(bytes)
+  if (!image) {
+    // 损坏的 PNG 按缺图处理（回退到样式颜色），不抛出未处理的解码错误。
+    image = createImageBitmap(new Blob([new Uint8Array(bytes)], { type: "image/png" })).catch(() => undefined)
+    pngBitmaps.set(bytes, image)
+  }
+  return image
 }
 
 function topLevelDicts(plist: string): string[] {
@@ -356,7 +370,6 @@ export class AtlasResolver {
   private readonly theme: string
   private readonly resourceRoots: string[]
   private readonly styles?: IniDocument
-  private readonly images = new Map<string, Promise<ImageBitmap | undefined>>()
   private readonly tiles = new Map<string, IniDocument>()
   private readonly embeddedFontFamily?: string
   private readonly embeddedFontReady: Promise<void>
@@ -386,14 +399,7 @@ export class AtlasResolver {
 
   private bitmap(path: string): Promise<ImageBitmap | undefined> | undefined {
     const bytes = this.archive.getBytes(path)
-    if (!bytes) return
-    let image = this.images.get(path)
-    if (!image) {
-      // 损坏的 PNG 按缺图处理（回退到样式颜色），不抛出未处理的解码错误。
-      image = createImageBitmap(pngBlob(bytes)).catch(() => undefined)
-      this.images.set(path, image)
-    }
-    return image
+    return bytes && pngBitmap(bytes)
   }
 
   sourceSize(styleID: string, highlighted: boolean): { width: number; height: number } | undefined {

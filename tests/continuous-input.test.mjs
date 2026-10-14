@@ -206,3 +206,13 @@ test('per-field undo buttons are no longer created', () => {
   assert.doesNotMatch(shell, /reset\.className = "pin-reset"/)
   assert.match(shell, /inspector-reset/)
 })
+
+test('undo history keeps only the latest 200 steps', () => {
+  const stack = []
+  for (let i = 0; i < 250; i++) history.pushChange(stack, { kind: 'text', path: 'a', before: String(i), after: String(i + 1) })
+  assert.equal(stack.length, 200)
+  assert.equal(stack[0].before, '50')
+  const record = createGestureHistory()
+  for (let i = 0; i < 250; i++) record(stack, { kind: 'text', path: 'a', before: '', after: '' }, {})
+  assert.equal(stack.length, 200)
+})

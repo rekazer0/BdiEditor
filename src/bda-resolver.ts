@@ -1,5 +1,5 @@
 import { decodeBdaAppearance } from "./bda-decode.ts"
-import { type VisualResolver, type Visual, type TextVisual, type StyleTextVisual } from "./atlas.ts"
+import { type VisualResolver, type Visual, type TextVisual, type StyleTextVisual, pngBitmap } from "./atlas.ts"
 import { type BdaAppearance, bdaStyleRef } from "./bda.ts"
 import { SkinArchive } from "./skin.ts"
 
@@ -29,11 +29,6 @@ export function bdaFilterColor(value: number): string | undefined {
   return bdaCssColor(unsigned)
 }
 
-export function pngBlob(bytes: Uint8Array): Blob {
-  const copy = new Uint8Array(bytes)
-  return new Blob([copy.buffer], { type: "image/png" })
-}
-
 export function pngSize(bytes: Uint8Array): { width: number; height: number } | undefined {
   if (bytes.length < 24 || bytes[0] !== 0x89 || bytes[1] !== 0x50 || bytes[2] !== 0x4e || bytes[3] !== 0x47) return
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
@@ -42,7 +37,6 @@ export function pngSize(bytes: Uint8Array): { width: number; height: number } | 
 
 export class BdaResolver implements VisualResolver {
   private readonly appearance: BdaAppearance
-  private readonly images = new Map<string, Promise<ImageBitmap | undefined>>()
   private readonly archive: SkinArchive
   private readonly fallback?: SkinArchive
   private readonly theme: string
@@ -77,13 +71,7 @@ export class BdaResolver implements VisualResolver {
   }
 
   private bitmap(archive: SkinArchive, path: string): Promise<ImageBitmap | undefined> {
-    let image = this.images.get(path)
-    if (!image) {
-      // 损坏的 PNG 按缺图处理，不抛出未处理的解码错误。
-      image = createImageBitmap(pngBlob(archive.getBytes(path)!)).catch(() => undefined)
-      this.images.set(path, image)
-    }
-    return image
+    return pngBitmap(archive.getBytes(path)!)
   }
 
   sourceSize(styleID: string, highlighted: boolean): { width: number; height: number } | undefined {

@@ -13,7 +13,7 @@ import { populateTileInspector, drawAtlas, loadTiles, syncAtlasWorkspace, bdaIma
 import { styleConfigPath, setSourceValue, scrollSelectedSource } from "./config-context"
 import { IniDocument } from "../ini.ts"
 import { renderBdaStyleEditor } from "../bda-editor.ts"
-import { drawVisualPreview, retinaThumbnail } from "../atlas.ts"
+import { drawVisualPreview, retinaThumbnail, thumbnailRecycler } from "../atlas.ts"
 import { translatedConfigLabel } from "./document-inspector"
 import { refreshPreview } from "./preview-render"
 import { soundPathForFilename, soundResourcePaths, SOUND_ACCEPT, isSoundPath } from "../sounds.ts"
@@ -319,9 +319,10 @@ export function releaseResourceURLs(): void {
   appState.resourceURLs = []
 }
 
-export async function renderStyleResourceGallery(): Promise<void> {
+/** galleryCanvas 复用上一轮列表的缩略图画布（每次编辑都会重建样式列表）。 */
+export async function renderStyleResourceGallery(galleryCanvas: ReturnType<typeof thumbnailRecycler>): Promise<void> {
   if (appState.archive?.format === "bda") {
-    await renderBdaStyleResourceGallery()
+    await renderBdaStyleResourceGallery(galleryCanvas)
     return
   }
   if (!appState.archive?.isText(styleConfigPath())) return
@@ -377,7 +378,7 @@ export async function renderStyleResourceGallery(): Promise<void> {
     const previews = document.createElement("span")
     previews.className = "resource-style-previews"
     for (const highlighted of [false, true]) {
-      const canvas = retinaThumbnail(document.createElement("canvas"), 128, 88)
+      const canvas = galleryCanvas(128, 88)
       drawVisualPreview(canvas, [await resolver.resolve(styleID, highlighted).catch(() => undefined)], false)
       previews.append(canvas)
     }
@@ -404,7 +405,7 @@ export async function renderStyleResourceGallery(): Promise<void> {
   if (appState.selectedResourceGalleryPath) selectGalleryItem(appState.selectedResourceGalleryPath, resourceGallery)
 }
 
-export async function renderBdaStyleResourceGallery(): Promise<void> {
+export async function renderBdaStyleResourceGallery(galleryCanvas: ReturnType<typeof thumbnailRecycler>): Promise<void> {
   const info = currentBdaAppearance()
   const part = bdaAppearancePart(appState.selectedPath)
   if (!info || part?.kind !== "styles") return
@@ -443,10 +444,10 @@ export async function renderBdaStyleResourceGallery(): Promise<void> {
     const previews = document.createElement("span")
     previews.className = "resource-style-previews"
     for (const highlighted of [false, true]) {
-      const canvas = retinaThumbnail(document.createElement("canvas"), 128, 88)
+      const canvas = galleryCanvas(128, 88)
       previews.append(canvas)
       void resolver?.resolve(bdaStyleID(ref), highlighted)
-        .then((visual) => { if (canvas.isConnected) drawVisualPreview(canvas, [visual], false) })
+        .then((visual) => { if (previews.isConnected) drawVisualPreview(canvas, [visual], false) })
         .catch(() => {})
     }
     const name = document.createElement("strong")
@@ -525,9 +526,10 @@ export function renderSoundResourceGallery(): void {
 export function renderResourceInspector(): void {
   if (!appState.archive) return
   releaseResourceURLs()
+  const galleryCanvas = thumbnailRecycler(resourceGallery)
   resourceGallery.replaceChildren()
   if (appState.resourceInspectorMode === "style") {
-    void renderStyleResourceGallery()
+    void renderStyleResourceGallery(galleryCanvas)
     return
   }
   if (appState.resourceInspectorMode === "sound") {

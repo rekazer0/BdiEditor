@@ -1,4 +1,4 @@
-import { pushChange, type Change } from "./history"
+import { pushChange, trimHistory, type Change } from "./history"
 
 /** Compact many gesture snapshots to first-before / final-after, including BDA bytes. */
 function compactGestureChanges(changes: readonly Change[]): Change[] {
@@ -34,6 +34,7 @@ export function createGestureHistory() {
     } else {
       const entry: Extract<Change, { kind: "batch" }> = { kind: "batch", changes: compactGestureChanges([change]) }
       stack.push(entry)
+      trimHistory(stack)
       active = { token, stack, entry }
     }
   }
