@@ -313,7 +313,8 @@ export function populateKeyInspector(): void {
     const name = field.dataset.keyField ?? ""
     // BDA 样式引用由源码结构控件编辑，旧格式按键字段只负责非 BDA 皮肤。
     field.disabled = !hasSelection || appState.archive?.format === "bda"
-    field.placeholder = ""
+    // 手势格子没配置时显示「+」（十字布局，DESIGN.md §10）。
+    field.placeholder = actionFieldNames.has(name) ? "+" : ""
     if (!hasSelection || bdaSelected) {
       field.value = ""
       continue

@@ -45,24 +45,35 @@ test("the category rail only navigates: there is no grouped display mode", () =>
   assert.doesNotMatch(main, /inspectorGroupedDisplay/)
 })
 
-test("sections collapse and remember it; edits can be reset from the object header", () => {
+test("sections collapse and remember it; edits can be reset from the rail", () => {
   assert.match(shell, /inspector-collapsed-sections/)
   assert.match(shell, /function resetAll/)
   assert.match(shell, /export function setInspectorKind/)
   assert.match(main, /setInspectorKind\(appState\.archive\?\.format === "bda" \? "bda" : appState\.archive \? "bds" : ""\)/)
 })
 
-test("group navigation is a sticky row of text tabs above the sections, with the property filter at its end", () => {
-  const bar = pane.slice(pane.indexOf('class="inspector-jumpbar"'), pane.indexOf('class="inspector-filter-empty"'))
-  assert.match(bar, /<nav id="mobile-inspector-groups"/)
-  assert.match(bar, /id="inspector-filter"[^>]*aria-label="筛选属性"/)
-  assert.match(bar, /class="inspector-filter-open ui-icon-button"/)
+test("the right rail: filter on top, groups with icon and label, edits count and reset at the bottom", () => {
+  const rail = pane.slice(pane.indexOf('<aside class="inspector-rail"'), pane.indexOf("</aside>"))
+  assert.ok(rail.indexOf("inspector-filter-open") < rail.indexOf('<nav id="mobile-inspector-groups"'), "筛选在分组之上")
+  assert.match(pane, /id="inspector-filter"[^>]*aria-label="筛选属性"/)
   const css = read("src/inspector.css")
-  assert.match(css, /\.source \.inspector-jumpbar \{[^}]*position: sticky;/)
-  assert.doesNotMatch(css, /padding-right: 48px/, "不再给右侧图标栏留位置")
-  assert.doesNotMatch(read("src/icons.ts"), /function groupIcon/, "导航用文字标签，不按名字猜图标")
+  assert.match(css, /\.source \.inspector-rail \{[^}]*position: sticky;[^}]*float: right;/)
+  assert.match(read("src/app/mobile-layout.ts"), /button\.append\(groupIcon\(label\), text\)/)
+  assert.match(shell, /rail\.append\(reset\)/)
   // 导航标签与分组标题同名
   for (const [, label, heading] of html.matchAll(/data-inspector-group-label="([^"]+)">\s*<h3>([^<]+)<\/h3>/g)) assert.equal(label, heading)
+})
+
+test("style references are one shared card: number and kind on the left, normal | pressed previews on the right", () => {
+  assert.match(read("src/app/style-references.ts"), /meta\.className = "style-reference-meta"/)
+  assert.match(read("src/bda-editor.ts"), /element\("span", "style-reference-meta"\)/)
+  assert.match(read("src/inspector.css"), /:is\(\.style-reference-row, \.bda-style-reference-input\) \{/)
+})
+
+test("gestures form a cross: tap in the middle, swipes around it, long press below", () => {
+  const css = read("src/inspector.css")
+  assert.match(css, /grid-template-areas: "\. up \." "left center right" "\. down \." "hold hold hold";/)
+  for (const gesture of ["CENTER", "HOLD", "UP", "DOWN", "LEFT", "RIGHT"]) assert.match(pane, new RegExp(`data-gesture="${gesture}"`))
 })
 
 test("filter, collapse-all, per-row revert and scrub handles live in the shared inspector shell", () => {
