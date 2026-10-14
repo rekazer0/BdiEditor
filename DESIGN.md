@@ -96,9 +96,10 @@
 | 选中 | 背景 `--accent-soft`，文字/图标 `--accent` |
 | 焦点 | 仅 `:focus-visible` 显示 `box-shadow: var(--focus-ring)`；输入框统一为 `--accent` 边框 + `--focus-ring` 光晕、无 outline，带前后缀的 `.ui-input` 只在外框显示，内层输入框不画 |
 | 禁用 | `opacity: var(--disabled-opacity)`，`pointer-events: none` |
-| 只读（表单字段在预览模式下禁用） | 透明底、`--secondary` 文字，不降低不透明度：值仍要看得清 |
+| 只读（交互预览下的表单字段） | 容器 `.ui-form[data-readonly="true"]`，字段 `:disabled`：保留输入框底色、`--secondary` 文字、不降低不透明度；悬停显示 `not-allowed` 光标；点击弹出“切换至编辑模式”弹窗 |
 
 - 光标：桌面端控件保持 `default`，只有链接用 `pointer`；画布上的拖拽对象用 `grab` / `grabbing`；可拖动调整数值的标签用 `ew-resize`。
+- 只读提示：交互预览下点到任何只读字段，一律调用 `requestEditMode()`（`src/app/mobile-layout.ts`）打开同一个 `#edit-mode-dialog`，确认后切换至编辑模式。不另做提示弹窗或 toast；新的只读区域只要放进 `.ui-form[data-readonly="true"]` 并禁用字段即可自动获得该行为。
 - 即时生效：属性修改立即作用于画布，并进入撤销栈，不出现“应用”按钮。
 - 破坏性操作（删除、覆盖）必须可撤销；撤销不了的才弹确认框。
 - 键盘：所有操作可用键盘完成；`Esc` 关闭浮层，或在没有浮层时取消选择。

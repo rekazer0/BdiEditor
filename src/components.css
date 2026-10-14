@@ -334,6 +334,8 @@ input.ui-input, select.ui-input { padding: 0 var(--space-sm); }
 }
 :where(.ui-form) :where(input, select, textarea):focus { border-color: var(--accent); background-color: var(--control); box-shadow: var(--focus-ring); }
 :where(.ui-form) :where(input, select, textarea):disabled { border-color: transparent; background-color: transparent; color: var(--secondary); opacity: 1; }
+:where(.ui-form[data-readonly="true"]) :where(input, select, textarea):disabled { cursor: not-allowed; pointer-events: auto; }
+:where(.ui-form[data-readonly="true"]) :where(input:not([type="checkbox"], [type="radio"], [type="color"], [type="range"]), select, textarea):disabled { background-color: var(--material-content); }
 :where(.ui-form) :where(input::placeholder) { color: var(--tertiary); }
 :where(.ui-form) :where(input[type="checkbox"][role="switch"]) {
   appearance: none;

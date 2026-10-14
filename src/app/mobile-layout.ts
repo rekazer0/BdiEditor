@@ -1,4 +1,4 @@
-import { modeChoiceButtons, mode, themeChoiceButtons, theme, orientationChoiceButtons, orientation, mobileChoiceButtons, mobileInspectorSelection, selectedKeyName, sourceHeading, quickInspector, mobileInspectorGroups, keyTypographyFieldsGroup, bdaConfigFieldsGroup, documentFieldsGroup, documentFields, bdaConfigFields, bdaSelectedStyleHeading, inspectorBackButton, mobilePaneButtons, sidebarPane, inspectorPane, mobileSplitHandle, panelScaleButton, replaceLayoutImageButton, adaptIos26Button, editorCrosshair, previewCoordinates, deviceShell, replaceAssetButton, keyFields, styleFields, toolbarFields, skinFields, gapFields } from "./dom"
+import { modeChoiceButtons, mode, themeChoiceButtons, theme, orientationChoiceButtons, orientation, mobileChoiceButtons, mobileInspectorSelection, selectedKeyName, sourceHeading, quickInspector, mobileInspectorGroups, keyTypographyFieldsGroup, bdaConfigFieldsGroup, documentFieldsGroup, documentFields, bdaConfigFields, bdaSelectedStyleHeading, inspectorBackButton, mobilePaneButtons, sidebarPane, inspectorPane, mobileSplitHandle, panelScaleButton, replaceLayoutImageButton, adaptIos26Button, editorCrosshair, previewCoordinates, deviceShell, replaceAssetButton, editModeDialog, keyFields, styleFields, toolbarFields, skinFields, gapFields } from "./dom"
 import { appState } from "./state"
 import { redrawStyleStateCanvases } from "./style-references"
 import { groupIcon } from "../icons"
@@ -284,6 +284,16 @@ export function applyModeState(): void {
   updateSourceFileActions()
   updateSourceSearchStatus()
   syncSegmentedControls()
+}
+
+/** 交互预览里点到只读控件时的唯一提示（DESIGN.md §7），确认后切换至编辑模式。 */
+export function requestEditMode(): void {
+  if (editModeDialog.open) return
+  editModeDialog.returnValue = ""
+  editModeDialog.showModal()
+  editModeDialog.addEventListener("close", () => {
+    if (editModeDialog.returnValue === "edit") selectChoice(mode, "edit")
+  }, { once: true })
 }
 
 export function selectChoice(select: HTMLSelectElement, value: string): void {

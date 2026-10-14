@@ -8,7 +8,7 @@ import { syncColorControl, writeColorControl, scrollSelectedSource } from "../co
 import { applyExactGap, moveMixedCoordinate, applyLayoutAction, copySelectedKeys, deleteSelectedKeys } from "../key-editing"
 import { shouldClearMixedInput } from "../../mixed-input.ts"
 import { syncCandidateSelection, updateDevicePreview, refreshPreview, setGuidesVisible } from "../preview-render"
-import { setMobilePane, syncSegmentedControls, applyModeState, selectChoice, setMobileInspectorGroup } from "../mobile-layout"
+import { setMobilePane, syncSegmentedControls, applyModeState, selectChoice, setMobileInspectorGroup, requestEditMode } from "../mobile-layout"
 import { ensureAiChat, aiDesignErrorMessage } from "../ai-panel"
 import { preferredPath, createMissingVariant, bdaAvailableLayoutPaths, bdaAppearanceStyleGroups, bdaAppearanceStylePath } from "../bda-documents"
 import { renderFiles } from "../file-tree"
@@ -205,6 +205,13 @@ export function wireEditingControls(): void {
       mode.value === "edit"
         ? "编辑模式：点击选择按键，在检查器中修改布局与属性。"
         : "交互预览：配置只读；可点击、长按或滑动按键模拟操作。"
+  })
+  // 只读表单里的禁用控件仍接收指针（components.css），点击统一提示切换模式。
+  document.addEventListener("pointerdown", (event) => {
+    const target = event.target
+    if (!(target instanceof Element) || !target.matches(":disabled") || !target.closest('.ui-form[data-readonly="true"]')) return
+    event.preventDefault()
+    requestEditMode()
   })
   for (const button of modeChoiceButtons) {
     button.addEventListener("click", () => selectChoice(mode, button.dataset.modeChoice ?? "preview"))

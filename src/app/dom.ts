@@ -225,6 +225,8 @@ export const panelScaleButton = $("#panel-scale") as HTMLButtonElement
 
 export const adaptIos26Button = $("#adapt-ios26") as HTMLButtonElement
 
+export const editModeDialog = $("#edit-mode-dialog") as HTMLDialogElement
+
 export const ios26Dialog = $("#ios26-dialog") as HTMLDialogElement
 
 export const ios26Form = $("#ios26-form") as HTMLFormElement
