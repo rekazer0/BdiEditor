@@ -162,6 +162,22 @@ test('mixed multi-selection delta is accumulated instead of converting empty inp
   assert.deepEqual(moves, [1]); assert.equal(field.value, '')
   assert.deepEqual(field.events, [])
 })
+test('Shift + arrow steps a number field by 10 as one write', () => {
+  const s = wheelSetup(), field = new Input()
+  const key = (k, extra = {}) => { const event = { target: field, key: k, shiftKey: true, defaultPrevented: false, preventDefault() { this.defaultPrevented = true }, ...extra }; s.root.emit('keydown', event); return event }
+  assert.equal(key('ArrowUp').defaultPrevented, true)
+  assert.equal(field.value, '10'); assert.deepEqual(field.events, ['input', 'change'])
+  key('ArrowDown'); assert.equal(field.value, '0')
+  assert.equal(key('ArrowUp', { shiftKey: false }).defaultPrevented, false, 'plain arrows stay native')
+})
+test('scrub handles resolve to exactly one editable number field', () => {
+  const { scrubbableField } = wheelSetup().api
+  const handle = (...fields) => ({ parentElement: { querySelectorAll: () => fields } })
+  const field = new Input(), text = Object.assign(new Input(), { type: 'text' })
+  assert.equal(scrubbableField(handle(field, text)), field)
+  assert.equal(scrubbableField(handle(field, new Input())), undefined, 'X/Y 共用的行标签不能拖')
+  assert.equal(scrubbableField(handle(Object.assign(new Input(), { disabled: true }))), undefined)
+})
 test('duplicate installation cannot double-step a field', () => {
   const s = wheelSetup(), field = new Input()
   s.api.installNumberInputWheel(s.root)

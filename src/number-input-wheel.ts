@@ -1,5 +1,8 @@
 type NumberInputRoot = Document | HTMLElement
 const NUMBER_WHEEL_IDLE_MS = 350
+const SHIFT_STEPS = 10
+const SCRUB_PX_PER_STEP = 2
+const SCRUB_THRESHOLD_PX = 3
 
 type WheelSession = {
   field: HTMLInputElement
@@ -28,16 +31,22 @@ function isEditableNumberInput(target: EventTarget | null): target is HTMLInputE
   return target instanceof HTMLInputElement && target.type === "number" && !target.disabled && !target.readOnly
 }
 
-function stepNumber(input: HTMLInputElement, direction: number): void {
+function stepNumber(input: HTMLInputElement, steps: number): void {
   if (input.step !== "any") {
-    if (direction > 0) input.stepUp()
-    else input.stepDown()
+    input.stepUp(steps)
     return
   }
-  const value = Number(input.value || 0) + direction
+  const value = Number(input.value || 0) + steps
   const min = input.min === "" ? -Infinity : Number(input.min)
   const max = input.max === "" ? Infinity : Number(input.max)
   input.value = String(Math.min(max, Math.max(min, value)))
+}
+
+/** 可拖动调整数值的把手（单位前缀、行标签）对应的那一个数值输入框；有多个或不可编辑时不能拖。 */
+export function scrubbableField(handle: Element): HTMLInputElement | undefined {
+  const scope = handle.parentElement
+  const fields = scope ? Array.from(scope.querySelectorAll("input")).filter((input) => input.type === "number") : []
+  return fields.length === 1 && isEditableNumberInput(fields[0]) ? fields[0] : undefined
 }
 
 /** Immediate lightweight value feedback; one expensive input/change dispatch per frame. */
@@ -82,6 +91,23 @@ export function installNumberInputWheel(root: NumberInputRoot = document, option
     }
   }
   finishers.add(finish)
+  // 一次连续手势（滚轮、拖动、Shift + 方向键）内：数值立即变化，每帧最多写回一次，结束后合成一步撤销。
+  const nudge = (field: HTMLInputElement, steps: number) => {
+    if (session?.field !== field) finish()
+    session ??= { field, token: {}, mixed: options.isMixed?.(field) ?? false,
+      delta: 0, value: field.value, committed: field.value, dirty: false, deferred: new Map() }
+    if (session.mixed) session.delta += steps
+    else {
+      stepNumber(field, steps)
+      session.value = field.value
+    }
+    session.dirty = true
+    if (!frame) frame = requestAnimationFrame(flush)
+  }
+  const finishWhenIdle = () => {
+    if (timer !== undefined) clearTimeout(timer)
+    timer = setTimeout(finish, NUMBER_WHEEL_IDLE_MS)
+  }
   root.addEventListener("wheel", (event) => {
     const wheel = event as WheelEvent
     if (wheel.defaultPrevented) return
@@ -90,21 +116,62 @@ export function installNumberInputWheel(root: NumberInputRoot = document, option
       return
     }
     wheel.preventDefault()
-    const field = wheel.target
-    if (session?.field !== field) finish()
-    session ??= { field, token: {}, mixed: options.isMixed?.(field) ?? false,
-      delta: 0, value: field.value, committed: field.value, dirty: false, deferred: new Map() }
-    const direction = wheel.deltaY < 0 ? 1 : -1
-    if (session.mixed) session.delta += direction
-    else {
-      stepNumber(field, direction)
-      session.value = field.value
-    }
-    session.dirty = true
-    if (!frame) frame = requestAnimationFrame(flush)
-    if (timer !== undefined) clearTimeout(timer)
-    timer = setTimeout(finish, NUMBER_WHEEL_IDLE_MS)
+    nudge(wheel.target, wheel.deltaY < 0 ? 1 : -1)
+    finishWhenIdle()
   }, { passive: false })
+  // Shift + ↑/↓ 一次改 10（Figma、Blender 的习惯）；不带 Shift 时交给原生输入框。
+  root.addEventListener("keydown", (event) => {
+    const key = event as KeyboardEvent
+    if (!key.shiftKey || key.defaultPrevented || (key.key !== "ArrowUp" && key.key !== "ArrowDown")) return
+    if (!isEditableNumberInput(key.target)) return
+    key.preventDefault()
+    nudge(key.target, key.key === "ArrowUp" ? SHIFT_STEPS : -SHIFT_STEPS)
+    finishWhenIdle()
+  })
+  // 按住数值的标签或单位前缀左右拖动来调整（scrubbing）；按住 Shift 每格 10。没拖动就是普通点击，聚焦输入框。
+  root.addEventListener("pointerdown", (event) => {
+    const pointer = event as PointerEvent
+    const handle = pointer.button === 0 ? (pointer.target as Element | null)?.closest?.<HTMLElement>("[data-scrub]") : null
+    const field = handle ? scrubbableField(handle) : undefined
+    if (!handle || !field) return
+    pointer.preventDefault()
+    if (document.activeElement instanceof HTMLElement && document.activeElement !== field) document.activeElement.blur()
+    handle.setPointerCapture(pointer.pointerId)
+    let lastX = pointer.clientX
+    let rest = 0
+    let moved = false
+    const move = (moveEvent: PointerEvent) => {
+      rest += moveEvent.clientX - lastX
+      lastX = moveEvent.clientX
+      if (!moved && Math.abs(rest) < SCRUB_THRESHOLD_PX) return
+      if (!moved) handle.setAttribute("data-scrubbing", "")
+      moved = true
+      const steps = Math.trunc(rest / SCRUB_PX_PER_STEP)
+      if (!steps) return
+      rest -= steps * SCRUB_PX_PER_STEP
+      nudge(field, steps * (moveEvent.shiftKey ? SHIFT_STEPS : 1))
+    }
+    const end = () => {
+      handle.removeEventListener("pointermove", move)
+      handle.removeEventListener("pointerup", end)
+      handle.removeEventListener("pointercancel", end)
+      handle.removeAttribute("data-scrubbing")
+      if (handle.hasPointerCapture(pointer.pointerId)) handle.releasePointerCapture(pointer.pointerId)
+      finish()
+      if (moved) {
+        // 拖完以后的 click 不再触发标签聚焦输入框。
+        const swallow = (click: Event) => click.preventDefault()
+        handle.addEventListener("click", swallow, { capture: true, once: true })
+        setTimeout(() => handle.removeEventListener("click", swallow, { capture: true }), 0)
+        return
+      }
+      field.focus()
+      field.select()
+    }
+    handle.addEventListener("pointermove", move)
+    handle.addEventListener("pointerup", end)
+    handle.addEventListener("pointercancel", end)
+  })
   // Flush before selection, typing, save and undo handlers see the new context.
   root.addEventListener("pointerdown", finish, true)
   root.addEventListener("keydown", finish, true)

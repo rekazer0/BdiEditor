@@ -51,3 +51,25 @@ test("sections collapse and remember it; edits can be reset from the object head
   assert.match(shell, /export function setInspectorKind/)
   assert.match(main, /setInspectorKind\(appState\.archive\?\.format === "bda" \? "bda" : appState\.archive \? "bds" : ""\)/)
 })
+
+test("group navigation is a sticky row of text tabs above the sections, with the property filter at its end", () => {
+  const bar = pane.slice(pane.indexOf('class="inspector-jumpbar"'), pane.indexOf('class="inspector-filter-empty"'))
+  assert.match(bar, /<nav id="mobile-inspector-groups"/)
+  assert.match(bar, /id="inspector-filter"[^>]*aria-label="筛选属性"/)
+  assert.match(bar, /class="inspector-filter-open ui-icon-button"/)
+  const css = read("src/inspector.css")
+  assert.match(css, /\.source \.inspector-jumpbar \{[^}]*position: sticky;/)
+  assert.doesNotMatch(css, /padding-right: 48px/, "不再给右侧图标栏留位置")
+  assert.doesNotMatch(read("src/icons.ts"), /function groupIcon/, "导航用文字标签，不按名字猜图标")
+  // 导航标签与分组标题同名
+  for (const [, label, heading] of html.matchAll(/data-inspector-group-label="([^"]+)">\s*<h3>([^<]+)<\/h3>/g)) assert.equal(label, heading)
+})
+
+test("filter, collapse-all, per-row revert and scrub handles live in the shared inspector shell", () => {
+  assert.match(shell, /function applyFilter/)
+  assert.match(shell, /data-filter-miss/)
+  assert.match(shell, /toggleSection\(heading, \(event as MouseEvent \| KeyboardEvent\)\.altKey\)/)
+  assert.match(shell, /function revertRow/)
+  assert.match(shell, /className = "inspector-revert"/)
+  assert.match(shell, /toggleAttribute\("data-scrub", Boolean\(scrubbableField\(handle\)\)\)/)
+})

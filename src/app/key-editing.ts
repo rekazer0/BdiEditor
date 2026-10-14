@@ -194,6 +194,7 @@ export function moveMixedCoordinate(field: HTMLInputElement, direction: number, 
     direction,
   )
   if (!delta) return false
-  moveSelectedKeys(delta[0], delta[1], appState.selectedKeySections, coalesce)
+  const distance = Math.abs(direction)
+  moveSelectedKeys(delta[0] * distance, delta[1] * distance, appState.selectedKeySections, coalesce)
   return true
 }

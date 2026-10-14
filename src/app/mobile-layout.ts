@@ -1,7 +1,7 @@
 import { modeChoiceButtons, mode, themeChoiceButtons, theme, orientationChoiceButtons, orientation, mobileChoiceButtons, mobileInspectorSelection, selectedKeyName, sourceHeading, quickInspector, mobileInspectorGroups, keyTypographyFieldsGroup, bdaConfigFieldsGroup, documentFieldsGroup, documentFields, bdaConfigFields, bdaSelectedStyleHeading, inspectorBackButton, mobilePaneButtons, sidebarPane, inspectorPane, mobileSplitHandle, panelScaleButton, replaceLayoutImageButton, adaptIos26Button, editorCrosshair, previewCoordinates, deviceShell, replaceAssetButton, keyFields, styleFields, toolbarFields, skinFields, gapFields } from "./dom"
 import { appState } from "./state"
 import { redrawStyleStateCanvases } from "./style-references"
-import { groupIcon } from "../icons"
+import { createIcon } from "../icons"
 import { bdaConfigPath } from "../bda.ts"
 import { selectFile } from "./navigation"
 import { mobilePortraitQuery, preview, toolbarPreview, source, keyboardFields, layoutActionButtons } from "./canvas-interaction"
@@ -47,7 +47,8 @@ export function syncMobileInspectorHeader(): void {
 }
 
 export function mobileInspectorGroupLabel(group: HTMLElement): string {
-  const explicitLabel = group.dataset.inspectorGroupLabel?.trim()
+  // 导航标签不带计数之类的括注（「已选按键（3）」→「已选按键」）。
+  const explicitLabel = group.dataset.inspectorGroupLabel?.trim().replace(/\s*[（(][^）)]*[）)]\s*$/, "")
   if (explicitLabel) return explicitLabel
   if (group.classList.contains("document-property-section")) {
     const label = group.querySelector(":scope > h3")?.textContent?.trim() ?? "配置"
@@ -79,16 +80,25 @@ export function setMobileInspectorGroup(id: string, scroll = true): void {
   const current = Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))
     .find((group) => group.dataset.mobileInspectorGroup === id)
   appState.inspectorGroupKey = current ? mobileInspectorGroupKey(current) : ""
+  revealActiveGroupButton()
   // Each group owns its scrolling area. Scrolling the outer grid here moves the
   // summary card and category rail together, so switching tabs appears to make
   // the controls jump away from the pointer.
   if (scroll) {
     quickInspector.scrollTop = 0
-    mobileInspectorGroups.querySelector<HTMLButtonElement>("button.active")?.scrollIntoView({ block: "nearest", inline: "nearest" })
     // 样式引用缩略图只在可见时才量得到卡片尺寸，切到该分组时补绘一次。
     redrawStyleStateCanvases()
     scrollToSinglePageInspectorGroup()
   }
+}
+
+/** 分组导航横向滚动：当前分组的按钮滚出可见范围时把它带回来（只动导航自己，不滚检查器）。 */
+function revealActiveGroupButton(): void {
+  const button = mobileInspectorGroups.querySelector<HTMLButtonElement>("button.active")
+  if (!button) return
+  const { scrollLeft, clientWidth } = mobileInspectorGroups
+  if (button.offsetLeft < scrollLeft) mobileInspectorGroups.scrollLeft = button.offsetLeft - 16
+  else if (button.offsetLeft + button.offsetWidth > scrollLeft + clientWidth) mobileInspectorGroups.scrollLeft = button.offsetLeft + button.offsetWidth - clientWidth + 16
 }
 
 /** 一页显示时把当前分区滚到检查器顶部；第一个分区保留顶部留白。 */
@@ -97,7 +107,12 @@ export function scrollToSinglePageInspectorGroup(): void {
     .filter((group) => group.getClientRects().length > 0)
   const current = groups.find((group) => group.dataset.mobileInspectorGroup === quickInspector.dataset.mobileInspectorGroup)
   quickInspector.scrollTop = 0
-  if (current && current !== groups[0]) quickInspector.scrollTop = current.getBoundingClientRect().top - quickInspector.getBoundingClientRect().top
+  if (current && current !== groups[0]) quickInspector.scrollTop = current.getBoundingClientRect().top - quickInspector.getBoundingClientRect().top - jumpbarHeight()
+}
+
+/** 分组导航吸附在检查器顶部，滚动定位与高亮都要让出它的高度。 */
+function jumpbarHeight(): number {
+  return mobileInspectorGroups.parentElement?.offsetHeight ?? 0
 }
 
 /** 换了选中对象时停在记住的分区（与分组模式一致）；同一对象重绘时只按滚动位置刷新分类轨。 */
@@ -115,13 +130,14 @@ export function syncSinglePageInspectorGroup(): void {
   const groups = Array.from(quickInspector.querySelectorAll<HTMLElement>(".mobile-inspector-managed"))
     .filter((group) => group.getClientRects().length > 0)
   if (!groups.length) return
-  const view = quickInspector.getBoundingClientRect()
+  const viewTop = quickInspector.getBoundingClientRect().top + jumpbarHeight()
+  const viewBottom = quickInspector.getBoundingClientRect().bottom
   const current = groups.find((group) => group.dataset.mobileInspectorGroup === quickInspector.dataset.mobileInspectorGroup)
   const atEnd = quickInspector.scrollTop + quickInspector.clientHeight >= quickInspector.scrollHeight - 2
   // 滚到底时末尾几个短分区到不了顶部：保留刚点选且仍可见的分区，否则点亮最后一个。
   const currentTop = current?.getBoundingClientRect().top ?? -Infinity
-  if (atEnd && currentTop >= view.top - 8 && currentTop < view.bottom) return
-  const next = atEnd ? groups[groups.length - 1] : groups.filter((group) => group.getBoundingClientRect().top - view.top <= 8).pop() ?? groups[0]
+  if (atEnd && currentTop >= viewTop - 8 && currentTop < viewBottom) return
+  const next = atEnd ? groups[groups.length - 1] : groups.filter((group) => group.getBoundingClientRect().top - viewTop <= 8).pop() ?? groups[0]
   if (next !== current) setMobileInspectorGroup(next.dataset.mobileInspectorGroup ?? "", false)
 }
 
@@ -152,8 +168,10 @@ export function syncMobileInspectorGroups(): void {
   bdaSelectedStyleHeading.hidden = !selectedBdaKey
   if (selectedBdaKey) {
     bdaConfigFieldsGroup.dataset.inspectorGroupLabel = "样式"
-    groups = [bdaConfigFieldsGroup]
-      .filter((group) => !group.hidden)
+    // 导航列出样式里的每个分区（已选按键、文字……），没有分区时退回整组。
+    const sections = bdaConfigFieldsGroup.hidden ? [] : Array.from(bdaConfigFieldsGroup.querySelectorAll<HTMLElement>(":scope > #bda-config-fields > .bda-inspector-section, :scope > .key-typography-fields"))
+      .filter((section) => !section.hidden)
+    groups = sections.length ? sections : [bdaConfigFieldsGroup].filter((group) => !group.hidden)
   } else {
     delete bdaConfigFieldsGroup.dataset.inspectorGroupLabel
   }
@@ -194,7 +212,7 @@ export function syncMobileInspectorGroups(): void {
     const text = document.createElement("span")
     text.className = "inspector-group-label"
     text.textContent = label
-    button.append(groupIcon(label), text)
+    button.append(text)
     button.title = railCodes.has(group) ? `${label}（${railCodes.get(group)}）` : label
     button.dataset.mobileInspectorGroup = group.dataset.mobileInspectorGroup
     button.addEventListener("click", () => setMobileInspectorGroup(group.dataset.mobileInspectorGroup ?? "0"))
@@ -205,8 +223,9 @@ export function syncMobileInspectorGroups(): void {
     const addDestination = (label: string, action: () => void) => {
       const button = document.createElement("button")
       button.type = "button"
-      button.title = label
-      button.append(groupIcon(label), Object.assign(document.createElement("span"), { className: "inspector-group-label", textContent: label }))
+      button.title = `转到${label}`
+      button.dataset.destination = "true"
+      button.append(Object.assign(document.createElement("span"), { className: "inspector-group-label", textContent: label }), createIcon("chevron-right", 12))
       button.addEventListener("click", action)
       mobileInspectorGroups.append(button)
     }

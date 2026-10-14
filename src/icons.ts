@@ -75,21 +75,6 @@ export function createIcon(name: string, size = 14): SVGElement {
   return svg
 }
 
-export function groupIcon(label: string): SVGElement {
-  const name = /资源|图片/.test(label) ? "images"
-    : /动画|动效|粒子/.test(label) ? "clapperboard"
-    : /声音|音效/.test(label) ? "volume-2"
-    : /气泡/.test(label) ? "message-square"
-    : /候选栏|提示栏/.test(label) ? "panel-top"
-    : /面板|布局|输入区|扩展区域/.test(label) ? "layout-grid"
-    : /列表/.test(label) ? "list"
-    : /基本信息|全局/.test(label) ? "info"
-    : /样式|外观|颜色|皮肤/.test(label) ? "palette"
-    : /文字|字体|内容/.test(label) ? "type"
-    : /动作|手势|按键/.test(label) ? "zap" : "panel-top"
-  return createIcon(name, 16)
-}
-
 /**
  * 旧代码里的平台符号名（SF Symbols 风格）→ Lucide 名。只用于迁移期间解析遗留名称，
  * 新代码直接写 Lucide 名（DESIGN.md §5）。

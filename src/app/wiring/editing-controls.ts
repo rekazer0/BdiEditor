@@ -108,7 +108,7 @@ export function wireEditingControls(): void {
   quickInspector.addEventListener("keydown", (event) => {
     const field = event.target
     if (!(field instanceof HTMLInputElement)) return
-    const direction = event.key === "ArrowUp" ? 1 : event.key === "ArrowDown" ? -1 : 0
+    const direction = (event.key === "ArrowUp" ? 1 : event.key === "ArrowDown" ? -1 : 0) * (event.shiftKey ? 10 : 1)
     if (moveMixedCoordinate(field, direction, event.repeat)) {
       event.preventDefault()
       return

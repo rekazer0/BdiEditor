@@ -306,7 +306,7 @@ await check("edit keys: geometry, keyboard nudge, undo/redo, multi-select, layou
   await page.locator('[data-inspector-tab="source"]').click()
   await page.waitForFunction(() => /SHOW=测/.test(document.querySelector("#source .cm-content")?.innerText ?? ""))
   await page.locator('[data-inspector-tab="properties"]').click()
-  await railTab(page, "动作")
+  await railTab(page, "手势")
   const up = page.locator("[data-key-field=UP]")
   await up.fill("F12")
   await up.press("Tab")
