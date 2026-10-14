@@ -1,7 +1,7 @@
 import type { AiSkinImageDraft } from "./ai-skin-images.ts"
 import { IniDocument, normalizeKeySections } from "./ini.ts"
 
-export type AiSkinFileSyntax = "ini" | "json"
+type AiSkinFileSyntax = "ini" | "json"
 
 export type AiSkinEditableFile = {
   path: string
@@ -9,13 +9,13 @@ export type AiSkinEditableFile = {
   text: string
 }
 
-export type AiSkinWorkspaceLimits = {
+type AiSkinWorkspaceLimits = {
   maxChangedFiles: number
   maxReadChars: number
   maxTotalChars: number
 }
 
-export type AiSkinTextDraft = AiSkinEditableFile & { before: string; after: string }
+type AiSkinTextDraft = AiSkinEditableFile & { before: string; after: string }
 
 export type AiSkinDraftChange = AiSkinTextDraft | AiSkinImageDraft
 

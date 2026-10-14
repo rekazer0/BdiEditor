@@ -19,10 +19,6 @@ export type LayoutAction =
   | "vertical-gap"
   | "swap"
 
-export function rectToString(rect: Omit<LayoutRect, "section">): string {
-  return [rect.x, rect.y, rect.width, rect.height].map(Math.round).join(",")
-}
-
 // 检查器里的 LIST 是 [LIST] 段的整体候选栏（画布上作为一个可选中按钮）：
 // 位置来自 POS、尺寸来自 CELL_SIZE × LIST_NUM、样式来自 BACK_STYLE/FORE_STYLE。
 // LIST:n 仅为预览渲染的标点占位，不可单独选中。
@@ -30,11 +26,6 @@ const listCellUnit = /^LIST:(\d+)$/
 
 export function isListCell(section: string): boolean {
   return section === "LIST" || listCellUnit.test(section)
-}
-
-export function listCellIndex(section: string): number {
-  const match = section.match(listCellUnit)
-  return match ? Number(match[1]) - 1 : 0
 }
 
 function listPair(layout: IniDocument, key: string): [number, number] | undefined {
@@ -137,19 +128,6 @@ export function gestureDirection(
   }
   if (Math.abs(deltaX) > Math.abs(deltaY)) return deltaX > 0 ? "right" : "left"
   return deltaY > 0 ? "down" : "up"
-}
-
-export function resizeRect(
-  rect: LayoutRect,
-  deltaX: number,
-  deltaY: number,
-  minimum = 20,
-): LayoutRect {
-  return {
-    ...rect,
-    width: Math.max(minimum, rect.width + deltaX),
-    height: Math.max(minimum, rect.height + deltaY),
-  }
 }
 
 export function moveRects(rects: LayoutRect[], deltaX: number, deltaY: number): LayoutRect[] {

@@ -1,5 +1,4 @@
-import { ArrowLeft, Copy, FolderInput, Grid2x2, Maximize, Minus, Plus, Scissors, createElement } from "lucide"
-import type { IconNode } from "lucide"
+import { createIcon } from "./icons"
 import type { TileSlice } from "./tiles"
 import "./atlas-workspace.css"
 
@@ -42,20 +41,20 @@ export function createAtlasWorkspace(actions: {
   const meta = header.querySelector("small")!
   const badge = header.querySelector<HTMLElement>(".atlas-selection")!
   workspace.prepend(header)
-  const button = (id: string, label: string, icon: IconNode, action: () => void) => {
+  const button = (id: string, label: string, icon: string, action: () => void) => {
     const element = document.createElement("button")
     element.id = id
     element.type = "button"
     element.className = "toolbar-button"
     element.title = label
     element.setAttribute("aria-label", label)
-    element.append(createElement(icon, { width: 16, height: 16 }))
+    element.append(createIcon(icon, 16))
     element.addEventListener("click", action)
     return element
   }
-  const back = button("atlas-back", "返回布局", ArrowLeft, actions.back)
+  const back = button("atlas-back", "返回布局", "arrow-left", actions.back)
   list.querySelector(".inspector-title")!.prepend(back)
-  const copy = button("atlas-copy-image", "复制图片及切片", Copy, actions.copy)
+  const copy = button("atlas-copy-image", "复制图片及切片", "copy", actions.copy)
   const createDialog = document.createElement("dialog")
   createDialog.id = "atlas-create-dialog"
   createDialog.className = "app-dialog"
@@ -66,7 +65,7 @@ export function createAtlasWorkspace(actions: {
     actions.create(String(data.get("name")).trim(), Number(data.get("width")), Number(data.get("height")))
   })
   document.body.append(createDialog)
-  const create = button("atlas-create-image", "新建图片", Plus, () => createDialog.showModal())
+  const create = button("atlas-create-image", "新建图片", "plus", () => createDialog.showModal())
   const input = document.createElement("input")
   input.type = "file"
   input.multiple = true
@@ -76,13 +75,13 @@ export function createAtlasWorkspace(actions: {
     actions.import(Array.from(input.files ?? []).filter(file => /\.(png|til)$/i.test(file.name)))
     input.value = ""
   })
-  const folder = button("atlas-import-folder", "导入图片目录", FolderInput, () => input.click())
+  const folder = button("atlas-import-folder", "导入图片目录", "folder-input", () => input.click())
   const extras = document.createElement("span")
   extras.className = "atlas-resource-extras"
   extras.append(copy, create, folder, input)
   list.querySelector(".resource-actions")!.append(extras)
-  const grid = button("atlas-grid", "显示切片网格", Grid2x2, actions.guides)
-  const autoSlice = button("atlas-auto-slice", "自动切片", Scissors, actions.autoSlice)
+  const grid = button("atlas-grid", "显示切片网格", "grid-2x2", actions.guides)
+  const autoSlice = button("atlas-auto-slice", "自动切片", "scissors", actions.autoSlice)
   toolbar.append(grid, autoSlice)
   const reference = document.createElement("div")
   reference.className = "atlas-reference"
@@ -125,9 +124,9 @@ export function createAtlasWorkspace(actions: {
     resize()
     actions.redraw()
   }
-  zoom.append(button("atlas-zoom-out", "缩小图集", Minus, () => zoomBy(1 / 1.2)), percent,
-    button("atlas-zoom-in", "放大图集", Plus, () => zoomBy(1.2)),
-    button("atlas-zoom-fit", "适配图集", Maximize, () => { fitted = true; resize(); actions.redraw() }))
+  zoom.append(button("atlas-zoom-out", "缩小图集", "minus", () => zoomBy(1 / 1.2)), percent,
+    button("atlas-zoom-in", "放大图集", "plus", () => zoomBy(1.2)),
+    button("atlas-zoom-fit", "适配图集", "maximize", () => { fitted = true; resize(); actions.redraw() }))
   workspace.append(zoom)
   wrap.addEventListener("wheel", event => {
     if (!desktopActive) return
@@ -159,7 +158,7 @@ export function createAtlasWorkspace(actions: {
   const endPan = () => { pan = undefined; wrap.classList.remove("atlas-panning") }
   wrap.addEventListener("pointerup", endPan)
   wrap.addEventListener("pointercancel", endPan)
-  new ResizeObserver(resize).observe(wrap)
+  new ResizeObserver(() => { resize(); actions.redraw() }).observe(wrap)
   const media = matchMedia("(min-width: 1000px)")
   const update = (next: AtlasState) => {
     state = next

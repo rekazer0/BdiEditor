@@ -3,11 +3,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
+import { appSource, declarations, run } from './helpers/app-source.mjs'
 
-const source = ts.createSourceFile('main.ts', readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true)
-const fn = source.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === 'sourceCopyPath')
-const context = vm.createContext({})
-vm.runInContext(ts.transpile(fn.getText(source), { target: ts.ScriptTarget.ES2022 }), context)
+const context = run(declarations('sourceCopyPath'))
 
 test('pasting a copy onto its own location gets a Finder-style 副本 name', () => {
   const taken = new Set(['light/skin/res/a.png', 'light/skin/res/a 副本.png'])

@@ -1,0 +1,713 @@
+/*
+ * 设备模拟：画布里的手机外框、状态栏、导航与编辑工具条，以及画布背景选项。
+ * 这里模拟的是真机系统界面和用户内容，颜色必须与真机一致、不随编辑器主题变化，
+ * 所以是 DESIGN.md 中唯一允许写色值字面量的文件（§1）。编辑器自身的界面不得写在这里。
+ */
+
+
+.canvas-wrap.preview-pan-ready .device-shell {
+  will-change: transform;
+}
+
+.canvas-wrap[data-background="glass"] {
+  background: var(--content);
+  -webkit-backdrop-filter: saturate(170%) blur(28px);
+  backdrop-filter: saturate(170%) blur(28px);
+}
+
+.canvas-wrap[data-background="checkerboard"] {
+  background-color: var(--checker-light);
+  background-image: var(--checker-image);
+  background-position: 0 0, calc(var(--checker-size) / 2) calc(var(--checker-size) / 2);
+  background-size: var(--checker-size) var(--checker-size);
+  --_canvas-text: #202124;
+  --_canvas-secondary: #5f6368;
+  --_canvas-tertiary: #74747b;
+}
+
+.canvas-wrap[data-background="white"] {
+  background: #fff;
+  --_canvas-text: #202124;
+  --_canvas-secondary: #5f6368;
+  --_canvas-tertiary: #74747b;
+}
+
+.canvas-wrap[data-background="gray"] {
+  background: #808080;
+  --_canvas-text: #202124;
+  --_canvas-secondary: #303236;
+  --_canvas-tertiary: #45484d;
+}
+
+.canvas-wrap[data-background="dark"] {
+  background: #242529;
+  --_canvas-text: #f2f3f4;
+  --_canvas-secondary: #a6a9ae;
+  --_canvas-tertiary: #858991;
+}
+
+
+.device-shell {
+  place-self: center;
+  height: min(calc(100vh - 145px), 720px);
+  max-height: 720px;
+  max-width: 96%;
+  aspect-ratio: 1206 / 2622;
+  padding: 7px;
+  border-radius: 38px;
+  background: #171719;
+  box-shadow: 0 18px 44px rgb(0 0 0 / 22%);
+  --_phone-keyboard-glass:
+    linear-gradient(180deg, rgb(255 255 255 / 34%), rgb(217 220 227 / 18%)),
+    radial-gradient(120% 72% at 50% -18%, rgb(255 255 255 / 20%), transparent 64%),
+    rgb(203 206 212 / 72%);
+  --_phone-keyboard-border: rgb(255 255 255 / 68%);
+  --_phone-keyboard-shadow: inset 0 1px rgb(255 255 255 / 48%), 0 -10px 28px rgb(82 103 135 / 10%);
+  transition: aspect-ratio 180ms ease;
+}
+
+.canvas-wrap[data-background="white"] .preview-coordinate-label,
+.canvas-wrap[data-background="gray"] .preview-coordinate-label,
+.canvas-wrap[data-background="checkerboard"] .preview-coordinate-label,
+.canvas-wrap[data-background="gray"] ~ .preview-zoom-control,
+.canvas-wrap[data-background="checkerboard"] ~ .preview-zoom-control {
+  border-color: rgb(32 33 36 / 22%);
+  background: rgb(255 255 255 / 88%);
+  color: #202124;
+  box-shadow: 0 8px 20px rgb(32 33 36 / 18%), inset 0 1px rgb(255 255 255 / 80%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.canvas-wrap[data-background="gray"] ~ .preview-zoom-control button,
+.canvas-wrap[data-background="checkerboard"] ~ .preview-zoom-control button {
+  color: #202124;
+}
+
+.device-shell[data-family="android"] {
+  border-radius: 34px;
+  background: #222326;
+}
+
+.device-shell[data-family="iphone"] {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--device-body-radius, 38px);
+  corner-shape: squircle;
+}
+
+.device-shell[data-family="iphone"] .device-screen {
+  position: absolute;
+  inset: var(--device-screen-inset-y) var(--device-screen-inset-x);
+  height: auto;
+  border-radius: var(--device-screen-radius, 32px);
+  corner-shape: squircle;
+  background: #fff;
+}
+
+.device-shell[data-orientation="land"] {
+  width: min(96%, 900px);
+  height: auto;
+}
+
+.device-screen {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  container-type: inline-size;
+  border-radius: 32px;
+  background:
+    radial-gradient(ellipse 45% 36% at 8% 100%, rgb(102 181 238 / 24%), transparent 100%),
+    radial-gradient(circle at 52% 56%, rgb(235 172 136 / 24%), transparent 52%),
+    radial-gradient(ellipse 45% 36% at 92% 100%, rgb(117 203 145 / 30%), transparent 100%),
+    radial-gradient(circle at 48% 94%, rgb(155 174 231 / 18%), transparent 46%),
+    #f5f5f7;
+}
+
+.device-shell[data-family="android"] .device-screen {
+  border-radius: 28px;
+}
+
+.device-reference-background {
+  display: none;
+}
+
+.device-shell[data-family="iphone"][data-orientation="port"][data-theme="light"]:not(.canvas-only) .device-screen {
+  background: #fff;
+}
+
+.device-shell[data-reference-frame="true"] {
+  border-radius: 14% / 6.44%;
+  corner-shape: round;
+}
+
+.device-shell[data-reference-frame="true"] .device-screen {
+  inset: 0;
+  border-radius: 14% / 6.44%;
+  corner-shape: round;
+}
+
+.device-shell[data-reference-frame="true"]::after {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 4px #171719;
+  content: "";
+  pointer-events: none;
+}
+
+.device-shell[data-reference-frame="true"] .device-screen::before {
+  width: 30.5%;
+  height: 3.65%;
+  top: 1.89%;
+  border-radius: 999px;
+}
+
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .device-reference-background {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  display: block;
+  background: center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+
+.device-shell[data-reference-frame="true"][data-theme="light"] {
+  --_phone-keyboard-glass:
+    linear-gradient(180deg, rgb(255 255 255 / 34%), rgb(217 220 227 / 18%)),
+    radial-gradient(120% 72% at 50% -18%, rgb(255 255 255 / 20%), transparent 64%),
+    rgb(203 206 212 / 72%);
+}
+
+.device-shell[data-reference-frame="true"][data-theme="light"] .device-reference-background {
+  background-image:
+    radial-gradient(ellipse 45% 36% at 8% 100%, rgb(102 181 238 / 24%), transparent 100%),
+    radial-gradient(circle at 52% 56%, rgb(235 172 136 / 24%), transparent 52%),
+    radial-gradient(ellipse 45% 36% at 92% 100%, rgb(117 203 145 / 30%), transparent 100%),
+    radial-gradient(circle at 48% 94%, rgb(155 174 231 / 18%), transparent 46%),
+    url("/iphone-notes-reference-blank.png");
+}
+
+.device-shell[data-reference-frame="true"][data-theme="dark"] {
+  --_phone-keyboard-glass:
+    linear-gradient(180deg, rgb(54 58 66 / 9%), rgb(6 8 10 / 16%)),
+    rgb(13 15 18 / 62%);
+  --_phone-keyboard-border: rgb(255 255 255 / 18%);
+  --_phone-keyboard-shadow: none;
+}
+
+.device-shell[data-reference-frame="true"][data-theme="dark"] .device-reference-background {
+  background-image:
+    radial-gradient(ellipse 64% 54% at 2% 94%, rgb(38 91 161 / 34%), transparent 78%),
+    radial-gradient(ellipse 80% 72% at 51% 61%, rgb(131 61 32 / 32%), transparent 79%),
+    radial-gradient(ellipse 64% 54% at 98% 94%, rgb(34 104 61 / 36%), transparent 78%),
+    url("/iphone-notes-reference-dark-blank.png");
+}
+
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .device-status,
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .phone-navigation,
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .simulation,
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .phone-editing-toolbar {
+  display: none;
+}
+
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .keyboard-dock {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 6.65% 6.65% 0 0;
+  border-top: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .keyboard-dock::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-sizing: border-box;
+  content: "";
+  pointer-events: none;
+}
+
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .keyboard-dock::after {
+  z-index: -1;
+  border: 1px solid rgb(255 255 255 / 34%);
+  border-bottom: 0;
+  background: var(--_phone-keyboard-glass);
+  box-shadow: none;
+  -webkit-backdrop-filter: saturate(118%) blur(34px);
+  backdrop-filter: saturate(118%) blur(34px);
+}
+
+.device-shell[data-reference-frame="true"]:not(.canvas-only) .keyboard-accessories {
+  visibility: visible;
+  background: transparent;
+}
+
+.device-screen::before {
+  width: var(--device-island-width, 74px);
+  height: var(--device-island-height, 19px);
+  position: absolute;
+  z-index: 3;
+  top: var(--device-island-offset, 8px);
+  left: 50%;
+  border-radius: 12px;
+  background: #09090a;
+  content: "";
+  transform: translateX(-50%);
+}
+
+.device-shell[data-family="iphone"][data-orientation="land"] .device-screen::before {
+  top: 50%;
+  left: var(--device-island-offset);
+  transform: translateY(-50%);
+}
+
+.device-shell[data-family="android"] .device-screen::before {
+  width: 10px;
+  height: 10px;
+  top: 10px;
+  border-radius: 50%;
+}
+
+.device-status {
+  height: 41px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 25px 0;
+  color: #151517;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.device-status-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.device-status-time .system-symbol {
+  width: 13px;
+  height: 13px;
+}
+
+.device-status-icons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.device-status-icons .system-symbol:last-child {
+  width: 1.25em;
+}
+
+.phone-navigation {
+  height: 45px;
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 17px;
+  color: #111;
+  font-size: 11px;
+}
+
+.phone-nav-round,
+.phone-nav-done {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(0 0 0 / 9%);
+  border-radius: 50%;
+  background: #fff;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.phone-nav-actions {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  padding: 0 11px;
+  border: 1px solid rgb(0 0 0 / 9%);
+  border-radius: 17px;
+  background: #fff;
+  white-space: nowrap;
+}
+
+.phone-nav-done {
+  color: #fff;
+  background: #ebb900;
+  font-size: 15px;
+}
+
+.phone-nav-round .system-symbol,
+.phone-nav-done .system-symbol {
+  font-size: 18px;
+}
+
+.phone-nav-actions .system-symbol {
+  font-size: 15px;
+}
+
+.phone-nav-actions .system-symbol:first-child {
+  opacity: 0.35;
+}
+
+.simulation {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 25px 12px;
+  color: #1d1d1f;
+}
+
+.simulation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #99999f;
+  font-size: 10px;
+}
+
+.simulation-heading button {
+  padding: 2px 5px;
+  border-radius: 5px;
+  color: #737378;
+  background: rgb(0 0 0 / 5%);
+  font-size: 9px;
+}
+
+#simulated-output {
+  width: 100%;
+  min-height: 56px;
+  flex: 1;
+  resize: none;
+  padding: 8px 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.45;
+  user-select: text;
+}
+
+#simulated-output::placeholder {
+  color: #a1a1a7;
+}
+
+.device-shell[data-family="iphone"] #simulated-output::placeholder {
+  color: transparent;
+}
+
+.device-shell[data-family="iphone"] .simulation-heading {
+  visibility: hidden;
+}
+
+.phone-editing-toolbar {
+  height: 34px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  margin: 0 7px 8px;
+  padding: 0 10px;
+  border: 1px solid rgb(0 0 0 / 10%);
+  border-radius: 999px;
+  color: #111;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 6px 16px rgb(0 0 0 / 8%);
+}
+
+.phone-editing-toolbar strong {
+  font-size: 11px;
+}
+
+.phone-editing-toolbar .system-symbol {
+  width: 17px;
+  height: 17px;
+}
+
+.device-shell[data-mode="edit"] #candidate-area.candidate-selected::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  box-shadow: inset 0 0 0 3px var(--accent);
+  pointer-events: none;
+}
+
+.device-shell:not(.canvas-only) #candidate-input {
+  position: relative;
+  inset: auto;
+  height: 100%;
+}
+
+.keyboard-accessories {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 21px 7px;
+  color: #111;
+  background: transparent;
+}
+
+.device-shell[data-accessories="hidden"] .keyboard-accessories {
+  display: none;
+}
+
+.device-shell[data-theme="dark"] .device-screen {
+  --_phone-keyboard-glass:
+    linear-gradient(180deg, rgb(54 58 66 / 9%), rgb(6 8 10 / 16%)),
+    rgb(13 15 18 / 62%);
+  --_phone-keyboard-border: rgb(255 255 255 / 18%);
+  --_phone-keyboard-shadow: none;
+  background:
+    radial-gradient(ellipse 64% 54% at 2% 94%, rgb(38 91 161 / 34%), transparent 78%),
+    radial-gradient(ellipse 80% 72% at 51% 61%, rgb(131 61 32 / 32%), transparent 79%),
+    radial-gradient(ellipse 64% 54% at 98% 94%, rgb(34 104 61 / 36%), transparent 78%),
+    #2c2c30;
+}
+
+.device-shell[data-theme="dark"] .device-status,
+.device-shell[data-theme="dark"] .phone-navigation,
+.device-shell[data-theme="dark"] .simulation,
+.device-shell[data-theme="dark"] #simulated-output,
+.device-shell[data-theme="dark"] .phone-editing-toolbar,
+.device-shell[data-theme="dark"] .keyboard-accessories {
+  color: #f5f5f7;
+}
+
+.device-shell[data-theme="dark"] .phone-nav-round,
+.device-shell[data-theme="dark"] .phone-nav-actions {
+  border-color: rgb(255 255 255 / 12%);
+  color: #f5f5f7;
+  background: #252527;
+}
+
+.device-shell[data-theme="dark"] .phone-editing-toolbar {
+  border-color: rgb(255 255 255 / 12%);
+  background: rgb(37 37 39 / 92%);
+}
+
+.device-shell[data-theme="dark"] .phone-nav-done {
+  color: #fff;
+  background: #d8aa00;
+}
+
+.device-shell[data-theme="dark"] .simulation-heading {
+  color: #98989f;
+}
+
+.device-shell[data-theme="dark"] .simulation-heading button {
+  color: #c3c3c8;
+  background: rgb(255 255 255 / 8%);
+}
+
+.device-shell[data-theme="dark"] #simulated-output::placeholder {
+  color: #6f6f76;
+}
+
+.device-shell[data-theme="dark"] .keyboard-dock,
+.device-shell[data-theme="dark"] .keyboard-accessories {
+  background: var(--_phone-keyboard-glass);
+}
+
+.device-shell[data-theme="dark"] .keyboard-dock {
+  -webkit-backdrop-filter: saturate(118%) blur(34px);
+  backdrop-filter: saturate(118%) blur(34px);
+}
+
+.device-shell[data-theme="dark"] .keyboard-accessory-icon {
+  filter: none;
+}
+
+.device-shell[data-theme="dark"] canvas {
+  background: transparent;
+}
+
+.device-shell[data-orientation="land"] .device-status {
+  display: none;
+}
+
+.device-shell[data-orientation="land"] .phone-navigation {
+  width: 45%;
+  margin-left: auto;
+  padding-right: 4%;
+}
+
+.device-shell[data-orientation="land"] .phone-editing-toolbar {
+  display: none;
+}
+
+.device-shell[data-orientation="land"] .simulation {
+  position: static;
+  width: auto;
+  max-height: none;
+  flex: none;
+  height: 68px;
+  padding: 8px 16px 6px;
+}
+
+.device-shell[data-orientation="land"] .keyboard-dock {
+  width: 100%;
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+  margin: 0;
+  border-radius: 22px 22px 0 0;
+}
+
+.device-shell.canvas-only {
+  width: var(--canvas-fit-width, var(--canvas-width, 1080px));
+  max-width: none;
+  transition: none;
+  height: auto;
+  aspect-ratio: auto;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.device-shell.canvas-only .device-screen {
+  height: auto;
+  display: block;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+}
+
+.device-shell.canvas-only .device-screen::before,
+.device-shell.canvas-only .device-status,
+.device-shell.canvas-only .phone-navigation,
+.device-shell.canvas-only .simulation,
+.device-shell.canvas-only .phone-editing-toolbar,
+.device-shell.canvas-only .keyboard-accessories {
+  display: none;
+}
+
+.device-shell.canvas-only .keyboard-dock {
+  display: grid;
+  grid-template-rows: auto auto;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  border-radius: 0;
+  border-top: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.device-shell.canvas-only #candidate-area {
+  height: auto;
+  grid-template-rows:
+    0px
+    0px
+    minmax(0, var(--toolbar-viewport-height, 0px));
+  overflow: visible;
+}
+
+.device-shell.canvas-only #candidate-input {
+  grid-row: 1;
+}
+
+.device-shell.canvas-only #candidate-words {
+  grid-row: 3;
+}
+
+.device-shell.canvas-only #candidate-area {
+  height: var(--candidate-viewport-height, auto);
+}
+
+.device-shell.canvas-only #preview {
+  width: 100%;
+  max-height: none;
+  transform: none;
+}
+
+.device-shell.canvas-only #panel-viewport {
+  width: 100%;
+  height: var(--panel-viewport-height, auto);
+  overflow: hidden;
+}
+
+.keyboard-dock .keyboard-accessories {
+  grid-row: 3;
+}
+
+.device-shell:not(.canvas-only)[data-mode="edit"] #candidate-area {
+  cursor: pointer;
+}
+
+.device-shell.canvas-only #toolbar-preview {
+  width: 100%;
+  height: var(--toolbar-viewport-height, 0px);
+}
+
+.canvas-wrap.empty .device-shell {
+  opacity: 0;
+  box-shadow: none;
+}
+
+@media (max-width: 1060px) {
+
+  #device-control {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+/* 设置「深色画布降低对比」 */
+:root[data-app-theme="dark"][data-dark-canvas-soften="true"] .canvas-wrap[data-background="dark"] { background-color: #303238; }
+
+/* 模板卡片预览：每个模板自己的底色与按键色 */
+.template-card[data-template="default-android"] { --_tone-bg: #1B1E23; --_tone-key: #2E333C; --_tone-cand: #2E333C; }
+.template-card[data-template="official-android-bds"] { --_tone-bg: #EDEFF3; --_tone-key: #FFFFFF; --_tone-cand: #FFFFFF; }
+.template-card[data-template="xiaomi-unified-rounded-blur"] { --_tone-bg: #F3F4F7; --_tone-key: #FFFFFF; --_tone-cand: #FFFFFF; }
+.template-card[data-template="oppo-dual-color"] { --_tone-bg: #E9EFFE; --_tone-key: #3A6DF0; --_tone-cand: #3A6DF0; }
+.template-card[data-template="iqoo-rounded-black"] { --_tone-bg: #14161A; --_tone-key: #26292F; --_tone-cand: #26292F; }
+.template-card[data-template="huawei-swipe-symbols-1080"] { --_tone-bg: #F0F1F4; --_tone-key: #FFFFFF; --_tone-cand: #FFFFFF; }
+.template-card[data-template="oppo-swipe-down"] { --_tone-bg: #F3F4F7; --_tone-key: #FFFFFF; --_tone-cand: #FFFFFF; }
+/*
+ 从 style.css 归并过来的同名规则（含响应式变体）
+ */
+.device-shell {
+  transition:
+    background-color var(--duration-base) var(--ease-standard),
+    color var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard),
+    opacity var(--duration-base) var(--ease-standard);
+}
+#device-control {
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--material-content);
+}

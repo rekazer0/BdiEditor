@@ -96,8 +96,8 @@ const skinStateDescriptions: Record<number, string> = {
   95: "AI 输入返回键第二态",
 }
 
-export const MIN_SKIN_STATE = 0
-export const MAX_SKIN_STATE = 122
+const MIN_SKIN_STATE = 0
+const MAX_SKIN_STATE = 122
 export const knownSkinStates = Array.from(
   { length: MAX_SKIN_STATE - MIN_SKIN_STATE + 1 },
   (_, index) => index + MIN_SKIN_STATE,
@@ -108,10 +108,6 @@ const skinStateFallbackTexts: Record<number, string> = {
   21: "搜索",
   23: "前往",
   27: "发送",
-}
-
-export function skinStateDescription(state: number): string | undefined {
-  return skinStateDescriptions[state]
 }
 
 export function skinStateFallbackText(state: number | undefined): string | undefined {
@@ -168,7 +164,7 @@ export function isConfiguredSymbolLayout(path: string, general: IniDocument | un
   return Boolean(current && current === configured)
 }
 
-export function previewPageTarget(
+function previewPageTarget(
   code: string,
   currentName: string,
   baseName = "py_9.ini",
@@ -239,9 +235,3 @@ export function previewPageTransition(
   }
 }
 
-export function layoutLetterKeyCount(document: IniDocument): number {
-  return document.sections().filter((section) => {
-    if (!/^KEY\d+$/.test(section)) return false
-    return /^[A-Za-z]+$/.test(document.get(section, "CENTER")?.trim() ?? "")
-  }).length
-}

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
+import { appSource, declarations, run } from './helpers/app-source.mjs'
 
 function load(name, globals = {}) {
   const context = vm.createContext({ exports: {}, ...globals })
@@ -161,22 +162,37 @@ test('mixed multi-selection delta is accumulated instead of converting empty inp
   assert.deepEqual(moves, [1]); assert.equal(field.value, '')
   assert.deepEqual(field.events, [])
 })
+test('Shift + arrow steps a number field by 10 as one write', () => {
+  const s = wheelSetup(), field = new Input()
+  const key = (k, extra = {}) => { const event = { target: field, key: k, shiftKey: true, defaultPrevented: false, preventDefault() { this.defaultPrevented = true }, ...extra }; s.root.emit('keydown', event); return event }
+  assert.equal(key('ArrowUp').defaultPrevented, true)
+  assert.equal(field.value, '10'); assert.deepEqual(field.events, ['input', 'change'])
+  key('ArrowDown'); assert.equal(field.value, '0')
+  assert.equal(key('ArrowUp', { shiftKey: false }).defaultPrevented, false, 'plain arrows stay native')
+})
+test('scrub handles resolve to exactly one editable number field', () => {
+  const { scrubbableField } = wheelSetup().api
+  const handle = (...fields) => ({ parentElement: { querySelectorAll: () => fields } })
+  const field = new Input(), text = Object.assign(new Input(), { type: 'text' })
+  assert.equal(scrubbableField(handle(field, text)), field)
+  assert.equal(scrubbableField(handle(field, new Input())), undefined, 'X/Y 共用的行标签不能拖')
+  assert.equal(scrubbableField(handle(Object.assign(new Input(), { disabled: true }))), undefined)
+})
 test('duplicate installation cannot double-step a field', () => {
   const s = wheelSetup(), field = new Input()
   s.api.installNumberInputWheel(s.root)
   s.wheel(field); s.tick(); assert.equal(field.value, '1')
 })
 
-const source = ts.createSourceFile('main.ts', readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true)
 const names = ['schedulePointerCoordinates', 'paintPreviewInteraction', 'schedulePreviewInteractionFrame', 'schedulePreviewPan', 'flushPreviewPan']
-const functions = source.statements.filter(n => ts.isFunctionDeclaration(n) && names.includes(n.name?.text)).map(n => n.getText(source)).join('\n')
+const functions = declarations(...names)
 test('pan and crosshair use the latest pointer snapshot in a single frame', () => {
   const frames = new Map(), paints = []; let id = 0
-  const context = vm.createContext({
+  const context = run(functions, {
     requestAnimationFrame: cb => { frames.set(++id, cb); return id }, cancelAnimationFrame: id => frames.delete(id),
     updatePointerCoordinates: e => paints.push(['crosshair', e.clientX]), setPreviewPan: x => paints.push(['pan', x]),
+    pointerCoordinatesFrame: 0,
   })
-  vm.runInContext(ts.transpile(`let pendingPointerCoordinates, pendingPreviewPan; let pointerCoordinatesFrame = 0; ${functions}`, { target: ts.ScriptTarget.ES2022 }), context)
   vm.runInContext('for (let i=1; i<=100; i++) { schedulePointerCoordinates({clientX:i,clientY:0,pointerType:"mouse"},{},{}); schedulePreviewPan(i,0) }', context)
   assert.equal(frames.size, 1)
   const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(cb => cb())
@@ -188,5 +204,5 @@ test('pan and crosshair use the latest pointer snapshot in a single frame', () =
 test('per-field undo buttons are no longer created', () => {
   const shell = readFileSync(new URL('../src/inspector-shell.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(shell, /reset\.className = "pin-reset"/)
-  assert.match(shell, /pin-reset-all/)
+  assert.match(shell, /inspector-reset/)
 })

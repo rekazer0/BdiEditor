@@ -16,11 +16,7 @@ export function exportFormatFromPath(path: string): ExportFormat | undefined {
     : undefined
 }
 
-export function isSxiPath(path: string): boolean {
-  return /\.sxi$/i.test(path)
-}
-
-export function exportPath(path: string, format: ExportTarget): string {
+function exportPath(path: string, format: ExportTarget): string {
   return /\.[^.\\/]+$/.test(path) ? path.replace(/\.[^.\\/]+$/, `.${format}`) : `${path}.${format}`
 }
 

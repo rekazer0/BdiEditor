@@ -92,7 +92,7 @@ export function drawVisualText(
   context.restore()
 }
 
-export function drawVisualSource(
+function drawVisualSource(
   context: Pick<CanvasRenderingContext2D, "drawImage">,
   visual: Pick<Visual, "image" | "source">,
   destination: { x: number; y: number; width: number; height: number },
@@ -168,7 +168,7 @@ export function drawVisualPreview(canvas: HTMLCanvasElement, visuals: Array<Visu
   })
 }
 
-export function resolveTextVisual(
+function resolveTextVisual(
   styles: IniDocument,
   foreground: string,
   highlighted: boolean,
@@ -208,7 +208,7 @@ export function resolveTextVisual(
   return Object.keys(result).length ? result : undefined
 }
 
-export function resolveStyleTextVisual(
+function resolveStyleTextVisual(
   styles: IniDocument,
   styleID: string,
   highlighted: boolean,
@@ -219,7 +219,7 @@ export function resolveStyleTextVisual(
   return { text, ...resolveTextVisual(styles, styleID, highlighted, defaultFontName) }
 }
 
-export function resolveVisualSpec(
+function resolveVisualSpec(
   styles: IniDocument,
   styleID: string,
   highlighted: boolean,
@@ -285,7 +285,7 @@ function normalizedToolbarImagePath(path: string | undefined): string | undefine
   return path?.trim().replace(/^\/+/, "").replace(/\.png$/i, "") || undefined
 }
 
-export function toolbarImagePaths(plist: string, limit = Number.POSITIVE_INFINITY): string[] {
+function toolbarImagePaths(plist: string, limit = Number.POSITIVE_INFINITY): string[] {
   const paths = topLevelDicts(plist)
     .filter((entry) => /<key>Position<\/key>\s*<string>toolbar<\/string>/.test(entry))
     .flatMap((entry) => {

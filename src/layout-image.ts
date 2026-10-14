@@ -3,7 +3,7 @@ import { nextTileIndex, updateTileSlice, type TileRect, type TileSlice } from ".
 
 export { nextTileIndex } from "./tiles.ts"
 
-export type LayoutKeyGeometry = { section: string; rect: TileRect }
+type LayoutKeyGeometry = { section: string; rect: TileRect }
 export type LayoutImageTarget = "panel" | "key-normal" | "key-highlight" | "fore-normal" | "fore-highlight" | "candidate"
 export type LayoutImagePlan = {
   target: LayoutImageTarget
@@ -12,7 +12,7 @@ export type LayoutImagePlan = {
   indices: Map<string, number>
   panelIndex?: number
 }
-export type LayoutImageAlphaMode = 1 | 2
+type LayoutImageAlphaMode = 1 | 2
 
 export function layoutKeyRects(layout: IniDocument, selected: readonly string[] = [], panelSize?: readonly [number, number]): LayoutKeyGeometry[] {
   const filter = selected.length ? new Set(selected) : undefined
@@ -60,7 +60,7 @@ export function planLayoutImage(target: LayoutImageTarget, keys: readonly Layout
   return { target, keys: [...keys], slices, indices }
 }
 
-export function layoutImageTileDocument(plan: LayoutImagePlan, alphaMode: LayoutImageAlphaMode): IniDocument {
+function layoutImageTileDocument(plan: LayoutImagePlan, alphaMode: LayoutImageAlphaMode): IniDocument {
   const tiles = IniDocument.parse(`[GLOBAL]\r\nUSE_ALPHA=${alphaMode}\r\nTILE_NUM=${plan.slices.length}\r\n\r\n`)
   for (const slice of plan.slices) updateTileSlice(tiles, slice)
   return tiles

@@ -80,7 +80,7 @@ export function updateTileSlice(document: IniDocument, slice: TileSlice): void {
 }
 
 // 工具书 V6 p43：[GLOBAL] TILE_NUM 必须与切片数量一致。
-export function syncTileCount(document: IniDocument): void {
+function syncTileCount(document: IniDocument): void {
   if (document.get("GLOBAL", "TILE_NUM") === undefined) return
   document.set("GLOBAL", "TILE_NUM", String(document.sections().filter((name) => tileSectionIndex(name) !== undefined).length))
 }

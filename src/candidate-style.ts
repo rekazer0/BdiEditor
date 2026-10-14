@@ -2,7 +2,7 @@ import type { TextVisual, VisualResolver } from "./atlas.ts"
 import type { IniDocument } from "./ini.ts"
 import { DEFAULT_CANDIDATE_HEIGHT, DEFAULT_PANEL_WIDTH } from "./keyboard.ts"
 
-export type CandidateRect = { x: number; y: number; width: number; height: number }
+type CandidateRect = { x: number; y: number; width: number; height: number }
 
 function candidateRect(document: IniDocument | undefined): CandidateRect | undefined {
   const values = document?.get("CAND", "VIEW_RECT")?.split(",").map(Number)
@@ -41,7 +41,7 @@ function inputInset(width: number): number {
   return Math.trunc(density * 2.5)
 }
 
-export type CandidateInputStyle = {
+type CandidateInputStyle = {
   foregroundStyle: string
   height: number
 }

@@ -50,3 +50,5 @@ src-tauri/gen/
 /pelican-bike.html
 /probe-pin-actions.html
 /public/inspector-fragment.html
+.ui-baseline/
+.ui-current/

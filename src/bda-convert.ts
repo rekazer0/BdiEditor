@@ -1,17 +1,7 @@
 import { strToU8, zipSync } from "fflate"
-import {
-  bdaAppearancePath,
-  bdaColorHex,
-  bdaConfigPath,
-  bdaLayoutDocument,
-  bdaStyleID,
-  decodeBdaAnimation,
-  decodeBdaAppearance,
-  decodeBdaSoundConfig,
-  bdaPanelKeyName,
-  type BdaAnimation,
-  type BdaImageAtom,
-} from "./bda.ts"
+import { bdaAppearancePath, bdaConfigPath, bdaLayoutDocument, bdaStyleID, bdaPanelKeyName, type BdaAnimation, type BdaImageAtom } from "./bda.ts"
+import { bdaColorHex } from "./bda-resolver.ts"
+import { decodeBdaAnimation, decodeBdaAppearance, decodeBdaSoundConfig } from "./bda-decode.ts"
 import { IniDocument } from "./ini.ts"
 import { SkinArchive } from "./skin.ts"
 import { soundPathForFilename } from "./sounds.ts"
@@ -19,7 +9,7 @@ import { soundPathForFilename } from "./sounds.ts"
 /** Sound styles sit above the image/color/text ranges used by bdaStyleID. */
 const SOUND_STYLE_BASE = 4_000_000
 
-export type BdaConversion = { archive: SkinArchive; warnings: string[] }
+type BdaConversion = { archive: SkinArchive; warnings: string[] }
 
 function pngSize(bytes: Uint8Array): [number, number] {
   if (

@@ -1,68 +1,20 @@
-:root {
-  font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #121419;
-  color-scheme: light;
-  background: #f4f5f6;
-
-  /* 间距系统 */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 12px;
-  --space-lg: 16px;
-  --space-xl: 24px;
-
-  /* 字号系统 */
-  --text-xs: 10px;
-  --text-sm: 11px;
-  --text-base: 12px;
-  --text-md: 13px;
-  --text-lg: 14px;
-
-  /* 圆角系统 */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 10px;
-
-  --line: rgb(0 0 0 / 10%);
-  --panel: #f4f5f6;
-  --secondary: #5b616e;
-  --control: #fff;
-  --hover: rgb(0 0 0 / 4%);
-  --accent: #3a6df0;
+.new-project-window {
+  color: var(--text);
+  background: var(--material-content);
+  font-family: var(--font-ui);
 }
 
-:root[data-app-theme="dark"] {
-  color: #f2f3f4;
-  color-scheme: dark;
-  background: #202225;
-  --line: rgb(255 255 255 / 14%);
-  --panel: #282b2e;
-  --secondary: #a6a9ae;
-  --control: #34373b;
-  --hover: rgb(255 255 255 / 8%);
-  --accent: #7a9bff;
-}
-
-* { box-sizing: border-box; }
-
-html,
-body {
+html, .new-project-window {
   height: 100%;
   margin: 0;
   overflow: hidden;
   background: var(--panel);
 }
 
-body {
+.new-project-window {
   color: inherit;
-  font-size: 18px;
-  user-select: none;
-  -webkit-font-smoothing: antialiased;
+  font-size: var(--font-size-xl);
 }
-
-button,
-input { font: inherit; }
 
 form {
   height: 100%;
@@ -70,12 +22,12 @@ form {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
-header { padding: var(--space-xl) var(--space-xl) 18px; }
+header { padding: var(--space-xl) var(--space-xl) 20px; }
 
 h1 {
   margin: 0;
-  font-size: 24px;
-  font-weight: 700;
+  font-size: var(--font-size-xl);
+  font-weight: 600;
   line-height: 1.25;
   letter-spacing: -0.02em;
 }
@@ -83,7 +35,7 @@ h1 {
 header p {
   margin: var(--space-sm) 0 0;
   color: var(--secondary);
-  font-size: var(--text-lg);
+  font-size: var(--font-size-md);
   line-height: 1.6;
 }
 
@@ -93,13 +45,13 @@ header .usage-note {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--control) 50%, transparent);
-  font-size: var(--text-base);
+  font-size: var(--font-size-sm);
   line-height: 1.65;
 }
 
 .templates {
   min-height: 0;
-  padding: 0 18px 18px 24px;
+  padding: 0 20px 20px 24px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -108,12 +60,12 @@ header .usage-note {
 .template-heading {
   display: flex;
   justify-content: space-between;
-  padding-bottom: 9px;
+  padding-bottom: 8px;
   color: var(--secondary);
-  font-size: 14px;
+  font-size: var(--font-size-lg);
 }
 
-.template-heading span { font-size: 13px; }
+.template-heading span { font-size: var(--font-size-md); }
 
 .template-list {
   display: grid;
@@ -128,17 +80,20 @@ header .usage-note {
   align-items: center;
   padding: var(--space-md) var(--space-lg);
   border: 1px solid var(--line);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   background: var(--control);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--duration-base) var(--ease-standard);
   box-shadow: none;
 }
+
+@media (hover: hover) {
 
 .template-option:hover {
   background: var(--hover);
   transform: none;
   box-shadow: none;
+}
 }
 
 .template-option:has(input:checked) {
@@ -168,14 +123,14 @@ header .usage-note {
 
 .template-option strong {
   overflow-wrap: anywhere;
-  font-size: var(--text-lg);
+  font-size: var(--font-size-md);
   font-weight: 600;
   line-height: 1.4;
 }
 
 .template-option small {
   color: var(--secondary);
-  font-size: var(--text-md);
+  font-size: var(--font-size-md);
   line-height: 1.4;
 }
 
@@ -193,8 +148,8 @@ footer {
 #project-error {
   flex-basis: 100%;
   margin: 0;
-  color: #d14343;
-  font-size: var(--text-base);
+  color: var(--state-danger);
+  font-size: var(--font-size-sm);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -212,17 +167,20 @@ footer button {
   border-radius: var(--radius-lg);
   color: inherit;
   background: var(--control);
-  font-size: var(--text-md);
+  font-size: var(--font-size-md);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--duration-base) var(--ease-standard);
   box-shadow: none;
 }
+
+@media (hover: hover) {
 
 footer button:hover:not(:disabled) {
   background: var(--hover);
   transform: none;
   box-shadow: none;
+}
 }
 
 footer button:active:not(:disabled) {
@@ -232,31 +190,28 @@ footer button:active:not(:disabled) {
 
 footer .primary {
   border: none;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
   box-shadow: none;
 }
 
+@media (hover: hover) {
+
 footer .primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 90%, #000);
+  background: color-mix(in srgb, var(--accent) 90%, var(--text));
   box-shadow: none;
 }
-
-button:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 @media (max-height: 620px) {
-  header { padding-block: 18px 14px; }
+  header { padding-block: 20px 16px; }
   header p { margin-top: 4px; }
-  .template-option { padding-block: 11px; }
+  .template-option { padding-block: 12px; }
   footer { padding-block: 12px; }
 }
 
 @media (max-width: 420px) {
   header { padding-inline: 16px; }
-  .templates { padding-inline: 16px 10px; }
+  .templates { padding-inline: 16px 12px; }
   footer { padding-inline: 16px; }
 }

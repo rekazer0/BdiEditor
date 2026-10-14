@@ -1,22 +1,23 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import test from "node:test"
+import { appSource } from "./helpers/app-source.mjs"
 
-const main = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8")
+const main = appSource()
 
 test("every selected INI layout can open its property inspector", () => {
   // ini / cnd / pop 都是属性面板能描述并回写的布局配置文档。
   assert.match(main, /function isConfigLayoutPath\(path: string\): boolean \{\s*return \/\\\.\(ini\|cnd\|pop\)\$\/i\.test\(path\)/)
   // BDA 容器里的同名遗留文件由 bda 解析器处理，不能按普通布局文档放行。
-  assert.match(main, /function showsLayoutProperties\(path: string\): boolean \{\s*return archive\?\.format !== "bda" && isConfigLayoutPath\(path\)/)
+  assert.match(main, /function showsLayoutProperties\(path: string\): boolean \{\s*return appState\.archive\?\.format !== "bda" && isConfigLayoutPath\(path\)/)
   // 从任意侧边栏点开布局文件都落到属性页。
   assert.match(main, /preferredSidebarView === "overview" \|\| showsLayoutProperties\(path\)/)
   // “源文件”侧边栏不再把布局文件顶到源代码页。
-  assert.match(main, /preferredSidebarView === "source"[\s\S]{0,240}&& path !== layoutPath && !showsLayoutProperties\(path\)/)
+  assert.match(main, /preferredSidebarView === "source"[\s\S]{0,240}&& path !== appState\.layoutPath && !showsLayoutProperties\(path\)/)
   // 属性标签对布局文件始终可用，不再要求概览分组或当前布局。
-  assert.match(main, /const configLayoutSelected = showsLayoutProperties\(selectedPath\)/)
+  assert.match(main, /const configLayoutSelected = showsLayoutProperties\(appState\.selectedPath\)/)
   assert.match(main, /\(configLayoutSelected \|\| overviewSelected \|\| layoutSelected\) && !imageSelected/)
-  assert.match(main, /const layoutSelected = selectedPath === layoutPath && \/\\\.ini\$\/i\.test\(selectedPath\)/)
+  assert.match(main, /const layoutSelected = appState\.selectedPath === appState\.layoutPath && \/\\\.ini\$\/i\.test\(appState\.selectedPath\)/)
   assert.doesNotMatch(main, /previousInspectorTab === "source" && path === layoutPath/)
 })
 
@@ -47,7 +48,7 @@ test("document inspector labels cover the keys real skins use", () => {
     assert.match(labels, new RegExp(`^\\s{2}${key}: "[^"]+"`, "m"), `${key} 缺少中文标签`)
   }
   // 侧边栏分组名与源码标签表共用，避免同一概念出现两种写法。
-  assert.match(main, /^import \{ sourceKeyLabels \} from "\.\/config-labels\.ts"$/m)
+  assert.match(main, /^import \{ sourceKeyLabels \} from "\.\.?\/config-labels\.ts"$/m)
   // 按 id 绑定布局文件的键（SYM_LAYOUT / NUM_9_LAYOUT…）沿用侧边栏名称。
   assert.match(main, /const layoutIDLabels: Record<string, string> = \{/)
   assert.match(main, /const layout = key\.match\(\/\^\(\[A-Z0-9_\]\+\)_LAYOUT\$\/\)/)
@@ -66,9 +67,9 @@ test("document sections and category rail stay readable", () => {
   // 否则按标签找回 active 分组时会选中同名的另一个。
   assert.match(main, /const usedRailLabels = new Map<string, number>\(\)/)
   // 面板重绘会重建分区元素，当前分组要用稳定键记住，否则高亮会跳回同名的第一个分组。
-  assert.match(main, /let inspectorGroupKey = ""/)
+  assert.match(main, /inspectorGroupKey: ""/)
   assert.match(main, /function mobileInspectorGroupKey\(group: HTMLElement\): string \{/)
-  assert.match(main, /const active = groups\.find\(\(group\) => mobileInspectorGroupKey\(group\) === inspectorGroupKey\)/)
+  assert.match(main, /const active = groups\.find\(\(group\) => mobileInspectorGroupKey\(group\) === appState\.inspectorGroupKey\)/)
   assert.match(main, /const seen = usedRailLabels\.get\(label\) \?\? 0/)
   assert.match(main, /label = `\$\{label\} \$\{seen \+ 1\}`\s*\n\s*group\.dataset\.inspectorGroupLabel = label/)
 })

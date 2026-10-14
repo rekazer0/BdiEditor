@@ -270,7 +270,7 @@ await check("edit keys: geometry, keyboard nudge, undo/redo, multi-select, layou
   await x.fill(String(original + 3))
   await x.press("Enter")
   await page.waitForFunction(() => !document.querySelector("#desktop-undo").disabled)
-  assert.match(await page.locator(".pin-actions-meta").textContent(), /已改/)
+  assert.match(await page.locator(".inspector-changes").textContent(), /已改/)
   await page.locator("#desktop-undo").click()
   await page.waitForFunction((value) => document.querySelector("[data-key-field=x]").value === String(value), original)
   await page.locator("#desktop-redo").click()
@@ -306,7 +306,7 @@ await check("edit keys: geometry, keyboard nudge, undo/redo, multi-select, layou
   await page.locator('[data-inspector-tab="source"]').click()
   await page.waitForFunction(() => /SHOW=测/.test(document.querySelector("#source .cm-content")?.innerText ?? ""))
   await page.locator('[data-inspector-tab="properties"]').click()
-  await railTab(page, "动作")
+  await railTab(page, "手势")
   const up = page.locator("[data-key-field=UP]")
   await up.fill("F12")
   await up.press("Tab")
@@ -507,7 +507,7 @@ await check("settings: every page, live preview, cancel restores and save persis
   }
   await page.locator('[data-settings-page="appearance"]').click()
   const accent = await page.locator('[data-settings-page="appearance"]').evaluate((node) => getComputedStyle(node).color)
-  const brand = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--pen-accent").trim())
+  const brand = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())
   assert.ok(brand, "accent token resolves")
   assert.notEqual(accent, "rgb(255, 107, 44)", "selected settings tab uses the accent, not the selection orange")
   await page.locator('[data-setting-choice="app-theme"][data-value="dark"]').click()
@@ -517,7 +517,7 @@ await check("settings: every page, live preview, cancel restores and save persis
     input.dispatchEvent(new Event("input", { bubbles: true }))
     input.dispatchEvent(new Event("change", { bubbles: true }))
   })
-  const applied = await page.evaluate(() => getComputedStyle(document.querySelector(".source")).getPropertyValue("--pin-accent").trim())
+  const applied = await page.evaluate(() => getComputedStyle(document.querySelector(".source")).getPropertyValue("--accent").trim())
   assert.equal(applied.toLowerCase(), "#12a150", "accent reaches the inspector")
   await page.locator("#settings-cancel").click()
   await dialog.waitFor({ state: "hidden" })
@@ -571,7 +571,7 @@ await check("file: rename, save, export every format and unsaved prompt", () => 
     }
     return names
   }
-  assert.deepEqual(await exportAll(), ["bdi", "bds"])
+  assert.deepEqual(await exportAll(), ["bdi", "bds", "sxi"])
   // Edit, then try to start a new skin: the unsaved prompt appears.
   await editMode(page)
   await selectKey(page)
@@ -614,7 +614,7 @@ await check("file: a BDA skin exports to every format", () => withPage(async (pa
     formats.push((await pending).suggestedFilename().split(".").pop())
     await closeOperationDialog(page)
   }
-  assert.deepEqual(formats, ["bdi", "bds", "bda", "bda"])
+  assert.deepEqual(formats, ["bdi", "bds", "bda", "bda", "sxi"])
 }))
 
 /* ------------------------------------------------------------------------------------------------

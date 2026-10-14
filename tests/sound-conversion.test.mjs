@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { SkinArchive } from '../src/skin.ts'
 import { convertBdaArchive } from '../src/bda-convert.ts'
-import { bdaSoundResourceType, updateBdaKeySound } from '../src/bda.ts'
+import { bdaSoundResourceType, updateBdaKeySound } from "../src/bda-encode.ts"
 import { decodeAiffPcm } from '../src/sounds.ts'
 
 const ogg = new Uint8Array(readFileSync(new URL('./fixtures/click.ogg', import.meta.url)))

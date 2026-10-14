@@ -2,7 +2,7 @@ import { actionDescription, knownFunctionCodes, knownSkinStates } from "./action
 import { jsonFieldLabels, sourceKeyLabels } from "./config-labels.ts"
 import type { SourceEditorLanguage } from "./source-editor.ts"
 
-export type SourceCompletionKind = "key" | "value"
+type SourceCompletionKind = "key" | "value"
 
 export type SourceCompletionItem = {
   label: string
@@ -11,7 +11,7 @@ export type SourceCompletionItem = {
   apply?: string
 }
 
-export type SourceCompletionResult = {
+type SourceCompletionResult = {
   items: SourceCompletionItem[]
   kind: SourceCompletionKind
   replaceLength: number

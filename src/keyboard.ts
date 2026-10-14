@@ -6,7 +6,7 @@ export const DEFAULT_CANDIDATE_HEIGHT = 133
 export const DEFAULT_BDA_PANEL_WIDTH = 1080
 export const DEFAULT_BDA_PANEL_HEIGHT = 641
 
-export type KeyboardConfig = {
+type KeyboardConfig = {
   width: number
   height: number
   styleID: string
@@ -14,20 +14,6 @@ export type KeyboardConfig = {
   pressedImage: string
   normalColor: string
   pressedColor: string
-}
-
-export function backgroundStyleSections(
-  layout: IniDocument,
-  keySections: string[],
-): string[] {
-  return [
-    ...new Set(
-      keySections.flatMap((section) => {
-        const id = layout.get(section, "BACK_STYLE")?.split(",")[0].trim()
-        return id && /^\d+$/.test(id) ? [`STYLE${id}`] : []
-      }),
-    ),
-  ]
 }
 
 export function keyboardConfig(gen: IniDocument, styles: IniDocument): KeyboardConfig {

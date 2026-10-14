@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { constrainedCanvasSize, drawNineSliceImage } from '../src/preview.ts'
+import { constrainedCanvasSize, drawNineSliceImage } from "../src/preview-draw.ts"
 
 // Model the shared scratch canvas: resizing clears it and drawing replaces pixels.
 function setup() {

@@ -1,4 +1,4 @@
-export type DeviceSpec = {
+type DeviceSpec = {
   width: number
   height: number
   family: "iphone" | "android"

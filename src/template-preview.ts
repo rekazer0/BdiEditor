@@ -1,5 +1,6 @@
 import { builtInProjectTemplatePreviewURL, loadBuiltInProjectTemplate } from "./operations.ts"
-import { readArchiveEntry, SkinArchive } from "./skin.ts"
+import { SkinArchive } from "./skin.ts"
+import { readArchiveEntry } from "./skin-zip.ts"
 
 /**
  * 皮肤包里的效果预览图。各平台位置不同（`demo.png` / `skin/demo.png` /

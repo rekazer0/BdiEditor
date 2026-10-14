@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
+import { appSource, declarations, run } from './helpers/app-source.mjs'
 
 const reviewSource = readFileSync(new URL('../src/ai-draft-review.ts', import.meta.url), 'utf8')
 const review = vm.createContext({ exports: {} })
@@ -32,15 +33,14 @@ test('large and long-line diffs explicitly disclose truncation', () => {
   assert.match(result.text, /完整内容/)
 })
 
-const main = ts.createSourceFile('main.ts', readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true)
 const draftFunctions = ['applyAiDesignDraft', 'validatedAiChanges', 'writeAiDraftChanges', 'previewAiDraft', 'revertAiDraftPreview', 'acceptAiDraftPreview', 'sameBytes']
-const functions = main.statements.filter(node => ts.isFunctionDeclaration(node) && draftFunctions.includes(node.name?.text)).map(node => node.getText(main)).join('\n')
+const functions = declarations(...draftFunctions)
 function setup(editing = true, stale = false) {
   const files = new Map([['keys.ini', stale ? 'manual edit' : 'old']])
   const target = { format: 'bdi', getBytes: () => undefined, getText: path => files.get(path), setText: (path, text) => files.set(path, text) }
   const draft = { target, changes: [{}], drafts: [{ path: 'keys.ini', syntax: 'ini', before: 'old', after: 'new' }], conversation: ['accepted'] }
   let commits = 0
-  const context = vm.createContext({
+  const context = run(functions, {
     archive: target, aiDesignDraft: undefined, aiDraftPreview: undefined, aiDesignBusy: false, aiDesignConversation: [],
     aiDesignStatus: { textContent: '' }, aiDesignPanel: { dataset: {} },
     isEditing: () => editing, source: { commit() {} },
@@ -50,7 +50,6 @@ function setup(editing = true, stale = false) {
     aiDesignErrorMessage: error => error.message,
     refreshAfterAiDraft() {},
   })
-  vm.runInContext(ts.transpile(functions, { target: ts.ScriptTarget.ES2022 }), context)
   vm.runInContext('function setAiDesignDraft(value) { revertAiDraftPreview(); aiDesignDraft = value; if (value) previewAiDraft(value) }', context)
   context.setAiDesignDraft(draft)
   return { context, draft, text: () => files.get('keys.ini'), commits: () => commits }

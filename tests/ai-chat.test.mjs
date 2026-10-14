@@ -11,6 +11,7 @@ const frames = []
 const runFrames = () => frames.splice(0).forEach(callback => callback())
 async function setup(run) {
   const context = vm.createContext({
+    iconMarkup: (name) => `<svg data-icon="${name}"></svg>`,
     requestAnimationFrame: callback => frames.push(callback), cancelAnimationFrame: () => {},
     exports: {}, AbortController, DOMException,
     customElements: { whenDefined: async () => {} },

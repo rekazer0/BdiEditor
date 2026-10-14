@@ -10,7 +10,7 @@ const session = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
 const queue: string[] = []
 let flushPromise: Promise<void> | undefined
 
-export function sanitizeDiagnosticText(value: unknown): string {
+function sanitizeDiagnosticText(value: unknown): string {
   const text = value instanceof Error ? value.message : String(value)
   return text
     .replace(/content:\/\/\S+/gi, "content://[redacted]")
@@ -19,7 +19,7 @@ export function sanitizeDiagnosticText(value: unknown): string {
     .slice(0, 4_000)
 }
 
-export function diagnosticError(error: unknown): { message: string; stack?: string } {
+function diagnosticError(error: unknown): { message: string; stack?: string } {
   if (!(error instanceof Error)) return { message: sanitizeDiagnosticText(error) }
   return {
     message: sanitizeDiagnosticText(error.message),

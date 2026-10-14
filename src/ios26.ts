@@ -65,10 +65,3 @@ export function adaptIos26KeyboardLayout(
   return layout.toString()
 }
 
-export function isIos26Adapted(candidateText: string | undefined, generalText: string | undefined): boolean {
-  if (!candidateText || !generalText) return false
-  const candidate = IniDocument.parse(candidateText)
-  const general = IniDocument.parse(generalText)
-  const candidateStyle = candidate.get("CAND", "BACK_STYLE")
-  return Boolean(candidateStyle && general.get("SCAND", "BACK_STYLE") === candidateStyle)
-}

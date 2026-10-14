@@ -1,5 +1,6 @@
 import "deep-chat"
 import type { DeepChat } from "deep-chat"
+import { iconMarkup } from "./icons"
 
 export type AiChatRunHooks = {
   signal: AbortSignal
@@ -13,7 +14,7 @@ export type AiChatRunResult = {
   summary?: string
 }
 
-export type AiChatRun = (prompt: string, hooks: AiChatRunHooks, files: readonly File[]) => Promise<AiChatRunResult>
+type AiChatRun = (prompt: string, hooks: AiChatRunHooks, files: readonly File[]) => Promise<AiChatRunResult>
 
 export type AiChatController = {
   clear: () => void
@@ -53,14 +54,8 @@ function stepRow(step: RunStep): HTMLLIElement {
 
 /** 1.4px stroke glyphs, matching the inspector's system symbols. */
 function stepIcon(kind: StepKind): string {
-  const paths: Record<StepKind, string> = {
-    thinking: '<path d="M8 2.6 9.3 6.2 12.9 7.5 9.3 8.8 8 12.4 6.7 8.8 3.1 7.5 6.7 6.2Z"/>',
-    reading: '<path d="M4.1 2.7h5.1L12 5.5v7.6a.5.5 0 0 1-.5.5h-7.4a.5.5 0 0 1-.5-.5V3.2a.5.5 0 0 1 .5-.5Z"/><path d="M9.2 2.7v2.8h2.7"/>',
-    editing: '<path d="m11.4 2.7 1.9 1.9-7.6 7.6-2.4.5.5-2.4Z"/><path d="m10.2 3.9 1.9 1.9"/>',
-    done: '<path d="m3.6 8.4 2.9 2.9 5.9-6.5"/>',
-    error: '<circle cx="8" cy="8" r="5.6"/><path d="M8 5.3v3.3M8 10.8h.01"/>',
-  }
-  return `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[kind]}</svg>`
+  const names: Record<StepKind, string> = { thinking: "sparkles", reading: "file-text", editing: "pen-line", done: "check", error: "circle-alert" }
+  return iconMarkup(names[kind], 16, 1.4)
 }
 
 /** Steps arrive as “AI 读取 project.bds…” (or “方案 1 · AI …”) — the panel already says who is acting. */
@@ -77,7 +72,7 @@ function runMarkup(id: string, bodyId: string): string {
     + `<button class="ai-run-head" type="button" aria-expanded="true" aria-controls="${bodyId}">`
     + '<span class="ai-run-spark" aria-hidden="true">✦</span>'
     + '<span class="ai-run-label">思考中…</span>'
-    + '<span class="ai-run-caret" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6.5 4 4 4-4"/></svg></span>'
+    + '<span class="ai-run-caret" aria-hidden="true">' + iconMarkup("chevron-down", 16) + "</span>"
     + "</button>"
     + `<div class="ai-run-body" id="${bodyId}">`
     + '<ol class="ai-run-steps"></ol>'
@@ -327,7 +322,7 @@ function configureAppearance(chat: DeepChat): void {
     tooltip: { text: "发送；生成时点击可停止" },
     submit: {
       // A symmetric arrow sits optically centred, unlike the default paper plane.
-      svg: { content: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg>' },
+      svg: { content: iconMarkup("arrow-up", 15, 1.6) },
       container: {
         default: { backgroundColor: accent, color: onAccent, borderRadius: radiusMd, boxSizing: "border-box",
           width: "28px", height: "28px", bottom: "6px", right: "6px", boxShadow: "none" },

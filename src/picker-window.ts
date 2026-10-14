@@ -4,7 +4,7 @@ import { LogicalSize } from "@tauri-apps/api/dpi"
 import { bindSlicePickerZoom, drawSlicePicker, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM, pickableSlices } from "./slice-picker-canvas.ts"
 import { tileSliceAt, type TilePoint, type TileSlice } from "./tiles.ts"
 import { drawVisualPreview, retinaThumbnail, type Visual } from "./atlas.ts"
-import { inspectorIcon } from "./inspector-icons.ts"
+import { createIcon, hydrateIcons } from "./icons.ts"
 
 type ImagePayload = {
   path: string
@@ -49,6 +49,12 @@ export type StyleLibraryPayload = {
 }
 
 const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
+hydrateIcons()
+// 取色器窗口跟随系统深浅色，与主窗口一样通过 data-app-theme 切换 token。
+const systemDark = matchMedia("(prefers-color-scheme: dark)")
+const syncTheme = () => { document.documentElement.dataset.appTheme = systemDark.matches ? "dark" : "light" }
+syncTheme()
+systemDark.addEventListener("change", syncTheme)
 const title = $("#picker-title")
 const styleName = $("#picker-style")
 const subtitle = $("#picker-subtitle")
@@ -267,14 +273,14 @@ function renderLibrarySounds(payload: StyleLibraryPayload, query: string): numbe
     label.textContent = `STYLE${styleID}`
     const name = document.createElement("small")
     name.textContent = filename
-    select.append(inspectorIcon("music", 16), label, name)
+    select.append(createIcon("music", 16), label, name)
     select.addEventListener("click", (event) => emitLibrary(event.metaKey || event.ctrlKey ? "style-library-edit" : "style-library-apply", { styleID }))
     const play = document.createElement("button")
     play.type = "button"
     play.disabled = !playable
     play.title = playable ? `播放 ${filename}` : "声音文件不存在"
     play.setAttribute("aria-label", play.title)
-    play.append(inspectorIcon("play", 14))
+    play.append(createIcon("play", 14))
     play.addEventListener("click", () => emitLibrary("style-library-play", { filename }))
     card.append(select, play)
     libraryGrid.append(card)
@@ -354,16 +360,19 @@ function renderLibrary(): void {
           libraryCanvasObserver.observe(canvas)
           previews.append(canvas)
         }
-        const badge = document.createElement("span")
-        badge.className = "style-kind-badge"
-        badge.append(inspectorIcon(style.kindIcon, 11), style.kindLabel)
-        previews.append(badge)
       }
       const label = document.createElement("strong")
       label.textContent = imagePath ? imagePath.split("/").pop()! : `样式 ${style!.label}`
       card.title = imagePath || `${label.textContent} · 单击预览，双击应用，Command/Ctrl 单击编辑`
       const note = document.createElement("small")
       note.textContent = image ? (image.referenced ? "已引用" : "图片资源") : `#${style!.label}`
+      if (style && !image) {
+        // 类型徽标放在说明行里，不压在预览图上。
+        const badge = document.createElement("span")
+        badge.className = "style-kind-badge"
+        badge.append(createIcon(style.kindIcon, 11), style.kindLabel)
+        note.prepend(badge)
+      }
       card.append(previews, label, note)
       const target = imagePath ? { imagePath } : { styleID: style!.styleID }
       card.addEventListener("click", (event) => {

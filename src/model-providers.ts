@@ -1,6 +1,6 @@
 export type ModelProtocol = "anthropic" | "openai-chat" | "openai-responses" | "google"
 
-export interface ModelProviderPreset {
+interface ModelProviderPreset {
   id: string
   label: string
   protocol: ModelProtocol

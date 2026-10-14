@@ -19,7 +19,7 @@ import { aiSkinSkill } from "./ai-skin-skill.ts"
 import { AiSkinWorkspace, type AiSkinDraftChange, type AiSkinEditableFile } from "./ai-skin-workspace.ts"
 import type { ModelProtocol } from "./model-providers.ts"
 
-export type AiDesignConfiguration = {
+type AiDesignConfiguration = {
   provider: string
   protocol: ModelProtocol
   apiUrl: string
@@ -27,7 +27,7 @@ export type AiDesignConfiguration = {
   apiKey: string
 }
 
-export type AiDesignProject = {
+type AiDesignProject = {
   format: "bdi" | "bds" | "bda"
   skinName: string
   skinPath: string
@@ -48,7 +48,7 @@ export type AiDesignProject = {
   images?: readonly AiSkinImageFile[]
 }
 
-export type AiDesignResult = {
+type AiDesignResult = {
   changes: AiSkinDraftChange[]
   response: string
   toolCalls: number
@@ -56,7 +56,7 @@ export type AiDesignResult = {
   variants?: AiDesignVariant[]
 }
 
-export type AiDesignVariant = {
+type AiDesignVariant = {
   id: string
   title: string
   changes: AiSkinDraftChange[]
@@ -67,7 +67,7 @@ export type AiDesignVariant = {
 
 export type AiDesignConversation = AgentMessage[]
 
-export type AiDesignAttachments = { images: ImageContent[]; text: string }
+type AiDesignAttachments = { images: ImageContent[]; text: string }
 
 const ATTACHMENT_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"])
 const ATTACHMENT_IMAGE_BYTES = 8 * 1024 * 1024
