@@ -563,6 +563,10 @@ select option {
   height: 16px;
 }
 
+.toolbar-menu button .ui-badge {
+  margin-left: auto;
+}
+
 .app-actions {
   display: grid;
   gap: 2px;

@@ -71,6 +71,7 @@
 - 尺寸：`--icon-size-sm` 14（控件内、行内）、`--icon-size-md` 16（工具栏、导航）、`--icon-size-lg` 20（空状态、大按钮）。
 - 描边统一 1.5，颜色 `currentColor`，由所在控件的文字颜色决定。
 - 新增图标：在 `icons.ts` 的注册表里按 Lucide 原名登记，同一含义全项目只用一个图标。
+- 实验功能：入口图标用 `flask-conical`，文字后跟 `<span class="ui-badge" data-variant="accent">实验</span>`，菜单里角标靠右对齐。功能转正时两者一起去掉，换回该功能本来的图标。
 
 ## 6. 动效
 
@@ -103,6 +104,7 @@
 - 只读提示：交互预览下点到任何只读字段，一律调用 `requestEditMode()`（`src/app/mobile-layout.ts`）打开同一个 `#edit-mode-dialog`，确认后切换至编辑模式。不另做提示弹窗或 toast；新的只读区域只要放进 `.ui-form[data-readonly="true"]` 并禁用字段即可自动获得该行为。
 - 即时生效：属性修改立即作用于画布，并进入撤销栈，不出现“应用”按钮。
 - 破坏性操作（删除、覆盖）必须可撤销；撤销不了的才弹确认框。
+- 导出类菜单项文字不加“…”。
 - 键盘：所有操作可用键盘完成；`Esc` 关闭浮层，或在没有浮层时取消选择。
 
 ## 8. CSS 组织
@@ -129,7 +131,7 @@
 | 分组 | `.ui-section` | 标题 13/600，内容行距 8 |
 | 列表行 | `.ui-list-item` | 图标 + 标题 + 次要文字 + 尾部附件 |
 | 菜单 | `.ui-menu` | 浮层，`--radius-lg`，`--shadow-md` |
-| 角标 | `.ui-badge` | 计数、状态 |
+| 角标 | `.ui-badge` | 计数、状态、“实验”标记（`data-variant="accent"`） |
 
 新组件要先在本表登记，写进 `components.css`，再在页面中使用。
 
