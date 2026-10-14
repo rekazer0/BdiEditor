@@ -1,6 +1,6 @@
 [package]
 name = "bdi-edit"
-version = "2.0.0-alpha"
+version = "2.0.0-beta"
 description = "百度 iOS 输入法皮肤编辑器"
 edition = "2021"
 
