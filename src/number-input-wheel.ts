@@ -111,7 +111,9 @@ export function installNumberInputWheel(root: NumberInputRoot = document, option
   root.addEventListener("wheel", (event) => {
     const wheel = event as WheelEvent
     if (wheel.defaultPrevented) return
-    if (!isEditableNumberInput(wheel.target) || wheel.ctrlKey || wheel.metaKey || !wheel.deltaY) {
+    // 只有点进去（聚焦）的输入框才吃滚轮，否则滚轮照常滚动面板。
+    if (!isEditableNumberInput(wheel.target) || wheel.target !== document.activeElement
+      || wheel.ctrlKey || wheel.metaKey || !wheel.deltaY) {
       finish()
       return
     }

@@ -82,6 +82,7 @@ function wheelSetup(options = {}) {
   const tick = () => { const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(cb => cb()) }
   const idle = () => { const callbacks = [...timers.values()]; timers.clear(); callbacks.forEach(cb => cb()) }
   const wheel = (field, deltaY = -1, extra = {}) => {
+    root.activeElement = extra.unfocused ? null : field
     const event = { target: field, deltaY, defaultPrevented: false, preventDefault() { this.defaultPrevented = true }, ...extra }
     root.emit('wheel', event); return event
   }
@@ -153,6 +154,7 @@ test('disabled/readonly fields and pinch-zoom are untouched', () => {
   field.disabled = true; assert.equal(s.wheel(field).defaultPrevented, false)
   field.disabled = false; field.readOnly = true; s.wheel(field)
   field.readOnly = false; assert.equal(s.wheel(field, -1, { ctrlKey: true }).defaultPrevented, false)
+  assert.equal(s.wheel(field, -1, { unfocused: true }).defaultPrevented, false)
   s.tick(); assert.equal(field.value, '0'); assert.equal(field.events.length, 0)
 })
 test('mixed multi-selection delta is accumulated instead of converting empty input to zero', () => {
