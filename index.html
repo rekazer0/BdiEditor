@@ -28,6 +28,7 @@
             <button type="button" data-mobile-export-format="bds"><span class="system-symbol" data-system-symbol="square.and.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/></svg></span><span>导出 Android 皮肤</span></button>
             <button type="button" data-mobile-export-format="bda" data-bda-platform="ios"><span class="system-symbol" data-system-symbol="square.and.arrow.down.badge.new" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/><circle class="fallback-dot" cx="16.2" cy="3.8" r="1.5"/></svg></span><span>导出新版 iOS 皮肤</span></button>
             <button type="button" data-mobile-export-format="bda" data-bda-platform="android"><span class="system-symbol" data-system-symbol="square.and.arrow.down.badge.new" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/><circle class="fallback-dot" cx="16.2" cy="3.8" r="1.5"/></svg></span><span>导出新版 Android 皮肤</span></button>
+            <button type="button" data-mobile-export-format="sxi"><span class="system-symbol" data-system-symbol="square.and.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/></svg></span><span>导出手心皮肤 (.sxi)</span></button>
             <span class="mobile-menu-separator" role="separator"></span>
             <button type="button" data-mobile-command="panel-scale"><span class="system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"></span><span>面板复制</span></button>
             <button type="button" data-mobile-command="replace-layout-image"><span class="system-symbol" data-system-symbol="photo.badge.arrow.down" aria-hidden="true"></span><span>替换键盘样式</span></button>
@@ -48,6 +49,7 @@
             <button type="button" role="menuitem" data-export-format="bds" disabled><span class="system-symbol" data-system-symbol="square.and.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/></svg></span><span>导出 Android 皮肤 (.bds)…</span></button>
             <button type="button" role="menuitem" data-export-format="bda" data-bda-platform="ios" disabled><span class="system-symbol" data-system-symbol="square.and.arrow.down.badge.new" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/><circle class="fallback-dot" cx="16.2" cy="3.8" r="1.5"/></svg></span><span>导出新版 iOS 皮肤 (.bda)…</span></button>
             <button type="button" role="menuitem" data-export-format="bda" data-bda-platform="android" disabled><span class="system-symbol" data-system-symbol="square.and.arrow.down.badge.new" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/><circle class="fallback-dot" cx="16.2" cy="3.8" r="1.5"/></svg></span><span>导出新版 Android 皮肤 (.bda)…</span></button>
+            <button type="button" role="menuitem" data-export-format="sxi" disabled><span class="system-symbol" data-system-symbol="square.and.arrow.down" aria-hidden="true"><svg class="system-symbol-fallback" viewBox="0 0 20 20"><path d="M4 10v6h12v-6"/><path d="M10 3.6v9.4m-3.6-3.6L10 13l3.6-3.6"/></svg></span><span>导出手心皮肤 (.sxi)…</span></button>
             <span class="toolbar-menu-separator" role="separator"></span>
             <span class="toolbar-menu-label">工具 · 编辑模式可用</span>
             <button id="panel-scale" type="button" role="menuitem" disabled><span class="system-symbol" data-system-symbol="arrow.left.and.right" aria-hidden="true"></span><span>面板复制…</span></button>
@@ -1037,7 +1039,7 @@
               <p>百度输入法 iOS 与 Android 皮肤可视化编辑器</p>
             </div>
             <div class="settings-list">
-              <p class="settings-about-note">支持读取、编辑和导出 BDI、BDS、BDA 皮肤包。</p>
+              <p class="settings-about-note">支持读取、编辑和导出 BDI、BDS、BDA 皮肤包，并可将三种格式导出手心皮肤 (.sxi)。</p>
               <p class="settings-about-note about-alpha">阿尔法版本：包含未完成的功能与实验性改动，仅用于测试。</p>
             </div>
             <section id="about-update" class="about-update" data-current-version="2.0.0alpha">
