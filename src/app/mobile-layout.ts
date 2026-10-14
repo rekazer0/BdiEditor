@@ -324,16 +324,21 @@ export function bindPaneResize(handle: HTMLElement, cssVar: string, storageKey: 
     e.preventDefault()
   })
 
+  // pointermove 可能比刷新率更频繁，每帧只改一次宽度，避免重复整页重排。
+  let pendingW: number | undefined
   handle.addEventListener("pointermove", (e) => {
     if (!dragging) return
-    const newW = Math.max(minW, Math.min(maxW, startW + (e.clientX - startX) * direction))
-    document.documentElement.style.setProperty(cssVar, `${newW}px`)
+    if (pendingW === undefined) requestAnimationFrame(() => {
+      document.documentElement.style.setProperty(cssVar, `${pendingW}px`)
+      pendingW = undefined
+    })
+    pendingW = Math.max(minW, Math.min(maxW, startW + (e.clientX - startX) * direction))
   })
 
   handle.addEventListener("pointerup", () => {
     if (!dragging) return
     dragging = false
     handle.classList.remove("dragging")
-    localStorage.setItem(storageKey, String(currentW()))
+    localStorage.setItem(storageKey, String(pendingW ?? currentW()))
   })
 }

@@ -147,8 +147,14 @@ function previewDestination(
 
 export function retinaThumbnail(canvas: HTMLCanvasElement, cssWidth: number, cssHeight: number): HTMLCanvasElement {
   const ratio = window.devicePixelRatio || 1
-  canvas.width = Math.max(1, Math.round(cssWidth * ratio))
-  canvas.height = Math.max(1, Math.round(cssHeight * ratio))
+  const width = Math.max(1, Math.round(cssWidth * ratio))
+  const height = Math.max(1, Math.round(cssHeight * ratio))
+  // 尺寸不变时只清空：重设尺寸会让 WebKit 重新分配 GPU 缓冲。
+  if (canvas.width === width && canvas.height === height) canvas.getContext("2d")?.clearRect(0, 0, width, height)
+  else {
+    canvas.width = width
+    canvas.height = height
+  }
   return canvas
 }
 

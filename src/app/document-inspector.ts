@@ -393,7 +393,6 @@ export function populateDocumentInspector(): void {
     if (!specialized && partLabels && partValues.length === partLabels.length) {
       const row = document.createElement("span")
       row.className = "ui-field-pair"
-      if (partLabels.length === 4) row.dataset.columns = "4"
       partLabels.forEach((name, index) => {
         const box = document.createElement("span")
         box.className = "ui-input"

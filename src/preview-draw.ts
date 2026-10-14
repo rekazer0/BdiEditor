@@ -59,11 +59,13 @@ export function drawNineSliceImage(
   const width = Math.max(1, Math.round(destination.width))
   const height = Math.max(1, Math.round(destination.height))
   // 此画布会被下一次绘制覆盖，不能作为不同样式或尺寸的缓存结果。
+  // 只增不减：WebKit 每次改画布尺寸都重新分配 GPU 缓冲，逐键重设会让每次重绘分配几十次。
   const buffer = createCanvas()
-  buffer.width = width
-  buffer.height = height
+  if (!(buffer.width >= width)) buffer.width = width
+  if (!(buffer.height >= height)) buffer.height = height
   const bufferContext = buffer.getContext("2d")
   if (!bufferContext) return
+  bufferContext.clearRect(0, 0, width, height)
   bufferContext.imageSmoothingEnabled = true
   bufferContext.imageSmoothingQuality = "high"
 

@@ -349,7 +349,7 @@ export async function renderStyleResourceGallery(galleryCanvas: ReturnType<typeo
   resourceSearch.placeholder = "搜索样式"
   resourceSearch.setAttribute("aria-label", "搜索样式")
   resourceSearchControl.setAttribute("aria-label", "搜索样式")
-  resourceCategory.hidden = false
+  resourceCategory.parentElement!.hidden = false
   resourceCount.textContent = `${styleIDs.length} 个样式`
   resourceUploadButton.hidden = true
   styleAddButton.hidden = false
@@ -384,14 +384,10 @@ export async function renderStyleResourceGallery(galleryCanvas: ReturnType<typeo
     }
     const name = document.createElement("strong")
     name.textContent = `STYLE${styleID}`
-    const entries = stylesDocument.entries(`STYLE${styleID}`)
-    const meta = document.createElement("small")
-    meta.textContent = soundFilename
-      || entries.find((entry) => entry.key === "INFO")?.value
-      || entries.find((entry) => entry.key === "SHOW")?.value
-      || `${entries.length} 项配置`
-    meta.prepend(styleKindBadge(styleKind(styleID, stylesDocument)))
-    button.append(previews, name, meta)
+    const nameRow = document.createElement("span")
+    nameRow.className = "style-resource-name"
+    nameRow.append(name, styleKindBadge(styleKind(styleID, stylesDocument), true))
+    button.append(previews, nameRow)
     button.addEventListener("click", () => {
       selectGalleryItem(`STYLE${styleID}`, resourceGallery)
       if (soundPath) playSoundPath(soundPath)
@@ -410,9 +406,9 @@ export async function renderBdaStyleResourceGallery(galleryCanvas: ReturnType<ty
   const part = bdaAppearancePart(appState.selectedPath)
   if (!info || part?.kind !== "styles") return
   const definitions = {
-    imageStyles: { label: "图片样式", type: "image", styles: info.appearance.imageStyles },
-    textStyles: { label: "文字样式", type: "text", styles: info.appearance.textStyles },
-    colorStyles: { label: "颜色样式", type: "color", styles: info.appearance.colorStyles },
+    imageStyles: { type: "image", styles: info.appearance.imageStyles },
+    textStyles: { type: "text", styles: info.appearance.textStyles },
+    colorStyles: { type: "color", styles: info.appearance.colorStyles },
   } as const
   const definition = definitions[part.group]
   if (resourceCategory.dataset.styleCategories !== "bda") {
@@ -426,7 +422,7 @@ export async function renderBdaStyleResourceGallery(galleryCanvas: ReturnType<ty
   resourceSearch.placeholder = "搜索样式"
   resourceSearch.setAttribute("aria-label", "搜索样式")
   resourceSearchControl.setAttribute("aria-label", "搜索样式")
-  resourceCategory.hidden = false
+  resourceCategory.parentElement!.hidden = false
   resourceCount.textContent = `${keys.length} 个样式`
   resourceUploadButton.hidden = true
   styleAddButton.hidden = true
@@ -452,9 +448,7 @@ export async function renderBdaStyleResourceGallery(galleryCanvas: ReturnType<ty
     }
     const name = document.createElement("strong")
     name.textContent = `STYLE ${key}`
-    const meta = document.createElement("small")
-    meta.textContent = definition.label
-    button.append(previews, name, meta)
+    button.append(previews, name)
     button.addEventListener("click", () => selectGalleryItem(`STYLE${key}`, resourceGallery))
     button.addEventListener("dblclick", () => selectStyleResource(String(key)))
     resourceGallery.append(button)
@@ -486,7 +480,7 @@ export function renderSoundResourceGallery(): void {
   resourceSearch.placeholder = "搜索按键音效"
   resourceSearch.setAttribute("aria-label", "搜索按键音效")
   resourceSearchControl.setAttribute("aria-label", "搜索按键音效")
-  resourceCategory.hidden = true
+  resourceCategory.parentElement!.hidden = true
   resourceCount.textContent = `${entries.length} 个音效文件`
   resourceUploadInput.accept = SOUND_ACCEPT
   resourceUploadButton.hidden = false
@@ -540,7 +534,7 @@ export function renderResourceInspector(): void {
   resourceSearch.placeholder = "搜索图片"
   resourceSearch.setAttribute("aria-label", "搜索图片")
   resourceSearchControl.setAttribute("aria-label", "搜索图片")
-  resourceCategory.hidden = true
+  resourceCategory.parentElement!.hidden = true
   resourceUploadInput.accept = ".png,image/png"
   resourceUploadButton.hidden = false
   resourceUploadButton.title = "上传图片"

@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { constrainedCanvasSize, drawNineSliceImage } from "../src/preview-draw.ts"
 
-// Model the shared scratch canvas: resizing clears it and drawing replaces pixels.
+// Model the shared scratch canvas: resizing or clearing wipes it and drawing replaces pixels.
 function setup() {
   let width = 0
   let height = 0
@@ -12,12 +12,12 @@ function setup() {
     set width(value) { width = value; slices = [] },
     get height() { return height },
     set height(value) { height = value; slices = [] },
-    getContext: () => ({ drawImage: (...args) => slices.push(args) }),
+    getContext: () => ({ drawImage: (...args) => slices.push(args), clearRect: () => { slices = [] } }),
   }
   const frames = []
   const context = {
     drawImage(canvas, ...args) {
-      frames.push({ width: canvas.width, height: canvas.height, slices: [...slices], args })
+      frames.push({ slices: [...slices], args })
     },
   }
   return {

@@ -424,7 +424,9 @@ function showImage(payload: ImagePayload): void {
   image = new Image()
   image.onload = () => {
     if (!image) return
-    fit = Math.min(1200 / image.naturalWidth, 760 / image.naturalHeight, 1)
+    // 默认缩放到图片区域的 80%（高按窗口初始 760 算，窗口高度会跟随画布变化）
+    const area = { width: window.innerWidth, height: 760 - $(".picker-toolbar").offsetHeight }
+    fit = Math.min(area.width * 0.8 / image.naturalWidth, area.height * 0.8 / image.naturalHeight)
     zoom = 1
     drawImage()
     void fitWindowHeight()

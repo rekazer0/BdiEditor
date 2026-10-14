@@ -70,12 +70,13 @@ export function styleConfigDocument(): IniDocument | undefined {
 }
 
 /** 样式类型徽标：样式库、检查器缩略图、样式配置列表共用，保证同一类型处处同一图标与文字。 */
-export function styleKindBadge(kind: StyleKind): HTMLElement {
+export function styleKindBadge(kind: StyleKind, iconOnly = false): HTMLElement {
   const badge = document.createElement("span")
   badge.className = "style-kind-badge"
   badge.dataset.styleKind = kind
   badge.title = `${styleKinds[kind].label}样式`
-  badge.append(createIcon(styleKinds[kind].icon, 11), styleKinds[kind].label)
+  badge.append(createIcon(styleKinds[kind].icon, 11))
+  if (!iconOnly) badge.append(styleKinds[kind].label)
   return badge
 }
 

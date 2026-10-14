@@ -10,14 +10,14 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 0 12px;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
-.picker-heading { min-width: 0; display: grid; gap: 2px; margin-right: auto; }
+.picker-heading { min-width: 0; display: grid; gap: 2px; margin-right: auto; line-height: 1.25; }
 .picker-heading strong, .picker-heading span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.picker-heading strong { font-size: var(--font-size-lg); }
-.picker-heading span { color: var(--secondary); font-size: var(--font-size-xs); }
+.picker-heading strong { font-size: var(--font-size-lg); font-weight: 600; }
+.picker-heading span { color: var(--tertiary); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
 .picker-toolbar button, .picker-toolbar input {
   height: 30px;
   padding: 0 12px;
@@ -32,17 +32,20 @@
 .picker-toolbar .picker-back:not([hidden]) {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 30px;
+  gap: 2px;
+  height: 28px;
   padding: 0 8px 0 4px;
   border-color: transparent;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--secondary);
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
 @media (hover: hover) {
-.picker-toolbar .picker-back:hover { color: inherit; }
+.picker-toolbar .picker-back:hover { background: var(--hover); color: var(--text); }
 }
-.picker-back-icon { width: 12px; height: 12px; }
+.picker-toolbar .picker-back:active { background: var(--hover); }
+.picker-back-icon { display: inline-flex; width: 16px; height: 16px; }
 .picker-toolbar input {
   width: min(260px, 40vw);
   padding-inline: 12px;

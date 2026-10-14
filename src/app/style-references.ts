@@ -267,20 +267,29 @@ export function redrawStyleStateCanvases(): void {
   }
 }
 
-/** 面板宽度变化（选中态切换、窗口缩放）后按新尺寸重绘，避免位图与卡片比例不符。 */
+const resizedStyleStateCanvases = new Set<HTMLCanvasElement>()
+let styleStateResizeTimer: ReturnType<typeof setTimeout> | undefined
+
+/** 面板宽度变化（选中态切换、窗口缩放）后按新尺寸重绘，避免位图与卡片比例不符。
+ *  拖动调宽时每帧都会触发，几百张缩略图逐帧重绘会卡顿，所以等宽度停稳后再统一重绘。 */
 export const styleStateCanvasObserver = new ResizeObserver((entries) => {
   for (const entry of entries) {
-    const canvas = entry.target
-    if (!(canvas instanceof HTMLCanvasElement)) continue
-    // 被重建替换掉的画布不再需要重绘，及时解绑，避免观察器长期持有已分离的位图。
-    if (!canvas.isConnected) {
-      styleStateCanvasObserver.unobserve(canvas)
-      styleStateVisuals.delete(canvas)
-      styleStateCanvasSizes.delete(canvas)
-      continue
-    }
-    sizeStyleStateCanvas(canvas)
+    if (entry.target instanceof HTMLCanvasElement) resizedStyleStateCanvases.add(entry.target)
   }
+  clearTimeout(styleStateResizeTimer)
+  styleStateResizeTimer = setTimeout(() => {
+    for (const canvas of resizedStyleStateCanvases) {
+      // 被重建替换掉的画布不再需要重绘，及时解绑，避免观察器长期持有已分离的位图。
+      if (!canvas.isConnected) {
+        styleStateCanvasObserver.unobserve(canvas)
+        styleStateVisuals.delete(canvas)
+        styleStateCanvasSizes.delete(canvas)
+        continue
+      }
+      sizeStyleStateCanvas(canvas)
+    }
+    resizedStyleStateCanvases.clear()
+  }, 120)
 })
 
 export function styleWriteTarget(

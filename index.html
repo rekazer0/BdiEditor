@@ -51,7 +51,7 @@
             <button type="button" role="menuitem" data-export-format="bda" data-bda-platform="android" disabled><span class="system-symbol" data-icon="file-down" aria-hidden="true"></span><span>导出新版 Android 皮肤 (.bda)</span></button>
             <button type="button" role="menuitem" data-export-format="sxi" disabled><span class="system-symbol" data-icon="flask-conical" aria-hidden="true"></span><span>导出手心皮肤 (.sxi)</span><span class="ui-badge" data-variant="accent">实验</span></button>
             <span class="toolbar-menu-separator" role="separator"></span>
-            <span class="toolbar-menu-label">工具 · 编辑模式可用</span>
+            <span class="toolbar-menu-label">工具</span>
             <button id="panel-scale" type="button" role="menuitem" disabled><span class="system-symbol" data-icon="arrow-left-right" aria-hidden="true"></span><span>面板复制…</span></button>
             <button id="replace-layout-image" type="button" role="menuitem" disabled><span class="system-symbol" data-icon="image-down" aria-hidden="true"></span><span>替换键盘样式…</span></button>
             <button id="adapt-ios26" type="button" role="menuitem" disabled><span class="system-symbol" data-icon="smartphone" aria-hidden="true"></span><span>适配 iOS 26 透明背景…</span></button>
@@ -357,7 +357,7 @@
             <button data-layout-action="vertical-gap" title="垂直等间距" aria-label="垂直等间距"><span class="system-symbol" data-icon="fold-vertical" aria-hidden="true"></span></button>
           </div>
         </div>
-        <div class="preview-zoom-control" aria-label="画布缩放">
+        <div class="preview-zoom-control glass-module" aria-label="画布缩放">
           <button id="preview-zoom-out" type="button" aria-label="缩小画布" title="缩小" data-icon="minus" data-icon-size="16"></button>
           <button id="preview-zoom-fit" type="button" aria-label="适配窗口，画布已锁定，双击解锁" title="画布已锁定（双击解锁）" aria-pressed="true" data-icon="scan" data-icon-size="16"></button>
           <button id="preview-zoom-in" type="button" aria-label="放大画布" title="放大" data-icon="plus" data-icon-size="16"></button>
@@ -532,12 +532,8 @@
               <strong id="resource-list-title">皮肤图片</strong>
               <span id="resource-count"></span>
               <div class="resource-filters">
-                <select id="resource-category" hidden aria-label="样式分类">
-                  <option value="all">全部样式</option>
-                  <option value="sound">声音样式</option>
-                  <option value="visual">视觉样式</option>
-                </select>
-                <label class="search-control" aria-label="搜索图片"><span class="system-symbol" data-icon="search" aria-hidden="true"></span><input id="resource-search" type="search" results="0" placeholder="搜索图片"></label>
+                <span class="ui-input ui-select" hidden><select id="resource-category" aria-label="样式分类"></select></span>
+                <label class="ui-input" aria-label="搜索图片"><span class="ui-input-affix" data-icon="search" aria-hidden="true"></span><input id="resource-search" type="text" role="searchbox" enterkeyhint="search" placeholder="搜索图片" autocomplete="off" spellcheck="false"></label>
               </div>
               <div class="resource-actions">
                 <button id="style-add" class="toolbar-button" type="button" title="新增样式" aria-label="新增样式" hidden><span class="icon system-symbol" data-icon="plus" aria-hidden="true"></span></button>
