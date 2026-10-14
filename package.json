@@ -25,6 +25,7 @@
     "@codemirror/view": "^6.43.9",
     "@earendil-works/pi-agent-core": "^0.84.4",
     "@earendil-works/pi-ai": "^0.84.4",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@lezer/highlight": "^1.2.3",
     "@tauri-apps/api": "^2.8.0",
     "@tauri-apps/plugin-dialog": "^2.4.0",

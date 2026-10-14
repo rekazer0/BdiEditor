@@ -152,14 +152,6 @@ canvas {
 }
 
 /* ===================== 原 style.css ===================== */
-@font-face {
-  font-family: "Source JetBrains Mono";
-  src: url("/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-
 ::-webkit-scrollbar {
   width: var(--_scrollbar-size);
   height: var(--_scrollbar-size);
@@ -3533,7 +3525,7 @@ body:has(.canvas-wrap.empty) .workspace {
   position: relative;
   font-size: var(--source-font-size, var(--font-size-xs));
   line-height: 1.6;
-  font-family: "Source JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
 }
 
 #source .cm-editor {
