@@ -52,10 +52,10 @@ export const styleKinds: Record<StyleKind, { label: string; icon: string }> = {
   empty: { label: "空", icon: "square-dashed" },
 }
 
-/** 按样式内容判定类型：有图即图片样式，其次动画、颜色、声音，只剩文字属性的归为文字样式。 */
+/** 按样式内容判定类型：有图即图片样式，其次动画、颜色、声音，只剩文字属性的归为文字样式；INFO 只是备注，不算属性。 */
 export function styleKind(styleID: string, styles = styleConfigDocument()): StyleKind {
   if (appState.archive?.format === "bda") return bdaStyleRef(styleID)?.type ?? "empty"
-  const keys = new Set(styles?.entries(`STYLE${styleID}`).filter((entry) => entry.value.trim()).map((entry) => entry.key) ?? [])
+  const keys = new Set(styles?.entries(`STYLE${styleID}`).filter((entry) => entry.key !== "INFO" && entry.value.trim()).map((entry) => entry.key) ?? [])
   const has = (pattern: RegExp) => [...keys].some((key) => pattern.test(key))
   if (has(/^(?:NM|HL)_IMG$/)) return "image"
   if (has(/ANIM|^EVENT\d+$/)) return "anim"
