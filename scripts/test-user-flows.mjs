@@ -584,7 +584,7 @@ await check("file: rename, save, export every format and unsaved prompt", () => 
     }
     return names
   }
-  assert.deepEqual(await exportAll(), ["bdi", "bds", "sxi"])
+  assert.deepEqual(await exportAll(), ["bdi", "bds", "sxi", "ssf"])
   // Edit, then try to start a new skin: the unsaved prompt appears.
   await editMode(page)
   await selectKey(page)
@@ -627,7 +627,27 @@ await check("file: a BDA skin exports to every format", () => withPage(async (pa
     formats.push((await pending).suggestedFilename().split(".").pop())
     await closeOperationDialog(page)
   }
-  assert.deepEqual(formats, ["bdi", "bds", "bda", "bda", "sxi"])
+  assert.deepEqual(formats, ["bdi", "bds", "bda", "bda", "sxi", "ssf"])
+}))
+
+await check("file: a Sogou .ssf opens as the chosen Baidu format", () => withPage(async (page) => {
+  const { ssfFixture } = await import("../tests/helpers/ssf-fixture.mjs")
+  for (const format of ["bds", "bda"]) {
+    await page.locator("#browser-open").setInputFiles({ name: "搜狗测试.ssf", mimeType: "application/octet-stream", buffer: Buffer.from(ssfFixture()) })
+    const dialog = page.locator("#ssf-import-dialog")
+    await dialog.waitFor({ state: "visible" })
+    await dialog.locator(`input[value="${format}"]`).check()
+    await dialog.getByRole("button", { name: "导入", exact: true }).click()
+    await page.waitForFunction((suffix) => document.querySelector("#document-name")?.textContent === `搜狗测试.${suffix}`, format, { timeout: 60000 })
+    await page.waitForSelector(".canvas-wrap:not(.empty)")
+    await closeOperationDialog(page)
+    await page.waitForFunction(() => !document.querySelector("#open")?.disabled)
+  }
+  // Backing out of the format dialog keeps the current skin.
+  await page.locator("#browser-open").setInputFiles({ name: "另一个.ssf", mimeType: "application/octet-stream", buffer: Buffer.from(ssfFixture()) })
+  await page.locator("#ssf-import-dialog").getByRole("button", { name: "取消", exact: true }).click()
+  await page.waitForFunction(() => !document.querySelector("#open")?.disabled)
+  assert.equal(await page.locator("#document-name").textContent(), "搜狗测试.bda")
 }))
 
 /* ------------------------------------------------------------------------------------------------

@@ -181,6 +181,14 @@ function bgSectionName(section: string, layout: string): string {
   return `${prefix}${section.replace(/^Key_/, "")}`
 }
 
+const MAIN_LAYOUTS = ["py_26", "py_9", "en_26", "en_9", "num_26", "num_9", "bh"]
+
+function layoutRank(path: string): number {
+  const main = MAIN_LAYOUTS.indexOf(path.split("/").pop()!.replace(/\.ini$/i, ""))
+  if (main >= 0) return main
+  return ssfBoard(path) === "other" ? MAIN_LAYOUTS.length + 1 : MAIN_LAYOUTS.length
+}
+
 /** Collects, per Sogou key class, the first Baidu key that reaches it. */
 function sampleKeys(archive: SkinArchive, theme: Theme, warnings: string[]): Map<string, KeySample & { layout: string }> {
   const samples = new Map<string, KeySample & { layout: string }>()
@@ -188,8 +196,9 @@ function sampleKeys(archive: SkinArchive, theme: Theme, warnings: string[]): Map
     const styles = new BaiduStyles(archive, theme, orientation, warnings)
     const prefix = `${theme}/skin/${orientation}/`
     const layouts = archive.names().filter((path) => path.startsWith(prefix) && /^[^/]+\.ini$/.test(path.slice(prefix.length)) && !path.endsWith("/gen.ini"))
-    // The boards Sogou styles per class come first so they, not symbol pages, define shared classes.
-    layouts.sort((a, b) => Number(ssfBoard(a) === "other") - Number(ssfBoard(b) === "other") || a.localeCompare(b))
+    // Several boards share a Sogou class (`Key_Q`, `Key_Space`): the main pinyin boards decide it,
+    // then the other boards Sogou styles per class, and symbol pages last.
+    layouts.sort((a, b) => layoutRank(a) - layoutRank(b) || a.localeCompare(b))
     for (const path of layouts) {
       const layout = path.slice(prefix.length, -4)
       const document = IniDocument.parse(archive.getText(path))
