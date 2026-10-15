@@ -34,7 +34,9 @@ export function decodeAiffPcm(bytes: Uint8Array): DecodedSound {
   let float = false
   let soundOffset = -1
   let soundLength = 0
-  for (let offset = 12; offset + 8 <= bytes.length;) {
+  // Watermark tools append data (e.g. a "JSONMETA" block) after the FORM; stop at the declared end.
+  const formEnd = Math.min(bytes.length, 8 + view.getUint32(4))
+  for (let offset = 12; offset + 8 <= formEnd;) {
     const id = text(offset, 4)
     const size = view.getUint32(offset + 4)
     const start = offset + 8

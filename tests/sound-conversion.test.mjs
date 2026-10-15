@@ -239,3 +239,17 @@ test('panel show/hide sounds are adapted like key press sounds', async () => {
   assert.equal(strFromU8(files['res/default.css']), '[STYLE1]\nPRESS_SOUND_PATH=tap.ogg\nPANEL_SHOW_SOUND_PATH=show.ogg\nPANEL_HIDE_SOUND_PATH=tap.ogg\n')
   assert.deepEqual(files['res/show.ogg'], ogg)
 })
+
+// 时光气囊 ships enter.aiff with a GuShao "JSONMETA{...}" watermark appended after the FORM chunk.
+test('AIFF with data appended after the FORM chunk still converts', async () => {
+  const watermarked = new Uint8Array([...aiff(), ...strToU8('JSONMETA\u0000\u0000\u0000\u0010{"marker":"x"}')])
+  assert.equal(decodeAiffPcm(watermarked).samplesDecoded, 32)
+  const warnings = []
+  const files = unzipSync(await SkinArchive.open(zipSync({
+    'skin/port/py_9.ini': strToU8('[PANEL]\nSOUND_STYLE=1\n'),
+    'skin/res/default.css': strToU8('[STYLE1]\nPRESS_SOUND_PATH=enter.aiff\n'),
+    'skin/res/enter.aiff': watermarked,
+  }), 'bdi').toBytesAsync('bds', warnings))
+  assert.deepEqual(warnings, [])
+  assert.ok(isOgg(files['res/enter.ogg']))
+})
