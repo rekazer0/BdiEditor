@@ -148,7 +148,10 @@ function bindFilter(root: HTMLElement): void {
     }
   })
   input.addEventListener("blur", () => { if (!input.value) setFilterOpen(false) })
-  root.querySelector(".inspector-filter-open")?.addEventListener("click", () => setFilterOpen(true))
+  const openButton = root.querySelector(".inspector-filter-open")
+  // 按下时不让输入框失焦，否则空输入会先因 blur 收起、再被 click 重新打开。
+  openButton?.addEventListener("pointerdown", (event) => event.preventDefault())
+  openButton?.addEventListener("click", () => setFilterOpen(!root.hasAttribute("data-filter-open")))
   root.querySelector(".inspector-filter-close")?.addEventListener("pointerdown", (event) => {
     // 先于输入框失焦处理，避免按钮在点击前被收起。
     event.preventDefault()
