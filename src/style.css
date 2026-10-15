@@ -2310,16 +2310,6 @@ body:has(.canvas-wrap.empty) .workspace {
   grid-template-columns: 1fr 1fr;
 }
 
-/* Keep the compact inspector variant aligned with the larger music card. */
-
-.style-reference-input.sound-style-reference > .sound-style-main > input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
 .style-picker-dialog {
   width: min(920px, calc(100vw - 40px));
   height: min(720px, calc(100vh - 40px));

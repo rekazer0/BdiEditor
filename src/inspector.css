@@ -297,25 +297,30 @@
   line-height: 18px;
 }
 
-/* —— 音效引用 —— */
-.source .sound-style-reference { gap: var(--space-xs); }
-.source .sound-style-main { display: flex; flex: 1; align-items: center; gap: var(--space-sm); min-width: 0; height: 40px; padding: 0 var(--space-md); border: 1px solid var(--line); border-radius: var(--radius-lg); color: var(--secondary); transition: background-color var(--duration-fast) var(--ease-standard); }
-.source .sound-style-main:not(.has-sound) { justify-content: center; gap: var(--space-xs); }
+/* —— 音效引用：和样式卡片同一种外框；左侧图标块，中间文件名 + 编号，右侧「更换」。
+   整条点击试听，没有音效时整条就是「选择音效」。 —— */
+.source .sound-style-reference { gap: var(--space-2xs); padding: var(--space-2xs); border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--material-content); }
+.source .sound-style-main { display: flex; flex: 1; align-items: center; gap: var(--space-sm); min-width: 0; padding: var(--space-xs); border-radius: var(--radius-md); color: var(--secondary); transition: background-color var(--duration-fast) var(--ease-standard); }
+.source .sound-style-main:not(.has-sound) { justify-content: center; gap: var(--space-xs); color: var(--tertiary); }
+.source .sound-style-main:not(.has-sound) > .sound-style-icon { width: auto; height: auto; background: none; }
 .source .sound-style-main:not(.has-sound) > .sound-style-main-meta { flex: none; }
 @media (hover: hover) { .source .sound-style-main:hover { background: var(--hover); } }
+.source .sound-style-main:active { background: color-mix(in srgb, var(--text) 10%, transparent); }
 .source .sound-style-main:focus-visible { outline: 0; box-shadow: var(--focus-ring); }
 .source #quick-inspector[data-readonly="true"] .sound-style-main:not(.has-sound) { pointer-events: none; }
+.source .sound-style-icon { display: grid; place-items: center; flex: none; width: var(--control-height-md); height: var(--control-height-md); border-radius: var(--radius-sm); background: var(--content); }
 .source .sound-style-main-meta { display: grid; flex: 1; min-width: 0; }
 .source :is(.sound-style-name, .sound-style-file) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.source .sound-style-name { font-weight: var(--font-weight-regular); }
-.source .has-sound .sound-style-name { color: var(--text); font-weight: var(--font-weight-medium); }
+.source .sound-style-name { font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+.source .has-sound .sound-style-name { color: var(--text); font-family: var(--font-mono); }
 .source .sound-style-file { color: var(--tertiary); font-size: var(--font-size-xs); }
 .source .sound-style-file:empty { display: none; }
 .source .sound-style-value { display: none; }
-.source :is(.inspector-sound-play, .sound-style-trigger) {
+.source .sound-style-trigger {
   display: grid;
   place-items: center;
   flex: none;
+  align-self: center;
   width: var(--control-height-md);
   height: var(--control-height-md);
   padding: 0;
@@ -324,9 +329,8 @@
   background: none;
   color: var(--secondary);
 }
-.source .sound-style-trigger { flex: none; }
-@media (hover: hover) { .source :is(.inspector-sound-play, .sound-style-trigger):hover:not(:disabled) { background: var(--hover); color: var(--text); } }
-.source :is(.inspector-sound-play, .sound-style-trigger)[hidden] { display: none; }
+@media (hover: hover) { .source .sound-style-trigger:hover:not(:disabled) { background: var(--hover); color: var(--text); } }
+.source .sound-style-trigger[hidden] { display: none; }
 
 .source #font-file-field[hidden] { display: none; }
 

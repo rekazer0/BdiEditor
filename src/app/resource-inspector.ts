@@ -503,7 +503,7 @@ export function renderSoundResourceGallery(): void {
     const name = document.createElement("strong")
     name.textContent = entry.label
     const meta = document.createElement("small")
-    meta.textContent = `${entry.filename} · ${entry.usage}`
+    meta.textContent = entry.usage
     button.append(icon, name, meta)
     button.addEventListener("click", () => {
       appState.selectedSoundID = entry.id

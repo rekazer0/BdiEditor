@@ -51,8 +51,9 @@ export function decorateStyleReferenceInput(input: HTMLInputElement, key = style
     soundMain.className = "sound-style-main"
     soundMain.setAttribute("role", "button")
     soundMain.tabIndex = 0
-    const musicIcon = createIcon("volume-2", 14)
-    musicIcon.classList.add("sound-style-main-icon")
+    const musicIcon = document.createElement("span")
+    musicIcon.className = "sound-style-icon"
+    musicIcon.append(createIcon("volume-2", 14))
     const soundMeta = document.createElement("span")
     soundMeta.className = "sound-style-main-meta"
     const soundTitle = document.createElement("strong")
@@ -64,26 +65,17 @@ export function decorateStyleReferenceInput(input: HTMLInputElement, key = style
     input.tabIndex = -1
     input.setAttribute("aria-hidden", "true")
     soundMain.append(musicIcon, soundMeta, input)
-    const playCurrent = () => {
-      const path = soundPathForStyle(input.value.split(",")[0]?.trim() ?? "")
-      if (path) playSoundPath(path)
-    }
     // 没有音效时整条就是「选择音效」按钮，有音效时点击试听。
     const activate = () => {
-      if (soundPathForStyle(input.value.split(",")[0]?.trim() ?? "")) playCurrent()
+      const path = soundPathForStyle(input.value.split(",")[0]?.trim() ?? "")
+      if (path) playSoundPath(path)
       else openStylePicker(input)
     }
     soundMain.addEventListener("click", activate)
     soundMain.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") { event.preventDefault(); activate() }
     })
-    const play = document.createElement("button")
-    play.type = "button"
-    play.className = "inspector-sound-play"
-    play.setAttribute("aria-label", "播放按键音效")
-    play.append(createIcon("play", 12))
-    play.addEventListener("click", playCurrent)
-    wrapper.append(soundMain, play)
+    wrapper.append(soundMain)
   } else {
     wrapper.append(input)
   }
@@ -208,11 +200,10 @@ export async function refreshStyleReferenceThumbnail(
     const title = main?.querySelector<HTMLElement>(".sound-style-name")
     const file = main?.querySelector<HTMLElement>(".sound-style-file")
     if (title) title.textContent = path?.split("/").pop() || "选择音效"
-    if (file) file.textContent = path ? `STYLE${styleID} · 点击试听` : ""
-    const play = button.parentElement?.querySelector<HTMLButtonElement>(".inspector-sound-play")
-    if (play) play.hidden = !path
+    if (file) file.textContent = path ? `STYLE${styleID}` : ""
     if (main) {
       main.classList.toggle("has-sound", Boolean(path))
+      main.title = path ? "点击试听" : ""
       main.setAttribute("aria-label", path ? "播放按键音效" : "选择音效")
     }
     button.hidden = !path
