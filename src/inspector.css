@@ -82,9 +82,9 @@
 .source .inspector-rail > .inspector-filter-open { flex: none; width: 100%; }
 .source #mobile-inspector-groups {
   display: grid;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
   width: 100%;
-  padding-top: var(--space-xs);
+  padding-top: var(--space-sm);
   border-top: 1px solid var(--line-soft);
 }
 .source #mobile-inspector-groups[hidden] { display: none; }
@@ -227,8 +227,7 @@
 
 /* —— 成对 / 四格数值 —— */
 .source .particle-range-inputs { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: center; gap: var(--space-xs); }
-.source .document-switch-control { display: flex; align-items: center; gap: var(--space-sm); }
-.source .document-switch-state { color: var(--tertiary); font-size: var(--font-size-xs); }
+.source .document-switch-control { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-sm); }
 
 /* —— 颜色：色块 + 色值 + 透明度 —— */
 .source .color-control { padding-left: var(--space-xs); }

@@ -426,14 +426,8 @@ export function populateDocumentInspector(): void {
       input.setAttribute("aria-label", translatedConfigLabel(entry.key))
       const control = document.createElement("span")
       control.className = "document-switch-control"
-      const state = document.createElement("span")
-      state.className = "document-switch-state"
-      state.textContent = input.checked ? "开启" : "关闭"
-      input.addEventListener("change", () => {
-        state.textContent = input.checked ? "开启" : "关闭"
-        update(entry.section, entry.key, input.checked ? "1" : "0")
-      })
-      control.append(input, state)
+      input.addEventListener("change", () => update(entry.section, entry.key, input.checked ? "1" : "0"))
+      control.append(input)
       label.classList.add("document-switch-field")
       label.append(control)
       return label
