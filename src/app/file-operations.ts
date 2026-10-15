@@ -382,13 +382,19 @@ export async function runFileOperation(
   }
 }
 
+let shownImageBytes: Uint8Array | undefined
+
 export function showImage(path: string): void {
   const bytes = appState.archive?.getBytes(path)
   if (!bytes) return
-  appState.assetURL = replaceImagePreviewURL(appState.assetURL, bytes)
-  clearImagePreviewError()
-  workspaceImage.src = appState.assetURL
-  assetImage.src = appState.assetURL
+  // 同一份字节不换 URL：重新解码期间切片画布会空白一帧。
+  if (bytes !== shownImageBytes || !appState.assetURL) {
+    shownImageBytes = bytes
+    appState.assetURL = replaceImagePreviewURL(appState.assetURL, bytes)
+    clearImagePreviewError()
+    workspaceImage.src = appState.assetURL
+    assetImage.src = appState.assetURL
+  }
   deviceShell.hidden = true
   workspaceImageFigure.hidden = false
   sourceEditor.hidden = true

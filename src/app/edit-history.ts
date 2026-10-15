@@ -144,14 +144,15 @@ export function refreshHistorySelection(): void {
   const index = appState.selectedTileIndex
   const resourceMode = appState.resourceConfigActive ? appState.resourceInspectorMode : "document"
   renderFiles()
-  if (appState.selectedPath && (appState.archive?.getBytes(appState.selectedPath) || isBdaAppearancePartPath(appState.selectedPath))) {
+  if (resourceMode === "image" && appState.archive?.isImage(path)) {
+    // 切片界面原地刷新：经 selectFile 会先切到第一张图再切回来，画布在两张图之间闪一下。
+    renderResourceInspector()
+    selectResourceImage(path)
+    appState.selectedTileIndex = appState.slices.some(slice => slice.index === index) ? index : undefined
+    populateTileInspector()
+    drawAtlas()
+  } else if (appState.selectedPath && (appState.archive?.getBytes(appState.selectedPath) || isBdaAppearancePartPath(appState.selectedPath))) {
     selectFile(appState.selectedPath, appState.sidebarView, resourceMode)
-    if (resourceMode === "image" && appState.archive?.isImage(path)) {
-      selectResourceImage(path)
-      appState.selectedTileIndex = appState.slices.some(slice => slice.index === index) ? index : undefined
-      populateTileInspector()
-      drawAtlas()
-    }
   }
   updateHistoryButtons()
 }
