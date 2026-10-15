@@ -133,6 +133,9 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: android-actions/setup-android@v3
+        with:
+          # The default also installs the legacy `tools` package, which the SDK repository no longer serves.
+          packages: platform-tools
       - name: Install Android NDK
         run: sdkmanager "ndk;$NDK_VERSION"
       - uses: dtolnay/rust-toolchain@stable
