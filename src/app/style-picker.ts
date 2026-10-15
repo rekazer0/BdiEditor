@@ -487,7 +487,9 @@ export const styleReferenceThumbnailInputs = new WeakMap<HTMLElement, { archive:
 export function refreshStyleReferenceThumbnails(): void {
   let resolver: VisualResolver | undefined
   for (const button of Array.from(document.querySelectorAll<HTMLElement>(".style-picker-trigger"))) {
-    const input = button.previousElementSibling
+    // 音效行的值藏在前面的卡片里；BDA 样式行前面不是输入框，它的缩略图另有绘制路径，这里跳过。
+    const previous = button.previousElementSibling
+    const input = previous?.classList.contains("sound-style-main") ? previous.querySelector("input") : previous
     if (!(input instanceof HTMLInputElement)) continue
     const key = styleReferenceKey(input)
     if (appState.archive) {
