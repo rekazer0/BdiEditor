@@ -132,6 +132,11 @@ export function wireFilesAndSettings(): void {
     renderRecentFiles()
   })
   $("#welcome-recent-open")?.addEventListener("click", () => openButton.click())
+  // 回到启动页但不关闭当前皮肤；在启动页打开别的皮肤时仍会先询问保存。
+  $("#recent-files")?.addEventListener("click", () => {
+    canvasWrap.classList.add("empty")
+    renderRecentFiles()
+  })
   renderRecentFiles()
   void hydrateTemplateCardPreviews(document.querySelector(".template-grid")!, { lazy: true })
   // 欢迎页模板卡：直接以该模板新建，不再弹选择器

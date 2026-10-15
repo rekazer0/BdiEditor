@@ -53,6 +53,11 @@ export function formatRecentTime(at: number): string {
 
 export function openRecentFile(item: RecentFile): void {
   if (appState.fileOperationRunning) return
+  // 从菜单回到启动页后再点当前皮肤，直接回到编辑，不重新读盘、不丢未保存修改。
+  if (appState.archive && !appState.unsavedNew && item.path === appState.currentPath) {
+    canvasWrap.classList.remove("empty")
+    return
+  }
   void runFileOperation("打开", async () => {
     if (!(await prepareDocumentReplacement())) return false
     if (!item.source || !sourceDirectoryEnabledBySettings()) return loadNativePath(item.path)

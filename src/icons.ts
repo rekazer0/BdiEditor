@@ -17,7 +17,7 @@ import {
   HardDrive, Smartphone, Crosshair, Moon, Sun, RectangleHorizontal, RectangleVertical, Scissors, ClipboardPaste,
   Undo2, Redo2, RotateCw, Share, Menu, Eye, EyeOff, Wifi, Signal, BatteryFull, Lightbulb, SlidersHorizontal,
   Paperclip, Sparkles, VolumeX, Check, ChevronsUpDown, CodeXml, FileDown, Minus, Scan, Paintbrush,
-  CircleAlert, FolderInput, Grid2x2, Maximize, Pointer, Timer, Frame, LayoutPanelTop, FlaskConical,
+  CircleAlert, FolderInput, Grid2x2, Maximize, Pointer, Timer, Frame, LayoutPanelTop, FlaskConical, History,
 } from "lucide"
 
 // Exact Lucide names from 属性检查器.pen, read through Pen MCP.
@@ -55,7 +55,7 @@ const icons: Record<string, IconNode> = {
   "panel-bottom": PanelBottom, "square-dashed-bottom": SquareDashedBottom,
   "layout-dashboard": LayoutDashboard, "columns-3": Columns3, "table-2": Table2, box: Box,
   // 源文件树
-  folder: Folder, file: File, "flask-conical": FlaskConical,
+  folder: Folder, file: File, "flask-conical": FlaskConical, history: History,
   // 工具栏、菜单与状态
   "hard-drive": HardDrive, smartphone: Smartphone, crosshair: Crosshair, moon: Moon, sun: Sun,
   "rectangle-horizontal": RectangleHorizontal, "rectangle-vertical": RectangleVertical, scissors: Scissors,
