@@ -73,6 +73,28 @@ test('falls back to local file headers when the central directory is unusable', 
   assert.equal(archive.getText('light/skin/port/gen.ini'), '[PANEL]\nSIZE=480,320')
 })
 
+// The 塔塔 BDI packer flags every entry "encrypted + data descriptor" (9) yet writes no descriptor;
+// fflate's streaming Unzip then dropped the last 12 bytes of each file and the key sounds broke.
+function flagMissingDataDescriptors(bytes) {
+  const view = dataView(bytes)
+  for (let offset = 0; offset + 46 <= bytes.length; offset++) {
+    const signature = view.getUint32(offset, true)
+    if (signature === LOCAL_SIGNATURE) view.setUint16(offset + 6, 9, true)
+    if (signature === CENTRAL_SIGNATURE) view.setUint16(offset + 8, 9, true)
+  }
+}
+
+test('keeps whole files when entries claim a data descriptor that is not there', async () => {
+  for (const breakCentral of [false, true]) {
+    const bytes = sampleArchive()
+    flagMissingDataDescriptors(bytes)
+    if (breakCentral) breakCentralMethods(bytes)
+    const archive = await SkinArchive.openAsync(bytes, undefined, () => {})
+    assert.equal(archive.getText('light/skin/port/py_9.ini'), '[PANEL]\nSIZE=480,320')
+    assert.equal(archive.getText('light/skin/port/res/default.css'), '[GLOBAL]\n')
+  }
+})
+
 test('opens an archive without any entries', async () => {
   const archive = await SkinArchive.openAsync(zipSync({}))
   assert.deepEqual(archive.names(), [])

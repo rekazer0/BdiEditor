@@ -226,3 +226,16 @@ test('Info.txt with any filename case is renamed and retargeted on BDI ⇄ BDS c
   assert.deepEqual(Object.keys(bdi).filter((path) => /info\.txt$/i.test(path)), ['skin/Info.txt'])
   assert.equal(strFromU8(bdi['skin/Info.txt']), 'Name=x\nSupportPlatform=I\n')
 })
+
+test('panel show/hide sounds are adapted like key press sounds', async () => {
+  const archive = SkinArchive.open(zipSync({
+    'skin/port/py_9.ini': strToU8('[PANEL]\nSOUND_STYLE=1\n'),
+    'skin/res/default.css': strToU8('[STYLE1]\nPRESS_SOUND_PATH=tap.aiff\nPANEL_SHOW_SOUND_PATH=show.aiff\nPANEL_HIDE_SOUND_PATH=tap.aiff\n'),
+    'skin/res/tap.aiff': aiff(),
+    'skin/res/show.aiff': aiff(),
+    'skin/res/show.ogg': ogg,
+  }), 'bdi')
+  const files = unzipSync(await archive.toBytesAsync('bds'))
+  assert.equal(strFromU8(files['res/default.css']), '[STYLE1]\nPRESS_SOUND_PATH=tap.ogg\nPANEL_SHOW_SOUND_PATH=show.ogg\nPANEL_HIDE_SOUND_PATH=tap.ogg\n')
+  assert.deepEqual(files['res/show.ogg'], ogg)
+})

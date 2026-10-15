@@ -232,7 +232,7 @@ function soundNeedsTranscode(path: string, format: "bdi" | "bds"): boolean {
 }
 
 /**
- * Rewrites every PRESS_SOUND_PATH in each theme's default.css (light and dark each have their own)
+ * Rewrites every PRESS/PANEL_SHOW/PANEL_HIDE_SOUND_PATH in each theme's default.css (light and dark each have their own)
  * that names a format the target platform does not play: Ogg → AIFF for BDI, AIFF/CAF → Ogg for BDS.
  * A same-named file in the target format next to that css is used as is; otherwise the referenced
  * file is transcoded. Original files are kept, matching official packages that bundle both formats.
@@ -292,7 +292,7 @@ export async function adaptPackageSounds(
     const directories = [...new Set([directory, directory.replace(/(?:land|port)\/res\/$/, "res/")])]
     let next = ""
     let last = 0
-    for (const match of text.matchAll(/^(\s*PRESS_SOUND_PATH\s*=\s*)(.*?)(\s*)$/gim)) {
+    for (const match of text.matchAll(/^(\s*(?:PRESS|PANEL_SHOW|PANEL_HIDE)_SOUND_PATH\s*=\s*)(.*?)(\s*)$/gim)) {
       const value = match[2].trim()
       const filename = value.split(/[\\/]/).pop() ?? ""
       if (!soundNeedsTranscode(filename, format)) continue

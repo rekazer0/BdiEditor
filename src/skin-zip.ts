@@ -188,10 +188,37 @@ export function normalizeEntryCounts(bytes: Uint8Array): Uint8Array {
   return normalized
 }
 
+/**
+ * 部分“加密”打包工具会给每个条目都打上“数据描述符”标志（bit 3），实际却把大小写在本地文件头里、
+ * 数据后面也没有描述符。fflate 的流式 Unzip 看到这个标志就忽略头里的大小，把下一个文件头前的
+ * 12 字节当描述符吃掉，每个文件都少了结尾 12 字节（音效因此损坏、转换后没声音）。
+ * 这里顺序扫本地文件头，只给“数据后面紧跟下一个 PK 头”的条目清掉这个标志，返回修正后的副本。
+ */
+function clearMissingDataDescriptorFlags(bytes: Uint8Array): Uint8Array {
+  const data = view(bytes)
+  const repairs: number[] = []
+  let offset = 0
+  while (offset + 30 <= bytes.length && data.getUint32(offset, true) === LOCAL_SIGNATURE) {
+    const compressedSize = data.getUint32(offset + 18, true)
+    const end = offset + 30 + data.getUint16(offset + 26, true) + data.getUint16(offset + 28, true) + compressedSize
+    if (end + 4 > bytes.length) break
+    const next = data.getUint32(end, true)
+    if (next !== LOCAL_SIGNATURE && next !== CENTRAL_SIGNATURE) break
+    if (data.getUint16(offset + 6, true) & 8 && compressedSize) repairs.push(offset + 6)
+    offset = end
+  }
+  if (!repairs.length) return bytes
+  const repaired = bytes.slice()
+  const repairedView = view(repaired)
+  for (const flagOffset of repairs) repairedView.setUint16(flagOffset, repairedView.getUint16(flagOffset, true) & ~8, true)
+  return repaired
+}
+
 export async function unzipWithProgress(
-  bytes: Uint8Array,
+  input: Uint8Array,
   onProgress?: (value: number) => void,
 ): Promise<Record<string, Uint8Array>> {
+  const bytes = clearMissingDataDescriptorFlags(input)
   const expected = view(bytes).getUint16(findEnd(bytes) + 10, true)
   const files: Record<string, Uint8Array> = {}
   let discovered = 0
