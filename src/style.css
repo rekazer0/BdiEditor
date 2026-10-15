@@ -8846,7 +8846,7 @@ main {
     min-height: 44px;
     padding: 0 12px;
     display: grid;
-    grid-template-columns: 20px minmax(0, 1fr);
+    grid-template-columns: 20px minmax(0, 1fr) auto;
     align-items: center;
     gap: 12px;
     border-radius: var(--radius-md);

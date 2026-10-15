@@ -53,7 +53,10 @@ test("sections are always expanded; edits can be reset from the rail", () => {
 })
 
 test("the right rail: filter on top, groups with icon and label, edits count and reset at the bottom", () => {
-  const rail = pane.slice(pane.indexOf('<aside class="inspector-rail"'), pane.indexOf("</aside>"))
+  // Not <aside>: the sidebar's global `aside` rules would slide the rail off-screen on phones.
+  const start = pane.indexOf('<div class="inspector-rail"')
+  assert.ok(start >= 0, "分类栏不能用 <aside>")
+  const rail = pane.slice(start, pane.indexOf("</nav>", start))
   assert.ok(rail.indexOf("inspector-filter-open") < rail.indexOf('<nav id="mobile-inspector-groups"'), "筛选在分组之上")
   assert.match(pane, /id="inspector-filter"[^>]*aria-label="筛选属性"/)
   const css = read("src/inspector.css")
