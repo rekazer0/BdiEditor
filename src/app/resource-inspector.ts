@@ -215,8 +215,8 @@ export async function renderStyleResourceDetail(): Promise<void> {
       alpha.setAttribute("aria-label", `${key} 透明度`)
       alpha.disabled = !isEditing()
       const colorControl = document.createElement("span")
-      colorControl.className = "color-control"
-      colorControl.append(textInput, picker, alpha)
+      colorControl.className = "color-control ui-input ui-color"
+      colorControl.append(picker, textInput, alpha)
       bindStyleDetailColor(textInput, picker, alpha)
       textInput.addEventListener("change", () => updateField(textInput.value))
       row.append(colorControl)
