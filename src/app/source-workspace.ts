@@ -259,7 +259,7 @@ export function setSourceDirectoryState(path: string, custom: boolean, error = "
   sourceDirectory.closest("label")?.setAttribute("data-invalid", String(Boolean(error)))
   sourceDirectoryStatus.textContent = error || (custom
     ? "自定义目录 · 不自动删除源码"
-    : "内置目录 · 保留最近 3 份源码")
+    : "内置目录 · 保留最近 9 份源码")
 }
 
 export async function applySourceDirectory(path: string | null): Promise<void> {

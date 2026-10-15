@@ -2,9 +2,9 @@ import { type RecentFile, type RecentThumb } from "./types"
 import { appState } from "./state"
 import { runFileOperation } from "./file-operations"
 import { prepareDocumentReplacement } from "./edit-history"
-import { loadNativePath } from "./archive-io"
+import { loadNativePath, loadSourceWorkspace } from "./archive-io"
 import { symbolSpan } from "../icons"
-import { isTauri } from "./canvas-interaction"
+import { isTauri, sourceDirectoryEnabledBySettings } from "./canvas-interaction"
 import { invoke } from "@tauri-apps/api/core"
 import { canvasWrap, welcomeScroller, $ } from "./dom"
 import { renderBlobPreview, archiveDemoImage, MissingPreviewImageError, releaseArchivePreview } from "../template-preview"
@@ -22,16 +22,17 @@ export function readRecentFiles(): RecentFile[] {
         Boolean(item)
         && typeof item.path === "string"
         && typeof item.name === "string"
-        && typeof item.at === "number",
+        && typeof item.at === "number"
+        && (item.source === undefined || typeof item.source === "string"),
     ).slice(0, recentFilesLimit)
   } catch {
     return []
   }
 }
 
-export function recordRecentFile(path: string, name: string): void {
+export function recordRecentFile(path: string, name: string, source = ""): void {
   if (!path || path.startsWith("content://")) return
-  const next = [{ path, name, at: Date.now() }, ...readRecentFiles().filter((item) => item.path !== path)]
+  const next = [{ path, name, at: Date.now(), source: source || undefined }, ...readRecentFiles().filter((item) => item.path !== path)]
     .slice(0, recentFilesLimit)
   localStorage.setItem(recentFilesKey, JSON.stringify(next))
   renderRecentFiles()
@@ -54,7 +55,13 @@ export function openRecentFile(item: RecentFile): void {
   if (appState.fileOperationRunning) return
   void runFileOperation("打开", async () => {
     if (!(await prepareDocumentReplacement())) return false
-    return loadNativePath(item.path)
+    if (!item.source || !sourceDirectoryEnabledBySettings()) return loadNativePath(item.path)
+    try {
+      return await loadSourceWorkspace(item.source, item.path)
+    } catch {
+      // 源码目录被删或被清理时退回原皮肤包，并重新生成源码目录。
+      return loadNativePath(item.path)
+    }
   })
 }
 

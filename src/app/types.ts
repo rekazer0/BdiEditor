@@ -96,6 +96,8 @@ export interface RecentFile {
   path: string
   name: string
   at: number
+  // 这份皮肤对应的源码目录；源码存储开启时从这里打开，而不是重新解析原包。
+  source?: string
 }
 
 export interface RecentThumb {

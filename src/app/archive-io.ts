@@ -112,7 +112,7 @@ export async function loadArchive(
     ? exportName("未命名", appState.archive.format)
     : displayName || path.split(/[\\/]/).pop() || "未命名皮肤"
   syncAiDesignContext()
-  if (!isNew && isTauri() && path) recordRecentFile(path, documentName.textContent)
+  if (!isNew && isTauri() && path) recordRecentFile(path, documentName.textContent, existingSourceWorkspace)
   saveButton.disabled = false
   for (const button of exportButtons) {
     const format = button.dataset.exportFormat as ExportTarget
@@ -164,6 +164,7 @@ export async function loadArchive(
       const pendingPaths = [...pendingSourcePaths]
       await activateSourceWorkspace(workspace, sourcePrefix)
       if (appState.archive !== pendingArchive || appState.sourceWorkspacePendingArchive !== pendingArchive) return
+      if (!isNew && path) recordRecentFile(path, documentName.textContent, workspace)
       pendingPaths.forEach((changedPath) => pendingSourcePaths.add(changedPath))
       await flushSourceAutosave()
       appState.sourceWorkspacePendingArchive = undefined
@@ -194,7 +195,8 @@ export async function openNative(): Promise<boolean> {
   return true
 }
 
-export async function loadSourceWorkspace(path: string): Promise<boolean> {
+/** skinPath 非空时表示从最近皮肤打开：保存仍写回原皮肤文件，并沿用这个源码目录。 */
+export async function loadSourceWorkspace(path: string, skinPath = ""): Promise<boolean> {
   if (isAndroidTauri() && path.startsWith("content://")) {
     const encoded = await invoke<string>("open_source_workspace_archive", { path })
     const decodedPath = decodeURIComponent(path)
@@ -204,8 +206,13 @@ export async function loadSourceWorkspace(path: string): Promise<boolean> {
       : ""
     const name = decodedPath.split(/[\\/]/).filter(Boolean).pop() || "皮肤源码"
     const packed = SkinArchive.open(decodeBase64Archive(encoded))
-    await loadArchive(sourceArchiveFromFiles(packed.sourceFiles()).toBytes(), "", false, path, name, sourcePrefix)
+    await loadArchive(sourceArchiveFromFiles(packed.sourceFiles()).toBytes(), skinPath, false, path, skinPath ? "" : name, sourcePrefix)
     return true
+  }
+  // 整个源码目录读完才知道大小，先按皮肤包大小决定是否立即弹出进度，免得点了半天没反应。
+  if (skinPath && showSkinLoadProgress(await invoke<number>("skin_file_size", { path: skinPath }).catch(() => 0))) {
+    updateFileOperationProgress(2, "正在读取源码目录…")
+    await waitForInterfacePaint()
   }
   const files = await invoke<SourceReadFilePayload[]>("open_source_workspace", { path })
   const directoryName = path.split(/[\\/]/).filter(Boolean).pop()?.toLowerCase() ?? ""
@@ -227,7 +234,7 @@ export async function loadSourceWorkspace(path: string): Promise<boolean> {
   if (!sourceFiles.length) throw new Error("源码文件夹为空")
   const sourceArchive = sourceArchiveFromFiles(sourceFiles)
   const name = path.split(/[\\/]/).pop() || "皮肤源码"
-  await loadArchive(sourceArchive.toBytes(), "", false, path, name, sourcePrefix)
+  await loadArchive(sourceArchive.toBytes(), skinPath, false, path, skinPath ? "" : name, sourcePrefix)
   return true
 }
 

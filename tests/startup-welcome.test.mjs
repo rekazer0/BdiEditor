@@ -14,3 +14,10 @@ test("startup welcome screen keeps recent skins bounded and template previews la
   assert.match(previews, /new IntersectionObserver/)
   assert.match(previews, /const staticURL = builtInProjectTemplatePreviewURL\(id\)/)
 })
+
+test("recent skins reopen from their stored source workspace", () => {
+  assert.match(main, /recordRecentFile\(path, documentName\.textContent, workspace\)/)
+  assert.match(main, /return await loadSourceWorkspace\(item\.source, item\.path\)/)
+  const lib = readFileSync(new URL("../src-tauri/src/lib.rs", import.meta.url), "utf8")
+  assert.match(lib, /const SOURCE_LIMIT: usize = 9;/)
+})

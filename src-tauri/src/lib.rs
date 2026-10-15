@@ -17,7 +17,8 @@ const MAX_SOURCE_BYTES: usize = 256 * 1024 * 1024;
 const MAX_SOURCE_FILES: usize = 4096;
 const SOURCE_MARKER: &str = ".bdi-editor-source";
 const SOURCE_MANIFEST: &str = ".bdi-editor-files.json";
-const SOURCE_LIMIT: usize = 3;
+// 与前端最近皮肤上限 recentFilesLimit 保持一致，每条最近记录都能找回自己的源码目录。
+const SOURCE_LIMIT: usize = 9;
 const RELEASES_URL: &str = "https://github.com/rekazer0/BdiEditor/releases";
 const CLIENT_LOG_FILE: &str = "client.jsonl";
 const CLIENT_LOG_PREVIOUS_FILE: &str = "client.previous.jsonl";
@@ -420,9 +421,9 @@ fn prune_source_workspaces(root: &Path) -> Result<(), String> {
         .filter_map(Result::ok)
         .filter(|entry| entry.path().is_dir() && entry.path().join(SOURCE_MARKER).is_file())
         .collect::<Vec<_>>();
+    // 按标记文件时间排序：打开源码目录时会刷新它，最近用过的目录不会先被删。
     workspaces.sort_by_key(|entry| {
-        entry
-            .metadata()
+        fs::metadata(entry.path().join(SOURCE_MARKER))
             .and_then(|metadata| metadata.modified())
             .unwrap_or(UNIX_EPOCH)
     });
@@ -526,6 +527,10 @@ async fn open_source_workspace(
         return Err("源码文件夹为空".into());
     }
     source_paths(&files)?;
+    let marker = directory.join(SOURCE_MARKER);
+    if marker.is_file() {
+        let _ = fs::write(marker, b"BdiEditor source workspace\n");
+    }
     app.fs_scope()
         .allow_directory(&directory, true)
         .map_err(|error| error.to_string())?;
@@ -1297,7 +1302,7 @@ mod tests {
         read_file_bytes, read_model_configuration_path, read_source_changes_path,
         read_source_files, safe_source_path, valid_share_filename, windows_material_kind,
         write_file, write_model_configuration_path, write_source_files, ModelConfiguration,
-        MAX_ARCHIVE_BYTES, SOURCE_MARKER,
+        MAX_ARCHIVE_BYTES, SOURCE_LIMIT, SOURCE_MARKER,
     };
     use std::fs;
     use std::thread;
@@ -1505,11 +1510,11 @@ mod tests {
     }
 
     #[test]
-    fn built_in_source_pruning_keeps_three_marked_workspaces() {
+    fn built_in_source_pruning_keeps_limit_marked_workspaces() {
         let root = std::env::temp_dir().join(format!("bdi-edit-prune-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).expect("create source root");
-        for index in 0..4 {
+        for index in 0..=SOURCE_LIMIT {
             let directory = root.join(format!("workspace-{index}"));
             fs::create_dir_all(&directory).expect("create workspace");
             fs::write(directory.join(SOURCE_MARKER), b"managed").expect("mark workspace");
@@ -1523,7 +1528,8 @@ mod tests {
             .filter_map(Result::ok)
             .filter(|entry| entry.path().join(SOURCE_MARKER).is_file())
             .count();
-        assert_eq!(marked, 3);
+        assert_eq!(marked, SOURCE_LIMIT);
+        assert!(!root.join("workspace-0").exists());
         assert!(unmanaged.is_dir());
         fs::remove_dir_all(root).expect("cleanup source root");
     }
