@@ -1500,7 +1500,6 @@ body:has(.canvas-wrap.empty) .workspace {
 .recent-card-folder {
   min-width: 0;
   overflow: hidden;
-  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1692,6 +1691,7 @@ body:has(.canvas-wrap.empty) .workspace {
   gap: 6px;
   font-size: var(--font-size-xs);
   color: var(--tertiary);
+  white-space: nowrap;
 }
 
 .template-meta em {
@@ -8108,7 +8108,6 @@ main {
 
 :root body .recent-card-folder {
   color: var(--tertiary);
-  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
 }
 
@@ -8132,7 +8131,7 @@ main {
 }
 
 :root body .recent-grid {
-  grid-template-columns: repeat(auto-fill, 280px);
+  grid-template-columns: repeat(auto-fill, 300px);
   gap: 16px;
 }
 
@@ -8213,7 +8212,7 @@ main {
 
 :root body .template-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, 300px);
   gap: 16px;
 }
 
