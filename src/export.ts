@@ -1,11 +1,11 @@
 export type ExportFormat = "bdi" | "bds" | "bda"
 
-// `.sxi` is a read-only export target: it is produced by the Palm skin converter,
-// never edited in place, so it is not a `SkinArchive` package format.
-export type ExportTarget = ExportFormat | "sxi"
+// `.sxi` (Palm) and `.ssf` (Sogou) are converted export targets: they are produced by converters,
+// never edited in place, so they are not `SkinArchive` package formats.
+export type ExportTarget = ExportFormat | "sxi" | "ssf"
 
 export function isExportFormat(format: ExportTarget): format is ExportFormat {
-  return format !== "sxi"
+  return format !== "sxi" && format !== "ssf"
 }
 
 export function exportFormatFromPath(path: string): ExportFormat | undefined {

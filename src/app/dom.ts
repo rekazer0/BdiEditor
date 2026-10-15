@@ -9,6 +9,10 @@ export const newProjectDialog = $("#new-project-dialog") as HTMLDialogElement
 
 export const newProjectForm = $("#new-project-form") as HTMLFormElement
 
+export const ssfImportDialog = $("#ssf-import-dialog") as HTMLDialogElement
+
+export const ssfImportForm = $("#ssf-import-form") as HTMLFormElement
+
 export const unsavedDialog = $("#unsaved-dialog") as HTMLDialogElement
 
 export const openButton = $("#open") as HTMLButtonElement

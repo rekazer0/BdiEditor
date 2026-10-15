@@ -75,6 +75,9 @@ export function convertBdaArchive(source: SkinArchive, base: SkinArchive, format
 
   for (const theme of ["light", "dark"] as const) {
     const soundStyles = new Map<string, string>()
+    // Both orientations share the theme's default.css; BDA style keys are global, so they merge.
+    const themeStyles = new Map<string, string[]>()
+    let conflicts = 0
     for (const name of ["Info.txt", "demo.png"] as const) {
       const bytes = source.getBytes(`${theme}/skin/${name}`) ?? source.getBytes(name)
       if (bytes) output.set(`${theme}/skin/${name}`, bytes)
@@ -140,7 +143,11 @@ export function convertBdaArchive(source: SkinArchive, base: SkinArchive, format
         output.set(`${targetPrefix}${layout}.ini`, strToU8(document.toString()))
       }
 
-      const styles: string[] = []
+      const addStyle = (header: string, lines: string[]) => {
+        const existing = themeStyles.get(header)
+        if (!existing) themeStyles.set(header, lines)
+        else if (existing.join("\n") !== lines.join("\n")) conflicts++
+      }
       const copied = new Set<string>()
       const imageSpec = (atom: BdaImageAtom | undefined): string | undefined => {
         const original = atom?.resource?.resourceID
@@ -159,41 +166,34 @@ export function convertBdaArchive(source: SkinArchive, base: SkinArchive, format
       for (const [key, style] of appearance.imageStyles) {
         const normal = imageSpec(style.normalImage)
         const highlighted = imageSpec(style.highlightImage) ?? normal
-        styles.push(
-          `[STYLE${bdaStyleID({ type: "image", key })}]`,
+        addStyle(`[STYLE${bdaStyleID({ type: "image", key })}]`, [
           ...(normal ? [`NM_IMG=${normal}`] : []),
           ...(highlighted ? [`HL_IMG=${highlighted}`] : []),
-          "",
-        )
+        ])
       }
       for (const [key, style] of appearance.colorStyles) {
-        styles.push(
-          `[STYLE${bdaStyleID({ type: "color", key })}]`,
+        addStyle(`[STYLE${bdaStyleID({ type: "color", key })}]`, [
           `NM_COLOR=${bdaColorHex(style.normalColor ?? 0)}`,
           `HL_COLOR=${bdaColorHex(style.highlightColor ?? style.normalColor ?? 0)}`,
-          "",
-        )
+        ])
       }
       for (const [key, style] of appearance.textStyles) {
-        styles.push(
-          `[STYLE${bdaStyleID({ type: "text", key })}]`,
+        addStyle(`[STYLE${bdaStyleID({ type: "text", key })}]`, [
           ...(style.fontName ? [`FONT_NAME=${style.fontName}`] : []),
           ...(style.fontSize ? [`FONT_SIZE=${style.fontSize}`] : []),
           `NM_COLOR=${bdaColorHex(style.normalColor ?? 0)}`,
           `HL_COLOR=${bdaColorHex(style.highlightColor ?? style.normalColor ?? 0)}`,
-          "",
-        )
+        ])
       }
-      // default.css is shared by both orientations, so it carries every sound style of the theme.
-      const soundSections = [...soundStyles].flatMap(([filename, styleID]) => [`[STYLE${styleID}]`, `PRESS_SOUND_PATH=${filename}`, ""])
-      output.set(
-        `${theme}/skin/res/default.css`,
-        strToU8(`[GLOBAL]\nSTYLE_NUM=${appearance.imageStyles.size + appearance.colorStyles.size + appearance.textStyles.size + soundStyles.size}\n\n${[...styles, ...soundSections].join("\n")}`),
-      )
       if (animation.sequences.size) {
         warnings.push(`${theme}/${orientation} 的 ${animation.sequences.size} 个序列帧动画已降级为首帧静态图`)
       }
     }
+    if (!themeStyles.size && !soundStyles.size) continue
+    for (const [filename, styleID] of soundStyles) themeStyles.set(`[STYLE${styleID}]`, [`PRESS_SOUND_PATH=${filename}`])
+    const sections = [...themeStyles].flatMap(([header, lines]) => [header, ...lines, ""])
+    output.set(`${theme}/skin/res/default.css`, strToU8(`[GLOBAL]\nSTYLE_NUM=${themeStyles.size}\n\n${sections.join("\n")}`))
+    if (conflicts) warnings.push(`${theme} 的横竖屏有 ${conflicts} 个同号样式内容不同，横屏沿用竖屏样式`)
   }
 
   if (!output.size) throw new Error("BDA 中没有可转换的外观配置")
