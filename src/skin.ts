@@ -199,8 +199,8 @@ export class SkinArchive {
   }
 
   static open(bytes: Uint8Array, formatHint?: ExportFormat): SkinArchive {
-    validateArchiveLimits(bytes)
     const sourceBytes = normalizeEntryCounts(bytes)
+    validateArchiveLimits(sourceBytes)
     const unpacked = unzipSync(sourceBytes)
     const names = Object.keys(unpacked)
     if (names.length > MAX_FILES) throw new Error(`皮肤包含过多文件（${names.length}）`)
@@ -221,8 +221,8 @@ export class SkinArchive {
     formatHint?: ExportFormat,
     onProgress?: (value: number) => void,
   ): Promise<SkinArchive> {
-    validateArchiveLimits(bytes)
     const sourceBytes = normalizeEntryCounts(bytes)
+    validateArchiveLimits(sourceBytes)
     const unpacked = await unpackArchive(sourceBytes, onProgress)
     const names = Object.keys(unpacked)
     if (names.length > MAX_FILES) throw new Error(`皮肤包含过多文件（${names.length}）`)

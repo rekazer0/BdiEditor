@@ -166,10 +166,13 @@ export function validateArchiveLimits(bytes: Uint8Array): void {
  * 部分 Android 打包工具（以及少数第三方皮肤）会把 EOCD 里的“本磁盘条目数”留成 0，
  * 只把总条目数写对。fflate 只读前者，会把整包解出 0 个文件，皮肤因此打不开或预览失败。
  * 这里按中央目录把 EOCD 的计数补齐，顺带把磁盘号归零，得到常规单磁盘 ZIP。
+ * 防解包工具还会把中央目录里的大小和本地头偏移全写成 0xFFFFFFFF（又没有 ZIP64 记录），
+ * 解包按它算会报“超过 256 MB”或读出垃圾；这时按顺序用对应的本地文件头把这三个值补回。
  */
 export function normalizeEntryCounts(bytes: Uint8Array): Uint8Array {
   let endOffset: number
   try {
+    if (bytes.byteLength > MAX_ARCHIVE_BYTES) return bytes
     endOffset = findEnd(bytes)
   } catch {
     return bytes
@@ -181,10 +184,30 @@ export function normalizeEntryCounts(bytes: Uint8Array): Uint8Array {
     [endOffset + 6, 0],
     [endOffset + 8, total],
   ]
-  if (repairs.every(([offset, value]) => data.getUint16(offset, true) === value)) return bytes
+  const wideRepairs: Array<[number, number]> = []
+  // 本地文件头的顺序可以和中央目录不同，按文件名对应。
+  const decoder = new TextDecoder()
+  const locals = new Map<string, number>()
+  for (let local = 0; local + 30 <= bytes.length && data.getUint32(local, true) === LOCAL_SIGNATURE;) {
+    locals.set(decoder.decode(bytes.subarray(local + 30, local + 30 + data.getUint16(local + 26, true))), local)
+    local += 30 + data.getUint16(local + 26, true) + data.getUint16(local + 28, true) + data.getUint32(local + 18, true)
+  }
+  let central = data.getUint32(endOffset + 16, true)
+  for (let index = 0; index < total && central + 46 <= endOffset && data.getUint32(central, true) === CENTRAL_SIGNATURE; index++) {
+    const nameLength = data.getUint16(central + 28, true)
+    const local = locals.get(decoder.decode(bytes.subarray(central + 46, central + 46 + nameLength)))
+    const unknown = [20, 24, 42].some((field) => data.getUint32(central + field, true) === 0xffffffff)
+    // 带数据描述符且头里大小为 0 的条目补不回来，保持原样交给后面的本地文件头解包。
+    if (unknown && local !== undefined && !(data.getUint16(local + 6, true) & 8 && !data.getUint32(local + 18, true))) {
+      wideRepairs.push([central + 20, data.getUint32(local + 18, true)], [central + 24, data.getUint32(local + 22, true)], [central + 42, local])
+    }
+    central += 46 + nameLength + data.getUint16(central + 30, true) + data.getUint16(central + 32, true)
+  }
+  if (!wideRepairs.length && repairs.every(([offset, value]) => data.getUint16(offset, true) === value)) return bytes
   const normalized = bytes.slice()
   const normalizedView = view(normalized)
   for (const [offset, value] of repairs) normalizedView.setUint16(offset, value, true)
+  for (const [offset, value] of wideRepairs) normalizedView.setUint32(offset, value, true)
   return normalized
 }
 

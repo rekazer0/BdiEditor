@@ -95,6 +95,29 @@ test('keeps whole files when entries claim a data descriptor that is not there',
   }
 })
 
+// Anti-extraction packers (seen in 赫本有只喵の极简绿m.bds) write 0xFFFFFFFF for every central
+// directory size and local offset without a ZIP64 record; the skin used to fail with "超过 256 MB".
+function poisonCentralSizes(bytes) {
+  const view = dataView(bytes)
+  for (let offset = 0; offset + 46 <= bytes.length; offset++) {
+    if (view.getUint32(offset, true) !== CENTRAL_SIGNATURE) continue
+    for (const field of [20, 24, 42]) view.setUint32(offset + field, 0xffffffff, true)
+  }
+}
+
+test('recovers central directory sizes and offsets from local headers', async () => {
+  const bytes = sampleArchive()
+  poisonCentralSizes(bytes)
+  for (const archive of [SkinArchive.open(bytes), await SkinArchive.openAsync(bytes), await SkinArchive.openAsync(bytes, undefined, () => {})]) {
+    assert.equal(archive.names().length, 4)
+    assert.equal(archive.getText('light/skin/port/py_9.ini'), '[PANEL]\nSIZE=480,320')
+  }
+  const archive = await SkinArchive.openAsync(bytes)
+  archive.setText('Info.txt', 'AtomSkinName=changed')
+  const saved = await SkinArchive.openAsync(await archive.toBytesAsync('bds'))
+  assert.equal(saved.getText('Info.txt'), 'AtomSkinName=changed')
+})
+
 test('opens an archive without any entries', async () => {
   const archive = await SkinArchive.openAsync(zipSync({}))
   assert.deepEqual(archive.names(), [])
