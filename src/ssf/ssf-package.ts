@@ -14,7 +14,7 @@
 
 import { unzipSync } from "fflate"
 import { IniDocument } from "../ini.ts"
-import { MAX_FILES, MAX_UNPACKED_BYTES, normalizeEntryCounts, safePath, validateArchiveLimits } from "../skin-zip.ts"
+import { MAX_FILES, MAX_UNPACKED_BYTES, normalizeEntryCounts, parseZip, safePath, validateArchiveLimits } from "../skin-zip.ts"
 import { isSkinContainer, unpackSkinContainer } from "./ssf-container.ts"
 
 export type SsfTheme = "light" | "dark"
@@ -70,6 +70,16 @@ function zipEntries(bytes: Uint8Array): Map<string, Uint8Array> {
 
 export function isSsfPath(path: string): boolean {
   return /\.m?ssf$/i.test(path)
+}
+
+/** For paths without an extension (Android `content://`): an encrypted container or a ZIP with phoneTheme.ini. */
+export function looksLikeSsf(bytes: Uint8Array): boolean {
+  if (isSkinContainer(bytes)) return true
+  try {
+    return parseZip(bytes).entries.some((entry) => entry.name === "phoneTheme.ini")
+  } catch {
+    return false
+  }
 }
 
 export class SsfPackage {

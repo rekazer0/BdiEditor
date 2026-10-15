@@ -9,6 +9,7 @@
 import { strToU8, zipSync } from "fflate"
 import { IniDocument } from "../ini.ts"
 import type { SkinArchive } from "../skin.ts"
+import { soundAsWav } from "../sounds.ts"
 import { ssfBoard, ssfKeyBinding, type SsfKeyBinding } from "./ssf-keymap.ts"
 import { cropImage, decodePng, encodePng, placeImage, resizeImage, type RgbaImage } from "./ssf-png.ts"
 
@@ -95,7 +96,14 @@ class BaiduStyles {
     if (!atlas) return
     const tiles = this.tiles.get(name)
     const source = numbers(tiles?.get(`IMG${tileValue || 1}`, "SOURCE_RECT"))
-    const [x, y, width, height] = source.length === 4 && source.every(Number.isFinite) ? source : [0, 0, atlas.width, atlas.height]
+    const [left, top, right, bottom] = source.length === 4 && source.every(Number.isFinite)
+      ? [source[0], source[1], source[0] + source[2], source[1] + source[3]]
+      : [0, 0, atlas.width, atlas.height]
+    // A slice never reaches outside its atlas, whatever the .til claims.
+    const x = Math.max(0, Math.round(left))
+    const y = Math.max(0, Math.round(top))
+    const width = Math.min(atlas.width, Math.round(right)) - x
+    const height = Math.min(atlas.height, Math.round(bottom)) - y
     if (width <= 0 || height <= 0) return
     const inner = numbers(tiles?.get(`IMG${tileValue || 1}`, "INNER_RECT"))
     const stretch = inner.length === 4 && inner[2] > 0 && inner[3] > 0
@@ -331,21 +339,27 @@ function infoValue(archive: SkinArchive, key: string): string | undefined {
   return bytes ? new TextDecoder().decode(bytes).match(new RegExp(`^\\uFEFF?${key}=(.*)$`, "mi"))?.[1].trim() : undefined
 }
 
-function soundFiles(archive: SkinArchive, theme: Theme, output: Map<string, Uint8Array>, warnings: string[]): void {
+/** The keyboard's default key sound, re-encoded as WAV (Baidu ships OGG or AIFF; Sogou plays WAV). */
+async function soundFiles(archive: SkinArchive, theme: Theme, output: Map<string, Uint8Array>, warnings: string[]): Promise<void> {
   const gen = `${theme}/skin/port/gen.ini`
   if (!archive.isText(gen)) return
   const styleID = IniDocument.parse(archive.getText(gen)).get("PANEL", "SOUND_STYLE")?.trim()
-  const filename = styleID && new BaiduStyles(archive, theme, "port", warnings).styles.get(`STYLE${styleID}`, "PRESS_SOUND_PATH")?.trim()
-  const bytes = filename && [`${theme}/skin/port/res/${filename}`, `${theme}/skin/res/${filename}`].map((path) => archive.getBytes(path)).find(Boolean)
+  const path = styleID && new BaiduStyles(archive, theme, "port", warnings).styles.get(`STYLE${styleID}`, "PRESS_SOUND_PATH")?.trim()
+  const filename = path && path.split(/[\\/]/).pop()
+  const bytes = filename && [`${theme}/skin/port/res/${filename}`, `${theme}/skin/res/${filename}`].map((candidate) => archive.getBytes(candidate)).find(Boolean)
   if (!filename || !bytes) return
-  if (!/\.wav$/i.test(filename)) warnings.push(`按键音 ${filename} 不是 WAV，搜狗输入法可能无法播放`)
-  output.set(`default/${filename}`, bytes)
   const sound = filename.replace(/\.[^.]+$/, "")
+  try {
+    output.set(`default/${sound}.wav`, await soundAsWav(bytes))
+  } catch (error) {
+    warnings.push(`按键音 ${filename} 无法转换为 WAV（${error instanceof Error ? error.message : error}），已省略`)
+    return
+  }
   output.set("default/sound_android.ini", strToU8(`[General]\nSUPPORT_SCREEN=${SOGOU_WIDTH}\nVERSION=1\n\n[Key]\nsound=${sound}\n`))
 }
 
 /** Converts a Baidu BDS/BDI skin to Sogou `.ssf` bytes. */
-export function convertBaiduToSsf(archive: SkinArchive): { bytes: Uint8Array; warnings: string[] } {
+export async function convertBaiduToSsf(archive: SkinArchive): Promise<{ bytes: Uint8Array; warnings: string[] }> {
   if (archive.format === "bda") throw new Error("BDA 需要先转换为 BDS 再导出搜狗皮肤")
   const warnings: string[] = []
   const output = new Map<string, Uint8Array>()
@@ -377,7 +391,7 @@ export function convertBaiduToSsf(archive: SkinArchive): { bytes: Uint8Array; wa
       "[status2]", "START=0,19", "END=6,23", "",
     ].join("\n")))
   }
-  soundFiles(archive, themes[0], output, warnings)
+  await soundFiles(archive, themes[0], output, warnings)
   if (archive.names().some((path) => /\/anim\.ini$/i.test(path))) warnings.push("百度按键动画在搜狗皮肤中没有对应，已忽略")
-  return { bytes: zipSync(Object.fromEntries(output), { level: 6 }), warnings }
+  return { bytes: zipSync(Object.fromEntries(output), { level: 6 }), warnings: [...new Set(warnings)] }
 }

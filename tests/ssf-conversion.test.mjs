@@ -7,7 +7,7 @@ import { IniDocument } from '../src/ini.ts'
 import { SkinArchive } from '../src/skin.ts'
 import { decodeBdaAppearance, decodeBdaSoundConfig } from '../src/bda-decode.ts'
 import { convertBdaArchive } from '../src/bda-convert.ts'
-import { SsfPackage, parseSsfImage, ssfColor } from '../src/ssf/ssf-package.ts'
+import { SsfPackage, looksLikeSsf, parseSsfImage, ssfColor } from '../src/ssf/ssf-package.ts'
 import { ssfBoard, ssfKeyBinding } from '../src/ssf/ssf-keymap.ts'
 import { compositeImage, cropImage, decodePng, encodePng, placeImage, pngSize, resizeImage, tintImage } from '../src/ssf/ssf-png.ts'
 import { convertSsfToBaidu } from '../src/ssf/ssf-to-baidu.ts'
@@ -385,7 +385,7 @@ test('ssf → BDA: panel background, candidate bar and key sounds', async () => 
 
 test('BDS → ssf → BDS keeps every key look', async () => {
   const first = convertSsfToBaidu(await SsfPackage.open(ssfFixture()), bdsTemplate).archive
-  const exported = convertBaiduToSsf(first)
+  const exported = await convertBaiduToSsf(first)
   assert.deepEqual(exported.warnings, [])
   const pkg = await SsfPackage.open(exported.bytes)
   assert.deepEqual([...pkg.themes], [['light', '1080/status1/'], ['dark', '1080/status2/']])
@@ -409,7 +409,7 @@ test('BDS → ssf: background stacking, FORE_OFFSET → FG_RECT and package file
   const q = document.sections().find((name) => document.get(name, 'CENTER') === 'q')
   document.set(q, 'FORE_OFFSET', '0,-10')
   files['port/py_26.ini'] = strToU8(document.toString())
-  const { bytes } = convertBaiduToSsf(SkinArchive.open(zipSync(files)))
+  const { bytes } = await convertBaiduToSsf(SkinArchive.open(zipSync(files)))
   const pkg = await SsfPackage.open(bytes)
   assert.deepEqual([...pkg.themes], [['light', '1080/']])
   assert.ok(!pkg.files.has('time.ini'))
@@ -427,13 +427,13 @@ test('BDS → ssf: background stacking, FORE_OFFSET → FG_RECT and package file
 })
 
 test('BDA → ssf goes through the official BDS base and keeps the panel background', async () => {
-  const { bytes, warnings } = exportSsf(bdaTemplate, bdaBase)
+  const { bytes, warnings } = await exportSsf(bdaTemplate, bdaBase)
   assert.deepEqual(warnings, [])
   const pkg = await SsfPackage.open(bytes)
   const skin = pkg.skin('light')
   assert.ok(skin.get('RootView', 'BG_IMAGE'))
   assert.ok(pkg.skin('light').sections().includes('Key_Q'))
-  assert.throws(() => exportSsf(bdaTemplate, undefined), /基础布局/)
+  await assert.rejects(exportSsf(bdaTemplate, undefined), /基础布局/)
 })
 
 test('BDA → BDS keeps portrait styles when landscape exists', () => {
@@ -442,6 +442,58 @@ test('BDA → BDS keeps portrait styles when landscape exists', () => {
   const css = new Set(IniDocument.parse(archive.getText('light/skin/res/default.css')).sections())
   const missing = [...portrait.imageStyles.keys()].filter((key) => !css.has(`STYLE${1_000_000 + key}`))
   assert.deepEqual(missing, [])
+})
+
+test('ssf → BDS: an extreme FG_RECT keeps the bare glyph instead of a giant canvas', async () => {
+  const files = unzipSync(ssfFixture())
+  const keys = IniDocument.parse(strFromU8(files['1080/status1/keys.ini']))
+  keys.set('Key_Q', 'FG_RECT', '0,0,0.001,0.001')
+  files['1080/status1/keys.ini'] = strToU8(keys.toString())
+  const { archive } = convertSsfToBaidu(await SsfPackage.open(zipSync(files)), bdsTemplate)
+  const fore = baiduKeyStyle(archive, 'light', 'port', 'py_26', 'q', 'FORE_STYLE').image
+  assert.deepEqual([fore.width, fore.height], SIZES.fgQ)
+})
+
+test('ssf → BDS: sound names cannot leave the res folder', async () => {
+  const files = unzipSync(ssfFixture())
+  files['default/sound_android.ini'] = strToU8('[Key]\nsound=sub/s_code\n')
+  files['default/sub/s_code.wav'] = files['default/s_code.wav']
+  const { archive } = convertSsfToBaidu(await SsfPackage.open(zipSync(files)), bdsTemplate)
+  assert.ok(archive.getBytes('light/skin/res/s_code.wav'))
+  assert.ok(!archive.names().some((name) => name.includes('sub/')))
+})
+
+test('BDS → ssf: the OGG key sound becomes WAV and a SOURCE_RECT past its atlas is clipped', async () => {
+  const files = unzipSync(bdsTemplate.toBytes())
+  const gen = IniDocument.parse(strFromU8(files['port/gen.ini']))
+  const css = IniDocument.parse(strFromU8(files['res/default.css']))
+  css.appendSection('STYLE99999', [{ key: 'PRESS_SOUND_PATH', value: '../click.ogg' }])
+  gen.set('PANEL', 'SOUND_STYLE', '99999')
+  files['port/gen.ini'] = strToU8(gen.toString())
+  files['res/default.css'] = strToU8(css.toString())
+  files['res/click.ogg'] = read('./fixtures/click.ogg')
+  // Point the q key's background at a slice reaching far outside its atlas.
+  const py26 = IniDocument.parse(strFromU8(files['port/py_26.ini']))
+  const q = py26.sections().find((name) => py26.get(name, 'CENTER') === 'q')
+  const [image] = css.get(`STYLE${py26.get(q, 'BACK_STYLE')}`, 'NM_IMG').split(',')
+  files[`res/${image}.til`] = strToU8('[GLOBAL]\nIMG_NUM=1\n\n[IMG1]\nSOURCE_RECT=0,0,99999,99999\n')
+  const { bytes, warnings } = await convertBaiduToSsf(SkinArchive.open(zipSync(files)))
+  assert.deepEqual(warnings, [])
+  const pkg = await SsfPackage.open(bytes)
+  const wav = pkg.files.get('default/click.wav')
+  assert.equal(strFromU8(wav.subarray(0, 4)), 'RIFF')
+  assert.ok(wav.length > 44)
+  assert.match(strFromU8(pkg.files.get('default/sound_android.ini')), /^sound=click$/m)
+  const atlas = decodePng(files[`res/${image}.png`])
+  const back = decodePng(pkg.file('light', parseSsfImage(pkg.skin('light').get(pkg.skin('light').get('Key_Q', 'BG_IMAGES'), 'NORMAL')).file))
+  assert.deepEqual([back.width, back.height], [atlas.width, atlas.height])
+})
+
+test('ssf files are recognised by content when the path has no extension', async () => {
+  assert.ok(looksLikeSsf(ssfFixture()))
+  assert.ok(looksLikeSsf(await skinContainer({ 'skin.ini': strToU8('') })))
+  assert.ok(!looksLikeSsf(bdsTemplate.toBytes()))
+  assert.ok(!looksLikeSsf(new Uint8Array([1, 2, 3])))
 })
 
 // —— Real skins (local only: third-party skins are not committed) ——
@@ -456,7 +508,7 @@ test('real Sogou skins convert to every format and back', { skip: realSkins.leng
       const { bytes: converted, warnings } = await importSsf(bytes, format, templates)
       assert.ok(!warnings.some((warning) => /缺少图片|无法解码/.test(warning)), `${name} → ${format}: ${warnings.join('；')}`)
       const archive = SkinArchive.open(converted, format)
-      const back = exportSsf(archive, bdaBase)
+      const back = await exportSsf(archive, bdaBase)
       assert.ok(!back.warnings.some((warning) => /没有可转换的键盘背景/.test(warning)), `${name} ${format} → ssf: ${back.warnings.join('；')}`)
       await SsfPackage.open(back.bytes)
     }

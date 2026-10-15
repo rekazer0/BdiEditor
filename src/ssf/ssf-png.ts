@@ -7,7 +7,8 @@ import { unzlibSync, zlibSync } from "fflate"
 export type RgbaImage = { width: number; height: number; data: Uint8Array }
 
 const SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10]
-const MAX_PIXELS = 4096 * 4096
+/** Largest image decoded or built: 4096 × 4096, far above any keyboard skin image. */
+export const MAX_PIXELS = 4096 * 4096
 const ADAM7 = [
   [0, 0, 8, 8], [4, 0, 8, 8], [0, 4, 4, 8], [2, 0, 4, 4],
   [0, 2, 2, 4], [1, 0, 2, 2], [0, 1, 1, 2],

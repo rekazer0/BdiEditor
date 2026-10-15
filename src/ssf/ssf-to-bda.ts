@@ -309,5 +309,5 @@ export function convertSsfToBda(pkg: SsfPackage, template: SkinArchive): SsfConv
     const themed = path.match(/^(light|dark)\/skin\/(.*)$/)!
     raw[dual ? `${themed[1]}/${themed[2]}` : themed[2]] = bytes
   }
-  return { archive: SkinArchive.open(zipSync(raw, { level: 6 }), "bda"), warnings }
+  return { archive: SkinArchive.open(zipSync(raw, { level: 6 }), "bda"), warnings: [...new Set(warnings)] }
 }

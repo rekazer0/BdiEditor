@@ -24,7 +24,7 @@ import { type SourceReadFilePayload, type ChosenFileData, type BrowserSaveFileHa
 import { readFile, writeFile } from "@tauri-apps/plugin-fs"
 import { convertBdaArchive } from "../bda-convert.ts"
 import { flushNumberInputWheel } from "../number-input-wheel.ts"
-import { isSsfPath } from "../ssf/ssf-package.ts"
+import { isSsfPath, looksLikeSsf } from "../ssf/ssf-package.ts"
 import { exportSsf } from "../ssf/ssf-convert.ts"
 import { importSsfDocument } from "./ssf-import"
 
@@ -259,13 +259,14 @@ export const UNSUPPORTED_SKIN_MESSAGE = "仅支持 .bda、.bdi、.bds 或 .ssf �
 
 /** Opens a skin file's bytes; a Sogou `.ssf` is converted to a Baidu format and opened as a new document. */
 export async function openSkinBytes(bytes: Uint8Array, path: string): Promise<boolean> {
-  if (!isSsfPath(path)) {
+  // Android pickers return content:// URIs without the file name, so the bytes decide there.
+  if (!(isSsfPath(path) || (path.startsWith("content://") && looksLikeSsf(bytes)))) {
     await loadArchive(bytes, path)
     return true
   }
   const converted = await importSsfDocument(bytes)
   if (!converted) return false
-  await loadArchive(converted, "", true, "", path.split(/[\\/]/).pop())
+  await loadArchive(converted, "", true, "", path.startsWith("content://") ? undefined : path.split(/[\\/]/).pop())
   return true
 }
 
@@ -343,7 +344,7 @@ export async function exportArchive(format: ExportTarget, targetBdaPlatform?: Ex
   if (format === "ssf") {
     updateFileOperationProgress(22, "正在导出搜狗皮肤…")
     await waitForInterfacePaint()
-    const result = exportSsf(appState.archive, appState.bdaBase)
+    const result = await exportSsf(appState.archive, appState.bdaBase)
     if (result.warnings.length && !window.confirm(
       `转换为搜狗皮肤时将降级以下内容：\n\n${result.warnings.join("\n")}\n\n继续导出吗？`,
     )) return

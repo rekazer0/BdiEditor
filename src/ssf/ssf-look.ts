@@ -8,7 +8,7 @@
 import type { IniDocument } from "../ini.ts"
 import { ssfKeyBinding, type SsfKeyBinding } from "./ssf-keymap.ts"
 import { parseSsfImage, ssfColor, type SsfImageRef, type SsfPackage, type SsfStretch, type SsfTheme } from "./ssf-package.ts"
-import { compositeImage, cropImage, decodePng, encodePng, isPng, placeImage, pngSize, resizeImage, type RgbaImage } from "./ssf-png.ts"
+import { MAX_PIXELS, compositeImage, cropImage, decodePng, encodePng, isPng, placeImage, pngSize, resizeImage, type RgbaImage } from "./ssf-png.ts"
 
 /** `id` is stable for identical content, so writers can share one file per distinct image. */
 export type LookImage = { id: string; bytes: Uint8Array; stretch?: SsfStretch }
@@ -132,13 +132,14 @@ export class SsfLook {
     if (rect) {
       const [x, y, width, height] = rect
       if (!(width > 0 && height > 0 && width <= 1 && height <= 1) || (!x && !y && width === 1 && height === 1)) return { id: name, bytes }
-      return this.derive(`${name}|rect:${rect.join(",")}`, () => {
-        const canvasWidth = Math.round(source.width / width)
-        const canvasHeight = Math.round(source.height / height)
-        return placeImage(source, canvasWidth, canvasHeight, Math.round(x * canvasWidth), Math.round(y * canvasHeight))
-      })
+      const canvasWidth = Math.round(source.width / width)
+      const canvasHeight = Math.round(source.height / height)
+      // A tiny FG_RECT would ask for a canvas many times the glyph; such a key keeps the bare glyph.
+      if (canvasWidth * canvasHeight > MAX_PIXELS) return { id: name, bytes }
+      return this.derive(`${name}|rect:${rect.join(",")}`, () =>
+        placeImage(source, canvasWidth, canvasHeight, Math.round(x * canvasWidth), Math.round(y * canvasHeight)))
     }
-    if (!canvas || (source.width >= canvas[0] && source.height >= canvas[1])) return { id: name, bytes }
+    if (!canvas || canvas[0] * canvas[1] > MAX_PIXELS || (source.width >= canvas[0] && source.height >= canvas[1])) return { id: name, bytes }
     return this.derive(`${name}|canvas:${canvas.join("x")}`, () => {
       const width = Math.max(canvas[0], source.width)
       const height = Math.max(canvas[1], source.height)
@@ -226,6 +227,7 @@ export class SsfLook {
     if (!sound) return
     const filename = [`${sound}.wav`, `${sound}.ogg`, `${sound}.mp3`, sound].find((name) => this.pkg.file(this.theme, name))
     const bytes = filename && this.pkg.file(this.theme, filename)
-    return filename && bytes ? { filename, bytes } : undefined
+    // Writers put the sound in their own res/ folder, so only the file name is kept.
+    return filename && bytes ? { filename: filename.split(/[\\/]/).pop()!, bytes } : undefined
   }
 }

@@ -25,11 +25,11 @@ export async function importSsf(bytes: Uint8Array, format: SsfImportFormat, temp
 }
 
 /** Converts any editable Baidu skin to `.ssf`; BDA goes through the official BDS base layout first. */
-export function exportSsf(archive: SkinArchive, bdaBase: SkinArchive | undefined): Converted {
+export async function exportSsf(archive: SkinArchive, bdaBase: SkinArchive | undefined): Promise<Converted> {
   if (archive.format !== "bda") return convertBaiduToSsf(archive)
   if (!bdaBase) throw new Error("无法加载 BDA 官方基础布局")
   const converted = convertBdaArchive(archive, bdaBase)
-  const result = convertBaiduToSsf(converted.archive)
+  const result = await convertBaiduToSsf(converted.archive)
   // BDA-only panels (split / one-handed landscape boards) have no Sogou counterpart either.
   const warnings = converted.warnings.filter((warning) => !warning.includes("没有 BDS/BDI 基础布局"))
   return { bytes: result.bytes, warnings: [...warnings, ...result.warnings] }

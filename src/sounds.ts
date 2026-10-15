@@ -177,6 +177,40 @@ function encodeAiffPcm16(sound: DecodedSound): Uint8Array {
   return bytes
 }
 
+function encodeWavPcm16(sound: DecodedSound): Uint8Array {
+  const channels = sound.channelData.length
+  const frames = sound.samplesDecoded
+  const dataLength = frames * channels * 2
+  const bytes = new Uint8Array(44 + dataLength)
+  const view = new DataView(bytes.buffer)
+  const ascii = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index++) bytes[offset + index] = value.charCodeAt(index)
+  }
+  const rate = Math.round(sound.sampleRate)
+  ascii(0, "RIFF")
+  view.setUint32(4, bytes.length - 8, true)
+  ascii(8, "WAVE")
+  ascii(12, "fmt ")
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, channels, true)
+  view.setUint32(24, rate, true)
+  view.setUint32(28, rate * channels * 2, true)
+  view.setUint16(32, channels * 2, true)
+  view.setUint16(34, 16, true)
+  ascii(36, "data")
+  view.setUint32(40, dataLength, true)
+  let offset = 44
+  for (let frame = 0; frame < frames; frame++) {
+    for (let channel = 0; channel < channels; channel++) {
+      const sample = Math.max(-1, Math.min(1, sound.channelData[channel][frame] ?? 0))
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
+      offset += 2
+    }
+  }
+  return bytes
+}
+
 async function decodeOggVorbis(bytes: Uint8Array): Promise<DecodedSound> {
   const { OggVorbisDecoder } = await import("@wasm-audio-decoders/ogg-vorbis")
   const decoder = new OggVorbisDecoder()
@@ -220,6 +254,12 @@ async function decodeSound(bytes: Uint8Array): Promise<DecodedSound> {
   if (head === "FORM") return decodeAiffPcm(bytes)
   if (head === "OggS") return decodeOggVorbis(bytes)
   throw new Error("不支持的音频编码")
+}
+
+/** A key sound as 16-bit PCM WAV, the format Sogou skins use; WAV input is returned unchanged. */
+export async function soundAsWav(bytes: Uint8Array): Promise<Uint8Array> {
+  if (new TextDecoder("ascii").decode(bytes.subarray(0, 4)) === "RIFF") return bytes
+  return encodeWavPcm16(await decodeSound(bytes))
 }
 
 /**

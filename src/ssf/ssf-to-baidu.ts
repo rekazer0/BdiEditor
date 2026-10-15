@@ -290,5 +290,5 @@ export function convertSsfToBaidu(pkg: SsfPackage, base: SkinArchive): SsfConver
     const themed = path.match(/^(light|dark)\/skin\/(.*)$/)!
     return [dual ? `${themed[1]}/${themed[2]}` : themed[2], bytes]
   }))
-  return { archive: SkinArchive.open(zipSync(raw, { level: 6 }), "bds"), warnings }
+  return { archive: SkinArchive.open(zipSync(raw, { level: 6 }), "bds"), warnings: [...new Set(warnings)] }
 }
