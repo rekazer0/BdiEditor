@@ -7,7 +7,7 @@ import { symbolSpan } from "../icons"
 import { isTauri } from "./canvas-interaction"
 import { invoke } from "@tauri-apps/api/core"
 import { canvasWrap, welcomeScroller, $ } from "./dom"
-import { renderBlobPreview, renderArchivePreview, MissingPreviewImageError, releaseArchivePreview } from "../template-preview"
+import { renderBlobPreview, archiveDemoImage, MissingPreviewImageError, releaseArchivePreview } from "../template-preview"
 
 export const recentFilesKey = "recent-files"
 
@@ -156,26 +156,26 @@ export async function renderRecentPreview(path: string, host: HTMLElement): Prom
   const stamp = (await invoke<number[]>("skin_file_stamp", { path })).join(":")
   const stored = await recentThumbRequest<RecentThumb | undefined>("readonly", (store) => store.get(path))
     .catch(() => undefined)
-  if (stored?.stamp === stamp) {
+  if (stored?.stamp === stamp && stored.bytes) {
     try {
-      return await renderBlobPreview(stored.blob, host)
+      return await renderBlobPreview(new Blob([stored.bytes], { type: stored.type }), host)
     } catch {
       // 缓存的图解码失败就当没缓存，重新从皮肤包取。
     }
   }
-  const image = await renderArchivePreviewWithRetry(path, host)
-  void fetch(image.src)
-    .then((response) => response.blob())
-    .then((blob) => recentThumbRequest("readwrite", (store) => store.put({ stamp, blob } satisfies RecentThumb, path)))
+  const blob = await readDemoImageWithRetry(path)
+  const image = await renderBlobPreview(blob, host)
+  void blob.arrayBuffer()
+    .then((bytes) => recentThumbRequest("readwrite", (store) => store.put({ stamp, bytes, type: blob.type } satisfies RecentThumb, path)))
     .catch(() => undefined)
   return image
 }
 
-export async function renderArchivePreviewWithRetry(path: string, host: HTMLElement): Promise<HTMLImageElement> {
+async function readDemoImageWithRetry(path: string): Promise<Blob> {
   let lastError: unknown
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      return await renderArchivePreview(await readRecentPreviewBytes(path), host)
+      return await archiveDemoImage(await readRecentPreviewBytes(path))
     } catch (error) {
       lastError = error
       // 没有 demo 图是稳定结果，重试只会把整包再读一遍。

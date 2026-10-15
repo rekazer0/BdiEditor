@@ -100,7 +100,9 @@ export interface RecentFile {
 
 export interface RecentThumb {
   stamp: string
-  blob: Blob
+  // WKWebView 的 IndexedDB 存不进 Blob（put 静默失败），只能存原始字节。
+  bytes: ArrayBuffer
+  type: string
 }
 
 export type WindowMaterialKind = "glass" | "acrylic" | "none"
