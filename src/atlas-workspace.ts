@@ -111,17 +111,36 @@ export function createAtlasWorkspace(actions: {
   let fitted = true
   let desktopActive = false
   let lastPath = ""
+  let panX = 0
+  let panY = 0
+  const setPan = (x: number, y: number) => {
+    panX = x
+    panY = y
+    canvas.style.translate = `${Math.round(x)}px ${Math.round(y)}px`
+  }
   const resize = () => {
     if (!desktopActive || !state?.width) return
-    if (fitted) zoomValue = Math.max(0.01, Math.min(1, (wrap.clientWidth - 64) / state.width, (wrap.clientHeight - 64) / state.height))
+    if (fitted) {
+      zoomValue = Math.max(0.01, Math.min(1, (wrap.clientWidth - 64) / state.width, (wrap.clientHeight - 64) / state.height))
+      setPan(0, 0)
+    }
     canvas.style.width = `${Math.round(state.width * zoomValue)}px`
     canvas.style.height = `${Math.round(state.height * zoomValue)}px`
     percent.textContent = `${Math.round(zoomValue * 100)}%`
   }
-  const zoomBy = (factor: number) => {
+  // 与主画布一致：以指针为锚点缩放，锚点下的图像位置保持不动
+  const zoomBy = (factor: number, anchor?: { x: number; y: number }) => {
+    const before = anchor && canvas.getBoundingClientRect()
     fitted = false
     zoomValue = Math.min(4, Math.max(0.05, zoomValue * factor))
     resize()
+    if (anchor && before) {
+      const after = canvas.getBoundingClientRect()
+      setPan(
+        panX + anchor.x - (after.left + (anchor.x - before.left) / before.width * after.width),
+        panY + anchor.y - (after.top + (anchor.y - before.top) / before.height * after.height),
+      )
+    }
     actions.redraw()
   }
   zoom.append(button("atlas-zoom-out", "缩小图集", "minus", () => zoomBy(1 / 1.2)), percent,
@@ -131,31 +150,47 @@ export function createAtlasWorkspace(actions: {
   wrap.addEventListener("wheel", event => {
     if (!desktopActive) return
     event.preventDefault()
-    zoomBy(event.deltaY < 0 ? 1.1 : 1 / 1.1)
+    // 按滚动量缩放：触控板捏合/Ctrl+滚轮一次会连发很多小 delta 事件，固定步长会跳得很猛
+    const delta = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? event.deltaY * 16 : event.deltaY
+    zoomBy(Math.exp(-Math.max(-100, Math.min(100, delta)) * 0.002), { x: event.clientX, y: event.clientY })
   }, { passive: false })
-  // 拖动空白处、中键拖动或按住空格拖动可平移图集；捕获阶段拦截，避免触发切片选择
+  // 与主画布一致：拖动任意处（超过 3px）平移；中键或按住空格立即平移。
+  // 切片绘制、移动、缩放会捕获指针，此时不平移。
   let spaceHeld = false
-  let pan: { x: number; y: number; left: number; top: number } | undefined
+  let candidate: { id: number; x: number; y: number } | undefined
+  let pan: { x: number; y: number; panX: number; panY: number } | undefined
   addEventListener("keydown", event => {
     if (event.code === "Space" && !(event.target as Element).closest?.("input, textarea, select, [contenteditable]")) spaceHeld = true
   })
   addEventListener("keyup", event => { if (event.code === "Space") spaceHeld = false })
   addEventListener("blur", () => { spaceHeld = false })
-  wrap.addEventListener("pointerdown", event => {
-    const background = event.target === wrap || (event.target as Element).id === "workspace-image-figure"
-    if (!desktopActive || !(event.button === 1 || event.button === 0 && (spaceHeld || background))) return
-    event.preventDefault()
-    event.stopPropagation()
-    pan = { x: event.clientX, y: event.clientY, left: wrap.scrollLeft, top: wrap.scrollTop }
+  const startPan = (event: PointerEvent) => {
+    candidate = undefined
+    pan = { x: event.clientX, y: event.clientY, panX, panY }
     wrap.setPointerCapture(event.pointerId)
     wrap.classList.add("atlas-panning")
+  }
+  wrap.addEventListener("pointerdown", event => {
+    if (!desktopActive || !(event.button === 1 || event.button === 0 && spaceHeld)) return
+    event.preventDefault()
+    event.stopPropagation()
+    startPan(event)
   }, { capture: true })
-  wrap.addEventListener("pointermove", event => {
-    if (!pan) return
-    wrap.scrollLeft = pan.left - (event.clientX - pan.x)
-    wrap.scrollTop = pan.top - (event.clientY - pan.y)
+  wrap.addEventListener("pointerdown", event => {
+    if (!desktopActive || pan || event.button !== 0 || event.pointerType === "touch" || canvas.hasPointerCapture(event.pointerId)) return
+    candidate = { id: event.pointerId, x: event.clientX, y: event.clientY }
   })
-  const endPan = () => { pan = undefined; wrap.classList.remove("atlas-panning") }
+  wrap.addEventListener("pointermove", event => {
+    if (candidate?.id === event.pointerId && Math.hypot(event.clientX - candidate.x, event.clientY - candidate.y) >= 3) {
+      const start = candidate
+      startPan(event)
+      pan!.x = start.x
+      pan!.y = start.y
+    }
+    if (!pan) return
+    setPan(pan.panX + event.clientX - pan.x, pan.panY + event.clientY - pan.y)
+  })
+  const endPan = () => { candidate = undefined; pan = undefined; wrap.classList.remove("atlas-panning") }
   wrap.addEventListener("pointerup", endPan)
   wrap.addEventListener("pointercancel", endPan)
   new ResizeObserver(() => { resize(); actions.redraw() }).observe(wrap)
@@ -176,6 +211,7 @@ export function createAtlasWorkspace(actions: {
       if (toolbar.parentElement !== toolbarHome) toolbarHome.prepend(toolbar)
       canvas.style.removeProperty("width")
       canvas.style.removeProperty("height")
+      canvas.style.removeProperty("translate")
     }
     const slice = next.selected
     title.textContent = next.path.split("/").pop() || "皮肤图片"
