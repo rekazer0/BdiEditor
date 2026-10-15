@@ -191,7 +191,7 @@ export async function openNative(): Promise<boolean> {
   if (!(await prepareDocumentReplacement())) return false
   const path = await open({
     multiple: false,
-    filters: [{ name: "输入法皮肤", extensions: ["bdi", "bds", "bda", "ssf"] }],
+    filters: [{ name: "输入法皮肤", extensions: ["bdi", "bds", "bda", "ssf", "mssf"] }],
   })
   if (typeof path !== "string") return false
   await loadNativePath(path)
@@ -278,7 +278,7 @@ export async function loadNativePath(path: string): Promise<boolean> {
 }
 
 export function isSupportedSkinPath(path: string): boolean {
-  return path.startsWith("content://") || /\.(bdi|bds|bda|ssf)$/i.test(path)
+  return path.startsWith("content://") || /\.(bdi|bds|bda|m?ssf)$/i.test(path)
 }
 
 export async function loadDroppedFile(file: File): Promise<boolean> {

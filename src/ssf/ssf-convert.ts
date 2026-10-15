@@ -14,7 +14,7 @@ type Converted = { bytes: Uint8Array; warnings: string[] }
 
 /** Converts `.ssf` bytes into a package of `format`, ready to open in the editor. */
 export async function importSsf(bytes: Uint8Array, format: SsfImportFormat, templates: SsfTemplates): Promise<Converted> {
-  const pkg = SsfPackage.open(bytes)
+  const pkg = await SsfPackage.open(bytes)
   if (format === "bda") {
     const { archive, warnings } = convertSsfToBda(pkg, templates.bda)
     return { bytes: archive.toBytes(), warnings }

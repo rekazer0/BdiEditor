@@ -1,4 +1,5 @@
-// Reader for Sogou phone skins (`.ssf`). A phone skin is a plain ZIP (iOS and Android share it):
+// Reader for Sogou phone skins (`.ssf`). A phone skin is a plain ZIP (iOS and Android share it), or the
+// same files in Sogou's encrypted container (ssf-container.ts):
 //
 //   phoneTheme.ini                     skin name / author / version
 //   time.ini                           which `statusN` folder is shown at which hours (day / night)
@@ -14,6 +15,7 @@
 import { unzipSync } from "fflate"
 import { IniDocument } from "../ini.ts"
 import { MAX_FILES, MAX_UNPACKED_BYTES, normalizeEntryCounts, safePath, validateArchiveLimits } from "../skin-zip.ts"
+import { isSkinContainer, unpackSkinContainer } from "./ssf-container.ts"
 
 export type SsfTheme = "light" | "dark"
 /** Stretchable band of a Sogou image: pixel ranges `left..right` and `top..bottom`. */
@@ -50,7 +52,6 @@ export function ssfColor(value: string | undefined): string | undefined {
 }
 
 function zipEntries(bytes: Uint8Array): Map<string, Uint8Array> {
-  if (bytes.length >= 4 && String.fromCharCode(...bytes.subarray(0, 4)) === "Skin") throw new Error(PC_SKIN_ERROR)
   const normalized = normalizeEntryCounts(bytes)
   validateArchiveLimits(normalized)
   const unpacked = unzipSync(normalized)
@@ -68,7 +69,7 @@ function zipEntries(bytes: Uint8Array): Map<string, Uint8Array> {
 }
 
 export function isSsfPath(path: string): boolean {
-  return /\.ssf$/i.test(path)
+  return /\.m?ssf$/i.test(path)
 }
 
 export class SsfPackage {
@@ -100,8 +101,9 @@ export class SsfPackage {
     }
   }
 
-  static open(bytes: Uint8Array): SsfPackage {
-    return new SsfPackage(zipEntries(bytes))
+  /** Reads a ZIP or encrypted package; what kind of skin it is comes from the files inside. */
+  static async open(bytes: Uint8Array): Promise<SsfPackage> {
+    return new SsfPackage(isSkinContainer(bytes) ? await unpackSkinContainer(bytes) : zipEntries(bytes))
   }
 
   private readThemes(): Map<SsfTheme, string> {

@@ -14,7 +14,7 @@ import { convertSsfToBaidu } from '../src/ssf/ssf-to-baidu.ts'
 import { convertSsfToBda } from '../src/ssf/ssf-to-bda.ts'
 import { convertBaiduToSsf } from '../src/ssf/baidu-to-ssf.ts'
 import { exportSsf, importSsf } from '../src/ssf/ssf-convert.ts'
-import { COLORS, SIZES, TEXT, solid, ssfFixture } from './helpers/ssf-fixture.mjs'
+import { COLORS, SIZES, TEXT, skinContainer, solid, ssfFixture } from './helpers/ssf-fixture.mjs'
 
 const read = (path) => new Uint8Array(readFileSync(new URL(path, import.meta.url)))
 const bdsTemplate = SkinArchive.open(read('../public/default-template.bds'))
@@ -133,28 +133,52 @@ test('PNG: place, crop, resize, composite and tint', () => {
 
 // —— Package reading ——
 
-test('ssf package: day/night come from the hours in time.ini, not the listing order', () => {
-  const pkg = SsfPackage.open(ssfFixture())
+test('ssf package: day/night come from the hours in time.ini, not the listing order', async () => {
+  const pkg = await SsfPackage.open(ssfFixture())
   assert.equal(pkg.resolution, '1080')
   assert.deepEqual([...pkg.themes], [['light', '1080/status1/'], ['dark', '1080/status2/']])
   assert.deepEqual(pkg.info, { name: '测试皮肤', author: '测试作者', version: '10000' })
-  const single = SsfPackage.open(ssfFixture({ single: true }))
+  const single = await SsfPackage.open(ssfFixture({ single: true }))
   assert.deepEqual([...single.themes], [['light', '1080/']])
 })
 
-test('ssf package: rejects PC skins, non-phone archives and unsafe paths', () => {
-  assert.throws(() => SsfPackage.open(new Uint8Array([...strToU8('Skin'), 1, 0, 0, 0])), /电脑版/)
-  assert.throws(() => SsfPackage.open(zipSync({ 'skin.ini': strToU8('[General]') })), /电脑版/)
-  assert.throws(() => SsfPackage.open(zipSync({ 'readme.txt': strToU8('x') })), /phoneTheme\.ini/)
-  assert.throws(() => SsfPackage.open(zipSync({ 'phoneTheme.ini': strToU8('[General]') })), /phoneSkin\.ini/)
-  assert.throws(() => SsfPackage.open(zipSync({ 'phoneTheme.ini': strToU8(''), '../1080/phoneSkin.ini': strToU8('') })), /不安全路径/)
+test('ssf package: rejects PC skins, non-phone archives and unsafe paths', async () => {
+  await assert.rejects(SsfPackage.open(zipSync({ 'skin.ini': strToU8('[General]') })), /电脑版/)
+  await assert.rejects(SsfPackage.open(zipSync({ 'readme.txt': strToU8('x') })), /phoneTheme\.ini/)
+  await assert.rejects(SsfPackage.open(zipSync({ 'phoneTheme.ini': strToU8('[General]') })), /phoneSkin\.ini/)
+  await assert.rejects(SsfPackage.open(zipSync({ 'phoneTheme.ini': strToU8(''), '../1080/phoneSkin.ini': strToU8('') })), /不安全路径/)
 })
 
-test('ssf package: reads UTF-16 and GBK INI text', () => {
+test('ssf package: the encrypted container opens like the ZIP and is judged by its files', async () => {
+  const files = unzipSync(ssfFixture())
+  const pkg = await SsfPackage.open(await skinContainer(files))
+  assert.deepEqual([...pkg.themes], [['light', '1080/status1/'], ['dark', '1080/status2/']])
+  assert.deepEqual([...pkg.files.keys()].sort(), Object.keys(files).sort())
+  assert.deepEqual(pkg.file('light', '26keyq.png'), files['1080/status1/26keyq.png'])
+  const { bytes } = await importSsf(await skinContainer(files), 'bds', templates)
+  assert.deepEqual(rgb(baiduKeyStyle(SkinArchive.open(bytes), 'light', 'port', 'py_26', 'q').image, 0, 0), COLORS.light.qKey)
+  // Windows-style names unpack to the same folders.
+  const windows = Object.fromEntries(Object.entries(files).map(([name, body]) => [name.replace(/\//g, '\\'), body]))
+  assert.ok((await SsfPackage.open(await skinContainer(windows))).files.has('1080/status1/phoneSkin.ini'))
+})
+
+test('ssf package: encrypted PC skins, other versions and damaged containers are rejected', async () => {
+  await assert.rejects(SsfPackage.open(await skinContainer({ 'skin.ini': strToU8('[General]') })), /电脑版/)
+  await assert.rejects(SsfPackage.open(await skinContainer({ 'skin.ini': strToU8('') }, { version: 2 })), /版本/)
+  await assert.rejects(SsfPackage.open(new Uint8Array([...strToU8('Skin'), 3, 0, 0, 0])), /版本/)
+  const broken = await skinContainer({ 'phoneTheme.ini': strToU8('') })
+  broken[broken.length - 1] ^= 0xff
+  await assert.rejects(SsfPackage.open(broken), /已损坏/)
+  await assert.rejects(SsfPackage.open(await skinContainer({ '../phoneTheme.ini': strToU8('') })), /不安全路径/)
+  await assert.rejects(SsfPackage.open(await skinContainer({ 'a.ini': strToU8(''), 'A.INI': strToU8('') })), /重复/)
+  await assert.rejects(SsfPackage.open(await skinContainer({ 'phoneTheme.ini': strToU8('') }, { declared: 1 })), /已损坏/)
+})
+
+test('ssf package: reads UTF-16 and GBK INI text', async () => {
   const utf16 = new Uint8Array([0xff, 0xfe, ...[...'[General]\nskin_name=宽字'].flatMap((char) => [char.charCodeAt(0) & 255, char.charCodeAt(0) >> 8])])
   const gbk = new Uint8Array([...strToU8('[General]\nskin_name='), 0xd6, 0xd0, 0xce, 0xc4])
   for (const [theme, name] of [[utf16, '宽字'], [gbk, '中文']]) {
-    const pkg = SsfPackage.open(zipSync({ 'phoneTheme.ini': theme, '1080/phoneSkin.ini': strToU8('') }))
+    const pkg = await SsfPackage.open(zipSync({ 'phoneTheme.ini': theme, '1080/phoneSkin.ini': strToU8('') }))
     assert.equal(pkg.info.name, name)
   }
 })
@@ -188,8 +212,8 @@ test('key table: boards, Sogou class names and landscape variants', () => {
 
 // —— Sogou → BDS / BDI ——
 
-test('ssf → BDS: per-key and shared backgrounds keep their stretch band, per theme', () => {
-  const { archive, warnings } = convertSsfToBaidu(SsfPackage.open(ssfFixture()), bdsTemplate)
+test('ssf → BDS: per-key and shared backgrounds keep their stretch band, per theme', async () => {
+  const { archive, warnings } = convertSsfToBaidu(await SsfPackage.open(ssfFixture()), bdsTemplate)
   assert.equal(archive.format, 'bds')
   for (const theme of ['light', 'dark']) {
     const c = COLORS[theme]
@@ -212,8 +236,8 @@ test('ssf → BDS: per-key and shared backgrounds keep their stretch band, per t
   assert.ok(warnings.some((warning) => /webp/.test(warning)))
 })
 
-test('ssf → BDS: FG_RECT becomes transparent padding and icons are centred on the key canvas', () => {
-  const { archive } = convertSsfToBaidu(SsfPackage.open(ssfFixture()), bdsTemplate)
+test('ssf → BDS: FG_RECT becomes transparent padding and icons are centred on the key canvas', async () => {
+  const { archive } = convertSsfToBaidu(await SsfPackage.open(ssfFixture()), bdsTemplate)
   const fore = baiduKeyStyle(archive, 'light', 'port', 'py_26', 'q', 'FORE_STYLE').image
   // FG_RECT=0,0.25,1,0.75 on a 90 px glyph → a 120 px canvas with the glyph in its bottom 90 rows.
   assert.deepEqual([fore.width, fore.height], [98, 120])
@@ -228,8 +252,8 @@ test('ssf → BDS: FG_RECT becomes transparent padding and icons are centred on 
   assert.equal(document.get(q, 'FORE_OFFSET'), undefined)
 })
 
-test('ssf → BDS: text-drawn keys keep the template glyph in the Sogou label colour', () => {
-  const { archive } = convertSsfToBaidu(SsfPackage.open(ssfFixture()), bdsTemplate)
+test('ssf → BDS: text-drawn keys keep the template glyph in the Sogou label colour', async () => {
+  const { archive } = convertSsfToBaidu(await SsfPackage.open(ssfFixture()), bdsTemplate)
   const glyph = baiduKeyStyle(archive, 'light', 'port', 'py_26', 'w', 'FORE_STYLE')
   const opaque = [...Array(glyph.image.width * glyph.image.height).keys()].find((index) => glyph.image.data[index * 4 + 3] > 0)
   assert.ok(opaque !== undefined, '模板字形应有可见像素')
@@ -238,8 +262,8 @@ test('ssf → BDS: text-drawn keys keep the template glyph in the Sogou label co
   assert.deepEqual(pressedOpaque, argb(TEXT.light.qwertyPressed))
 })
 
-test('ssf → BDS: one Sogou background splits into candidate bar and panel', () => {
-  const { archive } = convertSsfToBaidu(SsfPackage.open(ssfFixture()), bdsTemplate)
+test('ssf → BDS: one Sogou background splits into candidate bar and panel', async () => {
+  const { archive } = convertSsfToBaidu(await SsfPackage.open(ssfFixture()), bdsTemplate)
   const gen = IniDocument.parse(archive.getText('light/skin/port/gen.ini'))
   const panel = baiduStyleImage(archive, 'light', gen.get('PANEL', 'BACK_STYLE')).image
   assert.deepEqual([panel.width, panel.height], [1080, 846 - 126])
@@ -256,8 +280,8 @@ test('ssf → BDS: one Sogou background splits into candidate bar and panel', ()
   assert.equal(symbolPanel, gen.get('PANEL', 'BACK_STYLE'), '与通用背景相同的页面跟随新背景')
 })
 
-test('ssf → BDS: symbol column and key sounds', () => {
-  const { archive } = convertSsfToBaidu(SsfPackage.open(ssfFixture()), bdsTemplate)
+test('ssf → BDS: symbol column and key sounds', async () => {
+  const { archive } = convertSsfToBaidu(await SsfPackage.open(ssfFixture()), bdsTemplate)
   const py9 = IniDocument.parse(archive.getText('light/skin/port/py_9.ini'))
   assert.deepEqual(rgb(baiduStyleImage(archive, 'light', py9.get('LIST', 'BACK_STYLE')).image, 0, 0), COLORS.light.codeBack)
   assert.deepEqual(rgb(baiduStyleImage(archive, 'light', py9.get('LIST', 'CELL_STYLE')).image, 0, 0), COLORS.light.codeCell)
@@ -271,18 +295,18 @@ test('ssf → BDS: symbol column and key sounds', () => {
   assert.equal(css.get('GLOBAL', 'STYLE_NUM'), String(css.sections().filter((name) => /^STYLE\d+$/.test(name)).length))
 })
 
-test('ssf → BDS: a one-look skin becomes a single-theme package', () => {
-  const { archive } = convertSsfToBaidu(SsfPackage.open(ssfFixture({ single: true })), bdsTemplate)
+test('ssf → BDS: a one-look skin becomes a single-theme package', async () => {
+  const { archive } = convertSsfToBaidu(await SsfPackage.open(ssfFixture({ single: true })), bdsTemplate)
   assert.ok(archive.names().some((name) => name.startsWith('light/skin/')))
   assert.ok(!archive.names().some((name) => name.startsWith('dark/skin/')))
   assert.doesNotMatch(archive.getText('Info.txt'), /SupportDarkMode/)
   assert.ok(Object.keys(unzipSync(archive.toBytes())).includes('port/py_26.ini'))
 })
 
-test('ssf → BDS: missing images are reported, not fatal', () => {
+test('ssf → BDS: missing images are reported, not fatal', async () => {
   const files = unzipSync(ssfFixture())
   delete files['1080/status1/26keyq.png']
-  const { archive, warnings } = convertSsfToBaidu(SsfPackage.open(zipSync(files)), bdsTemplate)
+  const { archive, warnings } = convertSsfToBaidu(await SsfPackage.open(zipSync(files)), bdsTemplate)
   assert.ok(warnings.some((warning) => warning.includes('26keyq.png')))
   assert.deepEqual(rgb(baiduKeyStyle(archive, 'light', 'port', 'py_26', 'q').image, 0, 0), COLORS.light.letterKey)
 })
@@ -308,8 +332,8 @@ function bdaKeyImage(archive, theme, orientation, panel, keyName, which = 'back'
   return { appearance, key, ref, style: ref.type === 'image' ? appearance.imageStyles.get(ref.key) : appearance.textStyles.get(ref.key) }
 }
 
-test('ssf → BDA: keys point at new image styles with the Sogou images and stretch bands', () => {
-  const { archive } = convertSsfToBda(SsfPackage.open(ssfFixture()), bdaTemplate)
+test('ssf → BDA: keys point at new image styles with the Sogou images and stretch bands', async () => {
+  const { archive } = convertSsfToBda(await SsfPackage.open(ssfFixture()), bdaTemplate)
   assert.equal(archive.format, 'bda')
   for (const theme of ['light', 'dark']) {
     const { style } = bdaKeyImage(archive, theme, 'port', 'py_26', 'KEY_Q')
@@ -326,8 +350,8 @@ test('ssf → BDA: keys point at new image styles with the Sogou images and stre
   }
 })
 
-test('ssf → BDA: new style keys never collide between orientations, so BDA → BDS keeps them all', () => {
-  const { archive } = convertSsfToBda(SsfPackage.open(ssfFixture()), bdaTemplate)
+test('ssf → BDA: new style keys never collide between orientations, so BDA → BDS keeps them all', async () => {
+  const { archive } = convertSsfToBda(await SsfPackage.open(ssfFixture()), bdaTemplate)
   const port = decodeBdaAppearance(archive.getBytes('light/skin/port/appearanceConfig'))
   const land = decodeBdaAppearance(archive.getBytes('light/skin/land/appearanceConfig'))
   for (const group of ['imageStyles', 'textStyles']) {
@@ -339,8 +363,8 @@ test('ssf → BDA: new style keys never collide between orientations, so BDA →
   assert.ok(!warnings.some((warning) => /同号样式/.test(warning) && !/有 1 个/.test(warning)), warnings.join('\n'))
 })
 
-test('ssf → BDA: panel background, candidate bar and key sounds', () => {
-  const { archive } = convertSsfToBda(SsfPackage.open(ssfFixture()), bdaTemplate)
+test('ssf → BDA: panel background, candidate bar and key sounds', async () => {
+  const { archive } = convertSsfToBda(await SsfPackage.open(ssfFixture()), bdaTemplate)
   const appearance = decodeBdaAppearance(archive.getBytes('light/skin/port/appearanceConfig'))
   const panel = appearance.panels.get('py_26')
   const back = appearance.imageStyles.get(panel.backStyle.key)
@@ -359,11 +383,11 @@ test('ssf → BDA: panel background, candidate bar and key sounds', () => {
 
 // —— Baidu → Sogou ——
 
-test('BDS → ssf → BDS keeps every key look', () => {
-  const first = convertSsfToBaidu(SsfPackage.open(ssfFixture()), bdsTemplate).archive
+test('BDS → ssf → BDS keeps every key look', async () => {
+  const first = convertSsfToBaidu(await SsfPackage.open(ssfFixture()), bdsTemplate).archive
   const exported = convertBaiduToSsf(first)
   assert.deepEqual(exported.warnings, [])
-  const pkg = SsfPackage.open(exported.bytes)
+  const pkg = await SsfPackage.open(exported.bytes)
   assert.deepEqual([...pkg.themes], [['light', '1080/status1/'], ['dark', '1080/status2/']])
   assert.equal(pkg.info.name, '测试皮肤')
   const second = convertSsfToBaidu(pkg, bdsTemplate).archive
@@ -379,14 +403,14 @@ test('BDS → ssf → BDS keeps every key look', () => {
   }
 })
 
-test('BDS → ssf: background stacking, FORE_OFFSET → FG_RECT and package files', () => {
+test('BDS → ssf: background stacking, FORE_OFFSET → FG_RECT and package files', async () => {
   const files = unzipSync(bdsTemplate.toBytes())
   const document = IniDocument.parse(strFromU8(files['port/py_26.ini']))
   const q = document.sections().find((name) => document.get(name, 'CENTER') === 'q')
   document.set(q, 'FORE_OFFSET', '0,-10')
   files['port/py_26.ini'] = strToU8(document.toString())
   const { bytes } = convertBaiduToSsf(SkinArchive.open(zipSync(files)))
-  const pkg = SsfPackage.open(bytes)
+  const pkg = await SsfPackage.open(bytes)
   assert.deepEqual([...pkg.themes], [['light', '1080/']])
   assert.ok(!pkg.files.has('time.ini'))
   const skin = pkg.skin('light')
@@ -402,10 +426,10 @@ test('BDS → ssf: background stacking, FORE_OFFSET → FG_RECT and package file
   assert.match(new TextDecoder().decode(pkg.files.get('phoneTheme.ini')), /^skin_name=default$/m)
 })
 
-test('BDA → ssf goes through the official BDS base and keeps the panel background', () => {
+test('BDA → ssf goes through the official BDS base and keeps the panel background', async () => {
   const { bytes, warnings } = exportSsf(bdaTemplate, bdaBase)
   assert.deepEqual(warnings, [])
-  const pkg = SsfPackage.open(bytes)
+  const pkg = await SsfPackage.open(bytes)
   const skin = pkg.skin('light')
   assert.ok(skin.get('RootView', 'BG_IMAGE'))
   assert.ok(pkg.skin('light').sections().includes('Key_Q'))
@@ -434,7 +458,7 @@ test('real Sogou skins convert to every format and back', { skip: realSkins.leng
       const archive = SkinArchive.open(converted, format)
       const back = exportSsf(archive, bdaBase)
       assert.ok(!back.warnings.some((warning) => /没有可转换的键盘背景/.test(warning)), `${name} ${format} → ssf: ${back.warnings.join('；')}`)
-      SsfPackage.open(back.bytes)
+      await SsfPackage.open(back.bytes)
     }
   }
 })

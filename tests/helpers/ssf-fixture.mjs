@@ -1,6 +1,6 @@
 // A small but complete Sogou phone skin built in code, so tests need no third-party skins.
 // Every part has its own colour, which lets tests follow it through a conversion.
-import { strToU8, zipSync } from 'fflate'
+import { strToU8, zipSync, zlibSync } from 'fflate'
 import { encodePng } from '../../src/ssf/ssf-png.ts'
 
 export const SIZES = {
@@ -169,4 +169,46 @@ export function ssfFixture({ single = false } = {}) {
     }
   }
   return zipSync(files)
+}
+
+const hex = (value) => Uint8Array.from(value.match(/../g), (pair) => Number.parseInt(pair, 16))
+
+/**
+ * Packs files into Sogou's encrypted "Skin" container, written straight from the unSSF / ssf-extractor
+ * layout so the reader is checked against the format rather than against itself.
+ */
+export async function skinContainer(files, { version = 3, declared } = {}) {
+  const entries = Object.entries(files).map(([name, body]) => {
+    const nameBytes = new Uint8Array(name.length * 2)
+    for (let index = 0; index < name.length; index++) new DataView(nameBytes.buffer).setUint16(index * 2, name.charCodeAt(index), true)
+    const entry = new Uint8Array(8 + nameBytes.length + body.length)
+    const view = new DataView(entry.buffer)
+    view.setUint32(0, nameBytes.length, true)
+    entry.set(nameBytes, 4)
+    view.setUint32(4 + nameBytes.length, body.length, true)
+    entry.set(body, 8 + nameBytes.length)
+    return entry
+  })
+  const tableBytes = entries.length * 4
+  const raw = new Uint8Array(8 + tableBytes + entries.reduce((total, entry) => total + entry.length, 0))
+  const view = new DataView(raw.buffer)
+  view.setUint32(0, raw.length, true)
+  view.setUint32(4, tableBytes, true)
+  let offset = 8 + tableBytes
+  entries.forEach((entry, index) => {
+    view.setUint32(8 + index * 4, offset, true)
+    raw.set(entry, offset)
+    offset += entry.length
+  })
+  const compressed = zlibSync(raw)
+  const plain = new Uint8Array(4 + compressed.length)
+  new DataView(plain.buffer).setUint32(0, declared ?? raw.length, true)
+  plain.set(compressed, 4)
+  const key = await crypto.subtle.importKey('raw', hex('5236461AD38503669045162879033623DDBE6F03FF04E3CAD57FFCA350E49ED9'), 'AES-CBC', false, ['encrypt'])
+  const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-CBC', iv: hex('E07AAD35E090AA038A51FD05DF8C5D0F') }, key, plain))
+  const out = new Uint8Array(8 + encrypted.length)
+  out.set(strToU8('Skin'))
+  new DataView(out.buffer).setUint32(4, version, true)
+  out.set(encrypted, 8)
+  return out
 }
