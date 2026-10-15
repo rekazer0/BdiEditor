@@ -16,9 +16,12 @@ const THEMES = [["default", "light"], ["night", "dark"]] as const
 const ORIENTATIONS = ["port", "land"] as const
 
 // Swift writes `Int.max` as 9223372036854775807, which a double rounds to 2^63.
+export function parseSkinJsonValue(text: string): Json {
+  return JSON.parse(text, (_key, item) => item === 9223372036854775807 ? PALM_INT_MAX : item) as Json
+}
+
 export function parseSkinJson(text: string): JsonObject {
-  const value = JSON.parse(text, (_key, item) => item === 9223372036854775807 ? PALM_INT_MAX : item) as Json
-  const skin = asObject(value)
+  const skin = asObject(parseSkinJsonValue(text))
   if (!skin) throw new Error("skin.json 顶层必须是对象")
   return skin
 }
@@ -51,6 +54,17 @@ function hasEntries(value: Json): boolean {
 
 function same(left: Json, right: Json): boolean {
   return compactPalmJSON(left) === compactPalmJSON(right)
+}
+
+// AI and other fragment editors address a skin.json part as "skin.json/<key>/<key>/…".
+export function sxiFragmentPath(pointer: readonly string[]): string {
+  return `${SXI_SKIN_PATH}/${pointer.join("/")}`
+}
+
+export function applySxiFragments(skinText: string, fragments: ReadonlyArray<{ path: string; text: string }>): string {
+  const skin = parseSkinJson(skinText)
+  for (const { path, text } of fragments) setSxiFragment(skin, path.split("/").slice(1), parseSkinJsonValue(text))
+  return encodeSkinJson(skin)
 }
 
 export function sxiDerivedFiles(skin: JsonObject): Map<string, SxiDerivedFile> {

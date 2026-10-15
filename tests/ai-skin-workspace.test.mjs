@@ -33,3 +33,19 @@ test('add_ini_section and remove_ini_sections keep KEY numbering and counters in
   assert.equal(layout.after, '[PANEL]\nKEY_NUM=2\n[KEY1]\nVIEW_RECT=10,0,10,10\n[KEY2]\nVIEW_RECT=20,0,10,10\n')
   assert.match(styles.after, /STYLE_NUM=80/)
 })
+
+test('JSON path tools read and edit single values inside large JSON files', () => {
+  const text = JSON.stringify({ keys: [{ id: '1', b: { base_b: 118 } }], ss_1: { 118: { s_1: { c_normal: '232323' } } } }, null, 2)
+  const workspace = new AiSkinWorkspace([{ path: 'skin.json/default/s_port', syntax: 'json', text }])
+  assert.throws(() => workspace.setJsonValue('skin.json/default/s_port', 'ss_1/118/s_1/c_normal', '"FF0000"'), /先读取/)
+  assert.deepEqual(workspace.readJsonPaths('skin.json/default/s_port', ['keys/0/b', 'ss_1/118/s_1', 'ss_1/9']), {
+    values: { 'keys/0/b': { base_b: 118 }, 'ss_1/118/s_1': { c_normal: '232323' } },
+    missing: ['ss_1/9'],
+  })
+  assert.equal(workspace.setJsonValue('skin.json/default/s_port', 'ss_1/118/s_1/c_normal', '"FF0000"'), 'updated')
+  assert.equal(workspace.setJsonValue('skin.json/default/s_port', 'ss_1/118/s_1/c_hl', '"00FF00"'), 'created')
+  assert.throws(() => workspace.setJsonValue('skin.json/default/s_port', 'keys/1', '{}'), /数组下标不存在/)
+  assert.throws(() => workspace.setJsonValue('skin.json/default/s_port', 'nope/x', '1'), /路径无效/)
+  assert.throws(() => workspace.setJsonValue('skin.json/default/s_port', 'keys/0/id', '{'), /有效 JSON/)
+  assert.deepEqual(JSON.parse(workspace.changes()[0].after).ss_1['118'].s_1, { c_normal: 'FF0000', c_hl: '00FF00' })
+})

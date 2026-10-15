@@ -5,7 +5,7 @@ import { SkinArchive } from "../src/skin.ts"
 import { buildSxiZip } from "../src/palm/palm-export.ts"
 import { canExport, exportFormatFromPath } from "../src/export.ts"
 import { compactPalmJSON } from "../src/palm/palm-json.ts"
-import { encodeSkinJson, parseSkinJson, setSxiFragment, sxiDerivedFiles } from "../src/palm/sxi-projection.ts"
+import { applySxiFragments, encodeSkinJson, parseSkinJson, setSxiFragment, sxiDerivedFiles, sxiFragmentPath } from "../src/palm/sxi-projection.ts"
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
@@ -98,4 +98,19 @@ test("an opened .sxi only saves as .sxi", () => {
   assert.ok(canExport("bds", "sxi"))
   assert.ok(!canExport("bds", "bda"))
   assert.throws(() => archive.toBytes("bds"), /\.sxi/)
+})
+
+test("AI fragment drafts merge back into one skin.json edit", () => {
+  const archive = sxiArchive()
+  const before = archive.getText("skin.json")
+  const skin = parseSkinJson(before)
+  const board = skin.default.port_layout.b.full26Pinyin
+  board.keys[0].b.base_b = 7
+  const after = applySxiFragments(before, [
+    { path: sxiFragmentPath(["default", "port_layout", "b", "full26Pinyin"]), text: JSON.stringify(board, null, 2) },
+    { path: sxiFragmentPath(["info", "name"]), text: '"新名字"' },
+  ])
+  archive.setText("skin.json", after)
+  assert.match(archive.getText("light/skin/port/py_26.ini"), /\[KEY1\]\nBACK_STYLE=7/)
+  assert.match(archive.getText("Info.txt"), /Name=新名字/)
 })
