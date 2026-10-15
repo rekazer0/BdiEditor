@@ -238,9 +238,9 @@
 
 /* —— 样式卡片：左侧编号 + 类型，右侧并排「正常 | 按下」两个预览；标签在卡片上方。
    按键、整体布局、BDA 共用同一张卡片（style-references.ts / bda-editor.ts 生成同样的结构）。 —— */
-.source :is(.ui-field, .document-property-field, .fore-style-reference-field):has(.style-reference-row, .bda-style-reference-input, .sound-style-reference) { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
+.source :is(.ui-field, .document-property-field, .fore-style-reference-field).style-reference-field { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
 /* 卡片上方的标签：小号弱化，和属性行标签区分开；「+ 添加」靠右 */
-.source :is(.ui-field, .document-property-field, .fore-style-reference-field):has(.style-reference-row, .bda-style-reference-input, .sound-style-reference) > :first-child { display: flex; align-items: center; color: var(--tertiary); font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); }
+.source :is(.ui-field, .document-property-field, .fore-style-reference-field).style-reference-field > :first-child { display: flex; align-items: center; color: var(--tertiary); font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); }
 .source .style-reference-add { display: inline-flex; align-items: center; gap: var(--space-2xs); margin-left: auto; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; }
 .source .style-reference-add:focus-visible { outline: 0; border-radius: var(--radius-sm); box-shadow: var(--focus-ring); }
 .source #quick-inspector[data-readonly="true"] .style-reference-add { display: none; }

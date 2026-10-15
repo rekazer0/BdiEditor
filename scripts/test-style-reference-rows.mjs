@@ -33,7 +33,7 @@ const context = withAppState(vm.createContext({
   styleReferenceDrawIDs: new WeakMap(),
   styleStateVisuals: new WeakMap(),
   styleStateCanvasObserver: { observe() {}, unobserve() {} },
-  sizeStyleStateCanvas: () => false,
+  scheduleStyleStateSizing: canvas => { const meta = context.styleStateVisuals.get(canvas); drawn.push([meta.visual]) },
   visualResolver: () => ({ resolve: async (id, highlighted) => ({ id, highlighted }) }),
   drawVisualPreview: (canvas, layers) => drawn.push(layers),
   styleConfigDocument: () => undefined,

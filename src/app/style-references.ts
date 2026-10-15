@@ -44,6 +44,8 @@ export function decorateStyleReferenceInput(input: HTMLInputElement, key = style
   wrapper.className = "style-reference-input"
   wrapper.classList.toggle("sound-style-reference", soundStyle)
   parent.insertBefore(wrapper, input)
+  // 卡片布局靠这个 class 而不是 :has()：检查器每次重建都会让 :has() 重算整个右栏样式。
+  wrapper.closest(".ui-field, .document-property-field, .fore-style-reference-field")?.classList.add("style-reference-field")
   if (soundStyle) {
     const soundMain = document.createElement("span")
     soundMain.className = "sound-style-main"
@@ -234,9 +236,30 @@ export async function refreshStyleReferenceThumbnail(
   visuals.forEach((visual, index) => {
     const canvas = canvases[index]
     styleStateVisuals.set(canvas, { visual, foreground })
-    // 量不到尺寸（所在分组隐藏）时先用现有位图绘制，保证切回该分组时不出现空白预览。
-    if (!sizeStyleStateCanvas(canvas)) drawVisualPreview(canvas, [visual], foreground)
+    scheduleStyleStateSizing(canvas)
     styleStateCanvasObserver.observe(canvas)
+  })
+}
+
+const pendingStyleStateCanvases = new Set<HTMLCanvasElement>()
+let styleStateSizingFrame = 0
+
+/*
+ * 一次检查器重建会刷新几十个样式按钮，各自量尺寸再改位图，每个按钮都会触发一次强制布局，
+ * WebKit 下切换文件、点选按键明显卡顿。改为下一帧统一先量完、再改位图，只排版一次。
+ */
+function scheduleStyleStateSizing(canvas: HTMLCanvasElement): void {
+  pendingStyleStateCanvases.add(canvas)
+  styleStateSizingFrame ||= requestAnimationFrame(() => {
+    styleStateSizingFrame = 0
+    const canvases = Array.from(pendingStyleStateCanvases).filter((canvas) => canvas.isConnected)
+    pendingStyleStateCanvases.clear()
+    const rects = canvases.map((canvas) => canvas.getBoundingClientRect())
+    canvases.forEach((canvas, index) => {
+      const meta = styleStateVisuals.get(canvas)
+      // 量不到尺寸（所在分组隐藏）或尺寸未变时用现有位图绘制，保证切回该分组时不出现空白预览。
+      if (!sizeStyleStateCanvas(canvas, rects[index]) && meta) drawVisualPreview(canvas, [meta.visual], meta.foreground)
+    })
   })
 }
 
@@ -248,8 +271,7 @@ export const styleStateCanvasSizes = new WeakMap<HTMLCanvasElement, string>()
  * 缩略图按卡片的实际尺寸绘制：固定 152×76 的宽扁画布经过 object-fit: contain 后只剩卡片
  * 一半高度，图案显得又小又扁。改用卡片内容盒尺寸作为位图尺寸，样式图才能铺满卡片高度。
  */
-export function sizeStyleStateCanvas(canvas: HTMLCanvasElement): boolean {
-  const { width, height } = canvas.getBoundingClientRect()
+export function sizeStyleStateCanvas(canvas: HTMLCanvasElement, { width, height } = canvas.getBoundingClientRect()): boolean {
   if (width < 1 || height < 1) return false
   const size = `${Math.round(width)}x${Math.round(height)}`
   if (styleStateCanvasSizes.get(canvas) === size) return false
@@ -262,9 +284,9 @@ export function sizeStyleStateCanvas(canvas: HTMLCanvasElement): boolean {
 
 /** 分组切换后为之前量不到尺寸的缩略图补一次按尺寸重绘。 */
 export function redrawStyleStateCanvases(): void {
-  for (const canvas of Array.from(document.querySelectorAll<HTMLCanvasElement>(".style-reference-row canvas"))) {
-    sizeStyleStateCanvas(canvas)
-  }
+  const canvases = Array.from(document.querySelectorAll<HTMLCanvasElement>(".style-reference-row canvas"))
+  const rects = canvases.map((canvas) => canvas.getBoundingClientRect())
+  canvases.forEach((canvas, index) => sizeStyleStateCanvas(canvas, rects[index]))
 }
 
 const resizedStyleStateCanvases = new Set<HTMLCanvasElement>()
@@ -278,17 +300,19 @@ export const styleStateCanvasObserver = new ResizeObserver((entries) => {
   }
   clearTimeout(styleStateResizeTimer)
   styleStateResizeTimer = setTimeout(() => {
+    const connected: HTMLCanvasElement[] = []
     for (const canvas of resizedStyleStateCanvases) {
       // 被重建替换掉的画布不再需要重绘，及时解绑，避免观察器长期持有已分离的位图。
-      if (!canvas.isConnected) {
+      if (canvas.isConnected) connected.push(canvas)
+      else {
         styleStateCanvasObserver.unobserve(canvas)
         styleStateVisuals.delete(canvas)
         styleStateCanvasSizes.delete(canvas)
-        continue
       }
-      sizeStyleStateCanvas(canvas)
     }
     resizedStyleStateCanvases.clear()
+    const rects = connected.map((canvas) => canvas.getBoundingClientRect())
+    connected.forEach((canvas, index) => sizeStyleStateCanvas(canvas, rects[index]))
   }, 120)
 })
 
