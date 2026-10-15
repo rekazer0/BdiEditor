@@ -168,6 +168,7 @@ export function renderStyleReferenceRows(button: HTMLElement, input: HTMLInputEl
       item.title = `点击选择${highlighted ? "按下" : "正常"}图片切片；Alt 点击更换样式；Command/Ctrl 点击编辑样式`
       item.setAttribute("aria-label", item.title)
       const canvas = spare.pop() ?? retinaThumbnail(document.createElement("canvas"), 152, 76)
+      styleStateCanvases.add(canvas)
       canvas.setAttribute("aria-hidden", "true")
       item.append(canvas)
       item.addEventListener("click", (event) => {
@@ -242,6 +243,17 @@ export async function refreshStyleReferenceThumbnail(
 }
 
 const pendingStyleStateCanvases = new Set<HTMLCanvasElement>()
+const styleStateCanvases = new Set<HTMLCanvasElement>()
+
+/** WebKit 的 GC 不计入画布位图，检查器反复重建后旧位图越积越多、越用越卡；丢弃时立即释放。 */
+function releaseStyleStateCanvas(canvas: HTMLCanvasElement): void {
+  styleStateCanvases.delete(canvas)
+  styleStateCanvasObserver.unobserve(canvas)
+  styleStateVisuals.delete(canvas)
+  styleStateCanvasSizes.delete(canvas)
+  canvas.width = 0
+  canvas.height = 0
+}
 let styleStateSizingFrame = 0
 
 /*
@@ -252,6 +264,8 @@ function scheduleStyleStateSizing(canvas: HTMLCanvasElement): void {
   pendingStyleStateCanvases.add(canvas)
   styleStateSizingFrame ||= requestAnimationFrame(() => {
     styleStateSizingFrame = 0
+    // 检查器重建在这一帧之前已同步完成，此时还不在文档里的就是被丢弃的旧画布。
+    for (const canvas of styleStateCanvases) if (!canvas.isConnected) releaseStyleStateCanvas(canvas)
     const canvases = Array.from(pendingStyleStateCanvases).filter((canvas) => canvas.isConnected)
     pendingStyleStateCanvases.clear()
     const rects = canvases.map((canvas) => canvas.getBoundingClientRect())
@@ -304,11 +318,7 @@ export const styleStateCanvasObserver = new ResizeObserver((entries) => {
     for (const canvas of resizedStyleStateCanvases) {
       // 被重建替换掉的画布不再需要重绘，及时解绑，避免观察器长期持有已分离的位图。
       if (canvas.isConnected) connected.push(canvas)
-      else {
-        styleStateCanvasObserver.unobserve(canvas)
-        styleStateVisuals.delete(canvas)
-        styleStateCanvasSizes.delete(canvas)
-      }
+      else releaseStyleStateCanvas(canvas)
     }
     resizedStyleStateCanvases.clear()
     const rects = connected.map((canvas) => canvas.getBoundingClientRect())
