@@ -68,6 +68,8 @@ function packageInfo(files: Map<string, Uint8Array>, formatHint?: ExportFormat):
 }
 
 function canonicalPath(path: string, layout: PackageLayout, bdaRoots?: Map<BdaTheme, string>): string {
+  // Hand-made packages ship info.txt / INFO.TXT; the IME only reads Info.txt, so conversions must rename it.
+  path = path.replace(/(^|\/)info\.txt$/i, "$1Info.txt")
   if (layout === "bdi-dual") {
     if (path === "skin/") return ""
     if (path === "skin/Info.txt") return "Info.txt"

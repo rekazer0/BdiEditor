@@ -202,3 +202,27 @@ test('BDA → BDI prefers iOS key sounds', async () => {
   assert.ok(names.length)
   assert.ok(names.every((name) => name.endsWith('tap.aiff')), names.join())
 })
+
+// Reported 2026-10-13: a lowercase info.txt was neither renamed nor retargeted, so the IME fell back
+// to its default skin and system key sound after a BDI ⇄ BDS conversion.
+test('Info.txt with any filename case is renamed and retargeted on BDI ⇄ BDS conversion', async () => {
+  const bds = unzipSync(await SkinArchive.open(zipSync({
+    'skin/info.txt': strToU8('Name=x\nSupportPlatform=I\nStyle=default\n'),
+    'skin/light/skin/INFO.TXT': strToU8('Name=x\n'),
+    'skin/light/skin/port/py_9.ini': strToU8('[PANEL]\nSOUND_STYLE=1\n'),
+    'skin/light/skin/res/default.css': strToU8('[STYLE1]\nPRESS_SOUND_PATH=tap.aiff\n'),
+    'skin/light/skin/res/tap.aiff': aiff(),
+    'skin/dark/skin/port/py_9.ini': strToU8('[PANEL]\n'),
+  }), 'bdi').toBytesAsync('bds'))
+  assert.deepEqual(Object.keys(bds).filter((path) => /info\.txt$/i.test(path)), ['Info.txt'])
+  assert.equal(strFromU8(bds['Info.txt']), 'Name=x\nSupportPlatform=A\nStyle=default\n')
+  assert.match(strFromU8(bds['light/res/default.css']), /^PRESS_SOUND_PATH=tap\.ogg$/m)
+  assert.ok(isOgg(bds['light/res/tap.ogg']))
+
+  const bdi = unzipSync(await SkinArchive.open(zipSync({
+    'info.txt': strToU8('Name=x\nSupportPlatform=A\nStyle=default\n'),
+    'port/py_9.ini': strToU8('[PANEL]\n'),
+  }), 'bds').toBytesAsync('bdi'))
+  assert.deepEqual(Object.keys(bdi).filter((path) => /info\.txt$/i.test(path)), ['skin/Info.txt'])
+  assert.equal(strFromU8(bdi['skin/Info.txt']), 'Name=x\nSupportPlatform=I\n')
+})
