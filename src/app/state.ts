@@ -25,12 +25,14 @@ import { type SourceEditorValueRange } from "../lazy-source-editor.ts"
 import { type StyleKind } from "./types"
 import { type ProjectChoice } from "../project-chooser"
 import { type WindowMaterialKind } from "./types"
+import { type SsfTemplates } from "../ssf/ssf-convert.ts"
 export const appState = {
   fileOperationProgressVisible: false,
   simulatedComposition: "",
   lastSimulationLanguage: undefined as "zh" | "en" | undefined,
   archive: undefined as SkinArchive | undefined,
   bdaBase: undefined as SkinArchive | undefined,
+  ssfTemplates: undefined as SsfTemplates | undefined,
   currentPath: "",
   sourceWorkspacePath: "",
   sourceWorkspacePrefix: "",
