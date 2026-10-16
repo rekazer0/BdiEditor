@@ -1,7 +1,7 @@
 import { appState } from "./state"
 import { preview, source, toolbarPreview } from "./canvas-interaction"
 import { normalizeKeySections } from "../ini.ts"
-import { commitText, updateDirty } from "./edit-history"
+import { canvasEditable, commitText, updateDirty } from "./edit-history"
 import { setSourceValue, scrollSelectedSource } from "./config-context"
 import { populateKeyInspector } from "./key-inspector"
 import { updateSourceHighlight, updateInspectorView } from "./source-panel"
@@ -10,6 +10,7 @@ import { type LayoutRect, isListCell, listCellRect, applyLayoutAction as transfo
 import { mixedCoordinateDelta } from "../mixed-input.ts"
 
 export function copySelectedKeys(): void {
+  if (!canvasEditable()) return
   if (!appState.archive || !appState.layoutDocument || !appState.selectedKeySections.length) return
   const before = appState.layoutDocument.toString()
   const occupied = new Set(appState.layoutDocument.sections())
@@ -49,6 +50,7 @@ export function copySelectedKeys(): void {
 }
 
 export function deleteSelectedKeys(): void {
+  if (!canvasEditable()) return
   if (!appState.archive || !appState.layoutDocument || !appState.selectedKeySections.length) return
   const before = appState.layoutDocument.toString()
   if (!appState.layoutDocument.removeSections(preview.expandSections(appState.selectedKeySections))) return
@@ -97,6 +99,7 @@ export function selectedRects(): LayoutRect[] {
 }
 
 export function applyLayoutAction(action: string): void {
+  if (!canvasEditable()) return
   if (!appState.archive || !appState.layoutDocument) return
   if (action === "merge") {
     mergeSelectedKeys()
@@ -122,6 +125,7 @@ export function applyLayoutAction(action: string): void {
 }
 
 export function mergeSelectedKeys(): void {
+  if (!canvasEditable()) return
   if (!appState.archive || !appState.layoutDocument) return
   const rects = selectedRects().filter((rect) => !isListCell(rect.section))
   if (rects.length !== 2) return
@@ -142,6 +146,7 @@ export function mergeSelectedKeys(): void {
 }
 
 export function applyExactGap(field: HTMLInputElement): void {
+  if (!canvasEditable()) return
   if (!appState.archive || !appState.layoutDocument) return
   const gap = Number(field.value)
   if (!Number.isFinite(gap)) return
@@ -173,6 +178,7 @@ export function moveSelectedKeys(
   sections: readonly string[] = appState.selectedKeySections,
   coalesce = false,
 ): void {
+  if (!canvasEditable()) return
   if (!appState.archive || !appState.layoutDocument) return
   const rects = moveRects(sections.flatMap((section) => {
     const values = appState.layoutDocument?.get(section, "VIEW_RECT")?.split(",").map(Number)
@@ -203,6 +209,7 @@ export function isTextEditingTarget(target: EventTarget | null): boolean {
 }
 
 export function moveMixedCoordinate(field: HTMLInputElement, direction: number, coalesce = false): boolean {
+  if (!canvasEditable()) return false
   const delta = mixedCoordinateDelta(
     field.dataset.keyField ?? "",
     field.placeholder,

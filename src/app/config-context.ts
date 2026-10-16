@@ -16,6 +16,7 @@ import { resolveCandidateRect, resolveCandidateInputStyle } from "../candidate-s
 import { bdaStyleID } from "../bda.ts"
 import { devicePreviewTransparent } from "./preview-render"
 import { canvasEditable } from "./edit-history"
+import { isSsfBoardPath, ssfSelectedBindings } from "./ssf-documents"
 
 export function selectedSourceSections(): string[] {
   if (appState.resourceConfigActive && appState.selectedResourcePath) {
@@ -26,6 +27,8 @@ export function selectedSourceSections(): string[] {
   }
   const toolbarSections = isToolbarPath(appState.selectedPath) ? effectiveToolbarSections() : []
   if (toolbarSections.length) return toolbarSections
+  // A Sogou board's source is its phoneSkin.ini: the selected key's classes are what to reveal.
+  if (isSsfBoardPath(appState.selectedPath)) return ssfSelectedBindings().flatMap(({ binding }) => binding.sections)
   return appState.selectedPath === appState.layoutPath ? effectiveSelectedSections() : []
 }
 
@@ -123,10 +126,11 @@ export function isConfigLayoutPath(path: string): boolean {
 /**
  * 普通皮肤（bds/bdi）里所有布局文档都自带属性面板。
  * BDA 容器内的同名遗留文件由 bda 解析器处理，不能按普通布局文档放行；
- * 搜狗皮肤的 INI 字段含义与百度不同，只用源代码编辑。
+ * 搜狗皮肤的每个 INI 由 ssf-inspector.ts 按搜狗字段解析（预览用的转换布局除外）。
  */
 export function showsLayoutProperties(path: string): boolean {
-  return appState.archive?.format !== "bda" && appState.archive?.format !== "ssf" && isConfigLayoutPath(path)
+  if (appState.archive?.format === "ssf") return /\.ini$/i.test(path) && !appState.archive.isOverlay(path)
+  return appState.archive?.format !== "bda" && isConfigLayoutPath(path)
 }
 
 export function colorControlKey(field: HTMLInputElement): string {
@@ -282,6 +286,8 @@ export function refreshToolbarPreview(
   applyCandidateGeometry(document, width)
   const toolbarDocument = IniDocument.parse(document.toString())
   toolbarDocument.set("CAND", "BACK_STYLE", "")
+  // The template's toolbar icons are Baidu's; a Sogou skin's bar icons come with the Sogou app.
+  if (appState.archive.format === "ssf") toolbarDocument.removeSections(toolbarDocument.sections().filter((section) => /^ICON\d+$/.test(section)))
   toolbarPreview.setPanel("", width, height)
   toolbarPreview.setDocument(toolbarDocument)
   toolbarPreview.setMode(canvasEditable() ? "edit" : "preview")

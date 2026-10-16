@@ -14,7 +14,7 @@ export type SsfTemplates = { bds: SkinArchive; bda: SkinArchive }
 type Converted = { bytes: Uint8Array; warnings: string[] }
 
 /** The document's own files, not copies: derived images are cached by the arrays they come from. */
-function documentPackage(archive: SkinArchive): SsfPackage {
+export function documentPackage(archive: SkinArchive): SsfPackage {
   return SsfPackage.fromFiles(new Map(archive.names().flatMap((path) => {
     const bytes = path.endsWith("/") || archive.isOverlay(path) ? undefined : archive.getBytes(path)
     return bytes ? [[path, bytes] as const] : []
@@ -29,12 +29,6 @@ export async function ssfDocumentBytes(bytes: Uint8Array): Promise<Uint8Array> {
   const files = await unpackSsf(bytes)
   SsfPackage.fromFiles(files)
   return isSkinContainer(bytes) ? zipSync(Object.fromEntries(files), { level: 6 }) : bytes
-}
-
-/** The light (day) look's phoneSkin.ini, where a Sogou skin's key styles live; none in a broken package. */
-export function ssfMainSkinPath(archive: SkinArchive): string | undefined {
-  const complete = archive.getBytes("phoneTheme.ini") && archive.names().some((name) => /^\d+\/(?:[^/]+\/)?phoneSkin\.ini$/.test(name))
-  return complete ? `${documentPackage(archive).folder("light")}phoneSkin.ini` : undefined
 }
 
 /** The Baidu tree an SSF document previews as, for `SkinArchive.setOverlay`. */

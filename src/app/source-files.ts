@@ -7,13 +7,9 @@ import { selectFile } from "./navigation"
 import { refreshPreview } from "./preview-render"
 
 export function setSidebarView(view: "overview" | "source"): void {
-  // The overview groups Baidu configuration files; a Sogou skin is browsed as its own files.
-  const overviewAvailable = appState.archive?.format !== "ssf"
-  if (!overviewAvailable) view = "source"
   appState.sidebarView = view
   for (const button of sidebarViewButtons) {
     button.classList.toggle("active", button.dataset.sidebarView === view)
-    if (button.dataset.sidebarView === "overview") button.disabled = !overviewAvailable
   }
   files.querySelector<HTMLElement>(".sidebar-overview")?.toggleAttribute("hidden", view !== "overview")
   files.querySelector<HTMLElement>(".raw-files")?.toggleAttribute("hidden", view !== "source")

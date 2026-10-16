@@ -1,0 +1,179 @@
+// Chinese names for Sogou skin sections and fields, for the inspector and the overview.
+
+const FIELD_LABELS: Record<string, string> = {
+  NORMAL: "正常",
+  PRESSED: "按下",
+  DISABLED: "禁用",
+  NORMAL_ON: "开启",
+  PRESSED_ON: "开启按下",
+  FOCUSED: "聚焦",
+  BG_IMAGES: "背景样式",
+  BG_IMAGE: "背景图",
+  BG_STYLE: "背景类型",
+  BG_COLOR: "背景颜色",
+  BG_FUNCTION_COLOR: "功能区颜色",
+  BG_SMART_SEARCH_COLOR: "智能搜索颜色",
+  FG_IMAGES: "前景样式",
+  FG_IMGE: "前景样式",
+  FG_RECT: "前景区域",
+  FG_STYLE: "前景布局",
+  ICON: "图标",
+  ICONS: "图标组",
+  ICON_PRESSED: "按下图标",
+  ICON_RECT: "图标区域",
+  ICON_COLOR: "图标颜色",
+  HIGH_LIGHT_ICON_COLOR: "按下图标颜色",
+  LABEL: "主文字",
+  MINOR_LABEL: "副文字",
+  LABEL_STYLE: "文字样式",
+  LABEL_POSITION: "主文字区域",
+  LABEL_VISIBLE: "显示主文字",
+  LABEL_ORIENTATION: "文字方向",
+  LABEL_HORIZONTAL_OFFSET: "主文字水平偏移",
+  MINOR_LABEL_POSITION: "副文字区域",
+  MINOR_LABEL_VISIBLE: "显示副文字",
+  MINOR_LABEL_HORIZONTAL_OFFSET: "副文字水平偏移",
+  TEXT_COLOR: "文字颜色",
+  TEXT_COLOR_PRESSED: "按下文字颜色",
+  TEXT_SIZE: "字号",
+  TYPEFACE: "字体",
+  TEXT_STYLE: "文字样式",
+  TEXT_HIGHLIGHT_STYLE: "高亮文字样式",
+  SHADOW_COLOR_NORMAL: "阴影颜色",
+  SHADOW_COLOR_PRESSED: "按下阴影颜色",
+  COMPOSING_TEXT_COLOR: "输入码颜色",
+  CLOUD_TEXT_COLOR: "云候选颜色",
+  CLOUD_TEXT_COLOR_HIGHTLIGHT: "云候选高亮颜色",
+  POPUP_BG_COLOR: "气泡背景颜色",
+  POPUP_OFFSET_VERTICAL: "气泡垂直偏移",
+  MARGINS: "外边距",
+  PADDINGS: "内边距",
+  L_KEY: "长按按键",
+  TYPE: "类型",
+  ANIM_STYLE: "动画样式",
+  sound: "音效",
+  skin_name: "名称",
+  skin_author: "作者",
+  skin_contact: "联系方式",
+  skin_tip: "说明",
+  skin_version: "版本",
+  skin_version_self: "自定义版本",
+  skin_id: "皮肤编号",
+  skin_type: "皮肤类型",
+  "supports-screens": "支持分辨率",
+  preview_square: "方形预览图",
+  preview_comp: "候选预览图",
+  skip_icon_list: "沿用默认图标",
+  operational_skin: "运营皮肤",
+  anim_version: "动画版本",
+  SUPPORT_SCREEN: "支持分辨率",
+  VERSION: "版本",
+  LOOP_TYPE: "循环方式",
+  STATUS_LIST: "外观列表",
+  START: "开始时间",
+  END: "结束时间",
+  pic_path: "图片",
+  time_status: "外观",
+  keyboard_bg: "键盘背景",
+  loop_count: "循环次数",
+}
+
+const SECTION_LABELS: Record<string, string> = {
+  General: "通用",
+  RootView: "键盘背景",
+  WALLPAPER: "壁纸",
+  CandidateView: "候选栏",
+  CandidateViewLand: "候选栏（横屏）",
+  CandidateViewWeixin: "候选栏（微信）",
+  CandidateViewDoubleLines: "候选栏（双行）",
+  CandidateCodeView: "符号列",
+  CandidateGridViewContainer: "候选展开面板",
+  CloudView: "云候选",
+  ComposingView: "输入码",
+  KeyBg_Default: "九键默认背景",
+  KeyBg_Function: "九键功能键背景",
+  KeyBg_Space: "空格背景",
+  KeyBg_Space_Other: "其他空格背景",
+  KeyBg_Default_Latin: "全键默认背景",
+  KeyBg_Function_Qwerty: "全键功能键背景",
+  KeyBg_Space_Qwerty: "全键空格背景",
+  KeyBg_Digit_Qwerty: "全键数字背景",
+  KeyBg_UserSym: "符号列单元格",
+  BgCode: "符号列背景",
+  FgCode: "符号列前景",
+  TextStyle: "默认文字",
+  TextStyle_Candidate: "候选字",
+  TextStyle_Candidate_Highlight: "首选候选字",
+  TextStyle_Composing: "输入码文字",
+  TextStyle_Phone_Label: "九键文字",
+  TextStyle_Qwerty: "全键文字",
+  TextStyle_FuncKey_T9: "九键功能键文字",
+  TextStyle_FuncKey_26char: "全键功能键文字",
+  TextStyle_Space_Label: "空格文字",
+  TextStyle_Popup_Code: "符号列文字",
+  Key: "默认按键",
+  "720": "720 分辨率",
+  "1080": "1080 分辨率",
+}
+
+const KEY_NAMES: Record<string, string> = {
+  Backspace: "删除",
+  Backspace_Qwerty: "删除",
+  Enter: "回车",
+  Enter_Qwerty: "回车",
+  Return: "返回",
+  Space: "空格",
+  SymbolTable: "符号",
+  SymbolTable_Qwerty: "符号",
+  Symbols_Qwerty: "数字",
+  Digits: "数字",
+  SwitchToEN: "中英切换",
+  SwitchToEN_Qwerty: "中英切换",
+  EnSwitchToCH: "中英切换",
+  EnSwitchToCH_Qwerty: "中英切换",
+  Separator: "分词",
+  PunctPY: "分词",
+  Punct: "标点",
+  Shift: "大小写",
+  Shift_Qwerty: "大小写",
+  Clear_Input: "重输",
+  Prediction: "联想",
+  Prediction_En9: "联想",
+  Wildcard: "通配",
+  UDSymbol1_Qwerty: "逗号",
+  UDSymbol2_Qwerty: "句号",
+  CommaEn_T: "逗号",
+  PeriodEn_T: "句号",
+  One: "横",
+  Two: "竖",
+  Three: "撇",
+  Four: "点",
+  Five: "折",
+}
+
+export function ssfFieldLabel(key: string): string {
+  return FIELD_LABELS[key] ?? key
+}
+
+function keyName(name: string): string {
+  const bare = name.replace(/_(?:Land|Multi|PY|EN|EN_DIGIT)$/g, "").replace(/_(?:Land|Multi)$/g, "")
+  return KEY_NAMES[bare] ?? KEY_NAMES[name] ?? bare.replace(/_(?:Qwerty|py9|S)$/, "").replaceAll("_", " ")
+}
+
+/** `Key_A` → 按键 A, `SMA_Key9Bg_ABC` → ABC 背景; unknown sections keep their name. */
+export function ssfSectionLabel(section: string): string {
+  if (SECTION_LABELS[section]) return SECTION_LABELS[section]
+  if (/^status\d+$/.test(section)) return `外观 ${section.slice(6)}`
+  let match = section.match(/^Key_(.+)$/)
+  if (match) return `按键 ${keyName(match[1])}`
+  match = section.match(/^SMA_Key(?:9|26)Bg_(.+)$/)
+  if (match) return `${keyName(match[1])} 背景`
+  match = section.match(/^Foground_key_(.+)$/i)
+  if (match) return `${keyName(match[1])} 前景`
+  match = section.match(/^FGStyle_(.+)$/)
+  if (match) return `前景布局 ${match[1].replaceAll("_", " ")}`
+  match = section.match(/^TextStyle_(.+)$/)
+  if (match) return `文字 ${match[1].replaceAll("_", " ")}`
+  if (/^Anim/i.test(section)) return `动画 ${section.replace(/^Anim(?:ation)?_?/i, "").replaceAll("_", " ")}`.trim()
+  return section
+}

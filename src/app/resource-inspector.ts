@@ -29,7 +29,7 @@ export function openStyleImageResourceChooser(target: StyleImagePickerTarget): v
   else openStyleImageResourcePicker()
 }
 
-export function openBdaAnimationResourceChooser(onSelect: (resourceID: string) => void): void {
+export function openImageResourceChooser(onSelect: (resourceID: string) => void): void {
   appState.pickerTarget = undefined
   appState.resourcePickerSelect = onSelect
   if (isTauri()) openImagePickerList()

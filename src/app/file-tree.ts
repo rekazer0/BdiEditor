@@ -3,6 +3,7 @@ import { isBdaVirtualTextPath, isBdaAppearancePartPath, bdaAppearanceStylePath, 
 import { symbolSpan } from "../icons"
 import { layout, files, theme, orientation, documentName } from "./dom"
 import { selectFile, overviewGroupState } from "./navigation"
+import { ssfBoardPaths, ssfThemeFolder, SSF_SOUNDS_PATH } from "./ssf-documents"
 import { mobilePortraitQuery, sourceThumbnail } from "./canvas-interaction"
 import { setMobilePane } from "./mobile-layout"
 import { bdaAppearancePath, bdaConfigPaths } from "../bda.ts"
@@ -58,6 +59,59 @@ export function addNavButton(
     if (mobilePortraitQuery.matches) setMobilePane("inspector")
   })
   parent.append(button)
+}
+
+type NavEntry = {
+  group: string
+  label: string
+  path: string
+  className: string
+  icon: string
+  navMode?: string
+  meta?: string
+}
+
+const iniTypes: Record<string, Omit<NavEntry, "path">> = {
+  "bh.ini": { group: "键盘布局", label: "笔画键盘", className: "nav-layout", icon: "brush" },
+  "def_9.ini": { group: "键盘布局", label: "五笔 9 键", className: "nav-layout", icon: "pen-line" },
+  "def_26.ini": { group: "键盘布局", label: "五笔 26 键", className: "nav-layout", icon: "pen-tool" },
+  "def_26_new.ini": { group: "键盘布局", label: "五笔 26 键", className: "nav-layout", icon: "pen-off" },
+  "py_9.ini": { group: "键盘布局", label: "拼音 9 键", className: "nav-layout", icon: "grid-3x3" },
+  "py_26.ini": { group: "键盘布局", label: "拼音 26 键", className: "nav-layout", icon: "keyboard" },
+  "en_9.ini": { group: "键盘布局", label: "英文 9 键", className: "nav-layout", icon: "case-lower" },
+  "en_9s.ini": { group: "键盘布局", label: "英文 9 键 Shift", className: "nav-layout", icon: "arrow-big-up" },
+  "en_26.ini": { group: "键盘布局", label: "英文 26 键", className: "nav-layout", icon: "a-large-small" },
+  "en_26s.ini": { group: "键盘布局", label: "英文 26 键 Shift", className: "nav-layout", icon: "arrow-big-up-dash" },
+  "en_26_new.ini": { group: "键盘布局", label: "英文 26 键", className: "nav-layout", icon: "type" },
+  "en_26s_new.ini": { group: "键盘布局", label: "英文 26 键 Shift", className: "nav-layout", icon: "case-upper" },
+  "num_9.ini": { group: "数字与符号", label: "数字键盘", className: "nav-component", icon: "calculator" },
+  "num_26.ini": { group: "数字与符号", label: "26 键数字键盘", className: "nav-component", icon: "binary" },
+  "num2.ini": { group: "数字与符号", label: "数字键盘 2", className: "nav-component", icon: "hash" },
+  "symbol.ini": { group: "数字与符号", label: "符号面板", className: "nav-component", icon: "asterisk" },
+  "sym_26_cn.ini": { group: "数字与符号", label: "中文 26 键符号", className: "nav-component", icon: "quote" },
+  "sym_26_en.ini": { group: "数字与符号", label: "英文 26 键符号", className: "nav-component", icon: "at-sign" },
+  "hw_grid.ini": { group: "手写与选择", label: "手写面板", className: "nav-component", icon: "signature" },
+  "hw_full.ini": { group: "手写与选择", label: "全屏手写", className: "nav-component", icon: "pencil-line" },
+  "sel_ch.ini": { group: "手写与选择", label: "中文选择栏", className: "nav-component", icon: "rows-3" },
+  "sel_en.ini": { group: "手写与选择", label: "英文选择栏", className: "nav-component", icon: "list" },
+  "voice.ini": { group: "键盘组件", label: "语音键盘", className: "nav-component", icon: "mic" },
+  "dial.ini": { group: "键盘布局", label: "拨号键盘", className: "nav-layout", icon: "phone" },
+  "email.ini": { group: "键盘布局", label: "邮箱键盘", className: "nav-layout", icon: "mail" },
+  "net.ini": { group: "键盘布局", label: "网址键盘", className: "nav-layout", icon: "globe" },
+  "net_shifts.ini": { group: "键盘布局", label: "网址键盘大写", className: "nav-layout", icon: "link" },
+  "sel_ch_h.ini": { group: "手写与选择", label: "中文选择栏（加高）", className: "nav-component", icon: "list-ordered" },
+  "sel_en_h.ini": { group: "手写与选择", label: "英文选择栏（加高）", className: "nav-component", icon: "list-checks" },
+  "sym_26_cn_h.ini": { group: "数字与符号", label: "中文 26 键符号（加高）", className: "nav-component", icon: "message-square-quote" },
+  "sym_26_en_h.ini": { group: "数字与符号", label: "英文 26 键符号（加高）", className: "nav-component", icon: "ampersand" },
+  "symbol_h.ini": { group: "数字与符号", label: "符号面板（加高）", className: "nav-component", icon: "percent" },
+  "help.ini": { group: "手写与选择", label: "帮助面板", className: "nav-component", icon: "circle-help" },
+  "logo.ini": { group: "键盘组件", label: "输入法标识", className: "nav-component", icon: "app-window" },
+  "gen.ini": { group: "资源配置", label: "通用配置", className: "nav-style", icon: "settings" },
+}
+
+/** Overview name of a keyboard layout file (`py_9.ini` → 拼音 9 键). */
+export function layoutLabel(name: string): string {
+  return iniTypes[name]?.label ?? name.replace(/\.ini$/i, "").replaceAll("_", " ")
 }
 
 export function renderFiles(): void {
@@ -124,15 +178,6 @@ export function renderFiles(): void {
     return body
   }
 
-  type NavEntry = {
-    group: string
-    label: string
-    path: string
-    className: string
-    icon: string
-    navMode?: string
-    meta?: string
-  }
   const entries: NavEntry[] = []
   const bdaConfigGroups = [
     ["animation", "动画效果", "动画配置", "film"],
@@ -156,42 +201,19 @@ export function renderFiles(): void {
   const demoPath = appState.archive.names().includes(`${theme.value}/skin/demo.png`) ? `${theme.value}/skin/demo.png` : "demo.png"
   entries.push({ group: appState.archive.format === "bda" ? "皮肤信息" : "皮肤", label: "效果预览", path: demoPath, className: "nav-overview", icon: "image" })
 
-  const iniTypes: Record<string, Omit<NavEntry, "path">> = {
-    "bh.ini": { group: "键盘布局", label: "笔画键盘", className: "nav-layout", icon: "brush" },
-    "def_9.ini": { group: "键盘布局", label: "五笔 9 键", className: "nav-layout", icon: "pen-line" },
-    "def_26.ini": { group: "键盘布局", label: "五笔 26 键", className: "nav-layout", icon: "pen-tool" },
-    "def_26_new.ini": { group: "键盘布局", label: "五笔 26 键", className: "nav-layout", icon: "pen-off" },
-    "py_9.ini": { group: "键盘布局", label: "拼音 9 键", className: "nav-layout", icon: "grid-3x3" },
-    "py_26.ini": { group: "键盘布局", label: "拼音 26 键", className: "nav-layout", icon: "keyboard" },
-    "en_9.ini": { group: "键盘布局", label: "英文 9 键", className: "nav-layout", icon: "case-lower" },
-    "en_9s.ini": { group: "键盘布局", label: "英文 9 键 Shift", className: "nav-layout", icon: "arrow-big-up" },
-    "en_26.ini": { group: "键盘布局", label: "英文 26 键", className: "nav-layout", icon: "a-large-small" },
-    "en_26s.ini": { group: "键盘布局", label: "英文 26 键 Shift", className: "nav-layout", icon: "arrow-big-up-dash" },
-    "en_26_new.ini": { group: "键盘布局", label: "英文 26 键", className: "nav-layout", icon: "type" },
-    "en_26s_new.ini": { group: "键盘布局", label: "英文 26 键 Shift", className: "nav-layout", icon: "case-upper" },
-    "num_9.ini": { group: "数字与符号", label: "数字键盘", className: "nav-component", icon: "calculator" },
-    "num_26.ini": { group: "数字与符号", label: "26 键数字键盘", className: "nav-component", icon: "binary" },
-    "num2.ini": { group: "数字与符号", label: "数字键盘 2", className: "nav-component", icon: "hash" },
-    "symbol.ini": { group: "数字与符号", label: "符号面板", className: "nav-component", icon: "asterisk" },
-    "sym_26_cn.ini": { group: "数字与符号", label: "中文 26 键符号", className: "nav-component", icon: "quote" },
-    "sym_26_en.ini": { group: "数字与符号", label: "英文 26 键符号", className: "nav-component", icon: "at-sign" },
-    "hw_grid.ini": { group: "手写与选择", label: "手写面板", className: "nav-component", icon: "signature" },
-    "hw_full.ini": { group: "手写与选择", label: "全屏手写", className: "nav-component", icon: "pencil-line" },
-    "sel_ch.ini": { group: "手写与选择", label: "中文选择栏", className: "nav-component", icon: "rows-3" },
-    "sel_en.ini": { group: "手写与选择", label: "英文选择栏", className: "nav-component", icon: "list" },
-    "voice.ini": { group: "键盘组件", label: "语音键盘", className: "nav-component", icon: "mic" },
-    "dial.ini": { group: "键盘布局", label: "拨号键盘", className: "nav-layout", icon: "phone" },
-    "email.ini": { group: "键盘布局", label: "邮箱键盘", className: "nav-layout", icon: "mail" },
-    "net.ini": { group: "键盘布局", label: "网址键盘", className: "nav-layout", icon: "globe" },
-    "net_shifts.ini": { group: "键盘布局", label: "网址键盘大写", className: "nav-layout", icon: "link" },
-    "sel_ch_h.ini": { group: "手写与选择", label: "中文选择栏（加高）", className: "nav-component", icon: "list-ordered" },
-    "sel_en_h.ini": { group: "手写与选择", label: "英文选择栏（加高）", className: "nav-component", icon: "list-checks" },
-    "sym_26_cn_h.ini": { group: "数字与符号", label: "中文 26 键符号（加高）", className: "nav-component", icon: "message-square-quote" },
-    "sym_26_en_h.ini": { group: "数字与符号", label: "英文 26 键符号（加高）", className: "nav-component", icon: "ampersand" },
-    "symbol_h.ini": { group: "数字与符号", label: "符号面板（加高）", className: "nav-component", icon: "percent" },
-    "help.ini": { group: "手写与选择", label: "帮助面板", className: "nav-component", icon: "circle-help" },
-    "logo.ini": { group: "键盘组件", label: "输入法标识", className: "nav-component", icon: "app-window" },
-    "gen.ini": { group: "资源配置", label: "通用配置", className: "nav-style", icon: "settings" },
+  if (appState.archive.format === "ssf") {
+    const folder = ssfThemeFolder()
+    const preview = ["square_preview.png", "candidate_preview.png"].find((path) => appState.archive?.getBytes(path))
+    entries.push(
+      { group: "皮肤", label: "皮肤信息", path: "phoneTheme.ini", className: "nav-overview", icon: "info" },
+      ...preview ? [{ group: "皮肤", label: "效果预览", path: preview, className: "nav-overview", icon: "image" }] : [],
+      { group: "皮肤", label: "外观切换", path: "time.ini", className: "nav-overview", icon: "sun" },
+      { group: "资源配置", label: "按键样式", path: `${folder}phoneSkin.ini`, className: "nav-style", icon: "palette" },
+      { group: "资源配置", label: "按键前景", path: `${folder}keys.ini`, className: "nav-style", icon: "layers" },
+      { group: "资源配置", label: "按键动画", path: `${folder}anim.ini`, className: "nav-style", icon: "wand-sparkles" },
+      { group: "资源配置", label: "按键音效", path: SSF_SOUNDS_PATH, className: "nav-resource", icon: "volume-2" },
+      { group: "资源配置", label: "运营配置", path: "op.ini", className: "nav-style", icon: "sparkles" },
+    )
   }
   const hiddenLayouts = new Set<string>()
   const configPrefix = `${theme.value}/skin/${orientation.value}/`
@@ -320,9 +342,10 @@ export function renderFiles(): void {
   const groups = appState.archive.format === "bda"
     ? ["皮肤信息", "资源配置", "面板样式", "动画效果", "按键音效", "轻量动画", "开关配置", "贴纸配置", "场景配置"]
     : ["皮肤", "资源配置", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "扩展配置", "扩展布局"]
+  const ssfBoards = appState.archive.format === "ssf" ? new Set(ssfBoardPaths()) : undefined
   for (const group of groups) {
-    // An SSF skin's converted Baidu tree only feeds the preview, so it never shows up as a file.
-    const grouped = entries.filter((entry) => entry.group === group && !appState.archive?.isOverlay(entry.path) && (
+    // An SSF skin's converted Baidu tree only feeds the preview; of it, only the boards are listed (as Sogou boards).
+    const grouped = entries.filter((entry) => entry.group === group && (!appState.archive?.isOverlay(entry.path) || ssfBoards?.has(entry.path)) && (
       appState.archive?.names().includes(entry.path) ||
       appState.archive?.format === "bda" && (isBdaAppearancePartPath(entry.path) || Boolean(appState.bdaBase?.isText(bdaBasePath(entry.path))))
     ))

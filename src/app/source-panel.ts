@@ -1,3 +1,4 @@
+import { sourceEditPath } from "./ssf-documents"
 import { syncAtlasWorkspace } from "./tile-editing"
 import { files, sourceName, quickInspector, asset, resourceInspector, sourceEditor, aiDesignPanel, sourceToolbar, sourceFindToggle, sourceSearch, sourceValueHintsEnabled, sourceCompletionEnabled, sourceLineExplanationEnabled, sourceSearchCount, sourceSearchPrevious, sourceSearchNext, sourceReplacement, sourceReplace, sourceReplaceAll, sourceColorPicker, styleImageDialog, sourceStyleProxy } from "./dom"
 import { appState } from "./state"
@@ -23,9 +24,6 @@ import { previewItems } from "../preview-items.ts"
 
 export function updateInspectorView(): void {
   syncAtlasWorkspace()
-  // AI design writes Baidu configuration, so a Sogou skin has no AI tab.
-  const aiAvailable = appState.archive?.format !== "ssf"
-  if (!aiAvailable && appState.inspectorTab === "ai") appState.inspectorTab = "source"
   const imageSelected = Boolean(appState.archive?.isImage(appState.selectedPath))
   const overviewSelected = Boolean(
     files.querySelector(`.sidebar-overview button[data-path="${CSS.escape(appState.selectedPath)}"]`),
@@ -42,12 +40,12 @@ export function updateInspectorView(): void {
   for (const button of inspectorTabButtons) {
     const tab = button.dataset.inspectorTab
     const available = appState.resourceConfigActive
-      ? tab === "ai" && aiAvailable || tab === "properties" || tab === "source" && Boolean(appState.selectedPath) && !(
+      ? tab === "ai" || tab === "properties" || tab === "source" && Boolean(appState.selectedPath) && !(
         appState.archive?.format === "bda" && appState.resourceInspectorMode === "image"
       )
       :
       tab === "ai"
-        ? aiAvailable
+        ? true
         : tab === "properties"
         ? imageSelected || propertiesAvailable
         : !imageSelected && Boolean(appState.selectedPath)
@@ -306,7 +304,7 @@ export function openSourceStylePicker(range: SourceEditorValueRange): void {
  */
 export function selectKeyFromSourceOffset(offset: number): void {
   if (!isEditing() || !appState.archive || !appState.selectedPath) return
-  if (appState.selectedPath !== appState.layoutPath) return
+  if (appState.selectedPath !== appState.layoutPath || sourceEditPath() !== appState.selectedPath) return
   const bdaSource = appState.archive.format === "bda" && (
     appState.archive.isBdaConfig(appState.selectedPath) || isBdaVirtualTextPath(appState.selectedPath) || isBdaAppearancePartPath(appState.selectedPath)
   )

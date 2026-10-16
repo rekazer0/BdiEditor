@@ -7,7 +7,7 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { type ProjectChoice } from "../../project-chooser"
 import { finishNativeProjectChoice } from "../new-document"
 import { emitStyleLibrary, applyStyleLibrarySelection, editStyleLibrarySelection, addStyleFromLibrary, nextStyleID, showNewStyleError, availableStyleIDs } from "../style-picker"
-import { isEditing, commitText, updateDirty, commitBatch, redo, undo, hasUnsavedChanges, prepareDocumentReplacement } from "../edit-history"
+import { canvasEditable, isEditing, commitText, updateDirty, commitBatch, redo, undo, hasUnsavedChanges, prepareDocumentReplacement } from "../edit-history"
 import { WHOLE_IMAGE_INDEX } from "../../slice-picker-canvas.ts"
 import { soundPathForFilename } from "../../sounds.ts"
 import { bindPaneResize, applyModeState } from "../mobile-layout"
@@ -313,7 +313,7 @@ export function wireResourcesAndStartup(): void {
         moveSelectedTile(direction[0] * distance, direction[1] * distance, event.repeat)
         return
       }
-      if (!isEditing() || !appState.selectedKeySections.length || isTextEditingTarget(event.target)) return
+      if (!canvasEditable() || !appState.selectedKeySections.length || isTextEditingTarget(event.target)) return
       event.preventDefault()
       const distance = event.shiftKey ? 10 : 1
       moveSelectedKeys(direction[0] * distance, direction[1] * distance, appState.selectedKeySections, event.repeat)
@@ -347,7 +347,7 @@ export function wireResourcesAndStartup(): void {
     }
     if (
       (event.key === "Delete" || event.key === "Backspace") &&
-      isEditing() &&
+      canvasEditable() &&
       appState.selectedKeySections.length &&
       !isTextEditingTarget(event.target)
     ) {

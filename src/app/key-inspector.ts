@@ -24,6 +24,7 @@ import { keyboardConfig, setKeyboardHeight } from "../keyboard.ts"
 import { soundStyleForKey } from "../sounds.ts"
 import { selectedRects } from "./key-editing"
 import { updateStylePreviews } from "./style-picker"
+import { ssfInspectorTitle } from "./ssf-inspector"
 import { populateDocumentInspector, populateBdaConfigInspector } from "./document-inspector"
 
 export function selectedStylePropertyContext(property: string, styles?: IniDocument):
@@ -283,14 +284,16 @@ export function populateKeyInspector(): void {
     : toolbarSection
   const bdaConfigSelected = Boolean(appState.archive?.isBdaConfig(appState.selectedPath))
   const bdaSelected = appState.archive?.format === "bda"
+  // A Sogou skin's keys and boards are inspected by ssf-inspector.ts (through the document fields).
+  const ssfSelected = appState.archive?.format === "ssf"
   const candidateSelected = Boolean(bdaSelected && appState.selectedCandidate && appState.selectedPath === appState.layoutPath)
   syncBdaKeyFieldLabels(bdaSelected)
   skinFieldsGroup.hidden = !skinSelected || bdaSelected
   toolbarFieldsGroup.hidden = !toolbarSelected || bdaSelected || toolbarHasSelection
-  keyboardFieldsGroup.hidden = bdaSelected || skinSelected || toolbarSelected || bdaConfigSelected || candidateSelected || appState.selectedPath !== appState.layoutPath || hasSelection
+  keyboardFieldsGroup.hidden = bdaSelected || ssfSelected || skinSelected || toolbarSelected || bdaConfigSelected || candidateSelected || appState.selectedPath !== appState.layoutPath || hasSelection
   for (const group of keyOnlyGroups) {
     const availableForBda = group === keyTypographyFieldsGroup
-    group.hidden = skinSelected || bdaConfigSelected || !hasSelection || bdaSelected && !availableForBda
+    group.hidden = skinSelected || bdaConfigSelected || !hasSelection || ssfSelected || bdaSelected && !availableForBda
   }
   selectedKeyName.textContent = hasSelection
     ? sections.length > 1 ? `已选 ${sections.length} 个按键` : `按键 ${sections[0]?.match(/\d+$/)?.[0] ?? ""}`.trim()
@@ -309,10 +312,17 @@ export function populateKeyInspector(): void {
       : "整体布局"
   selectedKeyPreview.replaceChildren(createIcon(hasSelection ? bdaSelected ? "component" : sections.length > 1 ? "layers" : "key-round" : "layout-panel-top", 16))
   selectedKeyPreview.hidden = false
-  selectedKeyName.title = selectedKeyName.textContent ?? ""
   selectedKeyContext.textContent = hasSelection
     ? `${appState.selectedPath.split("/").pop()} · ${sections.length > 1 ? "keys.*" : sections[0]}`
     : appState.selectedPath || "选择文件以查看属性"
+  selectedKeyContext.title = appState.selectedPath
+  const ssfTitle = ssfSelected ? ssfInspectorTitle() : undefined
+  if (ssfTitle) {
+    selectedKeyName.textContent = ssfTitle.name
+    selectedKeyContext.textContent = ssfTitle.context
+    selectedKeyContext.title = ssfTitle.context
+  }
+  selectedKeyName.title = selectedKeyName.textContent ?? ""
   syncAiDesignContext()
   quickInspector.dataset.selectionCount = String(hasSelection ? sections.length : 0)
   quickInspector.dataset.selectionNames = JSON.stringify(hasSelection ? sections : [])
@@ -320,7 +330,6 @@ export function populateKeyInspector(): void {
     const label = field.closest("label")
     if (label) label.hidden = bdaSelected
   }
-  selectedKeyContext.title = appState.selectedPath
   setInspectorKind(appState.archive?.format === "bda" ? "bda" : appState.archive ? "bds" : "")
   syncMobileInspectorHeader()
   for (const field of skinFields) {
@@ -479,7 +488,7 @@ export function populateKeyInspector(): void {
   const paddingSection = quickInspector.querySelector<HTMLElement>(".inspector-padding-section")
   if (paddingSection) paddingSection.hidden = bdaSelected || !hasSelection || sections.some(isListCell) || !sections.every((section) => effectiveKeyValue(section, "PADDING") !== undefined)
   const multiLayout = $("#inspector-multi-layout")
-  const multiAvailable = sections.length > 1 && appState.archive?.format !== "bda" && !sections.some(isListCell)
+  const multiAvailable = sections.length > 1 && !bdaSelected && !ssfSelected && !sections.some(isListCell)
   multiLayout.dataset.available = String(multiAvailable)
   multiLayout.hidden = !multiAvailable
   canvasMultiToolbar.dataset.available = String(multiAvailable)
@@ -491,7 +500,9 @@ export function populateKeyInspector(): void {
   const layoutNote = keyLayoutFieldsGroup.querySelector<HTMLElement>(".inspector-note")!
   layoutNote.hidden = appState.archive?.format !== "bda"
   const listSelected = sections.some(isListCell)
-  const keyToolsAvailable = hasSelection && isEditing() && appState.archive?.format !== "bda" && !listSelected
+  const keyToolsAvailable = hasSelection && isEditing() && !bdaSelected && !ssfSelected && !listSelected
+  // Sogou skins carry no key geometry, so there is nothing to move, copy or delete.
+  for (const button of [...keyModeButtons, ...keyActionButtons]) button.hidden = ssfSelected
   for (const button of keyModeButtons) button.disabled = !keyToolsAvailable
   for (const button of keyActionButtons) {
     button.disabled = !keyToolsAvailable || (
@@ -504,7 +515,7 @@ export function populateKeyInspector(): void {
     preview.setEditTool(appState.keyMode)
   }
   for (const button of layoutActionButtons) {
-    button.disabled = appState.archive?.format === "bda" || listSelected || (
+    button.disabled = bdaSelected || ssfSelected || listSelected || (
       button.dataset.layoutAction === "swap" || button.dataset.layoutAction === "merge"
         ? appState.selectedKeySections.length !== 2
         : appState.selectedKeySections.length < 2

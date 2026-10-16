@@ -359,7 +359,7 @@ export function wireCanvasAndInspector(): void {
     const start = appState.canvasWrapClickStart
     appState.canvasWrapClickStart = undefined
     if (
-      !canvasEditable() ||
+      !isEditing() ||
       !start || Math.hypot(event.clientX - start.x, event.clientY - start.y) >= 3 ||
       candidateArea.contains(target) ||
       target.closest("canvas, button, input, select, label, [role=button]")

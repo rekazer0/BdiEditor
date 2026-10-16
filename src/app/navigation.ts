@@ -13,6 +13,7 @@ import { isListCell } from "../layout.ts"
 import { updateInspectorView, updateSourceSearchStatus } from "./source-panel"
 import { resourceImagePaths } from "../resources.ts"
 import { populateKeyInspector } from "./key-inspector"
+import { sourceEditPath } from "./ssf-documents"
 import { ensureSourcePathRendered, setSidebarView, updateSourceFileActions } from "./source-files"
 
 export function selectFile(
@@ -109,9 +110,10 @@ export function selectFile(
   } else if (appState.archive?.isText(path)) {
     hideImageWorkspace()
     appState.selectedDocument = IniDocument.parse(appState.archive.getText(path))
-    setSourceValue(appState.selectedDocument.toString())
+    const sourcePath = sourceEditPath(path)
+    setSourceValue(sourcePath === path ? appState.selectedDocument.toString() : appState.archive.getText(sourcePath))
     source.disabled = false
-    sourceName.textContent = path
+    sourceName.textContent = sourcePath
     const previewLayout =
       /\.ini$/i.test(path) &&
       !/(^|\/)gen\.ini$/i.test(path) &&

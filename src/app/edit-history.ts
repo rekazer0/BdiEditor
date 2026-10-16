@@ -22,12 +22,16 @@ import { isBdaAppearancePartPath, refreshBdaLayout } from "./bda-documents"
 import { selectFile } from "./navigation"
 import { selectResourceImage, renderResourceInspector } from "./resource-inspector"
 import { decodedBdaEditorSource } from "../bda-source.ts"
+import { sourceEditPath } from "./ssf-documents"
 
 export function isEditing(): boolean {
   return mode.value === "edit"
 }
 
-/** Keys and panels are edited on the canvas only for Baidu skins; a Sogou skin shows the template layout. */
+/**
+ * Keys and panels are moved, added and removed on the canvas only for Baidu skins. A Sogou skin has no
+ * key geometry: its keys are selected on the canvas and restyled in the inspector.
+ */
 export function canvasEditable(): boolean {
   return isEditing() && appState.archive?.format !== "ssf"
 }
@@ -128,7 +132,7 @@ export function applyTextSnapshot(path: string, text: string): void {
   if (path === appState.selectedPath) {
     appState.selectedDocument = IniDocument.parse(text)
     setSourceValue(text)
-  }
+  } else if (path === sourceEditPath()) setSourceValue(text)
   if (appState.resourceConfigActive && path === appState.tilePath) {
     appState.tileDocument = IniDocument.parse(text)
     appState.slices = tileSlices(appState.tileDocument)

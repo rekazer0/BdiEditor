@@ -17,6 +17,7 @@ import { isTauri } from "./canvas-interaction"
 import { showStyleImageDialog } from "./source-panel"
 import { drawSlicePicker, pickableSlices, WHOLE_IMAGE_INDEX } from "../slice-picker-canvas.ts"
 import { type TileRect, tileSlices } from "../tiles.ts"
+import { ssfPackage, ssfThemeFolder } from "./ssf-documents"
 
 export function selectedStyleImageSections(source: "BACK_STYLE" | "FORE_STYLE"): { document: IniDocument; path: string; sections: string[] } | undefined {
   if (!appState.archive || !appState.layoutDocument || !appState.selectedKeySections.length) return
@@ -128,8 +129,19 @@ export function openImagePickerList(): void {
   void showPickerWindow("list", "全部图片", 960, 680)
 }
 
+/** Images a style can use: Baidu res/ folders, or the folders a Sogou look looks images up in. */
+function pickableImagePaths(): string[] {
+  const archive = appState.archive
+  const names = archive?.names() ?? []
+  if (archive?.format !== "ssf") return resourceImagePaths(names, theme.value, orientation.value)
+  const pkg = ssfPackage()
+  const roots = [ssfThemeFolder(), pkg && `${pkg.resolution}/`, "default/", "default/res/"].filter((root): root is string => Boolean(root))
+  return names.filter((path) => !archive.isOverlay(path) && /\.(?:png|webp|jpe?g)$/i.test(path)
+    && roots.some((root) => path.startsWith(root) && !path.slice(root.length).includes("/")))
+}
+
 export function resourcePickerPayload(): NativeResourcePickerPayload {
-  return resourceImagePaths(appState.archive?.names() ?? [], theme.value, orientation.value).flatMap((path) => {
+  return pickableImagePaths().flatMap((path) => {
     const bytes = appState.archive?.getBytes(path)
     return bytes ? [{ path, dataURL: imageDataURL(bytes) }] : []
   })
@@ -155,8 +167,7 @@ export function selectImageResource(path: string): void {
 export function renderStyleImageResources(): void {
   if (!appState.archive) return
   const query = styleImageResourceSearch.value.trim().toLowerCase()
-  const paths = resourceImagePaths(appState.archive.names(), theme.value, orientation.value)
-    .filter((path) => path.toLowerCase().includes(query))
+  const paths = pickableImagePaths().filter((path) => path.toLowerCase().includes(query))
   styleImageImgList.replaceChildren()
   for (const path of paths) {
     const bytes = appState.archive.getBytes(path)

@@ -11,6 +11,10 @@ import { showStatus } from "./file-operations"
 import { syncSegmentedControls } from "./mobile-layout"
 import { refreshPreview, updateDevicePreview } from "./preview-render"
 import { appState } from "./state"
+import { preview } from "./canvas-interaction"
+import { renderFiles } from "./file-tree"
+import { selectFile } from "./navigation"
+import { isSsfBoardPath } from "./ssf-documents"
 
 /** How long typing pauses before the preview is rebuilt; a rebuild converts every image again. */
 const REBUILD_DELAY = 300
@@ -59,8 +63,14 @@ export function scheduleSsfPreview(): void {
  */
 export function switchSsfPreviewLayout(path: string): void {
   if (appState.archive?.isText(path)) {
+    const boardSelected = isSsfBoardPath(appState.selectedPath) || appState.selectedPath === appState.layoutPath
     appState.layoutPath = path
     appState.layoutDocument = IniDocument.parse(appState.archive.getText(path))
+    appState.selectedKeySections = []
+    preview.setSelected([])
+    // The overview lists the boards and phoneSkin.ini of the current look and orientation.
+    renderFiles()
+    if (boardSelected) selectFile(path)
   } else {
     const current = selectedVariant()
     theme.value = current.theme

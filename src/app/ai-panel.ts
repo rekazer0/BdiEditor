@@ -21,15 +21,26 @@ import { populateKeyInspector } from "./key-inspector"
 import { type ModelConfiguration, groupModelConfigurations, modelHost, modelConfigurationKey, initializeModelSettings } from "../model-settings.ts"
 import { modelProviderPreset } from "../model-providers.ts"
 import { symbolSpan } from "../icons"
+import { ssfSelectedBindings, ssfSkinPath, ssfThemeFolder, SSF_SOUNDS_PATH } from "./ssf-documents"
 
-export function aiEditableProjectFiles(target: SkinArchive, scope: "panel" | "project" = "project"): AiSkinEditableFile[] {
+/** Files a panel-scoped request may change: a Sogou look keeps every key class in its own folder. */
+function aiPanelFiles(target: SkinArchive): Set<string | undefined> {
+  if (target.format === "ssf") {
+    const folder = ssfThemeFolder()
+    return new Set([`${folder}phoneSkin.ini`, `${folder}keys.ini`, `${folder}anim.ini`, SSF_SOUNDS_PATH])
+  }
   const panelConfig = target.format === "bda"
     ? bdaConfigPath(target, theme.value, orientation.value, "appearance")
     : appState.layoutPath || appState.selectedPath || preferredPath()
   // 面板范围同时授权它引用的全局配置与样式表：按键文字、字体、颜色都定义在样式表里。
-  const panelFiles = new Set([panelConfig, ...target.format === "bda" ? [] : [genConfigPath(), styleConfigPath()]])
+  return new Set([panelConfig, ...target.format === "bda" ? [] : [genConfigPath(), styleConfigPath()]])
+}
+
+export function aiEditableProjectFiles(target: SkinArchive, scope: "panel" | "project" = "project"): AiSkinEditableFile[] {
+  const panelFiles = aiPanelFiles(target)
   return target.names().flatMap((path) => {
-    if (scope === "panel" && !panelFiles.has(path)) return []
+    // A Sogou skin's preview overlay is a conversion, never part of the skin.
+    if (target.isOverlay(path) || scope === "panel" && !panelFiles.has(path)) return []
     if (target.format === "bda") {
       if (!target.isBdaConfig(path) || !bdaDecodedSourceEditable(path)) return []
       const bytes = target.getBytes(path)
@@ -48,9 +59,11 @@ export function aiEditableProjectFiles(target: SkinArchive, scope: "panel" | "pr
 /** PNGs beside the panel's style sheet (or every PNG for project scope), with their .til slices. */
 export function aiEditableProjectImages(target: SkinArchive, scope: "panel" | "project" = "project"): AiSkinImageFile[] {
   if (target.format === "bda") return []
-  const folders = [styleConfigPath().replace(/[^/]*$/, ""), `${theme.value}/skin/res/`]
+  const folders = target.format === "ssf"
+    ? [ssfThemeFolder() ?? ""]
+    : [styleConfigPath().replace(/[^/]*$/, ""), `${theme.value}/skin/res/`]
   return target.names().flatMap((path) => {
-    if (!target.isImage(path) || scope === "panel" && !folders.some((folder) => path.startsWith(folder) && !path.slice(folder.length).includes("/"))) return []
+    if (!target.isImage(path) || target.isOverlay(path) || !/\.png$/i.test(path) || scope === "panel" && !folders.some((folder) => path.startsWith(folder) && !path.slice(folder.length).includes("/"))) return []
     const tilPath = path.replace(/\.png$/i, ".til")
     return [{ path, bytes: target.getBytes(path)!, tiles: target.isText(tilPath) ? target.getText(tilPath) : undefined }]
   })
@@ -96,6 +109,11 @@ export function aiPreviewImage(): { type: "image"; data: string; mimeType: strin
 }
 
 export function aiSelectedKeyContext(): { label: string; sections: string[]; values: Record<string, string> } {
+  if (appState.archive?.format === "ssf") {
+    // A Sogou key is styled by its classes; the canvas key sections belong to the preview overlay.
+    const sections = ssfSelectedBindings().flatMap(({ binding }) => binding.sections)
+    return { label: selectedKeyName.textContent?.trim() ?? "", sections: [...new Set(sections)], values: {} }
+  }
   const sections = appState.selectedKeySections.slice()
   const keys = ["BACK_STYLE", "FORE_STYLE", "FONT_NAME", "FONT_SIZE", "NM_COLOR", "HL_COLOR", "CENTER", "CLICK", "LONG_CLICK", "SWIPE"]
   const values: Record<string, string> = {}
@@ -110,7 +128,7 @@ export function syncAiDesignContext(): void {
   aiContextKey.hidden = appState.selectedKeySections.length === 0
   aiContextKey.textContent = appState.selectedKeySections.length > 1
     ? `${appState.selectedKeySections.length} 个按键`
-    : `${selectedKeyName.textContent?.trim() || "按键"} · ${appState.selectedKeySections[0] ?? ""}`
+    : `${selectedKeyName.textContent?.trim() || "按键"} · ${aiSelectedKeyContext().sections[0] ?? appState.selectedKeySections[0] ?? ""}`
   const available = Boolean(appState.archive && previewCanvas.width && previewCanvas.height)
   aiContextPreview.textContent = available ? "画布" : "暂无画布"
   aiContextPreview.dataset.off = String(!available)
@@ -182,7 +200,6 @@ export async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks, 
   if (appState.aiDesignDraft) throw new Error("请先应用或丢弃待确认的草稿，再继续对话。")
   source.commit()
   const target = appState.archive
-  if (target.format === "ssf") throw new Error("AI 设计只支持百度皮肤。")
   const configuration = appState.savedModels[Number(aiDesignModel.value)]
   if (!configuration) {
     throw new Error("请先配置 AI 模型。")
@@ -200,7 +217,8 @@ export async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks, 
     const panelScope = aiWantsWholeProject(prompt) ? "project" as const : "panel" as const
     const panelPath = target.format === "bda"
       ? bdaConfigPath(target, theme.value, orientation.value, "appearance") ?? appState.layoutPath
-      : appState.layoutPath || appState.selectedPath || preferredPath()
+      : target.format === "ssf" ? ssfSkinPath() ?? appState.selectedPath
+        : appState.layoutPath || appState.selectedPath || preferredPath()
     const project = {
       format: target.format,
       skinName: documentName.textContent?.trim() ?? "",

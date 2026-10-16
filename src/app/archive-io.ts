@@ -25,7 +25,7 @@ import { readFile, writeFile } from "@tauri-apps/plugin-fs"
 import { convertBdaArchive } from "../bda-convert.ts"
 import { flushNumberInputWheel } from "../number-input-wheel.ts"
 import { isSsfPath, looksLikeSsf } from "../ssf/ssf-package.ts"
-import { convertSsfDocument, exportSsf, ssfDocumentBytes, ssfMainSkinPath } from "../ssf/ssf-convert.ts"
+import { convertSsfDocument, exportSsf, ssfDocumentBytes } from "../ssf/ssf-convert.ts"
 import { rebuildSsfPreview, ssfTemplates } from "./ssf-preview"
 
 export async function loadArchive(
@@ -145,9 +145,6 @@ export async function loadArchive(
     updateFileOperationProgress(82, "正在生成皮肤预览…")
     selectFile(initial)
   }
-  // The preview keeps the converted layout; the inspector opens the Sogou skin's own key styles.
-  const ssfSkinPath = appState.archive.format === "ssf" ? ssfMainSkinPath(appState.archive) : undefined
-  if (ssfSkinPath) selectFile(ssfSkinPath, "source")
   // The canvas edits keys only for Baidu skins, so the mode state follows the document's format.
   applyModeState()
   updateFileOperationProgress(92, "正在连接源码工作区…")

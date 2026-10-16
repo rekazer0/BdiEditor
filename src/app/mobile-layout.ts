@@ -268,7 +268,7 @@ export function updatePanelToolButtons(): void {
 export function applyModeState(): void {
   const editing = isEditing()
   if (!editing && editorCrosshair.checked) previewCoordinates.hidden = true
-  const canvasMode = canvasEditable() ? "edit" : "preview"
+  const canvasMode = editing ? "edit" : "preview"
   deviceShell.dataset.mode = canvasMode
   preview.setMode(canvasMode)
   toolbarPreview.setMode(canvasMode)

@@ -6,7 +6,7 @@ import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { IniDocument } from '../src/ini.ts'
 import { SkinArchive } from '../src/skin.ts'
 import { parseZip } from '../src/skin-zip.ts'
-import { ssfDocumentBytes, ssfMainSkinPath, ssfPreviewFiles } from '../src/ssf/ssf-convert.ts'
+import { documentPackage, ssfDocumentBytes, ssfPreviewFiles } from '../src/ssf/ssf-convert.ts'
 import { exportFormatFromPath } from '../src/export.ts'
 import { decodePng, encodePng } from '../src/ssf/ssf-png.ts'
 import { SIZES, skinContainer, solid, ssfFixture } from './helpers/ssf-fixture.mjs'
@@ -18,7 +18,7 @@ test('ssf document: opens as its own format with the package paths as they are',
   const archive = await open(ssfFixture())
   assert.equal(archive.format, 'ssf')
   assert.ok(archive.names().includes('1080/status1/phoneSkin.ini'))
-  assert.equal(ssfMainSkinPath(archive), '1080/status1/phoneSkin.ini')
+  assert.equal(`${documentPackage(archive).folder('light')}phoneSkin.ini`, '1080/status1/phoneSkin.ini')
   assert.equal(exportFormatFromPath('a/皮肤.ssf'), 'ssf')
   assert.equal(exportFormatFromPath('皮肤.MSSF'), 'ssf')
   // Detected from the files alone too, e.g. a content:// URI without a name.
@@ -91,10 +91,10 @@ test('ssf document: Baidu and Sogou formats never repackage into each other', as
   assert.throws(() => SkinArchive.open(template.toBytes()).toBytes('bda'), /BDA/)
 })
 
-test('ssf document: a broken package has no main skin, and an explicit Baidu format is never taken for SSF', async () => {
+test('ssf document: a broken package does not open as a skin, and an explicit Baidu format is never taken for SSF', async () => {
   const files = unzipSync(ssfFixture())
   delete files['phoneTheme.ini']
-  assert.equal(ssfMainSkinPath(SkinArchive.open(zipSync(files), 'ssf')), undefined)
+  assert.throws(() => documentPackage(SkinArchive.open(zipSync(files), 'ssf')), /phoneTheme\.ini/)
   const baidu = unzipSync(template.toBytes())
   baidu['phoneTheme.ini'] = strToU8('[General]')
   assert.equal(SkinArchive.open(zipSync(baidu), 'bds').format, 'bds')

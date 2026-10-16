@@ -28,7 +28,7 @@ type AiDesignConfiguration = {
 }
 
 type AiDesignProject = {
-  format: "bdi" | "bds" | "bda"
+  format: "bdi" | "bds" | "bda" | "ssf"
   skinName: string
   skinPath: string
   theme: string
@@ -44,7 +44,7 @@ type AiDesignProject = {
   }
   preview?: ImageContent
   files: readonly AiSkinEditableFile[]
-  /** PNG assets (BDI/BDS) the AI may view, recolour or regenerate. */
+  /** PNG assets (BDI/BDS/SSF) the AI may view, recolour or regenerate. */
   images?: readonly AiSkinImageFile[]
 }
 
@@ -152,6 +152,9 @@ function configuredModel(config: AiDesignConfiguration, thinkingLevel: ThinkingL
 
 function imageGuide(project: AiDesignProject, canGenerate: boolean): string {
   if (!project.images?.length) return "当前格式不支持修改图片像素；不要因此拒绝整轮设计，先用已有样式、颜色、字体和引用完成可行调整，并说明未改动图片。"
+  if (project.format === "ssf") {
+    return `按键背景、前景图和图标的颜色画在 PNG 里。先按格式技能从按键类找到 NORMAL/PRESSED 引用的图片（\`图片.png,左,右,上,下\` 的第一项），用 view_image 确认（只查看目标按键实际引用的图片），再用 recolor_image 改色${canGenerate ? "；需要新图案或新风格时用 generate_image 生成" : "；当前未配置生图模型，用户要求新图案时直接告诉用户“未配置生图模型，请在 设置 > 大模型 > 生图模型 中配置”"}。同一张图片常被多个按键类共享，常态与按下态通常要一起改。可授权图片：${project.images.map((image) => image.path).join("、")}。`
+  }
   return `按键背景、图标的颜色常常直接画在 PNG 里，样式表没有颜色字段可改。此时先用 NM_IMG/HL_IMG 找到 \`图片名,切片序号\`，对应 res/图片名.png 的 IMG切片序号，用 view_image 确认（只查看目标按键实际引用的图片，不要逐张浏览全部资源），再用 recolor_image 改色${canGenerate ? "；需要新图案、新风格或质感重绘时用 generate_image 生成" : "。当前未配置生图模型：纯改色仍可用 recolor_image 完成；用户明确要求生成、重绘或编辑图片的图案/风格时，不要用改色或叠加色凑合，直接告诉用户“未配置生图模型，请在 设置 > 大模型 > 生图模型 中配置”"}。同一张图片的切片可能被多个样式共享，改前在样式表里确认引用范围；常态与按下态（NM_IMG/HL_IMG）通常要一起改。可授权图片：${project.images.map((image) => image.path).join("、")}。`
 }
 
@@ -163,7 +166,7 @@ function systemPrompt(project: AiDesignProject, canGenerate: boolean): string {
     .filter(([, value]) => value.trim())
     .map(([key, value]) => `${contextText(key, 80)}=${contextText(value)}`)
     .join("；")
-  return `你是百度输入法皮肤编辑器中的受限修复代理。你只能通过下列工具查询和修改当前打开的皮肤项目，不能访问磁盘、网络、命令行或项目外文件。
+  return `你是输入法皮肤编辑器中的受限修复代理。你只能通过下列工具查询和修改当前打开的皮肤项目，不能访问磁盘、网络、命令行或项目外文件。
 
 当前项目：皮肤“${contextText(project.skinName, 120)}”（${contextText(project.skinPath, 120)}），格式 ${contextText(project.format, 20).toUpperCase()}，当前预览主题 ${contextText(project.theme, 20)}，方向 ${contextText(project.orientation, 20)}，布局 ${contextText(project.layout, 80)}，键盘设备 ${contextText(project.keyboard, 80)}。
 当前选择：${selected}${selectedValues ? `；已暴露字段：${selectedValues}` : ""}。
@@ -174,11 +177,11 @@ ${project.preview ? "本轮请求附带当前画布预览图（候选栏与面�
 
 视觉修改指南（请先阅读配置，再用最少的精确修改实现）：
 - 配色：优先沿用现有颜色字段和明暗语义，保证普通/高亮/禁用状态有足够对比度；纯配色调整不要新建配置节。
-- 字体：只调整已有 FONT_NAME、FONT_SIZE、NM_COLOR、HL_COLOR 等字段，保持按键动作、数量和几何不变。
+${project.format === "ssf" ? "- 文字：只调整已有 TEXT_COLOR、TEXT_COLOR_PRESSED 等颜色字段（0xAARRGGBB），保持按键类和引用结构不变。" : "- 字体：只调整已有 FONT_NAME、FONT_SIZE、NM_COLOR、HL_COLOR 等字段，保持按键动作、数量和几何不变。"}
 - 质感：通过已有背景样式、边框、圆角、阴影或样式引用统一风格。
 - 图片资源：${imageGuide(project, canGenerate)}
-- 布局：用户说“保留布局”时禁止修改位置、尺寸、间距、按键数量、动作和配置节结构；只改视觉属性。
-- 重排布局（例如“改为14键”“加一个按键”“去掉某键”）：这是允许的。先读完当前布局所有 KEY 节，规划新网格；用 set_ini_value 改已有按键的 VIEW_RECT/TOUCH_RECT/动作，用 add_ini_section 新增按键（复制相邻同类按键的全部字段，只改几何、动作和样式引用），用 remove_ini_sections 删掉多余按键。新按键需要新文字时，复制一个现有文字样式节为新的 STYLEn 并改 SHOW，再让按键 FORE_STYLE 指向它。按键之间不得重叠，整体不超出 [PANEL] SIZE。
+${project.format === "ssf" ? "- 布局：搜狗皮肤不含按键位置和数量，排布由搜狗输入法决定；用户要求改布局时用一句话说明做不到，只完成视觉部分。" : `- 布局：用户说“保留布局”时禁止修改位置、尺寸、间距、按键数量、动作和配置节结构；只改视觉属性。
+- 重排布局（例如“改为14键”“加一个按键”“去掉某键”）：这是允许的。先读完当前布局所有 KEY 节，规划新网格；用 set_ini_value 改已有按键的 VIEW_RECT/TOUCH_RECT/动作，用 add_ini_section 新增按键（复制相邻同类按键的全部字段，只改几何、动作和样式引用），用 remove_ini_sections 删掉多余按键。新按键需要新文字时，复制一个现有文字样式节为新的 STYLEn 并改 SHOW，再让按键 FORE_STYLE 指向它。按键之间不得重叠，整体不超出 [PANEL] SIZE。`}
 - 范围：默认只修改当前打开面板及其引用的样式；用户说“整个皮肤/全局/所有面板”时才检查全部相关配置。
 - 不要因为某个字段不在当前布局文件里就放弃：先按下面的格式技能追踪样式引用，到样式表中找到真正的来源。
 - 验证：每次写入前必须 read_project_file；修改完成后复读关键片段并在总结中说明影响范围。
@@ -188,7 +191,7 @@ ${aiSkinSkill(project.format)}
 可用修复接口：
 1. read_project_file：分页读取一个已授权配置文件。修改前必须先读取目标片段。
 2. read_ini_sections：按配置节名直接读取 INI/CSS 中的若干节，适合在大样式表中定位 [STYLEN]。读取后即可修改该文件。
-3. set_ini_value：在已有 INI 配置节中新增配置键，或修改已有键。适用于 BDI/BDS 的 .ini/.css 配置。
+3. set_ini_value：在已有 INI 配置节中新增配置键，或修改已有键。适用于 BDI/BDS 的 .ini/.css 与搜狗皮肤的 .ini 配置。
 4. remove_ini_value：删除已有 INI 配置键。只有用户需求明确要求删除时才使用。
 5. add_ini_section / remove_ini_sections：新增或删除整个 INI 配置节，仅用于用户要求增删按键、重排布局或需要新样式时。
 6. replace_project_text：在 BDA JSON 中做唯一、精确的小片段替换；必须提供预期出现次数。不要用它重写整个文件。
