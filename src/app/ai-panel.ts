@@ -182,6 +182,7 @@ export async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks, 
   if (appState.aiDesignDraft) throw new Error("请先应用或丢弃待确认的草稿，再继续对话。")
   source.commit()
   const target = appState.archive
+  if (target.format === "ssf") throw new Error("AI 设计只支持百度皮肤。")
   const configuration = appState.savedModels[Number(aiDesignModel.value)]
   if (!configuration) {
     throw new Error("请先配置 AI 模型。")

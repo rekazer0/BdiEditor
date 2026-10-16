@@ -7,6 +7,7 @@
 import { strToU8, zipSync } from "fflate"
 import { IniDocument } from "../ini.ts"
 import { SkinArchive } from "../skin.ts"
+import { cached, fingerprint } from "./ssf-cache.ts"
 import { SsfLook, type LookColors, type LookImage, type LookPair } from "./ssf-look.ts"
 import type { SsfPackage, SsfTheme } from "./ssf-package.ts"
 import { cropImage, decodePng, encodePng, isPng, pngSize, tintImage, type RgbaImage } from "./ssf-png.ts"
@@ -103,7 +104,7 @@ class ThemeConverter {
   private readonly output: Map<string, Uint8Array>
   private readonly resources: ThemeResources
   private readonly soundStyles = new Map<string, string>()
-  private readonly glyphs = new Map<string, RgbaImage | undefined>()
+  private readonly glyphs = new Map<string, RgbaImage>()
   private keyboardStyles?: { panel?: string; cand?: string }
 
   constructor(pkg: SsfPackage, base: SkinArchive, theme: SsfTheme, output: Map<string, Uint8Array>, warnings: string[]) {
@@ -123,17 +124,21 @@ class ThemeConverter {
         ? this.resources.derivedStyle(styleID, { NM_COLOR: colors.normal, HL_COLOR: colors.pressed })
         : undefined
     }
-    if (!this.glyphs.has(imageName)) {
-      const bytes = this.base.getBytes(`light/skin/res/${imageName}.png`)
-      this.glyphs.set(imageName, bytes && isPng(bytes) ? decodePng(bytes) : undefined)
-    }
-    const atlas = this.glyphs.get(imageName)
+    const atlasBytes = this.base.getBytes(`light/skin/res/${imageName}.png`)
     const tilePath = `light/skin/res/${imageName}.til`
     const source = numbers(this.base.isText(tilePath) ? IniDocument.parse(this.base.getText(tilePath)).get(`IMG${tileValue}`, "SOURCE_RECT") : undefined)
-    if (!atlas || source.length !== 4) return
-    const glyph = cropImage(atlas, source[0], source[1], source[2], source[3])
-    const tinted = (color: string): LookImage => ({ id: `template:${imageName}:${tileValue}:${color}`, bytes: encodePng(tintImage(glyph, color)) })
-    return this.resources.imageStyle({ normal: tinted(colors.normal), pressed: tinted(colors.pressed) })
+    if (!atlasBytes || !isPng(atlasBytes) || source.length !== 4) return
+    const atlas = () => {
+      if (!this.glyphs.has(imageName)) this.glyphs.set(imageName, decodePng(atlasBytes))
+      return this.glyphs.get(imageName)!
+    }
+    const tinted = (color: string): LookImage | undefined => {
+      const id = `tint:${source.join(",")}:${color}|${fingerprint(atlasBytes)}`
+      return cached(id, () => ({ id, bytes: encodePng(tintImage(cropImage(atlas(), source[0], source[1], source[2], source[3]), color)) }))
+    }
+    const normal = tinted(colors.normal)
+    const pressed = tinted(colors.pressed)
+    return normal && pressed ? this.resources.imageStyle({ normal, pressed }) : undefined
   }
 
   private soundStyle(sound: { filename: string; bytes: Uint8Array } | undefined): string | undefined {
@@ -272,23 +277,31 @@ export function ssfPreview(pkg: SsfPackage): Uint8Array | undefined {
   return preview && isPng(preview) ? preview : undefined
 }
 
-/** Converts a Sogou skin to a Baidu BDS archive laid out on `base` (the official BDS template). */
-export function convertSsfToBaidu(pkg: SsfPackage, base: SkinArchive): SsfConversion {
+/**
+ * A Sogou skin laid out on `base` (the official BDS template), as canonical package paths
+ * (`light/skin/…`, `Info.txt`) before packaging; the editor previews an SSF document from these.
+ */
+export function ssfToBaiduFiles(pkg: SsfPackage, base: SkinArchive): { files: Map<string, Uint8Array>; warnings: string[] } {
   if (base.format === "bda") throw new Error("搜狗皮肤只能套用 BDS/BDI 模板")
   if (!base.isText("light/skin/res/default.css")) throw new Error("模板缺少 res/default.css")
   const warnings = [...pkg.warnings]
-  const canonical = new Map<string, Uint8Array>()
-  for (const theme of pkg.themes.keys()) new ThemeConverter(pkg, base, theme, canonical, warnings).convert()
-  canonical.set("Info.txt", infoText(base, pkg))
+  const files = new Map<string, Uint8Array>()
+  for (const theme of pkg.themes.keys()) new ThemeConverter(pkg, base, theme, files, warnings).convert()
+  files.set("Info.txt", infoText(base, pkg))
   const preview = ssfPreview(pkg)
-  if (preview) canonical.set("demo.png", preview)
+  if (preview) files.set("demo.png", preview)
   warnings.push(...ssfUnsupportedWarnings(pkg))
+  return { files, warnings: [...new Set(warnings)] }
+}
 
+/** Converts a Sogou skin to a Baidu BDS archive laid out on `base` (the official BDS template). */
+export function convertSsfToBaidu(pkg: SsfPackage, base: SkinArchive): SsfConversion {
+  const { files, warnings } = ssfToBaiduFiles(pkg, base)
   const dual = pkg.themes.size > 1
-  const raw = Object.fromEntries([...canonical].map(([path, bytes]) => {
+  const raw = Object.fromEntries([...files].map(([path, bytes]) => {
     if (path === "Info.txt" || path === "demo.png") return [path, bytes]
     const themed = path.match(/^(light|dark)\/skin\/(.*)$/)!
     return [dual ? `${themed[1]}/${themed[2]}` : themed[2], bytes]
   }))
-  return { archive: SkinArchive.open(zipSync(raw, { level: 6 }), "bds"), warnings: [...new Set(warnings)] }
+  return { archive: SkinArchive.open(zipSync(raw, { level: 6 }), "bds"), warnings }
 }

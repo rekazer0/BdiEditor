@@ -630,24 +630,62 @@ await check("file: a BDA skin exports to every format", () => withPage(async (pa
   assert.deepEqual(formats, ["bdi", "bds", "bda", "bda", "sxi", "ssf"])
 }))
 
-await check("file: a Sogou .ssf opens as the chosen Baidu format", () => withPage(async (page) => {
+await check("file: a Sogou .ssf is edited as its own files, previewed, and saved back as .ssf", () => withPage(async (page) => {
   const { ssfFixture } = await import("../tests/helpers/ssf-fixture.mjs")
-  for (const format of ["bds", "bda"]) {
-    await page.locator("#browser-open").setInputFiles({ name: "搜狗测试.ssf", mimeType: "application/octet-stream", buffer: Buffer.from(ssfFixture()) })
-    const dialog = page.locator("#ssf-import-dialog")
-    await dialog.waitFor({ state: "visible" })
-    await dialog.locator(`input[value="${format}"]`).check()
-    await dialog.getByRole("button", { name: "导入", exact: true }).click()
-    await page.waitForFunction((suffix) => document.querySelector("#document-name")?.textContent === `搜狗测试.${suffix}`, format, { timeout: 60000 })
-    await page.waitForSelector(".canvas-wrap:not(.empty)")
-    await closeOperationDialog(page)
-    await page.waitForFunction(() => !document.querySelector("#open")?.disabled)
-  }
-  // Backing out of the format dialog keeps the current skin.
-  await page.locator("#browser-open").setInputFiles({ name: "另一个.ssf", mimeType: "application/octet-stream", buffer: Buffer.from(ssfFixture()) })
-  await page.locator("#ssf-import-dialog").getByRole("button", { name: "取消", exact: true }).click()
+  await page.locator("#browser-open").setInputFiles({ name: "搜狗测试.ssf", mimeType: "application/octet-stream", buffer: Buffer.from(ssfFixture()) })
+  await page.waitForSelector(".canvas-wrap:not(.empty)")
+  await closeOperationDialog(page)
   await page.waitForFunction(() => !document.querySelector("#open")?.disabled)
-  assert.equal(await page.locator("#document-name").textContent(), "搜狗测试.bda")
+  assert.equal(await page.locator("#document-name").textContent(), "搜狗测试.ssf")
+  // The tree lists the Sogou files only; the converted Baidu tree behind the preview stays hidden.
+  assert.equal(await page.locator(".raw-files button.selected").getAttribute("data-path"), "1080/status1/phoneSkin.ini")
+  assert.equal(await page.locator('#files [data-path^="light/"]').count(), 0)
+  assert.equal(await page.locator('[data-sidebar-view="overview"]').isDisabled(), true)
+  assert.equal(await page.locator('[data-inspector-tab="ai"]').isDisabled(), true)
+  assert.equal(await page.locator('[data-inspector-tab="source"]').getAttribute("aria-pressed"), "true")
+  const candidateColor = () => page.locator("#candidate-words").evaluate((node) => node.style.color)
+  assert.equal(await candidateColor(), "rgb(1, 2, 3)")
+  // Editing the skin's own INI rebuilds the preview.
+  await editMode(page)
+  await page.waitForFunction(() => (document.querySelector("#source .cm-content")?.innerText ?? "").includes("TextStyle_Candidate"))
+  await page.locator("#source-find-toggle").click()
+  await page.locator("#source-replace-toggle").click()
+  await page.locator("#source-search").fill("0xFF010203")
+  await page.locator("#source-replacement").fill("0xFFFF0000")
+  await page.locator("#source-replace-all").click()
+  await page.waitForFunction(() => document.querySelector("#candidate-words")?.style.color === "rgb(255, 0, 0)", null, { timeout: 15000 })
+  assert.equal(await page.locator("#dirty").isVisible(), true)
+  // Clicking a key in edit mode types into the preview instead of selecting it.
+  const box = await page.locator("#preview").boundingBox()
+  await page.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.5)
+  assert.equal(await page.locator(".raw-files button.selected").getAttribute("data-path"), "1080/status1/phoneSkin.ini")
+  assert.equal(await page.locator('[data-inspector-tab="source"]').getAttribute("aria-pressed"), "true")
+  await page.locator("#desktop-undo").click()
+  await page.waitForFunction(() => document.querySelector("#candidate-words")?.style.color === "rgb(1, 2, 3)", null, { timeout: 15000 })
+  await page.locator("#desktop-redo").click()
+  await page.waitForFunction(() => document.querySelector("#candidate-words")?.style.color === "rgb(255, 0, 0)", null, { timeout: 15000 })
+  // Saving writes the .ssf; BDS and BDA exports go through the converter.
+  const pending = page.waitForEvent("download", { timeout: 60000 })
+  await openFileMenu(page)
+  await page.locator("#save").click()
+  const saved = await pending
+  await closeOperationDialog(page)
+  const { unzipSync, strFromU8 } = await import("fflate")
+  const savedFiles = unzipSync(new Uint8Array(readFileSync(await saved.path())))
+  assert.match(strFromU8(savedFiles["1080/status1/phoneSkin.ini"]), /TEXT_COLOR=0xFFFF0000/)
+  assert.equal(Object.keys(savedFiles).length, Object.keys(unzipSync(ssfFixture())).length)
+  assert.equal(await page.locator("#dirty").isVisible(), false)
+  const visibleFormats = await page.locator(".pen-file-menu [data-export-format]:not([hidden])").evaluateAll((items) => items.map((item) => item.dataset.exportFormat))
+  assert.deepEqual(visibleFormats, ["bdi", "bds", "bda", "bda", "ssf"])
+  // A skin with one look has no night preview to switch to, and switching never adds Baidu files to it.
+  await page.locator("#browser-open").setInputFiles({ name: "单外观.ssf", mimeType: "application/octet-stream", buffer: Buffer.from(ssfFixture({ single: true })) })
+  await page.waitForFunction(() => document.querySelector("#document-name")?.textContent === "单外观.ssf", null, { timeout: 60000 })
+  await closeOperationDialog(page)
+  await page.locator('[data-theme-choice="dark"]').first().click()
+  await page.waitForFunction(() => /没有这种外观/.test(document.querySelector("#event-log")?.textContent ?? ""))
+  assert.equal(await page.locator("#theme").inputValue(), "light")
+  assert.equal(await page.locator('#files [data-path^="dark/"]').count(), 0)
+  assert.equal(await page.locator("#dirty").isVisible(), false)
 }))
 
 /* ------------------------------------------------------------------------------------------------

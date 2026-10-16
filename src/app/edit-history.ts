@@ -27,6 +27,11 @@ export function isEditing(): boolean {
   return mode.value === "edit"
 }
 
+/** Keys and panels are edited on the canvas only for Baidu skins; a Sogou skin shows the template layout. */
+export function canvasEditable(): boolean {
+  return isEditing() && appState.archive?.format !== "ssf"
+}
+
 export function hasUnsavedChanges(): boolean {
   return appState.unsavedNew || Boolean(appState.archive?.changed.size)
 }

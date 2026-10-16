@@ -8,6 +8,7 @@
 import type { IniDocument } from "../ini.ts"
 import { ssfKeyBinding, type SsfKeyBinding } from "./ssf-keymap.ts"
 import { parseSsfImage, ssfColor, type SsfImageRef, type SsfPackage, type SsfStretch, type SsfTheme } from "./ssf-package.ts"
+import { cached, fingerprint } from "./ssf-cache.ts"
 import { MAX_PIXELS, compositeImage, cropImage, decodePng, encodePng, isPng, placeImage, pngSize, resizeImage, type RgbaImage } from "./ssf-png.ts"
 
 /** `id` is stable for identical content, so writers can share one file per distinct image. */
@@ -34,7 +35,6 @@ export class SsfLook {
   private readonly warnings: string[]
   private readonly missing = new Set<string>()
   private readonly decoded = new Map<string, RgbaImage | undefined>()
-  private readonly derived = new Map<string, LookImage | undefined>()
   private keyboardCache?: { panel?: LookImage; cand?: LookImage; panelColor?: string }
 
   constructor(pkg: SsfPackage, theme: SsfTheme, warnings: string[]) {
@@ -76,13 +76,16 @@ export class SsfLook {
     return bytes ? { id: `${ref.file}|${ref.stretch ?? ""}`, bytes, stretch: ref.stretch } : undefined
   }
 
-  /** Images derived from Sogou files (padded, cropped, composited) are built once per id. */
-  private derive(id: string, build: () => RgbaImage | undefined): LookImage | undefined {
-    if (!this.derived.has(id)) {
+  /**
+   * Images derived from Sogou files (padded, cropped, composited), keyed by how they are made and the
+   * bytes they are made from; `build` decodes only when the result is not cached yet.
+   */
+  private derive(kind: string, sources: Uint8Array[], build: () => RgbaImage | undefined): LookImage | undefined {
+    const id = `${kind}|${sources.map(fingerprint).join("|")}`
+    return cached(id, () => {
       const image = build()
-      this.derived.set(id, image && { id, bytes: encodePng(image) })
-    }
-    return this.derived.get(id)
+      return image && { id, bytes: encodePng(image) }
+    })
   }
 
   private statePair(section: string): LookPair | undefined {
@@ -126,24 +129,27 @@ export class SsfLook {
    */
   private foregroundImage(name: string, rect: number[] | undefined, canvas: [number, number] | undefined): LookImage | undefined {
     const bytes = this.file(name)
-    if (!bytes) return
-    const source = this.decode(name, bytes)
-    if (!source) return
+    const size = bytes && pngSize(bytes)
+    if (!bytes || !size) return
+    const [sourceWidth, sourceHeight] = size
     if (rect) {
       const [x, y, width, height] = rect
       if (!(width > 0 && height > 0 && width <= 1 && height <= 1) || (!x && !y && width === 1 && height === 1)) return { id: name, bytes }
-      const canvasWidth = Math.round(source.width / width)
-      const canvasHeight = Math.round(source.height / height)
+      const canvasWidth = Math.round(sourceWidth / width)
+      const canvasHeight = Math.round(sourceHeight / height)
       // A tiny FG_RECT would ask for a canvas many times the glyph; such a key keeps the bare glyph.
       if (canvasWidth * canvasHeight > MAX_PIXELS) return { id: name, bytes }
-      return this.derive(`${name}|rect:${rect.join(",")}`, () =>
-        placeImage(source, canvasWidth, canvasHeight, Math.round(x * canvasWidth), Math.round(y * canvasHeight)))
+      return this.derive(`rect:${rect.join(",")}`, [bytes], () => {
+        const source = this.decode(name, bytes)
+        return source && placeImage(source, canvasWidth, canvasHeight, Math.round(x * canvasWidth), Math.round(y * canvasHeight))
+      })
     }
-    if (!canvas || canvas[0] * canvas[1] > MAX_PIXELS || (source.width >= canvas[0] && source.height >= canvas[1])) return { id: name, bytes }
-    return this.derive(`${name}|canvas:${canvas.join("x")}`, () => {
-      const width = Math.max(canvas[0], source.width)
-      const height = Math.max(canvas[1], source.height)
-      return placeImage(source, width, height, Math.round((width - source.width) / 2), Math.round((height - source.height) / 2))
+    if (!canvas || canvas[0] * canvas[1] > MAX_PIXELS || (sourceWidth >= canvas[0] && sourceHeight >= canvas[1])) return { id: name, bytes }
+    const width = Math.max(canvas[0], sourceWidth)
+    const height = Math.max(canvas[1], sourceHeight)
+    return this.derive(`canvas:${width}x${height}`, [bytes], () => {
+      const source = this.decode(name, bytes)
+      return source && placeImage(source, width, height, Math.round((width - source.width) / 2), Math.round((height - source.height) / 2))
     })
   }
 
@@ -186,16 +192,25 @@ export class SsfLook {
     ].map(first).find((value) => value && /\.png$/i.test(value))
     const barSection = this.skin.get("CandidateView", "BG_IMAGE")?.trim()
     const barRef = barSection ? parseSsfImage(this.skin.get(barSection, "NORMAL")) : undefined
-    const background = backgroundName ? this.decode(backgroundName, this.file(backgroundName)) : undefined
+    const backgroundBytes = backgroundName ? this.file(backgroundName) : undefined
+    const backgroundSize = backgroundBytes && pngSize(backgroundBytes)
     const barBytes = barRef && this.file(barRef.file)
-    const bar = barRef && this.decode(barRef.file, barBytes)
+    const barSize = barBytes && pngSize(barBytes)
     const result: { panel?: LookImage; cand?: LookImage; panelColor?: string } = {}
-    if (background) {
-      const top = Math.min(background.height - 1, Math.max(0, bar ? Math.round(bar.height * background.width / SOGOU_WIDTH) : 0))
-      result.panel = this.derive(`${backgroundName}|panel`, () => cropImage(background, 0, top, background.width, background.height - top))
-      if (top > 0 && bar) {
-        result.cand = this.derive(`${backgroundName}|cand`, () =>
-          compositeImage(cropImage(background, 0, 0, background.width, top), resizeImage(bar, background.width, top)))
+    if (backgroundName && backgroundBytes && backgroundSize) {
+      const [width, height] = backgroundSize
+      const top = Math.min(height - 1, Math.max(0, barSize ? Math.round(barSize[1] * width / SOGOU_WIDTH) : 0))
+      const background = () => this.decode(backgroundName, backgroundBytes)
+      result.panel = this.derive(`panel:${top}`, [backgroundBytes], () => {
+        const image = background()
+        return image && cropImage(image, 0, top, image.width, image.height - top)
+      })
+      if (top > 0 && barRef && barBytes) {
+        result.cand = this.derive(`cand:${top}`, [backgroundBytes, barBytes], () => {
+          const image = background()
+          const bar = this.decode(barRef.file, barBytes)
+          return image && bar && compositeImage(cropImage(image, 0, 0, image.width, top), resizeImage(bar, image.width, top))
+        })
       }
     } else if (barRef && barBytes) {
       result.cand = { id: barRef.file, bytes: barBytes, stretch: barRef.stretch }

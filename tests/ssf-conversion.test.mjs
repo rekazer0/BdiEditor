@@ -13,7 +13,7 @@ import { compositeImage, cropImage, decodePng, encodePng, placeImage, pngSize, r
 import { convertSsfToBaidu } from '../src/ssf/ssf-to-baidu.ts'
 import { convertSsfToBda } from '../src/ssf/ssf-to-bda.ts'
 import { convertBaiduToSsf } from '../src/ssf/baidu-to-ssf.ts'
-import { exportSsf, importSsf } from '../src/ssf/ssf-convert.ts'
+import { convertSsfDocument, exportSsf, ssfDocumentBytes } from '../src/ssf/ssf-convert.ts'
 import { COLORS, SIZES, TEXT, skinContainer, solid, ssfFixture } from './helpers/ssf-fixture.mjs'
 
 const read = (path) => new Uint8Array(readFileSync(new URL(path, import.meta.url)))
@@ -21,6 +21,10 @@ const bdsTemplate = SkinArchive.open(read('../public/default-template.bds'))
 const bdaTemplate = SkinArchive.open(read('../public/default-template.bda'), 'bda')
 const bdaBase = SkinArchive.open(read('../public/bda-base.bds'))
 const templates = { bds: bdsTemplate, bda: bdaTemplate }
+
+/** Opens `.ssf` bytes the way the editor does: as an SSF document. */
+const ssfDocument = async (bytes) => SkinArchive.open(await ssfDocumentBytes(bytes), 'ssf')
+const convertSsfBytes = async (bytes, format) => convertSsfDocument(await ssfDocument(bytes), format, templates)
 
 const pixel = (image, x, y) => [...image.data.subarray((y * image.width + x) * 4, (y * image.width + x) * 4 + 4)]
 const rgb = (image, x, y) => pixel(image, x, y).slice(0, 3)
@@ -155,7 +159,7 @@ test('ssf package: the encrypted container opens like the ZIP and is judged by i
   assert.deepEqual([...pkg.themes], [['light', '1080/status1/'], ['dark', '1080/status2/']])
   assert.deepEqual([...pkg.files.keys()].sort(), Object.keys(files).sort())
   assert.deepEqual(pkg.file('light', '26keyq.png'), files['1080/status1/26keyq.png'])
-  const { bytes } = await importSsf(await skinContainer(files), 'bds', templates)
+  const { bytes } = await convertSsfBytes(await skinContainer(files), 'bds')
   assert.deepEqual(rgb(baiduKeyStyle(SkinArchive.open(bytes), 'light', 'port', 'py_26', 'q').image, 0, 0), COLORS.light.qKey)
   // Windows-style names unpack to the same folders.
   const windows = Object.fromEntries(Object.entries(files).map(([name, body]) => [name.replace(/\//g, '\\'), body]))
@@ -311,9 +315,9 @@ test('ssf → BDS: missing images are reported, not fatal', async () => {
   assert.deepEqual(rgb(baiduKeyStyle(archive, 'light', 'port', 'py_26', 'q').image, 0, 0), COLORS.light.letterKey)
 })
 
-test('import ssf as BDI and BDS: platform packages that reopen as their format', async () => {
+test('ssf → BDI and BDS: platform packages that reopen as their format', async () => {
   for (const format of ['bds', 'bdi']) {
-    const { bytes } = await importSsf(ssfFixture(), format, templates)
+    const { bytes } = await convertSsfBytes(ssfFixture(), format)
     const archive = SkinArchive.open(bytes, format)
     assert.equal(archive.format, format)
     assert.deepEqual(rgb(baiduKeyStyle(archive, 'dark', 'port', 'py_26', 'q').image, 0, 0), COLORS.dark.qKey)
@@ -505,7 +509,7 @@ test('real Sogou skins convert to every format and back', { skip: realSkins.leng
   for (const name of realSkins) {
     const bytes = new Uint8Array(readFileSync(join(realDir, name)))
     for (const format of ['bds', 'bdi', 'bda']) {
-      const { bytes: converted, warnings } = await importSsf(bytes, format, templates)
+      const { bytes: converted, warnings } = await convertSsfBytes(bytes, format)
       assert.ok(!warnings.some((warning) => /缺少图片|无法解码/.test(warning)), `${name} → ${format}: ${warnings.join('；')}`)
       const archive = SkinArchive.open(converted, format)
       const back = await exportSsf(archive, bdaBase)

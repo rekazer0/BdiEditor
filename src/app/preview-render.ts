@@ -1,4 +1,5 @@
 import { appState } from "./state"
+import { scheduleSsfPreview } from "./ssf-preview"
 import { type TextVisual, canvasFontFamily } from "../atlas.ts"
 import { setSimulatedComposition, toolbarPreview, currentDeviceValue, deviceGeometryProperties, preview, resizeKeyboardPreviews, schedulePreviewInteractionFrame, paintPreviewInteraction, applySkinState, REFERENCE_PHONE_WIDTH_SCALE, deviceFrameProperties } from "./canvas-interaction"
 import { simulatedOutput, skinState, candidateComposition, candidateInput, candidateWords, candidateArea, toolbarStrip, deviceShell, orientation, theme, layout, hintPreviewEnabled, canvasWrap, toolbarCanvas, panelStatus, previewZoomOut, previewZoomIn, $, skinStateValue, skinStateControl, toggleGuides, mobileToggleGuides } from "./dom"
@@ -115,6 +116,7 @@ export function devicePreviewTransparent(): boolean {
 
 export function refreshPreview(): void {
   if (!appState.archive) return
+  scheduleSsfPreview()
   const currentArchive = appState.archive
   const composing = refreshSimulationState()
   const resolver = visualResolver()

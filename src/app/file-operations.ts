@@ -189,6 +189,16 @@ export async function copyPanel(): Promise<boolean> {
   return true
 }
 
+/**
+ * Export targets the open skin can reach. BDI/BDS cannot become BDA and a Sogou skin has no Palm
+ * (.sxi) path; unreachable items are hidden rather than left as unexplained greyed-out rows.
+ */
+export function exportTargetHidden(format: ExportTarget): boolean {
+  const source = appState.archive?.format
+  if (!source) return false
+  return format === "bda" ? source !== "bda" && source !== "ssf" : format === "sxi" && source === "ssf"
+}
+
 export function setFileOperationBusy(busy: boolean): void {
   appState.fileOperationRunning = busy
   newButton.disabled = busy
@@ -198,9 +208,7 @@ export function setFileOperationBusy(busy: boolean): void {
   updatePanelToolButtons()
   updateSourceFileActions()
   for (const button of exportButtons) {
-    const format = button.dataset.exportFormat as ExportTarget
-    // 只有 BDA 皮肤能导出 BDA；其他格式直接隐藏这两项，不留一排无法解释的灰色菜单。
-    button.hidden = Boolean(appState.archive) && appState.archive!.format !== "bda" && format === "bda"
+    button.hidden = exportTargetHidden(button.dataset.exportFormat as ExportTarget)
     button.disabled = busy || !appState.archive || button.hidden
   }
 }

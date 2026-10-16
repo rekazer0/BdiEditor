@@ -33,6 +33,9 @@ export const appState = {
   archive: undefined as SkinArchive | undefined,
   bdaBase: undefined as SkinArchive | undefined,
   ssfTemplates: undefined as SsfTemplates | undefined,
+  /** Archive revision the SSF preview overlay was built from. */
+  ssfPreviewRevision: -1,
+  ssfPreviewTimer: undefined as number | undefined,
   currentPath: "",
   sourceWorkspacePath: "",
   sourceWorkspacePrefix: "",

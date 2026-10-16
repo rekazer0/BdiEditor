@@ -15,7 +15,7 @@ import { isConfiguredSymbolLayout } from "../actions.ts"
 import { resolveCandidateRect, resolveCandidateInputStyle } from "../candidate-style.ts"
 import { bdaStyleID } from "../bda.ts"
 import { devicePreviewTransparent } from "./preview-render"
-import { isEditing } from "./edit-history"
+import { canvasEditable } from "./edit-history"
 
 export function selectedSourceSections(): string[] {
   if (appState.resourceConfigActive && appState.selectedResourcePath) {
@@ -122,10 +122,11 @@ export function isConfigLayoutPath(path: string): boolean {
 
 /**
  * 普通皮肤（bds/bdi）里所有布局文档都自带属性面板。
- * BDA 容器内的同名遗留文件由 bda 解析器处理，不能按普通布局文档放行。
+ * BDA 容器内的同名遗留文件由 bda 解析器处理，不能按普通布局文档放行；
+ * 搜狗皮肤的 INI 字段含义与百度不同，只用源代码编辑。
  */
 export function showsLayoutProperties(path: string): boolean {
-  return appState.archive?.format !== "bda" && isConfigLayoutPath(path)
+  return appState.archive?.format !== "bda" && appState.archive?.format !== "ssf" && isConfigLayoutPath(path)
 }
 
 export function colorControlKey(field: HTMLInputElement): string {
@@ -283,6 +284,6 @@ export function refreshToolbarPreview(
   toolbarDocument.set("CAND", "BACK_STYLE", "")
   toolbarPreview.setPanel("", width, height)
   toolbarPreview.setDocument(toolbarDocument)
-  toolbarPreview.setMode(isEditing() ? "edit" : "preview")
+  toolbarPreview.setMode(canvasEditable() ? "edit" : "preview")
   return { width, height, inputHeight }
 }

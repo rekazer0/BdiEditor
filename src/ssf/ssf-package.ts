@@ -68,6 +68,11 @@ function zipEntries(bytes: Uint8Array): Map<string, Uint8Array> {
   return files
 }
 
+/** The files of a ZIP or encrypted `.ssf`, before deciding what kind of skin they are. */
+export async function unpackSsf(bytes: Uint8Array): Promise<Map<string, Uint8Array>> {
+  return isSkinContainer(bytes) ? unpackSkinContainer(bytes) : zipEntries(bytes)
+}
+
 export function isSsfPath(path: string): boolean {
   return /\.m?ssf$/i.test(path)
 }
@@ -113,7 +118,12 @@ export class SsfPackage {
 
   /** Reads a ZIP or encrypted package; what kind of skin it is comes from the files inside. */
   static async open(bytes: Uint8Array): Promise<SsfPackage> {
-    return new SsfPackage(isSkinContainer(bytes) ? await unpackSkinContainer(bytes) : zipEntries(bytes))
+    return new SsfPackage(await unpackSsf(bytes))
+  }
+
+  /** The skin an editor document currently holds. */
+  static fromFiles(files: Map<string, Uint8Array>): SsfPackage {
+    return new SsfPackage(files)
   }
 
   private readThemes(): Map<SsfTheme, string> {

@@ -23,6 +23,9 @@ import { previewItems } from "../preview-items.ts"
 
 export function updateInspectorView(): void {
   syncAtlasWorkspace()
+  // AI design writes Baidu configuration, so a Sogou skin has no AI tab.
+  const aiAvailable = appState.archive?.format !== "ssf"
+  if (!aiAvailable && appState.inspectorTab === "ai") appState.inspectorTab = "source"
   const imageSelected = Boolean(appState.archive?.isImage(appState.selectedPath))
   const overviewSelected = Boolean(
     files.querySelector(`.sidebar-overview button[data-path="${CSS.escape(appState.selectedPath)}"]`),
@@ -39,12 +42,12 @@ export function updateInspectorView(): void {
   for (const button of inspectorTabButtons) {
     const tab = button.dataset.inspectorTab
     const available = appState.resourceConfigActive
-      ? tab === "ai" || tab === "properties" || tab === "source" && Boolean(appState.selectedPath) && !(
+      ? tab === "ai" && aiAvailable || tab === "properties" || tab === "source" && Boolean(appState.selectedPath) && !(
         appState.archive?.format === "bda" && appState.resourceInspectorMode === "image"
       )
       :
       tab === "ai"
-        ? true
+        ? aiAvailable
         : tab === "properties"
         ? imageSelected || propertiesAvailable
         : !imageSelected && Boolean(appState.selectedPath)
