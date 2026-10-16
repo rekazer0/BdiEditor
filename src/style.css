@@ -4578,17 +4578,6 @@ input[type="search"]:focus {
     display: none;
   }
 
-  .preview-zoom-control {
-    right: 7px;
-    bottom: 30px;
-    padding: 2px;
-  }
-
-  .preview-zoom-control button {
-    width: 25px;
-    height: 25px;
-  }
-
   .workspace-status {
     gap: 8px;
     padding-inline: 8px;
@@ -4795,17 +4784,6 @@ input[type="search"]:focus {
 
   .canvas-wrap {
     padding: 6px;
-  }
-
-  .preview-zoom-control {
-    right: 7px;
-    bottom: 30px;
-    padding: 2px;
-  }
-
-  .preview-zoom-control button {
-    width: 25px;
-    height: 25px;
   }
 
   #files,
@@ -8885,8 +8863,13 @@ main {
     border-top: 0;
   }
 
-  :root body:has(.canvas-wrap.empty) .preview-zoom-control {
+  /* 手机上用双指缩放画布，不显示缩放按钮 */
+  :root body .preview-zoom-control {
     display: none;
+  }
+
+  :root body .canvas-wrap:not(.empty) {
+    touch-action: none;
   }
 
   :root body .canvas-wrap.empty .empty-state {
@@ -9194,16 +9177,6 @@ main {
     min-height: 0;
     padding: 8px;
   }
-
-  :root body .preview-zoom-control {
-    right: max(8px, env(safe-area-inset-right));
-    bottom: calc(10px + env(safe-area-inset-bottom));
-  }
-
-  :root body .preview-zoom-control button {
-    width: 32px;
-    height: 32px;
-  }
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -9316,8 +9289,7 @@ main {
   }
 
   :root body .preview-zoom-control {
-    right: max(8px, env(safe-area-inset-right));
-    bottom: calc(8px + env(safe-area-inset-bottom));
+    display: none;
   }
 
   :root body .sidebar-view-control button {

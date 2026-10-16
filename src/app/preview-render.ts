@@ -393,7 +393,7 @@ export function applyPreviewZoom(value: number, anchor?: { x: number; y: number 
   const before = anchor ? deviceShell.getBoundingClientRect() : undefined
   const anchorX = before && anchor ? (anchor.x - before.left) / before.width : 0.5
   const anchorY = before && anchor ? (anchor.y - before.top) / before.height : 0.5
-  appState.previewZoom = Math.min(3, Math.max(0.4, Math.round(value * 10) / 10))
+  appState.previewZoom = Math.min(3, Math.max(0.4, Math.round(value * 100) / 100))
   previewZoomOut.disabled = appState.previewZoom <= 0.4
   previewZoomIn.disabled = appState.previewZoom >= 3
   if (currentDeviceValue() === "canvas") fitCanvasPreview()
