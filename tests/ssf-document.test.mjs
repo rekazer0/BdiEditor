@@ -12,6 +12,7 @@ import { decodePng, encodePng } from '../src/ssf/ssf-png.ts'
 import { SIZES, skinContainer, solid, ssfFixture } from './helpers/ssf-fixture.mjs'
 
 const template = SkinArchive.open(new Uint8Array(readFileSync(new URL('../public/default-template.bds', import.meta.url))))
+const sogouTemplate = SkinArchive.open(new Uint8Array(readFileSync(new URL('../public/sogou-template.bds', import.meta.url))))
 const open = async (bytes) => SkinArchive.open(await ssfDocumentBytes(bytes), 'ssf')
 
 test('ssf document: opens as its own format with the package paths as they are', async () => {
@@ -56,6 +57,13 @@ test('ssf document: the preview overlay is readable, read-only, unsaved and not 
   const archive = await open(ssfFixture())
   const { files, warnings } = ssfPreviewFiles(archive, template)
   assert.ok(Array.isArray(warnings))
+  const gen = IniDocument.parse(strFromU8(files.get('light/skin/port/gen.ini')))
+  assert.equal(gen.get('PANEL', 'SIZE'), '1080,702')
+  const land = IniDocument.parse(strFromU8(files.get('light/skin/land/gen.ini')))
+  assert.equal(land.get('PANEL', 'SIZE'), '1920,570')
+  assert.equal(land.get('CAND', 'VIEW_RECT'), '0,0,1920,128')
+  const landKeys = IniDocument.parse(strFromU8(files.get('light/skin/land/py_9.ini')))
+  assert.equal(landKeys.get('KEY1', 'VIEW_RECT'), '305,12,398,137')
   const revision = archive.revision
   archive.setOverlay(files)
   assert.ok(archive.revision > revision)
@@ -67,6 +75,59 @@ test('ssf document: the preview overlay is readable, read-only, unsaved and not 
   assert.equal(archive.changed.size, 0)
   assert.ok(!Object.keys(unzipSync(archive.toBytes('ssf'))).some((name) => name.startsWith('light/')))
   assert.ok(!archive.sourceFiles().some((file) => file.path.startsWith('light/')))
+})
+
+test('ssf document: the canvas skeleton is Sogou\'s own layout, with the skin\'s toolbar icons', async () => {
+  const files = unzipSync(ssfFixture())
+  files['1080/status1/ime_function_voice.png'] = encodePng(solid(90, 90, [9, 8, 7]))
+  files['1080/status1/phoneSkin.ini'] = strToU8(`${strFromU8(files['1080/status1/phoneSkin.ini'])}\n[CandidateIMEFunctionView]\nICON_COLOR=0xFF6F3300\n`)
+  const { files: preview } = ssfPreviewFiles(await open(zipSync(files)), sogouTemplate)
+  const read = (path) => IniDocument.parse(strFromU8(preview.get(path)))
+  for (const orientation of ['port', 'land']) {
+    const [width, height] = read(`light/skin/${orientation}/gen.ini`).get('PANEL', 'SIZE').split(',').map(Number)
+    for (const board of ['py_9', 'py_26', 'en_26', 'num_9']) {
+      const layout = read(`light/skin/${orientation}/${board}.ini`)
+      const keys = layout.sections().filter((section) => /^KEY\d+$/.test(section))
+      assert.ok(keys.length > 10 && keys.every((key) => layout.get(key, 'SSF_SECTION')), `${orientation}/${board}`)
+      for (const key of keys) {
+        const [x, y, w, h] = layout.get(key, 'VIEW_RECT').split(',').map(Number)
+        assert.ok(x >= 0 && y >= 0 && x + w <= width && y + h <= height, `${orientation}/${board} ${key} overflows`)
+      }
+    }
+  }
+  // Sogou 9-key: symbol column on the left, backspace in the right column.
+  const py9 = read('light/skin/port/py_9.ini')
+  assert.equal(py9.get('KEY1', 'SSF_SECTION'), 'Key_PunctPY')
+  assert.equal(py9.get('KEY4', 'CENTER'), 'F36')
+  assert.ok(py9.get('LIST', 'POS'))
+  const cand = read('light/skin/port/cand1.cnd')
+  const icon = (name) => cand.sections().find((section) => cand.get(section, 'SSF_IMAGE') === name)
+  const css = read('light/skin/res/default.css')
+  const image = (section) => preview.get(`light/skin/res/${css.get(`STYLE${cand.get(section, 'FORE_STYLE')}`, 'NM_IMG').split(',')[0]}.png`)
+  assert.deepEqual(decodePng(image(icon('ime_function_voice.png'))).data.slice(0, 3), Uint8Array.of(9, 8, 7))
+  // Icons the skin does not ship keep Sogou's built-in artwork, recoloured to the skin's icon colour.
+  const logo = decodePng(image(icon('logo.png')))
+  const opaque = [...Array(logo.width * logo.height).keys()].map((i) => logo.data.subarray(i * 4, i * 4 + 4)).filter((p) => p[3] > 0)
+  assert.ok(opaque.length && opaque.every((p) => p[0] === 0x6f && p[1] === 0x33 && p[2] === 0))
+})
+
+for (const [resolution, portSize, landSize, candRect] of [
+  [720, '720,468', '1280,380', '0,0,1280,85'],
+  [480, '480,312', '854,260', '0,0,854,58'],
+]) test(`ssf document: ${resolution} preview uses official Sogou landscape dimensions`, async () => {
+  const files = unzipSync(ssfFixture())
+  files['time.ini'] = strToU8(`[General]\nSUPPORT_SCREEN=${resolution}\n[${resolution}]\nSTATUS_LIST=status1\n`)
+  for (const path of Object.keys(files).filter((name) => name.startsWith('1080/'))) delete files[path]
+  for (const [path, bytes] of Object.entries(unzipSync(ssfFixture()))) {
+    if (path.startsWith('1080/')) files[path.replace('1080/', `${resolution}/`)] = bytes
+  }
+  const archive = await open(zipSync(files))
+  const preview = ssfPreviewFiles(archive, template)
+  const gen = IniDocument.parse(strFromU8(preview.files.get('light/skin/port/gen.ini')))
+  assert.equal(gen.get('PANEL', 'SIZE'), portSize)
+  const land = IniDocument.parse(strFromU8(preview.files.get('light/skin/land/gen.ini')))
+  assert.equal(land.get('PANEL', 'SIZE'), landSize)
+  assert.equal(land.get('CAND', 'VIEW_RECT'), candRect)
 })
 
 test('ssf document: edits show up in the rebuilt preview', async () => {

@@ -117,6 +117,25 @@ test('continuous wheel frames form one undo operation; an idle gap starts a new 
   model = stack.pop().changes[0].before
   assert.equal(model, '0')
 })
+test('repeated Shift arrows keep the numeric field connected until the gesture ends', () => {
+  const s = wheelSetup(), field = new Input(), tokens = []
+  let refreshes = 0
+  field.onEvent = event => {
+    if (event.type !== 'change') return
+    tokens.push(s.api.numberInputGesture())
+    s.api.deferNumberInputRefresh('inspector', () => { refreshes++ })
+  }
+  for (let index = 0; index < 2; index++) {
+    s.root.emit('keydown', { target: field, key: 'Shift' })
+    s.root.emit('keydown', { target: field, key: 'ArrowUp', shiftKey: true, preventDefault() {} })
+    s.tick()
+  }
+  assert.equal(field.value, '20')
+  assert.equal(tokens[0], tokens[1])
+  assert.equal(refreshes, 0)
+  s.idle()
+  assert.equal(refreshes, 1)
+})
 test('field switch, keydown, blur and explicit undo flush pending updates', () => {
   const s = wheelSetup(), a = new Input(), b = new Input(), tokens = []
   a.onEvent = e => { if (e.type === 'input') tokens.push(s.api.numberInputGesture()) }

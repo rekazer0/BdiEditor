@@ -17,6 +17,7 @@ import { renderBdaMetadataEditor, renderBdaLayoutEditor, renderBdaConfigEditor }
 import { updateBdaRefs, updateSelectedBdaPanelProperty, updateBdaAppearanceStyleRef } from "./key-inspector"
 import { openImageResourceChooser } from "./resource-inspector"
 import { populateSsfInspector } from "./ssf-inspector"
+import { disconnectSsfThumbnails } from "./ssf-fields"
 
 export const documentFieldLabels: Record<string, string> = {
   BACK_STYLE: "背景样式",
@@ -291,6 +292,7 @@ export function particleNumberStep(key: string): string {
 }
 
 export function populateDocumentInspector(): void {
+  disconnectSsfThumbnails()
   documentFields.replaceChildren()
   if (appState.archive?.format === "ssf") {
     documentFieldsGroup.hidden = !populateSsfInspector(documentFields)

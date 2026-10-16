@@ -130,7 +130,7 @@ export function openImagePickerList(): void {
 }
 
 /** Images a style can use: Baidu res/ folders, or the folders a Sogou look looks images up in. */
-function pickableImagePaths(): string[] {
+export function pickableImagePaths(): string[] {
   const archive = appState.archive
   const names = archive?.names() ?? []
   if (archive?.format !== "ssf") return resourceImagePaths(names, theme.value, orientation.value)

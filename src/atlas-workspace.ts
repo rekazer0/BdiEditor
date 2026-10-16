@@ -1,4 +1,5 @@
 import { createIcon } from "./icons"
+import { wheelZoomFactor } from "./wheel-zoom"
 import type { TileSlice } from "./tiles"
 import "./atlas-workspace.css"
 
@@ -150,9 +151,7 @@ export function createAtlasWorkspace(actions: {
   wrap.addEventListener("wheel", event => {
     if (!desktopActive) return
     event.preventDefault()
-    // 按滚动量缩放：触控板捏合/Ctrl+滚轮一次会连发很多小 delta 事件，固定步长会跳得很猛
-    const delta = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? event.deltaY * 16 : event.deltaY
-    zoomBy(Math.exp(-Math.max(-100, Math.min(100, delta)) * 0.002), { x: event.clientX, y: event.clientY })
+    zoomBy(wheelZoomFactor(event), { x: event.clientX, y: event.clientY })
   }, { passive: false })
   // 与主画布一致：拖动任意处（超过 3px）平移；中键或按住空格立即平移。
   // 切片绘制、移动、缩放会捕获指针，此时不平移。

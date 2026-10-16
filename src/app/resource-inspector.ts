@@ -1,7 +1,7 @@
 import { type StyleImagePickerTarget, type SoundEntry } from "./types"
 import { appState } from "./state"
 import { isTauri, playSoundPath, resourceSearchControl, source, keySoundBuffers, releaseKeySound } from "./canvas-interaction"
-import { openImagePickerList, openStyleImageResourcePicker, openImageSlicePicker } from "./image-pickers"
+import { openImagePickerList, openStyleImageResourcePicker, openImageSlicePicker, pickableImagePaths } from "./image-pickers"
 import { type BdaStyleRef, bdaStyleID } from "../bda.ts"
 import { updateBdaRefs } from "./key-inspector"
 import { isEditing, commitText, updateDirty, commitBytes } from "./edit-history"
@@ -458,7 +458,12 @@ export async function renderBdaStyleResourceGallery(galleryCanvas: ReturnType<ty
 
 export function currentSoundEntries(): SoundEntry[] {
   if (!appState.archive) return []
-  return soundResourcePaths(appState.archive.names(), theme.value, orientation.value).map((path) => {
+  const names = appState.archive.names()
+  // 搜狗的音效都放在 default/ 下。
+  const paths = appState.archive.format === "ssf"
+    ? names.filter((path) => path.startsWith("default/") && !path.slice(8).includes("/") && isSoundPath(path)).sort()
+    : soundResourcePaths(names, theme.value, orientation.value)
+  return paths.map((path) => {
     const filename = path.split("/").pop() ?? path
     return {
       id: `file:${path}`,
@@ -545,7 +550,7 @@ export function renderResourceInspector(): void {
   resourceDownloadButton.setAttribute("aria-label", resourceDownloadButton.title)
   resourceDeleteButton.hidden = false
   const query = resourceSearch.value.trim().toLowerCase()
-  const paths = resourceImagePaths(appState.archive.names(), theme.value, orientation.value)
+  const paths = pickableImagePaths()
     .filter((path) => !query || path.toLowerCase().includes(query))
   const bdaUsageCounts = appState.archive.format === "bda" ? bdaImageUsageCounts() : new Map<string, number>()
   resourceCount.textContent = `${paths.length} 张图片`
@@ -665,8 +670,8 @@ export async function uploadKeySound(file: File): Promise<boolean> {
   const entries = currentSoundEntries()
   const selected = entries.find((entry) => entry.id === appState.selectedSoundID)
   const base = selected?.path.split("/").slice(0, -1).join("/")
-    ?? soundResourcePaths(appState.archive.names(), theme.value, orientation.value)[0]?.split("/").slice(0, -1).join("/")
-    ?? `${theme.value}/skin/res`
+    ?? entries[0]?.path.split("/").slice(0, -1).join("/")
+    ?? (appState.archive.format === "ssf" ? "default" : `${theme.value}/skin/res`)
   const targetPath = `${base}/${filename}`
   const beforeResource = appState.archive.getBytes(targetPath)?.slice()
   if (beforeResource && targetPath !== selected?.path && !window.confirm(`音效 ${filename} 已存在，是否替换？`)) return false

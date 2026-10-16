@@ -1,5 +1,5 @@
-// An SSF document is edited as its own files; the canvas shows it through its conversion onto the
-// official BDS template, installed as the archive's read-only overlay and rebuilt after each edit.
+// An SSF document is edited as its own files; the canvas uses the official Sogou skeleton as a
+// read-only overlay, rebuilt after each edit.
 
 import { IniDocument } from "../ini.ts"
 import { loadBuiltInProjectTemplate } from "../operations.ts"
@@ -20,9 +20,9 @@ import { isSsfBoardPath } from "./ssf-documents"
 const REBUILD_DELAY = 300
 
 export async function ssfTemplates(): Promise<SsfTemplates> {
-  appState.ssfTemplates ??= {
-    bds: SkinArchive.open(await loadBuiltInProjectTemplate("official-android-bds")),
-    bda: SkinArchive.open(await loadBuiltInProjectTemplate("default-android"), "bda"),
+  if (!appState.ssfTemplates) {
+    const [bds, bda, sogou] = await Promise.all(["official-android-bds", "default-android", "official-sogou"].map((id) => loadBuiltInProjectTemplate(id)))
+    appState.ssfTemplates ??= { bds: SkinArchive.open(bds), bda: SkinArchive.open(bda, "bda"), sogou: SkinArchive.open(sogou) }
   }
   return appState.ssfTemplates
 }
@@ -33,7 +33,7 @@ export function rebuildSsfPreview(): string[] {
   if (archive?.format !== "ssf" || !appState.ssfTemplates) return []
   let warnings: string[] = []
   try {
-    const preview = ssfPreviewFiles(archive, appState.ssfTemplates.bds)
+    const preview = ssfPreviewFiles(archive, appState.ssfTemplates.sogou)
     archive.setOverlay(preview.files)
     warnings = preview.warnings
   } catch (error) {
@@ -68,7 +68,7 @@ export function switchSsfPreviewLayout(path: string): void {
     appState.layoutDocument = IniDocument.parse(appState.archive.getText(path))
     appState.selectedKeySections = []
     preview.setSelected([])
-    // The overview lists the boards and phoneSkin.ini of the current look and orientation.
+    // 外观切换后，概览显示当前搜狗外观的原始配置文件。
     renderFiles()
     if (boardSelected) selectFile(path)
   } else {

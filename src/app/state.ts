@@ -180,7 +180,7 @@ export const appState = {
   fitCanvasDebounce: undefined as ReturnType<typeof setTimeout> | undefined,
   canvasFitFrozen: false,
   previewZoom: 1,
-  previewPanLocked: true,
+  previewPanLocked: false,
   previewPanX: 0,
   previewPanY: 0,
   previewPanStart: undefined as { pointerId: number; x: number; y: number; panX: number; panY: number } | undefined,

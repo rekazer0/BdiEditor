@@ -3,7 +3,7 @@ import { isBdaVirtualTextPath, isBdaAppearancePartPath, bdaAppearanceStylePath, 
 import { symbolSpan } from "../icons"
 import { layout, files, theme, orientation, documentName } from "./dom"
 import { selectFile, overviewGroupState } from "./navigation"
-import { ssfBoardPaths, ssfThemeFolder, SSF_SOUNDS_PATH } from "./ssf-documents"
+import { isSsfBoardPath, ssfThemeFolder, SSF_SOUNDS_PATH } from "./ssf-documents"
 import { mobilePortraitQuery, sourceThumbnail } from "./canvas-interaction"
 import { setMobilePane } from "./mobile-layout"
 import { bdaAppearancePath, bdaConfigPaths } from "../bda.ts"
@@ -122,6 +122,7 @@ export function renderFiles(): void {
   files.replaceChildren()
   appState.selectedFileButton = undefined
   document.documentElement.dataset.archiveFormat = appState.archive?.format ?? ""
+  layout.hidden = appState.archive?.format !== "ssf"
   if (!appState.archive) return
 
   const overview = document.createElement("div")
@@ -211,9 +212,48 @@ export function renderFiles(): void {
       { group: "资源配置", label: "按键样式", path: `${folder}phoneSkin.ini`, className: "nav-style", icon: "palette" },
       { group: "资源配置", label: "按键前景", path: `${folder}keys.ini`, className: "nav-style", icon: "layers" },
       { group: "资源配置", label: "按键动画", path: `${folder}anim.ini`, className: "nav-style", icon: "wand-sparkles" },
-      { group: "资源配置", label: "按键音效", path: SSF_SOUNDS_PATH, className: "nav-resource", icon: "volume-2" },
+      { group: "资源配置", label: "按键音效", path: SSF_SOUNDS_PATH, className: "nav-resource", icon: "volume-2", navMode: "document" },
+      { group: "资源配置", label: "图片资源", path: `${folder}phoneSkin.ini`, className: "nav-resource", icon: "images", navMode: "resource" },
+      { group: "资源配置", label: "音频资源", path: SSF_SOUNDS_PATH, className: "nav-resource", icon: "audio-lines", navMode: "sound" },
       { group: "资源配置", label: "运营配置", path: "op.ini", className: "nav-style", icon: "sparkles" },
     )
+    // 搜狗手机输入法的全部键盘（取自官方安装包），按它的叫法列出；画布用的是预览转换出的布局。
+    const boards = [
+      ["键盘布局", "py_9", "拼音九键", "grid-3x3"],
+      ["键盘布局", "py_26", "拼音全键", "keyboard"],
+      ["键盘布局", "py_14", "拼音 14 键", "columns-3"],
+      ["键盘布局", "py_9_big_enter", "拼音九键大回车", "layout-dashboard"],
+      ["键盘布局", "big_9", "拼音九键大按键", "grid-2x2"],
+      ["键盘布局", "py_9_double_input", "双拼九键", "table-2"],
+      ["键盘布局", "py_9_big_enter_double_input", "双拼九键大回车", "layout-panel-top"],
+      ["键盘布局", "py_26_double_input", "双拼全键", "layout-template"],
+      ["键盘布局", "def_26", "五笔", "pen-tool"],
+      ["键盘布局", "bh", "笔画", "brush"],
+      ["键盘布局", "bh_big_enter", "笔画大回车", "paintbrush"],
+      ["键盘布局", "cantonese_9", "粤语九键", "message-square"],
+      ["键盘布局", "cantonese_9_big_enter", "粤语九键大回车", "message-square-more"],
+      ["键盘布局", "cantonese_26", "粤语全键", "message-square-quote"],
+      ["键盘布局", "en_9", "英文九键", "case-lower"],
+      ["键盘布局", "en_9_multi", "英文九键多击", "case-upper"],
+      ["键盘布局", "en_26", "英文全键", "a-large-small"],
+      ["键盘布局", "en_26_digits", "英文全键带数字行", "rows-3"],
+      ["键盘布局", "en_26_pro", "英文专业版", "globe"],
+      ["键盘布局", "en_26_pro_digits", "英文专业版带数字行", "list-ordered"],
+      ["数字与符号", "num_9", "数字九键", "calculator"],
+      ["数字与符号", "num_26_1", "数字全键", "binary"],
+      ["数字与符号", "foreign_digit", "外文数字", "hash"],
+      ["数字与符号", "en_digit", "英文数字", "sigma"],
+      ["数字与符号", "en_symbol", "英文符号", "ampersand"],
+      ["手写与语音", "handwriting", "半屏手写", "signature"],
+      ["手写与语音", "handwriting_full", "全屏手写", "hand"],
+      ["手写与语音", "handwriting_grid", "手写格子", "scan-line"],
+      ["手写与语音", "handwriting_frosted_glass", "手写毛玻璃", "spline"],
+      ["手写与语音", "handwriting_ink_printing", "手写水墨", "pen-line"],
+      ["手写与语音", "voice", "语音", "mic"],
+    ]
+    for (const [group, name, label, icon] of boards) {
+      entries.push({ group, label, path: `${theme.value}/skin/${orientation.value}/${name}.ini`, className: "nav-layout", icon })
+    }
   }
   const hiddenLayouts = new Set<string>()
   const configPrefix = `${theme.value}/skin/${orientation.value}/`
@@ -263,7 +303,7 @@ export function renderFiles(): void {
       navMode: "sound",
     })
   }
-  const layoutPaths = appState.archive.format === "bda" ? [] : appState.archive.names()
+  const layoutPaths = appState.archive.format === "bda" || appState.archive.format === "ssf" ? [] : appState.archive.names()
   for (const path of layoutPaths.sort()) {
     const basePath = path
     if (!path.startsWith(configPrefix) || path.slice(configPrefix.length).includes("/") || !/\.ini$/i.test(path)) continue
@@ -341,15 +381,14 @@ export function renderFiles(): void {
   }
   const groups = appState.archive.format === "bda"
     ? ["皮肤信息", "资源配置", "面板样式", "动画效果", "按键音效", "轻量动画", "开关配置", "贴纸配置", "场景配置"]
-    : ["皮肤", "资源配置", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "扩展配置", "扩展布局"]
-  const ssfBoards = appState.archive.format === "ssf" ? new Set(ssfBoardPaths()) : undefined
+    : ["皮肤", "资源配置", "键盘布局", "数字与符号", "手写与语音", "手写与选择", "键盘组件", "扩展配置", "扩展布局"]
   for (const group of groups) {
-    // An SSF skin's converted Baidu tree only feeds the preview; of it, only the boards are listed (as Sogou boards).
-    const grouped = entries.filter((entry) => entry.group === group && (!appState.archive?.isOverlay(entry.path) || ssfBoards?.has(entry.path)) && (
+    // 预览生成的百度文件不属于搜狗原包，只有搜狗键盘布局作为入口显示。
+    const grouped = entries.filter((entry) => entry.group === group && (!appState.archive?.isOverlay(entry.path) || isSsfBoardPath(entry.path)) && (
       appState.archive?.names().includes(entry.path) ||
       appState.archive?.format === "bda" && (isBdaAppearancePartPath(entry.path) || Boolean(appState.bdaBase?.isText(bdaBasePath(entry.path))))
     ))
-    if (group === "键盘布局") {
+    if (group === "键盘布局" && appState.archive.format !== "ssf") {
       const layoutRank: Record<string, number> = { "py_9.ini": 0, "py_26.ini": 1, "bh.ini": 3 }
       grouped.sort((a, b) => {
         const aName = a.path.split("/").pop() ?? ""

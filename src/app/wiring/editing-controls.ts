@@ -163,7 +163,10 @@ export function wireEditingControls(): void {
   for (const control of [theme, orientation, layout]) {
     control.addEventListener("change", () => {
       const path = preferredPath()
-      if (appState.archive?.format === "ssf") return switchSsfPreviewLayout(path)
+      // 切换外观或横竖屏时，搜狗皮肤停留在当前键盘（概览里选的可能不是 9 / 26 键）。
+      if (appState.archive?.format === "ssf") {
+        return switchSsfPreviewLayout(control === layout ? path : path.replace(/[^/]+$/, appState.layoutPath.split("/").pop()!))
+      }
       if (control !== layout && !createMissingVariant(path)) return
       let selected = false
       if (appState.archive?.format === "bda") {

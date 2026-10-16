@@ -7,7 +7,7 @@ import { IniDocument } from "../ini.ts"
 import { ssfFieldLabel, ssfSectionLabel } from "../ssf/ssf-labels.ts"
 import { parseSsfImage, type SsfStretch } from "../ssf/ssf-package.ts"
 import { setSourceValue } from "./config-context"
-import { commitText, isEditing, updateDirty } from "./edit-history"
+import { commitBatch, commitText, isEditing, updateDirty } from "./edit-history"
 import { populateKeyInspector } from "./key-inspector"
 import { refreshPreview } from "./preview-render"
 import { openImageResourceChooser } from "./resource-inspector"
@@ -30,6 +30,7 @@ const QUADS: Record<string, string[]> = {
   PADDINGS: ["←", "↑", "→", "↓"],
 }
 const COLOR_VALUE = /^(?:0x|#)?([0-9a-f]{6}|[0-9a-f]{8})$/i
+const NUMERIC_FIELDS = new Set(["BG_STYLE", "TEXT_SIZE", "TYPEFACE", "TYPE", "LABEL_VISIBLE", "MINOR_LABEL_VISIBLE", "LABEL_ORIENTATION", "LABEL_HORIZONTAL_OFFSET", "MINOR_LABEL_HORIZONTAL_OFFSET", "POPUP_OFFSET_VERTICAL", "LOOP_TYPE", "START", "END", "loop_count"])
 
 function element<K extends keyof HTMLElementTagNameMap>(name: K, className?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(name)
@@ -42,20 +43,35 @@ function element<K extends keyof HTMLElementTagNameMap>(name: K, className?: str
  * skin right away (the inspector is not typing, so it skips the preview's debounce).
  */
 export function editSsfFile(path: string, change: (document: IniDocument) => void): void {
+  editTargets([{ path, section: "" }], change)
+}
+
+type SsfLocation = { path: string; section: string }
+
+function editTargets(targets: SsfLocation[], change: (document: IniDocument, target: SsfLocation) => void): void {
   const archive = appState.archive
   if (!archive || archive.format !== "ssf" || !isEditing()) return
-  const before = archive.isText(path) ? archive.getText(path) : ""
-  const document = IniDocument.parse(before)
-  change(document)
-  const after = document.toString()
-  if (after === before) return
-  commitText(path, before, after)
-  if (appState.selectedPath === path) appState.selectedDocument = IniDocument.parse(after)
-  if (sourceEditPath() === path) setSourceValue(after)
+  const changes = [...new Set(targets.map((target) => target.path))].flatMap((path) => {
+    const before = archive.isText(path) ? archive.getText(path) : ""
+    const document = IniDocument.parse(before)
+    for (const target of targets.filter((target) => target.path === path)) change(document, target)
+    const after = document.toString()
+    return before === after ? [] : [{ kind: "text" as const, path, before, after }]
+  })
+  if (!changes.length) return
+  if (changes.length === 1) commitText(changes[0].path, changes[0].before, changes[0].after)
+  else commitBatch(changes)
+  if (changes.some((change) => change.path === appState.selectedPath)) appState.selectedDocument = ssfDocument(appState.selectedPath)
+  const source = changes.find((change) => change.path === sourceEditPath())
+  if (source) setSourceValue(source.after)
   rebuildSsfPreview()
   refreshPreview()
   populateKeyInspector()
   updateDirty()
+}
+
+function writeValue(targets: SsfLocation[], key: string, value: string): void {
+  editTargets(targets, (document, target) => setSsfValue(document, target.section, key, value))
 }
 
 /** Sets a value, adding the section at the end of the file when it does not exist yet. */
@@ -100,6 +116,10 @@ const thumbnailObserver = new IntersectionObserver((entries) => {
   }
 })
 
+export function disconnectSsfThumbnails(): void {
+  thumbnailObserver.disconnect()
+}
+
 /** The image a Sogou value names, fitted whole into a thumbnail. */
 async function imageVisual(value: string | undefined): Promise<Visual | undefined> {
   const ref = parseSsfImage(value)
@@ -132,70 +152,62 @@ function withFile(value: string | undefined, file: string): string {
   return [file, ...rest].join(",")
 }
 
-/** Chooses an image of the skin for one state and writes it, keeping the stretch band. */
-function chooseImage(path: string, section: string, key: string, current: string | undefined): void {
-  if (!isEditing()) return
-  openImageResourceChooser((resourceID) => {
-    const file = /\.\w+$/.test(resourceID) ? resourceID : `${resourceID}.png`
-    editSsfFile(path, (document) => {
-      for (const linked of [key, ...LINKED_STATES[key] ?? []]) {
-        const old = document.get(section, linked)
-        if (linked === key || old !== undefined && old === current) setSsfValue(document, section, linked, withFile(old ?? current, file))
-      }
-    })
+/** Replace one state's file while preserving each target's own stretch band and linked states. */
+function replaceImage(targets: SsfLocation[], key: string, file: string): void {
+  editTargets(targets, (document, { section }) => {
+    const current = document.get(section, key) ?? document.get(section, key === "ICON_PRESSED" ? "ICON" : "NORMAL")
+    for (const linked of [key, ...LINKED_STATES[key] ?? []]) {
+      const old = document.get(section, linked)
+      if (linked === key || old !== undefined && old === current) setSsfValue(document, section, linked, withFile(old ?? current, file))
+    }
   })
 }
 
-export type CardReference = { path: string; section: string; key: string }
+function chooseImage(targets: SsfLocation[], key: string): void {
+  if (!isEditing()) return
+  openImageResourceChooser((resourceID) => replaceImage(targets, key, /\.\w+$/.test(resourceID) ? resourceID : `${resourceID}.png`))
+}
 
-/**
- * The shared style card (DESIGN.md §10): the name on the left is the section this card shows (typing
- * re-points `reference`, the key field naming it); the previews on the right pick each state's image.
- */
-export function imageCard(label: string, path: string, section: string, keys: [string, string], reference?: CardReference): HTMLElement {
+type CardReference = { path: string; section: string; key: string }
+
+/** SSF uses one image per card; each state's filename and preview edit that image independently. */
+function imageCard(label: string, key: string, targets: SsfLocation[]): HTMLElement {
+  const { path, section } = targets[0]
   const document = ssfDocument(path)
-  const row = element("div", "document-property-field wide style-reference-field")
-  caption(row, keys[0], label)
-  const wrapper = element("span", "style-reference-input")
-  const trigger = element("span", "style-picker-trigger")
-  const card = element("div", "style-reference-row")
+  const own = document.get(section, key)
+  const value = own ?? document.get(section, key === "ICON_PRESSED" ? "ICON" : "NORMAL")
+  const row = element("div", "ui-field document-property-field style-reference-field")
+  caption(row, key, label)
+  const card = element("div", "style-reference-row ssf-image-card")
   const meta = element("span", "style-reference-meta")
   const name = element("input", "style-reference-number style-reference-name")
-  name.value = reference ? ssfDocument(reference.path).get(reference.section, reference.key)?.split(",")[0].trim() ?? section : section
-  name.readOnly = !reference
+  name.value = parseSsfImage(value)?.file ?? ""
   name.disabled = !isEditing()
-  name.title = `${path} · [${section}]`
-  name.setAttribute("aria-label", `${label}引用的样式段`)
-  if (reference) {
-    name.addEventListener("change", () => {
-      const value = name.value.trim()
-      if (value) editSsfFile(reference.path, (target) => setSsfValue(target, reference.section, reference.key, value))
-    })
-  }
+  name.title = `${path} · [${section}] ${key}`
+  name.setAttribute("aria-label", `${label}文件名`)
+  name.addEventListener("change", () => {
+    const image = parseSsfImage(name.value.trim())
+    if (image) replaceImage(targets, key, image.file)
+  })
   meta.append(name, styleKindBadge("image"))
   const states = element("span", "style-picker-states")
-  const normal = document.get(section, keys[0])
-  for (const [index, key] of keys.entries()) {
-    const value = document.get(section, key) ?? (index ? normal : undefined)
-    const state = element("button", "style-picker-state")
-    state.type = "button"
-    state.dataset.styleState = index ? "highlighted" : "normal"
-    state.title = `${index ? "按下" : "正常"}：${value?.split(",")[0] ?? "未设置"}（点击更换图片）`
-    state.setAttribute("aria-label", state.title)
-    state.disabled = !isEditing()
-    state.append(thumbnail(value))
-    state.addEventListener("click", () => chooseImage(path, section, key, value))
-    states.append(state)
-  }
+  const state = element("button", "style-picker-state")
+  state.type = "button"
+  state.dataset.styleState = /PRESSED/.test(key) ? "highlighted" : "normal"
+  state.title = `${label}：${parseSsfImage(value)?.file ?? "未设置"}${own ? "" : "（沿用正常图片）"}，点击更换图片`
+  state.setAttribute("aria-label", state.title)
+  state.disabled = !isEditing()
+  state.append(thumbnail(value))
+  state.addEventListener("click", () => chooseImage(targets, key))
+  states.append(state)
   card.append(meta, states)
-  trigger.append(card)
-  wrapper.append(trigger)
-  row.append(wrapper)
+  row.append(card)
   return row
 }
 
 function numberParts(row: HTMLElement, key: string, affixes: string[], values: string[], onChange: (values: string[]) => void): void {
   const pair = element("span", "ui-field-pair")
+  if (affixes.length === 4 && key !== "FG_RECT") pair.dataset.columns = "4"
   affixes.forEach((affix, index) => {
     const box = element("span", "ui-input")
     const prefix = element("span", "ui-input-affix")
@@ -207,9 +219,7 @@ function numberParts(row: HTMLElement, key: string, affixes: string[], values: s
     input.disabled = !isEditing()
     input.setAttribute("aria-label", `${ssfFieldLabel(key)} ${affix}`)
     input.addEventListener("change", () => {
-      const next = [...values]
-      next[index] = input.value
-      onChange(next)
+      if (input.value !== "" && Number.isFinite(input.valueAsNumber)) onChange(Array.from(pair.querySelectorAll("input"), (field) => field.value))
     })
     box.append(prefix, input)
     pair.append(box)
@@ -218,17 +228,22 @@ function numberParts(row: HTMLElement, key: string, affixes: string[], values: s
 }
 
 /** The stretch band shared by a section's state images: Sogou's order is left, right, top, bottom. */
-export function stretchField(path: string, section: string): HTMLElement | undefined {
+function stretchField(path: string, section: string, targets = [{ path, section }]): HTMLElement | undefined {
   const document = ssfDocument(path)
   const stretch = parseSsfImage(document.get(section, "NORMAL"))?.stretch
   if (!stretch) return
-  const row = element("label", "document-property-field wide")
+  const row = element("div", "ui-field document-property-field")
+  row.dataset.stack = ""
   caption(row, "STRETCH", "拉伸区域")
   row.title = "九宫格可拉伸的像素区间：左、右、上、下"
   numberParts(row, "STRETCH", ["左", "右", "上", "下"], stretch.map(String), (values) => {
-    const next = values.map(Number) as SsfStretch
-    if (next.some((value) => !Number.isInteger(value)) || next[0] >= next[1] || next[2] >= next[3]) return
-    editSsfFile(path, (target) => {
+    const bands = targets.map((target) => {
+      const current = parseSsfImage(ssfDocument(target.path).get(target.section, "NORMAL"))?.stretch
+      return values.map((value, index) => value === "" ? current?.[index] : Number(value)) as SsfStretch
+    })
+    if (bands.some((next) => next.some((value) => !Number.isInteger(value)) || next[0] >= next[1] || next[2] >= next[3])) return
+    editTargets(targets, (target, { path, section }) => {
+      const next = bands[targets.findIndex((item) => item.path === path && item.section === section)]
       for (const key of IMAGE_STATES) {
         const value = target.get(section, key)
         const file = value && parseSsfImage(value)?.file
@@ -239,8 +254,8 @@ export function stretchField(path: string, section: string): HTMLElement | undef
   return row
 }
 
-function colorField(path: string, section: string, key: string, value: string): HTMLElement {
-  const row = element("label", "document-property-field")
+function colorField(key: string, value: string, targets: SsfLocation[]): HTMLElement {
+  const row = element("div", "ui-field document-property-field")
   caption(row, key)
   const hex = value.trim().match(COLOR_VALUE)?.[1].toUpperCase() ?? "FF000000"
   const argb = hex.length === 6 ? `FF${hex}` : hex
@@ -260,37 +275,46 @@ function colorField(path: string, section: string, key: string, value: string): 
   alpha.value = String(Math.round(Number.parseInt(argb.slice(0, 2), 16) / 255 * 100) / 100)
   alpha.setAttribute("aria-label", `${ssfFieldLabel(key)}透明度`)
   for (const input of [picker, text, alpha]) input.disabled = !isEditing()
-  const write = (next: string) => editSsfFile(path, (document) => setSsfValue(document, section, key, next))
-  const fromControls = () => {
-    const alphaHex = Math.round(Math.max(0, Math.min(1, Number(alpha.value) || 0)) * 255).toString(16).padStart(2, "0")
-    write(`0x${alphaHex}${picker.value.slice(1)}`.toUpperCase().replace(/^0X/, "0x"))
-  }
-  picker.addEventListener("change", fromControls)
-  alpha.addEventListener("change", fromControls)
+  const write = (next: string) => writeValue(targets, key, next)
+  const fromControls = (component: "color" | "alpha") => editTargets(targets, (document, target) => {
+    const current = document.get(target.section, key)?.trim().match(COLOR_VALUE)?.[1] ?? "FF000000"
+    const argb = current.length === 6 ? `FF${current}` : current
+    const alphaHex = component === "alpha" ? Math.round(Number(alpha.value) * 255).toString(16).padStart(2, "0") : argb.slice(0, 2)
+    const rgb = component === "color" ? picker.value.slice(1) : argb.slice(2)
+    setSsfValue(document, target.section, key, `0x${alphaHex}${rgb}`.toUpperCase().replace(/^0X/, "0x"))
+  })
+  picker.addEventListener("change", () => fromControls("color"))
+  alpha.addEventListener("change", () => { if (alpha.value !== "" && alpha.checkValidity()) fromControls("alpha") })
   text.addEventListener("change", () => { if (COLOR_VALUE.test(text.value.trim())) write(text.value.trim()) })
   control.append(picker, text, alpha)
   row.append(control)
   return row
 }
 
-function valueInput(path: string, section: string, key: string, value: string): HTMLInputElement {
+function valueInput(key: string, value: string, targets: SsfLocation[]): HTMLInputElement {
   const input = element("input", "document-property-input")
   input.value = value
   input.title = `${ssfFieldLabel(key)}：${value}`
   input.disabled = !isEditing()
+  if (NUMERIC_FIELDS.has(key) && /^-?\d+(?:\.\d+)?$/.test(value)) {
+    input.type = "number"
+    input.step = value.includes(".") ? "any" : "1"
+  }
   input.setAttribute("aria-label", ssfFieldLabel(key))
-  input.addEventListener("change", () => editSsfFile(path, (document) => setSsfValue(document, section, key, input.value)))
+  input.addEventListener("change", () => {
+    if (input.type !== "number" || input.value !== "" && Number.isFinite(input.valueAsNumber)) writeValue(targets, key, input.value)
+  })
   return input
 }
 
-function textField(path: string, section: string, key: string, value: string, options?: string[]): HTMLElement {
+function textField(key: string, value: string, targets: SsfLocation[], options?: string[]): HTMLElement {
   const row = element("label", "document-property-field")
-  if (value.length > 18 || options) row.classList.add("wide")
+  row.classList.add("ui-field")
   caption(row, key)
-  const input = valueInput(path, section, key, value)
+  const input = valueInput(key, value, targets)
   if (options?.length) {
     const list = element("datalist")
-    list.id = `ssf-options-${section}-${key}`.replace(/[^\w-]/g, "_")
+    list.id = `ssf-options-${targets[0].section}-${key}`.replace(/[^\w-]/g, "_")
     list.append(...options.map((option) => Object.assign(element("option"), { value: option })))
     input.setAttribute("list", list.id)
     row.append(list)
@@ -299,40 +323,24 @@ function textField(path: string, section: string, key: string, value: string, op
   return row
 }
 
-/** A stand-alone image value (DISABLED, BG_IMAGE=bg.png, pic_path…): its thumbnail picks another image. */
-function imageField(path: string, section: string, key: string, value: string): HTMLElement {
-  const row = element("label", "document-property-field wide")
-  caption(row, key)
-  const box = element("span", "ui-input")
-  const pick = element("button", "ui-input-affix ssf-image-affix")
-  pick.type = "button"
-  pick.title = `更换${ssfFieldLabel(key)}`
-  pick.setAttribute("aria-label", pick.title)
-  pick.disabled = !isEditing()
-  pick.append(thumbnail(value))
-  pick.addEventListener("click", (event) => {
-    event.preventDefault()
-    chooseImage(path, section, key, value)
-  })
-  box.append(pick, valueInput(path, section, key, value))
-  row.append(box)
-  return row
-}
-
 /** One row for any Sogou value, chosen by what the value is. `options` suggests values (sound names). */
-export function ssfField(path: string, section: string, entry: SsfEntry, options?: string[]): HTMLElement {
+function ssfField(entry: SsfEntry, targets: SsfLocation[], options?: string[]): HTMLElement {
   const { key, value } = entry
   const quad = QUADS[key]
   const parts = value.split(",").map((part) => part.trim())
-  if (quad && parts.length === quad.length) {
-    const row = element("label", "document-property-field wide")
+  if (quad && parts.length === quad.length && parts.every((part) => part !== "" && Number.isFinite(Number(part)))) {
+    const row = element("div", "ui-field document-property-field")
+    row.dataset.stack = ""
     caption(row, key)
-    numberParts(row, key, quad, parts, (values) => editSsfFile(path, (document) => setSsfValue(document, section, key, values.join(","))))
+    numberParts(row, key, quad, parts, (values) => editTargets(targets, (document, target) => {
+      const current = document.get(target.section, key)!.split(",")
+      setSsfValue(document, target.section, key, values.map((value, index) => value || current[index]).join(","))
+    }))
     return row
   }
-  if (/COLOR/i.test(key) && COLOR_VALUE.test(value.trim())) return colorField(path, section, key, value)
-  if (parseSsfImage(value)) return imageField(path, section, key, value)
-  return textField(path, section, key, value, options)
+  if (/COLOR/i.test(key) && COLOR_VALUE.test(value.trim())) return colorField(key, value, targets)
+  if (parseSsfImage(value)) return imageCard(ssfFieldLabel(key), key, targets)
+  return textField(key, value, targets, options)
 }
 
 export type SsfBlock = {
@@ -351,6 +359,8 @@ export type SsfBlock = {
   /** The field naming this block's image section, editable in its card. */
   reference?: CardReference
   options?: Record<string, string[]>
+  /** Matching sections of the other selected keys. */
+  peers?: SsfLocation[]
 }
 
 export function ssfButton(label: string, icon: string, onClick: () => void): HTMLButtonElement {
@@ -375,8 +385,37 @@ function blockHeading(block: SsfBlock): HTMLElement {
   return heading
 }
 
+function markMixed(row: HTMLElement, targets: SsfLocation[], keys: string[]): void {
+  const values = targets.map(({ path, section }) => ssfDocument(path).get(section, keys[0]) ?? "")
+  if (row.classList.contains("style-reference-field")) {
+    const key = keys[0]
+    const files = targets.map(({ path, section }) => parseSsfImage(ssfDocument(path).get(section, key) ?? ssfDocument(path).get(section, key === "ICON_PRESSED" ? "ICON" : "NORMAL"))?.file)
+    if (files.some((file) => file !== files[0])) {
+      const name = row.querySelector("input")!
+      name.value = ""
+      name.placeholder = "混合"
+      const state = row.querySelector<HTMLButtonElement>(".style-picker-state")!
+      state.replaceChildren("混合")
+      state.title = `${ssfFieldLabel(key)}：混合（点击更换图片）`
+      state.setAttribute("aria-label", state.title)
+    }
+    return
+  }
+  const inputs = Array.from(row.querySelectorAll<HTMLInputElement>("input:not([type=color])"))
+  const quad = QUADS[keys[0]] ?? (keys.length === IMAGE_STATES.length ? ["左", "右", "上", "下"] : undefined)
+  if (quad) {
+    const parts = keys.length === IMAGE_STATES.length ? values.map((value) => parseSsfImage(value)?.stretch?.map(String) ?? []) : values.map((value) => value.split(",").map((part) => part.trim()))
+    for (const [index, input] of inputs.entries()) {
+      if (parts.some((value) => value[index] !== parts[0][index])) { input.value = ""; input.placeholder = "混合" }
+    }
+  } else if (values.some((value) => value !== values[0])) {
+    for (const input of inputs) { input.value = ""; input.placeholder = "混合" }
+    row.querySelector(".color-control")?.setAttribute("data-mixed", "")
+  }
+}
+
 /** Rows of one section: its image pairs as cards, the stretch band, then every other value. */
-export function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
+function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
   const nodes: HTMLElement[] = []
   const exists = ssfDocument(block.path).sections().includes(block.section)
   if (!exists && !block.template) return nodes
@@ -400,29 +439,68 @@ export function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[
   const entries = ssfEntries(block.path, block.section).filter((entry) => !block.only || block.only.includes(entry.key))
   const keys = new Set(entries.map((entry) => entry.key))
   const grid = element("div", "document-property-grid")
+  const targets = [{ path: block.path, section: block.section }, ...block.peers ?? []]
   const used = new Set(block.omit ?? [])
+  const rowTargets = new Map<HTMLElement, SsfLocation[]>()
+  if (block.reference) {
+    const ref = block.reference
+    const locations = [{ path: ref.path, section: ref.section }]
+    const row = ssfField({ key: ref.key, value: ssfDocument(ref.path).get(ref.section, ref.key) ?? "" }, locations)
+    rowTargets.set(row, locations)
+    grid.append(row)
+  }
   for (const [normal, pressed, label] of [["NORMAL", "PRESSED", "图片"], ["ICON", "ICON_PRESSED", "图标"]] as const) {
     if (used.has(normal) || !keys.has(normal) || !parseSsfImage(entries.find((entry) => entry.key === normal)?.value)) continue
-    grid.append(imageCard(label, block.path, block.section, [normal, pressed], normal === "NORMAL" ? block.reference : undefined))
+    grid.append(imageCard(`正常${label}`, normal, targets), imageCard(`按下${label}`, pressed, targets))
     used.add(normal).add(pressed)
     if (normal === "NORMAL") {
-      const stretch = stretchField(block.path, block.section)
+      const stretch = stretchField(block.path, block.section, targets)
       if (stretch) grid.append(stretch)
     }
   }
   for (const entry of entries) {
     if (used.has(entry.key)) continue
-    grid.append(ssfField(block.path, block.section, entry, block.options?.[entry.key]))
+    grid.append(ssfField(entry, targets, block.options?.[entry.key]))
+  }
+  for (const row of Array.from(grid.children) as HTMLElement[]) {
+    const band = row.dataset.documentKey === "STRETCH"
+    const card = row.classList.contains("style-reference-field")
+    const rowKeys = band ? IMAGE_STATES : row.dataset.documentKey!.split(" ")
+    const savedKeys = rowKeys.flatMap((key) => [key, ...LINKED_STATES[key] ?? []])
+    const locations = rowTargets.get(row) ?? targets
+    const saved = locations.map((target) => ({ ...target, values: Object.fromEntries(savedKeys.map((key) => {
+      const value = ssfDocument(target.path).get(target.section, key)
+      return [key, value === undefined ? null : band ? value.split(",").slice(1).join(",") : card ? value.split(",")[0] : value]
+    })) }))
+    row.dataset.inspectorRowKey = JSON.stringify([locations, row.dataset.documentKey])
+    row.dataset.inspectorValue = JSON.stringify(saved)
+    row.addEventListener("inspector-reset", (event) => {
+      event.preventDefault()
+      const baseline = JSON.parse((event as CustomEvent<string>).detail) as typeof saved
+      editTargets(baseline, (document, target) => {
+        for (const item of baseline.filter((item) => item.path === target.path && item.section === target.section)) {
+          for (const [key, value] of Object.entries(item.values)) {
+            const current = document.get(target.section, key)
+            if (band) {
+              if (current) document.set(target.section, key, [current.split(",")[0], ...value ? value.split(",") : []].join(","))
+            } else if (value === null) document.remove(target.section, key)
+            else if (card && savedKeys.includes(key)) setSsfValue(document, target.section, key, withFile(current, value))
+            else setSsfValue(document, target.section, key, value)
+          }
+        }
+      })
+    })
+    if (block.peers?.length) markMixed(row, targets, rowKeys)
   }
   if (grid.childElementCount) nodes.push(grid)
   return nodes
 }
 
 /** One inspector group (a rail entry): several sections under one title, each with its own subheading. */
-export function renderGroup(label: string, blocks: SsfBlock[], code?: string): HTMLElement | undefined {
+export function renderGroup(label: string, blocks: SsfBlock[], code?: string, key = label): HTMLElement | undefined {
   const shown = blocks.filter((block) => block.template || ssfDocument(block.path).sections().includes(block.section))
   if (!shown.length) return
-  const section = element("section", "document-property-section")
+  const section = element("section", "ui-section document-property-section")
   section.dataset.inspectorGroupLabel = label
   const heading = element("h3", "document-section-heading")
   const title = element("span", "document-section-title")
@@ -435,6 +513,14 @@ export function renderGroup(label: string, blocks: SsfBlock[], code?: string): H
   }
   section.append(heading)
   const many = shown.length > 1
-  for (const block of shown) section.append(...renderBlock(block, many || Boolean(block.title)))
+  for (const [index, block] of shown.entries()) {
+    const subsection = element("div", "ui-subsection")
+    const references = shown.flatMap(({ reference }) => reference?.path === block.path && reference.section === block.section ? [reference.key] : [])
+    subsection.append(...renderBlock({ ...block, omit: [...block.omit ?? [], ...references] }, many || Boolean(block.title && block.title !== label)))
+    for (const row of Array.from(subsection.querySelectorAll<HTMLElement>("[data-inspector-row-key]"))) {
+      row.dataset.inspectorRowKey = JSON.stringify([key, index, row.dataset.documentKey])
+    }
+    section.append(subsection)
+  }
   return section
 }

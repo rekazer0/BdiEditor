@@ -20,7 +20,7 @@ import { bdaAvailableLayoutPaths, preferredPath, isBdaLayoutPath } from "./bda-d
 import { selectFile } from "./navigation"
 import { invoke } from "@tauri-apps/api/core"
 import { open, save } from "@tauri-apps/plugin-dialog"
-import { type SourceReadFilePayload, type ChosenFileData, type BrowserSaveFileHandle } from "./types"
+import { type SourceFilePayload, type ChosenFileData, type BrowserSaveFileHandle } from "./types"
 import { readFile, writeFile } from "@tauri-apps/plugin-fs"
 import { convertBdaArchive } from "../bda-convert.ts"
 import { flushNumberInputWheel } from "../number-input-wheel.ts"
@@ -29,7 +29,7 @@ import { convertSsfDocument, exportSsf, ssfDocumentBytes } from "../ssf/ssf-conv
 import { rebuildSsfPreview, ssfTemplates } from "./ssf-preview"
 
 export async function loadArchive(
-  bytes: Uint8Array,
+  bytes: Uint8Array | SkinArchive,
   path: string,
   isNew = false,
   existingSourceWorkspace = "",
@@ -37,12 +37,15 @@ export async function loadArchive(
   sourcePrefix = "",
 ): Promise<void> {
   const started = performance.now()
+  const sizeBytes = bytes instanceof SkinArchive
+    ? bytes.sourceFiles().reduce((total, file) => total + file.data.byteLength, 0)
+    : bytes.byteLength
   clientLog.info("archive.load.start", {
     name: (displayName || path).split(/[\\/]/).pop() || (isNew ? "new-project" : "unnamed"),
-    sizeBytes: bytes.byteLength,
+    sizeBytes,
     sourceWorkspace: Boolean(existingSourceWorkspace),
   })
-  if (showSkinLoadProgress(bytes.byteLength)) await waitForInterfacePaint()
+  if (showSkinLoadProgress(sizeBytes)) await waitForInterfacePaint()
   await flushSourceAutosave()
   await activateSourceWorkspace("", "")
   appState.sourceWorkspacePendingArchive = undefined
@@ -51,7 +54,7 @@ export async function loadArchive(
   let nextArchive: SkinArchive
   try {
     updateFileOperationProgress(18, "正在解析皮肤包…")
-    nextArchive = await SkinArchive.openAsync(
+    nextArchive = bytes instanceof SkinArchive ? bytes : await SkinArchive.openAsync(
       bytes,
       exportFormatFromPath(displayName || path),
       appState.fileOperationProgressVisible
@@ -61,7 +64,7 @@ export async function loadArchive(
   } catch (error) {
     clientLog.error("archive.parse.error", {
       name: (displayName || path).split(/[\\/]/).pop() || "unnamed",
-      sizeBytes: bytes.byteLength,
+      sizeBytes,
       durationMs: Math.round(performance.now() - started),
     }, error)
     void flushClientLogs()
@@ -216,7 +219,7 @@ export async function loadSourceWorkspace(path: string, skinPath = ""): Promise<
       : ""
     const name = decodedPath.split(/[\\/]/).filter(Boolean).pop() || "皮肤源码"
     const packed = SkinArchive.open(decodeBase64Archive(encoded))
-    await loadArchive(sourceArchiveFromFiles(packed.sourceFiles()).toBytes(), skinPath, false, path, skinPath ? "" : name, sourcePrefix)
+    await loadArchive(sourceArchiveFromFiles(packed.sourceFiles()), skinPath, false, path, skinPath ? "" : name, sourcePrefix)
     return true
   }
   // 整个源码目录读完才知道大小，先按皮肤包大小决定是否立即弹出进度，免得点了半天没反应。
@@ -224,7 +227,7 @@ export async function loadSourceWorkspace(path: string, skinPath = ""): Promise<
     updateFileOperationProgress(2, "正在读取源码目录…")
     await waitForInterfacePaint()
   }
-  const files = await invoke<SourceReadFilePayload[]>("open_source_workspace", { path })
+  const files = await invoke<SourceFilePayload[]>("open_source_workspace", { path })
   const directoryName = path.split(/[\\/]/).filter(Boolean).pop()?.toLowerCase() ?? ""
   const sourcePrefix = directoryName === "dark" || directoryName === "light"
     ? `${directoryName}/`
@@ -239,12 +242,12 @@ export async function loadSourceWorkspace(path: string, skinPath = ""): Promise<
         && !file.path.startsWith(sourcePrefix)
         ? `${sourcePrefix}${file.path}`
         : file.path,
-      data: new Uint8Array(file.data),
+      data: decodeBase64Archive(file.data),
     }))
   if (!sourceFiles.length) throw new Error("源码文件夹为空")
   const sourceArchive = sourceArchiveFromFiles(sourceFiles)
   const name = path.split(/[\\/]/).pop() || "皮肤源码"
-  await loadArchive(sourceArchive.toBytes(), skinPath, false, path, skinPath ? "" : name, sourcePrefix)
+  await loadArchive(sourceArchive, skinPath, false, path, skinPath ? "" : name, sourcePrefix)
   return true
 }
 

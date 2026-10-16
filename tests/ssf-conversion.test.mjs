@@ -146,6 +146,22 @@ test('ssf package: day/night come from the hours in time.ini, not the listing or
   assert.deepEqual([...single.themes], [['light', '1080/']])
 })
 
+test('ssf package: resolution follows time.ini supported screens', async () => {
+  const files = {
+    'phoneTheme.ini': strToU8('[General]\nskin_name=分辨率测试\n'),
+    'time.ini': strToU8('[General]\nSUPPORT_SCREEN=720,1080\n[1080]\nSTATUS_LIST=status1\n'),
+    '720/status1/phoneSkin.ini': strToU8('[General]\nSOURCE=720\n'),
+    '1080/status1/phoneSkin.ini': strToU8('[General]\nSOURCE=1080\n'),
+    '1440/status1/phoneSkin.ini': strToU8('[General]\nSOURCE=1440\n'),
+  }
+  const pkg = await SsfPackage.open(zipSync(files))
+
+  assert.equal(pkg.resolution, '1080')
+  assert.equal(pkg.folder('light'), '1080/status1/')
+  assert.equal(pkg.skin('light').get('General', 'SOURCE'), '1080')
+  assert.deepEqual(pkg.file('light', 'phoneSkin.ini'), files['1080/status1/phoneSkin.ini'])
+})
+
 test('ssf package: rejects PC skins, non-phone archives and unsafe paths', async () => {
   await assert.rejects(SsfPackage.open(zipSync({ 'skin.ini': strToU8('[General]') })), /电脑版/)
   await assert.rejects(SsfPackage.open(zipSync({ 'readme.txt': strToU8('x') })), /phoneTheme\.ini/)
@@ -207,6 +223,7 @@ test('key table: boards, Sogou class names and landscape variants', () => {
   assert.deepEqual(ssfKeyBinding('en_26', 's', false).sections, ['Key_S_EN', 'Key_S'])
   assert.deepEqual(ssfKeyBinding('py_26', 'h', true).sections, ['Key_H_Land_PY', 'Key_H_PY_Land', 'Key_H_Land', 'Key_H_PY', 'Key_H'])
   assert.deepEqual(ssfKeyBinding('py_9', 'k', false).sections, ['Key_JKL'])
+  assert.deepEqual(ssfKeyBinding('py_9', '0', false, 'Key_0_py9'), { sections: ['Key_0_py9', 'Key_Edits'], defaults: ['KeyBg_Function'], keyClass: 'function' })
   assert.deepEqual(ssfKeyBinding('bh', 'B6', false).sections, ['Key_Wildcard'])
   assert.deepEqual(ssfKeyBinding('num_9', '7', false).sections, ['Key_7'])
   assert.deepEqual(ssfKeyBinding('py_26', 'F36', false), { sections: ['Key_Backspace_Qwerty'], defaults: ['KeyBg_Function_Qwerty', 'KeyBg_Function'], keyClass: 'function' })
@@ -219,6 +236,7 @@ test('key table: boards, Sogou class names and landscape variants', () => {
 test('ssf → BDS: per-key and shared backgrounds keep their stretch band, per theme', async () => {
   const { archive, warnings } = convertSsfToBaidu(await SsfPackage.open(ssfFixture()), bdsTemplate)
   assert.equal(archive.format, 'bds')
+  assert.equal(IniDocument.parse(archive.getText('light/skin/land/gen.ini')).get('PANEL', 'SIZE'), '800,245')
   for (const theme of ['light', 'dark']) {
     const c = COLORS[theme]
     const q = baiduKeyStyle(archive, theme, 'port', 'py_26', 'q')

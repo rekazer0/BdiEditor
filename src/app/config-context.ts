@@ -286,8 +286,6 @@ export function refreshToolbarPreview(
   applyCandidateGeometry(document, width)
   const toolbarDocument = IniDocument.parse(document.toString())
   toolbarDocument.set("CAND", "BACK_STYLE", "")
-  // The template's toolbar icons are Baidu's; a Sogou skin's bar icons come with the Sogou app.
-  if (appState.archive.format === "ssf") toolbarDocument.removeSections(toolbarDocument.sections().filter((section) => /^ICON\d+$/.test(section)))
   toolbarPreview.setPanel("", width, height)
   toolbarPreview.setDocument(toolbarDocument)
   toolbarPreview.setMode(canvasEditable() ? "edit" : "preview")

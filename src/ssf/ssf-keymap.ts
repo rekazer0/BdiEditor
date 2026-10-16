@@ -24,12 +24,13 @@ const MODE_LETTERS = "HJLS"
 export function ssfBoard(layout: string): SsfBoard {
   // BDA landscape adds split / one-handed variants of the same boards (`py_9_split_left`, `bh_union`).
   const name = layout.replace(/\.ini$/i, "").split("/").pop()!.toLowerCase().replace(/_(?:split|union)(?:_left)?$/, "")
-  if (name === "py_26" || name === "def_26") return "py26"
-  if (name === "en_26" || name === "en_26s") return "en26"
+  // Sogou's variants (double pinyin, big enter, Cantonese, 14-key) style their keys like the base board.
+  if (/^(?:py_26|def_26|py_14|cantonese_26)/.test(name)) return "py26"
+  if (/^en_26/.test(name)) return "en26"
   if (/^num_26/.test(name)) return "num26"
-  if (name === "py_9" || name === "def_9") return "py9"
-  if (name === "en_9" || name === "en_9s") return "en9"
-  if (name === "bh") return "bh"
+  if (/^(?:py_9|def_9|big_9|cantonese_9)/.test(name)) return "py9"
+  if (name === "en_9" || name === "en_9s" || name === "en_9_multi") return "en9"
+  if (/^bh/.test(name)) return "bh"
   if (name === "num_9") return "num9"
   return "other"
 }
@@ -81,6 +82,8 @@ function primarySections(board: SsfBoard, action: string): string[] {
         return group ? [`Key_${group}`] : []
       }
       if (action === "'") return ["Key_PunctPY"]
+      // The 9-key 0 is Sogou's edit key; skins style it there, rarely on its digit class.
+      if (action === "0") return [board === "py9" ? "Key_Edits" : "Key_Edits_en9", "Key_0_py9"]
       return action === "…" || action === "*" ? ["Key_Punct"] : []
     }
     case "bh": {
@@ -106,16 +109,18 @@ function ssfKeyClass(action: string): SsfKeyClass {
   return /^(F\d+|Z\+)/.test(action) ? "function" : "char"
 }
 
-export function ssfKeyBinding(layout: string, action: string, landscape: boolean): SsfKeyBinding {
+/** `sourceBackground` is the background class the Sogou app itself names for the key (`SSF_BG`). */
+export function ssfKeyBinding(layout: string, action: string, landscape: boolean, sourceSection?: string, sourceBackground?: string): SsfKeyBinding {
   const board = ssfBoard(layout)
   const primary = primarySections(board, action)
-  const sections = landscape ? [...primary.flatMap(landscapeVariants), ...primary] : primary
-  const keyClass = ssfKeyClass(action)
+  const fallback = landscape ? [...primary.flatMap(landscapeVariants), ...primary] : primary
+  const sections = sourceSection ? [...new Set([sourceSection, ...fallback])] : fallback
+  const keyClass = sections.includes("Key_0_py9") ? "function" : ssfKeyClass(action)
   const qwerty = isQwerty(board)
   const defaults = keyClass === "space"
     ? qwerty ? ["KeyBg_Space_Qwerty", "KeyBg_Space"] : ["KeyBg_Space"]
     : keyClass === "function"
       ? qwerty ? ["KeyBg_Function_Qwerty", "KeyBg_Function"] : ["KeyBg_Function"]
       : qwerty ? ["KeyBg_Default_Latin", "KeyBg_Default"] : ["KeyBg_Default"]
-  return { sections, defaults, keyClass }
+  return { sections, defaults: sourceBackground ? [...new Set([sourceBackground, ...defaults])] : defaults, keyClass }
 }

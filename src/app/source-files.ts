@@ -27,13 +27,13 @@ export function sourceSelection(): { path: string; folder: boolean } | undefined
 
 export function updateSourceFileActions(): void {
   const selection = sourceSelection()
-  const editable = Boolean(appState.archive) && isEditing() && !appState.fileOperationRunning
-  sourceUploadButton.disabled = !editable
+  const available = Boolean(appState.archive) && !appState.fileOperationRunning
+  sourceUploadButton.disabled = !available
   sourceDownloadButton.disabled = appState.fileOperationRunning || !selection || selection.folder
   sourceCopyButton.disabled = appState.fileOperationRunning || !selection
-  sourcePasteButton.disabled = !editable || !appState.sourceTransfer?.files.length
-  sourceMoveButton.disabled = !editable || !selection
-  sourceDeleteButton.disabled = !editable || !selection
+  sourcePasteButton.disabled = !available || !appState.sourceTransfer?.files.length
+  sourceMoveButton.disabled = !available || !selection
+  sourceDeleteButton.disabled = !available || !selection
   sourceCopyButton.classList.toggle("active", appState.sourceTransfer?.mode === "copy")
   sourceMoveButton.classList.toggle("active", appState.sourceTransfer?.mode === "move")
   sourceCopyButton.setAttribute("aria-pressed", String(appState.sourceTransfer?.mode === "copy"))

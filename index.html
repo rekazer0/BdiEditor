@@ -185,7 +185,7 @@
               <button data-theme-choice="dark" title="深色" aria-label="深色"><span class="system-symbol" data-icon="moon" aria-hidden="true"></span></button>
               <select id="theme" hidden><option value="light">浅色</option><option value="dark">深色</option></select>
             </div>
-            <select id="layout" hidden><option value="py_9.ini">9键</option><option value="py_26.ini">26 键</option></select>
+            <select id="layout" class="ui-select" aria-label="预览布局" hidden><option value="py_9.ini">9 键</option><option value="py_26.ini">26 键</option></select>
           </div>
         </div>
         <div class="canvas-wrap empty">
@@ -363,7 +363,7 @@
         </div>
         <div class="preview-zoom-control glass-module" aria-label="画布缩放">
           <button id="preview-zoom-out" type="button" aria-label="缩小画布" title="缩小" data-icon="minus" data-icon-size="16"></button>
-          <button id="preview-zoom-fit" type="button" aria-label="适配窗口，画布已锁定，双击解锁" title="画布已锁定（双击解锁）" aria-pressed="true" data-icon="scan" data-icon-size="16"></button>
+          <button id="preview-zoom-fit" type="button" aria-label="适配窗口，双击锁定画布" title="适配窗口（双击锁定画布）" aria-pressed="false" data-icon="scan" data-icon-size="16"></button>
           <button id="preview-zoom-in" type="button" aria-label="放大画布" title="放大" data-icon="plus" data-icon-size="16"></button>
         </div>
         <div class="workspace-status" hidden aria-hidden="true"><div id="event-log" aria-live="polite">打开皮肤后可预览按键。</div><div id="panel-status">面板：-- × -- · 预览缩放：--%</div></div>

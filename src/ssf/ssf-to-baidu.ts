@@ -6,11 +6,12 @@
 
 import { strToU8, zipSync } from "fflate"
 import { IniDocument } from "../ini.ts"
+import { scaleIniDocument } from "../panel-tools.ts"
 import { SkinArchive } from "../skin.ts"
 import { cached, fingerprint } from "./ssf-cache.ts"
 import { SsfLook, type LookColors, type LookImage, type LookPair } from "./ssf-look.ts"
 import type { SsfPackage, SsfTheme } from "./ssf-package.ts"
-import { cropImage, decodePng, encodePng, isPng, pngSize, tintImage, type RgbaImage } from "./ssf-png.ts"
+import { cropImage, decodePng, encodePng, isPng, pngSize, tintImage, whiteMask, type RgbaImage } from "./ssf-png.ts"
 
 export type SsfConversion = { archive: SkinArchive; warnings: string[] }
 
@@ -34,10 +35,13 @@ class ThemeResources {
   private nextImage = 1
   private readonly images = new Map<string, string>()
 
-  constructor(theme: SsfTheme, output: Map<string, Uint8Array>, css: string) {
+  constructor(theme: SsfTheme, output: Map<string, Uint8Array>, css: string, scale = 1) {
     this.theme = theme
     this.output = output
     this.styles = IniDocument.parse(css)
+    if (scale !== 1) for (const { section, key, value } of this.styles.entries()) {
+      if (key === "FONT_SIZE") this.styles.set(section, key, String(Math.round(Number(value) * scale)))
+    }
     const used = this.styles.sections().flatMap((section) => {
       const id = section.match(/^STYLE(\d+)$/)?.[1]
       return id ? [Number(id)] : []
@@ -103,26 +107,37 @@ class ThemeConverter {
   private readonly theme: SsfTheme
   private readonly output: Map<string, Uint8Array>
   private readonly resources: ThemeResources
+  private readonly layoutScales: Record<"port" | "land", [number, number]>
   private readonly soundStyles = new Map<string, string>()
   private readonly glyphs = new Map<string, RgbaImage>()
   private keyboardStyles?: { panel?: string; cand?: string }
 
-  constructor(pkg: SsfPackage, base: SkinArchive, theme: SsfTheme, output: Map<string, Uint8Array>, warnings: string[]) {
+  constructor(pkg: SsfPackage, base: SkinArchive, theme: SsfTheme, output: Map<string, Uint8Array>, warnings: string[], panelWidth?: number) {
     const panel = base.isText("light/skin/port/gen.ini") ? IniDocument.parse(base.getText("light/skin/port/gen.ini")).get("PANEL", "SIZE") : undefined
-    this.look = new SsfLook(pkg, theme, warnings, numbers(panel)[0] || 480)
+    const templateWidth = numbers(panel)[0] || 480
+    const width = panelWidth || templateWidth
+    const scale = width / templateWidth
+    this.layoutScales = { port: [scale, scale], land: [scale, scale] }
+    // Sogou PhoneSkinMgr's SkinUILayoutHelper.getSkinSize uses separate landscape dimensions.
+    const landscape = new Map([[1080, [1920, 570]], [720, [1280, 380]], [480, [854, 260]]]).get(panelWidth ?? 0)
+    if (landscape && base.isText("light/skin/land/gen.ini")) {
+      const size = numbers(IniDocument.parse(base.getText("light/skin/land/gen.ini")).get("PANEL", "SIZE"))
+      if (size[0] > 0 && size[1] > 0) this.layoutScales.land = [landscape[0] / size[0], landscape[1] / size[1]]
+    }
+    this.look = new SsfLook(pkg, theme, warnings, width)
     this.base = base
     this.theme = theme
     this.output = output
-    this.resources = new ThemeResources(theme, output, base.getText("light/skin/res/default.css"))
+    this.resources = new ThemeResources(theme, output, base.getText("light/skin/res/default.css"), panelWidth ? scale : 1)
   }
 
-  /** Template glyph slices recoloured to the Sogou label colour, for keys Sogou draws as text. */
-  private tintedTemplateStyle(styleID: string, colors: LookColors): string | undefined {
+  /** Template glyph slices recoloured to the Sogou label colour, for keys Sogou draws as text; `show` replaces a text style's text. */
+  private tintedTemplateStyle(styleID: string, colors: LookColors, white = false, show?: string): string | undefined {
     const value = this.resources.styles.get(`STYLE${styleID}`, "NM_IMG")
     const [imageName, tileValue] = value?.split(",").map((part) => part.trim()) ?? []
     if (!imageName || !tileValue) {
       return this.resources.styles.sections().includes(`STYLE${styleID}`)
-        ? this.resources.derivedStyle(styleID, { NM_COLOR: colors.normal, HL_COLOR: colors.pressed })
+        ? this.resources.derivedStyle(styleID, { NM_COLOR: colors.normal, HL_COLOR: colors.pressed, ...(show ? { SHOW: show } : {}) })
         : undefined
     }
     const atlasBytes = this.base.getBytes(`light/skin/res/${imageName}.png`)
@@ -134,8 +149,11 @@ class ThemeConverter {
       return this.glyphs.get(imageName)!
     }
     const tinted = (color: string): LookImage | undefined => {
-      const id = `tint:${source.join(",")}:${color}|${fingerprint(atlasBytes)}`
-      return cached(id, () => ({ id, bytes: encodePng(tintImage(cropImage(atlas(), source[0], source[1], source[2], source[3]), color)) }))
+      const id = `tint:${source.join(",")}:${color}:${white}|${fingerprint(atlasBytes)}`
+      return cached(id, () => {
+        const glyph = cropImage(atlas(), source[0], source[1], source[2], source[3])
+        return { id, bytes: encodePng(tintImage(white ? whiteMask(glyph) : glyph, color)) }
+      })
     }
     const normal = tinted(colors.normal)
     const pressed = tinted(colors.pressed)
@@ -158,14 +176,14 @@ class ThemeConverter {
       const action = layout.get(section, "CENTER")?.trim()
       if (!action) continue
       const [, , width, height] = numbers(layout.get(section, "VIEW_RECT"))
-      const look = this.look.key(layoutName, action, landscape, width > 0 && height > 0 ? [width, height] : undefined)
+      const look = this.look.key(layoutName, action, landscape, width > 0 && height > 0 ? [width, height] : undefined, layout.get(section, "SSF_SECTION"), layout.get(section, "SSF_BG"))
       if (look.back) layout.set(section, "BACK_STYLE", this.resources.imageStyle(look.back))
       if (look.fore) {
         layout.set(section, "FORE_STYLE", this.resources.imageStyle(look.fore))
         layout.remove(section, "FORE_OFFSET")
       } else if (look.label) {
         const templateFore = layout.get(section, "FORE_STYLE")?.split(",").map((value) => value.trim()).filter(Boolean)
-        if (templateFore?.length) layout.set(section, "FORE_STYLE", templateFore.map((id) => this.tintedTemplateStyle(id, look.label!) ?? id).join(","))
+        if (templateFore?.length) layout.set(section, "FORE_STYLE", templateFore.map((id, index) => this.tintedTemplateStyle(id, look.label!, false, look.texts[index]) ?? id).join(","))
       }
       const sound = this.soundStyle(this.look.sound(look.binding))
       if (sound) layout.set(section, "SOUND_STYLE", sound)
@@ -219,6 +237,15 @@ class ThemeConverter {
       const fore = candidates.get(section, "FORE_STYLE")?.trim()
       if (text && highlight && fore) candidates.set(section, "FORE_STYLE", this.resources.derivedStyle(fore, { NM_COLOR: text, HL_COLOR: highlight }))
     }
+    // Sogou recolours the built-in toolbar icons a skin does not replace with its function icon colour.
+    const iconColor = this.look.color("CandidateIMEFunctionView", "ICON_COLOR") ?? this.look.color("General", "ICON_COLOR")
+    for (const section of candidates.sections().filter((name) => /^ICON\d+$/.test(name))) {
+      const name = candidates.get(section, "SSF_IMAGE")?.trim() ?? ""
+      const icon = this.look.toolbarIcon(name)
+      const fore = candidates.get(section, "FORE_STYLE")?.trim()
+      if (icon) candidates.set(section, "FORE_STYLE", this.resources.imageStyle(icon))
+      else if (iconColor && fore) candidates.set(section, "FORE_STYLE", this.tintedTemplateStyle(fore, { normal: iconColor, pressed: iconColor }, name === "logo.png") ?? fore)
+    }
     this.output.set(candPath, strToU8(candidates.toString()))
   }
 
@@ -228,7 +255,14 @@ class ThemeConverter {
       if (!path.startsWith(prefix) || path.endsWith("/")) continue
       const name = path.slice(prefix.length)
       if (name === "res/default.css" || name === "Info.txt" || name === "demo.png") continue
-      this.output.set(`${this.theme}/skin/${name}`, this.base.getBytes(path)!)
+      let bytes = this.base.getBytes(path)!
+      const orientation = name.match(/^(port|land)\/.*\.(?:ini|cnd)$/i)?.[1] as "port" | "land" | undefined
+      const [xScale, yScale] = orientation ? this.layoutScales[orientation] : [1, 1]
+      if (xScale !== 1 || yScale !== 1) {
+        const document = IniDocument.parse(new TextDecoder().decode(bytes))
+        bytes = strToU8(scaleIniDocument(document, xScale, yScale).toString())
+      }
+      this.output.set(`${this.theme}/skin/${name}`, bytes)
     }
     for (const orientation of ["port", "land"] as const) {
       const genPath = `${this.theme}/skin/${orientation}/gen.ini`
@@ -283,12 +317,12 @@ export function ssfPreview(pkg: SsfPackage): Uint8Array | undefined {
  * A Sogou skin laid out on `base` (the official BDS template), as canonical package paths
  * (`light/skin/…`, `Info.txt`) before packaging; the editor previews an SSF document from these.
  */
-export function ssfToBaiduFiles(pkg: SsfPackage, base: SkinArchive): { files: Map<string, Uint8Array>; warnings: string[] } {
+export function ssfToBaiduFiles(pkg: SsfPackage, base: SkinArchive, panelWidth?: number): { files: Map<string, Uint8Array>; warnings: string[] } {
   if (base.format === "bda") throw new Error("搜狗皮肤只能套用 BDS/BDI 模板")
   if (!base.isText("light/skin/res/default.css")) throw new Error("模板缺少 res/default.css")
   const warnings = [...pkg.warnings]
   const files = new Map<string, Uint8Array>()
-  for (const theme of pkg.themes.keys()) new ThemeConverter(pkg, base, theme, files, warnings).convert()
+  for (const theme of pkg.themes.keys()) new ThemeConverter(pkg, base, theme, files, warnings, panelWidth).convert()
   files.set("Info.txt", infoText(base, pkg))
   const preview = ssfPreview(pkg)
   if (preview) files.set("demo.png", preview)

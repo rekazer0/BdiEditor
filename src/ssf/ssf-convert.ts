@@ -10,7 +10,7 @@ import { convertSsfToBaidu, ssfToBaiduFiles } from "./ssf-to-baidu.ts"
 import { convertSsfToBda } from "./ssf-to-bda.ts"
 
 /** Official templates the Sogou look is painted onto: `bds` (BDS/BDI) and `bda`. */
-export type SsfTemplates = { bds: SkinArchive; bda: SkinArchive }
+export type SsfTemplates = { bds: SkinArchive; bda: SkinArchive; sogou: SkinArchive }
 type Converted = { bytes: Uint8Array; warnings: string[] }
 
 /** The document's own files, not copies: derived images are cached by the arrays they come from. */
@@ -31,9 +31,10 @@ export async function ssfDocumentBytes(bytes: Uint8Array): Promise<Uint8Array> {
   return isSkinContainer(bytes) ? zipSync(Object.fromEntries(files), { level: 6 }) : bytes
 }
 
-/** The Baidu tree an SSF document previews as, for `SkinArchive.setOverlay`. */
+/** Sogou's official skeleton in the canvas's INI schema, for `SkinArchive.setOverlay`. */
 export function ssfPreviewFiles(archive: SkinArchive, template: SkinArchive): { files: Map<string, Uint8Array>; warnings: string[] } {
-  return ssfToBaiduFiles(documentPackage(archive), template)
+  const pkg = documentPackage(archive)
+  return ssfToBaiduFiles(pkg, template, Number(pkg.resolution))
 }
 
 /** Converts an SSF document into a Baidu package of `format`. */

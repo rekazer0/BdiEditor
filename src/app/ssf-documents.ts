@@ -59,12 +59,6 @@ export function isSsfBoardPath(path: string): boolean {
     && /\.ini$/i.test(path) && !/\/gen\.ini$/i.test(path) && !path.slice(`${theme.value}/skin/${orientation.value}/`.length).includes("/")
 }
 
-/** Board layouts the overview lists: Baidu-only components (logo, help, voice…) have no Sogou counterpart. */
-export function ssfBoardPaths(): string[] {
-  const hidden = /^(?:gen|logo|help|voice|dial|email|net|net_shifts)\.ini$|_h\.ini$/i
-  return (appState.archive?.names() ?? []).filter((path) => isSsfBoardPath(path) && !hidden.test(path.split("/").pop()!))
-}
-
 /** The Sogou classes the selected canvas key is drawn from. */
 export function ssfSelectedBindings(): Array<{ section: string; action: string; binding: SsfKeyBinding }> {
   const document = appState.layoutDocument
@@ -72,7 +66,7 @@ export function ssfSelectedBindings(): Array<{ section: string; action: string; 
   const layout = appState.layoutPath.split("/").pop()!
   return appState.selectedKeySections.flatMap((section) => {
     const action = document.get(section, "CENTER")?.trim()
-    return action ? [{ section, action, binding: ssfKeyBinding(layout, action, orientation.value === "land") }] : []
+    return action ? [{ section, action, binding: ssfKeyBinding(layout, action, orientation.value === "land", document.get(section, "SSF_SECTION"), document.get(section, "SSF_BG")) }] : []
   })
 }
 

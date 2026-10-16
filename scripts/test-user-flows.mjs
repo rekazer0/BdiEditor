@@ -254,6 +254,14 @@ await check("preview: typing, devices, orientation, theme, guides, zoom, skin st
   assert.notEqual(await zoom(), before, "zoom in changes scale")
   await page.locator("#preview-zoom-out").click()
   await page.locator("#preview-zoom-fit").click()
+  // 触控板 / Cmd+滚轮会连发很多小 delta 事件，应按滚动量缩放，不能每个事件跳一大步
+  const fit = await page.locator("#preview").boundingBox()
+  await page.mouse.move(fit.x + fit.width / 2, fit.y + fit.height / 2)
+  for (let i = 0; i < 10; i++) await page.mouse.wheel(0, -4)
+  await page.waitForFunction((width) => document.querySelector("#preview").getBoundingClientRect().width > width + 1, fit.width)
+  const wheeled = await page.locator("#preview").boundingBox()
+  assert.ok(wheeled.width < fit.width * 1.2, "a burst of small wheel deltas zooms smoothly")
+  await page.locator("#preview-zoom-fit").click()
   const states = await page.locator("#skin-state option").count()
   if (states > 1) await page.selectOption("#skin-state", { index: 1 })
 }))
@@ -630,7 +638,7 @@ await check("file: a BDA skin exports to every format", () => withPage(async (pa
   assert.deepEqual(formats, ["bdi", "bds", "bda", "bda", "sxi", "ssf"])
 }))
 
-await check("file: a Sogou .ssf is edited natively: overview of its boards, Sogou properties, key selection, AI design", () => withPage(async (page) => {
+await check("file: a Sogou .ssf lists only its own files: preview switching, properties, key selection, AI design", () => withPage(async (page) => {
   const { ssfFixture } = await import("../tests/helpers/ssf-fixture.mjs")
   await page.locator("#browser-open").setInputFiles({ name: "搜狗测试.ssf", mimeType: "application/octet-stream", buffer: Buffer.from(ssfFixture()) })
   await page.waitForSelector(".canvas-wrap:not(.empty)")
@@ -639,20 +647,44 @@ await check("file: a Sogou .ssf is edited natively: overview of its boards, Sogo
   assert.equal(await page.locator("#document-name").textContent(), "搜狗测试.ssf")
   // The source tree lists the Sogou files only; the converted Baidu tree behind the preview stays hidden.
   assert.equal(await page.locator('.raw-files [data-path^="light/"]').count(), 0)
-  // The overview lists the Sogou files and every board, and the first board opens with Sogou properties.
+  // Overview entries are SSF files, plus Sogou's keyboards drawn from the preview overlay.
   assert.equal(await page.locator('[data-sidebar-view="overview"]').isDisabled(), false)
   await page.locator('[data-sidebar-view="overview"]').click()
+  const { unzipSync: unzipSsf } = await import("fflate")
+  const ownPaths = new Set(Object.keys(unzipSsf(ssfFixture())))
+  const overviewPaths = await page.locator('.sidebar-overview button[data-path]:not(.nav-layout)').evaluateAll((items) => items.map((item) => item.dataset.path))
+  assert.ok(overviewPaths.length > 0)
+  for (const path of overviewPaths) assert.ok(ownPaths.has(path), `Only real SSF files: ${path}`)
   assert.equal(await page.locator('.sidebar-overview button[data-path="phoneTheme.ini"]').count(), 1)
   assert.equal(await page.locator('.sidebar-overview button[data-path="1080/status1/phoneSkin.ini"]').count(), 1)
-  for (const board of ["py_9.ini", "py_26.ini", "en_26.ini", "num_9.ini"]) {
-    assert.equal(await page.locator(`.sidebar-overview button[data-path="light/skin/port/${board}"]`).count(), 1, board)
+  assert.equal(await page.locator('.sidebar-overview button[data-path^="light/"]').count(), 31)
+  for (const group of await page.locator('.sidebar-overview .nav-group').all()) {
+    assert.equal(Number(await group.locator('.nav-section-count').textContent()), await group.locator('button[data-path]').count())
   }
-  assert.equal(await page.locator('.sidebar-overview button[data-path$="/logo.ini"]').count(), 0)
   assert.equal(await page.locator('[data-inspector-tab="ai"]').isDisabled(), false)
   await editMode(page)
-  await page.locator('.sidebar-overview button[data-path="light/skin/port/py_9.ini"]').click()
+  await page.getByRole("combobox", { name: "预览布局", exact: true }).selectOption("py_9.ini")
   assert.equal(await page.locator("#selected-key").textContent(), "拼音 9 键")
   assert.equal(await page.locator("#selected-key-context").textContent(), "1080/status1/phoneSkin.ini")
+  await page.locator('[data-orientation-choice="land"]').click()
+  await page.waitForFunction(() => document.querySelector("#panel-status")?.textContent.includes("1920 × 570"))
+  const landscapeGeometry = () => page.evaluate(async () => {
+    const { preview } = await import('/src/app/canvas-interaction.ts')
+    const box = document.querySelector('#preview').getBoundingClientRect()
+    return { width: preview.panelWidth, height: preview.panelHeight, xScale: box.width / preview.panelWidth, yScale: box.height / preview.surfaceHeight }
+  })
+  const fitted = await landscapeGeometry()
+  assert.deepEqual([fitted.width, fitted.height], [1920, 570])
+  assert.ok(Math.abs(fitted.xScale - fitted.yScale) < 0.002, 'landscape preview keeps a uniform display scale')
+  await page.locator('#preview-zoom-in').click()
+  const zoomed = await landscapeGeometry()
+  assert.ok(zoomed.xScale > fitted.xScale)
+  assert.ok(Math.abs(zoomed.xScale - zoomed.yScale) < 0.002, 'zoom preserves landscape proportions')
+  await page.locator('#preview-zoom-fit').click()
+  assert.equal(await page.locator('.sidebar-overview button[data-path^="light/"]').count(), 0)
+  assert.equal(await page.locator("#selected-key-context").textContent(), "1080/status1/phoneSkin.ini")
+  await page.locator('[data-orientation-choice="port"]').click()
+  await page.waitForFunction(() => document.querySelector("#panel-status")?.textContent.includes("1080 × 642"))
   const groups = await page.locator("#document-fields > [data-inspector-group-label]").evaluateAll((items) => items.map((item) => item.dataset.inspectorGroupLabel))
   for (const group of ["键盘背景", "候选栏", "候选字", "按键背景", "音效"]) assert.ok(groups.includes(group), group)
   const candidateColor = () => page.locator("#candidate-words").evaluate((node) => node.style.color)
@@ -670,8 +702,8 @@ await check("file: a Sogou .ssf is edited natively: overview of its boards, Sogo
   assert.equal(await page.locator("#source-name").textContent(), "1080/status1/phoneSkin.ini")
   await page.locator('[data-inspector-tab="properties"]').click()
   // Clicking a key selects it and shows the Sogou classes it is drawn from; it cannot be moved or deleted.
-  await page.locator('.sidebar-overview button[data-path="light/skin/port/py_26.ini"]').click()
-  await clickCanvas(page, 0.45, 0.45)
+  await page.getByRole("combobox", { name: "预览布局", exact: true }).selectOption("py_26.ini")
+  await clickCanvas(page, 0.5, 0.4)
   await page.waitForSelector('#document-fields [data-inspector-group-label="背景"]')
   assert.match(await page.locator("#selected-key-context").textContent(), /^status1\/phoneSkin\.ini · Key_/)
   assert.equal(await page.locator("#document-fields [data-inspector-group-label=\"背景\"]").count(), 1)

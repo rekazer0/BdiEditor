@@ -1,6 +1,6 @@
 import { appState } from "./state"
 import { source, toolbarPreview, preview, mobilePortraitQuery } from "./canvas-interaction"
-import { toggleGuides, mobileToggleGuides, newTileButton, atlasCanvas, resourceListView, resourceDetail, sourceName, theme, orientation, quickInspector, files } from "./dom"
+import { toggleGuides, mobileToggleGuides, newTileButton, atlasCanvas, resourceListView, resourceDetail, sourceName, quickInspector, files } from "./dom"
 import { setGuidesVisible, refreshPreview, syncCandidateSelection } from "./preview-render"
 import { bdaAppearancePart, currentBdaAppearance, bdaBasePath, refreshBdaLayout, isBdaVirtualTextPath, isBdaLayoutPath, isBdaAppearancePartPath } from "./bda-documents"
 import { hideImageWorkspace, renderResourceInspector, selectResourceImage } from "./resource-inspector"
@@ -11,7 +11,7 @@ import { decodedBdaAppearancePart, decodedBdaSource, decodedBdaEditorSource, bda
 import { showImage } from "./file-operations"
 import { isListCell } from "../layout.ts"
 import { updateInspectorView, updateSourceSearchStatus } from "./source-panel"
-import { resourceImagePaths } from "../resources.ts"
+import { pickableImagePaths } from "./image-pickers"
 import { populateKeyInspector } from "./key-inspector"
 import { sourceEditPath } from "./ssf-documents"
 import { ensureSourcePathRendered, setSidebarView, updateSourceFileActions } from "./source-files"
@@ -161,7 +161,7 @@ export function selectFile(
   updateInspectorView()
   if (appState.resourceConfigActive) renderResourceInspector()
   if (resourceMode === "image" && appState.archive) {
-    const firstImage = resourceImagePaths(appState.archive.names(), theme.value, orientation.value)[0]
+    const firstImage = pickableImagePaths()[0]
     if (firstImage) selectResourceImage(firstImage)
   }
   if (!quickInspector.hidden) populateKeyInspector()

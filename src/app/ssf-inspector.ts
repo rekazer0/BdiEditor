@@ -7,11 +7,18 @@ import type { SsfKeyBinding } from "../ssf/ssf-keymap.ts"
 import { ssfSectionLabel } from "../ssf/ssf-labels.ts"
 import { firstValue, ssfBackground, ssfForeground, ssfSoundSection, ssfTextSections } from "../ssf/ssf-parts.ts"
 import { orientation } from "./dom"
-import { editSsfFile, freeSectionName, renderGroup, setSsfValue, ssfButton, ssfEntries, type SsfBlock } from "./ssf-fields"
+import { editSsfFile, freeSectionName, renderGroup as renderSsfGroup, setSsfValue, ssfButton, ssfEntries, type SsfBlock } from "./ssf-fields"
 import { openImageResourceChooser } from "./resource-inspector"
 import { isSsfBoardPath, ssfDocument, ssfKeysPath, ssfPackage, ssfQwertyBoard, ssfSelectedBindings, ssfSkinPath, ssfThemeFolder, SSF_SOUNDS_PATH } from "./ssf-documents"
 import { appState } from "./state"
 import { layoutLabel } from "./file-tree"
+
+type Group = { label: string; blocks: SsfBlock[]; code?: string; key?: string }
+
+function renderGroup(label: string, blocks: SsfBlock[], code?: string): Group | undefined {
+  const shown = blocks.filter((block) => block.template || ssfDocument(block.path).sections().includes(block.section))
+  return shown.length ? { label, blocks: shown, code } : undefined
+}
 
 const COLOR_TEMPLATE = [{ key: "TEXT_COLOR", value: "0xFF000000" }]
 
@@ -31,7 +38,7 @@ function soundOptions(): string[] {
   }))].sort()
 }
 
-function backgroundGroup(skinPath: string, skin: IniDocument, binding: SsfKeyBinding): HTMLElement | undefined {
+function backgroundGroup(skinPath: string, skin: IniDocument, binding: SsfKeyBinding): Group | undefined {
   const background = ssfBackground(skin, binding)
   if (!background) {
     const owner = ownSection(skin, binding)
@@ -68,7 +75,7 @@ function backgroundGroup(skinPath: string, skin: IniDocument, binding: SsfKeyBin
   }], background.images)
 }
 
-function foregroundGroup(skinPath: string, keysPath: string, skin: IniDocument, binding: SsfKeyBinding): HTMLElement | undefined {
+function foregroundGroup(skinPath: string, keysPath: string, skin: IniDocument, binding: SsfKeyBinding): Group | undefined {
   const keys = ssfDocument(keysPath)
   const foreground = ssfForeground(skin, keys, binding)
   const blocks: SsfBlock[] = []
@@ -99,7 +106,7 @@ function foregroundGroup(skinPath: string, keysPath: string, skin: IniDocument, 
   return renderGroup("前景", blocks)
 }
 
-function textGroup(skinPath: string, skin: IniDocument, binding: SsfKeyBinding): HTMLElement | undefined {
+function textGroup(skinPath: string, skin: IniDocument, binding: SsfKeyBinding): Group | undefined {
   const sections = ssfTextSections(binding, ssfQwertyBoard())
   const source = sections.find((section) => skin.get(section, "TEXT_COLOR") !== undefined)
   const own = binding.sections.includes(source ?? "")
@@ -120,7 +127,7 @@ function textGroup(skinPath: string, skin: IniDocument, binding: SsfKeyBinding):
   }], source)
 }
 
-function animationGroup(keysPath: string, binding: SsfKeyBinding): HTMLElement | undefined {
+function animationGroup(keysPath: string, binding: SsfKeyBinding): Group | undefined {
   const keys = ssfDocument(keysPath)
   const owner = binding.sections.find((section) => keys.get(section, "ANIM_STYLE"))
   if (!owner) return
@@ -131,7 +138,7 @@ function animationGroup(keysPath: string, binding: SsfKeyBinding): HTMLElement |
   return renderGroup("动画", blocks)
 }
 
-function soundGroup(binding: SsfKeyBinding | undefined): HTMLElement | undefined {
+function soundGroup(binding: SsfKeyBinding | undefined): Group | undefined {
   const sounds = ssfDocument(SSF_SOUNDS_PATH)
   const section = ssfSoundSection(sounds, binding)
   const options = { sound: soundOptions() }
@@ -148,7 +155,7 @@ function soundGroup(binding: SsfKeyBinding | undefined): HTMLElement | undefined
 }
 
 /** Remaining values of the key's own classes (labels, long-press key, type…). */
-function keyGroup(skinPath: string, binding: SsfKeyBinding): HTMLElement | undefined {
+function keyGroup(skinPath: string, binding: SsfKeyBinding): Group | undefined {
   const handled = ["BG_IMAGES", "ICON", "ICON_PRESSED", "FG_STYLE", "TEXT_COLOR", "TEXT_COLOR_PRESSED"]
   const blocks = binding.sections
     .filter((section) => ssfEntries(skinPath, section).some((entry) => !handled.includes(entry.key)))
@@ -156,7 +163,7 @@ function keyGroup(skinPath: string, binding: SsfKeyBinding): HTMLElement | undef
   return blocks.length ? renderGroup("按键", blocks) : undefined
 }
 
-function keyGroups(binding: SsfKeyBinding): HTMLElement[] {
+function keyGroups(binding: SsfKeyBinding): Group[] {
   const skinPath = ssfSkinPath()
   const keysPath = ssfKeysPath()
   if (!skinPath || !keysPath) return []
@@ -168,11 +175,11 @@ function keyGroups(binding: SsfKeyBinding): HTMLElement[] {
     keyGroup(skinPath, binding),
     animationGroup(keysPath, binding),
     soundGroup(binding),
-  ].filter((group): group is HTMLElement => Boolean(group))
+  ].filter((group): group is Group => Boolean(group))
 }
 
 /** What every key of the current board shares: backgrounds, candidate bar, default classes, colours. */
-function boardGroups(): HTMLElement[] {
+function boardGroups(): Group[] {
   const skinPath = ssfSkinPath()
   if (!skinPath) return []
   const skin = ssfDocument(skinPath)
@@ -181,7 +188,7 @@ function boardGroups(): HTMLElement[] {
   const block = (section: string, extra: Partial<SsfBlock> = {}): SsfBlock => ({ path: skinPath, section, ...extra })
   const referenced = (section: string, key: string, title: string): SsfBlock[] => {
     const target = firstValue(skin.get(section, key))
-    return target && !/\.\w+$/.test(target) ? [block(target, { title })] : []
+    return target && !/\.\w+$/.test(target) ? [block(target, { title, reference: { path: skinPath, section, key } })] : []
   }
   const candidate = orientation.value === "land" && skin.sections().includes("CandidateViewLand") ? "CandidateViewLand" : "CandidateView"
   const groups: Array<[string, SsfBlock[]]> = [
@@ -207,16 +214,16 @@ function boardGroups(): HTMLElement[] {
   return [
     ...groups.map(([label, blocks]) => renderGroup(label, blocks)),
     soundGroup(undefined),
-  ].filter((group): group is HTMLElement => Boolean(group))
+  ].filter((group): group is Group => Boolean(group))
 }
 
 /** Every section of a Sogou INI file, one group each. */
-function fileGroups(path: string): HTMLElement[] {
+function fileGroups(path: string): Group[] {
   const document = ssfDocument(path)
   return document.sections().flatMap((section) => {
     const label = path === "phoneTheme.ini" && section === "General" ? "皮肤信息" : ssfSectionLabel(section)
     const group = renderGroup(label, [{ path, section }], section)
-    return group ? [group] : []
+    return group ? [{ ...group, key: section }] : []
   })
 }
 
@@ -229,25 +236,47 @@ export function ssfInspectorTitle(): { name: string; context: string } | undefin
   if (!appState.selectedKeySections.length) return { name: layoutLabel(path.split("/").pop()!), context: skinPath }
   const primary = bindings[0]?.binding.sections.find((section) => !/_Land/.test(section)) ?? bindings[0]?.binding.sections[0]
   const name = appState.selectedKeySections.length > 1 ? `已选 ${appState.selectedKeySections.length} 个按键` : primary ? ssfSectionLabel(primary) : "按键"
-  return { name, context: primary ? `${skinPath.split("/").slice(-2).join("/")} · ${primary}` : skinPath }
+  return { name, context: bindings.length > 1 ? `${skinPath} · 共同属性` : primary ? `${skinPath.split("/").slice(-2).join("/")} · ${primary}` : skinPath }
+}
+
+/** Match blocks by their role in a group, then keep only fields present on every selected key. */
+function commonKeyGroups(selections: Group[][]): Group[] {
+  return selections[0].flatMap((group) => {
+    const peers = selections.map((groups) => groups.find((item) => item.label === group.label))
+    if (peers.some((peer) => !peer)) return []
+    const blocks = group.blocks.flatMap((block, index) => {
+      const matches = peers.map((peer) => peer!.blocks[index])
+      if (matches.some((match) => !match || (match.title ?? "") !== (block.title ?? ""))) return []
+      const entries = matches.map((match) => ssfEntries(match.path, match.section).filter((entry) => !match.omit?.includes(entry.key) && (!match.only || match.only.includes(entry.key))))
+      const only = entries[0].filter((entry) => entries.every((list) => list.some((item) => item.key === entry.key))).map((entry) => entry.key)
+      return only.length ? [{ path: block.path, section: block.section, title: block.title, only, options: block.options,
+        note: "修改会作用于所有选中按键；共享样式也会影响其他引用它的按键。",
+        peers: matches.slice(1).map(({ path, section }) => ({ path, section })),
+      }] : []
+    })
+    return blocks.length ? [{ label: group.label, blocks }] : []
+  })
 }
 
 /**
  * Fills `container` for the current Sogou selection and returns whether there was anything to show.
- * Several selected keys show the first one's classes: Sogou styles classes, not individual keys.
+ * Multiple selected keys expose only their common fields and write to every matching class.
  */
 export function populateSsfInspector(container: HTMLElement): boolean {
   container.replaceChildren()
   if (!ssfPackage()) return false
   const path = appState.selectedPath
-  let groups: HTMLElement[] = []
+  let groups: Group[] = []
   if (isSsfBoardPath(path) && path === appState.layoutPath) {
     const bindings = ssfSelectedBindings()
-    groups = bindings.length ? keyGroups(bindings[0].binding) : boardGroups()
+    groups = bindings.length > 1 ? commonKeyGroups(bindings.map(({ binding }) => keyGroups(binding))) : bindings.length ? keyGroups(bindings[0].binding) : boardGroups()
   } else if (appState.archive?.isText(path) && /\.ini$/i.test(path) && !appState.archive.isOverlay(path)) {
     groups = fileGroups(path)
   }
-  container.append(...groups)
+  container.append(...groups.flatMap(({ label, blocks, code, key }) => {
+    const group = renderSsfGroup(label, blocks, code, key)
+    return group ? [group] : []
+  }))
   container.dataset.path = path
   return groups.length > 0
 }

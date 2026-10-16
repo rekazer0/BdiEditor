@@ -1,4 +1,5 @@
 import type { TileSlice } from "./tiles.ts"
+import { wheelZoomFactor } from "./wheel-zoom.ts"
 
 // 超过浏览器画布尺寸上限会整张变白，按最长边限制
 const MAX_CANVAS_SIDE = 8192
@@ -74,7 +75,7 @@ export function bindSlicePickerZoom(stage: HTMLElement, canvas: HTMLCanvasElemen
   stage.addEventListener("wheel", (event) => {
     if (!event.ctrlKey && !event.metaKey) return
     event.preventDefault()
-    zoomAt(Math.exp(-event.deltaY * 0.01), event.clientX, event.clientY)
+    zoomAt(wheelZoomFactor(event), event.clientX, event.clientY)
   }, { passive: false })
   let gestureScale = 1
   type GestureEvent = UIEvent & { scale: number; clientX: number; clientY: number }

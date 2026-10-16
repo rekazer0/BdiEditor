@@ -1,5 +1,5 @@
 import { styleImageResourceOpen, styleImageResourceClose, styleImageResourceSearch, theme, orientation, $, inspectorResizeHandle, styleAddButton, newStyleID, newStyleDialog, newStyleForm, layout, resourceUploadButton, resourceUploadInput, resourceDownloadButton, resourceDeleteButton, resourceDetail, device, clearSimulationButton, simulatedOutput, toolbarMenus, windowMaterial, mode } from "../dom"
-import { openStyleImageResourcePicker, closeStyleImageResourcePicker, clearImageSlicePicker, renderStyleImageResources, updateSelectedImageReference, pickerImageReference, resourcePickerPayload, selectImageResource } from "../image-pickers"
+import { openStyleImageResourcePicker, closeStyleImageResourcePicker, clearImageSlicePicker, renderStyleImageResources, updateSelectedImageReference, pickerImageReference, resourcePickerPayload, selectImageResource, pickableImagePaths } from "../image-pickers"
 import { appState } from "../state"
 import { isTauri, playSoundPath, syncDeviceControlIcon, clearSimulatedOutput } from "../canvas-interaction"
 import { listen, emitTo } from "@tauri-apps/api/event"
@@ -23,7 +23,6 @@ import { type TileRect, duplicateTileSlice, nextTileIndex } from "../../tiles.ts
 import { type Change } from "../../history.ts"
 import { showStatus, runFileOperation, showError } from "../file-operations"
 import { resourceRootPath, setLayoutImageBytes, openLayoutImageDialog, syncLayoutImageConfig } from "../layout-image-replace"
-import { resourceImagePaths } from "../../resources.ts"
 import { writeToChosenFile, isSupportedSkinPath, loadDroppedPath, loadDroppedSourceWorkspace, loadNativePath, restoreLastSourceWorkspace } from "../archive-io"
 import { canvasBackgroundFromDevice } from "../../canvas-background.ts"
 import { applyCanvasBackground, applyWindowMaterialWithRetry, handleWindowMaterialError, sourceDirectoryInitialization, refreshUpdateStatus } from "../preferences"
@@ -237,7 +236,7 @@ export function wireResourcesAndStartup(): void {
       const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }))
       bitmap.close()
       if (appState.archive !== targetArchive || !isEditing()) return false
-      const paths = resourceImagePaths(appState.archive.names(), theme.value, orientation.value)
+      const paths = pickableImagePaths()
       const base = paths[0]?.split("/").slice(0, -1).join("/") ?? `${theme.value}/skin/${orientation.value}/res`
       const targetPath = `${base}/${file.name}`
       const before = appState.archive.getBytes(targetPath)

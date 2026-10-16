@@ -8,8 +8,8 @@
 //   <res>/[statusN/]*.png              images, looked up next to the INI first
 //   default/                           sounds (sound_android.ini + wav), fonts, shared webp animations
 //
-// `<res>` is a screen-width folder (1080, 720, 480); only the widest one is read because it is the one
-// the official tools author first and every sample carries it. Key geometry is not part of the package:
+// `<res>` is a screen-width folder (1080, 720, 480); the selected folder follows time.ini's supported
+// screens, falling back to the widest available folder. Key geometry is not part of the package:
 // it is built into the Sogou app, so converters lay the skin onto a Baidu base layout instead.
 
 import { unzipSync } from "fflate"
@@ -106,7 +106,12 @@ export class SsfPackage {
       return match ? [match[1]] : []
     }))].sort((a, b) => Number(b) - Number(a))
     if (!resolutions.length) throw new Error("搜狗皮肤缺少 phoneSkin.ini")
-    this.resolution = resolutions[0]
+    const time = files.has("time.ini") ? this.ini("time.ini") : undefined
+    const supported = time?.get("General", "SUPPORT_SCREEN")
+      ?.split(/[,;\s]+/)
+      .map((value) => value.trim())
+      .filter((value) => resolutions.includes(value))
+    this.resolution = [...new Set(supported?.length ? supported : resolutions)].sort((a, b) => Number(b) - Number(a))[0]
     this.themes = this.readThemes()
     const theme = this.ini("phoneTheme.ini")
     this.info = {

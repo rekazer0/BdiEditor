@@ -237,33 +237,37 @@ export function resizeImage(image: RgbaImage, width: number, height: number): Rg
   }
   const data = new Uint8Array(width * height * 4)
   const source = image.data
+  // Column offsets and weights are the same on every row; working them out once keeps the loop allocation-free.
+  const x0s = new Int32Array(width)
+  const x1s = new Int32Array(width)
+  const fxs = new Float64Array(width)
+  for (let x = 0; x < width; x++) {
+    const sx = Math.min(image.width - 1, Math.max(0, (x + 0.5) * image.width / width - 0.5))
+    const x0 = Math.floor(sx)
+    x0s[x] = x0 * 4
+    x1s[x] = Math.min(image.width - 1, x0 + 1) * 4
+    fxs[x] = sx - x0
+  }
   for (let y = 0; y < height; y++) {
     const sy = Math.min(image.height - 1, Math.max(0, (y + 0.5) * image.height / height - 0.5))
     const y0 = Math.floor(sy)
-    const y1 = Math.min(image.height - 1, y0 + 1)
+    const row0 = y0 * image.width * 4
+    const row1 = Math.min(image.height - 1, y0 + 1) * image.width * 4
     const fy = sy - y0
     for (let x = 0; x < width; x++) {
-      const sx = Math.min(image.width - 1, Math.max(0, (x + 0.5) * image.width / width - 0.5))
-      const x0 = Math.floor(sx)
-      const x1 = Math.min(image.width - 1, x0 + 1)
-      const fx = sx - x0
-      const corners = [
-        [(y0 * image.width + x0) * 4, (1 - fx) * (1 - fy)],
-        [(y0 * image.width + x1) * 4, fx * (1 - fy)],
-        [(y1 * image.width + x0) * 4, (1 - fx) * fy],
-        [(y1 * image.width + x1) * 4, fx * fy],
-      ]
-      let alpha = 0
-      let red = 0
-      let green = 0
-      let blue = 0
-      for (const [offset, weight] of corners) {
-        const a = source[offset + 3] * weight
-        alpha += a
-        red += source[offset] * a
-        green += source[offset + 1] * a
-        blue += source[offset + 2] * a
-      }
+      const fx = fxs[x]
+      const a00 = row0 + x0s[x]
+      const a01 = row0 + x1s[x]
+      const a10 = row1 + x0s[x]
+      const a11 = row1 + x1s[x]
+      const w00 = source[a00 + 3] * ((1 - fx) * (1 - fy))
+      const w01 = source[a01 + 3] * (fx * (1 - fy))
+      const w10 = source[a10 + 3] * ((1 - fx) * fy)
+      const w11 = source[a11 + 3] * (fx * fy)
+      const alpha = w00 + w01 + w10 + w11
+      const red = source[a00] * w00 + source[a01] * w01 + source[a10] * w10 + source[a11] * w11
+      const green = source[a00 + 1] * w00 + source[a01 + 1] * w01 + source[a10 + 1] * w10 + source[a11 + 1] * w11
+      const blue = source[a00 + 2] * w00 + source[a01 + 2] * w01 + source[a10 + 2] * w10 + source[a11 + 2] * w11
       const target = (y * width + x) * 4
       if (alpha > 0) {
         data[target] = Math.round(red / alpha)
@@ -304,6 +308,17 @@ export function tintImage(image: RgbaImage, argb: string): RgbaImage {
     data[offset + 1] = (value >>> 8) & 0xff
     data[offset + 2] = value & 0xff
     data[offset + 3] = Math.round(image.data[offset + 3] * alpha)
+  }
+  return { width: image.width, height: image.height, data }
+}
+
+/** Keeps only the white parts of a mark (Sogou's logo is a white S on a translucent orange tile), fully opaque. */
+export function whiteMask(image: RgbaImage): RgbaImage {
+  const data = new Uint8Array(image.data)
+  for (let offset = 0; offset < data.length; offset += 4) {
+    // The tile's palest orange still has a channel near 64; only lighter pixels belong to the mark.
+    const light = Math.min(data[offset], data[offset + 1], data[offset + 2])
+    data[offset + 3] = data[offset + 3] ? Math.max(0, Math.round((light - 64) * 255 / 191)) : 0
   }
   return { width: image.width, height: image.height, data }
 }

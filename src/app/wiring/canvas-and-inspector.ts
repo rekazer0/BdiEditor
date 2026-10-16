@@ -2,6 +2,7 @@ import { installClientLogging } from "../../client-log.ts"
 import { installSafeAreaLock } from "../../safe-area.ts"
 import { isTauri, scrollbarIdleTimers, source, schedulePointerCoordinates, mobileShareLabel, mobileShareMenuLabel, mobileCommandButtons, mobileCommandTarget, syncMobileCommands, mobilePortraitQuery, preview, toolbarPreview, keyboardFields } from "../canvas-interaction"
 import { installNumberInputWheel } from "../../number-input-wheel.ts"
+import { wheelZoomFactor } from "../../wheel-zoom.ts"
 import { mixedCoordinateDelta } from "../../mixed-input.ts"
 import { moveSelectedKeys, selectParentObject } from "../key-editing"
 import { renderSourceValueThumbnail, updateSourceFindVisibility } from "../source-panel"
@@ -282,11 +283,42 @@ export function wireCanvasAndInspector(): void {
     if (deviceShell.hidden || canvasWrap.classList.contains("empty")) return
     event.preventDefault()
     if (appState.previewPanLocked) return
-    applyPreviewZoom(
-      appState.previewZoom + (event.deltaY < 0 ? 0.1 : -0.1),
-      { x: event.clientX, y: event.clientY },
-    )
+    applyPreviewZoom(appState.previewZoom * wheelZoomFactor(event), { x: event.clientX, y: event.clientY })
   }, { passive: false })
+  // 触摸屏双指缩放：两指间距决定缩放，中点移动带动平移。捕获阶段处理，避免被画布内的按键拖动截走。
+  const touches = new Map<number, { x: number; y: number }>()
+  let pinch: { distance: number; zoom: number; x: number; y: number } | undefined
+  const pinchPoint = () => {
+    const [a, b] = [...touches.values()]
+    return { distance: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+  }
+  canvasWrap.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch" || appState.previewPanLocked || deviceShell.hidden || canvasWrap.classList.contains("empty")) return
+    touches.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    if (touches.size !== 2) return
+    pinch = { ...pinchPoint(), zoom: appState.previewZoom }
+    preview.setPointerInteractionLocked(true)
+    toolbarPreview.setPointerInteractionLocked(true)
+  }, { capture: true })
+  canvasWrap.addEventListener("pointermove", (event) => {
+    if (!touches.has(event.pointerId)) return
+    touches.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    if (!pinch || touches.size !== 2) return
+    event.preventDefault()
+    const point = pinchPoint()
+    setPreviewPan(appState.previewPanX + point.x - pinch.x, appState.previewPanY + point.y - pinch.y)
+    Object.assign(pinch, { x: point.x, y: point.y })
+    if (pinch.distance > 0) applyPreviewZoom(pinch.zoom * point.distance / pinch.distance, point)
+  }, { capture: true })
+  const endTouch = (event: PointerEvent) => {
+    touches.delete(event.pointerId)
+    if (!pinch || touches.size >= 2) return
+    pinch = undefined
+    preview.setPointerInteractionLocked(false)
+    toolbarPreview.setPointerInteractionLocked(false)
+  }
+  canvasWrap.addEventListener("pointerup", endTouch, { capture: true })
+  canvasWrap.addEventListener("pointercancel", endTouch, { capture: true })
   window.addEventListener("blur", () => {
     finishPreviewPan()
     if (editorCrosshair.checked) previewCoordinates.hidden = true

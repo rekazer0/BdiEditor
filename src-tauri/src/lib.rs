@@ -158,7 +158,7 @@ fn read_client_log_path(directory: &Path) -> Result<Vec<ClientLogFile>, String> 
         .collect()
 }
 
-#[derive(Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SourceFile {
     path: String,
@@ -265,6 +265,17 @@ fn source_paths(files: &[SourceFile]) -> Result<Vec<String>, String> {
         paths.push(file.path.clone());
     }
     Ok(paths)
+}
+
+// Binary resources must not cross IPC as one JSON number per byte.
+fn encode_source_files(files: Vec<SourceFile>) -> Vec<EncodedSourceFile> {
+    files
+        .into_iter()
+        .map(|file| EncodedSourceFile {
+            path: file.path,
+            data: BASE64_STANDARD.encode(file.data),
+        })
+        .collect()
 }
 
 fn decode_source_files(files: Vec<EncodedSourceFile>) -> Result<Vec<SourceFile>, String> {
@@ -512,14 +523,14 @@ async fn create_source_workspace(
 async fn open_source_workspace(
     app: tauri::AppHandle,
     path: String,
-) -> Result<Vec<SourceFile>, String> {
+) -> Result<Vec<EncodedSourceFile>, String> {
     #[cfg(target_os = "android")]
     if path.starts_with("content://") {
         let value = tauri_plugin_native_share::read_source_workspace(&app, path).await?;
         let files: Vec<SourceFile> =
             serde_json::from_value(value).map_err(|error| error.to_string())?;
         source_paths(&files)?;
-        return Ok(files);
+        return Ok(encode_source_files(files));
     }
     let directory = fs::canonicalize(path).map_err(|error| error.to_string())?;
     let files = read_source_files(&directory)?;
@@ -534,7 +545,7 @@ async fn open_source_workspace(
     app.fs_scope()
         .allow_directory(&directory, true)
         .map_err(|error| error.to_string())?;
-    Ok(files)
+    Ok(encode_source_files(files))
 }
 
 #[tauri::command]
@@ -1276,7 +1287,7 @@ async fn model_http_request(
         .send(ModelHttpEvent::Headers { status, headers })
         .map_err(|error| error.to_string())?;
     let mut received = 0usize;
-    while let Some(chunk) = response.chunk().await.map_err(|error| error.to_string())? {
+    while let Some(chunk) = response.chunk().await.map_err(model_stream_error)? {
         received += chunk.len();
         if received > MAX_MODEL_CHAT_BYTES {
             return Err("模型响应过大".into());
@@ -1293,13 +1304,28 @@ async fn model_http_request(
     Ok(())
 }
 
+// reqwest reports every mid-stream failure as "error decoding response body"; the cause chain says why.
+fn model_stream_error(error: reqwest::Error) -> String {
+    let mut detail = String::new();
+    let mut cause = std::error::Error::source(&error);
+    while let Some(inner) = cause {
+        detail.push_str(&format!("：{inner}"));
+        cause = inner.source();
+    }
+    if error.is_timeout() {
+        format!("模型响应超时，超过 120 秒没有收到新内容，请重试{detail}")
+    } else {
+        format!("模型响应中途断开，请检查网络后重试{detail}")
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::items_after_test_module)]
 mod tests {
     use super::{
         acrylic_alpha, append_client_log_path, apply_source_changes_path, model_list_url,
-        parse_model_list, prune_source_workspaces, read_client_log_path, read_file,
-        read_file_bytes, read_model_configuration_path, read_source_changes_path,
+        model_stream_error, parse_model_list, prune_source_workspaces, read_client_log_path,
+        read_file, read_file_bytes, read_model_configuration_path, read_source_changes_path,
         read_source_files, safe_source_path, valid_share_filename, windows_material_kind,
         write_file, write_model_configuration_path, write_source_files, ModelConfiguration,
         MAX_ARCHIVE_BYTES, SOURCE_LIMIT, SOURCE_MARKER,
@@ -1535,6 +1561,23 @@ mod tests {
     }
 
     #[test]
+    fn source_transfer_round_trips_binary_files_as_base64() {
+        let files = vec![
+            super::SourceFile {
+                path: "1080/图片.png".into(),
+                data: (0..=255).collect(),
+            },
+            super::SourceFile {
+                path: "empty.ini".into(),
+                data: Vec::new(),
+            },
+        ];
+        let encoded = super::encode_source_files(files.clone());
+        assert!(serde_json::to_value(&encoded).unwrap()[0]["data"].is_string());
+        assert_eq!(super::decode_source_files(encoded).unwrap(), files);
+    }
+
+    #[test]
     fn source_reader_accepts_empty_change_snapshots_and_limits_paths() {
         let root =
             std::env::temp_dir().join(format!("bdi-edit-empty-source-{}", std::process::id()));
@@ -1547,6 +1590,35 @@ mod tests {
         assert!(!safe_source_path("../outside"));
         assert!(!safe_source_path("/absolute"));
         fs::remove_dir_all(root).expect("cleanup source root");
+    }
+
+    #[test]
+    fn model_stream_error_explains_truncated_body() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let address = listener.local_addr().expect("address");
+        let server = thread::spawn(move || {
+            let (mut socket, _) = listener.accept().expect("accept");
+            let _ = socket.read(&mut [0; 1024]);
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\npartial")
+                .expect("write");
+        });
+        let message = tauri::async_runtime::block_on(async {
+            let mut response = reqwest::get(format!("http://{address}"))
+                .await
+                .expect("headers");
+            loop {
+                match response.chunk().await {
+                    Ok(Some(_)) => continue,
+                    Ok(None) => panic!("truncated body should fail"),
+                    Err(error) => break model_stream_error(error),
+                }
+            }
+        });
+        server.join().expect("server");
+        assert!(message.starts_with("模型响应中途断开"), "{message}");
+        assert!(message.contains('：'), "cause chain missing: {message}");
     }
 
     #[test]

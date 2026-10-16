@@ -69,8 +69,6 @@ export type BdaTileUsage = {
 
 export type SourceFilePayload = { path: string; data: string }
 
-export type SourceReadFilePayload = { path: string; data: number[] }
-
 export type SourceChangePayload = { path: string; data: number[] | null; directory: boolean }
 
 export type SoundEntry = {
