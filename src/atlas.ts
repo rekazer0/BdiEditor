@@ -1,5 +1,6 @@
 import { IniDocument } from "./ini.ts"
 import { SkinArchive } from "./skin.ts"
+import { type FontAdaptInfo, fontAdaptText, parseFontJson } from "./font-adapt.ts"
 
 export type Visual = {
   image?: ImageBitmap
@@ -21,7 +22,13 @@ export type TextVisual = {
   clearType?: number
 }
 
-export type StyleTextVisual = TextVisual & { text: string }
+export type StyleTextVisual = TextVisual & {
+  text: string
+  /** 「中/英」：只有这一段按字号和主色绘制，另一段（连同 /）缩小变淡。 */
+  emphasis?: "first" | "last"
+  /** 字体适配文字：真机只画文字，不画同一样式的切图。 */
+  replacesImage?: boolean
+}
 
 export type VisualResolver = {
   ready?(): Promise<void>
@@ -379,6 +386,7 @@ export class AtlasResolver {
   private readonly tiles = new Map<string, IniDocument>()
   private readonly embeddedFontFamily?: string
   private readonly embeddedFontReady: Promise<void>
+  private readonly fontAdapt: Map<string, FontAdaptInfo>
 
   constructor(archive: SkinArchive, theme: string, orientation: string) {
     this.archive = archive
@@ -397,6 +405,9 @@ export class AtlasResolver {
     const embeddedFont = fontPath ? loadEmbeddedFont(archive, fontPath) : undefined
     this.embeddedFontFamily = embeddedFont?.family
     this.embeddedFontReady = embeddedFont?.ready ?? Promise.resolve()
+    const fontJson = [`${theme}/skin/${orientation}/font.json`, `${theme}/skin/font.json`]
+      .find((candidate) => archive.getBytes(candidate))
+    this.fontAdapt = fontJson ? parseFontJson(archive.getText(fontJson)) : new Map()
   }
 
   ready(): Promise<void> {
@@ -497,6 +508,8 @@ export class AtlasResolver {
   }
 
   resolveStyleText(styleID: string, highlighted: boolean): StyleTextVisual | undefined {
+    const adapted = fontAdaptText(this.fontAdapt.get(styleID.trim()), highlighted)
+    if (adapted) return { ...adapted, fontName: this.embeddedFontFamily }
     if (!this.styles) return
     return resolveStyleTextVisual(this.styles, styleID, highlighted, this.embeddedFontFamily)
   }

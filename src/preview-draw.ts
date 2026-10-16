@@ -294,8 +294,37 @@ export function drawStyleText(
 ): void {
   context.fillStyle = visual.color ?? (theme === "dark" ? "#f5f5f7" : "#17191c")
   const weight = visual.fontWeight ? `${visual.fontWeight} ` : ""
-  context.font = `${weight}${visual.fontSize ?? 24}px ${canvasFontFamily(visual.fontName)}`
+  const font = (size: number) => `${weight}${size}px ${canvasFontFamily(visual.fontName)}`
+  const fontSize = visual.fontSize ?? 24
+  context.font = font(fontSize)
   context.textAlign = "center"
   context.textBaseline = "middle"
-  context.fillText(visual.text, point.x, point.y)
+  const slash = visual.emphasis ? visual.text.indexOf("/") : -1
+  if (slash < 0) {
+    context.fillText(visual.text, point.x, point.y)
+    return
+  }
+  // 真机的「中/英」：突出的一段按字号绘制，另一段（连同 /）约半字号、约六成浓度，两段同一基线、整体居中。
+  const first = visual.emphasis === "first"
+  const parts = [
+    { text: visual.text.slice(0, first ? slash : slash + 1), main: first },
+    { text: visual.text.slice(first ? slash : slash + 1), main: !first },
+  ]
+  context.save()
+  context.textAlign = "left"
+  context.textBaseline = "alphabetic"
+  const sized = parts.map((part) => {
+    context.font = font(part.main ? fontSize : fontSize / 2)
+    return { ...part, metrics: context.measureText(part.text) }
+  })
+  const main = sized.find((part) => part.main)!.metrics
+  const baseline = point.y + (main.actualBoundingBoxAscent - main.actualBoundingBoxDescent) / 2
+  let x = point.x - sized.reduce((width, part) => width + part.metrics.width, 0) / 2
+  for (const part of sized) {
+    context.font = font(part.main ? fontSize : fontSize / 2)
+    context.globalAlpha = part.main ? 1 : 0.6
+    context.fillText(part.text, x, baseline)
+    x += part.metrics.width
+  }
+  context.restore()
 }
