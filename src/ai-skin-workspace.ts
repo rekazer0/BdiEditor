@@ -34,6 +34,18 @@ function singleLine(label: string, value: string, max = 16_384): void {
   if (value.length > max) throw new Error(`${label}过长`)
 }
 
+// Walks "/"-separated keys to the container holding the last one; "" addresses the root.
+function jsonSlot(root: unknown, pointer: string): { parent: unknown; key?: string } | undefined {
+  const keys = pointer.split("/").filter(Boolean)
+  let parent = root
+  for (const key of keys.slice(0, -1)) {
+    if (!parent || typeof parent !== "object" || !Object.hasOwn(parent, key)) return
+    parent = (parent as Record<string, unknown>)[key]
+  }
+  if (!keys.length) return { parent: root }
+  return parent && typeof parent === "object" ? { parent, key: keys[keys.length - 1] } : undefined
+}
+
 export class AiSkinWorkspace {
   private readonly files = new Map<string, AiSkinEditableFile>()
   private readonly original = new Map<string, string>()
@@ -171,7 +183,7 @@ export class AiSkinWorkspace {
     if (file.syntax === "json") {
       try {
         const parsed: unknown = JSON.parse(next)
-        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not object")
+        if (!parsed || typeof parsed !== "object") throw new Error("not object")
       } catch {
         throw new Error("替换后的 JSON 配置无效")
       }
@@ -180,11 +192,55 @@ export class AiSkinWorkspace {
     return occurrences
   }
 
+  /** Reads values inside a JSON file by "/"-separated paths such as "keys/3/rect" or "ss_1/118". */
+  readJsonPaths(path: string, pointers: readonly string[]): { values: Record<string, unknown>; missing: string[] } {
+    const root = this.jsonRoot(path)
+    const values: Record<string, unknown> = {}
+    const missing: string[] = []
+    for (const pointer of new Set(pointers)) {
+      const found = jsonSlot(root, pointer)
+      if (found && (found.key === undefined || Object.hasOwn(found.parent as object, found.key))) {
+        values[pointer] = found.key === undefined ? root : (found.parent as Record<string, unknown>)[found.key]
+      } else missing.push(pointer)
+    }
+    this.readPaths.add(path)
+    return { values, missing }
+  }
+
+  /** Replaces one existing object member or array element, or adds a member to an existing object. */
+  setJsonValue(path: string, pointer: string, valueJson: string): "created" | "updated" | "unchanged" {
+    const file = this.requireFile(path)
+    this.requireRead(path)
+    const root = this.jsonRoot(path)
+    const found = jsonSlot(root, pointer)
+    if (!found || found.key === undefined) throw new Error(`JSON 路径无效：${pointer}`)
+    const parent = found.parent as Record<string, unknown>
+    if (Array.isArray(parent) && !Object.hasOwn(parent, found.key)) throw new Error(`数组下标不存在：${pointer}`)
+    let value: unknown
+    try {
+      value = JSON.parse(valueJson)
+    } catch {
+      throw new Error("valueJson 不是有效 JSON")
+    }
+    const created = !Object.hasOwn(parent, found.key)
+    parent[found.key] = value
+    const next = JSON.stringify(root, null, 2)
+    if (next === file.text) return "unchanged"
+    this.applyMutation(file, next)
+    return created ? "created" : "updated"
+  }
+
   changes(): AiSkinTextDraft[] {
     return [...this.files.values()].flatMap((file) => {
       const before = this.original.get(file.path)!
       return before === file.text ? [] : [{ ...file, before, after: file.text }]
     })
+  }
+
+  private jsonRoot(path: string): unknown {
+    const file = this.requireFile(path)
+    if (file.syntax !== "json") throw new Error("该工具只能用于 JSON 配置")
+    return JSON.parse(file.text)
   }
 
   private requireFile(path: string): AiSkinEditableFile {

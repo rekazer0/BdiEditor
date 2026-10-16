@@ -9,7 +9,7 @@ import { runFileOperation, readBrowserSkinFile, showImage } from "../file-operat
 import { openNative, saveArchive, currentExportFormat, shareArchiveToMobile, writeToChosenFile, isSupportedSkinPath, loadArchive, loadDroppedFile } from "../archive-io"
 import { recentFilesKey, recentPreviewCache, recentThumbRequest, renderRecentFiles } from "../recent-files"
 import { releaseArchivePreview, hydrateTemplateCardPreviews } from "../../template-preview"
-import { type ExportTarget } from "../../export.ts"
+import { type ExportFormat } from "../../export.ts"
 import { type BdaPlatform } from "../../bda-platform.ts"
 import { refreshUpdateStatus, settingsController, showSettingsPage, nativeSettings, savedDefaultDevice, applyCanvasBackground, initialCanvasBackground, applyEditorCrosshairSetting, applyAppTheme, systemTheme, savedSourceFontSize, applySourceFontSize, saveSourceFontSize, initializeWindowMaterial, handleWindowMaterialError, applyWindowMaterialWithRetry, currentWindowMaterialOpacity, applyWindowMaterialOpacity, startWindowsWindowDrag, restoreWindowMaterialAfterDrag, applySidebarViewVisibility, applyInspectorTabsVisibility, applySourceEditorFeatures, setCanvasDropState } from "../preferences"
 import { clientLogZip, clientLog } from "../../client-log.ts"
@@ -21,6 +21,7 @@ import { updateDevicePreview, refreshPreview } from "../preview-render"
 import { setLayoutImageHighlight, setLayoutImageBytes, openLayoutImageDialog } from "../layout-image-replace"
 import { selectFile } from "../navigation"
 import { isBdaAppearancePartPath, commitBdaSourceEdit } from "../bda-documents"
+import { commitSxiSourceEdit, isSxiSourcePath } from "../sxi-documents"
 import { scheduleSourceInputHighlight, applySourceColorPicker, selectKeyFromSourceOffset } from "../source-panel"
 import { IniDocument } from "../../ini.ts"
 import { tileSlices } from "../../tiles.ts"
@@ -155,7 +156,7 @@ export function wireFilesAndSettings(): void {
   })
   for (const button of exportButtons) {
     button.addEventListener("click", () => {
-      const format = button.dataset.exportFormat as ExportTarget
+      const format = button.dataset.exportFormat as ExportFormat
       const platform = button.dataset.bdaPlatform as Exclude<BdaPlatform, "unknown"> | undefined
       void runFileOperation("导出", () => saveArchive(true, format, platform))
     })
@@ -481,7 +482,7 @@ export function wireFilesAndSettings(): void {
   })
   source.addEventListener("input", () => {
     if (!isEditing() || !appState.archive || !appState.selectedPath) return
-    if (appState.archive.isBdaConfig(appState.selectedPath) || isBdaAppearancePartPath(appState.selectedPath)) {
+    if (appState.archive.isBdaConfig(appState.selectedPath) || isBdaAppearancePartPath(appState.selectedPath) || isSxiSourcePath(appState.selectedPath)) {
       scheduleSourceInputHighlight()
       return
     }
@@ -505,6 +506,7 @@ export function wireFilesAndSettings(): void {
     scheduleSourceInputHighlight(true)
   })
   source.addEventListener("change", commitBdaSourceEdit)
+  source.addEventListener("change", commitSxiSourceEdit)
   sourceColorPicker.addEventListener("change", applySourceColorPicker)
   /**
    * Reverse direction of the canvas ↔ source link: putting the caret inside a

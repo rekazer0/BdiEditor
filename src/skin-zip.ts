@@ -1,4 +1,4 @@
-import { zipSync, Unzip, UnzipInflate, inflateSync, unzip } from "fflate"
+import { zipSync, Unzip, UnzipInflate, inflateSync, unzipSync } from "fflate"
 
 export const MAX_FILES = 5_000
 
@@ -351,11 +351,9 @@ export async function unpackArchive(
 ): Promise<Record<string, Uint8Array>> {
   const report = onProgress ? (value: number) => onProgress(value * 0.85) : undefined
   try {
-    const unpacked = report
-      ? await unzipWithProgress(bytes, report)
-      : await new Promise<Record<string, Uint8Array>>((resolve, reject) => {
-        unzip(bytes, (error, files) => error ? reject(error) : resolve(files))
-      })
+    // fflate's async `unzip` inflates big entries in blob workers, which the page CSP blocks
+    // without ever calling back; small skins unpack synchronously instead.
+    const unpacked = report ? await unzipWithProgress(bytes, report) : unzipSync(bytes)
     if (Object.keys(unpacked).length) return unpacked
   } catch {
     // 中央目录不可用，交给下面的本地文件头解包。

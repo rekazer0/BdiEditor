@@ -1,6 +1,7 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate"
 import type { ExportFormat } from "./export.ts"
 import { adaptPackageSounds } from "./sounds.ts"
+import { SXI_INFO_PATH, SXI_SKIN_PATH, encodeSkinJson, parseSkinJson, sxiDerivedFiles } from "./palm/sxi-projection.ts"
 import { parseZip, validateArchiveLimits, normalizeEntryCounts, MAX_FILES, safePath, MAX_UNPACKED_BYTES, unpackArchive, view, changedLocal, writeUint32, writeUint16 } from "./skin-zip.ts"
 
 const TEXT_EXTENSIONS = new Set(["ini", "css", "til", "cnd", "pop", "txt", "plist"])
@@ -12,6 +13,7 @@ type PackageLayout =
   | "bds-single"
   | "bda-dual"
   | "bda-single"
+  | "sxi"
   | "legacy-ios"
 
 type BdaTheme = "light" | "dark"
@@ -60,6 +62,8 @@ function packageInfo(files: Map<string, Uint8Array>, formatHint?: ExportFormat):
   const bdaRoots = bdaThemeRoots(files)
   if (formatHint === "bda" && !bdaRoots) throw new Error("BDA 皮肤缺少 port/land appearanceConfig")
   if (bdaRoots) return { layout: bdaRoots.size > 1 ? "bda-dual" : "bda-single", bdaRoots }
+  // Palm `.sxi` keeps `light/res/` like a dual BDS, so it is recognised by its root model first.
+  if (files.has(SXI_SKIN_PATH) || formatHint === "sxi") return { layout: "sxi" }
   if (names.some((name) => /^skin\/(?:dark|light)\/skin\//.test(name))) return { layout: "bdi-dual" }
   if (names.some((name) => /^skin\/(?:land|port|res)\//.test(name))) return { layout: "bdi-single" }
   if (names.some((name) => /^(?:dark|light)\/(?:land|port|res)\//.test(name))) return { layout: "bds-dual" }
@@ -94,7 +98,7 @@ function canonicalPath(path: string, layout: PackageLayout, bdaRoots?: Map<BdaTh
     }
     return path
   }
-  if (layout === "bds-dual") {
+  if (layout === "bds-dual" || layout === "sxi") {
     const themed = path.match(/^(dark|light)(?:\/(.*))?$/)
     if (themed) return `${themed[1]}/skin/${themed[2] ?? ""}`
   }
@@ -120,7 +124,7 @@ function rawPath(path: string, layout: PackageLayout, bdaRoots?: Map<BdaTheme, s
     const root = bdaRoots?.get(themed[1] as BdaTheme) ?? ""
     return root ? `${root}/${themed[2]}` : themed[2]
   }
-  if (layout === "bds-dual") {
+  if (layout === "bds-dual" || layout === "sxi") {
     return path.replace(/^(dark|light)\/skin\//, "$1/")
   }
   if (layout === "bds-single") {
@@ -156,6 +160,13 @@ function targetPath(path: string, format: ExportFormat, single: boolean): string
   return themed ? `${themed[1]}/${themed[2]}` : path
 }
 
+// BDA and SXI carry their own configuration models; only BDI and BDS repackage into each other.
+function assertConvertible(source: ExportFormat, target: ExportFormat | undefined): void {
+  if (!target || target === source) return
+  if (source === "sxi" || target === "sxi") throw new Error("手心皮肤（.sxi）只能另存为 .sxi")
+  if (source === "bda" || target === "bda") throw new Error("BDA 与 BDI/BDS 使用不同配置格式，不能转换")
+}
+
 export class SkinArchive {
   private files: Map<string, Uint8Array>
   private originals: Map<string, Uint8Array>
@@ -166,6 +177,7 @@ export class SkinArchive {
   private canonicalToRaw = new Map<string, string>()
   private cachedNames?: string[]
   private changedRaw = new Set<string>()
+  private derived?: { source: Uint8Array; files: Map<string, { bytes: Uint8Array; pointer: string[] }>; base?: string[]; names: string[] }
   readonly changed = new Set<string>()
   /** Bumped whenever file contents or paths change, so callers can skip redundant redraws. */
   revision = 0
@@ -194,6 +206,7 @@ export class SkinArchive {
   }
 
   get format(): ExportFormat {
+    if (this.layout === "sxi") return "sxi"
     if (this.layout.startsWith("bda")) return "bda"
     return this.layout.startsWith("bds") ? "bds" : "bdi"
   }
@@ -250,7 +263,37 @@ export class SkinArchive {
 
   names(): string[] {
     this.cachedNames ??= [...this.canonicalToRaw.keys()].sort()
-    return this.cachedNames.slice()
+    const derived = this.derivedFiles()
+    if (!derived) return this.cachedNames.slice()
+    if (derived.base !== this.cachedNames) {
+      derived.base = this.cachedNames
+      derived.names = [...new Set([...this.cachedNames, ...derived.files.keys()])].sort()
+    }
+    return derived.names.slice()
+  }
+
+  // `.sxi` layouts, styles and tiles are read-only INI views of `skin.json`, rebuilt whenever
+  // `skin.json` changes. An unparsable `skin.json` simply derives nothing.
+  private derivedFiles(): SkinArchive["derived"] {
+    if (this.layout !== "sxi") return
+    const source = this.files.get(SXI_SKIN_PATH)
+    if (!source) return
+    if (this.derived?.source === source) return this.derived
+    const files = new Map<string, { bytes: Uint8Array; pointer: string[] }>()
+    try {
+      for (const [path, file] of sxiDerivedFiles(parseSkinJson(strFromU8(source)))) {
+        if (!this.canonicalToRaw.has(path)) files.set(path, { bytes: strToU8(file.text), pointer: file.pointer })
+      }
+    } catch {
+      files.clear()
+    }
+    this.derived = { source, files, names: [] }
+    return this.derived
+  }
+
+  /** The `skin.json` pointer a derived `.sxi` view comes from; undefined for stored files. */
+  derivedPointer(path: string): string[] | undefined {
+    return this.derivedFiles()?.files.get(path)?.pointer
   }
 
   sourceFiles(): Array<{ path: string; data: Uint8Array }> {
@@ -281,7 +324,7 @@ export class SkinArchive {
 
   isText(path: string): boolean {
     const extension = path.split(".").pop()?.toLowerCase() ?? ""
-    return this.getBytes(path) !== undefined && TEXT_EXTENSIONS.has(extension)
+    return this.getBytes(path) !== undefined && (TEXT_EXTENSIONS.has(extension) || this.layout === "sxi" && extension === "json")
   }
 
   isImage(path: string): boolean {
@@ -293,7 +336,7 @@ export class SkinArchive {
   }
 
   getBytes(path: string): Uint8Array | undefined {
-    return this.files.get(this.canonicalToRaw.get(path) ?? path)
+    return this.files.get(this.canonicalToRaw.get(path) ?? path) ?? this.derivedFiles()?.files.get(path)?.bytes
   }
 
   getText(path: string): string {
@@ -307,6 +350,7 @@ export class SkinArchive {
   }
 
   setBytes(path: string, bytes: Uint8Array): void {
+    if (this.derivedPointer(path)) throw new Error(`${path} 由 skin.json 生成，请在源码中修改 skin.json`)
     const raw = this.canonicalToRaw.get(path) ?? rawPath(path, this.layout, this.bdaRoots)
     const current = this.files.get(raw)
     if (current && current.length === bytes.length && current.every((byte, index) => byte === bytes[index])) {
@@ -317,6 +361,7 @@ export class SkinArchive {
     this.revision++
     this.canonicalToRaw.set(path, raw)
     if (isNewPath) this.cachedNames = undefined
+    if (this.layout === "sxi" && path === SXI_SKIN_PATH) this.syncSxiInfo(bytes)
     const original = this.originals.get(raw)
     if (original && original.length === bytes.length && original.every((byte, index) => byte === bytes[index])) {
       this.changed.delete(path)
@@ -324,6 +369,17 @@ export class SkinArchive {
     } else {
       this.changed.add(path)
       this.changedRaw.add(raw)
+    }
+  }
+
+  // `info.json` mirrors `skin.json`'s `info`, as the Palm converter writes it.
+  private syncSxiInfo(bytes: Uint8Array): void {
+    if (!this.canonicalToRaw.has(SXI_INFO_PATH)) return
+    try {
+      const info = parseSkinJson(strFromU8(bytes)).info
+      if (info !== undefined) this.setBytes(SXI_INFO_PATH, strToU8(encodeSkinJson(info)))
+    } catch {
+      // Callers validate skin.json before committing it; keep the stale mirror otherwise.
     }
   }
 
@@ -414,15 +470,13 @@ export class SkinArchive {
   }
 
   async toBytesAsync(format?: ExportFormat, warnings?: string[]): Promise<Uint8Array> {
-    if (format && (format === "bda" || this.format === "bda") && format !== this.format) {
-      throw new Error("BDA 与 BDI/BDS 使用不同配置格式，不能转换")
-    }
+    assertConvertible(this.format, format)
     if (this.changed.size === 0 && (!format || (format === this.format && this.layout !== "legacy-ios"))) {
       return this.sourceBytes.slice()
     }
     // Avoid fflate's one-worker-per-large-file async ZIP path, which can exhaust WebView workers.
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
-    if (format && format !== "bda" && (format !== this.format || this.layout === "legacy-ios")) {
+    if (format && format !== "bda" && format !== "sxi" && (format !== this.format || this.layout === "legacy-ios")) {
       return this.platformBytesAsync(format, warnings)
     }
     return this.toBytes(format)
@@ -430,7 +484,7 @@ export class SkinArchive {
 
   /** Packages for a BDI/BDS platform, pointing key sounds at a format that platform plays (AIFF / OGG). */
   async platformBytesAsync(format: "bdi" | "bds", warnings?: string[]): Promise<Uint8Array> {
-    if (this.format === "bda") throw new Error("BDA 与 BDI/BDS 使用不同配置格式，不能转换")
+    assertConvertible(this.format, format)
     const files = new Map(Object.entries(this.packagedFiles(format)))
     const adapted = await adaptPackageSounds(files, format)
     warnings?.push(...adapted.warnings)
@@ -438,9 +492,7 @@ export class SkinArchive {
   }
 
   toBytes(format?: ExportFormat): Uint8Array {
-    if (format && (format === "bda" || this.format === "bda") && format !== this.format) {
-      throw new Error("BDA 与 BDI/BDS 使用不同配置格式，不能转换")
-    }
+    assertConvertible(this.format, format)
     if (format && (format !== this.format || this.layout === "legacy-ios")) {
       return this.packagedBytes(format)
     }

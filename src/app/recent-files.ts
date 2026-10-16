@@ -78,7 +78,7 @@ export function recentFolderLabel(path: string): string {
 }
 
 export function recentFormatLabel(path: string): string {
-  return path.match(/\.(bdi|bds|bda)$/i)?.[0]?.toLowerCase() ?? "皮肤"
+  return path.match(/\.(bdi|bds|bda|sxi)$/i)?.[0]?.toLowerCase() ?? "皮肤"
 }
 
 export function recentCard(item: RecentFile): HTMLButtonElement {

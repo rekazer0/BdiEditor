@@ -1,3 +1,4 @@
+import type { ExportFormat } from "./export.ts"
 // 注入 AI 设计系统提示的皮肤格式知识；规则须与 atlas.ts / keyboard.ts 的实际解析保持一致。
 const INI_SKILL = `## 皮肤格式技能（BDI/BDS）
 
@@ -29,6 +30,17 @@ const BDA_SKILL = `## 皮肤格式技能（BDA）
 - 按键通过样式引用（type 为 image/text/color，key 为样式表中的序号）指向样式；按键显示文字、字体、颜色要到被引用的 textStyles / colorStyles 条目中修改，不要改按键的动作字段。
 - 用 read_project_file 读取后，用 replace_project_text 做唯一、精确的小片段替换；同一样式可能被多个按键共享，需在总结中说明影响范围。`
 
-export function aiSkinSkill(format: "bdi" | "bds" | "bda"): string {
-  return format === "bda" ? BDA_SKILL : INI_SKILL
+const SXI_SKILL = `## 皮肤格式技能（SXI 手心皮肤）
+- 唯一数据源是 skin.json，按片段授权给你，路径形如 \`skin.json/<主题>/<段>/...\`（default 为浅色，night 为深色），全部是 JSON：
+  - \`skin.json/<主题>/<port_layout|land_layout>/b/<面板类型>\`：面板布局（full26Pinyin、t9Pinyin、defaultGlobal 为全局面板配置等）。board.size 为面板尺寸 [宽,高]；keys 数组是按键：id、rect（显示区 [[x,y],[宽,高]]）、hit_rect（触摸区）、values（扁平 [类型,值,…]，类型 0 上 1 下 2 左 3 右 4 点击 5 显示 6 长按）、b（样式引用）；key_fix 是状态补丁（对应 INI 的 TIPn）。
+  - \`.../c/<名>\` 候选栏，\`.../h/<名>\` 气泡。
+  - \`skin.json/<主题>/<s_info|s_port|s_land>/ss_1\`：样式表（s_port/s_land 是竖屏/横屏实际生效的样式，优先于 s_info）；\`.../info/<图片名>\`：该图片的切片数组（rect1 源矩形，rect2 拉伸内区）。
+- 当前选择里的配置节 KEYn 对应布局片段 keys 中 id 为 "n" 的按键，TIPn 对应 key_fix/n。
+- 样式引用：b.base_b=N 是背景样式 ss_1/N；b.base_f=[A,B,…] 每个数字 N 依次查 ss_1/N，再查 ss_1/⌊N/100⌋ 作为字体与颜色回退；b.base_o 是对应的偏移。
+- 样式条目字段：s_1 文字（text 显示文字，f_s 字号，f_w 字重，f_n 字体，c_normal / c_hl 常态 / 按下颜色，RRGGBB 或 AARRGGBB）；s_2 图片（normal / hl 为 \`图片名,切片序号\`）；s_3 边框（size、color）。
+- 工作流：在布局片段里找到按键的 b，再用 read_json_paths 直接读取样式片段的 ss_1/N（不要分页通读整张样式表），确认后用 set_json_value 改具体字段（例如 ss_1/118/s_1/c_normal）。样式可能被多个按键、多个面板共享，在总结里说明影响。
+- 不能新增或删除按键、样式条目与文件；图片像素用图片工具修改。`
+
+export function aiSkinSkill(format: ExportFormat): string {
+  return format === "bda" ? BDA_SKILL : format === "sxi" ? SXI_SKILL : INI_SKILL
 }

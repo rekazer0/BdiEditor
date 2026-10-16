@@ -21,6 +21,7 @@ import { populateKeyInspector } from "./key-inspector"
 import { type ModelConfiguration, groupModelConfigurations, modelHost, modelConfigurationKey, initializeModelSettings } from "../model-settings.ts"
 import { modelProviderPreset } from "../model-providers.ts"
 import { symbolSpan } from "../icons"
+import { SXI_SKIN_PATH, applySxiFragments, parseSkinJson, sxiFragment, sxiFragmentPath } from "../palm/sxi-projection.ts"
 
 export function aiEditableProjectFiles(target: SkinArchive, scope: "panel" | "project" = "project"): AiSkinEditableFile[] {
   const panelConfig = target.format === "bda"
@@ -28,6 +29,7 @@ export function aiEditableProjectFiles(target: SkinArchive, scope: "panel" | "pr
     : appState.layoutPath || appState.selectedPath || preferredPath()
   // 面板范围同时授权它引用的全局配置与样式表：按键文字、字体、颜色都定义在样式表里。
   const panelFiles = new Set([panelConfig, ...target.format === "bda" ? [] : [genConfigPath(), styleConfigPath()]])
+  if (target.format === "sxi") return sxiEditableFragments(target, scope === "panel" ? panelFiles : undefined)
   return target.names().flatMap((path) => {
     if (scope === "panel" && !panelFiles.has(path)) return []
     if (target.format === "bda") {
@@ -43,6 +45,20 @@ export function aiEditableProjectFiles(target: SkinArchive, scope: "panel" | "pr
     if (!target.isText(path) || !/\.(?:ini|css|json)$/i.test(path)) return []
     return [{ path, syntax: /\.json$/i.test(path) ? "json" as const : "ini" as const, text: target.getText(path) }]
   })
+}
+
+// SXI is granted as skin.json fragments, one per derived layout or style; the project scope
+// stays within the current theme and orientation so it fits the workspace limits.
+function sxiEditableFragments(target: SkinArchive, panelFiles?: ReadonlySet<string | undefined>): AiSkinEditableFile[] {
+  const skin = parseSkinJson(target.getText(SXI_SKIN_PATH))
+  const roots = [`${theme.value}/skin/${orientation.value}/`, `${theme.value}/skin/res/`]
+  const pointers = new Map<string, string[]>()
+  for (const path of target.names()) {
+    const pointer = target.derivedPointer(path)
+    if (!pointer || (panelFiles ? !panelFiles.has(path) : !roots.some((root) => path.startsWith(root)))) continue
+    pointers.set(sxiFragmentPath(pointer), pointer)
+  }
+  return [...pointers].map(([path, pointer]) => ({ path, syntax: "json" as const, text: JSON.stringify(sxiFragment(skin, pointer), null, 2) }))
 }
 
 /** PNGs beside the panel's style sheet (or every PNG for project scope), with their .til slices. */
@@ -121,7 +137,8 @@ export function validatedAiChanges(target: SkinArchive, drafts: readonly AiSkinD
   const allowed = new Map(aiEditableProjectFiles(target).map((file) => [file.path, file]))
   const images = new Set(aiEditableProjectImages(target).map((image) => image.path))
   const seen = new Set<string>()
-  return drafts.flatMap<Change>((draft): Change[] => {
+  const fragments: Array<{ path: string; text: string }> = []
+  const changes = drafts.flatMap<Change>((draft): Change[] => {
     if (seen.has(draft.path)) throw new Error(`AI 返回了重复修改：${draft.path}`)
     seen.add(draft.path)
     if (draft.syntax === "png") {
@@ -134,6 +151,10 @@ export function validatedAiChanges(target: SkinArchive, drafts: readonly AiSkinD
     if (!editable || editable.syntax !== draft.syntax) throw new Error(`AI 修改了未授权文件：${draft.path}`)
     if (editable.text !== draft.before) throw new Error(`AI 运行期间文件已变化：${draft.path}`)
     if (draft.before === draft.after) return []
+    if (target.format === "sxi") {
+      fragments.push({ path: draft.path, text: draft.after })
+      return []
+    }
     if (target.format !== "bda") {
       return [{ kind: "text" as const, path: draft.path, before: draft.before, after: draft.after }]
     }
@@ -142,6 +163,9 @@ export function validatedAiChanges(target: SkinArchive, drafts: readonly AiSkinD
     const after = applyDecodedBdaSource(draft.path, before, draft.after)
     return [{ kind: "bytes" as const, path: draft.path, before: before.slice(), after }]
   })
+  if (!fragments.length) return changes
+  const before = target.getText(SXI_SKIN_PATH)
+  return [...changes, { kind: "text", path: SXI_SKIN_PATH, before, after: applySxiFragments(before, fragments) }]
 }
 
 export function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
@@ -197,9 +221,10 @@ export async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks, 
   syncAiDesignControls()
   try {
     const panelScope = aiWantsWholeProject(prompt) ? "project" as const : "panel" as const
+    const sxiPanel = target.derivedPointer(appState.layoutPath)
     const panelPath = target.format === "bda"
       ? bdaConfigPath(target, theme.value, orientation.value, "appearance") ?? appState.layoutPath
-      : appState.layoutPath || appState.selectedPath || preferredPath()
+      : sxiPanel ? sxiFragmentPath(sxiPanel) : appState.layoutPath || appState.selectedPath || preferredPath()
     const project = {
       format: target.format,
       skinName: documentName.textContent?.trim() ?? "",

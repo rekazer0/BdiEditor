@@ -1,3 +1,4 @@
+import type { ExportFormat } from "./export.ts"
 import { Agent, type AgentEvent, type AgentMessage, type AgentTool, type ThinkingLevel } from "@earendil-works/pi-agent-core"
 import {
   Type,
@@ -28,7 +29,7 @@ type AiDesignConfiguration = {
 }
 
 type AiDesignProject = {
-  format: "bdi" | "bds" | "bda"
+  format: ExportFormat
   skinName: string
   skinPath: string
   theme: string
@@ -191,10 +192,12 @@ ${aiSkinSkill(project.format)}
 3. set_ini_value：在已有 INI 配置节中新增配置键，或修改已有键。适用于 BDI/BDS 的 .ini/.css 配置。
 4. remove_ini_value：删除已有 INI 配置键。只有用户需求明确要求删除时才使用。
 5. add_ini_section / remove_ini_sections：新增或删除整个 INI 配置节，仅用于用户要求增删按键、重排布局或需要新样式时。
-6. replace_project_text：在 BDA JSON 中做唯一、精确的小片段替换；必须提供预期出现次数。不要用它重写整个文件。
-${project.images?.length ? `7. view_image：查看一张已授权 PNG 或其中一个切片，返回尺寸、切片列表、平均色和缩略图。
-8. recolor_image：把整张图或某个切片重新着色为目标颜色，保留明暗、光泽和透明度；默认不改灰白黑像素（如白色图标）。
-${canGenerate ? "9. generate_image：用图片生成模型按描述画一张新图，填入整张图或某个切片；默认按原切片的透明轮廓裁剪，保持按键形状。\n" : ""}` : ""}
+6. read_json_paths：按 "/" 分隔的路径读取 JSON 配置中的若干值（例如 keys/3、ss_1/118），适合在大 JSON 中定位。读取后即可修改该文件。
+7. set_json_value：把 JSON 配置中一个已有路径的值替换为给定 JSON，或给已有对象新增成员。
+8. replace_project_text：在 JSON 配置中做唯一、精确的小片段替换；必须提供预期出现次数。不要用它重写整个文件。
+${project.images?.length ? `9. view_image：查看一张已授权 PNG 或其中一个切片，返回尺寸、切片列表、平均色和缩略图。
+10. recolor_image：把整张图或某个切片重新着色为目标颜色，保留明暗、光泽和透明度；默认不改灰白黑像素（如白色图标）。
+${canGenerate ? "11. generate_image：用图片生成模型按描述画一张新图，填入整张图或某个切片；默认按原切片的透明轮廓裁剪，保持按键形状。\n" : ""}` : ""}
 安全要求：
 - 不存在创建或删除文件、新建图片文件以及执行 shell 的接口，不要尝试这些操作；已有图片只能通过图片工具修改像素。
 - 只能使用上面已授权的相对路径，禁止绝对路径和 ..。
@@ -202,7 +205,7 @@ ${canGenerate ? "9. generate_image：用图片生成模型按描述画一张新�
 - 优先修改少量颜色、字号、字体、样式引用和已有属性；保留未知字段及现有命名。
 - 工具修改只进入草稿，编辑器会在结束后统一校验并作为一次可撤销操作提交。
 - 如果无法安全完成，说明原因且不要做近似破坏性修改。
-- 需求中工具做不到的部分（例如 BDA 格式增删按键、按键动画、未配置生图模型时的新图案）用一句话说明，然后直接完成可行部分，不要反复权衡。
+- 需求中工具做不到的部分（例如 BDA/SXI 格式增删按键、按键动画、未配置生图模型时的新图案）用一句话说明，然后直接完成可行部分，不要反复权衡。
 - 用户要求整体换风格时，改动共享的样式或图片切片是预期行为，在总结中点明影响即可，不必为此犹豫。
 
 最终回复（给普通用户看）：
@@ -307,21 +310,52 @@ function toolsFor(workspace: AiSkinWorkspace, images: AiSkinImages, imageModel?:
     },
   }
 
+  const readJsonPathsSchema = Type.Object({
+    path: Type.String({ description: "已授权的 JSON 配置路径" }),
+    paths: Type.Array(Type.String(), { minItems: 1, maxItems: 40, description: "用 / 分隔的键路径，例如 keys/3 或 ss_1/118；空字符串表示整个文件" }),
+  })
+  const readJsonPaths: AgentTool<typeof readJsonPathsSchema> = {
+    name: "read_json_paths",
+    label: "读取 JSON 路径",
+    description: "按路径读取 JSON 配置中的若干值，返回不存在的路径列表。",
+    parameters: readJsonPathsSchema,
+    executionMode: "sequential",
+    execute: async (_id, { path, paths }) => {
+      return jsonResult({ path, ...workspace.readJsonPaths(path, paths) })
+    },
+  }
+
+  const setJsonValueSchema = Type.Object({
+    path: Type.String({ description: "已授权的 JSON 配置路径" }),
+    pointer: Type.String({ minLength: 1, description: "用 / 分隔的键路径，例如 ss_1/118/s_1/c_normal" }),
+    valueJson: Type.String({ maxLength: 50_000, description: "新值的 JSON 文本，例如 \"FF2080FF\"、42 或 [[0,0],[10,10]]" }),
+  })
+  const setJsonValue: AgentTool<typeof setJsonValueSchema> = {
+    name: "set_json_value",
+    label: "设置 JSON 值",
+    description: "替换 JSON 配置中一个已有路径的值，或给已有对象新增成员；不能新增数组元素或文件。",
+    parameters: setJsonValueSchema,
+    executionMode: "sequential",
+    execute: async (_id, { path, pointer, valueJson }) => {
+      return jsonResult({ status: workspace.setJsonValue(path, pointer, valueJson), path, pointer })
+    },
+  }
+
   const replaceProjectTextSchema = Type.Object({
-    path: Type.String({ description: "已授权的 BDA JSON 配置路径" }),
+    path: Type.String({ description: "已授权的 JSON 配置路径" }),
     oldText: Type.String({ minLength: 1, maxLength: 50_000 }),
     newText: Type.String({ maxLength: 50_000 }),
     expectedOccurrences: Type.Integer({ minimum: 1, maximum: 20 }),
   })
   const replaceProjectText: AgentTool<typeof replaceProjectTextSchema> = {
     name: "replace_project_text",
-    label: "精确修改 BDA JSON",
-    description: "只对已授权 BDA JSON 做精确小片段替换。替换后必须仍是 JSON 对象，不能重写整个文件。",
+    label: "精确修改 JSON",
+    description: "只对已授权 JSON 配置做精确小片段替换。替换后必须仍是有效 JSON，不能重写整个文件。",
     parameters: replaceProjectTextSchema,
     executionMode: "sequential",
     execute: async (_id, { path, oldText, newText, expectedOccurrences }) => {
       const file = workspace.listFiles().find((entry) => entry.path === path)
-      if (file?.syntax !== "json") throw new Error("精确文本替换只允许用于 BDA JSON 配置")
+      if (file?.syntax !== "json") throw new Error("精确文本替换只允许用于 JSON 配置")
       return jsonResult({
         replacements: workspace.replaceText(path, oldText, newText, expectedOccurrences),
         path,
@@ -329,7 +363,7 @@ function toolsFor(workspace: AiSkinWorkspace, images: AiSkinImages, imageModel?:
     },
   }
 
-  const tools: AgentTool[] = [readFile, readIniSections, setIniValue, removeIniValue, addIniSection, removeIniSections, replaceProjectText]
+  const tools: AgentTool[] = [readFile, readIniSections, setIniValue, removeIniValue, addIniSection, removeIniSections, readJsonPaths, setJsonValue, replaceProjectText]
   if (!images.paths().length) return tools
 
   const imagePath = Type.String({ description: "已授权的 PNG 路径" })
@@ -448,13 +482,15 @@ const TOOL_LABELS: Record<string, string> = {
   remove_ini_value: "写入删除属性草稿",
   add_ini_section: "新增配置节草稿",
   remove_ini_sections: "删除配置节草稿",
-  replace_project_text: "写入 BDA 精确替换草稿",
+  read_json_paths: "读取 JSON 配置",
+  set_json_value: "写入 JSON 配置草稿",
+  replace_project_text: "写入 JSON 精确替换草稿",
   dispatch_subagents: "派发子代理并行处理",
   view_image: "查看图片",
   recolor_image: "图片改色草稿",
   generate_image: "生成图片草稿",
 }
-const EDIT_TOOLS = new Set(["set_ini_value", "remove_ini_value", "add_ini_section", "remove_ini_sections", "replace_project_text", "recolor_image", "generate_image"])
+const EDIT_TOOLS = new Set(["set_ini_value", "remove_ini_value", "add_ini_section", "remove_ini_sections", "set_json_value", "replace_project_text", "recolor_image", "generate_image"])
 
 function eventStatus(event: AgentEvent): { kind: StatusKind; text: string } | undefined {
   if (event.type === "agent_start") return { kind: "thinking", text: "AI 正在分析当前皮肤…" }
