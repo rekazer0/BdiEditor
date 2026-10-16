@@ -108,7 +108,8 @@ class ThemeConverter {
   private keyboardStyles?: { panel?: string; cand?: string }
 
   constructor(pkg: SsfPackage, base: SkinArchive, theme: SsfTheme, output: Map<string, Uint8Array>, warnings: string[]) {
-    this.look = new SsfLook(pkg, theme, warnings)
+    const panel = base.isText("light/skin/port/gen.ini") ? IniDocument.parse(base.getText("light/skin/port/gen.ini")).get("PANEL", "SIZE") : undefined
+    this.look = new SsfLook(pkg, theme, warnings, numbers(panel)[0] || 480)
     this.base = base
     this.theme = theme
     this.output = output
@@ -156,7 +157,8 @@ class ThemeConverter {
     for (const section of layout.sections().filter((name) => /^KEY\d+$/.test(name))) {
       const action = layout.get(section, "CENTER")?.trim()
       if (!action) continue
-      const look = this.look.key(layoutName, action, landscape)
+      const [, , width, height] = numbers(layout.get(section, "VIEW_RECT"))
+      const look = this.look.key(layoutName, action, landscape, width > 0 && height > 0 ? [width, height] : undefined)
       if (look.back) layout.set(section, "BACK_STYLE", this.resources.imageStyle(look.back))
       if (look.fore) {
         layout.set(section, "FORE_STYLE", this.resources.imageStyle(look.fore))

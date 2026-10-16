@@ -231,6 +231,10 @@ export function cropImage(image: RgbaImage, x: number, y: number, width: number,
 /** Bilinear resize on premultiplied alpha, so transparent edges do not bleed dark fringes. */
 export function resizeImage(image: RgbaImage, width: number, height: number): RgbaImage {
   if (width === image.width && height === image.height) return image
+  // Bilinear at exactly half size averages 2×2 blocks; halving first keeps big shrinks from aliasing.
+  if (image.width > width * 2 && image.height > height * 2) {
+    return resizeImage(resizeImage(image, Math.round(image.width / 2), Math.round(image.height / 2)), width, height)
+  }
   const data = new Uint8Array(width * height * 4)
   const source = image.data
   for (let y = 0; y < height; y++) {

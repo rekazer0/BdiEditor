@@ -224,6 +224,9 @@ class BdaThemeConverter {
     if (!panel && panelColor) this.warnings.push("BDA 键盘背景只支持图片，纯色背景保留模板样式")
     const candidateText = this.look.color("TextStyle_Candidate")
     const candidateColors = candidateText ? { normal: candidateText, pressed: this.look.color("TextStyle_Candidate_Highlight") ?? candidateText } : undefined
+    const list = this.look.list()
+    const listBack = list.back && writer.imageStyle(list.back)
+    const listCell = list.cell && writer.imageStyle(list.cell)
     writer.panels((name, bytes) => join(rawFields(bytes).map((field) => {
       const original = bytes.slice(field.start, field.end)
       if (field.number === 3 && field.bytes) {
@@ -231,6 +234,18 @@ class BdaThemeConverter {
         const keyName = rawString(entry.find((item) => item.number === 1))
         const value = entry.find((item) => item.number === 2)?.bytes
         return value ? encodedField(3, 2, replaceField(field.bytes, 2, 2, this.key(writer, appearance, name, keyName, value, landscape))) : original
+      }
+      // The 9-key symbol column (`panel.lists`): background, cells and their text.
+      if (field.number === 2 && field.bytes) {
+        const value = rawFields(field.bytes).find((item) => item.number === 2)?.bytes
+        if (!value) return original
+        let listBytes = value
+        if (listBack) listBytes = replaceField(listBytes, 1, 2, listBack)
+        if (listCell) listBytes = replaceField(listBytes, 2, 2, listCell)
+        const fore = rawFields(listBytes).find((item) => item.number === 3)
+        const recoloured = list.text && fore && refType(fore) === STYLE_TYPES.text ? writer.recolouredText(refKey(fore), { normal: list.text, pressed: list.text }) : undefined
+        if (recoloured) listBytes = replaceField(listBytes, 3, 2, recoloured)
+        return encodedField(2, 2, replaceField(field.bytes, 2, 2, listBytes))
       }
       if ((field.number === 7 || field.number === 10) && panelRef) return encodedField(field.number, 2, panelRef)
       if (field.number === 4 && field.bytes) {

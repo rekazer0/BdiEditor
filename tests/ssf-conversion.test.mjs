@@ -224,7 +224,9 @@ test('ssf → BDS: per-key and shared backgrounds keep their stretch band, per t
     const q = baiduKeyStyle(archive, theme, 'port', 'py_26', 'q')
     assert.deepEqual(rgb(q.image, 0, 0), c.qKey)
     assert.deepEqual(rgb(q.pressed, 0, 0), c.qKeyPressed)
-    assert.equal(q.inner, `2,3,${SIZES.key26[0] - 4},${SIZES.key26[1] - 6}`)
+    // Sogou pixels shrink to the 480-wide template (×4/9): 98×142 → 44×63, the band with it.
+    assert.deepEqual([q.image.width, q.image.height], [44, 63])
+    assert.equal(q.inner, '1,1,42,61')
     assert.deepEqual(rgb(baiduKeyStyle(archive, theme, 'port', 'py_26', 'w').image, 0, 0), c.letterKey)
     assert.deepEqual(rgb(baiduKeyStyle(archive, theme, 'port', 'py_9', 'b').image, 0, 0), c.nineKey)
     assert.deepEqual(rgb(baiduKeyStyle(archive, theme, 'port', 'py_26', 'F36').image, 0, 0), c.functionKey)
@@ -240,17 +242,18 @@ test('ssf → BDS: per-key and shared backgrounds keep their stretch band, per t
   assert.ok(warnings.some((warning) => /webp/.test(warning)))
 })
 
-test('ssf → BDS: FG_RECT becomes transparent padding and icons are centred on the key canvas', async () => {
+test('ssf → BDS: FG_RECT becomes transparent padding and icons are centred on the key canvas, at template scale', async () => {
   const { archive } = convertSsfToBaidu(await SsfPackage.open(ssfFixture()), bdsTemplate)
   const fore = baiduKeyStyle(archive, 'light', 'port', 'py_26', 'q', 'FORE_STYLE').image
-  // FG_RECT=0,0.25,1,0.75 on a 90 px glyph → a 120 px canvas with the glyph in its bottom 90 rows.
-  assert.deepEqual([fore.width, fore.height], [98, 120])
-  assert.deepEqual(pixel(fore, 0, 29), [0, 0, 0, 0])
-  assert.deepEqual(rgb(fore, 0, 30), COLORS.light.qGlyph)
+  // FG_RECT=0,0.25,1,0.75 on a 90 px glyph → a 98×120 canvas with the glyph in its bottom 90 rows,
+  // shrunk ×4/9 to the 480-wide template: 44×53 with the glyph from row ~13.
+  assert.deepEqual([fore.width, fore.height], [44, 53])
+  assert.deepEqual(pixel(fore, 0, 11), [0, 0, 0, 0])
+  assert.deepEqual(rgb(fore, 0, 16), COLORS.light.qGlyph)
   const icon = baiduKeyStyle(archive, 'light', 'port', 'py_26', 'F36', 'FORE_STYLE').image
-  assert.deepEqual([icon.width, icon.height], SIZES.key26)
+  assert.deepEqual([icon.width, icon.height], [44, 63])
   assert.deepEqual(pixel(icon, 0, 0), [0, 0, 0, 0])
-  assert.deepEqual(rgb(icon, 49, 71), COLORS.light.icon)
+  assert.deepEqual(rgb(icon, 22, 32), COLORS.light.icon)
   const document = IniDocument.parse(archive.getText('light/skin/port/py_26.ini'))
   const q = document.sections().find((name) => document.get(name, 'CENTER') === 'q')
   assert.equal(document.get(q, 'FORE_OFFSET'), undefined)
@@ -378,6 +381,10 @@ test('ssf → BDA: panel background, candidate bar and key sounds', async () => 
   assert.equal(decodePng(archive.getBytes(`light/skin/res/${bar.normalImage.resource.resourceID}.png`)).height, 126)
   const candidateText = appearance.textStyles.get(panel.cand.cellForeStyle.key)
   assert.equal(candidateText.normalColor, Number.parseInt(TEXT.light.candidate, 16))
+  const list = [...appearance.panels.get('py_9').lists.values()][0]
+  const listImage = (ref) => decodePng(archive.getBytes(`light/skin/res/${appearance.imageStyles.get(ref.key).normalImage.resource.resourceID}.png`))
+  assert.deepEqual(rgb(listImage(list.backStyle), 0, 0), COLORS.light.codeBack)
+  assert.deepEqual(rgb(listImage(list.cellBackStyle), 0, 0), COLORS.light.codeCell)
   const sounds = decodeBdaSoundConfig(archive.getBytes('light/skin/port/soundConfig'))
   assert.equal(sounds.keySounds.get('default').resourceID, 's_code.wav')
   assert.equal(sounds.keySounds.get('KEY_F36').resourceID, 's_del.wav')
@@ -403,7 +410,7 @@ test('BDS → ssf → BDS keeps every key look', async () => {
       assert.equal(after.inner, before.inner, `${theme} ${layout}:${action} 拉伸区`)
     }
     const fore = baiduKeyStyle(second, theme, 'port', 'py_26', 'q', 'FORE_STYLE').image
-    assert.deepEqual(rgb(fore, 0, 30), COLORS[theme].qGlyph)
+    assert.deepEqual(rgb(fore, fore.width >> 1, fore.height >> 1), COLORS[theme].qGlyph)
   }
 })
 
@@ -427,6 +434,11 @@ test('BDS → ssf: background stacking, FORE_OFFSET → FG_RECT and package file
   for (const name of ['KeyBg_Default_Latin', 'KeyBg_Default', 'KeyBg_Function_Qwerty', 'KeyBg_Space']) {
     assert.ok(parseSsfImage(skin.get(name, 'NORMAL')), `${name} 缺少图片`)
   }
+  // The 480-wide template's glyphs grow to Sogou's 1080-wide pixels (×9/4).
+  const glyph = pkg.keys('light').get('Foground_Key_Q', 'NORMAL')
+  assert.ok(decodePng(pkg.file('light', glyph)).height > 73, '字形应放大到搜狗像素')
+  assert.equal(skin.get('CandidateCodeView', 'BG_IMAGE'), 'BgCodeView')
+  assert.ok(parseSsfImage(skin.get('BgCodeView', 'NORMAL')))
   assert.match(new TextDecoder().decode(pkg.files.get('phoneTheme.ini')), /^skin_name=default$/m)
 })
 
@@ -455,7 +467,8 @@ test('ssf → BDS: an extreme FG_RECT keeps the bare glyph instead of a giant ca
   files['1080/status1/keys.ini'] = strToU8(keys.toString())
   const { archive } = convertSsfToBaidu(await SsfPackage.open(zipSync(files)), bdsTemplate)
   const fore = baiduKeyStyle(archive, 'light', 'port', 'py_26', 'q', 'FORE_STYLE').image
-  assert.deepEqual([fore.width, fore.height], SIZES.fgQ)
+  // The bare 98×90 glyph, only shrunk to template scale.
+  assert.deepEqual([fore.width, fore.height], [44, 40])
 })
 
 test('ssf → BDS: sound names cannot leave the res folder', async () => {

@@ -2,8 +2,9 @@
 //
 // Shared by the BDS/BDI writer (ssf-to-baidu.ts) and the BDA writer (ssf-to-bda.ts) so both read the
 // Sogou skin the same way: a key's background comes from its class or the shared defaults, its
-// foreground from keys.ini (FG_RECT baked in as transparent padding, because Baidu stretches a
-// foreground over the whole key) or from an icon centred on the background's canvas.
+// foreground from keys.ini (FG_RECT baked in as transparent padding around the glyph) or from an
+// icon centred on the background's canvas. BDS draws images at their own size in layout units, so its
+// writer passes the panel width and the look shrinks Sogou pixels to match.
 
 import type { IniDocument } from "../ini.ts"
 import { ssfKeyBinding, type SsfKeyBinding } from "./ssf-keymap.ts"
@@ -16,9 +17,6 @@ export type LookImage = { id: string; bytes: Uint8Array; stretch?: SsfStretch }
 export type LookPair = { normal: LookImage; pressed: LookImage }
 export type LookColors = { normal: string; pressed: string }
 type KeyLook = { binding: SsfKeyBinding; back?: LookPair; fore?: LookPair; label?: LookColors }
-
-/** Sogou designs the keyboard at 1080 px wide; bar heights in its images use that scale. */
-const SOGOU_WIDTH = 1080
 
 type Foreground = { normal: string; pressed: string; rect?: number[] }
 
@@ -36,11 +34,18 @@ export class SsfLook {
   private readonly missing = new Set<string>()
   private readonly decoded = new Map<string, RgbaImage | undefined>()
   private keyboardCache?: { panel?: LookImage; cand?: LookImage; panelColor?: string }
+  /** Screen width the Sogou images are drawn for (the resolution folder, 1080 by default). */
+  private readonly sogouWidth: number
+  /** Baidu layout units per Sogou pixel; unset keeps Sogou sizes. */
+  private readonly scale?: number
 
-  constructor(pkg: SsfPackage, theme: SsfTheme, warnings: string[]) {
+  /** `baiduWidth` is the target panel width when the writer draws images at their own size (BDS/BDI). */
+  constructor(pkg: SsfPackage, theme: SsfTheme, warnings: string[], baiduWidth?: number) {
     this.pkg = pkg
     this.theme = theme
     this.warnings = warnings
+    this.sogouWidth = Number(pkg.resolution) || 1080
+    this.scale = baiduWidth ? baiduWidth / this.sogouWidth : undefined
     this.skin = pkg.skin(theme)
     this.keys = pkg.keys(theme)
     this.sounds = pkg.ini("default/sound_android.ini")
@@ -86,6 +91,37 @@ export class SsfLook {
       const image = build()
       return image && { id, bytes: encodePng(image) }
     })
+  }
+
+  private resized(image: LookImage, width: number, height: number): LookImage {
+    const size = pngSize(image.bytes)
+    if (!size || (size[0] === width && size[1] === height)) return image
+    const stretch = image.stretch?.map((value, index) => Math.round(value * (index < 2 ? width / size[0] : height / size[1]))) as SsfStretch | undefined
+    if (stretch && (stretch[1] <= stretch[0] || stretch[3] <= stretch[2])) return image
+    const resized = this.derive(`size:${width}x${height}:${stretch ?? ""}`, [image.bytes], () => {
+      const source = this.decode(image.id, image.bytes)
+      return source && resizeImage(source, width, height)
+    })
+    return resized ? { ...resized, stretch } : image
+  }
+
+  /** A stretchable image at Baidu size, so its fixed nine-slice borders keep their Sogou proportion. */
+  private scaledPair(pair: LookPair | undefined): LookPair | undefined {
+    const scale = this.scale
+    if (!pair || !scale || scale >= 1) return pair
+    const scaled = (image: LookImage) => {
+      const size = image.stretch && pngSize(image.bytes)
+      return size ? this.resized(image, Math.max(1, Math.round(size[0] * scale)), Math.max(1, Math.round(size[1] * scale))) : image
+    }
+    return { normal: scaled(pair.normal), pressed: scaled(pair.pressed) }
+  }
+
+  /** Baidu draws a foreground at its own size: Sogou pixels become layout units, never larger than the key. */
+  private fitted(image: LookImage, key: [number, number] | undefined): LookImage {
+    const size = pngSize(image.bytes)
+    if (!size || !this.scale) return image
+    const ratio = Math.min(this.scale, ...(key ? [key[0] / size[0], key[1] / size[1]] : []))
+    return this.resized(image, Math.max(1, Math.round(size[0] * ratio)), Math.max(1, Math.round(size[1] * ratio)))
   }
 
   private statePair(section: string): LookPair | undefined {
@@ -166,13 +202,18 @@ export class SsfLook {
     if (binding.keyClass === "function") return ssfColor(this.skin.get("General", pressed ? "HIGH_LIGHT_ICON_COLOR" : "ICON_COLOR"))
   }
 
-  key(layout: string, action: string, landscape: boolean): KeyLook {
+  key(layout: string, action: string, landscape: boolean, size?: [number, number]): KeyLook {
     const binding = ssfKeyBinding(layout, action, landscape)
-    const back = this.background(binding)
+    const sogouBack = this.background(binding)
     const source = this.foregroundSource(binding)
-    const canvas = back ? pngSize(back.normal.bytes) : undefined
-    const normal = source && this.foregroundImage(source.normal, source.rect, canvas)
-    const fore = source && normal ? { normal, pressed: this.foregroundImage(source.pressed, source.rect, canvas) ?? normal } : undefined
+    const canvas = sogouBack ? pngSize(sogouBack.normal.bytes) : undefined
+    const foreground = (name: string) => {
+      const image = this.foregroundImage(name, source?.rect, canvas)
+      return image && this.fitted(image, size)
+    }
+    const normal = source && foreground(source.normal)
+    const fore = source && normal ? { normal, pressed: foreground(source.pressed) ?? normal } : undefined
+    const back = this.scaledPair(sogouBack)
     const qwerty = /_26/.test(layout)
     const labelNormal = this.labelColor(binding, qwerty, false)
     const label = labelNormal ? { normal: labelNormal, pressed: this.labelColor(binding, qwerty, true) ?? labelNormal } : undefined
@@ -199,7 +240,7 @@ export class SsfLook {
     const result: { panel?: LookImage; cand?: LookImage; panelColor?: string } = {}
     if (backgroundName && backgroundBytes && backgroundSize) {
       const [width, height] = backgroundSize
-      const top = Math.min(height - 1, Math.max(0, barSize ? Math.round(barSize[1] * width / SOGOU_WIDTH) : 0))
+      const top = Math.min(height - 1, Math.max(0, barSize ? Math.round(barSize[1] * width / this.sogouWidth) : 0))
       const background = () => this.decode(backgroundName, backgroundBytes)
       result.panel = this.derive(`panel:${top}`, [backgroundBytes], () => {
         const image = background()
@@ -226,8 +267,8 @@ export class SsfLook {
     const back = first(this.skin.get("CandidateCodeView", "BG_IMAGE"))
     const cell = first(this.skin.get("CandidateCodeView", "BG_IMAGES"))
     return {
-      back: back ? this.statePair(back) : undefined,
-      cell: cell ? this.statePair(cell) : undefined,
+      back: this.scaledPair(back ? this.statePair(back) : undefined),
+      cell: this.scaledPair(cell ? this.statePair(cell) : undefined),
       text: ["TextStyle_Popup_Code", "TextStyle_Symbol", "TextStyle"].map((section) => ssfColor(this.skin.get(section, "TEXT_COLOR"))).find(Boolean),
     }
   }

@@ -2,8 +2,8 @@
 //
 // The reverse of ssf-to-baidu.ts with the same key table: every Baidu key names one Sogou key class,
 // the first key reaching a class decides its look. Atlas slices are cut into standalone PNGs (Sogou
-// references whole files), INNER_RECT becomes the Sogou stretch band, and a foreground's FORE_OFFSET
-// becomes FG_RECT. The Sogou background spans the candidate bar and the keys, so the Baidu candidate
+// references whole files), INNER_RECT becomes the Sogou stretch band, and a key's foreground layers
+// are flattened into one image whose place on the key becomes FG_RECT. The Sogou background spans the candidate bar and the keys, so the Baidu candidate
 // bar and panel backgrounds are stacked into one image. Light/dark themes become day/night statuses.
 
 import { strToU8, zipSync } from "fflate"
@@ -11,12 +11,13 @@ import { IniDocument } from "../ini.ts"
 import type { SkinArchive } from "../skin.ts"
 import { soundAsWav } from "../sounds.ts"
 import { ssfBoard, ssfKeyBinding, type SsfKeyBinding } from "./ssf-keymap.ts"
-import { cropImage, decodePng, encodePng, placeImage, resizeImage, type RgbaImage } from "./ssf-png.ts"
+import { compositeImage, cropImage, decodePng, encodePng, placeImage, resizeImage, type RgbaImage } from "./ssf-png.ts"
 
 type Theme = "light" | "dark"
 type SliceImage = { image: RgbaImage; stretch?: [number, number, number, number] }
 type StylePair = { normal?: SliceImage; pressed?: SliceImage; color?: string; pressedColor?: string }
-type KeySample = { binding: SsfKeyBinding; back: StylePair; fore?: StylePair; foreRect?: string; labelColor?: string; labelPressedColor?: string }
+type Foreground = { normal: RgbaImage; pressed: RgbaImage; rect: string }
+type KeySample = { binding: SsfKeyBinding; back: StylePair; fore?: Foreground; labelColor?: string; labelPressedColor?: string }
 
 const SOGOU_WIDTH = 1080
 const SOGOU_BAR_HEIGHT = 126
@@ -61,12 +62,17 @@ class BaiduStyles {
   private readonly archive: SkinArchive
   private readonly roots: string[]
   private readonly warnings: string[]
+  /** Sogou pixels per Baidu layout unit, from the portrait panel width. */
+  readonly scale: number
 
   /** Styles and atlases live in `<orientation>/res/` when present, otherwise in the theme's `res/`. */
   constructor(archive: SkinArchive, theme: Theme, orientation: "port" | "land", warnings: string[]) {
     this.archive = archive
     this.warnings = warnings
     this.roots = [`${theme}/skin/${orientation}/res`, `${theme}/skin/res`]
+    const gen = `${theme}/skin/port/gen.ini`
+    const width = numbers(archive.isText(gen) ? IniDocument.parse(archive.getText(gen)).get("PANEL", "SIZE") : undefined)[0]
+    this.scale = width > 0 ? SOGOU_WIDTH / width : 1
     const css = this.roots.map((root) => `${root}/default.css`).find((path) => archive.isText(path))
     this.styles = IniDocument.parse(css ? archive.getText(css) : "")
   }
@@ -109,7 +115,15 @@ class BaiduStyles {
     const stretch = inner.length === 4 && inner[2] > 0 && inner[3] > 0
       ? [inner[0] - x, inner[0] - x + inner[2], inner[1] - y, inner[1] - y + inner[3]] as [number, number, number, number]
       : undefined
-    return { image: cropImage(atlas, x, y, width, height), stretch }
+    const image = cropImage(atlas, x, y, width, height)
+    // Both draw nine-slice borders at their own size: Baidu in layout units, Sogou in 1080-wide pixels.
+    if (!stretch || this.scale === 1) return { image, stretch }
+    const scaledWidth = Math.max(1, Math.round(width * this.scale))
+    const scaledHeight = Math.max(1, Math.round(height * this.scale))
+    return {
+      image: resizeImage(image, scaledWidth, scaledHeight),
+      stretch: stretch.map((value, index) => Math.round(value * (index < 2 ? scaledWidth / width : scaledHeight / height))) as [number, number, number, number],
+    }
   }
 
   resolve(styleID: string | undefined): StylePair | undefined {
@@ -197,12 +211,54 @@ function layoutRank(path: string): number {
   return ssfBoard(path) === "other" ? MAIN_LAYOUTS.length + 1 : MAIN_LAYOUTS.length
 }
 
+function offsetValue(value: string | undefined): [number, number] | undefined {
+  const offset = numbers(value)
+  return offset.length === 2 && offset.every(Number.isFinite) ? [offset[0], offset[1]] : undefined
+}
+
+/**
+ * Every image layer of a key drawn the way Baidu does (centred at its own size, then offset) and cut
+ * to the area they cover, with that area as a Sogou FG_RECT (fractions of the key).
+ */
+function foreground(layers: Array<{ pair?: StylePair; offset: [number, number] }>, width: number, height: number, scale: number): Foreground | undefined {
+  const images = layers.filter((layer) => layer.pair?.normal)
+  if (!images.length) return
+  const draw = (pick: (pair: StylePair) => SliceImage | undefined) => images.reduce((canvas, { pair, offset }) => {
+    const image = (pick(pair!) ?? pair!.normal!).image
+    return compositeImage(canvas, placeImage(image, width, height, Math.round((width - image.width) / 2 + offset[0]), Math.round((height - image.height) / 2 + offset[1])))
+  }, { width, height, data: new Uint8Array(width * height * 4) } as RgbaImage)
+  const normal = draw((pair) => pair.normal)
+  const pressed = draw((pair) => pair.pressed)
+  let [left, top, right, bottom] = [width, height, 0, 0]
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const offset = (y * width + x) * 4 + 3
+      if (!normal.data[offset] && !pressed.data[offset]) continue
+      left = Math.min(left, x)
+      top = Math.min(top, y)
+      right = Math.max(right, x + 1)
+      bottom = Math.max(bottom, y + 1)
+    }
+  }
+  // Layers that draw nothing still hide the glyph a template would put there.
+  if (right <= left || bottom <= top) [left, top, right, bottom] = [0, 0, 1, 1]
+  const fraction = (value: number) => Number(value.toFixed(3))
+  // Sogou images are in its own pixels, so a 480-wide Baidu skin's glyphs grow to match.
+  const cut = (image: RgbaImage) => resizeImage(cropImage(image, left, top, right - left, bottom - top), Math.max(1, Math.round((right - left) * scale)), Math.max(1, Math.round((bottom - top) * scale)))
+  return {
+    normal: cut(normal),
+    pressed: cut(pressed),
+    rect: [left / width, top / height, (right - left) / width, (bottom - top) / height].map(fraction).join(","),
+  }
+}
+
 /** Collects, per Sogou key class, the first Baidu key that reaches it. */
 function sampleKeys(archive: SkinArchive, theme: Theme, warnings: string[]): Map<string, KeySample & { layout: string }> {
   const samples = new Map<string, KeySample & { layout: string }>()
   for (const orientation of ["port", "land"] as const) {
     const styles = new BaiduStyles(archive, theme, orientation, warnings)
     const prefix = `${theme}/skin/${orientation}/`
+    const gen = archive.isText(`${prefix}gen.ini`) ? IniDocument.parse(archive.getText(`${prefix}gen.ini`)) : undefined
     const layouts = archive.names().filter((path) => path.startsWith(prefix) && /^[^/]+\.ini$/.test(path.slice(prefix.length)) && !path.endsWith("/gen.ini"))
     // Several boards share a Sogou class (`Key_Q`, `Key_Space`): the main pinyin boards decide it,
     // then the other boards Sogou styles per class, and symbol pages last.
@@ -219,22 +275,17 @@ function sampleKeys(archive: SkinArchive, theme: Theme, warnings: string[]): Map
         const back = styles.resolve(document.get(section, "BACK_STYLE"))
         if (!back) continue
         const foreIDs = document.get(section, "FORE_STYLE")?.split(",").map((value) => value.trim()).filter(Boolean) ?? []
-        const fore = foreIDs.map((id) => styles.resolve(id)).find((pair) => pair?.normal)
-        const text = foreIDs.map((id) => styles.resolve(id)).find((pair) => pair?.color && !pair.normal)
-        const rect = numbers(document.get(section, "VIEW_RECT"))
-        const offset = numbers(document.get(section, "FORE_OFFSET")?.split(";")[0])
-        let foreRect: string | undefined
-        if (fore?.normal && offset.length === 2 && rect.length === 4 && rect[2] > 0 && rect[3] > 0) {
-          const { width, height } = fore.normal.image
-          const fraction = (value: number) => Number(Math.max(0, value).toFixed(3))
-          foreRect = [
-            fraction(((rect[2] - width) / 2 + offset[0]) / rect[2]),
-            fraction(((rect[3] - height) / 2 + offset[1]) / rect[3]),
-            fraction(width / rect[2]),
-            fraction(height / rect[3]),
-          ].join(",")
-        }
-        samples.set(name, { layout, binding, back, fore, foreRect, labelColor: text?.color, labelPressedColor: text?.pressedColor })
+        const offsets = document.get(section, "FORE_OFFSET")?.split(";") ?? []
+        const positions = document.get(section, "POS_TYPE")?.split(",") ?? []
+        const layers = foreIDs.map((id, index) => ({
+          pair: styles.resolve(id),
+          // Like the editor preview: the key's own offset, else the gen.ini OFFSETn its POS_TYPE names.
+          offset: offsetValue(offsets[index]) ?? offsetValue(gen?.get(`OFFSET${positions[index]?.trim()}`, "POS") ?? gen?.get(`OFFSET${positions[index]?.trim()}`, "R_POS")) ?? [0, 0],
+        }))
+        const text = layers.find(({ pair }) => pair?.color && !pair.normal)?.pair
+        const [, , width, height] = numbers(document.get(section, "VIEW_RECT"))
+        const fore = width > 0 && height > 0 ? foreground(layers, Math.round(width), Math.round(height), styles.scale) : undefined
+        samples.set(name, { layout, binding, back, fore, labelColor: text?.color, labelPressedColor: text?.pressedColor })
       }
     }
   }
@@ -299,14 +350,14 @@ function convertTheme(archive: SkinArchive, theme: Theme, folder: string, output
     const entries = [{ key: "BG_IMAGES", value: bgName }]
     if (sample.labelColor) entries.push({ key: "TEXT_COLOR", value: sample.labelColor }, { key: "TEXT_COLOR_PRESSED", value: sample.labelPressedColor ?? sample.labelColor })
     writer.skin.appendSection(section, entries)
-    if (sample.fore?.normal) {
+    if (sample.fore) {
       const foreName = `Foground_${section}`
       writer.keys.appendSection(section, [
         { key: "FG_IMAGES", value: foreName },
-        { key: "FG_RECT", value: sample.foreRect ?? "0,0,1,1" },
+        { key: "FG_RECT", value: sample.fore.rect },
       ])
-      const normal = writer.file(sample.fore.normal.image)
-      const pressed = writer.file((sample.fore.pressed ?? sample.fore.normal).image)
+      const normal = writer.file(sample.fore.normal)
+      const pressed = writer.file(sample.fore.pressed)
       writer.keys.appendSection(foreName, [
         { key: "NORMAL", value: normal },
         { key: "PRESSED", value: pressed },
@@ -331,6 +382,18 @@ function convertTheme(archive: SkinArchive, theme: Theme, folder: string, output
     writer.skin.appendSection("TextStyle_Candidate", [{ key: "TEXT_COLOR", value: candidate.color }])
     writer.skin.appendSection("TextStyle_Candidate_Highlight", [{ key: "TEXT_COLOR", value: candidate.pressedColor ?? candidate.color }])
   }
+  // The 9-key symbol column is Sogou's candidate code view.
+  const nine = `${theme}/skin/port/py_9.ini`
+  const list = archive.isText(nine) ? IniDocument.parse(archive.getText(nine)) : undefined
+  const listBack = styles.resolve(list?.get("LIST", "BACK_STYLE"))
+  const listCell = styles.resolve(list?.get("LIST", "CELL_STYLE"))
+  const codeView = [
+    ...(listBack && writer.stateSection("BgCodeView", listBack) ? [{ key: "BG_IMAGE", value: "BgCodeView" }] : []),
+    ...(listCell && writer.stateSection("BgCodeViewCell", listCell) ? [{ key: "BG_IMAGES", value: "BgCodeViewCell" }] : []),
+  ]
+  if (codeView.length) writer.skin.appendSection("CandidateCodeView", codeView)
+  const listText = styles.resolve(list?.get("LIST", "FORE_STYLE"))?.color
+  if (listText) writer.skin.appendSection("TextStyle_Popup_Code", [{ key: "TEXT_COLOR", value: listText }])
   writer.write()
 }
 
