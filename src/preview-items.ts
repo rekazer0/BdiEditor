@@ -1,4 +1,4 @@
-import { stateStyleValue, stateTipSection } from "./panel-tools.ts"
+import { effectiveStateTip, stateStyleValue, stateTipSection } from "./panel-tools.ts"
 import { IniDocument } from "./ini.ts"
 import { skinStateFallbackText } from "./actions.ts"
 import { DEFAULT_PANEL_WIDTH, DEFAULT_CANDIDATE_HEIGHT } from "./keyboard.ts"
@@ -60,7 +60,7 @@ export function visiblePreviewItems(
     if (stateGroup.length && fallbackGroup.length) {
       group.forEach((candidate) => handled.add(candidate))
       const selected = stateGroup.find((candidate) =>
-        stateStyleValue(candidate.statStyle, state ?? 0) !== undefined
+        stateTipSection(candidate.statStyle, state) !== undefined
       ) ?? fallbackGroup[0] ?? stateGroup[0]
       visible.push({
         ...selected,
@@ -79,7 +79,7 @@ export function effectivePreviewItem(
   item: PreviewItem,
   state?: number,
 ): PreviewItem {
-  const tip = stateTipSection(item.statStyle, state)
+  const tip = effectiveStateTip(document, item.statStyle, state)
   if (tip === undefined) return item
   const section = `TIP${tip}`
   const hasTip = document.sections().includes(section)
