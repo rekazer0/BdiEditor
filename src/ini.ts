@@ -155,7 +155,6 @@ export class IniDocument {
   }
 
   appendSection(section: string, entries: readonly { key: string; value: string }[]): void {
-    this.invalidate()
     const ending = this.lines.find((line) => line.ending)?.ending ?? "\n"
     if (this.lines.length && this.lines.at(-1)?.ending === "") {
       const previous = this.lines.at(-1)!
@@ -163,15 +162,21 @@ export class IniDocument {
       previous.raw += ending
     }
     this.lines.push({ raw: `[${section}]${ending}`, ending, section })
+    // Writers append thousands of sections between reads, so the index is extended instead of rebuilt.
+    if (this.sectionList && !this.sectionList.includes(section)) this.sectionList.push(section)
     for (const entry of entries) {
-      this.lines.push({
+      const line: Line = {
         raw: `${entry.key}=${entry.value}${ending}`,
         ending,
         section,
         key: entry.key,
         prefix: `${entry.key}=`,
         value: entry.value,
-      })
+      }
+      this.lines.push(line)
+      // Appended lines come last: they only fill keys no earlier line defines (the first one wins).
+      const id = entryId(section, entry.key)
+      if (this.index && !this.index.has(id)) this.index.set(id, line)
     }
   }
 

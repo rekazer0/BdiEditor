@@ -10,7 +10,7 @@ import { appState } from "../state"
 import { hydrateIcons } from "../../icons"
 import { syncSinglePageInspectorGroup, setMobileSplit, setMobilePane, syncMobileInspectorHeader, setMobilePreviewCollapsed } from "../mobile-layout"
 import { measureCanvasWrapInnerSize, scheduleFitCanvasPreview, applyPreviewZoom, setPreviewPan, finishPreviewPan, schedulePreviewPan } from "../preview-render"
-import { isEditing } from "../edit-history"
+import { canvasEditable, isEditing } from "../edit-history"
 import { chooseStyleImageSlice, clearImagePreviewError, showImagePreviewError } from "../resource-inspector"
 import { replacedSourceStyle } from "../../source-value-ranges.ts"
 import { applyStyleLibrarySelection, editStyleLibrarySelection, renderStylePicker, addStyleFromLibrary } from "../style-picker"
@@ -297,7 +297,7 @@ export function wireCanvasAndInspector(): void {
       appState.previewPanLocked ||
       event.pointerType === "touch" ||
       deviceShell.hidden ||
-      isEditing() && appState.keyMode === "move" && previewPanelViewport.contains(event.target as Node)
+      canvasEditable() && appState.keyMode === "move" && previewPanelViewport.contains(event.target as Node)
     ) return
     appState.previewPanCandidate = {
       pointerId: event.pointerId,
@@ -309,7 +309,7 @@ export function wireCanvasAndInspector(): void {
     canvasWrap.classList.add("preview-pan-ready")
   })
   canvasWrap.addEventListener("pointermove", (event) => {
-    if (isEditing() && appState.keyMode === "move" && previewPanelViewport.contains(event.target as Node)) return
+    if (canvasEditable() && appState.keyMode === "move" && previewPanelViewport.contains(event.target as Node)) return
     if (!appState.previewPanStart && appState.previewPanCandidate?.pointerId === event.pointerId) {
       const dx = event.clientX - appState.previewPanCandidate.x
       const dy = event.clientY - appState.previewPanCandidate.y
@@ -359,7 +359,7 @@ export function wireCanvasAndInspector(): void {
     const start = appState.canvasWrapClickStart
     appState.canvasWrapClickStart = undefined
     if (
-      !isEditing() ||
+      !canvasEditable() ||
       !start || Math.hypot(event.clientX - start.x, event.clientY - start.y) >= 3 ||
       candidateArea.contains(target) ||
       target.closest("canvas, button, input, select, label, [role=button]")

@@ -6,7 +6,7 @@ import { type Change } from "../../history.ts"
 import { preview, source, scheduleSelectionInspectorSync, isTauri, exportButtons, settingsNavItems, isAndroidTauri, LAST_SOURCE_WORKSPACE_KEY, currentDeviceValue } from "../canvas-interaction"
 import { startNewDocument, newDocument } from "../new-document"
 import { runFileOperation, readBrowserSkinFile, showImage } from "../file-operations"
-import { openNative, saveArchive, currentExportFormat, shareArchiveToMobile, writeToChosenFile, isSupportedSkinPath, loadArchive, loadDroppedFile } from "../archive-io"
+import { openNative, saveArchive, currentExportFormat, shareArchiveToMobile, writeToChosenFile, isSupportedSkinPath, loadDroppedFile, openSkinBytes, UNSUPPORTED_SKIN_MESSAGE } from "../archive-io"
 import { recentFilesKey, recentPreviewCache, recentThumbRequest, renderRecentFiles } from "../recent-files"
 import { releaseArchivePreview, hydrateTemplateCardPreviews } from "../../template-preview"
 import { type ExportTarget } from "../../export.ts"
@@ -402,9 +402,8 @@ export function wireFilesAndSettings(): void {
     const file = browserOpen.files?.[0]
     if (file) {
       await runFileOperation("打开", async () => {
-        if (!isSupportedSkinPath(file.name)) throw new Error("仅支持 .bda、.bdi 或 .bds 皮肤文件")
-        await loadArchive(await readBrowserSkinFile(file), file.name)
-        return true
+        if (!isSupportedSkinPath(file.name)) throw new Error(UNSUPPORTED_SKIN_MESSAGE)
+        return openSkinBytes(await readBrowserSkinFile(file), file.name)
       })
     }
     browserOpen.value = ""

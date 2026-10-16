@@ -6,7 +6,7 @@ import { bdaConfigPath } from "../bda.ts"
 import { selectFile } from "./navigation"
 import { mobilePortraitQuery, preview, toolbarPreview, source, keyboardFields, layoutActionButtons } from "./canvas-interaction"
 import { selectParentObject } from "./key-editing"
-import { isEditing } from "./edit-history"
+import { canvasEditable, isEditing } from "./edit-history"
 import { updateSourceFileActions } from "./source-files"
 import { updateSourceSearchStatus } from "./source-panel"
 import { syncAiDesignContext } from "./ai-panel"
@@ -259,7 +259,7 @@ export function setMobilePreviewCollapsed(collapsed: boolean): void {
 }
 
 export function updatePanelToolButtons(): void {
-  const editing = isEditing()
+  const editing = canvasEditable()
   panelScaleButton.disabled = !editing || appState.fileOperationRunning || !appState.archive
   replaceLayoutImageButton.disabled = !editing || appState.fileOperationRunning || !appState.archive || appState.archive.format === "bda"
   adaptIos26Button.disabled = !editing || appState.fileOperationRunning || !appState.archive || appState.archive.format === "bda"
@@ -268,9 +268,10 @@ export function updatePanelToolButtons(): void {
 export function applyModeState(): void {
   const editing = isEditing()
   if (!editing && editorCrosshair.checked) previewCoordinates.hidden = true
-  deviceShell.dataset.mode = editing ? "edit" : "preview"
-  preview.setMode(editing ? "edit" : "preview")
-  toolbarPreview.setMode(editing ? "edit" : "preview")
+  const canvasMode = canvasEditable() ? "edit" : "preview"
+  deviceShell.dataset.mode = canvasMode
+  preview.setMode(canvasMode)
+  toolbarPreview.setMode(canvasMode)
   preview.setEditTool(appState.keyMode)
   source.readOnly = !editing
   replaceAssetButton.disabled = !editing

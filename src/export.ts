@@ -1,7 +1,7 @@
-export type ExportFormat = "bdi" | "bds" | "bda"
+/** Package formats a `SkinArchive` opens, edits and saves in place: Baidu BDI / BDS / BDA and Sogou SSF. */
+export type ExportFormat = "bdi" | "bds" | "bda" | "ssf"
 
-// `.sxi` is a read-only export target: it is produced by the Palm skin converter,
-// never edited in place, so it is not a `SkinArchive` package format.
+// `.sxi` (Palm) is a converted export target: produced by the Palm converter, never edited in place.
 export type ExportTarget = ExportFormat | "sxi"
 
 export function isExportFormat(format: ExportTarget): format is ExportFormat {
@@ -11,7 +11,8 @@ export function isExportFormat(format: ExportTarget): format is ExportFormat {
 export function exportFormatFromPath(path: string): ExportFormat | undefined {
   const match = path.match(/\.([^.\\/]+)$/)
   const extension = match?.[1].toLowerCase()
-  return extension === "bdi" || extension === "bds" || extension === "bda"
+  if (extension === "mssf") return "ssf"
+  return extension === "bdi" || extension === "bds" || extension === "bda" || extension === "ssf"
     ? extension
     : undefined
 }

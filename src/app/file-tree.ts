@@ -321,7 +321,8 @@ export function renderFiles(): void {
     ? ["皮肤信息", "资源配置", "面板样式", "动画效果", "按键音效", "轻量动画", "开关配置", "贴纸配置", "场景配置"]
     : ["皮肤", "资源配置", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "扩展配置", "扩展布局"]
   for (const group of groups) {
-    const grouped = entries.filter((entry) => entry.group === group && (
+    // An SSF skin's converted Baidu tree only feeds the preview, so it never shows up as a file.
+    const grouped = entries.filter((entry) => entry.group === group && !appState.archive?.isOverlay(entry.path) && (
       appState.archive?.names().includes(entry.path) ||
       appState.archive?.format === "bda" && (isBdaAppearancePartPath(entry.path) || Boolean(appState.bdaBase?.isText(bdaBasePath(entry.path))))
     ))
@@ -378,7 +379,7 @@ export function renderFiles(): void {
   const sourceNameCompare = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" }).compare
   type SourceNode = { folders: Map<string, SourceNode>; paths: string[] }
   const root: SourceNode = { folders: new Map(), paths: [] }
-  for (const path of appState.archive.names().filter((name) => !name.endsWith("/"))) {
+  for (const path of appState.archive.names().filter((name) => !name.endsWith("/") && !appState.archive?.isOverlay(name))) {
     const parts = path.split("/")
     let node = root
     for (const part of parts.slice(0, -1)) {
