@@ -86,6 +86,8 @@ export const appState = {
   fileOperationRunning: false,
   firstCandidateTextVisual: undefined as TextVisual | undefined,
   candidateTextWidth: DEFAULT_PANEL_WIDTH,
+  /** `[INPUT] BACK_STYLE` and the skin size it is drawn at; the box's width follows the input code. */
+  candidateInputBackground: undefined as { style: string; candidateWidth: number; height: number } | undefined,
   canvasLogicalSize: undefined as {
   width: number
   height: number

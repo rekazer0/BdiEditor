@@ -1304,6 +1304,14 @@ h2 {
   display: none;
 }
 
+#candidate-input-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding-inline: var(--candidate-input-inset, 0cqw);
+}
+
 #candidate-input-background {
   position: absolute;
   inset: 0;

@@ -44,6 +44,8 @@ function inputInset(width: number): number {
 type CandidateInputStyle = {
   foregroundStyle: string
   height: number
+  /** Space between the input code and the edges of its background box. */
+  inset: number
 }
 
 export function candidateInputForegroundStyle(
@@ -59,7 +61,7 @@ export function candidateInputForegroundStyle(
   ].map((value) => value?.trim() ?? "").find(Boolean) ?? ""
 }
 
-/** The input code row's background: the candidate layout's `[INPUT]` first, then the general one. */
+/** The input code box's background: the candidate layout's `[INPUT]` first, then the general one. */
 export function candidateInputBackgroundStyle(
   general: IniDocument | undefined,
   candidate?: IniDocument,
@@ -92,6 +94,6 @@ export function resolveCandidateInputStyle(
 ): CandidateInputStyle {
   const foregroundStyle = candidateInputForegroundStyle(general, candidate)
   const fontSize = resolver.resolveText(foregroundStyle, false)?.fontSize
-  const height = fontSize && fontSize > 0 ? fontSize + (inputInset(width) * 2) : 0
-  return { foregroundStyle, height }
+  const inset = fontSize && fontSize > 0 ? inputInset(width) : 0
+  return { foregroundStyle, height: fontSize && fontSize > 0 ? fontSize + inset * 2 : 0, inset }
 }
