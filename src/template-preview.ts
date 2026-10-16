@@ -9,7 +9,8 @@ import { readArchiveEntry } from "./skin-zip.ts"
 function isDemoImagePath(name: string): boolean {
   const segments = name.split("/")
   if (segments.some((segment) => segment === "__MACOSX" || segment.startsWith("._"))) return false
-  return segments[segments.length - 1]?.toLowerCase() === "demo.png"
+  // Sogou skins keep their preview as square_preview.png next to phoneTheme.ini.
+  return segments[segments.length - 1]?.toLowerCase() === "demo.png" || name.toLowerCase() === "square_preview.png"
 }
 
 function demoImageType(bytes: Uint8Array): string {

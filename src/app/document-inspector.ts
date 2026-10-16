@@ -15,7 +15,9 @@ import { bdaPanelKeyName, bdaStyleID } from "../bda.ts"
 import { updateBdaDesignWidth, updateBdaAnimationFrame } from "../bda-encode.ts"
 import { renderBdaMetadataEditor, renderBdaLayoutEditor, renderBdaConfigEditor } from "../bda-editor.ts"
 import { updateBdaRefs, updateSelectedBdaPanelProperty, updateBdaAppearanceStyleRef } from "./key-inspector"
-import { openBdaAnimationResourceChooser } from "./resource-inspector"
+import { openImageResourceChooser } from "./resource-inspector"
+import { populateSsfInspector } from "./ssf-inspector"
+import { disconnectSsfThumbnails } from "./ssf-fields"
 
 export const documentFieldLabels: Record<string, string> = {
   BACK_STYLE: "背景样式",
@@ -290,7 +292,12 @@ export function particleNumberStep(key: string): string {
 }
 
 export function populateDocumentInspector(): void {
+  disconnectSsfThumbnails()
   documentFields.replaceChildren()
+  if (appState.archive?.format === "ssf") {
+    documentFieldsGroup.hidden = !populateSsfInspector(documentFields)
+    return
+  }
   const hasSelection = appState.selectedPath === appState.layoutPath && appState.selectedKeySections.length > 0
   if (appState.archive?.format === "bda" || !appState.selectedDocument || hasSelection || !appState.archive?.isText(appState.selectedPath)) {
     documentFieldsGroup.hidden = true
@@ -650,7 +657,7 @@ export function populateBdaConfigInspector(): void {
     onAnimationFrame: (sequence, frame, property, value) => update(
       updateBdaAnimationFrame(bytes, sequence, frame, property, value),
     ),
-    onPickAnimationResource: (sequence, frame) => openBdaAnimationResourceChooser((resourceID) => update(
+    onPickAnimationResource: (sequence, frame) => openImageResourceChooser((resourceID) => update(
       updateBdaAnimationFrame(bytes, sequence, frame, "resourceID", resourceID),
     )),
   })

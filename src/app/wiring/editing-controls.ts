@@ -10,12 +10,13 @@ import { shouldClearMixedInput } from "../../mixed-input.ts"
 import { syncCandidateSelection, updateDevicePreview, refreshPreview, setGuidesVisible } from "../preview-render"
 import { setMobilePane, syncSegmentedControls, applyModeState, selectChoice, setMobileInspectorGroup, requestEditMode } from "../mobile-layout"
 import { ensureAiChat, aiDesignErrorMessage } from "../ai-panel"
+import { switchSsfPreviewLayout } from "../ssf-preview"
 import { preferredPath, createMissingVariant, bdaAvailableLayoutPaths, bdaAppearanceStyleGroups, bdaAppearanceStylePath } from "../bda-documents"
 import { renderFiles } from "../file-tree"
 import { selectFile } from "../navigation"
 import { IniDocument } from "../../ini.ts"
 import { populateTileInspector, setDrawingTile, duplicateSelectedTile, deleteSelectedTile, drawAtlas, atlasPoint, scheduleAtlasDraw, commitTile, updateSelectedTile } from "../tile-editing"
-import { isEditing } from "../edit-history"
+import { canvasEditable, isEditing } from "../edit-history"
 import { selectStyleResource, showResourceList, renderResourceInspector } from "../resource-inspector"
 import { revealSourceFile } from "../source-files"
 import { type BdaAppearanceStyleGroup } from "../../bda.ts"
@@ -162,6 +163,10 @@ export function wireEditingControls(): void {
   for (const control of [theme, orientation, layout]) {
     control.addEventListener("change", () => {
       const path = preferredPath()
+      // 切换外观或横竖屏时，搜狗皮肤停留在当前键盘（概览里选的可能不是 9 / 26 键）。
+      if (appState.archive?.format === "ssf") {
+        return switchSsfPreviewLayout(control === layout ? path : path.replace(/[^/]+$/, appState.layoutPath.split("/").pop()!))
+      }
       if (control !== layout && !createMissingVariant(path)) return
       let selected = false
       if (appState.archive?.format === "bda") {
@@ -460,7 +465,7 @@ export function wireEditingControls(): void {
     void runFileOperation("复制面板", copyPanel)
   })
   candidateArea.addEventListener("click", (event) => {
-    if (!isEditing()) return
+    if (!canvasEditable()) return
     if (event.target === toolbarCanvas && appState.selectedToolbarSections.length) return
     if (appState.archive?.format === "bda") {
       if (appState.selectedPath !== appState.layoutPath) selectFile(appState.layoutPath, "overview")

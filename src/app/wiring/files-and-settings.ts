@@ -1,4 +1,6 @@
-import { sourcePasteButton, sourceMoveButton, sourceDeleteButton, toolbarMenus, newButton, openButton, browserOpen, $, saveButton, mobileShareButton, checkUpdateButton, aboutDiagnostics, exportLogsButton, exportLogsStatus, copyQqGroupButton, appDialogButtons, settingsDialog, settingsStorageNav, settingsModelNav, settingsStorageSection, settingsModelSection, aiNewSession, aiDesignStatus, aiDesignPanel, aiDraftApply, aiDraftCancel, sourceDirectoryEnabled, sourceDirectory, chooseSourceDirectory, resetSourceDirectory, sourceDirectoryStatus, sidebarViewButtons, defaultDevice, device, canvasBackground, mobilePreviewPosition, hintPreviewEnabled, editorCrosshair, editorCoordinateSnap, appTheme, sourceFontSize, windowMaterial, windowMaterialOpacity, sidebarViewVisible, inspectorTabsVisible, sourceCompletionEnabled, sourceValueHintsEnabled, sourceLineExplanationEnabled, undoButton, redoButton, fileOperationDialog, canvasWrap, replaceAssetButton, imageOpen, assetBackButton, sourceColorPicker } from "../dom"
+import { sourceEditPath } from "../ssf-documents"
+import { requestEditMode } from "../mobile-layout"
+import { sourceUploadButton, sourcePasteButton, sourceMoveButton, sourceDeleteButton, toolbarMenus, newButton, openButton, browserOpen, $, saveButton, mobileShareButton, checkUpdateButton, aboutDiagnostics, exportLogsButton, exportLogsStatus, copyQqGroupButton, appDialogButtons, settingsDialog, settingsStorageNav, settingsModelNav, settingsStorageSection, settingsModelSection, aiNewSession, aiDesignStatus, aiDesignPanel, aiDraftApply, aiDraftCancel, sourceDirectoryEnabled, sourceDirectory, chooseSourceDirectory, resetSourceDirectory, sourceDirectoryStatus, sidebarViewButtons, defaultDevice, device, canvasBackground, mobilePreviewPosition, hintPreviewEnabled, editorCrosshair, editorCoordinateSnap, appTheme, sourceFontSize, windowMaterial, windowMaterialOpacity, sidebarViewVisible, inspectorTabsVisible, sourceCompletionEnabled, sourceValueHintsEnabled, sourceLineExplanationEnabled, undoButton, redoButton, fileOperationDialog, canvasWrap, replaceAssetButton, imageOpen, assetBackButton, sourceColorPicker } from "../dom"
 import { appState } from "../state"
 import { isEditing, commitBatch, prepareDocumentReplacement, undo, redo, commitBytes, updateDirty, commitText } from "../edit-history"
 import { sourceTargetFolder, sourceCopyPath, refreshAfterSourceMutation, setSourceTransfer, sourceSelection, sourcePaths, setSidebarView, revealSourceFile } from "../source-files"
@@ -6,7 +8,7 @@ import { type Change } from "../../history.ts"
 import { preview, source, scheduleSelectionInspectorSync, isTauri, exportButtons, settingsNavItems, isAndroidTauri, LAST_SOURCE_WORKSPACE_KEY, currentDeviceValue } from "../canvas-interaction"
 import { startNewDocument, newDocument } from "../new-document"
 import { runFileOperation, readBrowserSkinFile, showImage } from "../file-operations"
-import { openNative, saveArchive, currentExportFormat, shareArchiveToMobile, writeToChosenFile, isSupportedSkinPath, loadArchive, loadDroppedFile } from "../archive-io"
+import { openNative, saveArchive, currentExportFormat, shareArchiveToMobile, writeToChosenFile, isSupportedSkinPath, loadDroppedFile, openSkinBytes, UNSUPPORTED_SKIN_MESSAGE } from "../archive-io"
 import { recentFilesKey, recentPreviewCache, recentThumbRequest, renderRecentFiles } from "../recent-files"
 import { releaseArchivePreview, hydrateTemplateCardPreviews } from "../../template-preview"
 import { type ExportTarget } from "../../export.ts"
@@ -29,6 +31,13 @@ import { type SourceEditorCursorMove } from "../../lazy-source-editor.ts"
 
 /** 源文件工具栏、源码目录、设置项、窗口事件与拖放。只在启动时由 main.ts 按顺序调用一次。 */
 export function wireFilesAndSettings(): void {
+  for (const button of [sourceUploadButton, sourcePasteButton, sourceMoveButton, sourceDeleteButton]) {
+    button.addEventListener("click", (event) => {
+      if (isEditing()) return
+      event.stopImmediatePropagation()
+      requestEditMode()
+    }, { capture: true })
+  }
   sourcePasteButton.addEventListener("click", () => {
     if (!appState.archive || !isEditing() || !appState.sourceTransfer?.files.length) return
     const folder = sourceTargetFolder()
@@ -402,9 +411,8 @@ export function wireFilesAndSettings(): void {
     const file = browserOpen.files?.[0]
     if (file) {
       await runFileOperation("打开", async () => {
-        if (!isSupportedSkinPath(file.name)) throw new Error("仅支持 .bda、.bdi 或 .bds 皮肤文件")
-        await loadArchive(await readBrowserSkinFile(file), file.name)
-        return true
+        if (!isSupportedSkinPath(file.name)) throw new Error(UNSUPPORTED_SKIN_MESSAGE)
+        return openSkinBytes(await readBrowserSkinFile(file), file.name)
       })
     }
     browserOpen.value = ""
@@ -495,6 +503,13 @@ export function wireFilesAndSettings(): void {
       drawAtlas()
       updateDirty()
       scheduleSourceInputHighlight()
+      return
+    }
+    const sourcePath = sourceEditPath()
+    if (sourcePath !== appState.selectedPath) {
+      commitText(sourcePath, appState.archive.getText(sourcePath), source.value)
+      updateDirty()
+      scheduleSourceInputHighlight(true)
       return
     }
     const before = appState.selectedDocument?.toString() ?? appState.archive.getText(appState.selectedPath)

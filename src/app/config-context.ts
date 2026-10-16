@@ -15,7 +15,8 @@ import { isConfiguredSymbolLayout } from "../actions.ts"
 import { resolveCandidateRect, resolveCandidateInputStyle } from "../candidate-style.ts"
 import { bdaStyleID } from "../bda.ts"
 import { devicePreviewTransparent } from "./preview-render"
-import { isEditing } from "./edit-history"
+import { canvasEditable } from "./edit-history"
+import { isSsfBoardPath, ssfSelectedBindings } from "./ssf-documents"
 
 export function selectedSourceSections(): string[] {
   if (appState.resourceConfigActive && appState.selectedResourcePath) {
@@ -26,6 +27,8 @@ export function selectedSourceSections(): string[] {
   }
   const toolbarSections = isToolbarPath(appState.selectedPath) ? effectiveToolbarSections() : []
   if (toolbarSections.length) return toolbarSections
+  // A Sogou board's source is its phoneSkin.ini: the selected key's classes are what to reveal.
+  if (isSsfBoardPath(appState.selectedPath)) return ssfSelectedBindings().flatMap(({ binding }) => binding.sections)
   return appState.selectedPath === appState.layoutPath ? effectiveSelectedSections() : []
 }
 
@@ -122,9 +125,11 @@ export function isConfigLayoutPath(path: string): boolean {
 
 /**
  * 普通皮肤（bds/bdi）里所有布局文档都自带属性面板。
- * BDA 容器内的同名遗留文件由 bda 解析器处理，不能按普通布局文档放行。
+ * BDA 容器内的同名遗留文件由 bda 解析器处理，不能按普通布局文档放行；
+ * 搜狗皮肤的每个 INI 由 ssf-inspector.ts 按搜狗字段解析（预览用的转换布局除外）。
  */
 export function showsLayoutProperties(path: string): boolean {
+  if (appState.archive?.format === "ssf") return /\.ini$/i.test(path) && !appState.archive.isOverlay(path)
   return appState.archive?.format !== "bda" && isConfigLayoutPath(path)
 }
 
@@ -283,6 +288,6 @@ export function refreshToolbarPreview(
   toolbarDocument.set("CAND", "BACK_STYLE", "")
   toolbarPreview.setPanel("", width, height)
   toolbarPreview.setDocument(toolbarDocument)
-  toolbarPreview.setMode(isEditing() ? "edit" : "preview")
+  toolbarPreview.setMode(canvasEditable() ? "edit" : "preview")
   return { width, height, inputHeight }
 }

@@ -1,5 +1,5 @@
 import { styleImageResourceOpen, styleImageResourceClose, styleImageResourceSearch, theme, orientation, $, inspectorResizeHandle, styleAddButton, newStyleID, newStyleDialog, newStyleForm, layout, resourceUploadButton, resourceUploadInput, resourceDownloadButton, resourceDeleteButton, resourceDetail, device, clearSimulationButton, simulatedOutput, toolbarMenus, windowMaterial, mode } from "../dom"
-import { openStyleImageResourcePicker, closeStyleImageResourcePicker, clearImageSlicePicker, renderStyleImageResources, updateSelectedImageReference, pickerImageReference, resourcePickerPayload, selectImageResource } from "../image-pickers"
+import { openStyleImageResourcePicker, closeStyleImageResourcePicker, clearImageSlicePicker, renderStyleImageResources, updateSelectedImageReference, pickerImageReference, resourcePickerPayload, selectImageResource, pickableImagePaths } from "../image-pickers"
 import { appState } from "../state"
 import { isTauri, playSoundPath, syncDeviceControlIcon, clearSimulatedOutput } from "../canvas-interaction"
 import { listen, emitTo } from "@tauri-apps/api/event"
@@ -7,7 +7,7 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { type ProjectChoice } from "../../project-chooser"
 import { finishNativeProjectChoice } from "../new-document"
 import { emitStyleLibrary, applyStyleLibrarySelection, editStyleLibrarySelection, addStyleFromLibrary, nextStyleID, showNewStyleError, availableStyleIDs } from "../style-picker"
-import { isEditing, commitText, updateDirty, commitBatch, redo, undo, hasUnsavedChanges, prepareDocumentReplacement } from "../edit-history"
+import { canvasEditable, isEditing, commitText, updateDirty, commitBatch, redo, undo, hasUnsavedChanges, prepareDocumentReplacement } from "../edit-history"
 import { WHOLE_IMAGE_INDEX } from "../../slice-picker-canvas.ts"
 import { soundPathForFilename } from "../../sounds.ts"
 import { bindPaneResize, applyModeState } from "../mobile-layout"
@@ -23,7 +23,6 @@ import { type TileRect, duplicateTileSlice, nextTileIndex } from "../../tiles.ts
 import { type Change } from "../../history.ts"
 import { showStatus, runFileOperation, showError } from "../file-operations"
 import { resourceRootPath, setLayoutImageBytes, openLayoutImageDialog, syncLayoutImageConfig } from "../layout-image-replace"
-import { resourceImagePaths } from "../../resources.ts"
 import { writeToChosenFile, isSupportedSkinPath, loadDroppedPath, loadDroppedSourceWorkspace, loadNativePath, restoreLastSourceWorkspace } from "../archive-io"
 import { canvasBackgroundFromDevice } from "../../canvas-background.ts"
 import { applyCanvasBackground, applyWindowMaterialWithRetry, handleWindowMaterialError, sourceDirectoryInitialization, refreshUpdateStatus } from "../preferences"
@@ -237,7 +236,7 @@ export function wireResourcesAndStartup(): void {
       const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }))
       bitmap.close()
       if (appState.archive !== targetArchive || !isEditing()) return false
-      const paths = resourceImagePaths(appState.archive.names(), theme.value, orientation.value)
+      const paths = pickableImagePaths()
       const base = paths[0]?.split("/").slice(0, -1).join("/") ?? `${theme.value}/skin/${orientation.value}/res`
       const targetPath = `${base}/${file.name}`
       const before = appState.archive.getBytes(targetPath)
@@ -313,7 +312,7 @@ export function wireResourcesAndStartup(): void {
         moveSelectedTile(direction[0] * distance, direction[1] * distance, event.repeat)
         return
       }
-      if (!isEditing() || !appState.selectedKeySections.length || isTextEditingTarget(event.target)) return
+      if (!canvasEditable() || !appState.selectedKeySections.length || isTextEditingTarget(event.target)) return
       event.preventDefault()
       const distance = event.shiftKey ? 10 : 1
       moveSelectedKeys(direction[0] * distance, direction[1] * distance, appState.selectedKeySections, event.repeat)
@@ -347,7 +346,7 @@ export function wireResourcesAndStartup(): void {
     }
     if (
       (event.key === "Delete" || event.key === "Backspace") &&
-      isEditing() &&
+      canvasEditable() &&
       appState.selectedKeySections.length &&
       !isTextEditingTarget(event.target)
     ) {

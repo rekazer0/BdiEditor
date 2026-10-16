@@ -1,5 +1,5 @@
 import { clientLog, flushClientLogs } from "../client-log.ts"
-import { showSkinLoadProgress, waitForInterfacePaint, updateFileOperationProgress, showStatus, showError, runFileOperation, readNativeSkinFile, readBrowserSkinFile } from "./file-operations"
+import { showSkinLoadProgress, waitForInterfacePaint, updateFileOperationProgress, showStatus, showError, runFileOperation, readNativeSkinFile, readBrowserSkinFile, exportTargetHidden } from "./file-operations"
 import { flushSourceAutosave, activateSourceWorkspace, sourceFilesPayload, decodeBase64Archive, sourceArchiveFromFiles } from "./source-workspace"
 import { appState } from "./state"
 import { releaseKeySound, keySoundBuffers, sourceDirectoryEnabledBySettings, isTauri, isAndroidTauri, exportButtons, pendingSourcePaths, LAST_SOURCE_WORKSPACE_KEY, isIOSWeb, isAndroidWeb } from "./canvas-interaction"
@@ -11,7 +11,7 @@ import { releaseImagePreviewURL } from "../image-preview.ts"
 import { clearImageSlicePicker } from "./image-pickers"
 import { aiDesignStatus, aiDesignPanel, theme, device, canvasBackground, canvasWrap, documentName, saveButton, layout, fileOperationDialog, fileOperationClose } from "./dom"
 import { setAiDesignDraft, syncAiDesignContext } from "./ai-panel"
-import { syncSegmentedControls } from "./mobile-layout"
+import { applyModeState, syncSegmentedControls } from "./mobile-layout"
 import { canvasDeviceValue, type CanvasBackground } from "../canvas-background.ts"
 import { updateHistoryButtons, updateDirty, prepareDocumentReplacement } from "./edit-history"
 import { recordRecentFile } from "./recent-files"
@@ -20,13 +20,16 @@ import { bdaAvailableLayoutPaths, preferredPath, isBdaLayoutPath } from "./bda-d
 import { selectFile } from "./navigation"
 import { invoke } from "@tauri-apps/api/core"
 import { open, save } from "@tauri-apps/plugin-dialog"
-import { type SourceReadFilePayload, type ChosenFileData, type BrowserSaveFileHandle } from "./types"
+import { type SourceFilePayload, type ChosenFileData, type BrowserSaveFileHandle } from "./types"
 import { readFile, writeFile } from "@tauri-apps/plugin-fs"
 import { convertBdaArchive } from "../bda-convert.ts"
 import { flushNumberInputWheel } from "../number-input-wheel.ts"
+import { isSsfPath, looksLikeSsf } from "../ssf/ssf-package.ts"
+import { convertSsfDocument, exportSsf, ssfDocumentBytes } from "../ssf/ssf-convert.ts"
+import { rebuildSsfPreview, ssfTemplates } from "./ssf-preview"
 
 export async function loadArchive(
-  bytes: Uint8Array,
+  bytes: Uint8Array | SkinArchive,
   path: string,
   isNew = false,
   existingSourceWorkspace = "",
@@ -34,12 +37,15 @@ export async function loadArchive(
   sourcePrefix = "",
 ): Promise<void> {
   const started = performance.now()
+  const sizeBytes = bytes instanceof SkinArchive
+    ? bytes.sourceFiles().reduce((total, file) => total + file.data.byteLength, 0)
+    : bytes.byteLength
   clientLog.info("archive.load.start", {
     name: (displayName || path).split(/[\\/]/).pop() || (isNew ? "new-project" : "unnamed"),
-    sizeBytes: bytes.byteLength,
+    sizeBytes,
     sourceWorkspace: Boolean(existingSourceWorkspace),
   })
-  if (showSkinLoadProgress(bytes.byteLength)) await waitForInterfacePaint()
+  if (showSkinLoadProgress(sizeBytes)) await waitForInterfacePaint()
   await flushSourceAutosave()
   await activateSourceWorkspace("", "")
   appState.sourceWorkspacePendingArchive = undefined
@@ -48,7 +54,7 @@ export async function loadArchive(
   let nextArchive: SkinArchive
   try {
     updateFileOperationProgress(18, "正在解析皮肤包…")
-    nextArchive = await SkinArchive.openAsync(
+    nextArchive = bytes instanceof SkinArchive ? bytes : await SkinArchive.openAsync(
       bytes,
       exportFormatFromPath(displayName || path),
       appState.fileOperationProgressVisible
@@ -58,7 +64,7 @@ export async function loadArchive(
   } catch (error) {
     clientLog.error("archive.parse.error", {
       name: (displayName || path).split(/[\\/]/).pop() || "unnamed",
-      sizeBytes: bytes.byteLength,
+      sizeBytes,
       durationMs: Math.round(performance.now() - started),
     }, error)
     void flushClientLogs()
@@ -69,6 +75,10 @@ export async function loadArchive(
     const response = await fetch(new URL("bda-base.bds", document.baseURI))
     if (!response.ok) throw new Error("无法加载 BDA 官方基础布局")
     appState.bdaBase = await SkinArchive.openAsync(new Uint8Array(await response.arrayBuffer()))
+  }
+  if (nextArchive.format === "ssf") {
+    updateFileOperationProgress(52, "正在生成搜狗皮肤预览…")
+    await ssfTemplates()
   }
   const bdaWarnings = bdaCompatibilityWarnings(nextArchive)
   if (bdaWarnings.length) clientLog.info("bda.compatibility.warning", { warnings: bdaWarnings.join("；") })
@@ -83,6 +93,8 @@ export async function loadArchive(
   appState.assetURL = releaseImagePreviewURL(appState.assetURL)
   clearImageSlicePicker()
   appState.archive = nextArchive
+  const ssfWarnings = rebuildSsfPreview()
+  if (ssfWarnings.length) clientLog.info("ssf.preview.warning", { warnings: ssfWarnings.join("；") })
   appState.aiDesignConversationTarget = nextArchive
   appState.aiDesignConversation = []
   aiDesignStatus.textContent = ""
@@ -109,14 +121,13 @@ export async function loadArchive(
   appState.redoStack = []
   updateHistoryButtons()
   documentName.textContent = isNew
-    ? exportName("未命名", appState.archive.format)
+    ? exportName(displayName || "未命名", appState.archive.format)
     : displayName || path.split(/[\\/]/).pop() || "未命名皮肤"
   syncAiDesignContext()
   if (!isNew && isTauri() && path) recordRecentFile(path, documentName.textContent, existingSourceWorkspace)
   saveButton.disabled = false
   for (const button of exportButtons) {
-    const format = button.dataset.exportFormat as ExportTarget
-    button.hidden = appState.archive.format !== "bda" && format === "bda"
+    button.hidden = exportTargetHidden(button.dataset.exportFormat as ExportTarget)
     button.disabled = button.hidden
   }
   updateFileOperationProgress(68, "正在生成文件列表…")
@@ -137,6 +148,8 @@ export async function loadArchive(
     updateFileOperationProgress(82, "正在生成皮肤预览…")
     selectFile(initial)
   }
+  // The canvas edits keys only for Baidu skins, so the mode state follows the document's format.
+  applyModeState()
   updateFileOperationProgress(92, "正在连接源码工作区…")
   await activateSourceWorkspace(nextSourceWorkspace, sourcePrefix)
   if (pendingSourceDirectory !== undefined) {
@@ -188,7 +201,7 @@ export async function openNative(): Promise<boolean> {
   if (!(await prepareDocumentReplacement())) return false
   const path = await open({
     multiple: false,
-    filters: [{ name: "百度输入法皮肤", extensions: ["bdi", "bds", "bda"] }],
+    filters: [{ name: "输入法皮肤", extensions: ["bdi", "bds", "bda", "ssf", "mssf"] }],
   })
   if (typeof path !== "string") return false
   await loadNativePath(path)
@@ -206,7 +219,7 @@ export async function loadSourceWorkspace(path: string, skinPath = ""): Promise<
       : ""
     const name = decodedPath.split(/[\\/]/).filter(Boolean).pop() || "皮肤源码"
     const packed = SkinArchive.open(decodeBase64Archive(encoded))
-    await loadArchive(sourceArchiveFromFiles(packed.sourceFiles()).toBytes(), skinPath, false, path, skinPath ? "" : name, sourcePrefix)
+    await loadArchive(sourceArchiveFromFiles(packed.sourceFiles()), skinPath, false, path, skinPath ? "" : name, sourcePrefix)
     return true
   }
   // 整个源码目录读完才知道大小，先按皮肤包大小决定是否立即弹出进度，免得点了半天没反应。
@@ -214,7 +227,7 @@ export async function loadSourceWorkspace(path: string, skinPath = ""): Promise<
     updateFileOperationProgress(2, "正在读取源码目录…")
     await waitForInterfacePaint()
   }
-  const files = await invoke<SourceReadFilePayload[]>("open_source_workspace", { path })
+  const files = await invoke<SourceFilePayload[]>("open_source_workspace", { path })
   const directoryName = path.split(/[\\/]/).filter(Boolean).pop()?.toLowerCase() ?? ""
   const sourcePrefix = directoryName === "dark" || directoryName === "light"
     ? `${directoryName}/`
@@ -229,12 +242,12 @@ export async function loadSourceWorkspace(path: string, skinPath = ""): Promise<
         && !file.path.startsWith(sourcePrefix)
         ? `${sourcePrefix}${file.path}`
         : file.path,
-      data: new Uint8Array(file.data),
+      data: decodeBase64Archive(file.data),
     }))
   if (!sourceFiles.length) throw new Error("源码文件夹为空")
   const sourceArchive = sourceArchiveFromFiles(sourceFiles)
   const name = path.split(/[\\/]/).pop() || "皮肤源码"
-  await loadArchive(sourceArchive.toBytes(), skinPath, false, path, skinPath ? "" : name, sourcePrefix)
+  await loadArchive(sourceArchive, skinPath, false, path, skinPath ? "" : name, sourcePrefix)
   return true
 }
 
@@ -252,24 +265,32 @@ export async function restoreLastSourceWorkspace(): Promise<void> {
   })
 }
 
-export async function loadNativePath(path: string): Promise<boolean> {
-  if (!isSupportedSkinPath(path)) throw new Error("仅支持 .bda、.bdi 或 .bds 皮肤文件")
-  const bytes = path.startsWith("content://")
-    ? await readFile(path)
-    : await readNativeSkinFile(path)
-  await loadArchive(bytes, path)
+export const UNSUPPORTED_SKIN_MESSAGE = "仅支持 .bda、.bdi、.bds、.ssf 或 .mssf 皮肤文件"
+
+/** Opens a skin file's bytes; a Sogou skin is unpacked first when it uses the encrypted container. */
+export async function openSkinBytes(bytes: Uint8Array, path: string): Promise<boolean> {
+  // Android pickers return content:// URIs without the file name, so the bytes decide there.
+  const ssf = isSsfPath(path) || (path.startsWith("content://") && looksLikeSsf(bytes))
+  await loadArchive(ssf ? await ssfDocumentBytes(bytes) : bytes, path)
   return true
 }
 
+export async function loadNativePath(path: string): Promise<boolean> {
+  if (!isSupportedSkinPath(path)) throw new Error(UNSUPPORTED_SKIN_MESSAGE)
+  const bytes = path.startsWith("content://")
+    ? await readFile(path)
+    : await readNativeSkinFile(path)
+  return openSkinBytes(bytes, path)
+}
+
 export function isSupportedSkinPath(path: string): boolean {
-  return path.startsWith("content://") || /\.(bdi|bds|bda)$/i.test(path)
+  return path.startsWith("content://") || /\.(bdi|bds|bda|m?ssf)$/i.test(path)
 }
 
 export async function loadDroppedFile(file: File): Promise<boolean> {
   if (!isSupportedSkinPath(file.name)) return false
   if (!(await prepareDocumentReplacement())) return false
-  await loadArchive(await readBrowserSkinFile(file), file.name)
-  return true
+  return openSkinBytes(await readBrowserSkinFile(file), file.name)
 }
 
 export async function loadDroppedPath(path: string): Promise<boolean> {
@@ -288,7 +309,7 @@ export function currentExportFormat(): ExportFormat {
 }
 
 export function mobileShareFormat(): ExportFormat {
-  if (appState.archive?.format === "bda") return "bda"
+  if (appState.archive?.format === "bda" || appState.archive?.format === "ssf") return appState.archive.format
   if (isIOSWeb()) return "bdi"
   if (isAndroidTauri() || isAndroidWeb()) return "bds"
   return currentExportFormat()
@@ -297,7 +318,7 @@ export function mobileShareFormat(): ExportFormat {
 // `.sxi` is a Palm converter artifact rather than a skin package, so save dialogs label
 // it separately.
 function exportTargetLabel(format: ExportTarget): string {
-  return format === "sxi" ? "手心皮肤" : `${format.toUpperCase()} 皮肤`
+  return format === "sxi" ? "手心皮肤" : format === "ssf" ? "搜狗皮肤" : `${format.toUpperCase()} 皮肤`
 }
 
 export async function exportArchive(format: ExportTarget, targetBdaPlatform?: Exclude<BdaPlatform, "unknown">): Promise<{
@@ -308,6 +329,7 @@ export async function exportArchive(format: ExportTarget, targetBdaPlatform?: Ex
   if (!appState.archive) throw new Error("当前没有可保存的皮肤")
   if (appState.aiDraftPreview) throw new Error("请先应用或丢弃 AI 修改草稿")
   if (format === "sxi") {
+    if (appState.archive.format === "ssf") throw new Error("搜狗皮肤请先导出为百度皮肤，再转换为手心皮肤")
     updateFileOperationProgress(22, "正在导出手心皮肤…")
     await waitForInterfacePaint()
     let source: SkinArchive = appState.archive
@@ -323,6 +345,29 @@ export async function exportArchive(format: ExportTarget, targetBdaPlatform?: Ex
     }
     const result = buildSxiZip(source)
     if (result.warnings.length) clientLog.info("sxi.export.warning", { warnings: result.warnings.join("；") })
+    return { bytes: result.bytes, converted: true, warnings: result.warnings }
+  }
+  if (appState.archive.format === "ssf" && format !== "ssf") {
+    updateFileOperationProgress(22, `正在转换为 ${format.toUpperCase()}…`)
+    await waitForInterfacePaint()
+    const result = await convertSsfDocument(appState.archive, format, await ssfTemplates())
+    if (result.warnings.length && !window.confirm(
+      `搜狗皮肤转换为 ${format.toUpperCase()} 时将降级以下内容：\n\n${result.warnings.join("\n")}\n\n继续导出吗？`,
+    )) return
+    // The converter writes Android BDA; iOS gets the same platform conversion as any BDA.
+    const bytes = format === "bda" && targetBdaPlatform === "ios"
+      ? await convertBdaPlatform(SkinArchive.open(result.bytes, "bda"), "ios").toBytesAsync()
+      : result.bytes
+    return { bytes, converted: true, warnings: result.warnings }
+  }
+  if (format === "ssf") {
+    if (appState.archive.format === "ssf") return { bytes: await appState.archive.toBytesAsync("ssf"), converted: false, warnings: [] }
+    updateFileOperationProgress(22, "正在导出搜狗皮肤…")
+    await waitForInterfacePaint()
+    const result = await exportSsf(appState.archive, appState.bdaBase)
+    if (result.warnings.length && !window.confirm(
+      `转换为搜狗皮肤时将降级以下内容：\n\n${result.warnings.join("\n")}\n\n继续导出吗？`,
+    )) return
     return { bytes: result.bytes, converted: true, warnings: result.warnings }
   }
   updateFileOperationProgress(22, `正在生成 ${format.toUpperCase()} 皮肤包…`)

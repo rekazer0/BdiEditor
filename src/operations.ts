@@ -19,6 +19,7 @@ function fetchPublicAsset(path: string): ReturnType<typeof fetch> {
 const builtInProjectTemplatePaths: Record<string, string> = {
   "default-android": "/default-template.bda",
   "official-android-bds": "/default-template.bds",
+  "official-sogou": "/sogou-template.bds",
   "oppo-swipe-down": "/templates/oppo-swipe-down.bds",
   "oppo-dual-color": "/templates/oppo-dual-color.bds",
   "iqoo-rounded-black": "/templates/iqoo-rounded-black.bds",

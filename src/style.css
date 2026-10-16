@@ -9005,8 +9005,8 @@ main {
     background: var(--material-panel);
   }
 
-  /* Dock: a thin strip with two page indicators. Panes switch by swiping sideways (or tapping
-     an indicator); the rest of the strip is the grab handle that resizes the split. */
+  /* Dock: a thin strip with two page indicators. Panes switch by swiping sideways; the whole
+     strip, indicators included, is the grab handle that resizes or collapses the split. */
 
   :root body .mobile-workspace-tabs {
     height: var(--mobile-dock-h);
@@ -9020,6 +9020,7 @@ main {
   :root body .mobile-workspace-tabs button[data-mobile-pane] {
     position: relative;
     z-index: 3;
+    pointer-events: none;
     flex: none;
     width: 30px;
     height: 100%;

@@ -128,6 +128,7 @@ export function installNumberInputWheel(root: NumberInputRoot = document, option
     if (!isEditableNumberInput(key.target)) return
     key.preventDefault()
     nudge(key.target, key.key === "ArrowUp" ? SHIFT_STEPS : -SHIFT_STEPS)
+    flush()
     finishWhenIdle()
   })
   // 按住数值的标签或单位前缀左右拖动来调整（scrubbing）；按住 Shift 每格 10。没拖动就是普通点击，聚焦输入框。
@@ -176,7 +177,11 @@ export function installNumberInputWheel(root: NumberInputRoot = document, option
   })
   // Flush before selection, typing, save and undo handlers see the new context.
   root.addEventListener("pointerdown", finish, true)
-  root.addEventListener("keydown", finish, true)
+  root.addEventListener("keydown", (event) => {
+    const key = event as KeyboardEvent
+    if (isEditableNumberInput(key.target) && (key.key === "Shift" || key.shiftKey && (key.key === "ArrowUp" || key.key === "ArrowDown"))) return
+    finish()
+  }, true)
   root.addEventListener("focusout", () => { if (!dispatchSession) finish() }, true)
   window.addEventListener("blur", finish)
   document.addEventListener("visibilitychange", () => { if (document.hidden) finish() })

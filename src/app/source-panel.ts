@@ -1,3 +1,4 @@
+import { sourceEditPath } from "./ssf-documents"
 import { syncAtlasWorkspace } from "./tile-editing"
 import { files, sourceName, quickInspector, asset, resourceInspector, sourceEditor, aiDesignPanel, sourceToolbar, sourceFindToggle, sourceSearch, sourceValueHintsEnabled, sourceCompletionEnabled, sourceLineExplanationEnabled, sourceSearchCount, sourceSearchPrevious, sourceSearchNext, sourceReplacement, sourceReplace, sourceReplaceAll, sourceColorPicker, styleImageDialog, sourceStyleProxy } from "./dom"
 import { appState } from "./state"
@@ -303,7 +304,7 @@ export function openSourceStylePicker(range: SourceEditorValueRange): void {
  */
 export function selectKeyFromSourceOffset(offset: number): void {
   if (!isEditing() || !appState.archive || !appState.selectedPath) return
-  if (appState.selectedPath !== appState.layoutPath) return
+  if (appState.selectedPath !== appState.layoutPath || sourceEditPath() !== appState.selectedPath) return
   const bdaSource = appState.archive.format === "bda" && (
     appState.archive.isBdaConfig(appState.selectedPath) || isBdaVirtualTextPath(appState.selectedPath) || isBdaAppearancePartPath(appState.selectedPath)
   )

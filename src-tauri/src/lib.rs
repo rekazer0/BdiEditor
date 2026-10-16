@@ -158,7 +158,7 @@ fn read_client_log_path(directory: &Path) -> Result<Vec<ClientLogFile>, String> 
         .collect()
 }
 
-#[derive(Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SourceFile {
     path: String,
@@ -265,6 +265,17 @@ fn source_paths(files: &[SourceFile]) -> Result<Vec<String>, String> {
         paths.push(file.path.clone());
     }
     Ok(paths)
+}
+
+// Binary resources must not cross IPC as one JSON number per byte.
+fn encode_source_files(files: Vec<SourceFile>) -> Vec<EncodedSourceFile> {
+    files
+        .into_iter()
+        .map(|file| EncodedSourceFile {
+            path: file.path,
+            data: BASE64_STANDARD.encode(file.data),
+        })
+        .collect()
 }
 
 fn decode_source_files(files: Vec<EncodedSourceFile>) -> Result<Vec<SourceFile>, String> {
@@ -512,14 +523,14 @@ async fn create_source_workspace(
 async fn open_source_workspace(
     app: tauri::AppHandle,
     path: String,
-) -> Result<Vec<SourceFile>, String> {
+) -> Result<Vec<EncodedSourceFile>, String> {
     #[cfg(target_os = "android")]
     if path.starts_with("content://") {
         let value = tauri_plugin_native_share::read_source_workspace(&app, path).await?;
         let files: Vec<SourceFile> =
             serde_json::from_value(value).map_err(|error| error.to_string())?;
         source_paths(&files)?;
-        return Ok(files);
+        return Ok(encode_source_files(files));
     }
     let directory = fs::canonicalize(path).map_err(|error| error.to_string())?;
     let files = read_source_files(&directory)?;
@@ -534,7 +545,7 @@ async fn open_source_workspace(
     app.fs_scope()
         .allow_directory(&directory, true)
         .map_err(|error| error.to_string())?;
-    Ok(files)
+    Ok(encode_source_files(files))
 }
 
 #[tauri::command]
@@ -1547,6 +1558,23 @@ mod tests {
         assert!(!root.join("workspace-0").exists());
         assert!(unmanaged.is_dir());
         fs::remove_dir_all(root).expect("cleanup source root");
+    }
+
+    #[test]
+    fn source_transfer_round_trips_binary_files_as_base64() {
+        let files = vec![
+            super::SourceFile {
+                path: "1080/图片.png".into(),
+                data: (0..=255).collect(),
+            },
+            super::SourceFile {
+                path: "empty.ini".into(),
+                data: Vec::new(),
+            },
+        ];
+        let encoded = super::encode_source_files(files.clone());
+        assert!(serde_json::to_value(&encoded).unwrap()[0]["data"].is_string());
+        assert_eq!(super::decode_source_files(encoded).unwrap(), files);
     }
 
     #[test]

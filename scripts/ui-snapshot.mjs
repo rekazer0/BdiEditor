@@ -6,6 +6,7 @@
 import { chromium } from "playwright"
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
+import { ssfFixture } from "../tests/helpers/ssf-fixture.mjs"
 
 const mode = process.argv[2] ?? "compare"
 const only = process.argv[3]
@@ -130,6 +131,20 @@ await withPage(async (page) => {
   await capture(page, "bda-key")
   await railTabs(page, "bda-key")
 })
+for (const colorScheme of ["light", "dark"]) await withPage(async (page) => {
+  await page.locator("#browser-open").setInputFiles({ name: "检查器.ssf", mimeType: "application/octet-stream", buffer: Buffer.from(ssfFixture()) })
+  await page.waitForFunction(() => !document.querySelector("#open")?.disabled)
+  const close = page.locator("#file-operation-dialog[open] #file-operation-close")
+  if (await close.isVisible()) await close.click()
+  await page.getByRole("button", { name: "编辑模式", exact: true }).click()
+  await page.getByRole("combobox", { name: "预览布局", exact: true }).selectOption("py_26.ini")
+  await capture(page, `${colorScheme}-ssf-board`)
+  const box = await page.locator("#preview").boundingBox()
+  await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.4)
+  await page.waitForSelector('#document-fields [data-inspector-group-label="背景"]')
+  await capture(page, `${colorScheme}-ssf-key`)
+  await railTabs(page, `${colorScheme}-ssf-key`)
+}, { colorScheme })
 await withPage(async (page) => {
   await openTemplate(page, "official-android-bds")
   await editAndSelectKey(page)

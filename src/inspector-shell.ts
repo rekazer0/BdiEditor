@@ -27,6 +27,7 @@ const SECTION_SELECTOR = ":is(.inspector-group, .document-property-section, .bda
 const ROW_SELECTOR = ".ui-field, .document-property-field, .bda-text-field, .bda-readonly-field, .bda-range-field, .bda-color-field, .fore-style-reference-field, .inspector-gesture"
 const SCRUB_HANDLES = ".ui-input > .ui-input-affix, .ui-field > span:first-child, .document-field-caption"
 const baselines = new WeakMap<HTMLElement, string>()
+const keyedBaselines = new Map<string, string>()
 let rows: Row[] = []
 let filterQuery = ""
 
@@ -100,6 +101,9 @@ function applyFilter(): void {
     }
     for (const details of Array.from(section.querySelectorAll("details"))) {
       details.toggleAttribute("data-filter-miss", !sectionRows.some((row) => hits.has(row) && details.contains(row)))
+    }
+    for (const block of Array.from(section.querySelectorAll(".ui-subsection"))) {
+      block.toggleAttribute("data-filter-miss", Boolean(query) && !sectionHit && ![...hits].some((row) => block.contains(row)))
     }
     const visibleHits = [...hits].filter((row) => !isHidden(row, section)).length
     section.toggleAttribute("data-filter-miss", Boolean(query) && !sectionHit && visibleHits === 0)
@@ -183,7 +187,7 @@ function resetButton(): HTMLButtonElement | null {
 }
 
 function rowValue(row: Row): string {
-  return JSON.stringify(row.inputs.map(valueOf))
+  return row.el.dataset.inspectorValue ?? JSON.stringify(row.inputs.map(valueOf))
 }
 
 function collectRows(): void {
@@ -198,7 +202,10 @@ function collectRows(): void {
   }
   rows = Array.from(grouped, ([el, inputs]) => {
     const row = { el, inputs }
+    const key = el.dataset.inspectorRowKey
+    if (key && keyedBaselines.has(key)) baselines.set(el, keyedBaselines.get(key)!)
     if (!baselines.has(el)) baselines.set(el, rowValue(row))
+    if (key && !keyedBaselines.has(key)) keyedBaselines.set(key, baselines.get(el)!)
     return row
   })
 }
@@ -235,6 +242,10 @@ function updateStatus(): void {
 }
 
 function revertRow(row: Row): void {
+  if (row.el.dataset.inspectorValue !== undefined) {
+    row.el.dispatchEvent(new CustomEvent("inspector-reset", { cancelable: true, detail: baselines.get(row.el) }))
+    return
+  }
   const values = JSON.parse(baselines.get(row.el) ?? "[]") as string[]
   const restore = () => row.inputs.forEach((input, index) => {
     if (input instanceof HTMLInputElement && input.type === "checkbox") input.checked = values[index] === "true"
@@ -306,6 +317,21 @@ function syncGestures(): void {
   if (count) count.textContent = `${cells.filter((cell) => cell.classList.contains("configured")).length} / ${cells.length}`
 }
 
+// WebKit 不会按位图内存及时触发 GC；移除的缩略图主动释放，同步复用的画布保留。
+function releaseRemovedCanvases(records: MutationRecord[]): void {
+  for (const record of records) {
+    for (const node of record.removedNodes) {
+      if (!(node instanceof Element) || node.isConnected) continue
+      const canvases = node instanceof HTMLCanvasElement ? [node] : node.querySelectorAll("canvas")
+      for (const canvas of canvases) {
+        if (canvas.isConnected) continue
+        canvas.width = 0
+        canvas.height = 0
+      }
+    }
+  }
+}
+
 export function initInspectorShell(): void {
   renderEmptyState()
   decorateSections()
@@ -320,7 +346,8 @@ export function initInspectorShell(): void {
   root.addEventListener("change", onInspectorInput, true)
 
   let scheduled = false
-  const observer = new MutationObserver(() => {
+  const observer = new MutationObserver((records) => {
+    releaseRemovedCanvases(records)
     if (scheduled) return
     scheduled = true
     requestAnimationFrame(() => {
@@ -347,10 +374,13 @@ let selectionContext = ""
 export function syncInspectorRows(context: string): void {
   const fresh = context !== selectionContext
   selectionContext = context
+  if (fresh) keyedBaselines.clear()
   collectRows()
   for (const row of rows) {
     if (fresh) baselines.set(row.el, rowValue(row))
-    if (fresh || rowValue(row) === baselines.get(row.el)) markRow(row, false)
+    if (fresh && row.el.dataset.inspectorRowKey) keyedBaselines.set(row.el.dataset.inspectorRowKey, rowValue(row))
+    if (row.el.dataset.inspectorValue !== undefined) markRow(row, !fresh && rowValue(row) !== baselines.get(row.el))
+    else if (fresh || rowValue(row) === baselines.get(row.el)) markRow(row, false)
   }
   updateStatus()
   syncGestures()

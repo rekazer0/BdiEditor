@@ -29,6 +29,34 @@ const BDA_SKILL = `## 皮肤格式技能（BDA）
 - 按键通过样式引用（type 为 image/text/color，key 为样式表中的序号）指向样式；按键显示文字、字体、颜色要到被引用的 textStyles / colorStyles 条目中修改，不要改按键的动作字段。
 - 用 read_project_file 读取后，用 replace_project_text 做唯一、精确的小片段替换；同一样式可能被多个按键共享，需在总结中说明影响范围。`
 
-export function aiSkinSkill(format: "bdi" | "bds" | "bda"): string {
-  return format === "bda" ? BDA_SKILL : INI_SKILL
+// 规则须与 ssf/ssf-parts.ts、ssf/ssf-keymap.ts 的实际解析保持一致。
+const SSF_SKILL = `## 皮肤格式技能（搜狗 SSF）
+
+### 文件分工
+- \`phoneTheme.ini\`：皮肤名称（skin_name）、作者、版本。
+- \`time.ini\`：哪个外观文件夹（statusN）在哪些时段显示；中午显示的是白天外观，另一个是夜间外观。
+- \`<分辨率>/<statusN>/phoneSkin.ini\`：当前外观的主文件，按键类、背景图、文字颜色、候选栏、键盘背景都在这里。
+- \`<分辨率>/<statusN>/keys.ini\`：按键前景图（FG_IMAGES、FG_RECT）和按键动画引用（ANIM_STYLE）。
+- \`<分辨率>/<statusN>/anim.ini\`：按键动画。
+- \`default/sound_android.ini\`：按键音效。[Key] 是默认音效；sound= 填 default/ 下的音频文件名（不含扩展名）。
+- 图片先在 statusN 文件夹找，找不到再依次找 \`<分辨率>/\`、\`default/\`。
+
+### 解析规则（最重要）
+- 搜狗皮肤不含按键位置：按键排布由搜狗输入法决定，不能增删按键或改几何，只改视觉。
+- 按键类是配置节：全键字母 [Key_A]，九键字母组 [Key_ABC]，九键功能键 [Key_Backspace]、[Key_Enter]，全键功能键加 _Qwerty（[Key_Backspace_Qwerty]）。横屏先读 _Land 变体（[Key_A_Land]）。
+- 背景：按键类的 BG_IMAGES=段名，该段的 NORMAL / PRESSED（以及 DISABLED、NORMAL_ON、PRESSED_ON）是各状态图片。值格式 \`图片.png,左,右,上,下\`，后四个数是九宫格可拉伸的像素区间，换图时保留。
+- 按键类没有可用的 BG_IMAGES 时用共享默认段：九键 KeyBg_Default、功能键 KeyBg_Function、空格 KeyBg_Space；全键 KeyBg_Default_Latin、KeyBg_Function_Qwerty、KeyBg_Space_Qwerty。
+- 前景：keys.ini 里按键类的 FG_IMAGES=段名，该段 NORMAL / PRESSED 是前景图，FG_RECT=x,y,宽,高 是占按键的比例；没有时用 phoneSkin.ini 按键类的 ICON / ICON_PRESSED。
+- 文字颜色：TEXT_COLOR / TEXT_COLOR_PRESSED，格式 0xAARRGGBB。按键类自己没写时依次用：全键 TextStyle_Qwerty、九键 TextStyle_Phone_Label（功能键 TextStyle_FuncKey_26char / TextStyle_FuncKey_T9，空格 TextStyle_Space_Label），最后 TextStyle。功能键图标颜色在 [General] ICON_COLOR / HIGH_LIGHT_ICON_COLOR。
+- 键盘背景 [RootView] BG_IMAGE；候选栏 [CandidateView] BG_IMAGE=段名，该段 NORMAL 是候选栏图片；候选字 [TextStyle_Candidate]、首选 [TextStyle_Candidate_Highlight]；输入码 [ComposingView] BG_COLOR 与 [TextStyle_Composing]。
+- 同名配置节可能出现两次，第一次出现的值生效。
+
+### 推荐工作流
+1. 用 read_ini_sections 读取目标按键类，按上面的规则找到真正提供背景、前景或颜色的段，再读取那个段。
+2. 共享段（默认背景、TextStyle）会影响同类的所有按键；只改一个键时，用 add_ini_section 复制出新段（如 SMA_Key_A），再让该按键类的 BG_IMAGES 指向它，或把 TEXT_COLOR 写进按键类自己的节。
+3. 图片颜色要改像素时，按段里的文件名用 view_image / recolor_image 修改对应 PNG。
+4. 改完复读被改的节确认结果，在总结中说明影响范围。`
+
+export function aiSkinSkill(format: "bdi" | "bds" | "bda" | "ssf"): string {
+  return format === "bda" ? BDA_SKILL : format === "ssf" ? SSF_SKILL : INI_SKILL
 }

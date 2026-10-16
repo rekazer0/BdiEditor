@@ -2,6 +2,7 @@ import { installClientLogging } from "../../client-log.ts"
 import { installSafeAreaLock } from "../../safe-area.ts"
 import { isTauri, scrollbarIdleTimers, source, schedulePointerCoordinates, mobileShareLabel, mobileShareMenuLabel, mobileCommandButtons, mobileCommandTarget, syncMobileCommands, mobilePortraitQuery, preview, toolbarPreview, keyboardFields } from "../canvas-interaction"
 import { installNumberInputWheel } from "../../number-input-wheel.ts"
+import { wheelZoomFactor } from "../../wheel-zoom.ts"
 import { mixedCoordinateDelta } from "../../mixed-input.ts"
 import { moveSelectedKeys, selectParentObject } from "../key-editing"
 import { renderSourceValueThumbnail, updateSourceFindVisibility } from "../source-panel"
@@ -10,7 +11,7 @@ import { appState } from "../state"
 import { hydrateIcons } from "../../icons"
 import { syncSinglePageInspectorGroup, setMobileSplit, setMobilePane, syncMobileInspectorHeader, setMobilePreviewCollapsed } from "../mobile-layout"
 import { measureCanvasWrapInnerSize, scheduleFitCanvasPreview, applyPreviewZoom, setPreviewPan, finishPreviewPan, schedulePreviewPan } from "../preview-render"
-import { isEditing } from "../edit-history"
+import { canvasEditable, isEditing } from "../edit-history"
 import { chooseStyleImageSlice, clearImagePreviewError, showImagePreviewError } from "../resource-inspector"
 import { replacedSourceStyle } from "../../source-value-ranges.ts"
 import { applyStyleLibrarySelection, editStyleLibrarySelection, renderStylePicker, addStyleFromLibrary } from "../style-picker"
@@ -282,10 +283,7 @@ export function wireCanvasAndInspector(): void {
     if (deviceShell.hidden || canvasWrap.classList.contains("empty")) return
     event.preventDefault()
     if (appState.previewPanLocked) return
-    applyPreviewZoom(
-      appState.previewZoom + (event.deltaY < 0 ? 0.1 : -0.1),
-      { x: event.clientX, y: event.clientY },
-    )
+    applyPreviewZoom(appState.previewZoom * wheelZoomFactor(event), { x: event.clientX, y: event.clientY })
   }, { passive: false })
   // 触摸屏双指缩放：两指间距决定缩放，中点移动带动平移。捕获阶段处理，避免被画布内的按键拖动截走。
   const touches = new Map<number, { x: number; y: number }>()
@@ -331,7 +329,7 @@ export function wireCanvasAndInspector(): void {
       appState.previewPanLocked ||
       event.pointerType === "touch" ||
       deviceShell.hidden ||
-      isEditing() && appState.keyMode === "move" && previewPanelViewport.contains(event.target as Node)
+      canvasEditable() && appState.keyMode === "move" && previewPanelViewport.contains(event.target as Node)
     ) return
     appState.previewPanCandidate = {
       pointerId: event.pointerId,
@@ -343,7 +341,7 @@ export function wireCanvasAndInspector(): void {
     canvasWrap.classList.add("preview-pan-ready")
   })
   canvasWrap.addEventListener("pointermove", (event) => {
-    if (isEditing() && appState.keyMode === "move" && previewPanelViewport.contains(event.target as Node)) return
+    if (canvasEditable() && appState.keyMode === "move" && previewPanelViewport.contains(event.target as Node)) return
     if (!appState.previewPanStart && appState.previewPanCandidate?.pointerId === event.pointerId) {
       const dx = event.clientX - appState.previewPanCandidate.x
       const dy = event.clientY - appState.previewPanCandidate.y

@@ -8,8 +8,11 @@ const main = appSource()
 test("every selected INI layout can open its property inspector", () => {
   // ini / cnd / pop 都是属性面板能描述并回写的布局配置文档。
   assert.match(main, /function isConfigLayoutPath\(path: string\): boolean \{\s*return \/\\\.\(ini\|cnd\|pop\)\$\/i\.test\(path\)/)
-  // BDA 容器里的同名遗留文件由 bda 解析器处理，不能按普通布局文档放行。
-  assert.match(main, /function showsLayoutProperties\(path: string\): boolean \{\s*return appState\.archive\?\.format !== "bda" && isConfigLayoutPath\(path\)/)
+  // BDA 容器里的同名遗留文件由 bda 解析器处理，不能按普通布局文档放行；
+  // 搜狗皮肤的 INI 由搜狗检查器解析，预览用的转换布局不算皮肤文件。
+  assert.match(main, /function showsLayoutProperties\(path: string\): boolean \{\s*if \(appState\.archive\?\.format === "ssf"\) return \/\\\.ini\$\/i\.test\(path\) && !appState\.archive\.isOverlay\(path\)\s*return appState\.archive\?\.format !== "bda" && isConfigLayoutPath\(path\)/)
+  // 搜狗皮肤的属性由 ssf-inspector.ts 填进文档分区，不走百度的文档解释。
+  assert.match(main, /if \(appState\.archive\?\.format === "ssf"\) \{\s*documentFieldsGroup\.hidden = !populateSsfInspector\(documentFields\)/)
   // 从任意侧边栏点开布局文件都落到属性页。
   assert.match(main, /preferredSidebarView === "overview" \|\| showsLayoutProperties\(path\)/)
   // “源文件”侧边栏不再把布局文件顶到源代码页。

@@ -179,7 +179,8 @@ for (const viewport of portraitPhones) {
     await openTemplate(page)
     const hidden = await rect(page, "main > .source")
     assert.ok(hidden.x >= viewport.width - 1, `inspector stays off screen on the layout pane (x ${hidden.x})`)
-    await page.locator('button[data-mobile-pane="inspector"]').click()
+    // indicators are pointer-transparent (the dock is the split handle); switch via keyboard
+    await page.locator('button[data-mobile-pane="inspector"]').press("Enter")
     await page.waitForTimeout(350)
     const source = await rect(page, "main > .source")
     assert.ok(source.x >= -1 && source.right <= viewport.width + 1, "inspector slides in")

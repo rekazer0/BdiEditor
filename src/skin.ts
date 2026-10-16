@@ -12,6 +12,7 @@ type PackageLayout =
   | "bds-single"
   | "bda-dual"
   | "bda-single"
+  | "ssf"
   | "legacy-ios"
 
 type BdaTheme = "light" | "dark"
@@ -60,6 +61,9 @@ function packageInfo(files: Map<string, Uint8Array>, formatHint?: ExportFormat):
   const bdaRoots = bdaThemeRoots(files)
   if (formatHint === "bda" && !bdaRoots) throw new Error("BDA 皮肤缺少 port/land appearanceConfig")
   if (bdaRoots) return { layout: bdaRoots.size > 1 ? "bda-dual" : "bda-single", bdaRoots }
+  // A Sogou phone skin keeps its own folder layout, so its paths are used as they are. Without a
+  // file name (Android content:// URIs) its phoneTheme.ini identifies it.
+  if (formatHint === "ssf" || !formatHint && names.includes("phoneTheme.ini")) return { layout: "ssf" }
   if (names.some((name) => /^skin\/(?:dark|light)\/skin\//.test(name))) return { layout: "bdi-dual" }
   if (names.some((name) => /^skin\/(?:land|port|res)\//.test(name))) return { layout: "bdi-single" }
   if (names.some((name) => /^(?:dark|light)\/(?:land|port|res)\//.test(name))) return { layout: "bds-dual" }
@@ -68,6 +72,7 @@ function packageInfo(files: Map<string, Uint8Array>, formatHint?: ExportFormat):
 }
 
 function canonicalPath(path: string, layout: PackageLayout, bdaRoots?: Map<BdaTheme, string>): string {
+  if (layout === "ssf") return path
   // Hand-made packages ship info.txt / INFO.TXT; the IME only reads Info.txt, so conversions must rename it.
   path = path.replace(/(^|\/)info\.txt$/i, "$1Info.txt")
   if (layout === "bdi-dual") {
@@ -156,6 +161,13 @@ function targetPath(path: string, format: ExportFormat, single: boolean): string
   return themed ? `${themed[1]}/${themed[2]}` : path
 }
 
+/** BDA and SSF each have their own configuration format; only BDI and BDS repackage into each other. */
+function assertRepackable(from: ExportFormat, to: ExportFormat | undefined): void {
+  if (!to || to === from) return
+  if (from === "bda" || to === "bda") throw new Error("BDA 与 BDI/BDS 使用不同配置格式，不能转换")
+  if (from === "ssf" || to === "ssf") throw new Error("搜狗皮肤与百度皮肤使用不同配置格式，需要经过转换")
+}
+
 export class SkinArchive {
   private files: Map<string, Uint8Array>
   private originals: Map<string, Uint8Array>
@@ -166,6 +178,8 @@ export class SkinArchive {
   private canonicalToRaw = new Map<string, string>()
   private cachedNames?: string[]
   private changedRaw = new Set<string>()
+  /** Read-only files listed and read next to the package but never saved (an SSF skin's converted Baidu tree). */
+  private overlay = new Map<string, Uint8Array>()
   readonly changed = new Set<string>()
   /** Bumped whenever file contents or paths change, so callers can skip redundant redraws. */
   revision = 0
@@ -194,6 +208,7 @@ export class SkinArchive {
   }
 
   get format(): ExportFormat {
+    if (this.layout === "ssf") return "ssf"
     if (this.layout.startsWith("bda")) return "bda"
     return this.layout.startsWith("bds") ? "bds" : "bdi"
   }
@@ -249,8 +264,19 @@ export class SkinArchive {
   }
 
   names(): string[] {
-    this.cachedNames ??= [...this.canonicalToRaw.keys()].sort()
+    this.cachedNames ??= [...new Set([...this.canonicalToRaw.keys(), ...this.overlay.keys()])].sort()
     return this.cachedNames.slice()
+  }
+
+  /** Replaces the read-only overlay; package files of the same path still win. */
+  setOverlay(files: Map<string, Uint8Array>): void {
+    this.overlay = files
+    this.cachedNames = undefined
+    this.revision++
+  }
+
+  isOverlay(path: string): boolean {
+    return !this.canonicalToRaw.has(path) && this.overlay.has(path)
   }
 
   sourceFiles(): Array<{ path: string; data: Uint8Array }> {
@@ -293,7 +319,7 @@ export class SkinArchive {
   }
 
   getBytes(path: string): Uint8Array | undefined {
-    return this.files.get(this.canonicalToRaw.get(path) ?? path)
+    return this.files.get(this.canonicalToRaw.get(path) ?? path) ?? this.overlay.get(path)
   }
 
   getText(path: string): string {
@@ -307,6 +333,7 @@ export class SkinArchive {
   }
 
   setBytes(path: string, bytes: Uint8Array): void {
+    if (this.isOverlay(path)) throw new Error(`${path} 是预览用的转换结果，不能修改`)
     const raw = this.canonicalToRaw.get(path) ?? rawPath(path, this.layout, this.bdaRoots)
     const current = this.files.get(raw)
     if (current && current.length === bytes.length && current.every((byte, index) => byte === bytes[index])) {
@@ -414,15 +441,13 @@ export class SkinArchive {
   }
 
   async toBytesAsync(format?: ExportFormat, warnings?: string[]): Promise<Uint8Array> {
-    if (format && (format === "bda" || this.format === "bda") && format !== this.format) {
-      throw new Error("BDA 与 BDI/BDS 使用不同配置格式，不能转换")
-    }
+    assertRepackable(this.format, format)
     if (this.changed.size === 0 && (!format || (format === this.format && this.layout !== "legacy-ios"))) {
       return this.sourceBytes.slice()
     }
     // Avoid fflate's one-worker-per-large-file async ZIP path, which can exhaust WebView workers.
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
-    if (format && format !== "bda" && (format !== this.format || this.layout === "legacy-ios")) {
+    if ((format === "bdi" || format === "bds") && (format !== this.format || this.layout === "legacy-ios")) {
       return this.platformBytesAsync(format, warnings)
     }
     return this.toBytes(format)
@@ -430,7 +455,7 @@ export class SkinArchive {
 
   /** Packages for a BDI/BDS platform, pointing key sounds at a format that platform plays (AIFF / OGG). */
   async platformBytesAsync(format: "bdi" | "bds", warnings?: string[]): Promise<Uint8Array> {
-    if (this.format === "bda") throw new Error("BDA 与 BDI/BDS 使用不同配置格式，不能转换")
+    assertRepackable(this.format, format)
     const files = new Map(Object.entries(this.packagedFiles(format)))
     const adapted = await adaptPackageSounds(files, format)
     warnings?.push(...adapted.warnings)
@@ -438,9 +463,7 @@ export class SkinArchive {
   }
 
   toBytes(format?: ExportFormat): Uint8Array {
-    if (format && (format === "bda" || this.format === "bda") && format !== this.format) {
-      throw new Error("BDA 与 BDI/BDS 使用不同配置格式，不能转换")
-    }
+    assertRepackable(this.format, format)
     if (format && (format !== this.format || this.layout === "legacy-ios")) {
       return this.packagedBytes(format)
     }

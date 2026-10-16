@@ -1,4 +1,5 @@
 import { appState } from "./state"
+import { scheduleSsfPreview } from "./ssf-preview"
 import { type TextVisual, canvasFontFamily } from "../atlas.ts"
 import { setSimulatedComposition, toolbarPreview, currentDeviceValue, deviceGeometryProperties, preview, resizeKeyboardPreviews, schedulePreviewInteractionFrame, paintPreviewInteraction, applySkinState, REFERENCE_PHONE_WIDTH_SCALE, deviceFrameProperties } from "./canvas-interaction"
 import { simulatedOutput, skinState, candidateComposition, candidateInput, candidateWords, candidateArea, toolbarStrip, deviceShell, orientation, theme, layout, hintPreviewEnabled, canvasWrap, toolbarCanvas, panelStatus, previewZoomOut, previewZoomIn, $, skinStateValue, skinStateControl, toggleGuides, mobileToggleGuides } from "./dom"
@@ -115,6 +116,7 @@ export function devicePreviewTransparent(): boolean {
 
 export function refreshPreview(): void {
   if (!appState.archive) return
+  scheduleSsfPreview()
   const currentArchive = appState.archive
   const composing = refreshSimulationState()
   const resolver = visualResolver()
@@ -393,7 +395,7 @@ export function applyPreviewZoom(value: number, anchor?: { x: number; y: number 
   const before = anchor ? deviceShell.getBoundingClientRect() : undefined
   const anchorX = before && anchor ? (anchor.x - before.left) / before.width : 0.5
   const anchorY = before && anchor ? (anchor.y - before.top) / before.height : 0.5
-  appState.previewZoom = Math.min(3, Math.max(0.4, Math.round(value * 100) / 100))
+  appState.previewZoom = Math.min(3, Math.max(0.4, Math.round(value * 1000) / 1000))
   previewZoomOut.disabled = appState.previewZoom <= 0.4
   previewZoomIn.disabled = appState.previewZoom >= 3
   if (currentDeviceValue() === "canvas") fitCanvasPreview()

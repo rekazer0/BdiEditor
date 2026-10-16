@@ -3,6 +3,7 @@ import { isBdaVirtualTextPath, isBdaAppearancePartPath, bdaAppearanceStylePath, 
 import { symbolSpan } from "../icons"
 import { layout, files, theme, orientation, documentName } from "./dom"
 import { selectFile, overviewGroupState } from "./navigation"
+import { isSsfBoardPath, ssfThemeFolder, SSF_SOUNDS_PATH } from "./ssf-documents"
 import { mobilePortraitQuery, sourceThumbnail } from "./canvas-interaction"
 import { setMobilePane } from "./mobile-layout"
 import { bdaAppearancePath, bdaConfigPaths } from "../bda.ts"
@@ -60,6 +61,59 @@ export function addNavButton(
   parent.append(button)
 }
 
+type NavEntry = {
+  group: string
+  label: string
+  path: string
+  className: string
+  icon: string
+  navMode?: string
+  meta?: string
+}
+
+const iniTypes: Record<string, Omit<NavEntry, "path">> = {
+  "bh.ini": { group: "键盘布局", label: "笔画键盘", className: "nav-layout", icon: "brush" },
+  "def_9.ini": { group: "键盘布局", label: "五笔 9 键", className: "nav-layout", icon: "pen-line" },
+  "def_26.ini": { group: "键盘布局", label: "五笔 26 键", className: "nav-layout", icon: "pen-tool" },
+  "def_26_new.ini": { group: "键盘布局", label: "五笔 26 键", className: "nav-layout", icon: "pen-off" },
+  "py_9.ini": { group: "键盘布局", label: "拼音 9 键", className: "nav-layout", icon: "grid-3x3" },
+  "py_26.ini": { group: "键盘布局", label: "拼音 26 键", className: "nav-layout", icon: "keyboard" },
+  "en_9.ini": { group: "键盘布局", label: "英文 9 键", className: "nav-layout", icon: "case-lower" },
+  "en_9s.ini": { group: "键盘布局", label: "英文 9 键 Shift", className: "nav-layout", icon: "arrow-big-up" },
+  "en_26.ini": { group: "键盘布局", label: "英文 26 键", className: "nav-layout", icon: "a-large-small" },
+  "en_26s.ini": { group: "键盘布局", label: "英文 26 键 Shift", className: "nav-layout", icon: "arrow-big-up-dash" },
+  "en_26_new.ini": { group: "键盘布局", label: "英文 26 键", className: "nav-layout", icon: "type" },
+  "en_26s_new.ini": { group: "键盘布局", label: "英文 26 键 Shift", className: "nav-layout", icon: "case-upper" },
+  "num_9.ini": { group: "数字与符号", label: "数字键盘", className: "nav-component", icon: "calculator" },
+  "num_26.ini": { group: "数字与符号", label: "26 键数字键盘", className: "nav-component", icon: "binary" },
+  "num2.ini": { group: "数字与符号", label: "数字键盘 2", className: "nav-component", icon: "hash" },
+  "symbol.ini": { group: "数字与符号", label: "符号面板", className: "nav-component", icon: "asterisk" },
+  "sym_26_cn.ini": { group: "数字与符号", label: "中文 26 键符号", className: "nav-component", icon: "quote" },
+  "sym_26_en.ini": { group: "数字与符号", label: "英文 26 键符号", className: "nav-component", icon: "at-sign" },
+  "hw_grid.ini": { group: "手写与选择", label: "手写面板", className: "nav-component", icon: "signature" },
+  "hw_full.ini": { group: "手写与选择", label: "全屏手写", className: "nav-component", icon: "pencil-line" },
+  "sel_ch.ini": { group: "手写与选择", label: "中文选择栏", className: "nav-component", icon: "rows-3" },
+  "sel_en.ini": { group: "手写与选择", label: "英文选择栏", className: "nav-component", icon: "list" },
+  "voice.ini": { group: "键盘组件", label: "语音键盘", className: "nav-component", icon: "mic" },
+  "dial.ini": { group: "键盘布局", label: "拨号键盘", className: "nav-layout", icon: "phone" },
+  "email.ini": { group: "键盘布局", label: "邮箱键盘", className: "nav-layout", icon: "mail" },
+  "net.ini": { group: "键盘布局", label: "网址键盘", className: "nav-layout", icon: "globe" },
+  "net_shifts.ini": { group: "键盘布局", label: "网址键盘大写", className: "nav-layout", icon: "link" },
+  "sel_ch_h.ini": { group: "手写与选择", label: "中文选择栏（加高）", className: "nav-component", icon: "list-ordered" },
+  "sel_en_h.ini": { group: "手写与选择", label: "英文选择栏（加高）", className: "nav-component", icon: "list-checks" },
+  "sym_26_cn_h.ini": { group: "数字与符号", label: "中文 26 键符号（加高）", className: "nav-component", icon: "message-square-quote" },
+  "sym_26_en_h.ini": { group: "数字与符号", label: "英文 26 键符号（加高）", className: "nav-component", icon: "ampersand" },
+  "symbol_h.ini": { group: "数字与符号", label: "符号面板（加高）", className: "nav-component", icon: "percent" },
+  "help.ini": { group: "手写与选择", label: "帮助面板", className: "nav-component", icon: "circle-help" },
+  "logo.ini": { group: "键盘组件", label: "输入法标识", className: "nav-component", icon: "app-window" },
+  "gen.ini": { group: "资源配置", label: "通用配置", className: "nav-style", icon: "settings" },
+}
+
+/** Overview name of a keyboard layout file (`py_9.ini` → 拼音 9 键). */
+export function layoutLabel(name: string): string {
+  return iniTypes[name]?.label ?? name.replace(/\.ini$/i, "").replaceAll("_", " ")
+}
+
 export function renderFiles(): void {
   // 重建文件树前记住展开的文件夹，上传、删除、撤销后树不会整体收起。
   const openFolders = Array.from(files.querySelectorAll<HTMLDetailsElement>("details.raw-folder[open]"))
@@ -68,6 +122,7 @@ export function renderFiles(): void {
   files.replaceChildren()
   appState.selectedFileButton = undefined
   document.documentElement.dataset.archiveFormat = appState.archive?.format ?? ""
+  layout.hidden = appState.archive?.format !== "ssf"
   if (!appState.archive) return
 
   const overview = document.createElement("div")
@@ -124,15 +179,6 @@ export function renderFiles(): void {
     return body
   }
 
-  type NavEntry = {
-    group: string
-    label: string
-    path: string
-    className: string
-    icon: string
-    navMode?: string
-    meta?: string
-  }
   const entries: NavEntry[] = []
   const bdaConfigGroups = [
     ["animation", "动画效果", "动画配置", "film"],
@@ -156,42 +202,58 @@ export function renderFiles(): void {
   const demoPath = appState.archive.names().includes(`${theme.value}/skin/demo.png`) ? `${theme.value}/skin/demo.png` : "demo.png"
   entries.push({ group: appState.archive.format === "bda" ? "皮肤信息" : "皮肤", label: "效果预览", path: demoPath, className: "nav-overview", icon: "image" })
 
-  const iniTypes: Record<string, Omit<NavEntry, "path">> = {
-    "bh.ini": { group: "键盘布局", label: "笔画键盘", className: "nav-layout", icon: "brush" },
-    "def_9.ini": { group: "键盘布局", label: "五笔 9 键", className: "nav-layout", icon: "pen-line" },
-    "def_26.ini": { group: "键盘布局", label: "五笔 26 键", className: "nav-layout", icon: "pen-tool" },
-    "def_26_new.ini": { group: "键盘布局", label: "五笔 26 键", className: "nav-layout", icon: "pen-off" },
-    "py_9.ini": { group: "键盘布局", label: "拼音 9 键", className: "nav-layout", icon: "grid-3x3" },
-    "py_26.ini": { group: "键盘布局", label: "拼音 26 键", className: "nav-layout", icon: "keyboard" },
-    "en_9.ini": { group: "键盘布局", label: "英文 9 键", className: "nav-layout", icon: "case-lower" },
-    "en_9s.ini": { group: "键盘布局", label: "英文 9 键 Shift", className: "nav-layout", icon: "arrow-big-up" },
-    "en_26.ini": { group: "键盘布局", label: "英文 26 键", className: "nav-layout", icon: "a-large-small" },
-    "en_26s.ini": { group: "键盘布局", label: "英文 26 键 Shift", className: "nav-layout", icon: "arrow-big-up-dash" },
-    "en_26_new.ini": { group: "键盘布局", label: "英文 26 键", className: "nav-layout", icon: "type" },
-    "en_26s_new.ini": { group: "键盘布局", label: "英文 26 键 Shift", className: "nav-layout", icon: "case-upper" },
-    "num_9.ini": { group: "数字与符号", label: "数字键盘", className: "nav-component", icon: "calculator" },
-    "num_26.ini": { group: "数字与符号", label: "26 键数字键盘", className: "nav-component", icon: "binary" },
-    "num2.ini": { group: "数字与符号", label: "数字键盘 2", className: "nav-component", icon: "hash" },
-    "symbol.ini": { group: "数字与符号", label: "符号面板", className: "nav-component", icon: "asterisk" },
-    "sym_26_cn.ini": { group: "数字与符号", label: "中文 26 键符号", className: "nav-component", icon: "quote" },
-    "sym_26_en.ini": { group: "数字与符号", label: "英文 26 键符号", className: "nav-component", icon: "at-sign" },
-    "hw_grid.ini": { group: "手写与选择", label: "手写面板", className: "nav-component", icon: "signature" },
-    "hw_full.ini": { group: "手写与选择", label: "全屏手写", className: "nav-component", icon: "pencil-line" },
-    "sel_ch.ini": { group: "手写与选择", label: "中文选择栏", className: "nav-component", icon: "rows-3" },
-    "sel_en.ini": { group: "手写与选择", label: "英文选择栏", className: "nav-component", icon: "list" },
-    "voice.ini": { group: "键盘组件", label: "语音键盘", className: "nav-component", icon: "mic" },
-    "dial.ini": { group: "键盘布局", label: "拨号键盘", className: "nav-layout", icon: "phone" },
-    "email.ini": { group: "键盘布局", label: "邮箱键盘", className: "nav-layout", icon: "mail" },
-    "net.ini": { group: "键盘布局", label: "网址键盘", className: "nav-layout", icon: "globe" },
-    "net_shifts.ini": { group: "键盘布局", label: "网址键盘大写", className: "nav-layout", icon: "link" },
-    "sel_ch_h.ini": { group: "手写与选择", label: "中文选择栏（加高）", className: "nav-component", icon: "list-ordered" },
-    "sel_en_h.ini": { group: "手写与选择", label: "英文选择栏（加高）", className: "nav-component", icon: "list-checks" },
-    "sym_26_cn_h.ini": { group: "数字与符号", label: "中文 26 键符号（加高）", className: "nav-component", icon: "message-square-quote" },
-    "sym_26_en_h.ini": { group: "数字与符号", label: "英文 26 键符号（加高）", className: "nav-component", icon: "ampersand" },
-    "symbol_h.ini": { group: "数字与符号", label: "符号面板（加高）", className: "nav-component", icon: "percent" },
-    "help.ini": { group: "手写与选择", label: "帮助面板", className: "nav-component", icon: "circle-help" },
-    "logo.ini": { group: "键盘组件", label: "输入法标识", className: "nav-component", icon: "app-window" },
-    "gen.ini": { group: "资源配置", label: "通用配置", className: "nav-style", icon: "settings" },
+  if (appState.archive.format === "ssf") {
+    const folder = ssfThemeFolder()
+    const preview = ["square_preview.png", "candidate_preview.png"].find((path) => appState.archive?.getBytes(path))
+    entries.push(
+      { group: "皮肤", label: "皮肤信息", path: "phoneTheme.ini", className: "nav-overview", icon: "info" },
+      ...preview ? [{ group: "皮肤", label: "效果预览", path: preview, className: "nav-overview", icon: "image" }] : [],
+      { group: "皮肤", label: "外观切换", path: "time.ini", className: "nav-overview", icon: "sun" },
+      { group: "资源配置", label: "按键样式", path: `${folder}phoneSkin.ini`, className: "nav-style", icon: "palette" },
+      { group: "资源配置", label: "按键前景", path: `${folder}keys.ini`, className: "nav-style", icon: "layers" },
+      { group: "资源配置", label: "按键动画", path: `${folder}anim.ini`, className: "nav-style", icon: "wand-sparkles" },
+      { group: "资源配置", label: "按键音效", path: SSF_SOUNDS_PATH, className: "nav-resource", icon: "volume-2", navMode: "document" },
+      { group: "资源配置", label: "图片资源", path: `${folder}phoneSkin.ini`, className: "nav-resource", icon: "images", navMode: "resource" },
+      { group: "资源配置", label: "音频资源", path: SSF_SOUNDS_PATH, className: "nav-resource", icon: "audio-lines", navMode: "sound" },
+      { group: "资源配置", label: "运营配置", path: "op.ini", className: "nav-style", icon: "sparkles" },
+    )
+    // 搜狗手机输入法的全部键盘（取自官方安装包），按它的叫法列出；画布用的是预览转换出的布局。
+    const boards = [
+      ["键盘布局", "py_9", "拼音九键", "grid-3x3"],
+      ["键盘布局", "py_26", "拼音全键", "keyboard"],
+      ["键盘布局", "py_14", "拼音 14 键", "columns-3"],
+      ["键盘布局", "py_9_big_enter", "拼音九键大回车", "layout-dashboard"],
+      ["键盘布局", "big_9", "拼音九键大按键", "grid-2x2"],
+      ["键盘布局", "py_9_double_input", "双拼九键", "table-2"],
+      ["键盘布局", "py_9_big_enter_double_input", "双拼九键大回车", "layout-panel-top"],
+      ["键盘布局", "py_26_double_input", "双拼全键", "layout-template"],
+      ["键盘布局", "def_26", "五笔", "pen-tool"],
+      ["键盘布局", "bh", "笔画", "brush"],
+      ["键盘布局", "bh_big_enter", "笔画大回车", "paintbrush"],
+      ["键盘布局", "cantonese_9", "粤语九键", "message-square"],
+      ["键盘布局", "cantonese_9_big_enter", "粤语九键大回车", "message-square-more"],
+      ["键盘布局", "cantonese_26", "粤语全键", "message-square-quote"],
+      ["键盘布局", "en_9", "英文九键", "case-lower"],
+      ["键盘布局", "en_9_multi", "英文九键多击", "case-upper"],
+      ["键盘布局", "en_26", "英文全键", "a-large-small"],
+      ["键盘布局", "en_26_digits", "英文全键带数字行", "rows-3"],
+      ["键盘布局", "en_26_pro", "英文专业版", "globe"],
+      ["键盘布局", "en_26_pro_digits", "英文专业版带数字行", "list-ordered"],
+      ["数字与符号", "num_9", "数字九键", "calculator"],
+      ["数字与符号", "num_26_1", "数字全键", "binary"],
+      ["数字与符号", "foreign_digit", "外文数字", "hash"],
+      ["数字与符号", "en_digit", "英文数字", "sigma"],
+      ["数字与符号", "en_symbol", "英文符号", "ampersand"],
+      ["手写与语音", "handwriting", "半屏手写", "signature"],
+      ["手写与语音", "handwriting_full", "全屏手写", "hand"],
+      ["手写与语音", "handwriting_grid", "手写格子", "scan-line"],
+      ["手写与语音", "handwriting_frosted_glass", "手写毛玻璃", "spline"],
+      ["手写与语音", "handwriting_ink_printing", "手写水墨", "pen-line"],
+      ["手写与语音", "voice", "语音", "mic"],
+    ]
+    for (const [group, name, label, icon] of boards) {
+      entries.push({ group, label, path: `${theme.value}/skin/${orientation.value}/${name}.ini`, className: "nav-layout", icon })
+    }
   }
   const hiddenLayouts = new Set<string>()
   const configPrefix = `${theme.value}/skin/${orientation.value}/`
@@ -241,7 +303,7 @@ export function renderFiles(): void {
       navMode: "sound",
     })
   }
-  const layoutPaths = appState.archive.format === "bda" ? [] : appState.archive.names()
+  const layoutPaths = appState.archive.format === "bda" || appState.archive.format === "ssf" ? [] : appState.archive.names()
   for (const path of layoutPaths.sort()) {
     const basePath = path
     if (!path.startsWith(configPrefix) || path.slice(configPrefix.length).includes("/") || !/\.ini$/i.test(path)) continue
@@ -319,13 +381,14 @@ export function renderFiles(): void {
   }
   const groups = appState.archive.format === "bda"
     ? ["皮肤信息", "资源配置", "面板样式", "动画效果", "按键音效", "轻量动画", "开关配置", "贴纸配置", "场景配置"]
-    : ["皮肤", "资源配置", "键盘布局", "数字与符号", "手写与选择", "键盘组件", "扩展配置", "扩展布局"]
+    : ["皮肤", "资源配置", "键盘布局", "数字与符号", "手写与语音", "手写与选择", "键盘组件", "扩展配置", "扩展布局"]
   for (const group of groups) {
-    const grouped = entries.filter((entry) => entry.group === group && (
+    // 预览生成的百度文件不属于搜狗原包，只有搜狗键盘布局作为入口显示。
+    const grouped = entries.filter((entry) => entry.group === group && (!appState.archive?.isOverlay(entry.path) || isSsfBoardPath(entry.path)) && (
       appState.archive?.names().includes(entry.path) ||
       appState.archive?.format === "bda" && (isBdaAppearancePartPath(entry.path) || Boolean(appState.bdaBase?.isText(bdaBasePath(entry.path))))
     ))
-    if (group === "键盘布局") {
+    if (group === "键盘布局" && appState.archive.format !== "ssf") {
       const layoutRank: Record<string, number> = { "py_9.ini": 0, "py_26.ini": 1, "bh.ini": 3 }
       grouped.sort((a, b) => {
         const aName = a.path.split("/").pop() ?? ""
@@ -378,7 +441,7 @@ export function renderFiles(): void {
   const sourceNameCompare = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" }).compare
   type SourceNode = { folders: Map<string, SourceNode>; paths: string[] }
   const root: SourceNode = { folders: new Map(), paths: [] }
-  for (const path of appState.archive.names().filter((name) => !name.endsWith("/"))) {
+  for (const path of appState.archive.names().filter((name) => !name.endsWith("/") && !appState.archive?.isOverlay(name))) {
     const parts = path.split("/")
     let node = root
     for (const part of parts.slice(0, -1)) {
