@@ -2,7 +2,7 @@ import { appState } from "./state"
 import { scheduleSsfPreview } from "./ssf-preview"
 import { type TextVisual, canvasFontFamily } from "../atlas.ts"
 import { setSimulatedComposition, toolbarPreview, currentDeviceValue, deviceGeometryProperties, preview, resizeKeyboardPreviews, schedulePreviewInteractionFrame, paintPreviewInteraction, applySkinState, REFERENCE_PHONE_WIDTH_SCALE, deviceFrameProperties } from "./canvas-interaction"
-import { simulatedOutput, skinState, candidateComposition, candidateInput, candidateWords, candidateArea, toolbarStrip, deviceShell, orientation, theme, layout, hintPreviewEnabled, canvasWrap, toolbarCanvas, panelStatus, previewZoomOut, previewZoomIn, $, skinStateValue, skinStateControl, toggleGuides, mobileToggleGuides } from "./dom"
+import { simulatedOutput, skinState, candidateComposition, candidateInput, candidateInputText, candidateWords, candidateArea, toolbarStrip, deviceShell, orientation, theme, layout, hintPreviewEnabled, canvasWrap, toolbarCanvas, panelStatus, previewZoomOut, previewZoomIn, $, skinStateValue, skinStateControl, toggleGuides, mobileToggleGuides } from "./dom"
 import { candidatePreview } from "../simulation.ts"
 import { isConfiguredSymbolLayout, skinStateLabel } from "../actions.ts"
 import { textDocument, visualResolver, currentBdaAppearance, bdaBasePath, bdaAvailableLayoutPaths } from "./bda-documents"
@@ -55,7 +55,7 @@ export function renderCandidateState(): boolean {
   )
   candidateComposition.hidden = !state.composing
   candidateInput.hidden = !state.input
-  candidateInput.textContent = state.input
+  candidateInputText.textContent = state.input
   candidateWords.replaceChildren(...state.candidates.map((value) => {
     const item = document.createElement("span")
     item.textContent = value

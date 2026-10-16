@@ -1,10 +1,10 @@
 import { appState } from "./state"
-import { skinState, sourceEditor, theme, orientation, colorPickers, colorAlphas, candidateArea, toolbarStrip, candidateBackgroundCanvas, toolbarCanvas } from "./dom"
+import { skinState, sourceEditor, theme, orientation, colorPickers, colorAlphas, candidateArea, toolbarStrip, candidateBackgroundCanvas, candidateInputBackgroundCanvas, toolbarCanvas } from "./dom"
 import { isListCell } from "../layout.ts"
 import { effectivePanelSection } from "../panel-tools.ts"
 import { selectedBdaSourceKeys } from "./document-inspector"
 import { jsonPropertyRanges, iniSectionRanges } from "../highlight.ts"
-import { source, toolbarPreview, candidateBackgroundPreview } from "./canvas-interaction"
+import { source, toolbarPreview, candidateBackgroundPreview, candidateInputBackgroundPreview } from "./canvas-interaction"
 import { deferNumberInputRefresh } from "../number-input-wheel.ts"
 import { updateSourceHighlight } from "./source-panel"
 import { IniDocument } from "../ini.ts"
@@ -12,7 +12,7 @@ import { bdaBasePath, textDocument, currentBdaAppearance } from "./bda-documents
 import { firstExistingPath } from "../resources.ts"
 import { type VisualResolver } from "../atlas.ts"
 import { isConfiguredSymbolLayout } from "../actions.ts"
-import { resolveCandidateRect, resolveCandidateInputStyle } from "../candidate-style.ts"
+import { resolveCandidateRect, resolveCandidateInputStyle, candidateInputBackgroundStyle } from "../candidate-style.ts"
 import { bdaStyleID } from "../bda.ts"
 import { devicePreviewTransparent } from "./preview-render"
 import { canvasEditable } from "./edit-history"
@@ -238,6 +238,7 @@ export function refreshToolbarPreview(
     delete toolbarStrip.dataset.path
     toolbarStrip.hidden = true
     candidateBackgroundCanvas.hidden = true
+    candidateInputBackgroundCanvas.hidden = true
     return
   }
   const path = toolbarConfigPath()
@@ -246,6 +247,7 @@ export function refreshToolbarPreview(
     delete toolbarStrip.dataset.path
     toolbarStrip.hidden = true
     candidateBackgroundCanvas.hidden = true
+    candidateInputBackgroundCanvas.hidden = true
     return
   }
   const gen = textDocument(genConfigPath())
@@ -280,6 +282,16 @@ export function refreshToolbarPreview(
     height,
   )
   candidateBackgroundPreview.setDocument(undefined)
+  const inputBackgroundStyle = bdaPanel?.input
+    ? bdaStyleID(bdaPanel.input.backStyle)
+    : candidateInputBackgroundStyle(gen, document)
+  candidateInputBackgroundCanvas.hidden = !inputBackgroundStyle || inputHeight <= 0
+  if (!candidateInputBackgroundCanvas.hidden) {
+    candidateInputBackgroundPreview.setResolver(resolver)
+    candidateInputBackgroundPreview.setTheme(theme.value === "dark" ? "dark" : "light")
+    candidateInputBackgroundPreview.setTransparent(devicePreviewTransparent())
+    candidateInputBackgroundPreview.setPanel(inputBackgroundStyle, width, inputHeight)
+  }
   toolbarCanvas.style.setProperty("--toolbar-width", String(width))
   toolbarCanvas.style.setProperty("--toolbar-height", String(height))
   toolbarCanvas.style.setProperty("--candidate-input-height", String(inputHeight))

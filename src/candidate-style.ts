@@ -59,6 +59,17 @@ export function candidateInputForegroundStyle(
   ].map((value) => value?.trim() ?? "").find(Boolean) ?? ""
 }
 
+/** The input code row's background: the candidate layout's `[INPUT]` first, then the general one. */
+export function candidateInputBackgroundStyle(
+  general: IniDocument | undefined,
+  candidate?: IniDocument,
+): string {
+  return [
+    candidate?.get("INPUT", "BACK_STYLE"),
+    general?.get("INPUT", "BACK_STYLE"),
+  ].map((value) => value?.split(",")[0].trim() ?? "").find(Boolean) ?? ""
+}
+
 export function resolveCandidateTextVisuals(
   candidate: IniDocument | undefined,
   general: IniDocument | undefined,
