@@ -30,18 +30,17 @@ export function stateStyleValue(value: string | undefined, state: number): numbe
   return match ? Number(match[1]) : undefined
 }
 
-// 真机上有几类状态由输入法设置或机型决定，始终生效并与预览所选状态叠加：
-// - 长按语音 / 国际化语言三态 S34、S36、S37 总有一个生效，默认设置是 S36（长按语音开启且无国际化语言）；
-// - S99：官方小米皮肤用它把贴着屏幕圆角的按键（如九键回车）换成同弧度的切图，大圆角全面屏上生效。
-// 所选状态没有对应 TIP 时按这些状态显示；所选状态的 TIP 自己再写 STAT_STYLE 时继续换层（S27 → TIP3 → S99 → TIP21）。
+// 官方 Android（KeyParam.J）按 STAT_STYLE 的书写顺序取第一个"状态成立"的 S<状态>_<TIP>，只换这一层，
+// TIP 自己的 STAT_STYLE 不再生效。预览里成立的状态是：所选状态，加上真机始终成立的设备状态——
+// - 长按语音 / 国际化语言 S34、S36、S37 三者互斥（InputEventHandler），默认开着空格语音、没装其他语言，即 S36；
+// - S99：小米模板用它把贴屏幕圆角的按键（九键回车）换成同弧度切图，用户真机上成立。
 const VOICE_LANGUAGE_STATES = [34, 36, 37]
 const DEFAULT_VOICE_LANGUAGE_STATE = 36
 const ROUNDED_CORNER_STATE = 99
 
-function deviceStateTip(value: string | undefined, state: number): number | undefined {
-  const voiceLanguage = VOICE_LANGUAGE_STATES.includes(state) ? undefined : DEFAULT_VOICE_LANGUAGE_STATE
-  return (voiceLanguage === undefined ? undefined : stateStyleValue(value, voiceLanguage)) ??
-    (state === ROUNDED_CORNER_STATE ? undefined : stateStyleValue(value, ROUNDED_CORNER_STATE))
+function activeStates(state: number): Set<number> {
+  const voiceLanguage = VOICE_LANGUAGE_STATES.includes(state) ? state : DEFAULT_VOICE_LANGUAGE_STATE
+  return new Set([state, voiceLanguage, ROUNDED_CORNER_STATE])
 }
 
 export function stateTipSection(
@@ -50,24 +49,10 @@ export function stateTipSection(
 ): number | undefined {
   const effectiveState = state ?? 0
   if (effectiveState < 0 || effectiveState > 122) return
-  return stateStyleValue(value, effectiveState) ?? deviceStateTip(value, effectiveState)
-}
-
-/** stateTipSection 加上 TIP 之间按设备状态的继续换层；最终 TIP 必须存在，否则沿用上一层。 */
-export function effectiveStateTip(
-  document: IniDocument,
-  value: string | undefined,
-  state: number | undefined,
-): number | undefined {
-  let tip = stateTipSection(value, state)
-  const visited = new Set<number>()
-  while (tip !== undefined && !visited.has(tip)) {
-    visited.add(tip)
-    const next = deviceStateTip(document.get(`TIP${tip}`, "STAT_STYLE"), state ?? 0)
-    if (next === undefined || !document.sections().includes(`TIP${next}`)) break
-    tip = next
+  const active = activeStates(effectiveState)
+  for (const match of value?.matchAll(/(?:^|\|)\s*S(\d+)_(\d+)\s*(?=\||$)/g) ?? []) {
+    if (active.has(Number(match[1]))) return Number(match[2])
   }
-  return tip
 }
 
 export function effectivePanelSection(
@@ -75,7 +60,7 @@ export function effectivePanelSection(
   section: string,
   state: number | undefined,
 ): string {
-  const tip = effectiveStateTip(document, document.get(section, "STAT_STYLE"), state)
+  const tip = stateTipSection(document.get(section, "STAT_STYLE"), state)
   const target = tip === undefined ? undefined : `TIP${tip}`
   return target && document.sections().includes(target) ? target : section
 }

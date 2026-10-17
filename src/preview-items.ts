@@ -1,4 +1,4 @@
-import { effectiveStateTip, stateStyleValue, stateTipSection } from "./panel-tools.ts"
+import { stateStyleValue, stateTipSection } from "./panel-tools.ts"
 import { IniDocument } from "./ini.ts"
 import { skinStateFallbackText } from "./actions.ts"
 import { DEFAULT_PANEL_WIDTH, DEFAULT_CANDIDATE_HEIGHT } from "./keyboard.ts"
@@ -79,7 +79,7 @@ export function effectivePreviewItem(
   item: PreviewItem,
   state?: number,
 ): PreviewItem {
-  const tip = effectiveStateTip(document, item.statStyle, state)
+  const tip = stateTipSection(item.statStyle, state)
   if (tip === undefined) return item
   const section = `TIP${tip}`
   const hasTip = document.sections().includes(section)

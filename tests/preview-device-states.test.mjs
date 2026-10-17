@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { IniDocument } from '../src/ini.ts'
 import { SkinArchive } from '../src/skin.ts'
-import { effectiveStateTip, stateTipSection } from '../src/panel-tools.ts'
+import { stateTipSection } from '../src/panel-tools.ts'
 import { bdaLayoutDocument } from '../src/bda.ts'
 import { decodeBdaAppearance } from '../src/bda-decode.ts'
 
@@ -18,14 +18,15 @@ test('the space key shows its S36 variant (Baidu default: long-press voice on) u
   assert.equal(stateTipSection('S34_7|S37_9', undefined), undefined)
 })
 
-test('the Xiaomi nine-key enter takes the rounded-corner (S99) image on top of the chosen state', () => {
+test('the first written state that holds picks the TIP, and a TIP does not switch again (KeyParam.J)', () => {
   const layout = IniDocument.parse(template('templates/xiaomi-unified-rounded-blur.bds').getText('light/skin/port/py_9.ini'))
   const enter = layout.get('KEY12', 'STAT_STYLE')
-  assert.equal(effectiveStateTip(layout, enter, undefined), 18)
-  // S27（输入框已满足发送条件）→ TIP3 → S99 → TIP21
-  assert.equal(effectiveStateTip(layout, enter, 27), 21)
-  assert.equal(layout.get('TIP21', 'BACK_STYLE'), '694')
-  assert.equal(effectiveStateTip(layout, layout.get('KEY10', 'STAT_STYLE'), undefined), 8)
+  // 默认只有设备状态成立：S99 → TIP18（贴屏幕圆角的回车切图）。
+  assert.equal(stateTipSection(enter, undefined), 18)
+  // S27 写在 S99 之前，先命中 TIP3；TIP3 自己的 STAT_STYLE=S99_21 不再生效。
+  assert.equal(stateTipSection(enter, 27), 3)
+  assert.equal(stateTipSection(layout.get('KEY10', 'STAT_STYLE'), undefined), 8)
+  assert.equal(stateTipSection('S36_8|S4_9', 4), 8)
 })
 
 test('BDA state keys place foregrounds relative to the key they belong to', () => {
