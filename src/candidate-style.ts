@@ -26,8 +26,9 @@ export function resolveCandidateRect(
   }
 }
 
-function inputInset(width: number): number {
-  const density = width <= 240 ? 0.75
+/** The density Baidu Android assumes a skin of this panel width was drawn for (`ImeBaseGlobal.d`). */
+function skinDensity(width: number): number {
+  return width <= 240 ? 0.75
     : width < 360 ? 1
     : width < 480 ? 1.2
     : width < 600 ? 1.5
@@ -38,14 +39,33 @@ function inputInset(width: number): number {
     : width < 1152 ? 3.3
     : width < 1280 ? 3.6
     : 4.4
-  return Math.trunc(density * 2.5)
 }
 
-type CandidateInputStyle = {
-  foregroundStyle: string
+/**
+ * Baidu Android's input code bar (`InputBarView`), in skin units: `inset` is `ImeBaseGlobal.L`
+ * (2.5dp), `textLeft` is where the code starts (6dp).
+ */
+export type InputBarMetrics = {
   height: number
-  /** Space between the input code and the edges of its background box. */
   inset: number
+  textLeft: number
+}
+
+type CandidateInputStyle = InputBarMetrics & { foregroundStyle: string }
+
+/**
+ * The bar's box: as wide as the code plus 6dp before and two insets after it; a code wider than
+ * the panel fills it and shows its end, an inset from either edge.
+ */
+export function inputBarBox(
+  textWidth: number,
+  metrics: InputBarMetrics,
+  panelWidth: number,
+): { width: number; paddingStart: number; paddingEnd: number } {
+  const width = metrics.textLeft + textWidth + metrics.inset * 2
+  return width > panelWidth
+    ? { width: panelWidth, paddingStart: metrics.inset, paddingEnd: metrics.inset }
+    : { width, paddingStart: metrics.textLeft, paddingEnd: metrics.inset * 2 }
 }
 
 export function candidateInputForegroundStyle(
@@ -61,7 +81,7 @@ export function candidateInputForegroundStyle(
   ].map((value) => value?.trim() ?? "").find(Boolean) ?? ""
 }
 
-/** The input code box's background: the candidate layout's `[INPUT]` first, then the general one. */
+/** The input code bar's background: the candidate layout's `[INPUT]` first, then the general one. */
 export function candidateInputBackgroundStyle(
   general: IniDocument | undefined,
   candidate?: IniDocument,
@@ -94,6 +114,8 @@ export function resolveCandidateInputStyle(
 ): CandidateInputStyle {
   const foregroundStyle = candidateInputForegroundStyle(general, candidate)
   const fontSize = resolver.resolveText(foregroundStyle, false)?.fontSize
-  const inset = fontSize && fontSize > 0 ? inputInset(width) : 0
-  return { foregroundStyle, height: fontSize && fontSize > 0 ? fontSize + inset * 2 : 0, inset }
+  if (!fontSize || fontSize <= 0) return { foregroundStyle, height: 0, inset: 0, textLeft: 0 }
+  const density = skinDensity(width)
+  const inset = Math.trunc(density * 2.5)
+  return { foregroundStyle, height: fontSize + inset * 2, inset, textLeft: Math.trunc(density * 6) }
 }

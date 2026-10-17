@@ -103,9 +103,10 @@ export function applyDeviceKeyboardGeometry(
   )
   deviceShell.style.setProperty("--candidate-row", `${geometry.candidateHeight}fr`)
   deviceShell.style.setProperty("--candidate-top-inset-row", `${geometry.topInsetHeight}fr`)
-  deviceShell.style.setProperty("--candidate-inset-row", `${geometry.candidateInsetHeight}fr`)
   deviceShell.style.setProperty("--candidate-content-row", `${geometry.candidateContentHeight}fr`)
-  deviceShell.style.setProperty("--candidate-input-height", `${geometry.candidateInsetHeight}px`)
+  // The keyboard spans the screen width, so a share of it in cqw follows the device frame's scale.
+  const screenWidth = orientation.value === "port" ? spec.width : spec.height
+  deviceShell.style.setProperty("--candidate-input-height", `${(geometry.inputBarHeight / screenWidth) * 100}cqw`)
   deviceShell.style.setProperty("--panel-row", `${geometry.panelHeight}fr`)
   deviceShell.style.setProperty("--safe-row", `${geometry.safeBottomHeight}fr`)
 }
@@ -360,8 +361,11 @@ export function fitCanvasPreview(): void {
   const toolbarWidth = Number(toolbarCanvas.style.getPropertyValue("--toolbar-width") || "0")
   if (toolbarWidth > 0 && toolbarHeight > 0) {
     deviceShell.style.setProperty("--toolbar-viewport-height", `${Math.round(toolbarHeight * scale)}px`)
-    const inputHeight = Number(toolbarCanvas.style.getPropertyValue("--candidate-input-height") || "0")
-    deviceShell.style.setProperty("--candidate-input-height", `${Math.round(inputHeight * scale)}px`)
+    // A device frame sizes the input code bar in applyDeviceKeyboardGeometry.
+    if (currentDeviceValue() === "canvas") {
+      const inputHeight = Number(toolbarCanvas.style.getPropertyValue("--candidate-input-height") || "0")
+      deviceShell.style.setProperty("--candidate-input-height", `${Math.round(inputHeight * scale)}px`)
+    }
     deviceShell.style.setProperty(
       "--candidate-viewport-height",
       `${Math.round(toolbarHeight * scale)}px`,

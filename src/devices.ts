@@ -51,7 +51,8 @@ export function keyboardPreviewGeometry(
 ): {
   candidateHeight: number
   topInsetHeight: number
-  candidateInsetHeight: number
+  /** The input code bar floats above the keyboard (a popup on Baidu Android); it adds no height. */
+  inputBarHeight: number
   candidateContentHeight: number
   panelHeight: number
   safeBottomHeight: number
@@ -68,19 +69,18 @@ export function keyboardPreviewGeometry(
       ? device.width * 0.06
       : 0
   const topInsetHeight = iphonePortrait ? device.width * (38 / 1206) : 0
-  const totalLogicalHeight = candidateLogicalHeight + candidateInputHeight + panelLogicalHeight
+  const totalLogicalHeight = candidateLogicalHeight + panelLogicalHeight
   const widthScale = screenWidth / skinWidth
   const heightScale = (screenHeight - safeLogicalHeight - topInsetHeight) / totalLogicalHeight
   const scale = Math.min(widthScale, heightScale)
-  const candidateInsetHeight = candidateInputHeight * scale
   const candidateContentHeight = candidateLogicalHeight * scale
-  const candidateHeight = topInsetHeight + (candidateInputHeight + candidateLogicalHeight) * scale
+  const candidateHeight = topInsetHeight + candidateLogicalHeight * scale
   const panelHeight = panelLogicalHeight * scale
   const safeBottomHeight = safeLogicalHeight
   return {
     candidateHeight,
     topInsetHeight,
-    candidateInsetHeight,
+    inputBarHeight: candidateInputHeight * scale,
     candidateContentHeight,
     panelHeight,
     safeBottomHeight,

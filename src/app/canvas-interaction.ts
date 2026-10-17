@@ -1,4 +1,4 @@
-import { mobileCommandMenu, settingsDialog, $, sidebarViewControl, device, resourceSearch, editorCrosshair, previewCoordinates, canvasWrap, previewCanvas, toolbarCanvas, editorCoordinateSnap, previewCoordinateX, previewCoordinateY, toolbarStrip, candidateBackgroundCanvas, candidateInputBackgroundCanvas, skinState, skinStateValue, eventLog, theme, orientation, simulatedOutput, deviceControlIcon, mobileUndoButton, undoButton, mobileRedoButton, redoButton, desktopUndoButton, desktopRedoButton } from "./dom"
+import { mobileCommandMenu, settingsDialog, $, sidebarViewControl, device, resourceSearch, editorCrosshair, previewCoordinates, canvasWrap, previewCanvas, toolbarCanvas, editorCoordinateSnap, previewCoordinateX, previewCoordinateY, toolbarStrip, candidateBackgroundCanvas, skinState, skinStateValue, eventLog, theme, orientation, simulatedOutput, deviceControlIcon, mobileUndoButton, undoButton, mobileRedoButton, redoButton, desktopUndoButton, desktopRedoButton } from "./dom"
 import { LazySourceCodeEditor } from "../lazy-source-editor.ts"
 import { effectiveDeviceValue } from "../canvas-background.ts"
 import { type SourceWriteSnapshot } from "../source-tree.ts"
@@ -104,7 +104,6 @@ export const deviceGeometryProperties = [
   "--keyboard-height-land",
   "--candidate-row",
   "--candidate-top-inset-row",
-  "--candidate-inset-row",
   "--candidate-content-row",
   "--candidate-input-height",
   "--panel-row",
@@ -278,13 +277,10 @@ export const toolbarPreview = new Preview(toolbarCanvas, handlePreviewEvent, (se
 
 export const candidateBackgroundPreview = new Preview(candidateBackgroundCanvas, () => {}, () => {})
 
-export const candidateInputBackgroundPreview = new Preview(candidateInputBackgroundCanvas, () => {}, () => {})
-
 export function resizeKeyboardPreviews(): void {
   preview.resize()
   toolbarPreview.resize()
   candidateBackgroundPreview.resize()
-  candidateInputBackgroundPreview.resize()
 }
 
 export function applySkinState(state?: number, message?: string): void {

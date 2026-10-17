@@ -1,10 +1,10 @@
 import { appState } from "./state"
-import { skinState, sourceEditor, theme, orientation, colorPickers, colorAlphas, candidateArea, toolbarStrip, candidateBackgroundCanvas, candidateInputBackgroundCanvas, candidateInputBox, toolbarCanvas } from "./dom"
+import { skinState, sourceEditor, theme, orientation, colorPickers, colorAlphas, candidateArea, toolbarStrip, candidateBackgroundCanvas, candidateInputBackgroundCanvas, candidateInputBox, candidateInputText, toolbarCanvas } from "./dom"
 import { isListCell } from "../layout.ts"
 import { effectivePanelSection } from "../panel-tools.ts"
 import { selectedBdaSourceKeys } from "./document-inspector"
 import { jsonPropertyRanges, iniSectionRanges } from "../highlight.ts"
-import { source, toolbarPreview, candidateBackgroundPreview, candidateInputBackgroundPreview } from "./canvas-interaction"
+import { source, toolbarPreview, candidateBackgroundPreview } from "./canvas-interaction"
 import { deferNumberInputRefresh } from "../number-input-wheel.ts"
 import { updateSourceHighlight } from "./source-panel"
 import { IniDocument } from "../ini.ts"
@@ -12,7 +12,8 @@ import { bdaBasePath, textDocument, currentBdaAppearance } from "./bda-documents
 import { firstExistingPath } from "../resources.ts"
 import { type VisualResolver } from "../atlas.ts"
 import { isConfiguredSymbolLayout } from "../actions.ts"
-import { resolveCandidateRect, resolveCandidateInputStyle, candidateInputBackgroundStyle } from "../candidate-style.ts"
+import { resolveCandidateRect, resolveCandidateInputStyle, candidateInputBackgroundStyle, inputBarBox } from "../candidate-style.ts"
+import { drawInputBarBackground, setCanvasSize } from "../preview-draw.ts"
 import { bdaStyleID } from "../bda.ts"
 import { devicePreviewTransparent } from "./preview-render"
 import { canvasEditable } from "./edit-history"
@@ -230,18 +231,29 @@ export function applyCandidateGeometry(
   else candidateArea.style.removeProperty("--candidate-more-width")
 }
 
-function hideCandidateInputBackground(): void {
-  appState.candidateInputBackground = undefined
+function hideCandidateInputBar(): void {
+  appState.candidateInputBar = undefined
   candidateInputBackgroundCanvas.hidden = true
 }
 
-/** Draws `[INPUT] BACK_STYLE` at the input code box's size, in skin units, so sliced images stretch like on the phone. */
-export function fitCandidateInputBackground(): void {
-  const background = appState.candidateInputBackground
+/** Sizes the input code bar around the typed code and paints its background, in skin units. */
+export function fitCandidateInputBar(): void {
+  const bar = appState.candidateInputBar
   const areaWidth = candidateArea.clientWidth
-  if (!background || !areaWidth) return
-  const width = Math.max(1, Math.round((candidateInputBox.offsetWidth / areaWidth) * background.candidateWidth))
-  candidateInputBackgroundPreview.setPanel(background.style, width, background.height)
+  if (!bar || !areaWidth) return
+  const textWidth = (candidateInputText.offsetWidth / areaWidth) * bar.candidateWidth
+  const box = inputBarBox(textWidth, bar.metrics, bar.candidateWidth)
+  const cqw = (value: number) => `${(value / bar.candidateWidth) * 100}cqw`
+  candidateInputBox.style.setProperty("--candidate-input-box-width", cqw(box.width))
+  candidateInputBox.style.setProperty("--candidate-input-padding-start", cqw(box.paddingStart))
+  candidateInputBox.style.setProperty("--candidate-input-padding-end", cqw(box.paddingEnd))
+  const width = Math.max(1, Math.round(box.width))
+  const height = Math.max(1, Math.round(bar.metrics.height))
+  setCanvasSize(candidateInputBackgroundCanvas, width, height)
+  const context = candidateInputBackgroundCanvas.getContext("2d")
+  if (!context) return
+  context.clearRect(0, 0, width, height)
+  drawInputBarBackground(context, bar.visual, width, height)
 }
 
 export function refreshToolbarPreview(
@@ -252,7 +264,7 @@ export function refreshToolbarPreview(
     delete toolbarStrip.dataset.path
     toolbarStrip.hidden = true
     candidateBackgroundCanvas.hidden = true
-    hideCandidateInputBackground()
+    hideCandidateInputBar()
     return
   }
   const path = toolbarConfigPath()
@@ -261,7 +273,7 @@ export function refreshToolbarPreview(
     delete toolbarStrip.dataset.path
     toolbarStrip.hidden = true
     candidateBackgroundCanvas.hidden = true
-    hideCandidateInputBackground()
+    hideCandidateInputBar()
     return
   }
   const gen = textDocument(genConfigPath())
@@ -299,16 +311,20 @@ export function refreshToolbarPreview(
   const inputBackgroundStyle = bdaPanel?.input
     ? bdaStyleID(bdaPanel.input.backStyle)
     : candidateInputBackgroundStyle(gen, document)
-  candidateArea.style.setProperty("--candidate-input-inset", `${(inputStyle.inset / width) * 100}cqw`)
-  if (inputBackgroundStyle && inputHeight > 0) {
-    appState.candidateInputBackground = { style: inputBackgroundStyle, candidateWidth: width, height: inputHeight }
-    candidateInputBackgroundCanvas.hidden = false
-    candidateInputBackgroundPreview.setResolver(resolver)
-    candidateInputBackgroundPreview.setTheme(theme.value === "dark" ? "dark" : "light")
-    candidateInputBackgroundPreview.setTransparent(devicePreviewTransparent())
-    fitCandidateInputBackground()
+  if (inputHeight > 0) {
+    const bar: NonNullable<typeof appState.candidateInputBar> = { metrics: inputStyle, candidateWidth: width }
+    appState.candidateInputBar = bar
+    candidateInputBackgroundCanvas.hidden = !inputBackgroundStyle
+    fitCandidateInputBar()
+    if (inputBackgroundStyle) {
+      void resolver.resolve(inputBackgroundStyle, false).then((visual) => {
+        if (appState.candidateInputBar !== bar) return
+        bar.visual = visual
+        fitCandidateInputBar()
+      })
+    }
   } else {
-    hideCandidateInputBackground()
+    hideCandidateInputBar()
   }
   toolbarCanvas.style.setProperty("--toolbar-width", String(width))
   toolbarCanvas.style.setProperty("--toolbar-height", String(height))
