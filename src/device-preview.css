@@ -451,6 +451,20 @@
   pointer-events: none;
 }
 
+/* On iOS the input code fills the keyboard row above the candidates and starts where their text does. */
+.device-shell[data-input-bar="keyboard"] #candidate-input-box {
+  width: 100%;
+  justify-content: flex-start;
+  padding-inline: calc(var(--candidate-left-padding, 0cqw) + var(--candidate-first-gap, 0cqw) + var(--candidate-cell-inset, 0cqw)) 0;
+}
+
+.device-shell[data-input-bar="keyboard"]:not(.canvas-only) #candidate-input {
+  position: relative;
+  inset: auto;
+  grid-row: 2;
+  height: 100%;
+}
+
 .keyboard-accessories {
   display: flex;
   align-items: center;
@@ -613,6 +627,7 @@
 .device-shell.canvas-only #candidate-area {
   height: auto;
   grid-template-rows:
+    0px
     0px
     minmax(0, var(--toolbar-viewport-height, 0px));
   overflow: visible;

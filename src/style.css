@@ -1236,6 +1236,7 @@ h2 {
   display: grid;
   grid-template-rows:
     minmax(0, var(--candidate-top-inset-row, 0fr))
+    minmax(0, var(--candidate-inset-row, 0fr))
     minmax(0, var(--candidate-content-row, 133fr));
   position: relative;
   overflow: visible;
@@ -1254,7 +1255,7 @@ h2 {
 }
 
 #candidate-background {
-  grid-row: 2;
+  grid-row: 3;
 }
 
 #toolbar-strip,
@@ -1264,7 +1265,7 @@ h2 {
 }
 
 #toolbar-strip {
-  grid-row: 2;
+  grid-row: 3;
 }
 
 #toolbar-strip,
@@ -1327,7 +1328,7 @@ h2 {
 #candidate-words {
   min-height: 0;
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 3;
   display: flex;
   align-items: center;
   gap: var(--candidate-cell-width, 0);

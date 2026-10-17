@@ -8,6 +8,7 @@ import { isConfiguredSymbolLayout, skinStateLabel } from "../actions.ts"
 import { textDocument, visualResolver, currentBdaAppearance, bdaBasePath, bdaAvailableLayoutPaths } from "./bda-documents"
 import { genConfigPath, keyboardContext, refreshToolbarPreview, legacyAnimationConfigPath, styleConfigPath, toolbarConfigPath, isToolbarPath } from "./config-context"
 import { deviceSpec, keyboardPreviewGeometry, showsKeyboardAccessories } from "../devices.ts"
+import { skinPlatform } from "../bda-platform.ts"
 import { bdaConfigPath, bdaLayoutDocument, bdaStyleID } from "../bda.ts"
 import { decodeBdaAnimation } from "../bda-decode.ts"
 import { parseLegacyAnimation } from "../preview-animation.ts"
@@ -77,12 +78,23 @@ export function refreshSimulationState(): boolean {
   return composing
 }
 
+/**
+ * Baidu iOS shows the input code in a row at the keyboard's top, Android in a popup above it. The
+ * phone decides, not the skin (iOS installs Android BDS too); the bare canvas follows the skin.
+ */
+export function inputBarInKeyboard(): boolean {
+  const spec = deviceSpec(currentDeviceValue())
+  if (spec) return spec.family === "iphone"
+  return Boolean(appState.archive && skinPlatform(appState.archive) === "ios")
+}
+
 export function applyDeviceKeyboardGeometry(
   panelWidth: number,
   panelHeight: number,
   candidateHeight: number,
   candidateInputHeight: number,
 ): void {
+  deviceShell.dataset.inputBar = inputBarInKeyboard() ? "keyboard" : "popup"
   const spec = deviceSpec(currentDeviceValue())
   if (!spec) {
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
@@ -95,6 +107,7 @@ export function applyDeviceKeyboardGeometry(
     panelHeight,
     candidateHeight,
     candidateInputHeight,
+    deviceShell.dataset.inputBar === "keyboard",
   )
   const screenHeight = orientation.value === "port" ? spec.height : spec.width
   deviceShell.style.setProperty(
@@ -103,6 +116,7 @@ export function applyDeviceKeyboardGeometry(
   )
   deviceShell.style.setProperty("--candidate-row", `${geometry.candidateHeight}fr`)
   deviceShell.style.setProperty("--candidate-top-inset-row", `${geometry.topInsetHeight}fr`)
+  deviceShell.style.setProperty("--candidate-inset-row", `${geometry.candidateInsetHeight}fr`)
   deviceShell.style.setProperty("--candidate-content-row", `${geometry.candidateContentHeight}fr`)
   // The keyboard spans the screen width, so a share of it in cqw follows the device frame's scale.
   const screenWidth = orientation.value === "port" ? spec.width : spec.height

@@ -104,3 +104,11 @@ export function bdaCompatibilityWarnings(archive: SkinArchive): string[] {
   if (encrypted.length) warnings.push(`ZIP 有 ${encrypted.length} 个条目被标记为加密，目标输入法可能静默拒绝`)
   return warnings
 }
+
+/** The keyboard that draws the skin: BDI is iOS; a BDS declared for iOS only, or an iOS BDA, too. */
+export function skinPlatform(archive: SkinArchive): Exclude<BdaPlatform, "unknown"> {
+  if (archive.format === "bdi") return "ios"
+  if (archive.format === "bda") return bdaPlatform(archive) === "ios" ? "ios" : "android"
+  const declared = infoValue(archive, "SupportPlatform")?.toUpperCase() ?? ""
+  return declared.includes("I") && !declared.includes("A") ? "ios" : "android"
+}

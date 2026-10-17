@@ -15,7 +15,7 @@ import { isConfiguredSymbolLayout } from "../actions.ts"
 import { resolveCandidateRect, resolveCandidateInputStyle, candidateInputBackgroundStyle, inputBarBox } from "../candidate-style.ts"
 import { drawInputBarBackground, setCanvasSize } from "../preview-draw.ts"
 import { bdaStyleID } from "../bda.ts"
-import { devicePreviewTransparent } from "./preview-render"
+import { devicePreviewTransparent, inputBarInKeyboard } from "./preview-render"
 import { canvasEditable } from "./edit-history"
 import { isSsfBoardPath, ssfSelectedBindings } from "./ssf-documents"
 
@@ -242,7 +242,10 @@ export function fitCandidateInputBar(): void {
   const areaWidth = candidateArea.clientWidth
   if (!bar || !areaWidth) return
   const textWidth = (candidateInputText.offsetWidth / areaWidth) * bar.candidateWidth
-  const box = inputBarBox(textWidth, bar.metrics, bar.candidateWidth)
+  // The box and its insets are Baidu Android's; iOS fills the whole keyboard row (see device-preview.css).
+  const box = inputBarInKeyboard()
+    ? { width: bar.candidateWidth, paddingStart: 0, paddingEnd: 0 }
+    : inputBarBox(textWidth, bar.metrics, bar.candidateWidth)
   const cqw = (value: number) => `${(value / bar.candidateWidth) * 100}cqw`
   candidateInputBox.style.setProperty("--candidate-input-box-width", cqw(box.width))
   candidateInputBox.style.setProperty("--candidate-input-padding-start", cqw(box.paddingStart))

@@ -104,6 +104,7 @@ export const deviceGeometryProperties = [
   "--keyboard-height-land",
   "--candidate-row",
   "--candidate-top-inset-row",
+  "--candidate-inset-row",
   "--candidate-content-row",
   "--candidate-input-height",
   "--panel-row",
