@@ -9,7 +9,8 @@ import { type AiDesignConversation } from "../ai-design.ts"
 import { type AiChatController } from "../ai-chat.ts"
 import { type LayoutImageTarget } from "../layout-image.ts"
 import { type LayoutImageConfig } from "./types"
-import { type TextVisual } from "../atlas.ts"
+import { type TextVisual, type Visual } from "../atlas.ts"
+import { type InputBarMetrics } from "../candidate-style.ts"
 import { DEFAULT_PANEL_WIDTH } from "../keyboard.ts"
 import { type TileSlice } from "../tiles.ts"
 import { type TilePoint } from "../tiles.ts"
@@ -86,6 +87,8 @@ export const appState = {
   fileOperationRunning: false,
   firstCandidateTextVisual: undefined as TextVisual | undefined,
   candidateTextWidth: DEFAULT_PANEL_WIDTH,
+  /** The input code bar's metrics and `[INPUT] BACK_STYLE`; its width follows the typed code. */
+  candidateInputBar: undefined as { metrics: InputBarMetrics; candidateWidth: number; visual?: Visual } | undefined,
   canvasLogicalSize: undefined as {
   width: number
   height: number

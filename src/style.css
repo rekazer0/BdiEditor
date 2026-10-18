@@ -1284,6 +1284,7 @@ h2 {
   display: none;
 }
 
+/* Baidu Android shows the input code in a popup whose bottom sits on the keyboard's top edge. */
 #candidate-input {
   position: absolute;
   inset-inline: 0;
@@ -1291,13 +1292,37 @@ h2 {
   height: var(--candidate-input-height, 0px);
   min-height: 0;
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 1;
   display: flex;
   align-items: center;
-  padding: 0 var(--candidate-cell-inset, 0cqw);
   overflow: hidden;
   line-height: 1.15;
   white-space: nowrap;
+}
+
+#candidate-input[hidden] {
+  display: none;
+}
+
+#candidate-input-box {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: var(--candidate-input-box-width, auto);
+  height: 100%;
+  padding-inline: var(--candidate-input-padding-start, 0cqw) var(--candidate-input-padding-end, 0cqw);
+  overflow: hidden;
+}
+
+#candidate-input-background {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 #candidate-words {

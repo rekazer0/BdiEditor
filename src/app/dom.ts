@@ -521,6 +521,12 @@ export const candidateComposition = $("#candidate-composition")
 
 export const candidateInput = $("#candidate-input")
 
+export const candidateInputBox = $("#candidate-input-box")
+
+export const candidateInputBackgroundCanvas = $("#candidate-input-background") as HTMLCanvasElement
+
+export const candidateInputText = $("#candidate-input-text")
+
 export const candidateWords = $("#candidate-words")
 
 export const modeChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mode-choice]"))

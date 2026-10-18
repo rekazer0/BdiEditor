@@ -213,7 +213,8 @@
   position: relative;
   z-index: 1;
   margin-top: auto;
-  overflow: hidden;
+  /* The input code bar floats above the keyboard; the glass layer below keeps the rounded corners. */
+  overflow: visible;
   isolation: isolate;
   border-radius: 6.65% 6.65% 0 0;
   border-top: 0;
@@ -450,9 +451,17 @@
   pointer-events: none;
 }
 
-.device-shell:not(.canvas-only) #candidate-input {
+/* On iOS the input code fills the keyboard row above the candidates and starts where their text does. */
+.device-shell[data-input-bar="keyboard"] #candidate-input-box {
+  width: 100%;
+  justify-content: flex-start;
+  padding-inline: calc(var(--candidate-left-padding, 0cqw) + var(--candidate-first-gap, 0cqw) + var(--candidate-cell-inset, 0cqw)) 0;
+}
+
+.device-shell[data-input-bar="keyboard"]:not(.canvas-only) #candidate-input {
   position: relative;
   inset: auto;
+  grid-row: 2;
   height: 100%;
 }
 
@@ -622,14 +631,6 @@
     0px
     minmax(0, var(--toolbar-viewport-height, 0px));
   overflow: visible;
-}
-
-.device-shell.canvas-only #candidate-input {
-  grid-row: 1;
-}
-
-.device-shell.canvas-only #candidate-words {
-  grid-row: 3;
 }
 
 .device-shell.canvas-only #candidate-area {

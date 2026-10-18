@@ -48,10 +48,13 @@ export function keyboardPreviewGeometry(
   panelLogicalHeight: number,
   candidateLogicalHeight: number,
   candidateInputLogicalHeight = 0,
+  inputBarInKeyboard = false,
 ): {
   candidateHeight: number
   topInsetHeight: number
+  /** On iOS the input code takes a row at the keyboard's top; Android shows it in a popup above. */
   candidateInsetHeight: number
+  inputBarHeight: number
   candidateContentHeight: number
   panelHeight: number
   safeBottomHeight: number
@@ -62,25 +65,26 @@ export function keyboardPreviewGeometry(
   const iphonePortrait = orientation === "port" && device.family === "iphone"
   const androidPortrait = orientation === "port" && device.family === "android"
   const candidateInputHeight = Math.max(0, candidateInputLogicalHeight)
+  const rowHeight = inputBarInKeyboard ? candidateInputHeight : 0
   const safeLogicalHeight = iphonePortrait
     ? device.width * (236 / 1206)
     : androidPortrait
       ? device.width * 0.06
       : 0
   const topInsetHeight = iphonePortrait ? device.width * (38 / 1206) : 0
-  const totalLogicalHeight = candidateLogicalHeight + candidateInputHeight + panelLogicalHeight
+  const totalLogicalHeight = candidateLogicalHeight + rowHeight + panelLogicalHeight
   const widthScale = screenWidth / skinWidth
   const heightScale = (screenHeight - safeLogicalHeight - topInsetHeight) / totalLogicalHeight
   const scale = Math.min(widthScale, heightScale)
-  const candidateInsetHeight = candidateInputHeight * scale
   const candidateContentHeight = candidateLogicalHeight * scale
-  const candidateHeight = topInsetHeight + (candidateInputHeight + candidateLogicalHeight) * scale
+  const candidateHeight = topInsetHeight + (rowHeight + candidateLogicalHeight) * scale
   const panelHeight = panelLogicalHeight * scale
   const safeBottomHeight = safeLogicalHeight
   return {
     candidateHeight,
     topInsetHeight,
-    candidateInsetHeight,
+    candidateInsetHeight: rowHeight * scale,
+    inputBarHeight: candidateInputHeight * scale,
     candidateContentHeight,
     panelHeight,
     safeBottomHeight,

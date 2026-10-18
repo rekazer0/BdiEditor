@@ -2,12 +2,13 @@ import { appState } from "./state"
 import { scheduleSsfPreview } from "./ssf-preview"
 import { type TextVisual, canvasFontFamily } from "../atlas.ts"
 import { setSimulatedComposition, toolbarPreview, currentDeviceValue, deviceGeometryProperties, preview, resizeKeyboardPreviews, schedulePreviewInteractionFrame, paintPreviewInteraction, applySkinState, REFERENCE_PHONE_WIDTH_SCALE, deviceFrameProperties } from "./canvas-interaction"
-import { simulatedOutput, skinState, candidateComposition, candidateInput, candidateWords, candidateArea, toolbarStrip, deviceShell, orientation, theme, layout, hintPreviewEnabled, canvasWrap, toolbarCanvas, panelStatus, previewZoomOut, previewZoomIn, $, skinStateValue, skinStateControl, toggleGuides, mobileToggleGuides } from "./dom"
+import { simulatedOutput, skinState, candidateComposition, candidateInput, candidateInputText, candidateWords, candidateArea, toolbarStrip, deviceShell, orientation, theme, layout, hintPreviewEnabled, canvasWrap, toolbarCanvas, panelStatus, previewZoomOut, previewZoomIn, $, skinStateValue, skinStateControl, toggleGuides, mobileToggleGuides } from "./dom"
 import { candidatePreview } from "../simulation.ts"
 import { isConfiguredSymbolLayout, skinStateLabel } from "../actions.ts"
 import { textDocument, visualResolver, currentBdaAppearance, bdaBasePath, bdaAvailableLayoutPaths } from "./bda-documents"
 import { genConfigPath, keyboardContext, refreshToolbarPreview, legacyAnimationConfigPath, styleConfigPath, toolbarConfigPath, isToolbarPath } from "./config-context"
 import { deviceSpec, keyboardPreviewGeometry, showsKeyboardAccessories } from "../devices.ts"
+import { skinPlatform } from "../bda-platform.ts"
 import { bdaConfigPath, bdaLayoutDocument, bdaStyleID } from "../bda.ts"
 import { decodeBdaAnimation } from "../bda-decode.ts"
 import { parseLegacyAnimation } from "../preview-animation.ts"
@@ -15,7 +16,7 @@ import { parseLegacyHint } from "../preview-hints.ts"
 import { previewItems, previewSurfaceHeight, previewContentVerticalBounds } from "../preview-items.ts"
 import { IniDocument } from "../ini.ts"
 import { resolvePanelConfig, DEFAULT_BDA_PANEL_WIDTH, DEFAULT_BDA_PANEL_HEIGHT } from "../keyboard.ts"
-import { candidateInputForegroundStyle, resolveCandidateTextVisuals } from "../candidate-style.ts"
+import { resolveCandidateInputTextVisual, resolveCandidateTextVisuals } from "../candidate-style.ts"
 import { availableSkinStates, canvasFitWidth, previewScalePercent } from "../panel-tools.ts"
 import { populateKeyInspector } from "./key-inspector"
 import { setDrawingTile, drawAtlas } from "./tile-editing"
@@ -55,7 +56,7 @@ export function renderCandidateState(): boolean {
   )
   candidateComposition.hidden = !state.composing
   candidateInput.hidden = !state.input
-  candidateInput.textContent = state.input
+  candidateInputText.textContent = state.input
   candidateWords.replaceChildren(...state.candidates.map((value) => {
     const item = document.createElement("span")
     item.textContent = value
@@ -77,12 +78,23 @@ export function refreshSimulationState(): boolean {
   return composing
 }
 
+/**
+ * Baidu iOS shows the input code in a row at the keyboard's top, Android in a popup above it. The
+ * phone decides, not the skin (iOS installs Android BDS too); the bare canvas follows the skin.
+ */
+export function inputBarInKeyboard(): boolean {
+  const spec = deviceSpec(currentDeviceValue())
+  if (spec) return spec.family === "iphone"
+  return Boolean(appState.archive && skinPlatform(appState.archive) === "ios")
+}
+
 export function applyDeviceKeyboardGeometry(
   panelWidth: number,
   panelHeight: number,
   candidateHeight: number,
   candidateInputHeight: number,
 ): void {
+  deviceShell.dataset.inputBar = inputBarInKeyboard() ? "keyboard" : "popup"
   const spec = deviceSpec(currentDeviceValue())
   if (!spec) {
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
@@ -95,6 +107,7 @@ export function applyDeviceKeyboardGeometry(
     panelHeight,
     candidateHeight,
     candidateInputHeight,
+    deviceShell.dataset.inputBar === "keyboard",
   )
   const screenHeight = orientation.value === "port" ? spec.height : spec.width
   deviceShell.style.setProperty(
@@ -105,7 +118,9 @@ export function applyDeviceKeyboardGeometry(
   deviceShell.style.setProperty("--candidate-top-inset-row", `${geometry.topInsetHeight}fr`)
   deviceShell.style.setProperty("--candidate-inset-row", `${geometry.candidateInsetHeight}fr`)
   deviceShell.style.setProperty("--candidate-content-row", `${geometry.candidateContentHeight}fr`)
-  deviceShell.style.setProperty("--candidate-input-height", `${geometry.candidateInsetHeight}px`)
+  // The keyboard spans the screen width, so a share of it in cqw follows the device frame's scale.
+  const screenWidth = orientation.value === "port" ? spec.width : spec.height
+  deviceShell.style.setProperty("--candidate-input-height", `${(geometry.inputBarHeight / screenWidth) * 100}cqw`)
   deviceShell.style.setProperty("--panel-row", `${geometry.panelHeight}fr`)
   deviceShell.style.setProperty("--safe-row", `${geometry.safeBottomHeight}fr`)
 }
@@ -180,10 +195,7 @@ export function refreshPreview(): void {
       context.gen,
       context.styles,
     )
-    const inputVisual = resolver.resolveText(
-      candidateInputForegroundStyle(context.gen, candidateLayout),
-      false,
-    )
+    const inputVisual = resolveCandidateInputTextVisual(context.gen, resolver, candidateLayout, inputBarInKeyboard())
     const { normal: candidateVisual, first: firstCandidateVisual } =
       resolveCandidateTextVisuals(candidateLayout, context.gen, resolver)
     appState.firstCandidateTextVisual = firstCandidateVisual
@@ -227,12 +239,9 @@ export function refreshPreview(): void {
     const panelHeight = layoutSize?.[1] || generalSize?.[1] || DEFAULT_BDA_PANEL_HEIGHT
     const candidateDocument = toolbarConfigPath() ? textDocument(toolbarConfigPath()!) : undefined
     const panel = currentBdaAppearance()?.appearance.panels.get(layout.value.replace(/\.ini$/i, ""))
-    const inputVisual = resolver?.resolveText(
-      panel?.input?.textStyle
-        ? bdaStyleID(panel.input.textStyle)
-        : candidateInputForegroundStyle(bdaGen, candidateDocument),
-      false,
-    )
+    const inputVisual = panel?.input?.textStyle
+      ? resolver?.resolveText(bdaStyleID(panel.input.textStyle), false)
+      : resolver && resolveCandidateInputTextVisual(bdaGen, resolver, candidateDocument, inputBarInKeyboard())
     const { normal: candidateVisual, first: firstVisual } = resolver
       ? resolveCandidateTextVisuals(candidateDocument, bdaGen, resolver)
       : { normal: undefined, first: undefined }
@@ -360,8 +369,11 @@ export function fitCanvasPreview(): void {
   const toolbarWidth = Number(toolbarCanvas.style.getPropertyValue("--toolbar-width") || "0")
   if (toolbarWidth > 0 && toolbarHeight > 0) {
     deviceShell.style.setProperty("--toolbar-viewport-height", `${Math.round(toolbarHeight * scale)}px`)
-    const inputHeight = Number(toolbarCanvas.style.getPropertyValue("--candidate-input-height") || "0")
-    deviceShell.style.setProperty("--candidate-input-height", `${Math.round(inputHeight * scale)}px`)
+    // A device frame sizes the input code bar in applyDeviceKeyboardGeometry.
+    if (currentDeviceValue() === "canvas") {
+      const inputHeight = Number(toolbarCanvas.style.getPropertyValue("--candidate-input-height") || "0")
+      deviceShell.style.setProperty("--candidate-input-height", `${Math.round(inputHeight * scale)}px`)
+    }
     deviceShell.style.setProperty(
       "--candidate-viewport-height",
       `${Math.round(toolbarHeight * scale)}px`,

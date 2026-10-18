@@ -26,8 +26,9 @@ export function resolveCandidateRect(
   }
 }
 
-function inputInset(width: number): number {
-  const density = width <= 240 ? 0.75
+/** The density Baidu Android assumes a skin of this panel width was drawn for (`ImeBaseGlobal.d`). */
+function skinDensity(width: number): number {
+  return width <= 240 ? 0.75
     : width < 360 ? 1
     : width < 480 ? 1.2
     : width < 600 ? 1.5
@@ -38,15 +39,36 @@ function inputInset(width: number): number {
     : width < 1152 ? 3.3
     : width < 1280 ? 3.6
     : 4.4
-  return Math.trunc(density * 2.5)
 }
 
-type CandidateInputStyle = {
-  foregroundStyle: string
+/**
+ * Baidu Android's input code bar (`InputBarView`), in skin units: `inset` is `ImeBaseGlobal.L`
+ * (2.5dp), `textLeft` is where the code starts (6dp).
+ */
+export type InputBarMetrics = {
   height: number
+  inset: number
+  textLeft: number
 }
 
-export function candidateInputForegroundStyle(
+type CandidateInputStyle = InputBarMetrics & { foregroundStyle: string }
+
+/**
+ * The bar's box: as wide as the code plus 6dp before and two insets after it; a code wider than
+ * the panel fills it and shows its end, an inset from either edge.
+ */
+export function inputBarBox(
+  textWidth: number,
+  metrics: InputBarMetrics,
+  panelWidth: number,
+): { width: number; paddingStart: number; paddingEnd: number } {
+  const width = metrics.textLeft + textWidth + metrics.inset * 2
+  return width > panelWidth
+    ? { width: panelWidth, paddingStart: metrics.inset, paddingEnd: metrics.inset }
+    : { width, paddingStart: metrics.textLeft, paddingEnd: metrics.inset * 2 }
+}
+
+function candidateInputForegroundStyle(
   general: IniDocument | undefined,
   candidate?: IniDocument,
 ): string {
@@ -57,6 +79,37 @@ export function candidateInputForegroundStyle(
     general?.get("INPUT", "FORE_STYLE"),
     general?.get("SCAND", "FORE_STYLE"),
   ].map((value) => value?.trim() ?? "").find(Boolean) ?? ""
+}
+
+export function resolveCandidateInputTextVisual(
+  general: IniDocument | undefined,
+  resolver: VisualResolver,
+  candidate?: IniDocument,
+  inKeyboard = false,
+): TextVisual | undefined {
+  const visual = resolver.resolveText(candidateInputForegroundStyle(general, candidate), false)
+  if (!inKeyboard || !visual) return visual
+  const input = resolver.resolveText([
+    candidate?.get("CAND", "INPUT_STYLE"),
+    candidate?.get("INPUT", "FORE_STYLE"),
+    general?.get("INPUT", "FORE_STYLE"),
+  ].map((value) => value?.trim() ?? "").find(Boolean) ?? "", false)
+  // shortcut: iOS 的 INPUT 字号与 SCAND 颜色已按真机截图校准，取得 iOS 绘制代码后核对更多皮肤。
+  return { ...input, ...visual, fontSize: input?.fontSize ?? visual.fontSize }
+}
+
+/** iOS draws the inline row with SCAND; Android's popup uses INPUT. */
+export function candidateInputBackgroundStyle(
+  general: IniDocument | undefined,
+  candidate?: IniDocument,
+  inKeyboard = false,
+): string {
+  return [
+    inKeyboard ? candidate?.get("SCAND", "BACK_STYLE") : undefined,
+    candidate?.get("INPUT", "BACK_STYLE"),
+    inKeyboard ? general?.get("SCAND", "BACK_STYLE") : undefined,
+    general?.get("INPUT", "BACK_STYLE"),
+  ].map((value) => value?.split(",")[0].trim() ?? "").find(Boolean) ?? ""
 }
 
 export function resolveCandidateTextVisuals(
@@ -78,9 +131,16 @@ export function resolveCandidateInputStyle(
   resolver: VisualResolver,
   width: number,
   candidate?: IniDocument,
+  inKeyboard = false,
 ): CandidateInputStyle {
   const foregroundStyle = candidateInputForegroundStyle(general, candidate)
-  const fontSize = resolver.resolveText(foregroundStyle, false)?.fontSize
-  const height = fontSize && fontSize > 0 ? fontSize + (inputInset(width) * 2) : 0
-  return { foregroundStyle, height }
+  const fontSize = resolveCandidateInputTextVisual(general, resolver, candidate, inKeyboard)?.fontSize
+  if (!fontSize || fontSize <= 0) return { foregroundStyle, height: 0, inset: 0, textLeft: 0 }
+  const density = skinDensity(width)
+  const inset = Math.trunc(density * 2.5)
+  const background = inKeyboard
+    ? resolver.sourceSize?.(candidateInputBackgroundStyle(general, candidate, true), false)
+    : undefined
+  const height = background?.width === width && background.height > 0 ? background.height : fontSize + inset * 2
+  return { foregroundStyle, height, inset, textLeft: Math.trunc(density * 6) }
 }

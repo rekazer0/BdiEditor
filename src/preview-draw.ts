@@ -237,6 +237,38 @@ export function drawVisual(
   strokeBorder(context, visual, destination)
 }
 
+/**
+ * Baidu Android's input code bar background (`InputBarView`): `[INPUT] BACK_STYLE`'s NM_COLOR fills
+ * the box, the style's image only when it has no colour (none, or 00000000); BORDER_COLOR edges the
+ * left, top and right.
+ */
+export function drawInputBarBackground(
+  context: CanvasRenderingContext2D,
+  visual: Visual | undefined,
+  width: number,
+  height: number,
+): void {
+  if (!visual) return
+  const box = { x: 0, y: 0, width, height }
+  if (visual.color && visual.color !== "rgba(0, 0, 0, 0)") {
+    if (!isTransparentColor(visual.color)) {
+      context.fillStyle = visual.color
+      context.fillRect(0, 0, width, height)
+    }
+  } else {
+    drawVisual(context, { ...visual, borderColor: undefined }, box, true)
+  }
+  if (!visual.borderColor || isTransparentColor(visual.borderColor)) return
+  context.strokeStyle = visual.borderColor
+  context.lineWidth = 1
+  context.beginPath()
+  context.moveTo(0.5, height)
+  context.lineTo(0.5, 0.5)
+  context.lineTo(width - 0.5, 0.5)
+  context.lineTo(width - 0.5, height)
+  context.stroke()
+}
+
 export function filterRgb(color: string): string {
   const match = color.match(/^rgba\(([^,]+),([^,]+),([^,]+),/)
   return match ? `rgb(${match[1]}, ${match[2]}, ${match[3]})` : color
