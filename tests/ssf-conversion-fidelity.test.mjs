@@ -1,0 +1,134 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { strToU8, unzipSync, zipSync } from 'fflate'
+import { IniDocument } from '../src/ini.ts'
+import { SkinArchive } from '../src/skin.ts'
+import { offsetFromSection } from '../src/preview-items.ts'
+import { convertBaiduToSsf } from '../src/ssf/baidu-to-ssf.ts'
+import { convertSsfToBaidu } from '../src/ssf/ssf-to-baidu.ts'
+import { convertSsfToBda } from '../src/ssf/ssf-to-bda.ts'
+import { decodeBdaAppearance } from '../src/bda-decode.ts'
+import { SsfPackage } from '../src/ssf/ssf-package.ts'
+import { SsfLook } from '../src/ssf/ssf-look.ts'
+import { decodePng, encodePng } from '../src/ssf/ssf-png.ts'
+import { ssfFixture, solid } from './helpers/ssf-fixture.mjs'
+
+const templateBytes = new Uint8Array(readFileSync(new URL('../public/default-template.bds', import.meta.url)))
+const template = SkinArchive.open(templateBytes)
+const pixel = (image, x, y) => [...image.data.subarray((y * image.width + x) * 4, (y * image.width + x) * 4 + 4)]
+const parse = (files, path) => IniDocument.parse(new TextDecoder().decode(files[path]))
+const keySection = (document, action) => document.sections().find((name) => /^KEY\d+$/.test(name) && document.get(name, 'CENTER') === action)
+
+function styleImage(archive, styleID) {
+  const css = IniDocument.parse(archive.getText('light/skin/res/default.css'))
+  const [name] = css.get(`STYLE${styleID}`, 'NM_IMG').split(',')
+  return decodePng(archive.getBytes(`light/skin/res/${name}.png`))
+}
+
+test('Baidu R_POS uses percentages of the key; POS stays in pixels', () => {
+  const document = IniDocument.parse('[OFFSET1]\nR_POS=25,-25\n[OFFSET2]\nPOS=4,-3\nR_POS=99,99\n')
+  assert.deepEqual(offsetFromSection(document, 'OFFSET1', { width: 80, height: 40 }), [20, -10])
+  assert.deepEqual(offsetFromSection(document, 'OFFSET2', { width: 80, height: 40 }), [4, -3])
+})
+
+test('Baidu → SSF places R_POS foregrounds relative to the key and respects explicit offsets', async () => {
+  for (const explicit of [undefined, '1,2']) {
+    const files = unzipSync(templateBytes)
+    const layout = parse(files, 'port/py_26.ini')
+    const q = keySection(layout, 'q')
+    const [, , width, height] = layout.get(q, 'VIEW_RECT').split(',').map(Number)
+    layout.set(q, 'FORE_STYLE', '99002')
+    layout.set(q, 'POS_TYPE', '1')
+    layout.remove(q, 'FORE_OFFSET')
+    if (explicit) layout.set(q, 'FORE_OFFSET', explicit)
+    const gen = parse(files, 'port/gen.ini')
+    gen.removeSections(['OFFSET1'])
+    gen.appendSection('OFFSET1', [{ key: 'R_POS', value: '25,-25' }])
+    const css = parse(files, 'res/default.css')
+    css.appendSection('STYLE99002', [{ key: 'NM_IMG', value: 'offset_glyph,1' }])
+    files['res/offset_glyph.png'] = encodePng(solid(6, 6, [12, 34, 56]))
+    files['res/offset_glyph.til'] = strToU8('[IMG1]\nSOURCE_RECT=0,0,6,6\n')
+    files['port/py_26.ini'] = strToU8(layout.toString())
+    files['port/gen.ini'] = strToU8(gen.toString())
+    files['res/default.css'] = strToU8(css.toString())
+    const { bytes } = await convertBaiduToSsf(SkinArchive.open(zipSync(files)))
+    const pkg = await SsfPackage.open(bytes)
+    const rect = pkg.keys('light').get('Key_Q', 'FG_RECT').split(',').map(Number)
+    const [dx, dy] = explicit ? [1, 2] : [Math.trunc(width / 4), Math.trunc(-height / 4)]
+    const expected = [Math.round((width - 6) / 2 + dx) / width, Math.round((height - 6) / 2 + dy) / height, 6 / width, 6 / height]
+    rect.forEach((value, index) => assert.ok(Math.abs(value - expected[index]) < 0.001, `${explicit ?? 'R_POS'}: ${rect}`))
+  }
+})
+
+test('SSF foreground replaces template offsets and fills its FG_RECT in the target key', async () => {
+  const files = unzipSync(templateBytes)
+  const layout = parse(files, 'port/py_26.ini')
+  const q = keySection(layout, 'q')
+  layout.set(q, 'POS_TYPE', '1')
+  files['port/py_26.ini'] = strToU8(layout.toString())
+  const { archive } = convertSsfToBaidu(await SsfPackage.open(ssfFixture()), SkinArchive.open(zipSync(files)))
+  const result = IniDocument.parse(archive.getText('light/skin/port/py_26.ini'))
+  assert.equal(result.get(q, 'POS_TYPE'), undefined)
+  assert.equal(result.get(q, 'FORE_OFFSET'), undefined)
+  const [, , width, height] = result.get(q, 'VIEW_RECT').split(',').map(Number)
+  const image = styleImage(archive, result.get(q, 'FORE_STYLE'))
+  assert.deepEqual([image.width, image.height], [width, height])
+  assert.equal(pixel(image, width >> 1, Math.floor(height * 0.1))[3], 0)
+  assert.ok(pixel(image, width >> 1, Math.floor(height * 0.5))[3] > 0)
+})
+
+test('SSF explicit transparent function icon also hides the Baidu template icon', async () => {
+  const files = unzipSync(ssfFixture())
+  const skin = parse(files, '1080/status1/phoneSkin.ini')
+  skin.appendSection('Key_Enter_Qwerty', [{ key: 'ICON', value: 'transparent.png' }])
+  files['1080/status1/phoneSkin.ini'] = strToU8(skin.toString())
+  files['1080/status1/transparent.png'] = encodePng(solid(1, 1, [0, 0, 0], 0))
+  const { archive } = convertSsfToBaidu(await SsfPackage.open(zipSync(files)), template)
+  const layout = IniDocument.parse(archive.getText('light/skin/port/py_26.ini'))
+  const image = styleImage(archive, layout.get(keySection(layout, 'F39'), 'FORE_STYLE'))
+  assert.ok(image.data.every((value, index) => index % 4 !== 3 || value === 0))
+})
+
+test('Baidu → SSF → Baidu applies a translucent candidate background only once', async () => {
+  const files = unzipSync(templateBytes)
+  const gen = parse(files, 'port/gen.ini')
+  const candPath = `port/${gen.get('CAND', 'LAYOUT_NAME')}.cnd`
+  const cand = parse(files, candPath)
+  const css = parse(files, 'res/default.css')
+  css.appendSection('STYLE99001', [{ key: 'NM_COLOR', value: '80406080' }])
+  cand.set('CAND', 'BACK_STYLE', '99001')
+  files[candPath] = strToU8(cand.toString())
+  files['res/default.css'] = strToU8(css.toString())
+  const { bytes } = await convertBaiduToSsf(SkinArchive.open(zipSync(files)))
+  const pkg = await SsfPackage.open(bytes)
+  const look = new SsfLook(pkg, 'light', [], 1080)
+  const image = decodePng(look.keyboard().cand.bytes)
+  assert.deepEqual(pixel(image, image.width >> 1, image.height >> 1), [64, 96, 128, 128])
+})
+
+test('SSF RootView BG_STYLE=2 uses BG_COLOR ahead of an inactive BG_IMAGE', async () => {
+  const files = unzipSync(ssfFixture())
+  const skin = parse(files, '1080/status1/phoneSkin.ini')
+  skin.set('RootView', 'BG_STYLE', '2')
+  skin.set('RootView', 'BG_COLOR', '0xFF123456')
+  skin.appendSection('WALLPAPER', [{ key: 'BG_IMAGE', value: 'bg.png' }])
+  files['1080/status1/phoneSkin.ini'] = strToU8(skin.toString())
+  const look = new SsfLook(await SsfPackage.open(zipSync(files)), 'light', [])
+  assert.equal(Boolean(look.keyboard().panel), false)
+  assert.equal(look.keyboard().panelColor, 'FF123456')
+  const pkg = await SsfPackage.open(zipSync(files))
+  const { archive } = convertSsfToBaidu(pkg, template)
+  const gen = IniDocument.parse(archive.getText('light/skin/port/gen.ini'))
+  const css = IniDocument.parse(archive.getText('light/skin/res/default.css'))
+  assert.equal(css.get(`STYLE${gen.get('PANEL', 'BACK_STYLE')}`, 'NM_COLOR'), 'FF123456')
+  const bda = SkinArchive.open(new Uint8Array(readFileSync(new URL('../public/default-template.bda', import.meta.url))), 'bda')
+  const converted = convertSsfToBda(pkg, bda)
+  assert.ok(!converted.warnings.some((warning) => warning.includes('纯色背景')))
+  for (const orientation of ['port', 'land']) {
+    const appearance = decodeBdaAppearance(converted.archive.getBytes(`light/skin/${orientation}/appearanceConfig`))
+    const ref = appearance.panels.get('py_26').backStyle
+    assert.equal(ref.type, 'color')
+    assert.equal(appearance.colorStyles.get(ref.key).normalColor, 0xFF123456)
+  }
+})

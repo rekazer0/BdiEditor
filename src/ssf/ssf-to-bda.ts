@@ -45,7 +45,7 @@ function mapEntry(key: number, value: Uint8Array): Uint8Array {
  * Next free style keys of a theme. BDA style keys are global across a theme's orientations (the
  * converters merge both into one default.css), so new keys start above every orientation's maximum.
  */
-type StyleKeys = { image: number; text: number }
+type StyleKeys = { image: number; text: number; color: number }
 
 /** Collects every edit to one appearanceConfig and its theme's `res/` images. */
 class AppearanceWriter {
@@ -77,6 +77,13 @@ class AppearanceWriter {
     ])
     this.appended.push(encodedField(1, 2, mapEntry(key, style)))
     return styleRef("image", key)
+  }
+
+  colorStyle(color: string): Uint8Array {
+    const key = this.keys.color++
+    const style = join([1, 2].map((field) => encodedField(field, 0, encodeVarint(Number.parseInt(color, 16)))))
+    this.appended.push(encodedField(3, 2, mapEntry(key, style)))
+    return styleRef("color", key)
   }
 
   /** A copy of a template text style with the Sogou label colours, shared by every key that needs it. */
@@ -169,6 +176,7 @@ class BdaThemeConverter {
     this.keys = {
       image: Math.max(0, ...appearances.flatMap((appearance) => [...appearance.imageStyles.keys()])) + 1,
       text: Math.max(0, ...appearances.flatMap((appearance) => [...appearance.textStyles.keys()])) + 1,
+      color: Math.max(0, ...appearances.flatMap((appearance) => [...appearance.colorStyles.keys()])) + 1,
     }
     const used = template.names().filter((path) => /\/res\/[^/]+\.png$/i.test(path)).map((path) => path.split("/").pop()!.slice(0, -4))
     this.images = new ThemeImages(theme, output, used)
@@ -219,9 +227,8 @@ class BdaThemeConverter {
     const appearance = decodeBdaAppearanceUncached(source)
     const writer = new AppearanceWriter(source, this.images, this.keys)
     const { panel, cand, panelColor } = this.look.keyboard()
-    const panelRef = panel ? writer.imageStyle({ normal: panel, pressed: panel }) : undefined
+    const panelRef = panel ? writer.imageStyle({ normal: panel, pressed: panel }) : panelColor ? writer.colorStyle(panelColor) : undefined
     const candRef = cand ? writer.imageStyle({ normal: cand, pressed: cand }) : undefined
-    if (!panel && panelColor) this.warnings.push("BDA 键盘背景只支持图片，纯色背景保留模板样式")
     const candidateText = this.look.color("TextStyle_Candidate")
     const candidateColors = candidateText ? { normal: candidateText, pressed: this.look.color("TextStyle_Candidate_Highlight") ?? candidateText } : undefined
     const list = this.look.list()

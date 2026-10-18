@@ -260,14 +260,13 @@ test('ssf → BDS: per-key and shared backgrounds keep their stretch band, per t
   assert.ok(warnings.some((warning) => /webp/.test(warning)))
 })
 
-test('ssf → BDS: FG_RECT becomes transparent padding and icons are centred on the key canvas, at template scale', async () => {
+test('ssf → BDS: FG_RECT uses the target key and icons are centred on the key canvas', async () => {
   const { archive } = convertSsfToBaidu(await SsfPackage.open(ssfFixture()), bdsTemplate)
   const fore = baiduKeyStyle(archive, 'light', 'port', 'py_26', 'q', 'FORE_STYLE').image
-  // FG_RECT=0,0.25,1,0.75 on a 90 px glyph → a 98×120 canvas with the glyph in its bottom 90 rows,
-  // shrunk ×4/9 to the 480-wide template: 44×53 with the glyph from row ~13.
-  assert.deepEqual([fore.width, fore.height], [44, 53])
-  assert.deepEqual(pixel(fore, 0, 11), [0, 0, 0, 0])
-  assert.deepEqual(rgb(fore, 0, 16), COLORS.light.qGlyph)
+  // FG_RECT=0,0.25,1,0.75 occupies the bottom 75% of the target's 44×73 key.
+  assert.deepEqual([fore.width, fore.height], [44, 73])
+  assert.deepEqual(pixel(fore, 0, 16), [0, 0, 0, 0])
+  assert.deepEqual(rgb(fore, 0, 20), COLORS.light.qGlyph)
   const icon = baiduKeyStyle(archive, 'light', 'port', 'py_26', 'F36', 'FORE_STYLE').image
   assert.deepEqual([icon.width, icon.height], [44, 63])
   assert.deepEqual(pixel(icon, 0, 0), [0, 0, 0, 0])
@@ -379,7 +378,7 @@ test('ssf → BDA: new style keys never collide between orientations, so BDA →
   const { archive } = convertSsfToBda(await SsfPackage.open(ssfFixture()), bdaTemplate)
   const port = decodeBdaAppearance(archive.getBytes('light/skin/port/appearanceConfig'))
   const land = decodeBdaAppearance(archive.getBytes('light/skin/land/appearanceConfig'))
-  for (const group of ['imageStyles', 'textStyles']) {
+  for (const group of ['imageStyles', 'textStyles', 'colorStyles']) {
     const shared = [...port[group].keys()].filter((key) => land[group].has(key))
     const differing = shared.filter((key) => JSON.stringify(port[group].get(key)) !== JSON.stringify(land[group].get(key)))
     assert.ok(differing.length <= 1, `${group} 冲突 ${differing.length}`)
@@ -478,15 +477,20 @@ test('BDA → BDS keeps portrait styles when landscape exists', () => {
   assert.deepEqual(missing, [])
 })
 
-test('ssf → BDS: an extreme FG_RECT keeps the bare glyph instead of a giant canvas', async () => {
+test('ssf → BDS: an extreme FG_RECT stays inside the target key without a giant canvas', async () => {
   const files = unzipSync(ssfFixture())
   const keys = IniDocument.parse(strFromU8(files['1080/status1/keys.ini']))
   keys.set('Key_Q', 'FG_RECT', '0,0,0.001,0.001')
   files['1080/status1/keys.ini'] = strToU8(keys.toString())
   const { archive } = convertSsfToBaidu(await SsfPackage.open(zipSync(files)), bdsTemplate)
   const fore = baiduKeyStyle(archive, 'light', 'port', 'py_26', 'q', 'FORE_STYLE').image
-  // The bare 98×90 glyph, only shrunk to template scale.
-  assert.deepEqual([fore.width, fore.height], [44, 40])
+  assert.deepEqual([fore.width, fore.height], [44, 73])
+  assert.equal(fore.data.filter((value, index) => index % 4 === 3 && value > 0).length, 1)
+  keys.set('Key_Q', 'FG_RECT', '0,0,-1,0.5')
+  files['1080/status1/keys.ini'] = strToU8(keys.toString())
+  const invalid = convertSsfToBaidu(await SsfPackage.open(zipSync(files)), bdsTemplate).archive
+  const fallback = baiduKeyStyle(invalid, 'light', 'port', 'py_26', 'q', 'FORE_STYLE').image
+  assert.deepEqual([fallback.width, fallback.height], [44, 40])
 })
 
 test('ssf → BDS: sound names cannot leave the res folder', async () => {

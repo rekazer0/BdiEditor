@@ -138,7 +138,7 @@ export class SsfLook {
   }
 
   /** `on` reads the `_ON` states, which Sogou's pinyin boards show on letter keys (capitals). */
-  private foregroundSource(binding: SsfKeyBinding, native: boolean, on: boolean): Foreground | undefined {
+  private foregroundSource(binding: SsfKeyBinding, on: boolean): Foreground | undefined {
     const found = ssfForeground(this.skin, this.keys, binding)
     if (found?.kind === "keys") {
       const state = (name: string) => firstValue(this.keys.get(found.images, on ? `${name}_ON` : name)) ?? firstValue(this.keys.get(found.images, name))
@@ -149,7 +149,7 @@ export class SsfLook {
       const icon = firstValue(this.skin.get(found.owner, "ICON"))!
       return { normal: icon, pressed: firstValue(this.skin.get(found.owner, "ICON_PRESSED")) ?? icon }
     }
-    if (native && binding.sections.some((section) => /^transparent\.png$/i.test(firstValue(this.skin.get(section, "ICON")) ?? ""))) {
+    if (binding.sections.some((section) => /^transparent\.png$/i.test(firstValue(this.skin.get(section, "ICON")) ?? ""))) {
       return { normal: "transparent.png", pressed: "transparent.png" }
     }
   }
@@ -158,14 +158,20 @@ export class SsfLook {
    * FG_RECT (fractions of the key) becomes transparent padding; an icon is centred on a canvas the
    * size of the key's own background image, which Sogou draws at the key's real size.
    */
-  private foregroundImage(name: string, rect: number[] | undefined, canvas: [number, number] | undefined): LookImage | undefined {
+  private foregroundImage(name: string, rect: number[] | undefined, canvas: [number, number] | undefined, target?: [number, number]): LookImage | undefined {
     const bytes = this.file(name)
     const size = bytes && pngSize(bytes)
     if (!bytes || !size) return
     const [sourceWidth, sourceHeight] = size
     if (rect) {
       const [x, y, width, height] = rect
-      if (!(width > 0 && height > 0 && width <= 1 && height <= 1) || (!x && !y && width === 1 && height === 1)) return { id: name, bytes }
+      if (!(width > 0 && height > 0 && width <= 1 && height <= 1)) return { id: name, bytes }
+      if (target) return this.derive(`rect:${rect.join(",")}:target:${target.join(",")}`, [bytes], () => {
+        const source = this.decode(name, bytes)
+        const glyph = source && resizeImage(source, Math.max(1, Math.round(target[0] * width)), Math.max(1, Math.round(target[1] * height)))
+        return glyph && placeImage(glyph, target[0], target[1], Math.round(x * target[0]), Math.round(y * target[1]))
+      })
+      if (!x && !y && width === 1 && height === 1) return { id: name, bytes }
       const canvasWidth = Math.round(sourceWidth / width)
       const canvasHeight = Math.round(sourceHeight / height)
       // A tiny FG_RECT would ask for a canvas many times the glyph; such a key keeps the bare glyph.
@@ -198,9 +204,10 @@ export class SsfLook {
     const sogouBack = this.background(binding)
     // Sogou's pinyin layouts mark letter keys S_FLAG=1 (English ones add KEY_FLAG_VALUE): they start upper case.
     const on = /^[a-z]$/.test(action) && ["py9", "py26"].includes(ssfBoard(layout))
-    const source = this.foregroundSource(binding, !!sourceSection, on)
+    const source = this.foregroundSource(binding, on)
     const canvas = sogouBack ? pngSize(sogouBack.normal.bytes) : undefined
     const foreground = (name: string) => {
+      if (source?.rect && size && source.rect.slice(2).every((value) => value > 0 && value <= 1)) return this.foregroundImage(name, source.rect, canvas, size)
       const image = this.foregroundImage(name, source?.rect, canvas)
       return image && (sourceSection && size ? this.resized(image, Math.round(size[0]), Math.round(size[1])) : this.fitted(image, size))
     }
@@ -220,7 +227,8 @@ export class SsfLook {
    */
   keyboard(): { panel?: LookImage; cand?: LookImage; panelColor?: string } {
     if (this.keyboardCache) return this.keyboardCache
-    const backgroundName = [
+    const solidBackground = this.skin.get("RootView", "BG_STYLE")?.trim() === "2"
+    const backgroundName = solidBackground ? undefined : [
       this.skin.get("RootView", "BG_IMAGE"),
       this.skin.get("WALLPAPER", "BG_IMAGE"),
       this.skin.get("General", "PLATFORM_BG_IMAGE"),
@@ -250,7 +258,8 @@ export class SsfLook {
     } else if (barRef && barBytes) {
       result.cand = { id: barRef.file, bytes: barBytes, stretch: barRef.stretch }
     }
-    result.panelColor = ssfColor(this.skin.get("WALLPAPER", "COLOR")) ?? ssfColor(this.skin.get("RootView", "BG_FUNCTION_COLOR"))
+    result.panelColor = (solidBackground ? ssfColor(this.skin.get("RootView", "BG_COLOR")) : undefined)
+      ?? ssfColor(this.skin.get("WALLPAPER", "COLOR")) ?? ssfColor(this.skin.get("RootView", "BG_FUNCTION_COLOR"))
     if (!result.panel && !result.panelColor) this.warnings.push(`${this.theme === "dark" ? "夜间" : "白天"}外观没有键盘背景，保留模板背景`)
     this.keyboardCache = result
     return result

@@ -236,6 +236,7 @@ export async function paintPreview(self: Preview): Promise<void> {
       const offset = key.foreOffsets[layer] ?? offsetFromSection(
         self.offsets,
         `OFFSET${key.positionTypes[layer] ?? ""}`,
+        key.rect,
       )
       const destination = key.foreRect ?? foregroundLayerRect(key.rect, fore?.source, offset)
       withTransform(context, key.rect, foreScale, foreTranslation, foreRotation, foreOpacity, () => {
@@ -261,6 +262,7 @@ export async function paintPreview(self: Preview): Promise<void> {
       const offset = key.foreOffsets[layer] ?? offsetFromSection(
         self.offsets,
         `OFFSET${key.positionTypes[layer] ?? ""}`,
+        key.rect,
       )
       const point = foregroundTextPoint(key.foreRect ?? key.rect, offset)
       withTransform(context, key.rect, foreScale, foreTranslation, foreRotation, foreOpacity, () => {

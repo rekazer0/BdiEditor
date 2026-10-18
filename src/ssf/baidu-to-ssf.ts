@@ -3,11 +3,13 @@
 // The reverse of ssf-to-baidu.ts with the same key table: every Baidu key names one Sogou key class,
 // the first key reaching a class decides its look. Atlas slices are cut into standalone PNGs (Sogou
 // references whole files), INNER_RECT becomes the Sogou stretch band, and a key's foreground layers
-// are flattened into one image whose place on the key becomes FG_RECT. The Sogou background spans the candidate bar and the keys, so the Baidu candidate
-// bar and panel backgrounds are stacked into one image. Light/dark themes become day/night statuses.
+// are flattened into one image whose place on the key becomes FG_RECT. The Sogou background spans
+// the candidate bar and keys; its top strip stays transparent beneath the separate candidate image.
+// Light/dark themes become day/night statuses.
 
 import { strToU8, zipSync } from "fflate"
 import { IniDocument } from "../ini.ts"
+import { offsetFromSection } from "../preview-items.ts"
 import type { SkinArchive } from "../skin.ts"
 import { soundAsWav } from "../sounds.ts"
 import { ssfBoard, ssfKeyBinding, type SsfKeyBinding } from "./ssf-keymap.ts"
@@ -277,13 +279,12 @@ function sampleKeys(archive: SkinArchive, theme: Theme, warnings: string[]): Map
         const foreIDs = document.get(section, "FORE_STYLE")?.split(",").map((value) => value.trim()).filter(Boolean) ?? []
         const offsets = document.get(section, "FORE_OFFSET")?.split(";") ?? []
         const positions = document.get(section, "POS_TYPE")?.split(",") ?? []
+        const [, , width, height] = numbers(document.get(section, "VIEW_RECT"))
         const layers = foreIDs.map((id, index) => ({
           pair: styles.resolve(id),
-          // Like the editor preview: the key's own offset, else the gen.ini OFFSETn its POS_TYPE names.
-          offset: offsetValue(offsets[index]) ?? offsetValue(gen?.get(`OFFSET${positions[index]?.trim()}`, "POS") ?? gen?.get(`OFFSET${positions[index]?.trim()}`, "R_POS")) ?? [0, 0],
+          offset: offsetValue(offsets[index]) ?? offsetFromSection(gen, `OFFSET${positions[index]?.trim()}`, { width, height }) ?? [0, 0],
         }))
         const text = layers.find(({ pair }) => pair?.color && !pair.normal)?.pair
-        const [, , width, height] = numbers(document.get(section, "VIEW_RECT"))
         const fore = width > 0 && height > 0 ? foreground(layers, Math.round(width), Math.round(height), styles.scale) : undefined
         samples.set(name, { layout, binding, back, fore, labelColor: text?.color, labelPressedColor: text?.pressedColor })
       }
@@ -323,9 +324,8 @@ function keyboardBackground(styles: BaiduStyles, archive: SkinArchive, theme: Th
   const panel = fill(firstStyle(styles, sources.panel, "PANEL", "BACK_STYLE"), SOGOU_KEYBOARD_HEIGHT)
   const bar = fill(firstStyle(styles, sources.cand, "CAND", "BACK_STYLE"), SOGOU_BAR_HEIGHT)
   if (!panel) return { bar }
-  const background = placeImage(panel, SOGOU_WIDTH, SOGOU_BAR_HEIGHT + SOGOU_KEYBOARD_HEIGHT, 0, SOGOU_BAR_HEIGHT)
-  if (bar) background.data.set(bar.data, 0)
-  return { background, bar }
+  // CandidateView draws bar.png over RootView; its strip stays transparent to avoid doubling alpha.
+  return { background: placeImage(panel, SOGOU_WIDTH, SOGOU_BAR_HEIGHT + SOGOU_KEYBOARD_HEIGHT, 0, SOGOU_BAR_HEIGHT), bar }
 }
 
 function candidateColors(archive: SkinArchive, theme: Theme, styles: BaiduStyles): StylePair | undefined {
