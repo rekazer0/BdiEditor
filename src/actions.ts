@@ -92,6 +92,7 @@ const skinStateDescriptions: Record<number, string> = {
   55: "符号页返回键处于删除状态",
   56: "Vivo 语音面板错误状态",
   63: "Pad 符号扩展页",
+  67: "融合布局状态",
   94: "AI 输入返回键第一态",
   95: "AI 输入返回键第二态",
 }

@@ -21,8 +21,9 @@ test('the space key shows its S36 variant (Baidu default: long-press voice on) u
 test('the first written state that holds picks the TIP, and a TIP does not switch again (KeyParam.J)', () => {
   const layout = IniDocument.parse(template('templates/xiaomi-unified-rounded-blur.bds').getText('light/skin/port/py_9.ini'))
   const enter = layout.get('KEY12', 'STAT_STYLE')
-  // 默认只有设备状态成立：S99 → TIP18（贴屏幕圆角的回车切图）。
-  assert.equal(stateTipSection(enter, undefined), 18)
+  // 官方 APK 未找到 S99 的启用来源；显式选中 S99 时仍可预览厂商变体。
+  assert.equal(stateTipSection(enter, undefined), undefined)
+  assert.equal(stateTipSection(enter, 99), 18)
   // S27 写在 S99 之前，先命中 TIP3；TIP3 自己的 STAT_STYLE=S99_21 不再生效。
   assert.equal(stateTipSection(enter, 27), 3)
   assert.equal(stateTipSection(layout.get('KEY10', 'STAT_STYLE'), undefined), 8)
@@ -39,4 +40,11 @@ test('BDA state keys place foregrounds relative to the key they belong to', () =
   // The "0" label of KEY_F38_S36 sits above the microphone, not on top of it.
   const offsets = layout.get(`TIP${tip}`, 'FORE_OFFSET').split(';').map((pair) => pair.split(',').map(Number))
   assert.ok(offsets.some(([, y]) => y < -20), layout.get(`TIP${tip}`, 'FORE_OFFSET'))
+})
+
+test('official phone defaults enable fusion layout S67, but not Cangjie mode S35 or OEM S99', () => {
+  assert.equal(stateTipSection('S35_1|S99_2|S67_3', undefined), 3)
+  assert.equal(stateTipSection('S35_1|S99_2', undefined), undefined)
+  assert.equal(stateTipSection('S35_1|S67_3', 35), 1)
+  assert.equal(stateTipSection('S99_2|S67_3', 99), 2)
 })

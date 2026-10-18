@@ -31,16 +31,16 @@ export function stateStyleValue(value: string | undefined, state: number): numbe
 }
 
 // 官方 Android（KeyParam.J）按 STAT_STYLE 的书写顺序取第一个"状态成立"的 S<状态>_<TIP>，只换这一层，
-// TIP 自己的 STAT_STYLE 不再生效。预览里成立的状态是：所选状态，加上真机始终成立的设备状态——
+// TIP 自己的 STAT_STYLE 不再生效。预览默认模拟官方 APK 的普通手机初始设置：
 // - 长按语音 / 国际化语言 S34、S36、S37 三者互斥（InputEventHandler），默认开着空格语音、没装其他语言，即 S36；
-// - S99：小米模板用它把贴屏幕圆角的按键（九键回车）换成同弧度切图，用户真机上成立。
+// - S67：SkinLayoutManagerKt.a/e 的 fusion 布局；S35（仓颉速成）默认关闭，S99 未找到启用来源，不自动加上。
 const VOICE_LANGUAGE_STATES = [34, 36, 37]
 const DEFAULT_VOICE_LANGUAGE_STATE = 36
-const ROUNDED_CORNER_STATE = 99
+const DEFAULT_LAYOUT_STATE = 67
 
 function activeStates(state: number): Set<number> {
   const voiceLanguage = VOICE_LANGUAGE_STATES.includes(state) ? state : DEFAULT_VOICE_LANGUAGE_STATE
-  return new Set([state, voiceLanguage, ROUNDED_CORNER_STATE])
+  return new Set([state, voiceLanguage, DEFAULT_LAYOUT_STATE])
 }
 
 export function stateTipSection(
