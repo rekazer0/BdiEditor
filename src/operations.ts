@@ -51,3 +51,10 @@ export async function loadBuiltInProjectTemplate(
   if (!response.ok) throw new Error("无法加载内置默认皮肤模板")
   return new Uint8Array(await response.arrayBuffer())
 }
+
+/** The official BDA skin's INI layout skeleton (1080 × 641 portrait), the base BDI/BDS conversion lays on. */
+export async function loadBdaBase(fetcher: ProjectTemplateFetcher = fetchPublicAsset): Promise<Uint8Array> {
+  const response = await fetcher("/bda-base.bds")
+  if (!response.ok) throw new Error("无法加载 BDA 官方基础布局")
+  return new Uint8Array(await response.arrayBuffer())
+}

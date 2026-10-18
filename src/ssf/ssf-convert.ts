@@ -6,10 +6,11 @@ import type { SkinArchive } from "../skin.ts"
 import { convertBaiduToSsf } from "./baidu-to-ssf.ts"
 import { isSkinContainer } from "./ssf-container.ts"
 import { SsfPackage, unpackSsf } from "./ssf-package.ts"
+import { syncKeyStateTips } from "./ssf-state-tips.ts"
 import { convertSsfToBaidu, ssfToBaiduFiles } from "./ssf-to-baidu.ts"
 import { convertSsfToBda } from "./ssf-to-bda.ts"
 
-/** Official templates the Sogou look is painted onto: `bds` (BDS/BDI) and `bda`. */
+/** The BDA skeleton re-laid as BDI/BDS, the native BDA template, and the Sogou preview skeleton. */
 export type SsfTemplates = { bds: SkinArchive; bda: SkinArchive; sogou: SkinArchive }
 type Converted = { bytes: Uint8Array; warnings: string[] }
 
@@ -37,6 +38,15 @@ export function ssfPreviewFiles(archive: SkinArchive, template: SkinArchive): { 
   return ssfToBaiduFiles(pkg, template, Number(pkg.resolution))
 }
 
+/**
+ * The skeleton BDI/BDS conversion lays an SSF document on: the official BDA skin converted to INI.
+ * Both BDI/BDS and BDA then share its 1080 × 641 portrait panel instead of the old 480 × 312 template.
+ */
+export function ssfConversionTemplate(bda: SkinArchive, bdaBase: SkinArchive): SkinArchive {
+  if (bda.format !== "bda") throw new Error("SSF 转换骨架需要 BDA 模板")
+  return convertBdaArchive(bda, bdaBase).archive
+}
+
 /** Converts an SSF document into a Baidu package of `format`. */
 export async function convertSsfDocument(archive: SkinArchive, format: "bdi" | "bds" | "bda", templates: SsfTemplates): Promise<Converted> {
   const pkg = documentPackage(archive)
@@ -45,6 +55,7 @@ export async function convertSsfDocument(archive: SkinArchive, format: "bdi" | "
     return { bytes: converted.toBytes(), warnings }
   }
   const { archive: converted, warnings } = convertSsfToBaidu(pkg, templates.bds)
+  syncKeyStateTips(converted)
   // Platform packaging also re-encodes the Sogou WAV key sounds into what the target IME plays.
   return { bytes: await converted.platformBytesAsync(format, warnings), warnings }
 }
