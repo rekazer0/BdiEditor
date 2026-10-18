@@ -184,7 +184,7 @@ function boardGroups(): Group[] {
   if (!skinPath) return []
   const skin = ssfDocument(skinPath)
   const qwerty = ssfQwertyBoard()
-  const nineKey = /\/(?:py|en)_9s?\.ini$/i.test(appState.layoutPath)
+  const nineKey = appState.layoutDocument?.sections().includes("LIST")
   const block = (section: string, extra: Partial<SsfBlock> = {}): SsfBlock => ({ path: skinPath, section, ...extra })
   const referenced = (section: string, key: string, title: string): SsfBlock[] => {
     const target = firstValue(skin.get(section, key))
@@ -208,6 +208,7 @@ function boardGroups(): Group[] {
       block("CandidateCodeView"),
       ...referenced("CandidateCodeView", "BG_IMAGE", "符号列背景"),
       ...referenced("CandidateCodeView", "BG_IMAGES", "符号列单元格"),
+      block(firstValue(skin.get("CandidateCodeView", "TEXT_STYLE")) ?? "TextStyle_Text", { template: COLOR_TEMPLATE }),
       block("TextStyle_Popup_Code"),
     ]] as [string, SsfBlock[]]] : [],
   ]

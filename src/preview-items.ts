@@ -317,7 +317,7 @@ export function itemFromSection(document: IniDocument, section: string): Preview
   const foreStyles = section === "CAND"
     ? []
     : value("FORE_STYLE").split(",").map((token) => token.trim()).filter(Boolean)
-  const center = value("CENTER")
+  const center = value("CENTER") || value("KEY")
   const down = value("DOWN") || center
   return {
     section,

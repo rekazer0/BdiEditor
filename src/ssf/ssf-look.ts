@@ -164,12 +164,18 @@ export class SsfLook {
     if (!bytes || !size) return
     const [sourceWidth, sourceHeight] = size
     if (rect) {
-      const [x, y, width, height] = rect
-      if (!(width > 0 && height > 0 && width <= 1 && height <= 1)) return { id: name, bytes }
+      // Sogou parses FG_RECT as Android RectF: left, top, right, bottom.
+      const [x, y, right, bottom] = rect
+      const width = right - x
+      const height = bottom - y
+      if (!(width > 0 && height > 0 && width <= 1 && height <= 1)) return this.fitted({ id: name, bytes }, target)
       if (target) return this.derive(`rect:${rect.join(",")}:target:${target.join(",")}`, [bytes], () => {
         const source = this.decode(name, bytes)
-        const glyph = source && resizeImage(source, Math.max(1, Math.round(target[0] * width)), Math.max(1, Math.round(target[1] * height)))
-        return glyph && placeImage(glyph, target[0], target[1], Math.round(x * target[0]), Math.round(y * target[1]))
+        const boxWidth = target[0] * width
+        const boxHeight = target[1] * height
+        const scale = Math.min(boxWidth / sourceWidth, boxHeight / sourceHeight)
+        const glyph = source && resizeImage(source, Math.max(1, Math.round(sourceWidth * scale)), Math.max(1, Math.round(sourceHeight * scale)))
+        return glyph && placeImage(glyph, target[0], target[1], Math.round(x * target[0] + (boxWidth - glyph.width) / 2), Math.round(y * target[1] + (boxHeight - glyph.height) / 2))
       })
       if (!x && !y && width === 1 && height === 1) return { id: name, bytes }
       const canvasWidth = Math.round(sourceWidth / width)
@@ -207,7 +213,7 @@ export class SsfLook {
     const source = this.foregroundSource(binding, on)
     const canvas = sogouBack ? pngSize(sogouBack.normal.bytes) : undefined
     const foreground = (name: string) => {
-      if (source?.rect && size && source.rect.slice(2).every((value) => value > 0 && value <= 1)) return this.foregroundImage(name, source.rect, canvas, size)
+      if (source?.rect && size) return this.foregroundImage(name, source.rect, canvas, size)
       const image = this.foregroundImage(name, source?.rect, canvas)
       return image && (sourceSection && size ? this.resized(image, Math.round(size[0]), Math.round(size[1])) : this.fitted(image, size))
     }
@@ -267,20 +273,30 @@ export class SsfLook {
 
   /** The skin's replacement for one of Sogou's built-in toolbar icons, if it ships that file. */
   toolbarIcon(name: string): LookPair | undefined {
-    const bytes = this.pkg.file(this.theme, name)
+    // Legacy skins draw the S logo with the multimedia slot (the APK's IME_Function_Multimedia).
+    const file = name === "logo.png" && !this.pkg.file(this.theme, name) ? "ime_function_multimedia.png" : name
+    const bytes = this.pkg.file(this.theme, file)
     if (!bytes || !isPng(bytes)) return
-    const normal = this.fitted({ id: `icon:${name}|${fingerprint(bytes)}`, bytes }, undefined)
-    return { normal, pressed: normal }
+    const normal = this.fitted({ id: `icon:${file}|${fingerprint(bytes)}`, bytes }, undefined)
+    const pressedBytes = this.pkg.file(this.theme, file.replace(/\.png$/i, "_p.png"))
+    const pressed = pressedBytes && isPng(pressedBytes) ? this.fitted({ id: `icon:${file}:pressed|${fingerprint(pressedBytes)}`, bytes: pressedBytes }, undefined) : normal
+    return { normal, pressed }
   }
 
   /** The 9-key symbol column, which Sogou styles as the candidate code view. */
-  list(): { back?: LookPair; cell?: LookPair; text?: string } {
+  list(textStyle = "TextStyle_Text"): { back?: LookPair; cell?: LookPair; text?: string; font?: { name: string; bytes: Uint8Array }; fontSize?: number } {
+    textStyle = firstValue(this.skin.get("CandidateCodeView", "TEXT_STYLE")) ?? textStyle
     const back = firstValue(this.skin.get("CandidateCodeView", "BG_IMAGE"))
     const cell = firstValue(this.skin.get("CandidateCodeView", "BG_IMAGES"))
+    const name = this.skin.get(textStyle, "TYPEFACE") ?? "DROIDSANSFALLBACK.ttf"
+    const bytes = this.pkg.file(this.theme, name)
+    const size = Number(this.skin.get(textStyle, "TEXT_SIZE"))
     return {
       back: this.scaledPair(back ? this.statePair(back) : undefined),
       cell: this.scaledPair(cell ? this.statePair(cell) : undefined),
-      text: ["TextStyle_Popup_Code", "TextStyle_Symbol", "TextStyle"].map((section) => ssfColor(this.skin.get(section, "TEXT_COLOR"))).find(Boolean),
+      text: [textStyle, "TextStyle"].map((section) => ssfColor(this.skin.get(section, "TEXT_COLOR"))).find(Boolean),
+      font: bytes ? { name, bytes } : undefined,
+      fontSize: size > 0 ? Math.round(size * (this.scale ?? 1) * this.sogouWidth) : undefined,
     }
   }
 

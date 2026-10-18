@@ -24,6 +24,7 @@ import { type SourceFilePayload, type ChosenFileData, type BrowserSaveFileHandle
 import { readFile, writeFile } from "@tauri-apps/plugin-fs"
 import { convertBdaArchive } from "../bda-convert.ts"
 import { flushNumberInputWheel } from "../number-input-wheel.ts"
+import { loadBdaBase } from "../operations.ts"
 import { isSsfPath, looksLikeSsf } from "../ssf/ssf-package.ts"
 import { convertSsfDocument, exportSsf, ssfDocumentBytes } from "../ssf/ssf-convert.ts"
 import { rebuildSsfPreview, ssfTemplates } from "./ssf-preview"
@@ -72,9 +73,7 @@ export async function loadArchive(
   }
   if (nextArchive.format === "bda" && !appState.bdaBase) {
     updateFileOperationProgress(52, "正在加载 BDA 基础布局…")
-    const response = await fetch(new URL("bda-base.bds", document.baseURI))
-    if (!response.ok) throw new Error("无法加载 BDA 官方基础布局")
-    appState.bdaBase = await SkinArchive.openAsync(new Uint8Array(await response.arrayBuffer()))
+    appState.bdaBase = await SkinArchive.openAsync(await loadBdaBase())
   }
   if (nextArchive.format === "ssf") {
     updateFileOperationProgress(52, "正在生成搜狗皮肤预览…")

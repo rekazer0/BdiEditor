@@ -396,7 +396,16 @@ export class AtlasResolver {
       : undefined
     const embeddedFont = fontPath ? loadEmbeddedFont(archive, fontPath) : undefined
     this.embeddedFontFamily = embeddedFont?.family
-    this.embeddedFontReady = embeddedFont?.ready ?? Promise.resolve()
+    const fonts = [embeddedFont?.ready]
+    if (path && this.styles) for (const { section, key, value } of this.styles.entries()) {
+      if (key !== "FONT_NAME" || !/\.(ttf|otf|woff2?)$/i.test(value)) continue
+      const source = embeddedFontPath(archive.names(), path, value)
+      const font = source && loadEmbeddedFont(archive, source)
+      if (!font) continue
+      this.styles.set(section, key, font.family)
+      fonts.push(font.ready)
+    }
+    this.embeddedFontReady = Promise.all(fonts).then(() => {})
   }
 
   ready(): Promise<void> {

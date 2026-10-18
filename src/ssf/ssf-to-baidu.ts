@@ -111,6 +111,8 @@ class ThemeConverter {
   private readonly soundStyles = new Map<string, string>()
   private readonly glyphs = new Map<string, RgbaImage>()
   private keyboardStyles?: { panel?: string; cand?: string }
+  /** Style of the Sogou keyboard background for the orientation being written, if the skin has one. */
+  private panelStyle?: string
 
   constructor(pkg: SsfPackage, base: SkinArchive, theme: SsfTheme, output: Map<string, Uint8Array>, warnings: string[], panelWidth?: number) {
     const panel = base.isText("light/skin/port/gen.ini") ? IniDocument.parse(base.getText("light/skin/port/gen.ini")).get("PANEL", "SIZE") : undefined
@@ -192,14 +194,19 @@ class ThemeConverter {
   }
 
   private convertLists(layout: IniDocument): void {
-    const list = this.look.list()
-    const back = list.back && this.resources.imageStyle(list.back)
-    const cell = list.cell && this.resources.imageStyle(list.cell)
     for (const section of layout.sections().filter((name) => /^LIST\d*$/.test(name))) {
+      const list = this.look.list(layout.get(section, "SSF_TEXT_STYLE"))
+      const back = list.back && this.resources.imageStyle(list.back)
+      const cell = list.cell && this.resources.imageStyle(list.cell)
       if (back && layout.get(section, "BACK_STYLE")) layout.set(section, "BACK_STYLE", back)
       if (cell && layout.get(section, "CELL_STYLE")) layout.set(section, "CELL_STYLE", cell)
       const fore = layout.get(section, "FORE_STYLE")?.trim()
-      if (list.text && fore) layout.set(section, "FORE_STYLE", this.resources.derivedStyle(fore, { NM_COLOR: list.text, HL_COLOR: list.text }))
+      if (list.font) this.output.set(`${this.theme}/skin/res/${list.font.name}`, list.font.bytes)
+      if (fore) layout.set(section, "FORE_STYLE", this.resources.derivedStyle(fore, {
+        ...(list.text ? { NM_COLOR: list.text, HL_COLOR: list.text } : {}),
+        ...(list.font ? { FONT_NAME: list.font.name } : {}),
+        ...(list.fontSize ? { FONT_SIZE: String(list.fontSize) } : {}),
+      }))
     }
   }
 
@@ -216,6 +223,7 @@ class ThemeConverter {
 
   private convertGeneral(gen: IniDocument, orientation: string): void {
     const { panel, cand } = this.keyboard()
+    this.panelStyle = panel
     if (panel) gen.set("PANEL", "BACK_STYLE", panel)
     const defaultSound = this.soundStyle(this.look.sound(undefined))
     if (defaultSound) gen.set("PANEL", "SOUND_STYLE", defaultSound)
@@ -270,18 +278,16 @@ class ThemeConverter {
       const genBytes = this.output.get(genPath)
       if (!genBytes) continue
       const gen = IniDocument.parse(new TextDecoder().decode(genBytes))
-      const templatePanel = gen.get("PANEL", "BACK_STYLE")?.trim()
       this.convertGeneral(gen, orientation)
       this.output.set(genPath, strToU8(gen.toString()))
-      const { panel } = this.keyboard()
       for (const path of [...this.output.keys()]) {
         const match = path.match(new RegExp(`^${this.theme}/skin/${orientation}/([^/]+)\\.ini$`))
         if (!match || match[1] === "gen") continue
         const layout = IniDocument.parse(new TextDecoder().decode(this.output.get(path)!))
         this.convertKeys(layout, match[1], orientation === "land")
         this.convertLists(layout)
-        // Pages that repeat the general panel background (symbol, handwriting) follow it.
-        if (panel && templatePanel && layout.get("PANEL", "BACK_STYLE")?.trim() === templatePanel) layout.set("PANEL", "BACK_STYLE", panel)
+        // Sogou paints one background behind every board, while the Baidu skeleton gives each board its own.
+        if (this.panelStyle && layout.sections().includes("PANEL")) layout.set("PANEL", "BACK_STYLE", this.panelStyle)
         this.output.set(path, strToU8(layout.toString()))
       }
     }

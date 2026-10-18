@@ -65,7 +65,8 @@ export function drawNineSliceImage(
   if (!(buffer.height >= height)) buffer.height = height
   const bufferContext = buffer.getContext("2d")
   if (!bufferContext) return
-  bufferContext.clearRect(0, 0, width, height)
+  // Image filtering samples beyond the source crop; clear the retained buffer's old edge pixels too.
+  bufferContext.clearRect(0, 0, buffer.width, buffer.height)
   bufferContext.imageSmoothingEnabled = true
   bufferContext.imageSmoothingQuality = "high"
 

@@ -47,7 +47,7 @@ const SSF_SKILL = `## 皮肤格式技能（搜狗 SSF）
 - 按键类是配置节：全键字母 [Key_A]，九键字母组 [Key_ABC]，九键功能键 [Key_Backspace]、[Key_Enter]，全键功能键加 _Qwerty（[Key_Backspace_Qwerty]）。横屏先读 _Land 变体（[Key_A_Land]）。
 - 背景：按键类的 BG_IMAGES=段名，该段的 NORMAL / PRESSED（以及 DISABLED、NORMAL_ON、PRESSED_ON）是各状态图片。值格式 \`图片.png,左,右,上,下\`，后四个数是九宫格可拉伸的像素区间，换图时保留。
 - 按键类没有可用的 BG_IMAGES 时用共享默认段：九键 KeyBg_Default、功能键 KeyBg_Function、空格 KeyBg_Space；全键 KeyBg_Default_Latin、KeyBg_Function_Qwerty、KeyBg_Space_Qwerty。
-- 前景：keys.ini 里按键类的 FG_IMAGES=段名，该段 NORMAL / PRESSED 是前景图，FG_RECT=x,y,宽,高 是占按键的比例；没有时用 phoneSkin.ini 按键类的 ICON / ICON_PRESSED。
+- 前景：keys.ini 里按键类的 FG_IMAGES=段名，该段 NORMAL / PRESSED 是前景图，FG_RECT=左,上,右,下 是按键内的比例坐标；没有时用 phoneSkin.ini 按键类的 ICON / ICON_PRESSED。
 - 文字颜色：TEXT_COLOR / TEXT_COLOR_PRESSED，格式 0xAARRGGBB。按键类自己没写时依次用：全键 TextStyle_Qwerty、九键 TextStyle_Phone_Label（功能键 TextStyle_FuncKey_26char / TextStyle_FuncKey_T9，空格 TextStyle_Space_Label），最后 TextStyle。功能键图标颜色在 [General] ICON_COLOR / HIGH_LIGHT_ICON_COLOR。
 - 键盘背景 [RootView] BG_IMAGE；候选栏 [CandidateView] BG_IMAGE=段名，该段 NORMAL 是候选栏图片；候选字 [TextStyle_Candidate]、首选 [TextStyle_Candidate_Highlight]；输入码 [ComposingView] BG_COLOR 与 [TextStyle_Composing]。
 - 同名配置节可能出现两次，第一次出现的值生效。

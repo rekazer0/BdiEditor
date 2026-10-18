@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { IniDocument } from '../src/ini.ts'
 import { SkinArchive } from '../src/skin.ts'
+import { AtlasResolver } from '../src/atlas.ts'
 import { parseZip } from '../src/skin-zip.ts'
 import { documentPackage, ssfDocumentBytes, ssfPreviewFiles } from '../src/ssf/ssf-convert.ts'
 import { exportFormatFromPath } from '../src/export.ts'
@@ -109,6 +110,54 @@ test('ssf document: the canvas skeleton is Sogou\'s own layout, with the skin\'s
   const logo = decodePng(image(icon('logo.png')))
   const opaque = [...Array(logo.width * logo.height).keys()].map((i) => logo.data.subarray(i * 4, i * 4 + 4)).filter((p) => p[3] > 0)
   assert.ok(opaque.length && opaque.every((p) => p[0] === 0x6f && p[1] === 0x33 && p[2] === 0))
+})
+
+test('ssf document: legacy toolbar logo, symbol text and double-pinyin function keys keep their skin', async () => {
+  const files = unzipSync(ssfFixture())
+  const skin = IniDocument.parse(strFromU8(files['1080/status1/phoneSkin.ini']))
+  skin.appendSection('TextStyle_Text', [
+    { key: 'TEXT_COLOR', value: '0xFFFFEADE' },
+    { key: 'TEXT_SIZE', value: '0.039' },
+    { key: 'TYPEFACE', value: 'symbols.ttf' },
+  ])
+  files['1080/status1/phoneSkin.ini'] = strToU8(skin.toString())
+  files['1080/status1/ime_function_multimedia.png'] = encodePng(solid(78, 78, [70, 80, 90]))
+  files['1080/status1/ime_function_multimedia_p.png'] = encodePng(solid(78, 78, [90, 80, 70]))
+  files['default/symbols.ttf'] = Uint8Array.of(0, 1, 2, 3)
+  const archive = await open(zipSync(files))
+  const { files: preview } = ssfPreviewFiles(archive, sogouTemplate)
+  const read = (path) => IniDocument.parse(strFromU8(preview.get(path)))
+  const css = read('light/skin/res/default.css')
+  for (const orientation of ['port', 'land']) {
+    const cand = read(`light/skin/${orientation}/cand1.cnd`)
+    const logo = cand.sections().find((section) => cand.get(section, 'SSF_IMAGE') === 'logo.png')
+    for (const [state, expected] of [['NM_IMG', [70, 80, 90]], ['HL_IMG', [90, 80, 70]]]) {
+      const [name] = css.get(`STYLE${cand.get(logo, 'FORE_STYLE')}`, state).split(',')
+      assert.deepEqual([...decodePng(preview.get(`light/skin/res/${name}.png`)).data.slice(0, 3)], expected)
+    }
+    const py9 = read(`light/skin/${orientation}/py_9.ini`)
+    const textStyle = `STYLE${py9.get('LIST', 'FORE_STYLE')}`
+    assert.equal(css.get(textStyle, 'NM_COLOR'), 'FFFFEADE')
+    assert.equal(css.get(textStyle, 'FONT_SIZE'), '42')
+    assert.equal(css.get(textStyle, 'FONT_NAME'), 'symbols.ttf')
+    assert.ok(py9.get('LIST', 'CELL_STYLE'))
+    for (const board of ['py_9_double_input', 'py_9_big_enter_double_input']) {
+      const layout = read(`light/skin/${orientation}/${board}.ini`)
+      const keys = layout.sections().filter((section) => /^KEY\d+$/.test(section))
+      const space = keys.find((key) => layout.get(key, 'CENTER') === 'F38')
+      assert.ok(space, `${orientation}/${board}: missing space action`)
+      const base = read(`light/skin/${orientation}/py_9.ini`)
+      const baseSpace = base.sections().find((key) => base.get(key, 'CENTER') === 'F38')
+      assert.equal(css.get(`STYLE${layout.get(space, 'BACK_STYLE')}`, 'NM_IMG'), css.get(`STYLE${base.get(baseSpace, 'BACK_STYLE')}`, 'NM_IMG'))
+      assert.ok(keys.some((key) => layout.get(key, 'CENTER') === "'"))
+    }
+  }
+  archive.setOverlay(preview)
+  const resolver = new AtlasResolver(archive, 'light', 'port')
+  await resolver.ready()
+  const py9 = read('light/skin/port/py_9.ini')
+  assert.match(resolver.resolveText(py9.get('LIST', 'FORE_STYLE'), false).fontName, /^BdiEmbeddedFont/)
+  assert.deepEqual([...archive.changed], [])
 })
 
 for (const [resolution, portSize, landSize, candRect] of [
