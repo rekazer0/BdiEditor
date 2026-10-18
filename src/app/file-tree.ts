@@ -12,6 +12,7 @@ import { toolbarConfigPath, styleConfigPath, legacyAnimationConfigPath } from ".
 import { firstExistingPath } from "../resources.ts"
 import { updateSourceFileActions, setSourceDropTarget, sourceDropFolder, commitSourceUploads, ensureSourcePathRendered, setSidebarView } from "./source-files"
 import { isSoundPath, soundMimeType } from "../sounds.ts"
+import { pickableImagePaths } from "./image-pickers"
 import { isEditing } from "./edit-history"
 import { runFileOperation } from "./file-operations"
 
@@ -204,6 +205,7 @@ export function renderFiles(): void {
 
   if (appState.archive.format === "ssf") {
     const folder = ssfThemeFolder()
+    const images = pickableImagePaths()
     const preview = ["square_preview.png", "candidate_preview.png"].find((path) => appState.archive?.getBytes(path))
     entries.push(
       { group: "皮肤", label: "皮肤信息", path: "phoneTheme.ini", className: "nav-overview", icon: "info" },
@@ -213,7 +215,7 @@ export function renderFiles(): void {
       { group: "资源配置", label: "按键前景", path: `${folder}keys.ini`, className: "nav-style", icon: "layers" },
       { group: "资源配置", label: "按键动画", path: `${folder}anim.ini`, className: "nav-style", icon: "wand-sparkles" },
       { group: "资源配置", label: "按键音效", path: SSF_SOUNDS_PATH, className: "nav-resource", icon: "volume-2", navMode: "document" },
-      { group: "资源配置", label: "图片资源", path: `${folder}phoneSkin.ini`, className: "nav-resource", icon: "images", navMode: "resource" },
+      ...images.length ? [{ group: "资源配置", label: "图片资源", path: images[0], className: "nav-resource", icon: "images", navMode: "resource", meta: `${images.length} 张图片` }] : [],
       { group: "资源配置", label: "音频资源", path: SSF_SOUNDS_PATH, className: "nav-resource", icon: "audio-lines", navMode: "sound" },
       { group: "资源配置", label: "运营配置", path: "op.ini", className: "nav-style", icon: "sparkles" },
     )
