@@ -3,7 +3,7 @@ import { appState } from "./state"
 import { type UnsavedDecision, unsavedDecision } from "../unsaved.ts"
 import { flushNumberInputWheel, numberInputGesture } from "../number-input-wheel.ts"
 import { flushSourceAutosave, scheduleSourceAutosave } from "./source-workspace"
-import { showError } from "./file-operations"
+import { showError, showStatus } from "./file-operations"
 import { isTauri, recordChange } from "./canvas-interaction"
 import { message } from "@tauri-apps/plugin-dialog"
 import { saveArchive, currentExportFormat } from "./archive-io"
@@ -86,8 +86,16 @@ export function updateHistoryButtons(): void {
   redoButton.disabled = appState.redoStack.length === 0
 }
 
+// SXI layouts and styles are read-only views of skin.json; an inspector edit is dropped and
+// the view reloaded, so the mutated in-memory document does not linger.
+function rejectDerivedEdit(): void {
+  showStatus("手心皮肤的布局与样式由 skin.json 生成：请在源码面板编辑对应 JSON")
+  if (appState.selectedPath) selectFile(appState.selectedPath, appState.sidebarView)
+}
+
 export function commitText(path: string, before: string, after: string, coalesce = false): void {
   if (!appState.archive || before === after) return
+  if (appState.archive.derivedPointer(path)) return rejectDerivedEdit()
   acceptAiDraftPreview()
   appState.sourceHistoryHighlight = undefined
   appState.archive.setText(path, after)
@@ -98,6 +106,7 @@ export function commitText(path: string, before: string, after: string, coalesce
 }
 
 export function commitBytes(path: string, before: Uint8Array | undefined, after: Uint8Array): void {
+  if (appState.archive?.derivedPointer(path)) return rejectDerivedEdit()
   if (!appState.archive || before && before.length === after.length && before.every((byte, index) => byte === after[index])) return
   acceptAiDraftPreview()
   appState.archive.setBytes(path, after)
@@ -109,6 +118,7 @@ export function commitBytes(path: string, before: Uint8Array | undefined, after:
 
 export function commitBatch(changes: Change[]): void {
   if (!appState.archive || !changes.length) return
+  if (changes.some((change) => change.kind !== "batch" && appState.archive!.derivedPointer(change.path))) return rejectDerivedEdit()
   acceptAiDraftPreview()
   for (const change of changes) {
     if (change.kind === "text") appState.archive.setText(change.path, change.after)

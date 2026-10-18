@@ -11,7 +11,7 @@ import { updateDirty, commitBatch } from "./edit-history"
 import { updateDevicePreview, refreshPreview } from "./preview-render"
 import { updateSourceFileActions } from "./source-files"
 import { exportButtons, isTauri, LARGE_SKIN_BYTES } from "./canvas-interaction"
-import { type ExportTarget } from "../export.ts"
+import { canExport, type ExportFormat } from "../export.ts"
 import { operationError } from "../operations.ts"
 import { clientLog, flushClientLogs } from "../client-log.ts"
 import { message } from "@tauri-apps/plugin-dialog"
@@ -193,10 +193,10 @@ export async function copyPanel(): Promise<boolean> {
  * Export targets the open skin can reach. BDI/BDS cannot become BDA and a Sogou skin has no Palm
  * (.sxi) path; unreachable items are hidden rather than left as unexplained greyed-out rows.
  */
-export function exportTargetHidden(format: ExportTarget): boolean {
+export function exportTargetHidden(format: ExportFormat): boolean {
   const source = appState.archive?.format
   if (!source) return false
-  return format === "bda" ? source !== "bda" && source !== "ssf" : format === "sxi" && source === "ssf"
+  return !canExport(source, format)
 }
 
 export function setFileOperationBusy(busy: boolean): void {
@@ -208,7 +208,7 @@ export function setFileOperationBusy(busy: boolean): void {
   updatePanelToolButtons()
   updateSourceFileActions()
   for (const button of exportButtons) {
-    button.hidden = exportTargetHidden(button.dataset.exportFormat as ExportTarget)
+    button.hidden = exportTargetHidden(button.dataset.exportFormat as ExportFormat)
     button.disabled = busy || !appState.archive || button.hidden
   }
 }

@@ -754,7 +754,7 @@ fn valid_share_filename(name: &str) -> bool {
                 .and_then(|value| value.to_str())
                 .map(str::to_ascii_lowercase)
                 .as_deref(),
-            Some("bdi" | "bds" | "bda")
+            Some("bdi" | "bds" | "bda" | "sxi")
         )
 }
 
