@@ -56,7 +56,9 @@ test('Baidu → SSF places R_POS foregrounds relative to the key and respects ex
     const pkg = await SsfPackage.open(bytes)
     const rect = pkg.keys('light').get('Key_Q', 'FG_RECT').split(',').map(Number)
     const [dx, dy] = explicit ? [1, 2] : [Math.trunc(width / 4), Math.trunc(-height / 4)]
-    const expected = [Math.round((width - 6) / 2 + dx) / width, Math.round((height - 6) / 2 + dy) / height, 6 / width, 6 / height]
+    const left = Math.round((width - 6) / 2 + dx)
+    const top = Math.round((height - 6) / 2 + dy)
+    const expected = [left / width, top / height, (left + 6) / width, (top + 6) / height]
     rect.forEach((value, index) => assert.ok(Math.abs(value - expected[index]) < 0.001, `${explicit ?? 'R_POS'}: ${rect}`))
   }
 })
@@ -88,6 +90,18 @@ test('SSF explicit transparent function icon also hides the Baidu template icon'
   const layout = IniDocument.parse(archive.getText('light/skin/port/py_26.ini'))
   const image = styleImage(archive, layout.get(keySection(layout, 'F39'), 'FORE_STYLE'))
   assert.ok(image.data.every((value, index) => index % 4 !== 3 || value === 0))
+})
+
+test('SSF FG_RECT uses right/bottom edges and fits the glyph without stretching in landscape', async () => {
+  const pkg = await SsfPackage.open(ssfFixture())
+  pkg.keys('light').set('Key_Q', 'FG_RECT', '0.25,0.1,0.75,0.9')
+  const image = decodePng(new SsfLook(pkg, 'light', [], 1080).key('py_26', 'q', true, [200, 100]).fore.normal.bytes)
+  const points = []
+  for (let y = 0; y < image.height; y++) for (let x = 0; x < image.width; x++) if (pixel(image, x, y)[3]) points.push([x, y])
+  assert.deepEqual([
+    Math.min(...points.map(([x]) => x)), Math.min(...points.map(([, y]) => y)),
+    Math.max(...points.map(([x]) => x)) + 1, Math.max(...points.map(([, y]) => y)) + 1,
+  ], [57, 10, 144, 90])
 })
 
 test('Baidu → SSF → Baidu applies a translucent candidate background only once', async () => {

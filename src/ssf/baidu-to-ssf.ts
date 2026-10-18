@@ -250,7 +250,7 @@ function foreground(layers: Array<{ pair?: StylePair; offset: [number, number] }
   return {
     normal: cut(normal),
     pressed: cut(pressed),
-    rect: [left / width, top / height, (right - left) / width, (bottom - top) / height].map(fraction).join(","),
+    rect: [left / width, top / height, right / width, bottom / height].map(fraction).join(","),
   }
 }
 
@@ -393,7 +393,7 @@ function convertTheme(archive: SkinArchive, theme: Theme, folder: string, output
   ]
   if (codeView.length) writer.skin.appendSection("CandidateCodeView", codeView)
   const listText = styles.resolve(list?.get("LIST", "FORE_STYLE"))?.color
-  if (listText) writer.skin.appendSection("TextStyle_Popup_Code", [{ key: "TEXT_COLOR", value: listText }])
+  if (listText) writer.skin.appendSection("TextStyle_Text", [{ key: "TEXT_COLOR", value: listText }])
   writer.write()
 }
 

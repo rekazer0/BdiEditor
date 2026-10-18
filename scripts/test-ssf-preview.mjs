@@ -31,6 +31,7 @@ try {
   assert.ok(find('F36').y < find('F40').y && find('F40').y < find('0').y && find('0').y < find('F39').y)
   assert.deepEqual(initial.changed, [])
   await page.screenshot({ path: '/tmp/bdi-sogou-canvas-fixed.png' })
+  if (sample) await page.screenshot({ path: '/tmp/bdi-sogou-skin-fixed.png' })
   await page.getByRole('button', { name: '编辑模式', exact: true }).click()
   const layout = page.getByRole('combobox', { name: '预览布局', exact: true })
   const layouts = await layout.locator('option').evaluateAll((options) => options.map((option) => option.value))
@@ -54,14 +55,35 @@ try {
   // The overview lists Sogou's keyboards; a board picked there survives a look switch.
   const boards = page.locator('#files .nav-group[data-overview-group="键盘布局"] .nav-group-body .nav-label')
   assert.deepEqual(await boards.allTextContents(), ['拼音九键', '拼音全键', '拼音 14 键', '拼音九键大回车', '拼音九键大按键', '双拼九键', '双拼九键大回车', '双拼全键', '五笔', '笔画', '笔画大回车', '粤语九键', '粤语九键大回车', '粤语全键', '英文九键', '英文九键多击', '英文全键', '英文全键带数字行', '英文专业版', '英文专业版带数字行'])
-  // Every Sogou board draws on the canvas inside its panel.
+  // Every Sogou board draws on the canvas inside its panel, in both orientations and looks.
   await page.evaluate(() => document.querySelectorAll('#files .nav-group').forEach((group) => { group.open = true }))
-  for (const button of await page.locator('#files .sidebar-overview button.nav-layout').all()) {
-    await button.click()
-    const result = await state()
-    assert.ok(result.keys.length > 0, `${result.path}: no keys`)
-    assert.ok(result.keys.every(({ rect }) => rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= result.width + 2 && rect.y + rect.height <= result.height + 2), `${result.path}: keys overflow`)
+  let boardChecks = 0
+  for (const theme of ['light', 'dark']) for (const orientation of ['port', 'land']) {
+    await choose('theme', theme)
+    await choose('orientation', orientation)
+    for (const button of await page.locator('#files .sidebar-overview button.nav-layout').all()) {
+      await button.click()
+      const result = await state()
+      assert.ok(result.keys.length > 0, `${result.path}: no keys`)
+      assert.ok(result.keys.every(({ rect }) => rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= result.width + 2 && rect.y + rect.height <= result.height + 2), `${result.path}: keys overflow`)
+      if (/py_9.*double_input/.test(result.path)) {
+        assert.ok(result.keys.some((key) => key.center === 'F38'), `${result.path}: missing space`)
+        assert.ok(result.keys.some((key) => key.center === "'"), `${result.path}: missing punctuation`)
+      }
+      assert.deepEqual(result.changed, [])
+      boardChecks++
+      if (sample && theme === 'light' && orientation === 'port' && /\/(?:big_9|py_9_big_enter_double_input)\.ini$/.test(result.path)) {
+        await page.evaluate(async () => {
+          const { preview, toolbarPreview } = await import('/src/app/canvas-interaction.ts')
+          await preview.rendered()
+          await toolbarPreview.rendered()
+        })
+        await page.screenshot({ path: `/tmp/bdi-sogou-${result.path.split('/').pop().replace('.ini', '')}-fixed.png` })
+      }
+    }
   }
+  await choose('orientation', 'port')
+  await choose('theme', 'light')
   await page.locator('#files .nav-group[data-overview-group="键盘布局"]').getByText('英文全键', { exact: true }).click()
   assert.match((await state()).path, /light\/skin\/port\/en_26\.ini$/)
   await choose('theme', 'dark')
@@ -78,7 +100,7 @@ try {
     await page.waitForTimeout(30)
   }
   assert.deepEqual(errors, [])
-  console.log(`Sogou native preview: ${layouts.length} boards × 2 orientations × both looks, toolbar, geometry, selection and unchanged source passed${sample ? ` (${sample})` : ''}`)
+  console.log(`Sogou native preview: ${layouts.length} primary boards × 2 orientations × both looks, ${boardChecks} overview board checks, toolbar, geometry, selection and unchanged source passed${sample ? ` (${sample})` : ''}`)
 } catch (error) {
   await page.screenshot({ path: '/tmp/bdi-sogou-preview-failure.png' })
   throw error

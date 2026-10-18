@@ -22,7 +22,7 @@ export type SsfEntry = { key: string; value: string }
 const LINKED_STATES: Record<string, string[]> = { NORMAL: ["DISABLED", "NORMAL_ON"], PRESSED: ["PRESSED_ON"] }
 export const IMAGE_STATES = ["NORMAL", "PRESSED", "DISABLED", "NORMAL_ON", "PRESSED_ON", "FOCUSED"]
 const QUADS: Record<string, string[]> = {
-  FG_RECT: ["X", "Y", "W", "H"],
+  FG_RECT: ["←", "↑", "→", "↓"],
   ICON_RECT: ["←", "↑", "→", "↓"],
   LABEL_POSITION: ["←", "↑", "→", "↓"],
   MINOR_LABEL_POSITION: ["←", "↑", "→", "↓"],

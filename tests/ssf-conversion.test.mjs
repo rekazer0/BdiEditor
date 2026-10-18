@@ -263,10 +263,11 @@ test('ssf → BDS: per-key and shared backgrounds keep their stretch band, per t
 test('ssf → BDS: FG_RECT uses the target key and icons are centred on the key canvas', async () => {
   const { archive } = convertSsfToBaidu(await SsfPackage.open(ssfFixture()), bdsTemplate)
   const fore = baiduKeyStyle(archive, 'light', 'port', 'py_26', 'q', 'FORE_STYLE').image
-  // FG_RECT=0,0.25,1,0.75 occupies the bottom 75% of the target's 44×73 key.
+  // FG_RECT=0,0.25,1,0.75 bounds the middle half of the target's 44×73 key.
   assert.deepEqual([fore.width, fore.height], [44, 73])
   assert.deepEqual(pixel(fore, 0, 16), [0, 0, 0, 0])
-  assert.deepEqual(rgb(fore, 0, 20), COLORS.light.qGlyph)
+  assert.deepEqual(rgb(fore, 22, 36), COLORS.light.qGlyph)
+  assert.deepEqual(pixel(fore, 22, 60), [0, 0, 0, 0])
   const icon = baiduKeyStyle(archive, 'light', 'port', 'py_26', 'F36', 'FORE_STYLE').image
   assert.deepEqual([icon.width, icon.height], [44, 63])
   assert.deepEqual(pixel(icon, 0, 0), [0, 0, 0, 0])

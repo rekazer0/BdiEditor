@@ -7,12 +7,13 @@ function setup() {
   let width = 0
   let height = 0
   let slices = []
+  const clears = []
   const buffer = {
     get width() { return width },
     set width(value) { width = value; slices = [] },
     get height() { return height },
     set height(value) { height = value; slices = [] },
-    getContext: () => ({ drawImage: (...args) => slices.push(args), clearRect: () => { slices = [] } }),
+    getContext: () => ({ drawImage: (...args) => slices.push(args), clearRect: (...args) => { clears.push(args); slices = [] } }),
   }
   const frames = []
   const context = {
@@ -22,6 +23,7 @@ function setup() {
   }
   return {
     frames,
+    clears,
     draw(image, width, height) {
       drawNineSliceImage(context, {
         image, source: [10, 20, 106, 151], inner: [52, 64, 2, 17],
@@ -31,7 +33,7 @@ function setup() {
 }
 
 test('nine-slice backgrounds remain complete after alternating sizes', () => {
-  const { draw, frames } = setup()
+  const { draw, frames, clears } = setup()
   const image = {}
   draw(image, 110, 143)
   draw(image, 160, 400)
@@ -39,6 +41,7 @@ test('nine-slice backgrounds remain complete after alternating sizes', () => {
   assert.deepEqual(frames[2], frames[0])
   assert.equal(frames[0].slices.length, 9)
   assert.deepEqual(frames[0].args, [0, 0, 110, 143, 13, 12, 110, 143])
+  assert.deepEqual(clears[2], [0, 0, 160, 400], 'filtering must not sample dirty pixels outside the smaller source crop')
 })
 
 test('different bitmap objects and repeated frames keep their own background', () => {

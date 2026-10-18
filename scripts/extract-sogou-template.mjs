@@ -98,6 +98,8 @@ const actions = { Key_Backspace: 'F36', Key_Backspace_Qwerty: 'F36', Key_Clear_I
 const groups = { ABC: 'b', DEF: 'e', GHI: 'h', JKL: 'k', MNO: 'n', PQRS: 'q', TUV: 'u', WXYZ: 'x' }
 function action(section, doc) {
   const canonical = section.replace(/_Land/g, '').replace(/_(PY|EN)$/, '')
+  if (canonical === 'Key_Space_py9_DP') return 'F38'
+  if (canonical === 'Key_PunctPY_DP') return "'"
   if (actions[canonical]) return actions[canonical]
   if (canonical === 'Key_Return_Symbol') return 'F4'
   if (canonical === 'Key_Space_Korean_Symbol') return 'F38'
@@ -141,10 +143,18 @@ for (const orientation of ['port', 'land']) {
   const cand = IniDocument.parse(`[CAND]\nBACK_STYLE=${candStyle}\nFORE_STYLE=${textStyle}\nPADDING=12,0,12,0\nFIRST_GAP=12\nCELL_W=60\n`)
   // Sogou 20.x's default toolbar (the order its own skin previews show); the app sets it in code, not in an INI.
   const toolbar = ['logo_png', 'ime_function_expression_png', 'ime_function_switch_png', 'ime_function_voice_png', 'ime_function_sousou_png', 'ime_function_fanlingxi_png', 'close_png']
+  const toolbarActions = ['F31', 'F7', 'F13', 'F72', 'F82', 'F68', 'F8']
+  cand.set('CAND', 'ICON_NUM', String(toolbar.length))
   toolbar.forEach((ref, index) => {
     const fore = imageStyle(ref, ref)
     // SSF_IMAGE names the official file, so a skin's same-named icon replaces it on the canvas.
-    if (fore) cand.appendSection(`ICON${index + 1}`, [{ key: 'FORE_STYLE', value: fore }, { key: 'SSF_IMAGE', value: (images.get(ref, 'IMAGE') ?? ref).split(',')[0] }, { key: 'VIEW_RECT', value: `${Math.round(index * width / toolbar.length)},0,${Math.round(width / toolbar.length)},${candHeight}` }, { key: 'PERSIST', value: '1' }])
+    if (fore) cand.appendSection(`ICON${index + 1}`, [
+      { key: 'FORE_STYLE', value: fore }, { key: 'SSF_IMAGE', value: (images.get(ref, 'IMAGE') ?? ref).split(',')[0] },
+      { key: 'VIEW_RECT', value: `${Math.round(index * width / toolbar.length)},0,${Math.round(width / toolbar.length)},${candHeight}` },
+      { key: 'SIZE', value: `${Math.round(width / toolbar.length)},${candHeight}` },
+      { key: 'POS', value: `${Math.round(index * width / toolbar.length)},0` }, { key: 'ANCHOR_TYPE', value: '1' },
+      { key: 'KEY', value: toolbarActions[index] }, { key: 'PERSIST', value: '1' },
+    ])
   })
   files[`${orientation}/cand1.cnd`] = strToU8(cand.toString())
   for (const [name, ...layers] of boards) {
@@ -211,7 +221,10 @@ for (const orientation of ['port', 'land']) {
         { key: 'POS', value: `${Math.round(list('X') * width)},${Math.round(list('Y') * height)}` },
         { key: 'CELL_SIZE', value: `${Math.round(list('W') * width)},${Math.round(list('H') * height / rows)}` },
         { key: 'LIST_NUM', value: String(rows) }, { key: 'TYPE', value: '0' }, { key: 'NAMES', value: '， 。 ？ ！' },
-        { key: 'BACK_STYLE', value: background('BgCode') }, { key: 'FORE_STYLE', value: textStyle },
+        { key: 'BACK_STYLE', value: background('BgCode') },
+        { key: 'CELL_STYLE', value: background('KeyBg_UserSym') },
+        { key: 'SSF_TEXT_STYLE', value: cands.get('CandidateCodeView', 'TEXT_STYLE') },
+        { key: 'FORE_STYLE', value: style({ FONT_SIZE: Math.round(width * Number(template.get('TextStyle_Text', 'TEXT_SIZE'))), NM_COLOR: 'FF373737', HL_COLOR: 'FF373737' }) },
       ])
     }
     files[`${orientation}/${name}.ini`] = strToU8(layout.toString())

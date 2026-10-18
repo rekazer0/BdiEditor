@@ -194,14 +194,19 @@ class ThemeConverter {
   }
 
   private convertLists(layout: IniDocument): void {
-    const list = this.look.list()
-    const back = list.back && this.resources.imageStyle(list.back)
-    const cell = list.cell && this.resources.imageStyle(list.cell)
     for (const section of layout.sections().filter((name) => /^LIST\d*$/.test(name))) {
+      const list = this.look.list(layout.get(section, "SSF_TEXT_STYLE"))
+      const back = list.back && this.resources.imageStyle(list.back)
+      const cell = list.cell && this.resources.imageStyle(list.cell)
       if (back && layout.get(section, "BACK_STYLE")) layout.set(section, "BACK_STYLE", back)
       if (cell && layout.get(section, "CELL_STYLE")) layout.set(section, "CELL_STYLE", cell)
       const fore = layout.get(section, "FORE_STYLE")?.trim()
-      if (list.text && fore) layout.set(section, "FORE_STYLE", this.resources.derivedStyle(fore, { NM_COLOR: list.text, HL_COLOR: list.text }))
+      if (list.font) this.output.set(`${this.theme}/skin/res/${list.font.name}`, list.font.bytes)
+      if (fore) layout.set(section, "FORE_STYLE", this.resources.derivedStyle(fore, {
+        ...(list.text ? { NM_COLOR: list.text, HL_COLOR: list.text } : {}),
+        ...(list.font ? { FONT_NAME: list.font.name } : {}),
+        ...(list.fontSize ? { FONT_SIZE: String(list.fontSize) } : {}),
+      }))
     }
   }
 
