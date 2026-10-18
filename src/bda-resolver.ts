@@ -115,12 +115,14 @@ export class BdaResolver implements VisualResolver {
     if (!found) return { filterColor: bdaFilterColor(atom?.filterColor ?? 0) }
     const image = await this.bitmap(found.archive, found.path)
     if (!image) return { filterColor: bdaFilterColor(atom?.filterColor ?? 0) }
+    const inner = atom?.innerRect
     return {
       image,
       imagePath: found.archive === this.archive ? found.path : undefined,
       source: [0, 0, image.width, image.height],
-      inner: atom?.innerRect
-        ? [atom.innerRect.x, atom.innerRect.y, atom.innerRect.width, atom.innerRect.height]
+      // 与 .til 的 INNER_RECT 一致：宽高为 0（官方皮肤常写空的 innerRect）时整图拉伸，不按九宫格切。
+      inner: inner && inner.width > 0 && inner.height > 0
+        ? [inner.x, inner.y, inner.width, inner.height]
         : undefined,
       filterColor: bdaFilterColor(atom?.filterColor ?? 0),
     }

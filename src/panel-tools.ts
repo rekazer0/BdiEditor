@@ -30,13 +30,29 @@ export function stateStyleValue(value: string | undefined, state: number): numbe
   return match ? Number(match[1]) : undefined
 }
 
+// 官方 Android（KeyParam.J）按 STAT_STYLE 的书写顺序取第一个"状态成立"的 S<状态>_<TIP>，只换这一层，
+// TIP 自己的 STAT_STYLE 不再生效。预览默认模拟官方 APK 的普通手机初始设置：
+// - 长按语音 / 国际化语言 S34、S36、S37 三者互斥（InputEventHandler），默认开着空格语音、没装其他语言，即 S36；
+// - S67：SkinLayoutManagerKt.a/e 的 fusion 布局；S35（仓颉速成）默认关闭，S99 未找到启用来源，不自动加上。
+const VOICE_LANGUAGE_STATES = [34, 36, 37]
+const DEFAULT_VOICE_LANGUAGE_STATE = 36
+const DEFAULT_LAYOUT_STATE = 67
+
+function activeStates(state: number): Set<number> {
+  const voiceLanguage = VOICE_LANGUAGE_STATES.includes(state) ? state : DEFAULT_VOICE_LANGUAGE_STATE
+  return new Set([state, voiceLanguage, DEFAULT_LAYOUT_STATE])
+}
+
 export function stateTipSection(
   value: string | undefined,
   state: number | undefined,
 ): number | undefined {
   const effectiveState = state ?? 0
   if (effectiveState < 0 || effectiveState > 122) return
-  return stateStyleValue(value, effectiveState)
+  const active = activeStates(effectiveState)
+  for (const match of value?.matchAll(/(?:^|\|)\s*S(\d+)_(\d+)\s*(?=\||$)/g) ?? []) {
+    if (active.has(Number(match[1]))) return Number(match[2])
+  }
 }
 
 export function effectivePanelSection(

@@ -325,12 +325,13 @@ function setBdaStyle(document: IniDocument, section: string, property: string, s
   if (style) document.set(section, property, bdaStyleID(style))
 }
 
-function applyBdaKey(document: IniDocument, section: string, key: BdaKey): void {
+// sizeSection：前景偏移按哪个区段的尺寸换算。状态 TIP 没有 VIEW_RECT，取所属按键的。
+function applyBdaKey(document: IniDocument, section: string, key: BdaKey, sizeSection = section): void {
   setBdaStyle(document, section, "BACK_STYLE", key.backStyle)
   setBdaStyle(document, section, "HL_BACK_STYLE", key.backStyleState)
   if (key.foreStyles.length) document.set(section, "FORE_STYLE", key.foreStyles.map(bdaStyleID).join(","))
   if (!key.foreStyleOffsets.length) return
-  const rect = (document.get(section, "VIEW_RECT") ?? document.get(section, "SIZE"))?.split(",").map(Number)
+  const rect = (document.get(sizeSection, "VIEW_RECT") ?? document.get(sizeSection, "SIZE"))?.split(",").map(Number)
   const width = rect?.at(-2) ?? 0
   const height = rect?.at(-1) ?? 0
   document.set(section, "FORE_OFFSET", key.foreStyleOffsets
@@ -351,7 +352,7 @@ function applyBdaStateKeys(
     if (!action || !states) continue
     for (const match of states.matchAll(/S(\d+)_(\d+)/g)) {
       const key = keys.get(`${name(action)}_S${match[1]}`)
-      if (key) applyBdaKey(document, `TIP${match[2]}`, key)
+      if (key) applyBdaKey(document, `TIP${match[2]}`, key, section)
     }
   }
 }

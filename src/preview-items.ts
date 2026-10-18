@@ -60,7 +60,7 @@ export function visiblePreviewItems(
     if (stateGroup.length && fallbackGroup.length) {
       group.forEach((candidate) => handled.add(candidate))
       const selected = stateGroup.find((candidate) =>
-        stateStyleValue(candidate.statStyle, state ?? 0) !== undefined
+        stateTipSection(candidate.statStyle, state) !== undefined
       ) ?? fallbackGroup[0] ?? stateGroup[0]
       visible.push({
         ...selected,

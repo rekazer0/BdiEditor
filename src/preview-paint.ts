@@ -211,8 +211,8 @@ export async function paintPreview(self: Preview): Promise<void> {
     const backOpacity = animationElapsed >= 0
       ? legacyAnimationOpacity(self.legacyAnimation, backAnimationStyle, animationElapsed)
       : bdaBack.opacity
-    const foregrounds = phoneForegroundLayers(visuals[index].fore)
     const styleTexts = visuals[index].styleTexts
+    const foregrounds = phoneForegroundLayers(visuals[index].fore)
     const hasForeground = foregrounds.some(Boolean) || styleTexts.some(Boolean)
     if (shouldDrawItemBackground(key, self.panelStyle, self.panelWidth, self.panelHeight)) {
       withTransform(context, key.rect, backScale, backTranslation, backRotation, backOpacity, () => {
