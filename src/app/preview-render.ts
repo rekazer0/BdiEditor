@@ -55,7 +55,7 @@ export function renderCandidateState(): boolean {
     skinState.value ? Number(skinState.value) : undefined,
   )
   candidateComposition.hidden = !state.composing
-  candidateInput.hidden = !state.input
+  candidateInput.hidden = !state.input && !inputBarInKeyboard()
   candidateInputText.textContent = state.input
   candidateWords.replaceChildren(...state.candidates.map((value) => {
     const item = document.createElement("span")

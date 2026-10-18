@@ -99,6 +99,13 @@ try {
       return parseFloat(getComputedStyle(document.getElementById('candidate-input')).fontSize) * appState.candidateTextWidth / area.clientWidth
     })
     assert.ok(Math.abs(rendered - size) < 0.2, `${device}: input font size is ${size}, got ${rendered}`)
+    await compose('')
+    const idle = await measure()
+    assert.equal(idle.hidden, device !== 'iphone-17-pro', `${device}: only the iPhone keeps its empty input background`)
+    assert.deepEqual(idle.background, color, 'clearing input preserves the configured background pixels')
+    assert.equal(await page.locator('#candidate-input-background').isVisible(), device === 'iphone-17-pro')
+    assert.equal(await page.locator('#candidate-words').isVisible(), false, 'idle state shows toolbar instead of candidate words')
+    assert.equal(await page.locator('#candidate-input-text').textContent(), '', 'clearing input removes the code text')
   }
   assert.deepEqual(errors, [])
   console.log('Input bar phone geometry and background checks passed')
