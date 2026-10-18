@@ -16,7 +16,7 @@ import { parseLegacyHint } from "../preview-hints.ts"
 import { previewItems, previewSurfaceHeight, previewContentVerticalBounds } from "../preview-items.ts"
 import { IniDocument } from "../ini.ts"
 import { resolvePanelConfig, DEFAULT_BDA_PANEL_WIDTH, DEFAULT_BDA_PANEL_HEIGHT } from "../keyboard.ts"
-import { candidateInputForegroundStyle, resolveCandidateTextVisuals } from "../candidate-style.ts"
+import { resolveCandidateInputTextVisual, resolveCandidateTextVisuals } from "../candidate-style.ts"
 import { availableSkinStates, canvasFitWidth, previewScalePercent } from "../panel-tools.ts"
 import { populateKeyInspector } from "./key-inspector"
 import { setDrawingTile, drawAtlas } from "./tile-editing"
@@ -195,10 +195,7 @@ export function refreshPreview(): void {
       context.gen,
       context.styles,
     )
-    const inputVisual = resolver.resolveText(
-      candidateInputForegroundStyle(context.gen, candidateLayout),
-      false,
-    )
+    const inputVisual = resolveCandidateInputTextVisual(context.gen, resolver, candidateLayout, inputBarInKeyboard())
     const { normal: candidateVisual, first: firstCandidateVisual } =
       resolveCandidateTextVisuals(candidateLayout, context.gen, resolver)
     appState.firstCandidateTextVisual = firstCandidateVisual
@@ -242,12 +239,9 @@ export function refreshPreview(): void {
     const panelHeight = layoutSize?.[1] || generalSize?.[1] || DEFAULT_BDA_PANEL_HEIGHT
     const candidateDocument = toolbarConfigPath() ? textDocument(toolbarConfigPath()!) : undefined
     const panel = currentBdaAppearance()?.appearance.panels.get(layout.value.replace(/\.ini$/i, ""))
-    const inputVisual = resolver?.resolveText(
-      panel?.input?.textStyle
-        ? bdaStyleID(panel.input.textStyle)
-        : candidateInputForegroundStyle(bdaGen, candidateDocument),
-      false,
-    )
+    const inputVisual = panel?.input?.textStyle
+      ? resolver?.resolveText(bdaStyleID(panel.input.textStyle), false)
+      : resolver && resolveCandidateInputTextVisual(bdaGen, resolver, candidateDocument, inputBarInKeyboard())
     const { normal: candidateVisual, first: firstVisual } = resolver
       ? resolveCandidateTextVisuals(candidateDocument, bdaGen, resolver)
       : { normal: undefined, first: undefined }

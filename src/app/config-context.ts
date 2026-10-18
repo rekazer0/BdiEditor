@@ -295,7 +295,7 @@ export function refreshToolbarPreview(
   const inputGeneral = bdaPanel?.input?.textStyle
     ? IniDocument.parse(`[INPUT]\nFORE_STYLE=${bdaStyleID(bdaPanel.input.textStyle)}\n`)
     : gen
-  const inputStyle = resolveCandidateInputStyle(inputGeneral, resolver, width, document)
+  const inputStyle = resolveCandidateInputStyle(inputGeneral, resolver, width, document, inputBarInKeyboard())
   const inputHeight = inputStyle.height
   const backgroundStyle = appState.archive?.format === "bda"
     ? bdaStyleID(bdaPanel?.backStyle)
@@ -313,7 +313,7 @@ export function refreshToolbarPreview(
   candidateBackgroundPreview.setDocument(undefined)
   const inputBackgroundStyle = bdaPanel?.input
     ? bdaStyleID(bdaPanel.input.backStyle)
-    : candidateInputBackgroundStyle(gen, document)
+    : candidateInputBackgroundStyle(gen, document, inputBarInKeyboard())
   if (inputHeight > 0) {
     const bar: NonNullable<typeof appState.candidateInputBar> = { metrics: inputStyle, candidateWidth: width }
     appState.candidateInputBar = bar

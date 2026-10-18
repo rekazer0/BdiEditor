@@ -1,0 +1,37 @@
+# 冷萃摩卡：iPhone 真机截图对照
+
+2026-10-18，测试用户提供的 `冷萃摩卡无漂浮正常音_restored.bdi` 与 `照片 2.jpg`。
+选择深色外观、竖屏 `py_26.ini`、iPhone 17 Pro，模拟输入 `ni'hao`；另外回归 Android 输入浮窗。
+
+## 发现的问题
+
+旧预览将 `[INPUT] BACK_STYLE=3` 的灰色铺在输入行上，挡住人物背景；
+同时直接使用 `[SCAND] INPUT_STYLE=6` 的 90 字号，导致输入码明显偏大。
+先前只检查背景存在和行宽，无法发现这种样式取错的问题。
+
+## 样本中的证据与修正
+
+| 配置 | 样本值 | 处理 |
+|---|---|---|
+| SCAND BACK_STYLE | 514 → bj,1 | iPhone 输入行使用此背景 |
+| bj,1 SOURCE_RECT | 0,0,1080,70 | 全宽切图以原始 70 像素定义行高 |
+| INPUT FORE_STYLE | 1，字号 45 | iPhone 输入码字号 |
+| SCAND INPUT_STYLE | 6，字号 90，深色颜色 #92B5BF | iPhone 保留其颜色，不套用浮窗大字号 |
+| INPUT BACK_STYLE | 3，深色颜色 #7A7F82 | Android 仍按已有 INPUT 浮窗规则处理 |
+
+字号和颜色的组合依据真机截图校准，属于当前预览模型；本次没有 iOS 客户端绘制代码作为佐证。
+窄条、九宫格等非全宽图片继续采用文字行高回退，不强行按图片宽高比决定行高。
+没有新增用户选项，也不改皮肤文件中的配置值。
+
+## 验证
+
+- 真实样本断言：背景 source 为 `[0,0,1080,70]`、行高 70、输入字号 45；输入样式仍保留 SCAND 的颜色。
+- 皮肤归档 `changed` 为空，预览与切换设备没有改动原始资源。
+- 内置小米模板、此前的青蛙皮肤、当前摩卡皮肤均通过输入行专项测试。
+- 新增合成样本，将 INPUT / SCAND 设为不同颜色、45 / 90 不同字号，验证实际应用中的 iPhone / Android 分支。
+- 修正测试中的异步轮询：先获取 appState，再同步轮询状态和像素，避免 Promise 造成过早放行。
+- 类型检查通过；单元与设计规范检查 195/195；常规界面快照 0 处差异。
+
+验证截图保存在本工作区 `artifacts/mocha-keyboard-iphone.png`、`artifacts/mocha-fixed-iphone.png`、`artifacts/mocha-fixed-android.png`。
+- 完整 `npm run test:e2e` 已运行：75 个真实皮肤均通过；综合用户流程 21/22。
+  唯一失败仍是此前已有的 SSF 侧栏重复入口断言（`scripts/test-user-flows.mjs:659`，2 ≠ 1），不涉及本次输入行改动。

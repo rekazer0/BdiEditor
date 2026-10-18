@@ -68,7 +68,7 @@ export function inputBarBox(
     : { width, paddingStart: metrics.textLeft, paddingEnd: metrics.inset * 2 }
 }
 
-export function candidateInputForegroundStyle(
+function candidateInputForegroundStyle(
   general: IniDocument | undefined,
   candidate?: IniDocument,
 ): string {
@@ -81,13 +81,33 @@ export function candidateInputForegroundStyle(
   ].map((value) => value?.trim() ?? "").find(Boolean) ?? ""
 }
 
-/** The input code bar's background: the candidate layout's `[INPUT]` first, then the general one. */
+export function resolveCandidateInputTextVisual(
+  general: IniDocument | undefined,
+  resolver: VisualResolver,
+  candidate?: IniDocument,
+  inKeyboard = false,
+): TextVisual | undefined {
+  const visual = resolver.resolveText(candidateInputForegroundStyle(general, candidate), false)
+  if (!inKeyboard || !visual) return visual
+  const input = resolver.resolveText([
+    candidate?.get("CAND", "INPUT_STYLE"),
+    candidate?.get("INPUT", "FORE_STYLE"),
+    general?.get("INPUT", "FORE_STYLE"),
+  ].map((value) => value?.trim() ?? "").find(Boolean) ?? "", false)
+  // shortcut: iOS 的 INPUT 字号与 SCAND 颜色已按真机截图校准，取得 iOS 绘制代码后核对更多皮肤。
+  return { ...input, ...visual, fontSize: input?.fontSize ?? visual.fontSize }
+}
+
+/** iOS draws the inline row with SCAND; Android's popup uses INPUT. */
 export function candidateInputBackgroundStyle(
   general: IniDocument | undefined,
   candidate?: IniDocument,
+  inKeyboard = false,
 ): string {
   return [
+    inKeyboard ? candidate?.get("SCAND", "BACK_STYLE") : undefined,
     candidate?.get("INPUT", "BACK_STYLE"),
+    inKeyboard ? general?.get("SCAND", "BACK_STYLE") : undefined,
     general?.get("INPUT", "BACK_STYLE"),
   ].map((value) => value?.split(",")[0].trim() ?? "").find(Boolean) ?? ""
 }
@@ -111,11 +131,16 @@ export function resolveCandidateInputStyle(
   resolver: VisualResolver,
   width: number,
   candidate?: IniDocument,
+  inKeyboard = false,
 ): CandidateInputStyle {
   const foregroundStyle = candidateInputForegroundStyle(general, candidate)
-  const fontSize = resolver.resolveText(foregroundStyle, false)?.fontSize
+  const fontSize = resolveCandidateInputTextVisual(general, resolver, candidate, inKeyboard)?.fontSize
   if (!fontSize || fontSize <= 0) return { foregroundStyle, height: 0, inset: 0, textLeft: 0 }
   const density = skinDensity(width)
   const inset = Math.trunc(density * 2.5)
-  return { foregroundStyle, height: fontSize + inset * 2, inset, textLeft: Math.trunc(density * 6) }
+  const background = inKeyboard
+    ? resolver.sourceSize?.(candidateInputBackgroundStyle(general, candidate, true), false)
+    : undefined
+  const height = background?.width === width && background.height > 0 ? background.height : fontSize + inset * 2
+  return { foregroundStyle, height, inset, textLeft: Math.trunc(density * 6) }
 }

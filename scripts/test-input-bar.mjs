@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { createServer } from 'vite'
+import { SkinArchive } from '../src/skin.ts'
+import { IniDocument } from '../src/ini.ts'
 
 const root = new URL('..', import.meta.url).pathname
 const server = await createServer({ root, logLevel: 'error', server: { host: '127.0.0.1', port: 41921, strictPort: false } })
@@ -13,6 +15,7 @@ page.on('pageerror', (error) => errors.push(error.message))
 const sample = process.env.BDI_SKIN_PATH ?? `${root}/public/templates/xiaomi-unified-rounded-blur.bds`
 try {
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`)
+  await page.evaluate(async () => { globalThis.inputBarTestState = (await import('/src/app/state.ts')).appState })
   await page.locator('#browser-open').setInputFiles({ name: sample.split('/').pop(), mimeType: 'application/octet-stream', buffer: readFileSync(sample) })
   await page.waitForFunction(() => !document.querySelector('#open').disabled)
   const close = page.locator('#file-operation-dialog[open] #file-operation-close')
@@ -31,9 +34,8 @@ try {
     const canvas = document.getElementById('candidate-input-background')
     return { input: rect('candidate-input'), box: rect('candidate-input-box'), text: rect('candidate-input-text'), area: rect('candidate-area'), words: rect('candidate-words'), background: [...canvas.getContext('2d').getImageData(1, 1, 1, 1).data], hidden: document.getElementById('candidate-input').hidden }
   })
-  const settle = () => page.waitForFunction(async () => {
-    const { appState } = await import('/src/app/state.ts')
-    return Boolean(appState.candidateInputBar?.visual) && document.getElementById('candidate-input-background').getContext('2d').getImageData(1, 1, 1, 1).data[3] > 0
+  const settle = () => page.waitForFunction(() => {
+    return Boolean(globalThis.inputBarTestState.candidateInputBar?.visual) && document.getElementById('candidate-input-background').getContext('2d').getImageData(1, 1, 1, 1).data[3] > 0
   })
   await page.locator('#device').selectOption('pixel-10-pro')
   await compose('ni')
@@ -64,6 +66,40 @@ try {
   await page.screenshot({ path: '/tmp/bdi-input-android.png' })
   await compose('')
   assert.equal((await measure()).hidden, true, 'clearing input hides the bar')
+
+  // Make INPUT and SCAND visibly different so a wrong platform branch cannot pass on geometry alone.
+  const fixture = SkinArchive.open(new Uint8Array(readFileSync(`${root}/public/templates/xiaomi-unified-rounded-blur.bds`)))
+  for (const path of fixture.names().filter((path) => path.endsWith('/gen.ini') || path.endsWith('/default.css'))) {
+    const document = IniDocument.parse(fixture.getText(path))
+    if (path.endsWith('/gen.ini')) {
+      document.set('INPUT', 'BACK_STYLE', '9001')
+      document.set('INPUT', 'FORE_STYLE', '9003')
+      document.set('SCAND', 'BACK_STYLE', '9002')
+      document.set('SCAND', 'INPUT_STYLE', '9004')
+    } else {
+      for (const [id, color, size] of [[9001, 'FF123456'], [9002, 'FF456789'], [9003, 'FF111111', 45], [9004, 'FF92B5BF', 90]]) {
+        document.appendSection(`STYLE${id}`, [{ key: 'NM_COLOR', value: color }, ...(size ? [{ key: 'FONT_SIZE', value: String(size) }] : [])])
+      }
+    }
+    fixture.setText(path, document.toString())
+  }
+  await page.locator('#browser-open').setInputFiles({ name: 'input-scand.bds', mimeType: 'application/octet-stream', buffer: Buffer.from(fixture.toBytes('bds')) })
+  await page.waitForFunction(() => document.querySelector('#document-name').textContent === 'input-scand.bds' && !document.querySelector('#open').disabled)
+  if (await close.isVisible()) await close.click()
+  for (const [device, color, size] of [['pixel-10-pro', [18, 52, 86, 255], 90], ['iphone-17-pro', [69, 103, 137, 255], 45]]) {
+    await page.locator('#device').selectOption(device)
+    await compose("ni'hao")
+    await page.waitForFunction((expected) => {
+      const canvas = document.getElementById('candidate-input-background')
+      return globalThis.inputBarTestState.candidateInputBar?.visual && [...canvas.getContext('2d').getImageData(1, 1, 1, 1).data].every((value, i) => value === expected[i])
+    }, color)
+    const rendered = await page.evaluate(async () => {
+      const { appState } = await import('/src/app/state.ts')
+      const area = document.getElementById('candidate-area')
+      return parseFloat(getComputedStyle(document.getElementById('candidate-input')).fontSize) * appState.candidateTextWidth / area.clientWidth
+    })
+    assert.ok(Math.abs(rendered - size) < 0.2, `${device}: input font size is ${size}, got ${rendered}`)
+  }
   assert.deepEqual(errors, [])
   console.log('Input bar phone geometry and background checks passed')
 } finally {

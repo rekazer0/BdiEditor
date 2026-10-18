@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { drawInputBarBackground } from '../src/preview-draw.ts'
 import { IniDocument } from '../src/ini.ts'
-import { candidateInputBackgroundStyle, inputBarBox, resolveCandidateInputStyle } from '../src/candidate-style.ts'
+import { candidateInputBackgroundStyle, inputBarBox, resolveCandidateInputStyle, resolveCandidateInputTextVisual } from '../src/candidate-style.ts'
 
 test('input code background comes from the candidate layout, then the general config', () => {
   const general = IniDocument.parse('[INPUT]\nBACK_STYLE=127\nFORE_STYLE=128\n')
@@ -50,4 +50,27 @@ test('input background has a border on the left, top and right, with no bottom e
   ])
   assert.deepEqual(backgroundCalls({ borderColor: 'rgba(0, 0, 0, 0)' }), [])
   assert.deepEqual(backgroundCalls(undefined), [])
+})
+
+
+test('iPhone inline input uses SCAND artwork and colour with INPUT text size', () => {
+  const general = IniDocument.parse('[INPUT]\nBACK_STYLE=3\nFORE_STYLE=1\n[SCAND]\nBACK_STYLE=514\nINPUT_STYLE=6\n')
+  const resolver = {
+    resolveText: (id) => ({ '1': { fontSize: 45, fontWeight: 500, color: '#7a7f82' }, '6': { fontSize: 90, color: '#92b5bf' } })[id],
+    sourceSize: (id) => id === '514' ? { width: 1080, height: 70 } : undefined,
+  }
+  assert.equal(candidateInputBackgroundStyle(general), '3')
+  assert.equal(candidateInputBackgroundStyle(general, undefined, true), '514')
+  assert.equal(resolveCandidateInputTextVisual(general, resolver)?.fontSize, 90)
+  assert.deepEqual(resolveCandidateInputTextVisual(general, resolver, undefined, true), { fontSize: 45, fontWeight: 500, color: '#92b5bf' })
+  assert.equal(resolveCandidateInputStyle(general, resolver, 1080).height, 106)
+  assert.equal(resolveCandidateInputStyle(general, resolver, 1080, undefined, true).height, 70)
+})
+
+test('iPhone input keeps the INPUT background when no SCAND artwork is configured', () => {
+  const general = IniDocument.parse('[INPUT]\nBACK_STYLE=7\nFORE_STYLE=8\n')
+  const resolver = { resolveText: () => ({ fontSize: 45 }), sourceSize: () => undefined }
+  assert.equal(candidateInputBackgroundStyle(general, undefined, true), '7')
+  assert.equal(resolveCandidateInputStyle(general, resolver, 1125, undefined, true).height, 61)
+  assert.equal(resolveCandidateInputStyle(undefined, resolver, 1080, undefined, true).height, 61)
 })
