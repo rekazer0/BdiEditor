@@ -299,13 +299,13 @@ export function previewItemSections(document: IniDocument, section: string): str
   return [section, ...tips]
 }
 
-// gen.ini 的 OFFSET 段既有 POS=x,y 也有 R_POS=x,y（部分 Android 皮肤）。
-// 两者同义，解析时优先 POS、回退 R_POS。
-export function offsetFromSection(document: IniDocument | undefined, section: string): [number, number] | undefined {
+// Baidu RelativeOffsetParam uses percentages of the key, truncated toward zero.
+export function offsetFromSection(document: IniDocument | undefined, section: string, rect: Pick<Rect, "width" | "height">): [number, number] | undefined {
   if (!document) return
-  return parseOffset(
-    document.get(section, "POS") ?? document.get(section, "R_POS"),
-  )
+  const absolute = parseOffset(document.get(section, "POS"))
+  if (absolute) return absolute
+  const relative = parseOffset(document.get(section, "R_POS"))
+  return relative && [Math.trunc(rect.width * relative[0] / 100), Math.trunc(rect.height * relative[1] / 100)]
 }
 
 export function itemFromSection(document: IniDocument, section: string): PreviewItem | undefined {

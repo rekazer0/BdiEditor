@@ -181,6 +181,7 @@ class ThemeConverter {
       if (look.fore) {
         layout.set(section, "FORE_STYLE", this.resources.imageStyle(look.fore))
         layout.remove(section, "FORE_OFFSET")
+        layout.remove(section, "POS_TYPE")
       } else if (look.label) {
         const templateFore = layout.get(section, "FORE_STYLE")?.split(",").map((value) => value.trim()).filter(Boolean)
         if (templateFore?.length) layout.set(section, "FORE_STYLE", templateFore.map((id, index) => this.tintedTemplateStyle(id, look.label!, false, look.texts[index]) ?? id).join(","))
