@@ -65,7 +65,10 @@
   color: #121419;
   color-scheme: light;
   background: transparent;
-  --safe-area-top: env(safe-area-inset-top, 0px);
+  --browser-occlusion-top: 0px;
+  --browser-occlusion-bottom: 0px;
+  --safe-area-top: max(env(safe-area-inset-top, 0px), var(--browser-occlusion-top));
+  --safe-area-bottom: max(env(safe-area-inset-bottom, 0px), var(--browser-occlusion-bottom));
   --titlebar-height: calc(54px + var(--safe-area-top));
 
   /* 阴影系统：只用于浮层，表面用 1px 描边区分层级 */

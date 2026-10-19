@@ -4508,7 +4508,7 @@ input[type="search"]:focus {
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    padding-bottom: var(--space-xl);
   }
 
   aside:has(.raw-files:not([hidden])) #files {
@@ -8673,11 +8673,16 @@ main {
 
 @media (max-width: 760px) {
 
+  :root:has(body.app-window) {
+    background: var(--material-toolbar);
+  }
+
   :root body .titlebar {
     height: var(--titlebar-height);
     min-height: var(--titlebar-height);
     gap: 6px;
     padding: var(--safe-area-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+    background: var(--material-toolbar);
   }
 
   :root body .titlebar-left,
@@ -9194,6 +9199,14 @@ main {
   :root body .canvas-wrap {
     min-height: 0;
     padding: 8px;
+  }
+
+  :root:not([data-mobile-preview-position="top"]) body .canvas-wrap:not(.empty) {
+    padding-bottom: calc(var(--space-sm) + var(--safe-area-bottom));
+  }
+
+  :root:not([data-mobile-preview-position="top"]) body .canvas-multi-toolbar {
+    bottom: calc(var(--space-lg) + var(--space-2xs) + var(--safe-area-bottom));
   }
 }
 

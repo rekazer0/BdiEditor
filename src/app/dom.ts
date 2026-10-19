@@ -3,6 +3,8 @@
 
 export const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 
+export const browserThemeColor = $<HTMLMetaElement>("#browser-theme-color")
+
 export const newButton = $("#new") as HTMLButtonElement
 
 export const newProjectDialog = $("#new-project-dialog") as HTMLDialogElement

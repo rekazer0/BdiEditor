@@ -273,6 +273,99 @@ await check("390×844 preview above the panes", () => withPage({ width: 390, hei
   assert.ok(Math.abs(dock.bottom - sidebar.y) <= 1 && Math.abs(sidebar.bottom - main.bottom) <= 1, "panes below the dock")
 }, { storage: { "mobile-preview-position": "top" } }))
 
+for (const { top, position } of [
+  { top: 52, position: "top" }, { top: 52, position: "bottom" },
+  { top: 59, position: "top" }, { top: 59, position: "bottom" },
+]) {
+  await check(`Dynamic Island ${top}px safe area with preview at ${position}`, () => withPage({ width: 393, height: 852 }, async (page) => {
+    const session = await page.context().newCDPSession(page)
+    // The application must read browser values; no device-specific inset
+    // belongs in app code.
+    await session.send("Emulation.setSafeAreaInsetsOverride", { insets: { top, bottom: 34 } })
+    await openTemplate(page, "official-android-bds")
+    await assertTitlebarClean(page, "Dynamic Island")
+    const titlebar = await rect(page, ".titlebar")
+    assert.equal(titlebar.height, top + 52, "toolbar reserves the browser safe area above its 52px control row")
+    for (const selector of [".titlebar-left", ".titlebar-center", ".titlebar-right"]) {
+      const controls = await rect(page, selector)
+      assert.ok(controls.y >= top, `${selector} stays below the Dynamic Island safe area`)
+      assert.ok(controls.bottom <= titlebar.bottom, `${selector} stays inside the toolbar`)
+    }
+    assert.equal((await rect(page, "main")).y, titlebar.bottom, "workspace starts after the full toolbar")
+    await session.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: 0, bottom: 0 } })
+    assert.equal((await rect(page, ".titlebar")).height, 52, "removing the browser inset removes the reserved space")
+  }, { colorScheme: "dark", storage: { "mobile-preview-position": position } }))
+}
+
+for (const colorScheme of ["light", "dark"]) {
+  await check(`browser safe areas and split position (${colorScheme})`, () => withPage({ width: 390, height: 844 }, async (page) => {
+    await openTemplate(page)
+    const session = await page.context().newCDPSession(page)
+    await session.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: 24, bottom: 20 } })
+    const background = await page.evaluate(() => ({
+      root: getComputedStyle(document.documentElement).backgroundColor,
+      toolbar: getComputedStyle(document.querySelector(".titlebar")).backgroundColor,
+      browser: document.querySelector('meta[name="theme-color"]').content,
+      toolbarToken: getComputedStyle(document.documentElement).getPropertyValue("--material-toolbar").trim(),
+    }))
+    assert.equal(background.root, background.toolbar, "top safe area continues the toolbar background")
+    assert.equal(background.browser, background.toolbarToken, "browser chrome follows the app theme")
+
+    const insets = () => page.evaluate(() => ({
+      top: parseFloat(getComputedStyle(document.querySelector(".titlebar")).paddingTop),
+      canvas: parseFloat(getComputedStyle(document.querySelector(".canvas-wrap")).paddingBottom),
+      editor: parseFloat(getComputedStyle(document.querySelector("main > .source")).paddingBottom),
+      controls: parseFloat(getComputedStyle(document.querySelector(".canvas-multi-toolbar")).bottom),
+    }))
+    assert.equal((await insets()).top, 24, "top inset comes from the browser safe area")
+    assert.equal((await insets()).canvas, 28, "bottom canvas clears the system safe area")
+    const editorPadding = (await insets()).editor
+
+    const setViewport = async (top, bottom, scale = 1) => {
+      await page.evaluate(({ top, bottom, scale }) => {
+        Object.defineProperties(visualViewport, {
+          height: { configurable: true, value: innerHeight - top - bottom },
+          offsetTop: { configurable: true, value: top },
+          scale: { configurable: true, value: scale },
+        })
+        visualViewport.dispatchEvent(new Event("resize"))
+      }, { top, bottom, scale })
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    }
+    await setViewport(32, 52)
+    assert.equal((await insets()).top, 32, "top controls clear the visual viewport overlap")
+    assert.equal((await insets()).canvas, 60, "bottom inset uses the reported overlap without adding it twice")
+    assert.equal((await insets()).controls, 70, "floating canvas controls clear the bottom overlap")
+    await setViewport(0, 36)
+    assert.equal((await insets()).canvas, 44, "browser control height updates after resizing")
+
+    await page.evaluate(() => {
+      const select = document.querySelector("#mobile-preview-position")
+      select.value = "top"
+      select.dispatchEvent(new Event("change"))
+    })
+    assert.equal((await insets()).canvas, 8, "top canvas needs no bottom avoidance")
+    assert.equal((await insets()).editor, editorPadding, "bottom editor gains no safe area padding")
+    await page.locator("#mobile-split-handle").click()
+    assert.equal((await insets()).editor, editorPadding, "collapsed canvas adds no editor padding")
+
+    await setViewport(60, 200, 2)
+    assert.equal((await insets()).top, 24, "pinch zoom is not browser chrome")
+    await setViewport(0, 0)
+    await page.evaluate(() => {
+      const input = document.createElement("input")
+      input.id = "keyboard-viewport-probe"
+      document.body.append(input)
+      input.focus()
+    })
+    await setViewport(0, 300)
+    assert.equal(await page.locator("html").getAttribute("data-keyboard-open"), "true", "keyboard shrink is detected")
+    assert.equal(await page.evaluate(() => document.documentElement.style.getPropertyValue("--browser-occlusion-bottom")), "0px", "keyboard height is not a browser inset")
+    await setViewport(0, 0)
+    await page.locator("#keyboard-viewport-probe").evaluate((input) => input.remove())
+  }, { colorScheme }))
+}
+
 await check("844×390 landscape phone keeps the canvas", () => withPage({ width: 844, height: 390 }, async (page) => {
   await assertNoPageOverflow(page, "landscape welcome")
   await openTemplate(page)

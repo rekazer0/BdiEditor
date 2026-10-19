@@ -1,4 +1,4 @@
-import { checkUpdateButton, updateStatus, downloadUpdate, aboutUpdate, settingsDialog, canvasBackground, canvasWrap, editorCrosshair, deviceShell, previewCoordinates, editorCoordinateSnapSetting, appTheme, sourceFontSize, sourceEditor, windowMaterialOpacity, windowMaterialOpacityValue, windowMaterial, windowMaterialOpacitySetting, sidebarViewVisible, inspectorTabs, inspectorTabsVisible, sourceCompletionEnabled, sourceValueHintsEnabled, sourceLineExplanationEnabled } from "./dom"
+import { checkUpdateButton, updateStatus, downloadUpdate, aboutUpdate, settingsDialog, canvasBackground, canvasWrap, editorCrosshair, deviceShell, previewCoordinates, editorCoordinateSnapSetting, appTheme, sourceFontSize, sourceEditor, windowMaterialOpacity, windowMaterialOpacityValue, windowMaterial, windowMaterialOpacitySetting, sidebarViewVisible, inspectorTabs, inspectorTabsVisible, sourceCompletionEnabled, sourceValueHintsEnabled, sourceLineExplanationEnabled, browserThemeColor } from "./dom"
 import { isTauri, settingsPages, settingsNavItems, preview, toolbarPreview, sidebarViewHeading, source } from "./canvas-interaction"
 import { invoke } from "@tauri-apps/api/core"
 import { checkForUpdate } from "../update.ts"
@@ -92,6 +92,7 @@ export function applyAppTheme(): void {
   const resolved = preference === "system" ? (systemTheme.matches ? "dark" : "light") : preference
   document.documentElement.dataset.appTheme = resolved
   document.documentElement.style.colorScheme = resolved
+  browserThemeColor.content = getComputedStyle(document.documentElement).getPropertyValue("--material-toolbar").trim()
   if (isTauri()) void getCurrentWindow().setTheme(preference === "system" ? null : preference)
 }
 

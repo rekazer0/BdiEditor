@@ -85,6 +85,12 @@ export function installSafeAreaLock(root: HTMLElement = document.documentElement
       baselineHeight: baselineViewportHeight,
     })
     const keyboardOpen = viewportShrunk && (focusedInput || keyboardWasOpen)
+    // visualViewport reports controls that overlap the layout viewport. Browser
+    // chrome already excluded by dvh needs no extra inset. Ignore keyboard and
+    // pinch-zoom geometry; neither describes browser controls.
+    const browserOverlay = !keyboardOpen && (viewport?.scale ?? 1) === 1
+    root.style.setProperty("--browser-occlusion-top", `${browserOverlay ? frame.offsetTop : 0}px`)
+    root.style.setProperty("--browser-occlusion-bottom", `${browserOverlay ? Math.max(0, window.innerHeight - frame.height - frame.offsetTop) : 0}px`)
     root.dataset.keyboardOpen = keyboardOpen ? "true" : "false"
     if (reveal && keyboardOpen) revealFocusedInput()
     if (keyboardWasOpen && !keyboardOpen) restoreAfterKeyboard()
@@ -115,6 +121,8 @@ export function installSafeAreaLock(root: HTMLElement = document.documentElement
   return () => {
     for (const [target, type, listener] of listeners) target.removeEventListener(type, listener)
     for (const timer of restoreTimers) window.clearTimeout(timer)
+    root.style.removeProperty("--browser-occlusion-top")
+    root.style.removeProperty("--browser-occlusion-bottom")
     delete root.dataset.keyboardOpen
   }
 }
