@@ -192,16 +192,53 @@ export function normalizeEntryCounts(bytes: Uint8Array): Uint8Array {
     locals.set(decoder.decode(bytes.subarray(local + 30, local + 30 + data.getUint16(local + 26, true))), local)
     local += 30 + data.getUint16(local + 26, true) + data.getUint16(local + 28, true) + data.getUint32(local + 18, true)
   }
+  // ZIP64 把 8 字节大小放在中央目录的 extra 字段（id 1）里；值按“未压缩、压缩、偏移”的顺序出现。
+  const zip64Values = (central: number, nameLength: number, extraLength: number): number[] | undefined => {
+    let extra = central + 46 + nameLength
+    const end = extra + extraLength
+    while (extra + 4 <= end) {
+      const content = extra + 4
+      const size = data.getUint16(extra + 2, true)
+      if (data.getUint16(extra, true) === 1) {
+        const values: number[] = []
+        for (let cursor = content; cursor + 8 <= content + size; cursor += 8) {
+          const low = data.getUint32(cursor, true)
+          const high = data.getUint32(cursor + 4, true)
+          values.push(high === 0 ? low : Number.POSITIVE_INFINITY)
+        }
+        return values
+      }
+      extra = content + size
+    }
+    return
+  }
   let central = data.getUint32(endOffset + 16, true)
   for (let index = 0; index < total && central + 46 <= endOffset && data.getUint32(central, true) === CENTRAL_SIGNATURE; index++) {
     const nameLength = data.getUint16(central + 28, true)
-    const local = locals.get(decoder.decode(bytes.subarray(central + 46, central + 46 + nameLength)))
-    const unknown = [20, 24, 42].some((field) => data.getUint32(central + field, true) === 0xffffffff)
-    // 带数据描述符且头里大小为 0 的条目补不回来，保持原样交给后面的本地文件头解包。
-    if (unknown && local !== undefined && !(data.getUint16(local + 6, true) & 8 && !data.getUint32(local + 18, true))) {
-      wideRepairs.push([central + 20, data.getUint32(local + 18, true)], [central + 24, data.getUint32(local + 22, true)], [central + 42, local])
+    const extraLength = data.getUint16(central + 30, true)
+    const sentinel = new Set(
+      [20, 24, 42].filter((field) => data.getUint32(central + field, true) === 0xffffffff),
+    )
+    if (sentinel.size) {
+      const zipped = zip64Values(central, nameLength, extraLength)
+      const order = [24, 20, 42].filter((field) => sentinel.has(field))
+      for (const [position, field] of order.entries()) {
+        const value = zipped?.[position]
+        if (value === undefined || value >= 0xffffffff) continue
+        wideRepairs.push([central + field, value])
+        sentinel.delete(field)
+      }
+      const local = locals.get(decoder.decode(bytes.subarray(central + 46, central + 46 + nameLength)))
+      // 带数据描述符且头里大小为 0 的条目补不回来，保持原样交给后面的本地文件头解包。
+      if (local !== undefined && !(data.getUint16(local + 6, true) & 8 && !data.getUint32(local + 18, true))) {
+        const fallback: Array<[number, number]> = [[24, data.getUint32(local + 22, true)], [20, data.getUint32(local + 18, true)], [42, local]]
+        for (const [field, value] of fallback) {
+          if (!sentinel.has(field) || value === 0xffffffff) continue
+          wideRepairs.push([central + field, value])
+        }
+      }
     }
-    central += 46 + nameLength + data.getUint16(central + 30, true) + data.getUint16(central + 32, true)
+    central += 46 + nameLength + extraLength + data.getUint16(central + 32, true)
   }
   if (!wideRepairs.length && repairs.every(([offset, value]) => data.getUint16(offset, true) === value)) return bytes
   const normalized = bytes.slice()

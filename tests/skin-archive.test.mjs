@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { strToU8, zipSync } from 'fflate'
+import { deflateSync, strToU8, zipSync } from 'fflate'
 import { SkinArchive } from "../src/skin.ts"
 import { readArchiveEntry } from "../src/skin-zip.ts"
 
@@ -116,6 +116,90 @@ test('recovers central directory sizes and offsets from local headers', async ()
   archive.setText('Info.txt', 'AtomSkinName=changed')
   const saved = await SkinArchive.openAsync(await archive.toBytesAsync('bds'))
   assert.equal(saved.getText('Info.txt'), 'AtomSkinName=changed')
+})
+
+// Palm 的打包器把真实大小写进中央目录的 ZIP64 extra 字段，却不写 ZIP64 结束记录，
+// fflate 因此不会去读它（拒绝摆烂-乱17.sxi 就报“超过 256 MB”）。
+function zip64Archive() {
+  const entries = [
+    ['Info.txt', strToU8('AtomSkinName=zip64')],
+    ['light/port/py_9.ini', strToU8('[PANEL]\nSIZE=480,320')],
+  ]
+  const parts = []
+  const centrals = []
+  let offset = 0
+  for (const [name, data] of entries) {
+    const nameBytes = strToU8(name)
+    const compressed = deflateSync(data)
+    const header = new Uint8Array(30 + nameBytes.length + 20)
+    const headerView = dataView(header)
+    headerView.setUint32(0, LOCAL_SIGNATURE, true)
+    headerView.setUint16(4, 45, true)
+    headerView.setUint16(6, 0x08, true)
+    headerView.setUint16(8, 8, true)
+    headerView.setUint32(18, 0xffffffff, true)
+    headerView.setUint32(22, 0xffffffff, true)
+    headerView.setUint16(26, nameBytes.length, true)
+    headerView.setUint16(28, 20, true)
+    header.set(nameBytes, 30)
+    // 本地头里的 ZIP64 占位全是 0，真实大小在数据描述符里。
+    headerView.setUint16(30 + nameBytes.length, 1, true)
+    headerView.setUint16(32 + nameBytes.length, 16, true)
+    const descriptor = new Uint8Array(24)
+    const descriptorView = dataView(descriptor)
+    descriptorView.setUint32(0, 0x08074b50, true)
+    descriptorView.setUint32(8, compressed.length, true)
+    descriptorView.setUint32(16, data.length, true)
+    const central = new Uint8Array(46 + nameBytes.length + 20)
+    const centralView = dataView(central)
+    centralView.setUint32(0, CENTRAL_SIGNATURE, true)
+    centralView.setUint16(4, 45, true)
+    centralView.setUint16(6, 45, true)
+    centralView.setUint16(8, 0x08, true)
+    centralView.setUint16(10, 8, true)
+    centralView.setUint32(20, 0xffffffff, true)
+    centralView.setUint32(24, 0xffffffff, true)
+    centralView.setUint32(42, offset, true)
+    centralView.setUint16(28, nameBytes.length, true)
+    centralView.setUint16(30, 20, true)
+    central.set(nameBytes, 46)
+    const extra = 46 + nameBytes.length
+    centralView.setUint16(extra, 1, true)
+    centralView.setUint16(extra + 2, 16, true)
+    centralView.setUint32(extra + 4, data.length, true)
+    centralView.setUint32(extra + 12, compressed.length, true)
+    parts.push(header, compressed, descriptor)
+    centrals.push(central)
+    offset += header.length + compressed.length + descriptor.length
+  }
+  const end = new Uint8Array(22)
+  const endView = dataView(end)
+  endView.setUint32(0, END_SIGNATURE, true)
+  endView.setUint16(8, entries.length, true)
+  endView.setUint16(10, entries.length, true)
+  endView.setUint32(12, centrals.reduce((total, part) => total + part.length, 0), true)
+  endView.setUint32(16, offset, true)
+  const all = [...parts, ...centrals, end]
+  const bytes = new Uint8Array(all.reduce((total, part) => total + part.length, 0))
+  let position = 0
+  for (const part of all) {
+    bytes.set(part, position)
+    position += part.length
+  }
+  return bytes
+}
+
+test('recovers ZIP64 central directory sizes without a ZIP64 end record', async () => {
+  const bytes = zip64Archive()
+  for (const archive of [SkinArchive.open(bytes), await SkinArchive.openAsync(bytes)]) {
+    assert.equal(archive.names().length, 2)
+    assert.equal(archive.getText('Info.txt'), 'AtomSkinName=zip64')
+    assert.equal(archive.getText('light/port/py_9.ini'), '[PANEL]\nSIZE=480,320')
+  }
+  const archive = await SkinArchive.openAsync(bytes)
+  archive.setText('Info.txt', 'AtomSkinName=saved')
+  const saved = await SkinArchive.openAsync(await archive.toBytesAsync('bds'))
+  assert.equal(saved.getText('Info.txt'), 'AtomSkinName=saved')
 })
 
 test('opens an archive without any entries', async () => {
