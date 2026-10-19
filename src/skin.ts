@@ -18,7 +18,7 @@ type PackageLayout =
   | "legacy-ios"
 
 type BdaTheme = "light" | "dark"
-type PackageInfo = { layout: PackageLayout; bdaRoots?: Map<BdaTheme, string> }
+type PackageInfo = { layout: PackageLayout; bdaRoots?: Map<BdaTheme, string>; sxiNested?: boolean }
 
 function bdaThemeRoots(files: Map<string, Uint8Array>): Map<BdaTheme, string> | undefined {
   const names = [...files.keys()]
@@ -66,8 +66,11 @@ function packageInfo(files: Map<string, Uint8Array>, formatHint?: ExportFormat):
   // A Sogou phone skin keeps its own folder layout, so its paths are used as they are. Without a
   // file name (Android content:// URIs) its phoneTheme.ini identifies it.
   if (formatHint === "ssf" || !formatHint && names.includes("phoneTheme.ini")) return { layout: "ssf" }
-  // Palm `.sxi` keeps `light/res/` like a dual BDS, so it is recognised by its root model first.
-  if (files.has(SXI_SKIN_PATH) || formatHint === "sxi") return { layout: "sxi" }
+  // Palm `.sxi` keeps its own tree. Palm's exporter nests it under `light/skin/`, while this
+  // editor's converter writes the flat `light/` form, so both spellings have to be read.
+  if (files.has(SXI_SKIN_PATH) || formatHint === "sxi") {
+    return { layout: "sxi", sxiNested: names.some((name) => /^(?:dark|light)\/skin\//.test(name)) }
+  }
   if (names.some((name) => /^skin\/(?:dark|light)\/skin\//.test(name))) return { layout: "bdi-dual" }
   if (names.some((name) => /^skin\/(?:land|port|res)\//.test(name))) return { layout: "bdi-single" }
   if (names.some((name) => /^(?:dark|light)\/(?:land|port|res)\//.test(name))) return { layout: "bds-dual" }
@@ -105,7 +108,12 @@ function canonicalPath(path: string, layout: PackageLayout, bdaRoots?: Map<BdaTh
   }
   if (layout === "bds-dual" || layout === "sxi") {
     const themed = path.match(/^(dark|light)(?:\/(.*))?$/)
-    if (themed) return `${themed[1]}/skin/${themed[2] ?? ""}`
+    if (themed) {
+      // Palm's own `.sxi` trees already carry `light/skin/`; adding a second `skin/` there
+      // leaves every resource unreachable, which blanks the whole preview.
+      if (layout === "sxi" && (themed[2] === "skin" || themed[2]?.startsWith("skin/"))) return path
+      return `${themed[1]}/skin/${themed[2] ?? ""}`
+    }
   }
   if (layout === "bds-single") {
     if (path === "Info.txt" || path === "demo.png") return path
@@ -114,7 +122,7 @@ function canonicalPath(path: string, layout: PackageLayout, bdaRoots?: Map<BdaTh
   return path
 }
 
-function rawPath(path: string, layout: PackageLayout, bdaRoots?: Map<BdaTheme, string>): string {
+function rawPath(path: string, layout: PackageLayout, bdaRoots?: Map<BdaTheme, string>, sxiNested?: boolean): string {
   if (layout === "bdi-dual") {
     if (path === "Info.txt" || path === "demo.png") return `skin/${path}`
     return path.replace(/^(dark|light)\/skin\//, "skin/$1/skin/")
@@ -130,6 +138,7 @@ function rawPath(path: string, layout: PackageLayout, bdaRoots?: Map<BdaTheme, s
     return root ? `${root}/${themed[2]}` : themed[2]
   }
   if (layout === "bds-dual" || layout === "sxi") {
+    if (layout === "sxi" && sxiNested) return path
     return path.replace(/^(dark|light)\/skin\//, "$1/")
   }
   if (layout === "bds-single") {
@@ -180,6 +189,7 @@ export class SkinArchive {
   private sourceZip?: ReturnType<typeof parseZip>
   private layout: PackageLayout
   private bdaRoots?: Map<BdaTheme, string>
+  private sxiNested: boolean
   private canonicalToRaw = new Map<string, string>()
   private cachedNames?: string[]
   private changedRaw = new Set<string>()
@@ -197,6 +207,7 @@ export class SkinArchive {
     const info = packageInfo(files, formatHint)
     this.layout = info.layout
     this.bdaRoots = info.bdaRoots
+    this.sxiNested = info.sxiNested ?? false
     this.rebuildPathMap()
     try {
       this.sourceZip = parseZip(this.sourceBytes)
@@ -331,7 +342,7 @@ export class SkinArchive {
   }
 
   sourcePath(path: string): string {
-    return this.canonicalToRaw.get(path) ?? rawPath(path, this.layout, this.bdaRoots)
+    return this.canonicalToRaw.get(path) ?? rawPath(path, this.layout, this.bdaRoots, this.sxiNested)
   }
 
   getSourceBytes(path: string): Uint8Array | undefined {
@@ -372,7 +383,7 @@ export class SkinArchive {
   setBytes(path: string, bytes: Uint8Array): void {
     if (this.isOverlay(path)) throw new Error(`${path} 是预览用的转换结果，不能修改`)
     if (this.derivedPointer(path)) throw new Error(`${path} 由 skin.json 生成，请在源码中修改 skin.json`)
-    const raw = this.canonicalToRaw.get(path) ?? rawPath(path, this.layout, this.bdaRoots)
+    const raw = this.canonicalToRaw.get(path) ?? rawPath(path, this.layout, this.bdaRoots, this.sxiNested)
     const current = this.files.get(raw)
     if (current && current.length === bytes.length && current.every((byte, index) => byte === bytes[index])) {
       return
@@ -429,6 +440,7 @@ export class SkinArchive {
         this.sourceZip = reopened.sourceZip
         this.layout = reopened.layout
         this.bdaRoots = reopened.bdaRoots
+        this.sxiNested = reopened.sxiNested
         this.canonicalToRaw = reopened.canonicalToRaw
         this.cachedNames = undefined
         this.revision++

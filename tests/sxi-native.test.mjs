@@ -104,6 +104,36 @@ test("an opened .sxi only saves as .sxi", () => {
   assert.throws(() => archive.toBytes("bds"), /\.sxi/)
 })
 
+test("Palm's nested light/skin tree is read as it is, new files stay nested", () => {
+  const nested = SkinArchive.open(zipSync({
+    "skin.json": strToU8("{}"),
+    "Info.txt": strToU8("Name=嵌套"),
+    "light/skin/res/bg.png": PNG,
+    "light/skin/port/py_9.ini": strToU8("[PANEL]\nSIZE=480,320"),
+  }))
+  assert.equal(nested.format, "sxi")
+  assert.equal(nested.getText("light/skin/port/py_9.ini"), "[PANEL]\nSIZE=480,320")
+  assert.deepEqual(nested.getBytes("light/skin/res/bg.png"), PNG)
+  assert.equal(nested.sourcePath("light/skin/res/bg.png"), "light/skin/res/bg.png")
+  nested.setText("light/skin/res/extra.txt", "x")
+  assert.deepEqual(nested.sourceFiles().map((file) => file.path).sort(), [
+    "Info.txt",
+    "light/skin/port/py_9.ini",
+    "light/skin/res/bg.png",
+    "light/skin/res/extra.txt",
+    "skin.json",
+  ])
+  // 本编辑器从 BDI/BDS 转出的 .sxi 是扁平的 `light/` 树，仍要映射到同一个规范路径。
+  const flat = SkinArchive.open(zipSync({
+    "skin.json": strToU8("{}"),
+    "Info.txt": strToU8("Name=扁平"),
+    "light/res/bg.png": PNG,
+    "light/port/py_9.ini": strToU8("[PANEL]\nSIZE=480,320"),
+  }))
+  assert.deepEqual(flat.getBytes("light/skin/res/bg.png"), PNG)
+  assert.equal(flat.sourcePath("light/skin/res/bg.png"), "light/res/bg.png")
+})
+
 test("AI fragment drafts merge back into one skin.json edit", () => {
   const archive = sxiArchive()
   const before = archive.getText("skin.json")
