@@ -9030,24 +9030,23 @@ main {
     background: var(--material-panel);
   }
 
-  /* Dock: a thin strip with two page indicators. Panes switch by swiping sideways; the whole
-     strip, indicators included, is the grab handle that resizes or collapses the split. */
+  /* Each half of the hairline represents its pane: layout on the left, inspector on the right. */
 
   :root body .mobile-workspace-tabs {
     height: var(--mobile-dock-h);
     justify-content: center;
     align-items: center;
-    gap: 2px;
+    gap: 0;
     padding: 0;
-    border-top: 1px solid var(--line);
+    border: 0;
   }
 
   :root body .mobile-workspace-tabs button[data-mobile-pane] {
     position: relative;
     z-index: 3;
     pointer-events: none;
-    flex: none;
-    width: 30px;
+    flex: 1;
+    min-width: 0;
     height: 100%;
     padding: 0;
     border: 0;
@@ -9061,14 +9060,9 @@ main {
   :root body .mobile-workspace-tabs button[data-mobile-pane]::after {
     content: "";
     position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 14px;
-    height: 4px;
-    margin: -2px 0 0 -8px;
-    border-radius: var(--radius-full);
-    background: color-mix(in srgb, var(--secondary) 35%, transparent);
-    transition: width var(--duration-base) var(--ease-standard), margin var(--duration-base) var(--ease-standard), background-color var(--duration-base) var(--ease-standard);
+    inset: 0;
+    background: var(--line-strong);
+    transition: background-color var(--duration-base) var(--ease-standard);
   }
 
   :root body .mobile-workspace-tabs button[data-mobile-pane].active {
@@ -9076,16 +9070,14 @@ main {
   }
 
   :root body .mobile-workspace-tabs button[data-mobile-pane].active::after {
-    width: 24px;
-    margin-left: -12px;
     background: var(--accent);
   }
 
   :root body .mobile-split-handle {
     z-index: 2;
-    inset: 0;
+    inset: calc(-1 * var(--space-sm)) 0 auto;
     width: auto;
-    height: auto;
+    height: calc(var(--space-lg) + var(--mobile-dock-h));
     border-radius: 0;
     transform: none;
   }

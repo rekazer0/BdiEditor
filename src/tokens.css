@@ -161,7 +161,7 @@
   :root { --mobile-dock-h: 56px; }
 }
 @media (max-width: 760px) and (orientation: portrait) {
-  :root { --mobile-dock-h: 16px; }
+  :root { --mobile-dock-h: 1px; }
 }
 
 :root[data-app-theme="dark"] {
