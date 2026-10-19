@@ -199,8 +199,8 @@ export function renderFiles(): void {
     className: "nav-overview",
     icon: "info",
   })
-  // BDA 的 demo 在主题目录下，其他格式放在包根；条目只在文件存在时才显示。
-  const demoPath = appState.archive.names().includes(`${theme.value}/skin/demo.png`) ? `${theme.value}/skin/demo.png` : "demo.png"
+  // BDA 的 demo 在主题目录下，其他格式放在包根，手心 .sxi 用包根的 preview.png；条目只在文件存在时才显示。
+  const demoPath = ["preview.png", `${theme.value}/skin/demo.png`].find((path) => appState.archive?.names().includes(path)) ?? "demo.png"
   entries.push({ group: appState.archive.format === "bda" ? "皮肤信息" : "皮肤", label: "效果预览", path: demoPath, className: "nav-overview", icon: "image" })
 
   if (appState.archive.format === "ssf") {

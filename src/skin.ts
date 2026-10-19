@@ -179,7 +179,7 @@ function assertRepackable(from: ExportFormat, to: ExportFormat | undefined): voi
   if (!to || to === from) return
   if (from === "bda" || to === "bda") throw new Error("BDA 与 BDI/BDS 使用不同配置格式，不能转换")
   if (from === "ssf" || to === "ssf") throw new Error("搜狗皮肤与百度皮肤使用不同配置格式，需要经过转换")
-  if (from === "sxi" || to === "sxi") throw new Error("手心皮肤（.sxi）只能另存为 .sxi")
+  if (from === "sxi" || to === "sxi") throw new Error("手心皮肤（.sxi）需要转换后导出，不能直接改包")
 }
 
 export class SkinArchive {

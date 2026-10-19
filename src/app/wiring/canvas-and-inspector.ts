@@ -1,12 +1,12 @@
 import { installClientLogging } from "../../client-log.ts"
 import { installSafeAreaLock } from "../../safe-area.ts"
-import { isTauri, scrollbarIdleTimers, source, schedulePointerCoordinates, mobileShareLabel, mobileShareMenuLabel, mobileCommandButtons, mobileCommandTarget, syncMobileCommands, mobilePortraitQuery, preview, toolbarPreview, keyboardFields } from "../canvas-interaction"
+import { isTauri, scrollbarIdleTimers, source, schedulePointerCoordinates, syncMobileShareLabel, mobileCommandButtons, mobileCommandTarget, syncMobileCommands, mobilePortraitQuery, preview, toolbarPreview, keyboardFields } from "../canvas-interaction"
 import { installNumberInputWheel } from "../../number-input-wheel.ts"
 import { wheelZoomFactor } from "../../wheel-zoom.ts"
 import { mixedCoordinateDelta } from "../../mixed-input.ts"
 import { moveSelectedKeys, selectParentObject } from "../key-editing"
 import { renderSourceValueThumbnail, updateSourceFindVisibility } from "../source-panel"
-import { sidebarProjectName, documentName, aiDesignThinking, canvasWrap, deviceShell, toolbarStrip, previewCanvas, toolbarCanvas, editorCrosshair, previewCoordinates, previewCoordinateX, previewCoordinateY, mobileShareButton, mobileCommandMenu, mobileUndoButton, undoButton, mobileRedoButton, redoButton, desktopUndoButton, desktopRedoButton, quickInspector, mobileInspectorGroups, bdaInspectorStateButtons, bdaConfigFieldsGroup, mobilePaneButtons, files, mainWorkspace, mobileSplitHandle, mobilePreviewPosition, previewZoomOut, previewZoomFit, previewZoomIn, previewPanelViewport, candidateArea, candidateInputText, styleDetailImageButtons, workspaceImage, sourceStyleProxy, styleLibraryApply, styleLibraryEdit, $, styleLibraryPreview, stylePickerDialog, stylePickerSearch, toolbarFields, keyFields, stylePickerClose, newStyleDialog, stylePickerAdd, baiduActionCodes, sourceUploadButton, sourceUploadInput, sourceDownloadButton, sourceCopyButton } from "../dom"
+import { sidebarProjectName, documentName, aiDesignThinking, canvasWrap, deviceShell, toolbarStrip, previewCanvas, toolbarCanvas, editorCrosshair, previewCoordinates, previewCoordinateX, previewCoordinateY, mobileCommandMenu, mobileUndoButton, undoButton, mobileRedoButton, redoButton, desktopUndoButton, desktopRedoButton, quickInspector, mobileInspectorGroups, bdaInspectorStateButtons, bdaConfigFieldsGroup, mobilePaneButtons, files, mainWorkspace, mobileSplitHandle, mobilePreviewPosition, previewZoomOut, previewZoomFit, previewZoomIn, previewPanelViewport, candidateArea, candidateInputText, styleDetailImageButtons, workspaceImage, sourceStyleProxy, styleLibraryApply, styleLibraryEdit, $, styleLibraryPreview, stylePickerDialog, stylePickerSearch, toolbarFields, keyFields, stylePickerClose, newStyleDialog, stylePickerAdd, baiduActionCodes, sourceUploadButton, sourceUploadInput, sourceDownloadButton, sourceCopyButton } from "../dom"
 import { appState } from "../state"
 import { hydrateIcons } from "../../icons"
 import { syncSinglePageInspectorGroup, setMobileSplit, setMobilePane, syncMobileInspectorHeader, setMobilePreviewCollapsed } from "../mobile-layout"
@@ -112,10 +112,7 @@ export function wireCanvasAndInspector(): void {
       }
     }
   })
-  mobileShareButton.querySelector("span:last-child")!.textContent = mobileShareLabel
-  mobileShareButton.title = mobileShareLabel
-  mobileShareButton.setAttribute("aria-label", mobileShareLabel)
-  mobileShareMenuLabel.textContent = mobileShareLabel
+  syncMobileShareLabel()
   hydrateIcons()
   for (const button of mobileCommandButtons) {
     button.addEventListener("click", () => {
@@ -266,8 +263,10 @@ export function wireCanvasAndInspector(): void {
     appState.canvasWrapInnerSize = measureCanvasWrapInnerSize()
     scheduleFitCanvasPreview()
   }).observe(canvasWrap)
-  // The input code bar is sized around the typed code, so it is refit whenever the code's width changes.
-  new ResizeObserver(() => fitCandidateInputBar()).observe(candidateInputText)
+  // Initial layout and device changes can size the candidate area without changing the empty text.
+  const inputBarObserver = new ResizeObserver(() => fitCandidateInputBar())
+  inputBarObserver.observe(candidateInputText)
+  inputBarObserver.observe(candidateArea)
   previewZoomOut.addEventListener("click", () => applyPreviewZoom(appState.previewZoom - 0.1))
   previewZoomFit.addEventListener("click", () => {
     setPreviewPan(0, 0)

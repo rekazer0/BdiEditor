@@ -46,8 +46,6 @@ export function wireResourcesAndStartup(): void {
   if (isTauri()) {
     void listen("new-project-ready", () => {
       appState.nativeProjectWindowReady = true
-      window.clearTimeout(appState.nativeProjectReadyTimer)
-      appState.nativeProjectReadyTimer = undefined
       void WebviewWindow.getByLabel("new-project").then((window) => window?.setFocus())
     })
     void listen<ProjectChoice>("new-project-select", (event) => {

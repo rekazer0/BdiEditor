@@ -70,7 +70,8 @@ export function tipsText(value: Json): string | undefined {
   if (!Array.isArray(value)) return
   const items: string[] = []
   for (let index = 0; index + 1 < value.length; index += 2) items.push(`S${value[index]}_${value[index + 1]}`)
-  return items.join("|")
+  // An empty state list must leave the key without `STAT_STYLE`, not override it with a blank value.
+  return items.length ? items.join("|") : undefined
 }
 
 export class IniWriter {

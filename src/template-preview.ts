@@ -2,6 +2,8 @@ import { builtInProjectTemplatePreviewURL, loadBuiltInProjectTemplate } from "./
 import { SkinArchive } from "./skin.ts"
 import { readArchiveEntry } from "./skin-zip.ts"
 
+const SXI_PREVIEW_PATH = "preview.png"
+
 /**
  * 皮肤包里的效果预览图。各平台位置不同（`demo.png` / `skin/demo.png` /
  * `dark/skin/demo.png`），所以只按文件名匹配，跳过 macOS 资源分叉。
@@ -33,13 +35,14 @@ function previewCards(root: ParentNode): HTMLButtonElement[] {
  * 才退回整包解压。
  */
 async function demoImageBytes(bytes: Uint8Array): Promise<Uint8Array | undefined> {
-  const entry = readArchiveEntry(bytes, isDemoImagePath)
+  // 手心 .sxi 的总预览图是包根的 preview.png，优先于各外观下的 demo 图。
+  const entry = readArchiveEntry(bytes, (name) => name === SXI_PREVIEW_PATH) ?? readArchiveEntry(bytes, isDemoImagePath)
   if (entry) return entry.data
   const archive = await SkinArchive.openAsync(bytes)
   const path = archive.names()
     .filter(isDemoImagePath)
     .sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b))[0]
-  return path ? archive.getBytes(path) : undefined
+  return archive.getBytes(SXI_PREVIEW_PATH) ?? (path ? archive.getBytes(path) : undefined)
 }
 
 /** 包内没有 demo 预览图。这是稳定结果，调用方不必重试。 */

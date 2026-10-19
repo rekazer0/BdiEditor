@@ -2,11 +2,11 @@ import { clientLog, flushClientLogs } from "../client-log.ts"
 import { showSkinLoadProgress, waitForInterfacePaint, updateFileOperationProgress, showStatus, showError, runFileOperation, readNativeSkinFile, readBrowserSkinFile, exportTargetHidden } from "./file-operations"
 import { flushSourceAutosave, activateSourceWorkspace, sourceFilesPayload, decodeBase64Archive, sourceArchiveFromFiles } from "./source-workspace"
 import { appState } from "./state"
-import { releaseKeySound, keySoundBuffers, sourceDirectoryEnabledBySettings, isTauri, isAndroidTauri, exportButtons, pendingSourcePaths, LAST_SOURCE_WORKSPACE_KEY, isIOSWeb, isAndroidWeb } from "./canvas-interaction"
+import { releaseKeySound, keySoundBuffers, sourceDirectoryEnabledBySettings, isTauri, isAndroidTauri, exportButtons, pendingSourcePaths, LAST_SOURCE_WORKSPACE_KEY, isIOSWeb, isAndroidWeb, syncMobileShareLabel } from "./canvas-interaction"
 import { SkinArchive } from "../skin.ts"
 import { canExport, exportFormatFromPath, exportName, type ExportFormat } from "../export.ts"
 import { buildSxiZip } from "../palm/palm-export.ts"
-import { bdaCompatibilityWarnings, type BdaPlatform, convertBdaPlatform } from "../bda-platform.ts"
+import { bdaCompatibilityWarnings, bdaPlatform, type BdaPlatform, convertBdaPlatform } from "../bda-platform.ts"
 import { releaseImagePreviewURL } from "../image-preview.ts"
 import { clearImageSlicePicker } from "./image-pickers"
 import { aiDesignStatus, aiDesignPanel, theme, device, canvasBackground, canvasWrap, documentName, saveButton, layout, fileOperationDialog, fileOperationClose } from "./dom"
@@ -27,6 +27,7 @@ import { flushNumberInputWheel } from "../number-input-wheel.ts"
 import { loadBdaBase } from "../operations.ts"
 import { isSsfPath, looksLikeSsf } from "../ssf/ssf-package.ts"
 import { convertSsfDocument, exportSsf, ssfDocumentBytes } from "../ssf/ssf-convert.ts"
+import { convertSxiToBaidu, convertSxiToBda } from "../palm/sxi-to-baidu.ts"
 import { rebuildSsfPreview, ssfTemplates } from "./ssf-preview"
 
 export async function loadArchive(
@@ -129,6 +130,7 @@ export async function loadArchive(
     button.hidden = exportTargetHidden(button.dataset.exportFormat as ExportFormat)
     button.disabled = button.hidden
   }
+  syncMobileShareLabel()
   updateFileOperationProgress(68, "正在生成文件列表…")
   await waitForInterfacePaint()
   renderFiles()
@@ -358,6 +360,22 @@ export async function exportArchive(format: ExportFormat, targetBdaPlatform?: Ex
       : result.bytes
     return { bytes, converted: true, warnings: result.warnings }
   }
+  if (appState.archive.format === "sxi" && format !== "sxi") {
+    if (format === "ssf") throw new Error("手心皮肤不能直接导出为搜狗皮肤")
+    updateFileOperationProgress(22, `正在转换为 ${format.toUpperCase()}…`)
+    await waitForInterfacePaint()
+    const result = format === "bda"
+      ? await convertSxiToBda(appState.archive, (await ssfTemplates()).bda)
+      : await convertSxiToBaidu(appState.archive, format)
+    if (result.warnings.length && !window.confirm(
+      `手心皮肤转换为 ${format.toUpperCase()} 时将降级以下内容：\n\n${result.warnings.join("\n")}\n\n继续导出吗？`,
+    )) return
+    // The BDA writer emits the Android package; iOS gets the usual platform conversion.
+    const bytes = format === "bda" && targetBdaPlatform === "ios"
+      ? await convertBdaPlatform(SkinArchive.open(result.bytes, "bda"), "ios").toBytesAsync()
+      : result.bytes
+    return { bytes, converted: true, warnings: result.warnings }
+  }
   if (format === "ssf") {
     if (appState.archive.format === "ssf") return { bytes: await appState.archive.toBytesAsync("ssf"), converted: false, warnings: [] }
     updateFileOperationProgress(22, "正在导出搜狗皮肤…")
@@ -566,6 +584,9 @@ export async function saveArchive(
 
 export async function shareArchiveToMobile(): Promise<boolean> {
   if (!appState.archive) return false
+  if (isIOSWeb() && (appState.archive.format !== "bdi" && (appState.archive.format !== "bda" || bdaPlatform(appState.archive) !== "ios"))) {
+    throw new Error("当前格式不支持 iOS，请先打开 .bdi 或 iOS 版 .bda 皮肤")
+  }
   const format = mobileShareFormat()
   const exported = await exportArchive(format, format === "bda" ? (isIOSWeb() ? "ios" : "android") : undefined)
   if (!exported) return false
@@ -580,23 +601,22 @@ export async function shareArchiveToMobile(): Promise<boolean> {
   if (!navigator.share || navigator.canShare && !navigator.canShare({ files: [file] })) {
     throw new Error("当前设备不支持系统文件分享")
   }
-  // navigator.share needs a live user activation, which packaging the skin may have used up.
-  if (navigator.userActivation && !navigator.userActivation.isActive && !(await waitForTap(`${name} 已生成，轻点“分享”继续`, "分享"))) return false
-  try {
-    await navigator.share({ title: name, files: [file] })
-    return true
-  } catch (error) {
+  const share = () => navigator.share!({ title: name, files: [file] }).then(() => true).catch((error) => {
     if (error instanceof DOMException && error.name === "AbortError") return false
     throw error
+  })
+  if (navigator.userActivation && !navigator.userActivation.isActive) {
+    return waitForTap(`${name} 已生成，轻点“分享”继续`, "分享", share)
   }
+  return share()
 }
 
 /**
  * Shows a button in the progress dialog and resolves once it is tapped (true) or the dialog is dismissed
  * (false). `onTap` runs inside the tap's click handler, while its user activation is still live.
  */
-export function waitForTap(detail: string, label: string, onTap?: () => void): Promise<boolean> {
-  return new Promise((resolve) => {
+export function waitForTap(detail: string, label: string, onTap?: () => void | Promise<boolean>): Promise<boolean> {
+  return new Promise((resolve, reject) => {
     appState.fileOperationProgressVisible = true
     if (!fileOperationDialog.open) fileOperationDialog.showModal()
     updateFileOperationProgress(90, detail)
@@ -614,9 +634,16 @@ export function waitForTap(detail: string, label: string, onTap?: () => void): P
       resolve(confirmed)
     }
     const cancel = () => finish(false)
-    share.addEventListener("click", () => {
-      onTap?.()
-      finish(true)
+    share.addEventListener("click", async () => {
+      try {
+        finish(await onTap?.() ?? true)
+      } catch (error) {
+        share.remove()
+        fileOperationClose.disabled = true
+        fileOperationClose.removeEventListener("click", cancel)
+        fileOperationDialog.removeEventListener("close", cancel)
+        reject(error)
+      }
     }, { once: true })
     fileOperationClose.addEventListener("click", cancel, { once: true })
     fileOperationDialog.addEventListener("close", cancel, { once: true })

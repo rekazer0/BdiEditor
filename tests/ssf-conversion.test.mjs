@@ -20,7 +20,7 @@ const read = (path) => new Uint8Array(readFileSync(new URL(path, import.meta.url
 const bdsTemplate = SkinArchive.open(read('../public/default-template.bds'))
 const bdaTemplate = SkinArchive.open(read('../public/default-template.bda'), 'bda')
 const bdaBase = SkinArchive.open(read('../public/bda-base.bds'))
-const templates = { bds: bdsTemplate, bda: bdaTemplate }
+const templates = { sogou: SkinArchive.open(read('../public/sogou-template.bds')), bda: bdaTemplate }
 
 /** Opens `.ssf` bytes the way the editor does: as an SSF document. */
 const ssfDocument = async (bytes) => SkinArchive.open(await ssfDocumentBytes(bytes), 'ssf')

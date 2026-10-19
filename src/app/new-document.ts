@@ -60,8 +60,6 @@ export const EMBEDDED_PROJECT_FALLBACK = "__embedded-project-fallback__"
 
 export function finishNativeProjectChoice(templateID?: string): void {
   if (!appState.resolveNativeProjectChoice) return
-  window.clearTimeout(appState.nativeProjectReadyTimer)
-  appState.nativeProjectReadyTimer = undefined
   const resolve = appState.resolveNativeProjectChoice
   appState.resolveNativeProjectChoice = undefined
   appState.nativeProjectChoice = undefined
@@ -108,11 +106,6 @@ export async function chooseNativeProjectTemplate(): Promise<string | undefined>
       finishNativeProjectChoice(appState.nativeProjectWindowReady ? undefined : EMBEDDED_PROJECT_FALLBACK)
     })
     void projectWindow.once("tauri://error", () => finishNativeProjectChoice(EMBEDDED_PROJECT_FALLBACK))
-    appState.nativeProjectReadyTimer = window.setTimeout(() => {
-      if (appState.nativeProjectWindowReady || !appState.resolveNativeProjectChoice) return
-      void WebviewWindow.getByLabel("new-project").then((window) => window?.close())
-      finishNativeProjectChoice(EMBEDDED_PROJECT_FALLBACK)
-    }, 2500)
   } catch {
     finishNativeProjectChoice(EMBEDDED_PROJECT_FALLBACK)
   }

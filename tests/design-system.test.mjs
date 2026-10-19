@@ -12,7 +12,7 @@ const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, (m) => m.repla
 const cssFiles = list("src/", ".css")
 // 设备模拟按真机还原，数值规则不适用（DESIGN.md §1）
 const scaledCss = (files) => Object.fromEntries(Object.entries(files).filter(([file]) => file !== "src/device-preview.css"))
-const tsFiles = [...list("src/", ".ts"), ...list("src/app/", ".ts"), ...list("src/app/wiring/", ".ts")]
+const tsFiles = [...list("src/", ".ts"), ...list("src/app/", ".ts"), ...list("src/app/wiring/", ".ts"), ...list("src/ssf/", ".ts"), ...list("src/palm/", ".ts")]
 const htmlFiles = list("", ".html")
 const css = Object.fromEntries(cssFiles.map((f) => [f, stripComments(read(f))]))
 const ts = Object.fromEntries(tsFiles.map((f) => [f, read(f)]))

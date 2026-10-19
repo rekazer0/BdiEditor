@@ -22,6 +22,9 @@ form {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
+/* 脚本把静态列表改成模板卡片之前不显示，避免先闪出旧版列表。 */
+form:not(.project-chooser) { visibility: hidden; }
+
 header { padding: var(--space-xl) var(--space-xl) 20px; }
 
 h1 {

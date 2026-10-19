@@ -98,6 +98,7 @@ export function applyDeviceKeyboardGeometry(
   const spec = deviceSpec(currentDeviceValue())
   if (!spec) {
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
+    fitCanvasPreview()
     return
   }
   const geometry = keyboardPreviewGeometry(

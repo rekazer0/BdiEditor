@@ -20,7 +20,7 @@ function sourceBds() {
       "[TIP1]", "BACK_STYLE=5", "CENTER=F39",
       "[LIST]", "POS=0,0", "CELL_SIZE=100,50", "NAMES=a b c", "LIST_ORDER=1",
     ].join("\n")),
-    "light/port/cand1.cnd": strToU8("[CAND]\nBACK_STYLE=6\nVIEW_RECT=0,0,1080,120\nPADDING=1,2,3,4\n[ICON0]\nPOS=0,0\nSIZE=10,10\nKEY=F31\nFIX_SIZE=10,10\n"),
+    "light/port/cand1.cnd": strToU8("[CAND]\nBACK_STYLE=6\nCELL_STYLE=5\nVIEW_RECT=0,0,1080,120\nPADDING=1,2,3,4\n[ICON1]\nPOS=0,0\nSIZE=10,10\nKEY=F31\nFIX_SIZE=10,10\n[ICON2]\nPOS=20,0\nSIZE=10,10\nKEY=F9\n"),
     "light/port/hint1.pop": strToU8("[HINT]\nBACK_ICON=0\n[ICON0]\nPOS=1,2\nSIZE=3,4\n"),
     "light/res/default.css": strToU8("[STYLE1]\nNM_IMG=bg,0\n[STYLE3]\nSHOW=中\nFONT_SIZE=40\nNM_COLOR=FF000000\n"),
     "light/res/anim.ini": strToU8("[ANIM1]\nCATEGORY=0\nTYPE=1\nDURATION=200\nFROM=0\nTO=1\n"),
@@ -66,6 +66,19 @@ test("re-exporting the derived views reproduces every layout and style model", (
   assert.equal(compactPalmJSON(again.info), compactPalmJSON(skin.info))
 })
 
+test("candidate cell background and icons survive export and projection", () => {
+  const files = unzipSync(buildSxiZip(sourceBds()).bytes)
+  const skin = parseSkinJson(strFromU8(files["skin.json"]))
+  const candidate = skin.default.port_layout.c.cand1
+  assert.equal(candidate.i_cell, 5)
+  assert.equal(candidate.icon_list.length, 2)
+  const cnd = sxiDerivedFiles(skin).get("light/skin/port/cand1.cnd").text
+  assert.match(cnd, /CELL_STYLE=5/)
+  assert.match(cnd, /\[ICON1\]/)
+  assert.match(cnd, /\[ICON2\]/)
+  assert.doesNotMatch(cnd, /STAT_STYLE=\n/)
+})
+
 test("editing a skin.json fragment updates the views and saves only skin.json and info.json", () => {
   const archive = sxiArchive()
   const original = archive.toBytes()
@@ -90,18 +103,21 @@ test("editing a skin.json fragment updates the views and saves only skin.json an
   assert.ok(!Object.keys(saved).some((name) => /\.(?:ini|css|til|cnd|pop|txt)$/.test(name)))
 })
 
-test("an opened .sxi only saves as .sxi", () => {
+test("an opened .sxi saves in place and exports to Baidu formats", () => {
   const archive = sxiArchive()
   assert.equal(exportFormatFromPath("skin.SXI"), "sxi")
   assert.ok(canExport("sxi", "sxi"))
-  assert.ok(!canExport("sxi", "bds"))
+  assert.ok(canExport("sxi", "bds"))
+  assert.ok(canExport("sxi", "bdi"))
+  assert.ok(canExport("sxi", "bda"))
   assert.ok(canExport("bds", "sxi"))
   assert.ok(!canExport("bds", "bda"))
   assert.ok(canExport("ssf", "bda"))
   assert.ok(!canExport("ssf", "sxi"))
   assert.ok(!canExport("sxi", "ssf"))
   assert.equal(exportFormatFromPath("skin.mssf"), "ssf")
-  assert.throws(() => archive.toBytes("bds"), /\.sxi/)
+  // Export goes through the converter, never a direct repackage.
+  assert.throws(() => archive.toBytes("bds"), /需要转换/)
 })
 
 test("Palm's nested light/skin tree is read as it is, new files stay nested", () => {
@@ -147,4 +163,24 @@ test("AI fragment drafts merge back into one skin.json edit", () => {
   archive.setText("skin.json", after)
   assert.match(archive.getText("light/skin/port/py_26.ini"), /\[KEY1\]\nBACK_STYLE=7/)
   assert.match(archive.getText("Info.txt"), /Name=新名字/)
+})
+
+test("orientation-only styles are also published in s_info, and MORE keeps its grid orientation", () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  const archive = SkinArchive.open(zipSync({
+    "Info.txt": strToU8("Name=方向样式\n"),
+    "light/port/gen.ini": strToU8("[PANEL]\nSIZE=1080,600\n[MORE]\nGRID=5,4\nLAYOUT_NAME=sel_ch\n"),
+    "light/port/py_26.ini": strToU8("[PANEL]\nSIZE=1080,600\n[KEY1]\nBACK_STYLE=2\nVIEW_RECT=0,0,100,100\nCENTER=q\n"),
+    // No shared `light/res/default.css`: every style lives in the portrait folder.
+    "light/port/res/default.css": strToU8("[STYLE2]\nNM_IMG=btn,0\n"),
+    "light/port/res/btn.til": strToU8("[IMG0]\nSOURCE_RECT=0,0,10,10\n"),
+    "light/port/res/btn.png": png,
+  }))
+  const skin = parseSkinJson(strFromU8(unzipSync(buildSxiZip(archive).bytes)["skin.json"]))
+  // The app resolves candidate/list cell backgrounds from the shared table.
+  assert.equal(skin.default.s_info.ss_1["2"].s_2.normal, "btn,0")
+  assert.equal(skin.default.s_port.ss_1["2"].s_2.normal, "btn,0")
+  assert.deepEqual([skin.default.port_layout.b.defaultGlobal.more.row, skin.default.port_layout.b.defaultGlobal.more.col], [4, 5])
+  const gen = sxiDerivedFiles(skin).get("light/skin/port/gen.ini").text
+  assert.match(gen, /GRID=5,4/)
 })
