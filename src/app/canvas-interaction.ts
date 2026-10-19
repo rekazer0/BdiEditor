@@ -1,4 +1,4 @@
-import { mobileCommandMenu, settingsDialog, $, sidebarViewControl, device, resourceSearch, editorCrosshair, previewCoordinates, canvasWrap, previewCanvas, toolbarCanvas, editorCoordinateSnap, previewCoordinateX, previewCoordinateY, toolbarStrip, candidateBackgroundCanvas, skinState, skinStateValue, eventLog, theme, orientation, simulatedOutput, deviceControlIcon, mobileUndoButton, undoButton, mobileRedoButton, redoButton, desktopUndoButton, desktopRedoButton } from "./dom"
+import { mobileCommandMenu, settingsDialog, $, sidebarViewControl, device, resourceSearch, editorCrosshair, previewCoordinates, canvasWrap, previewCanvas, toolbarCanvas, editorCoordinateSnap, previewCoordinateX, previewCoordinateY, toolbarStrip, candidateBackgroundCanvas, skinState, skinStateValue, eventLog, theme, orientation, simulatedOutput, deviceControlIcon, mobileShareButton, mobileUndoButton, undoButton, mobileRedoButton, redoButton, desktopUndoButton, desktopRedoButton } from "./dom"
 import { LazySourceCodeEditor } from "../lazy-source-editor.ts"
 import { effectiveDeviceValue } from "../canvas-background.ts"
 import { type SourceWriteSnapshot } from "../source-tree.ts"
@@ -609,14 +609,20 @@ export function isIOSWeb(): boolean {
     navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
 }
 
-export const mobileShareLabel = isAndroidTauri()
-  ? "导入百度输入法"
-  : isAndroidWeb()
-    ? "分享 Android 皮肤"
-    : isIOSWeb()
-      ? "分享 iOS 皮肤"
-      : "分享皮肤"
+export function mobileShareLabel(): string {
+  const format = appState.archive?.format
+  return format === "ssf" ? "分享到搜狗输入法"
+    : format === "sxi" ? "分享到手心输入法"
+      : "分享到百度输入法"
+}
 
+export function syncMobileShareLabel(): void {
+  const label = mobileShareLabel()
+  mobileShareButton.querySelector("span:last-child")!.textContent = label
+  mobileShareButton.title = label
+  mobileShareButton.setAttribute("aria-label", label)
+  mobileShareMenuLabel.textContent = label
+}
 // 源文件树缩略图按 PNG 字节缓存：文件被改写时换成新的字节对象，旧缓存随之回收。
 // 只保留 16px（按像素比放大）的小图，大图解码后立即释放。
 export const sourceThumbnails = new WeakMap<Uint8Array, Promise<string | undefined>>()

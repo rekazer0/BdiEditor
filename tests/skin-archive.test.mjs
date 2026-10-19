@@ -246,3 +246,13 @@ test('gives up when a local header defers sizes to a data descriptor', () => {
 test('returns nothing when no entry matches', () => {
   assert.equal(readArchiveEntry(sampleArchive(), (name) => name === 'demo.png'), undefined)
 })
+
+test('sxi thumbnails use the root preview.png over per-appearance demo images', async () => {
+  globalThis.window ??= globalThis
+  const { archiveDemoImage } = await import('../src/template-preview.ts')
+  const bytes = zipSync({
+    'dark/skin/demo.png': strToU8('dark-demo'),
+    'preview.png': strToU8('sxi-preview'),
+  }, { level: 0 })
+  assert.equal(await (await archiveDemoImage(bytes)).text(), 'sxi-preview')
+})

@@ -254,6 +254,9 @@ await check("preview: typing, devices, orientation, theme, guides, zoom, skin st
   assert.notEqual(await zoom(), before, "zoom in changes scale")
   await page.locator("#preview-zoom-out").click()
   await page.locator("#preview-zoom-fit").click()
+  assert.equal(await page.locator("#preview-zoom-fit").getAttribute("aria-pressed"), "true", "canvas view is locked by default")
+  await page.locator("#preview-zoom-fit").dblclick()
+  assert.equal(await page.locator("#preview-zoom-fit").getAttribute("aria-pressed"), "false")
   // 触控板 / Cmd+滚轮会连发很多小 delta 事件，应按滚动量缩放，不能每个事件跳一大步
   const fit = await page.locator("#preview").boundingBox()
   await page.mouse.move(fit.x + fit.width / 2, fit.y + fit.height / 2)
@@ -817,7 +820,7 @@ await browser.close()
 await server?.close()
 
 for (const result of results) {
-  console.log(`${result.ok ? "ok  " : "FAIL"} ${result.name} (${(result.ms / 1000).toFixed(1)}s)${result.ok ? "" : `\n     ${String(result.error.message).split("\n").slice(0, 4).join("\n     ")}`}`)
+  console.log(`${result.ok ? "ok  " : "FAIL"} ${result.name} (${(result.ms / 1000).toFixed(1)}s)${result.ok ? "" : `\n     ${String(result.error.message).split("\n").slice(0, 14).join("\n     ")}`}`)
 }
 const failed = results.filter((result) => !result.ok).length
 console.log(`\n${results.length - failed}/${results.length} passed`)

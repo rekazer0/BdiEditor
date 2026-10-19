@@ -2,9 +2,9 @@
 // read-only overlay, rebuilt after each edit.
 
 import { IniDocument } from "../ini.ts"
-import { loadBdaBase, loadBuiltInProjectTemplate } from "../operations.ts"
+import { loadBuiltInProjectTemplate } from "../operations.ts"
 import { SkinArchive } from "../skin.ts"
-import { ssfConversionTemplate, ssfPreviewFiles, type SsfTemplates } from "../ssf/ssf-convert.ts"
+import { ssfPreviewFiles, type SsfTemplates } from "../ssf/ssf-convert.ts"
 import { selectedVariant } from "./bda-documents"
 import { layout, orientation, theme } from "./dom"
 import { showStatus } from "./file-operations"
@@ -21,16 +21,12 @@ const REBUILD_DELAY = 300
 
 export async function ssfTemplates(): Promise<SsfTemplates> {
   if (!appState.ssfTemplates) {
-    const [bdaBytes, bdaBaseBytes, sogouBytes] = await Promise.all([
+    const [bdaBytes, sogouBytes] = await Promise.all([
       loadBuiltInProjectTemplate("default-android"),
-      loadBdaBase(),
       loadBuiltInProjectTemplate("official-sogou"),
     ])
     const bda = SkinArchive.open(bdaBytes, "bda")
     appState.ssfTemplates ??= {
-      // BDI/BDS get the BDA skin's own 1080 layout skeleton, so the converted panel keeps the
-      // resolution of the BDA export instead of the old 480 × 312 BDS template.
-      bds: ssfConversionTemplate(bda, SkinArchive.open(bdaBaseBytes)),
       bda,
       sogou: SkinArchive.open(sogouBytes),
     }

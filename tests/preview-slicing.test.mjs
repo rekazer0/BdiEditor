@@ -41,7 +41,8 @@ test('nine-slice backgrounds remain complete after alternating sizes', () => {
   assert.deepEqual(frames[2], frames[0])
   assert.equal(frames[0].slices.length, 9)
   assert.deepEqual(frames[0].args, [0, 0, 110, 143, 13, 12, 110, 143])
-  assert.deepEqual(clears[2], [0, 0, 160, 400], 'filtering must not sample dirty pixels outside the smaller source crop')
+  assert.deepEqual(clears[0], [0, 0, 112, 145], 'the first draw also has a transparent filtering margin')
+  assert.deepEqual(clears[2], [0, 0, 162, 402], 'filtering must not sample dirty pixels outside the smaller source crop')
 })
 
 test('different bitmap objects and repeated frames keep their own background', () => {

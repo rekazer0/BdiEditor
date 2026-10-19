@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { chromium } from 'playwright'
+import { chromium, webkit } from 'playwright'
 import { createServer } from 'vite'
 import { SkinArchive } from '../src/skin.ts'
 import { IniDocument } from '../src/ini.ts'
@@ -8,7 +8,7 @@ import { IniDocument } from '../src/ini.ts'
 const root = new URL('..', import.meta.url).pathname
 const server = await createServer({ root, logLevel: 'error', server: { host: '127.0.0.1', port: 41921, strictPort: false } })
 await server.listen()
-const browser = await chromium.launch()
+const browser = await (process.env.BROWSER === 'webkit' ? webkit : chromium).launch()
 const page = await browser.newPage({ viewport: { width: 1600, height: 1100 }, bypassCSP: true })
 const errors = []
 page.on('pageerror', (error) => errors.push(error.message))
@@ -37,6 +37,29 @@ try {
   const settle = () => page.waitForFunction(() => {
     return Boolean(globalThis.inputBarTestState.candidateInputBar?.visual) && document.getElementById('candidate-input-background').getContext('2d').getImageData(1, 1, 1, 1).data[3] > 0
   })
+  await settle()
+  const inline = await page.evaluate(async () => (await import('/src/app/preview-render.ts')).inputBarInKeyboard())
+  const initial = await measure()
+  assert.equal(initial.hidden, !inline, 'opening shows the inline row, while Android popup waits for input')
+  if (inline) {
+    assert.ok(initial.input.height > 0, 'inline input row has height immediately after import')
+    assert.ok(Math.abs(initial.box.width - initial.area.width) < 2, 'inline input background fills the row')
+  }
+  const refreshedHeight = await page.evaluate(async () => {
+    const { refreshPreview } = await import('/src/app/preview-render.ts')
+    refreshPreview()
+    return document.getElementById('candidate-input').getBoundingClientRect().height
+  })
+  if (inline) assert.ok(refreshedHeight > 0, 'refresh preserves canvas input height without a resize or typing')
+  assert.equal(await page.locator('#candidate-words').isVisible(), false, 'opening a skin keeps candidate words hidden')
+  await page.screenshot({ path: `/tmp/bdi-input-initial-${process.env.BROWSER ?? 'chromium'}-${sample.split('.').pop()}.png` })
+  for (const device of ['pixel-10-pro', 'iphone-17-pro']) {
+    await page.locator('#device').selectOption(device)
+    await settle()
+    const idle = await measure()
+    assert.equal(idle.hidden, device !== 'iphone-17-pro', `${device}: inline row is visible before typing, popup is hidden`)
+    if (!idle.hidden) assert.ok(Math.abs(idle.box.width - idle.area.width) < 2, `${device}: initial inline background fills the row`)
+  }
   await page.locator('#device').selectOption('pixel-10-pro')
   await compose('ni')
   await settle()
@@ -65,7 +88,7 @@ try {
   await settle()
   await page.screenshot({ path: '/tmp/bdi-input-android.png' })
   await compose('')
-  assert.equal((await measure()).hidden, true, 'clearing input hides the bar')
+  assert.equal((await measure()).hidden, true, 'clearing input hides the Android popup')
 
   // Make INPUT and SCAND visibly different so a wrong platform branch cannot pass on geometry alone.
   const fixture = SkinArchive.open(new Uint8Array(readFileSync(`${root}/public/templates/xiaomi-unified-rounded-blur.bds`)))
@@ -101,7 +124,8 @@ try {
     assert.ok(Math.abs(rendered - size) < 0.2, `${device}: input font size is ${size}, got ${rendered}`)
     await compose('')
     const idle = await measure()
-    assert.equal(idle.hidden, device !== 'iphone-17-pro', `${device}: only the iPhone keeps its empty input background`)
+    assert.equal(idle.hidden, device !== 'iphone-17-pro', `${device}: only the inline row keeps its empty background`)
+    if (!idle.hidden) assert.ok(Math.abs(idle.box.width - idle.area.width) < 2, `${device}: empty inline background fills the row`)
     assert.deepEqual(idle.background, color, 'clearing input preserves the configured background pixels')
     assert.equal(await page.locator('#candidate-input-background').isVisible(), device === 'iphone-17-pro')
     assert.equal(await page.locator('#candidate-words').isVisible(), false, 'idle state shows toolbar instead of candidate words')

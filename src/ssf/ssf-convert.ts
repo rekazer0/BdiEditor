@@ -10,8 +10,8 @@ import { syncKeyStateTips } from "./ssf-state-tips.ts"
 import { convertSsfToBaidu, ssfToBaiduFiles } from "./ssf-to-baidu.ts"
 import { convertSsfToBda } from "./ssf-to-bda.ts"
 
-/** The BDA skeleton re-laid as BDI/BDS, the native BDA template, and the Sogou preview skeleton. */
-export type SsfTemplates = { bds: SkinArchive; bda: SkinArchive; sogou: SkinArchive }
+/** The Sogou canvas/BDI/BDS skeleton and the native BDA template. */
+export type SsfTemplates = { bda: SkinArchive; sogou: SkinArchive }
 type Converted = { bytes: Uint8Array; warnings: string[] }
 
 /** The document's own files, not copies: derived images are cached by the arrays they come from. */
@@ -38,15 +38,6 @@ export function ssfPreviewFiles(archive: SkinArchive, template: SkinArchive): { 
   return ssfToBaiduFiles(pkg, template, Number(pkg.resolution))
 }
 
-/**
- * The skeleton BDI/BDS conversion lays an SSF document on: the official BDA skin converted to INI.
- * Both BDI/BDS and BDA then share its 1080 × 641 portrait panel instead of the old 480 × 312 template.
- */
-export function ssfConversionTemplate(bda: SkinArchive, bdaBase: SkinArchive): SkinArchive {
-  if (bda.format !== "bda") throw new Error("SSF 转换骨架需要 BDA 模板")
-  return convertBdaArchive(bda, bdaBase).archive
-}
-
 /** Converts an SSF document into a Baidu package of `format`. */
 export async function convertSsfDocument(archive: SkinArchive, format: "bdi" | "bds" | "bda", templates: SsfTemplates): Promise<Converted> {
   const pkg = documentPackage(archive)
@@ -54,7 +45,8 @@ export async function convertSsfDocument(archive: SkinArchive, format: "bdi" | "
     const { archive: converted, warnings } = convertSsfToBda(pkg, templates.bda)
     return { bytes: converted.toBytes(), warnings }
   }
-  const { archive: converted, warnings } = convertSsfToBaidu(pkg, templates.bds)
+  // Export the same geometry, background and toolbar the SSF canvas shows.
+  const { archive: converted, warnings } = convertSsfToBaidu(pkg, templates.sogou, Number(pkg.resolution))
   syncKeyStateTips(converted)
   // Platform packaging also re-encodes the Sogou WAV key sounds into what the target IME plays.
   return { bytes: await converted.platformBytesAsync(format, warnings), warnings }

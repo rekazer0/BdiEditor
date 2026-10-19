@@ -183,7 +183,7 @@ export const appState = {
   fitCanvasDebounce: undefined as ReturnType<typeof setTimeout> | undefined,
   canvasFitFrozen: false,
   previewZoom: 1,
-  previewPanLocked: false,
+  previewPanLocked: true,
   previewPanX: 0,
   previewPanY: 0,
   previewPanStart: undefined as { pointerId: number; x: number; y: number; panX: number; panY: number } | undefined,
@@ -215,7 +215,6 @@ export const appState = {
   nativeProjectChoice: undefined as Promise<string | undefined> | undefined,
   resolveNativeProjectChoice: undefined as ((templateID: string | undefined) => void) | undefined,
   nativeProjectWindowReady: false,
-  nativeProjectReadyTimer: undefined as number | undefined,
   recentPreviewRunning: false,
   // 持久缩略图缓存：重启后不必再读整包解 demo 图。按路径存，条目随最近列表裁剪（最多 9 个）。
   recentThumbDb: undefined as Promise<IDBDatabase> | undefined,

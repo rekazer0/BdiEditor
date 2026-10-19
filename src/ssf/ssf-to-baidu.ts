@@ -321,7 +321,7 @@ export function ssfPreview(pkg: SsfPackage): Uint8Array | undefined {
 }
 
 /**
- * A Sogou skin laid out on `base` (the official BDS template), as canonical package paths
+ * A Sogou skin laid out on `base` (the Sogou BDS skeleton), as canonical package paths
  * (`light/skin/…`, `Info.txt`) before packaging; the editor previews an SSF document from these.
  */
 export function ssfToBaiduFiles(pkg: SsfPackage, base: SkinArchive, panelWidth?: number): { files: Map<string, Uint8Array>; warnings: string[] } {
@@ -337,12 +337,18 @@ export function ssfToBaiduFiles(pkg: SsfPackage, base: SkinArchive, panelWidth?:
   return { files, warnings: [...new Set(warnings)] }
 }
 
-/** Converts a Sogou skin to a Baidu BDS archive laid out on `base` (the official BDS template). */
-export function convertSsfToBaidu(pkg: SsfPackage, base: SkinArchive): SsfConversion {
-  const { files, warnings } = ssfToBaiduFiles(pkg, base)
+/** Converts a Sogou skin to a Baidu BDS archive laid out on `base` (the Sogou BDS skeleton). */
+export function convertSsfToBaidu(pkg: SsfPackage, base: SkinArchive, panelWidth?: number): SsfConversion {
+  const { files, warnings } = ssfToBaiduFiles(pkg, base, panelWidth)
   const dual = pkg.themes.size > 1
   const raw = Object.fromEntries([...files].map(([path, bytes]) => {
     if (path === "Info.txt" || path === "demo.png") return [path, bytes]
+    if (/\.(?:ini|cnd)$/i.test(path)) {
+      const document = IniDocument.parse(new TextDecoder().decode(bytes))
+      const metadata = document.entries().filter(({ key }) => key.startsWith("SSF_"))
+      for (const { section, key } of metadata) document.remove(section, key)
+      if (metadata.length) bytes = strToU8(document.toString())
+    }
     const themed = path.match(/^(light|dark)\/skin\/(.*)$/)!
     return [dual ? `${themed[1]}/${themed[2]}` : themed[2], bytes]
   }))

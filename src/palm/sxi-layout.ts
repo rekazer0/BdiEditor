@@ -59,6 +59,7 @@ function putCandidate(entries: Map<string, string>, model: JsonObject): void {
     ["gap", "CELL_W", "number"],
     ["f_gap", "FIRST_GAP", "number"],
     ["more_width", "MORE_W", "number"],
+    ["i_cell", "CELL_STYLE", "number"],
     ["i_mask", "MASK_STYLE", "number"],
     ["i_f_b", "FIRST_BACK", "number"],
     ["i_f_f", "FIRST_FORE", "number"],
@@ -176,7 +177,7 @@ export function boardText(value: Json): string {
   if (more) {
     const [entries, part] = more
     putBase(entries, part.b)
-    if (typeof part.row === "number" && typeof part.col === "number") put(entries, "GRID", `${part.row},${part.col}`)
+    if (typeof part.row === "number" && typeof part.col === "number") put(entries, "GRID", `${part.col},${part.row}`)
     putFields(entries, part, [
       ["i_h", "H_LINE_STYLE_INDEX", "number"],
       ["i_v", "V_LINE_STYLE_INDEX", "number"],
@@ -244,7 +245,8 @@ export function candidateText(value: Json): string {
   }
   for (const [index, icon] of (Array.isArray(model.icon_list) ? model.icon_list : []).entries()) {
     const record = asObject(icon) ?? {}
-    const entries = writer.section(`ICON${index}`)
+    // Baidu candidate/cell icons are numbered from 1, the way real `.cnd` files spell them.
+    const entries = writer.section(`ICON${index + 1}`)
     put(entries, "STAT_STYLE", tipsText(record.t))
     putBase(entries, record.b)
     put(entries, "KEY", actionText(record.k))
@@ -290,6 +292,7 @@ export function bubbleText(value: Json): string {
   }
   for (const [index, icon] of Object.entries(asObject(model.icon_info) ?? {})) {
     const record = asObject(icon) ?? {}
+    // `icon_info` keeps the section numbering the `.pop` file had.
     const entries = writer.section(`ICON${index}`)
     putBase(entries, record.b)
     putFields(entries, record, [
