@@ -5,7 +5,7 @@ import { appState } from "../state"
 import { isEditing, commitBatch, prepareDocumentReplacement, undo, redo, commitBytes, updateDirty, commitText } from "../edit-history"
 import { sourceTargetFolder, sourceCopyPath, refreshAfterSourceMutation, setSourceTransfer, sourceSelection, sourcePaths, setSidebarView, revealSourceFile } from "../source-files"
 import { type Change } from "../../history.ts"
-import { preview, source, scheduleSelectionInspectorSync, isTauri, exportButtons, settingsNavItems, isAndroidTauri, LAST_SOURCE_WORKSPACE_KEY, currentDeviceValue } from "../canvas-interaction"
+import { preview, source, scheduleSelectionInspectorSync, isTauri, exportButtons, settingsNavItems, isAndroidTauri, isIOSWeb, LAST_SOURCE_WORKSPACE_KEY, currentDeviceValue } from "../canvas-interaction"
 import { startNewDocument, newDocument } from "../new-document"
 import { runFileOperation, readBrowserSkinFile, showImage } from "../file-operations"
 import { openNative, saveArchive, currentExportFormat, shareArchiveToMobile, writeToChosenFile, isSupportedSkinPath, loadDroppedFile, openSkinBytes, UNSUPPORTED_SKIN_MESSAGE } from "../archive-io"
@@ -408,6 +408,8 @@ export function wireFilesAndSettings(): void {
   })
   undoButton.addEventListener("click", undo)
   redoButton.addEventListener("click", redo)
+  // iOS Safari 不认识这些自定义扩展名，带 accept 会把所有文件变灰；改由 change 里校验扩展名。
+  if (isIOSWeb()) browserOpen.removeAttribute("accept")
   browserOpen.addEventListener("change", async () => {
     const file = browserOpen.files?.[0]
     if (file) {
