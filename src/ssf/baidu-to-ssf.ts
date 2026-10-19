@@ -332,6 +332,26 @@ function candidateColors(archive: SkinArchive, theme: Theme, styles: BaiduStyles
   return firstStyle(styles, styleSources(archive, theme).cand, "CAND", "FORE_STYLE")
 }
 
+/** Match toolbar actions, not slot numbers: Baidu skins can reorder their icons. */
+function toolbarImages(archive: SkinArchive, theme: Theme, styles: BaiduStyles, writer: StatusWriter): void {
+  const names: Record<string, string> = {
+    F31: "logo.png", F7: "ime_function_expression.png", F13: "ime_function_switch.png",
+    F72: "ime_function_voice.png", F82: "ime_function_sousou.png", F68: "ime_function_fanlingxi.png", F8: "close.png",
+  }
+  for (const document of styleSources(archive, theme).cand) {
+    for (const section of document.sections().filter((name) => /^ICON\d+$/.test(name))) {
+      const name = names[document.get(section, "KEY")?.trim() ?? ""]
+      const pair = styles.resolve(document.get(section, "FORE_STYLE"))
+      if (!name || !pair?.normal) continue
+      for (const [slice, filename] of [[pair.normal, name], [pair.pressed ?? pair.normal, name.replace(/\.png$/, "_p.png")]] as const) {
+        // Non-stretch slices still use Baidu layout pixels; Sogou icons use 1080-wide pixels.
+        const scale = slice.stretch ? 1 : styles.scale
+        writer.file(resizeImage(slice.image, Math.max(1, Math.round(slice.image.width * scale)), Math.max(1, Math.round(slice.image.height * scale))), filename)
+      }
+    }
+  }
+}
+
 function convertTheme(archive: SkinArchive, theme: Theme, folder: string, output: Map<string, Uint8Array>, warnings: string[]): void {
   const styles = new BaiduStyles(archive, theme, "port", warnings)
   const writer = new StatusWriter(folder, output)
@@ -382,6 +402,7 @@ function convertTheme(archive: SkinArchive, theme: Theme, folder: string, output
     writer.skin.appendSection("TextStyle_Candidate", [{ key: "TEXT_COLOR", value: candidate.color }])
     writer.skin.appendSection("TextStyle_Candidate_Highlight", [{ key: "TEXT_COLOR", value: candidate.pressedColor ?? candidate.color }])
   }
+  toolbarImages(archive, theme, styles, writer)
   // The 9-key symbol column is Sogou's candidate code view.
   const nine = `${theme}/skin/port/py_9.ini`
   const list = archive.isText(nine) ? IniDocument.parse(archive.getText(nine)) : undefined

@@ -412,6 +412,56 @@ test('ssf → BDA: panel background, candidate bar and key sounds', async () => 
 
 // —— Baidu → Sogou ——
 
+test('BDS/BDI → ssf: toolbar actions keep all seven normal/pressed icons in both themes', async () => {
+  const toolbarTemplate = SkinArchive.open(read('../public/sogou-template.bds'))
+  const gen = IniDocument.parse(toolbarTemplate.getText('light/skin/port/gen.ini'))
+  gen.set('PANEL', 'SIZE', '480,320')
+  toolbarTemplate.setText('light/skin/port/gen.ini', gen.toString())
+  const files = unzipSync(ssfFixture())
+  const names = ['logo.png', 'ime_function_expression.png', 'ime_function_switch.png', 'ime_function_voice.png', 'ime_function_sousou.png', 'ime_function_fanlingxi.png', 'close.png']
+  for (const status of ['status1', 'status2']) for (const [index, name] of names.entries()) {
+    files[`1080/${status}/${name}`] = encodePng(solid(48, 54, [index + 1, status === 'status1' ? 20 : 40, 60]))
+    files[`1080/${status}/${name.replace('.png', '_p.png')}`] = encodePng(solid(48, 54, [index + 1, 80, 100]))
+  }
+  // A 480-wide source also checks the conversion back to Sogou pixel dimensions.
+  const source = convertSsfToBaidu(await SsfPackage.open(zipSync(files)), toolbarTemplate).archive
+  for (const theme of ['light', 'dark']) {
+    const path = `${theme}/skin/port/cand1.cnd`
+    const cand = IniDocument.parse(source.getText(path))
+    const fields = ['KEY', 'FORE_STYLE']
+    for (const field of fields) {
+      const first = cand.get('ICON1', field)
+      cand.set('ICON1', field, cand.get('ICON7', field))
+      cand.set('ICON7', field, first)
+    }
+    source.setText(path, cand.toString())
+  }
+  for (const format of ['bds', 'bdi']) {
+    const archive = SkinArchive.open(await source.platformBytesAsync(format, []), format)
+    const before = archive.toBytes()
+    const { bytes } = await exportSsf(archive)
+    const pkg = await SsfPackage.open(bytes)
+    const reopened = convertSsfToBaidu(pkg, toolbarTemplate).archive
+    for (const theme of ['light', 'dark']) for (const name of names) {
+      for (const filename of [name, name.replace('.png', '_p.png')]) {
+        const original = decodePng(files[`1080/${theme === 'light' ? 'status1' : 'status2'}/${filename}`])
+        const expected = resizeImage(original, 21, 24)
+        assertSamePixels(decodePng(pkg.file(theme, filename)), resizeImage(expected, 47, 54), `${format} ${theme} ${filename}`)
+      }
+      const sourceCand = IniDocument.parse(archive.getText(`${theme}/skin/port/cand1.cnd`))
+      const targetCand = IniDocument.parse(reopened.getText(`${theme}/skin/port/cand1.cnd`))
+      const action = IniDocument.parse(toolbarTemplate.getText('light/skin/port/cand1.cnd'))
+      const targetSection = action.sections().find((section) => action.get(section, 'SSF_IMAGE') === name)
+      const sourceSection = sourceCand.sections().find((section) => sourceCand.get(section, 'KEY') === action.get(targetSection, 'KEY'))
+      const beforeStyle = baiduStyleImage(archive, theme, sourceCand.get(sourceSection, 'FORE_STYLE'))
+      const afterStyle = baiduStyleImage(reopened, theme, targetCand.get(targetSection, 'FORE_STYLE'))
+      assertSamePixels(afterStyle.image, beforeStyle.image, `${format} ${theme} ${name} reopened`)
+      assertSamePixels(afterStyle.pressed, beforeStyle.pressed, `${format} ${theme} ${name} pressed reopened`)
+    }
+    assert.deepEqual(archive.toBytes(), before, 'export leaves the source unchanged')
+  }
+})
+
 test('BDS → ssf → BDS keeps every key look', async () => {
   const first = convertSsfToBaidu(await SsfPackage.open(ssfFixture()), bdsTemplate).archive
   const exported = await convertBaiduToSsf(first)
