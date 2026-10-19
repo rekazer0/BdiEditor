@@ -238,11 +238,13 @@ export function updateFileOperationProgress(value: number, detail: string): void
 
 export function showSkinLoadProgress(size: number): boolean {
   if (size <= LARGE_SKIN_BYTES) return false
-  if (!appState.fileOperationProgressVisible) {
-    appState.fileOperationProgressVisible = true
-    if (!fileOperationDialog.open) fileOperationDialog.showModal()
-  }
+  showFileOperationProgress()
   return true
+}
+
+export function showFileOperationProgress(): void {
+  appState.fileOperationProgressVisible = true
+  if (!fileOperationDialog.open) fileOperationDialog.showModal()
 }
 
 export async function readBrowserSkinFile(file: File): Promise<Uint8Array> {

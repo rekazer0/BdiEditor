@@ -1,5 +1,5 @@
 import { clientLog, flushClientLogs } from "../client-log.ts"
-import { showSkinLoadProgress, waitForInterfacePaint, updateFileOperationProgress, showStatus, showError, runFileOperation, readNativeSkinFile, readBrowserSkinFile, exportTargetHidden } from "./file-operations"
+import { showSkinLoadProgress, showFileOperationProgress, waitForInterfacePaint, updateFileOperationProgress, showStatus, showError, runFileOperation, readNativeSkinFile, readBrowserSkinFile, exportTargetHidden } from "./file-operations"
 import { flushSourceAutosave, activateSourceWorkspace, sourceFilesPayload, decodeBase64Archive, sourceArchiveFromFiles } from "./source-workspace"
 import { appState } from "./state"
 import { releaseKeySound, keySoundBuffers, sourceDirectoryEnabledBySettings, isTauri, isAndroidTauri, exportButtons, pendingSourcePaths, LAST_SOURCE_WORKSPACE_KEY, isIOSWeb, isAndroidWeb, syncMobileShareLabel } from "./canvas-interaction"
@@ -584,7 +584,13 @@ export async function saveArchive(
 
 export async function shareArchiveToMobile(): Promise<boolean> {
   if (!appState.archive) return false
-  if (isIOSWeb() && (appState.archive.format !== "bdi" && (appState.archive.format !== "bda" || bdaPlatform(appState.archive) !== "ios"))) {
+  const ios = isIOSWeb()
+  if (!isAndroidTauri()) {
+    // Small exports also need visible preparation and error feedback on mobile.
+    showFileOperationProgress()
+    if (!navigator.share) throw new Error("当前浏览器不支持系统文件分享")
+  }
+  if (ios && (appState.archive.format !== "bdi" && (appState.archive.format !== "bda" || bdaPlatform(appState.archive) !== "ios"))) {
     throw new Error("当前格式不支持 iOS，请先打开 .bdi 或 iOS 版 .bda 皮肤")
   }
   const format = mobileShareFormat()
@@ -605,7 +611,9 @@ export async function shareArchiveToMobile(): Promise<boolean> {
     if (error instanceof DOMException && error.name === "AbortError") return false
     throw error
   })
-  if (navigator.userActivation && !navigator.userActivation.isActive) {
+  // Packaging has already awaited asynchronous work. Older iOS versions do not
+  // expose userActivation, so always get a fresh tap there before calling share.
+  if (ios || navigator.userActivation && !navigator.userActivation.isActive) {
     return waitForTap(`${name} 已生成，轻点“分享”继续`, "分享", share)
   }
   return share()
@@ -617,8 +625,7 @@ export async function shareArchiveToMobile(): Promise<boolean> {
  */
 export function waitForTap(detail: string, label: string, onTap?: () => void | Promise<boolean>): Promise<boolean> {
   return new Promise((resolve, reject) => {
-    appState.fileOperationProgressVisible = true
-    if (!fileOperationDialog.open) fileOperationDialog.showModal()
+    showFileOperationProgress()
     updateFileOperationProgress(90, detail)
     const share = document.createElement("button")
     share.type = "button"
