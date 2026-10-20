@@ -172,7 +172,7 @@ check = async (name, run) => (!only || only.test(name) ? runCheck(name, run) : u
 
 await check("welcome: one recent section, templates, no document controls", () => withPage(async (page) => {
   assert.equal(await page.locator(".welcome-aside").count(), 0, "duplicate recent column removed")
-  assert.equal(await page.locator(".template-grid .template-card").count(), 7)
+  assert.equal(await page.locator(".template-grid .template-card").count(), 8)
   await page.waitForFunction(() => document.querySelectorAll(".template-grid .template-preview img, .template-grid .template-preview canvas").length >= 3, null, { timeout: 30000 })
   for (const selector of ["#desktop-undo", ".mode-control", "#recent-clear"]) {
     assert.equal(await page.locator(selector).isVisible(), false, `${selector} hidden without a skin`)
@@ -188,10 +188,10 @@ await check("welcome: one recent section, templates, no document controls", () =
 /* ------------------------------------------------------------------------------------------------
  * 2 · Every built-in template opens and renders in both modes
  * ---------------------------------------------------------------------------------------------- */
-for (const template of ["default-android", "official-android-bds", "xiaomi-unified-rounded-blur", "oppo-dual-color", "iqoo-rounded-black", "huawei-swipe-symbols-1080", "oppo-swipe-down"]) {
+for (const template of ["default-android", "official-android-bds", "xiaomi-unified-rounded-blur", "oppo-dual-color", "iqoo-rounded-black", "huawei-swipe-symbols-1080", "oppo-swipe-down", "palm-default"]) {
   await check(`template ${template}: opens, previews and edits`, () => withPage(async (page) => {
     await openTemplate(page, template)
-    assert.match(await page.locator("#document-name").textContent(), /\.(bds|bda)$/)
+    assert.match(await page.locator("#document-name").textContent(), /\.(bds|bda|sxi)$/)
     await editMode(page)
     await selectKey(page)
     assert.ok(await page.locator("#mobile-inspector-groups button").count() >= 1, "inspector categories")

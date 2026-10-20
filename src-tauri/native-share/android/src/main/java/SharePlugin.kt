@@ -112,6 +112,7 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
       "IQOO提取圆角黑色\n互联网整理 BDS 皮肤",
       "小米默认皮肤(统一颜色键盘版3)_适配圆角模糊\n互联网整理 BDS 皮肤",
       "华为提取上滑符号1080\n互联网整理 BDS 皮肤",
+      "手心默认皮肤\n互联网整理 SXI 皮肤",
     )
     val ids = arrayOf(
       "default-android",
@@ -121,6 +122,7 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
       "iqoo-rounded-black",
       "xiaomi-unified-rounded-blur",
       "huawei-swipe-symbols-1080",
+      "palm-default",
     )
     var selected = 0
     AlertDialog.Builder(activity)

@@ -25,6 +25,7 @@ const builtInProjectTemplatePaths: Record<string, string> = {
   "iqoo-rounded-black": "/templates/iqoo-rounded-black.bds",
   "xiaomi-unified-rounded-blur": "/templates/xiaomi-unified-rounded-blur.bds",
   "huawei-swipe-symbols-1080": "/templates/huawei-swipe-symbols-1080.bds",
+  "palm-default": "/templates/palm-default.sxi",
 }
 
 /**
@@ -39,6 +40,11 @@ const builtInProjectTemplatePreviewPaths: Record<string, string> = {
 export function builtInProjectTemplatePreviewURL(id: string): string | undefined {
   const path = builtInProjectTemplatePreviewPaths[id]
   return path ? new URL(path.replace(/^\//, ""), document.baseURI).href : undefined
+}
+
+/** 内置模板的文件扩展名（含点），新建时用作默认文件名后缀。 */
+export function builtInProjectTemplateExtension(id: string): string {
+  return builtInProjectTemplatePaths[id]?.match(/\.\w+$/)?.[0] ?? ".bds"
 }
 
 export async function loadBuiltInProjectTemplate(
