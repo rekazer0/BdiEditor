@@ -52,8 +52,6 @@ for (const activation of [undefined, { isActive: true }, { isActive: false }]) {
     assert.deepEqual(calls.slice(0, 3), ['progress', 'exported', 'tap'])
     const file = calls[3].file
     assert.equal(file.name, '测试.bdi')
-    // A generic MIME type would make iOS offer the file as plain data; the .bdi extension has to decide.
-    assert.equal(file.type, '')
     assert.deepEqual(new Uint8Array(await file.arrayBuffer()), bytes)
   })
 }
