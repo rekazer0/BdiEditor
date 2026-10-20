@@ -398,6 +398,8 @@
   outline: 0;
 }
 .source .inspector-gesture > input:is(:focus, :disabled) { border-color: transparent; background: none; box-shadow: none; }
+/* 原生候选按钮的占位会让 WebKit 中的动作码偏离格子中心。 */
+.source .inspector-gesture > input::-webkit-list-button { appearance: none; width: 0; margin: 0; padding: 0; }
 .source .inspector-gesture > input::placeholder { color: var(--tertiary); font-weight: var(--font-weight-regular); }
 .source .inspector-gesture > small { max-width: 100%; overflow: hidden; color: var(--tertiary); font-size: var(--font-size-xs); text-overflow: ellipsis; white-space: nowrap; }
 .source .inspector-gesture > small:empty { display: none; }
