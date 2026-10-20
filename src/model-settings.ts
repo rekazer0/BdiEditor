@@ -58,6 +58,13 @@ export function flattenModelProviders(providers: ModelProvider[]): ModelConfigur
   return providers.flatMap(({ models, ...service }) => models.map((model) => ({ ...service, model })))
 }
 
+/** What still keeps one provider from being saved, for its row in the list. */
+function providerProblem(provider: ModelProvider): string | undefined {
+  if (!provider.apiUrl) return "缺少 API 地址"
+  if (!provider.apiKey) return "缺少 API 密钥"
+  if (!provider.models.length) return "未选择模型"
+}
+
 /** Returns the first problem in a provider list, so the editor can select the offending entry. */
 export function validateModelProviders(providers: ModelProvider[]): { index: number; message: string } | undefined {
   const seen = new Set<string>()
@@ -99,7 +106,9 @@ export function initializeModelSettings(section: HTMLElement, options: {
   const choices = $<HTMLUListElement>("model-choices")
   const name = $<HTMLInputElement>("model-name")
   const addModel = $<HTMLButtonElement>("model-name-add")
+  const choiceCount = $<HTMLElement>("model-choices-count")
   const toggleKey = $<HTMLButtonElement>("toggle-model-api-key")
+  const toggleImageKey = $<HTMLButtonElement>("toggle-image-model-api-key")
   const refresh = $<HTMLButtonElement>("refresh-model-list")
   const test = $<HTMLButtonElement>("test-model-connection")
   const statusText = $<HTMLElement>("model-configuration-status")
@@ -134,39 +143,51 @@ export function initializeModelSettings(section: HTMLElement, options: {
   }
   const current = () => draft[active]
 
+  function iconButton(icon: string, label: string, onClick: () => void): HTMLButtonElement {
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = "ui-icon-button"
+    button.title = label
+    button.setAttribute("aria-label", label)
+    button.append(options.icon(icon))
+    button.addEventListener("click", onClick)
+    return button
+  }
+
   function renderProfiles(): void {
     profiles.replaceChildren(...draft.map((group, index) => {
       const label = modelProviderPreset(group.provider).label
+      const problem = providerProblem(group)
       const item = document.createElement("li")
       const select = document.createElement("button")
       select.type = "button"
       select.className = "model-profile"
       select.setAttribute("aria-pressed", String(index === active))
+      const text = document.createElement("span")
+      text.className = "model-profile-text"
       const title = document.createElement("strong")
       title.textContent = label
       const detail = document.createElement("small")
-      detail.textContent = [group.models.length ? group.models.join("、") : "未选择模型", modelHost(group.apiUrl)].filter(Boolean).join(" · ")
-      select.append(title, detail)
+      detail.textContent = problem ?? [group.models.join("、"), modelHost(group.apiUrl)].filter(Boolean).join(" · ")
+      if (problem) detail.dataset.problem = ""
+      text.append(title, detail)
+      select.append(text)
       if (index === 0) {
-        const badge = document.createElement("em")
+        const badge = document.createElement("span")
+        badge.className = "ui-badge"
         badge.textContent = "默认"
         select.append(badge)
       }
       select.addEventListener("click", () => selectProfile(index))
-      const remove = document.createElement("button")
-      remove.type = "button"
-      remove.className = "model-profile-remove"
-      remove.title = `删除 ${label}`
-      remove.setAttribute("aria-label", remove.title)
-      remove.append(options.icon("trash"))
-      remove.addEventListener("click", () => removeProfile(index))
-      item.append(select, remove)
+      item.append(select)
+      if (index > 0) item.append(iconButton("arrow-up", `将 ${label} 设为默认`, () => makeDefault(index)))
+      item.append(iconButton("trash", `删除 ${label}`, () => removeProfile(index)))
       return item
     }))
     if (!draft.length) {
       const empty = document.createElement("li")
       empty.className = "model-profiles-empty"
-      empty.textContent = "尚未配置服务商，点击“新增”添加"
+      empty.textContent = "还没有服务商。点击“添加服务商”，选择预设并填写 API 密钥即可开始使用 AI 设计。"
       profiles.append(empty)
     }
     const count = draft.reduce((total, group) => total + group.models.length, 0)
@@ -176,9 +197,13 @@ export function initializeModelSettings(section: HTMLElement, options: {
   function renderChoices(): void {
     const group = current()
     if (!group) return
-    const preset = modelProviderPreset(group.provider).model
-    const all = [...new Set([...group.models, ...fetched, ...(preset ? [preset] : [])])]
-    choices.replaceChildren(...all.map((model) => {
+    const all = choiceModels(group)
+    const query = name.value.trim().toLowerCase()
+    // Chosen models stay on top so a long fetched list never hides what is in use.
+    const shown = all
+      .filter((model) => !query || model.toLowerCase().includes(query))
+      .sort((left, right) => Number(group.models.includes(right)) - Number(group.models.includes(left)))
+    choices.replaceChildren(...shown.map((model) => {
       const item = document.createElement("li")
       const label = document.createElement("label")
       const box = document.createElement("input")
@@ -187,6 +212,7 @@ export function initializeModelSettings(section: HTMLElement, options: {
       box.addEventListener("change", () => {
         group.models = box.checked ? [...group.models, model] : group.models.filter((item) => item !== model)
         renderProfiles()
+        renderChoiceCount(group)
         notify()
       })
       const text = document.createElement("span")
@@ -195,12 +221,25 @@ export function initializeModelSettings(section: HTMLElement, options: {
       item.append(label)
       return item
     }))
-    if (!all.length) {
+    if (!shown.length) {
       const empty = document.createElement("li")
       empty.className = "model-choices-empty"
-      empty.textContent = "点击“获取”读取模型列表，或在下方手动添加"
+      empty.textContent = query
+        ? `没有匹配“${name.value.trim()}”的模型，按回车或点 + 添加它`
+        : "点击“获取列表”读取服务商的模型，或在上方输入模型 ID 添加"
       choices.append(empty)
     }
+    renderChoiceCount(group)
+  }
+
+  /** Everything the open provider can offer: its chosen models, the fetched list and the preset default. */
+  function choiceModels(group: ModelProvider): string[] {
+    const preset = modelProviderPreset(group.provider).model
+    return [...new Set([...group.models, ...fetched, ...(preset ? [preset] : [])])]
+  }
+
+  function renderChoiceCount(group: ModelProvider): void {
+    choiceCount.textContent = `已选 ${group.models.length} / ${choiceModels(group).length}`
   }
 
   function renderEditor(): void {
@@ -243,7 +282,16 @@ export function initializeModelSettings(section: HTMLElement, options: {
     draft.push(presetProvider())
     selectProfile(draft.length - 1)
     provider.focus()
-    setStatus("选择服务商并填写 API 密钥后保存")
+    setStatus("选择服务商预设，填写 API 密钥并勾选模型后保存")
+    notify()
+  }
+
+  function makeDefault(index: number): void {
+    const [group] = draft.splice(index, 1)
+    draft.unshift(group)
+    active = active === index ? 0 : active < index ? active + 1 : active
+    render()
+    setStatus(`${modelProviderPreset(group.provider).label} 已设为默认，保存后生效`)
     notify()
   }
 
@@ -271,6 +319,7 @@ export function initializeModelSettings(section: HTMLElement, options: {
     name.value = ""
     renderProfiles()
     renderChoices()
+    setStatus(`已添加 ${model}`)
     notify()
   }
 
@@ -315,6 +364,7 @@ export function initializeModelSettings(section: HTMLElement, options: {
   apiUrl.addEventListener("input", () => updateCurrent({ apiUrl: apiUrl.value.trim() }))
   apiKey.addEventListener("input", () => updateCurrent({ apiKey: apiKey.value.trim() }))
   addModel.addEventListener("click", addCustomModel)
+  name.addEventListener("input", renderChoices)
   name.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return
     event.preventDefault()
@@ -322,13 +372,19 @@ export function initializeModelSettings(section: HTMLElement, options: {
   })
   $("model-profile-add").addEventListener("click", addProfile)
 
-  toggleKey.addEventListener("click", () => {
-    const revealing = apiKey.type === "password"
-    apiKey.type = revealing ? "text" : "password"
-    toggleKey.title = revealing ? "隐藏 API 密钥" : "显示 API 密钥"
-    toggleKey.setAttribute("aria-label", toggleKey.title)
-    toggleKey.replaceChildren(options.icon(revealing ? "eye.slash" : "eye"))
-  })
+  function syncKeyToggle(toggle: HTMLButtonElement, input: HTMLInputElement): void {
+    const revealed = input.type === "text"
+    toggle.title = revealed ? "隐藏 API 密钥" : "显示 API 密钥"
+    toggle.setAttribute("aria-label", toggle.title)
+    toggle.setAttribute("aria-pressed", String(revealed))
+    toggle.replaceChildren(options.icon(revealed ? "eye.slash" : "eye"))
+  }
+  for (const [toggle, input] of [[toggleKey, apiKey], [toggleImageKey, imageApiKey]] as const) {
+    toggle.addEventListener("click", () => {
+      input.type = input.type === "password" ? "text" : "password"
+      syncKeyToggle(toggle, input)
+    })
+  }
 
   async function request<T>(pending: string, failure: string, command: string, model: string): Promise<T | undefined> {
     const group = current()
@@ -352,8 +408,9 @@ export function initializeModelSettings(section: HTMLElement, options: {
   refresh.addEventListener("click", () => void request<string[]>("正在从 API 获取模型…", "获取模型失败", "fetch_model_list", "").then((models) => {
     if (!models) return
     fetched = models
+    name.value = ""
     renderChoices()
-    setStatus(`已获取 ${models.length} 个模型，勾选要使用的模型`, "success")
+    setStatus(models.length ? `已获取 ${models.length} 个模型，勾选要使用的模型` : "服务商没有返回模型，请手动输入模型 ID", models.length ? "success" : "idle")
   }))
   test.addEventListener("click", () => {
     const model = current()?.models[0]
@@ -414,6 +471,8 @@ export function initializeModelSettings(section: HTMLElement, options: {
       draft = groupModelConfigurations(chatModels(saved))
       imageDraft = structuredClone(savedImage())
       apiKey.type = imageApiKey.type = "password"
+      syncKeyToggle(toggleKey, apiKey)
+      syncKeyToggle(toggleImageKey, imageApiKey)
       active = Math.min(Math.max(active, 0), draft.length - 1)
       fetched = []
       render()
@@ -435,12 +494,12 @@ export function initializeModelSettings(section: HTMLElement, options: {
       if (problem) {
         selectProfile(problem.index)
         setStatus(problem.message, "error")
-        throw new Error(`大模型 · ${problem.message}`)
+        throw new Error(`AI 模型 · ${problem.message}`)
       }
       const imageProblem = validateImageModel(imageDraft)
       if (imageProblem) {
         setStatus(imageProblem, "error")
-        throw new Error(`大模型 · ${imageProblem}`)
+        throw new Error(`AI 模型 · ${imageProblem}`)
       }
       setStatus("正在保存配置…", "busy")
       try {

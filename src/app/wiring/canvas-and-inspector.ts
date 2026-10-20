@@ -6,7 +6,7 @@ import { wheelZoomFactor } from "../../wheel-zoom.ts"
 import { mixedCoordinateDelta } from "../../mixed-input.ts"
 import { moveSelectedKeys, selectParentObject } from "../key-editing"
 import { renderSourceValueThumbnail, updateSourceFindVisibility } from "../source-panel"
-import { sidebarProjectName, documentName, aiDesignThinking, canvasWrap, deviceShell, toolbarStrip, previewCanvas, toolbarCanvas, editorCrosshair, previewCoordinates, previewCoordinateX, previewCoordinateY, mobileCommandMenu, mobileUndoButton, undoButton, mobileRedoButton, redoButton, desktopUndoButton, desktopRedoButton, quickInspector, mobileInspectorGroups, bdaInspectorStateButtons, bdaConfigFieldsGroup, mobilePaneButtons, files, mainWorkspace, mobileSplitHandle, mobilePreviewPosition, previewZoomOut, previewZoomFit, previewZoomIn, previewPanelViewport, candidateArea, candidateInputText, styleDetailImageButtons, workspaceImage, sourceStyleProxy, styleLibraryApply, styleLibraryEdit, $, styleLibraryPreview, stylePickerDialog, stylePickerSearch, toolbarFields, keyFields, stylePickerClose, newStyleDialog, stylePickerAdd, baiduActionCodes, sourceUploadButton, sourceUploadInput, sourceDownloadButton, sourceCopyButton } from "../dom"
+import { sidebarProjectName, documentName, aiDesignThinking, aiDesignIntensity, aiDesignScope, aiDesignModel, canvasWrap, deviceShell, toolbarStrip, previewCanvas, toolbarCanvas, editorCrosshair, previewCoordinates, previewCoordinateX, previewCoordinateY, mobileCommandMenu, mobileUndoButton, undoButton, mobileRedoButton, redoButton, desktopUndoButton, desktopRedoButton, quickInspector, mobileInspectorGroups, bdaInspectorStateButtons, bdaConfigFieldsGroup, mobilePaneButtons, files, mainWorkspace, mobileSplitHandle, mobilePreviewPosition, previewZoomOut, previewZoomFit, previewZoomIn, previewPanelViewport, candidateArea, candidateInputText, styleDetailImageButtons, workspaceImage, sourceStyleProxy, styleLibraryApply, styleLibraryEdit, $, styleLibraryPreview, stylePickerDialog, stylePickerSearch, toolbarFields, keyFields, stylePickerClose, newStyleDialog, stylePickerAdd, baiduActionCodes, sourceUploadButton, sourceUploadInput, sourceDownloadButton, sourceCopyButton } from "../dom"
 import { appState } from "../state"
 import { hydrateIcons } from "../../icons"
 import { syncSinglePageInspectorGroup, setMobileSplit, setMobilePane, syncMobileInspectorHeader, setMobilePreviewCollapsed } from "../mobile-layout"
@@ -23,6 +23,7 @@ import { renameDocumentTitle } from "../key-inspector"
 import { runFileOperation } from "../file-operations"
 import { sourceTargetFolder, commitSourceUploads, sourceSelection, setSourceTransfer } from "../source-files"
 import { writeToChosenFile } from "../archive-io"
+import { rememberAiDesignModel, setAiDesignScope } from "../ai-panel"
 
 /** 启动环境、全局指针、画布预览、检查器与缩放。只在启动时由 main.ts 按顺序调用一次。 */
 export function wireCanvasAndInspector(): void {
@@ -91,6 +92,11 @@ export function wireCanvasAndInspector(): void {
   aiDesignThinking.value = localStorage.getItem("ai-thinking-level") || "off"
   if (!aiDesignThinking.value) aiDesignThinking.value = "off"
   aiDesignThinking.addEventListener("change", () => localStorage.setItem("ai-thinking-level", aiDesignThinking.value))
+  aiDesignIntensity.value = localStorage.getItem("ai-design-intensity") || "balanced"
+  if (!aiDesignIntensity.value) aiDesignIntensity.value = "balanced"
+  aiDesignIntensity.addEventListener("change", () => localStorage.setItem("ai-design-intensity", aiDesignIntensity.value))
+  aiDesignScope.addEventListener("click", () => setAiDesignScope(aiDesignScope.getAttribute("aria-pressed") !== "true"))
+  aiDesignModel.addEventListener("change", rememberAiDesignModel)
   canvasWrap.addEventListener("pointermove", (event) => {
     if (appState.previewPanStart || deviceShell.hidden) return
     const onToolbar = toolbarStrip.contains(event.target as Node)

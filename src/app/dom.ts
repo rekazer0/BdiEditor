@@ -39,8 +39,6 @@ export const appDialogButtons = Array.from(document.querySelectorAll<HTMLButtonE
 
 export const settingsDialog = $("#settings-dialog") as HTMLDialogElement
 
-export const settingsStorageNav = $("#settings-storage-nav") as HTMLButtonElement
-
 export const settingsModelNav = $("#settings-model-nav") as HTMLButtonElement
 
 export const settingsModelSection = $("#settings-model-section")
@@ -341,6 +339,10 @@ export const aiDesignChat = $("#ai-design-chat")
 export const aiDesignModel = $("#ai-design-model") as HTMLSelectElement
 
 export const aiDesignThinking = $("#ai-design-thinking") as HTMLSelectElement
+
+export const aiDesignIntensity = $("#ai-design-intensity") as HTMLSelectElement
+
+export const aiDesignScope = $("#ai-design-scope") as HTMLButtonElement
 
 export const aiContextKey = $("#ai-context-key")
 

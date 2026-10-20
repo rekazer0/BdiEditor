@@ -2,7 +2,7 @@ import { SkinArchive } from "../skin.ts"
 import { type AiSkinEditableFile, type AiSkinDraftChange } from "../ai-skin-workspace.ts"
 import { bdaConfigPath } from "../bda.ts"
 import { bdaDecodedSourceEditable, decodedBdaEditorSource, applyDecodedBdaSource } from "../bda-source.ts"
-import { theme, orientation, previewCanvas, candidateBackgroundCanvas, toolbarCanvas, toolbarStrip, selectedKeyName, aiContextKey, aiContextPreview, aiDesignModel, aiDesignPanel, aiDesignStatus, documentName, layout, device, aiDesignThinking, aiDraftPanel, aiDesignChat, aiDraftFiles, aiDraftSummary, aiNewSession, aiDraftApply, aiDraftCancel, aiModelSettings, $ } from "./dom"
+import { theme, orientation, previewCanvas, candidateBackgroundCanvas, toolbarCanvas, toolbarStrip, selectedKeyName, aiContextKey, aiContextPreview, aiDesignModel, aiDesignPanel, aiDesignStatus, documentName, layout, device, aiDesignThinking, aiDraftPanel, aiDesignChat, aiDraftFiles, aiDraftSummary, aiNewSession, aiDraftApply, aiDraftCancel, aiModelSettings, aiDesignIntensity, aiDesignScope, $ } from "./dom"
 import { appState } from "./state"
 import { preferredPath, refreshBdaLayout } from "./bda-documents"
 import { genConfigPath, styleConfigPath, effectiveKeyValue } from "./config-context"
@@ -90,7 +90,14 @@ export function aiWantsWholeProject(prompt: string): boolean {
 }
 
 export function aiWantsVariants(prompt: string): boolean {
-  return /开创性|创新|创作|灵感|大胆|全新风格|多版|几版|几个方案|不同方向|方案选择/i.test(prompt)
+  return /多版|几版|几个方案|多个方案|多套方案|[三3]\s*个方案|不同方向|方案选择/i.test(prompt)
+}
+
+/** The scope chip: the current panel (default) or the whole skin. */
+export function setAiDesignScope(project: boolean): void {
+  aiDesignScope.setAttribute("aria-pressed", String(project))
+  aiDesignScope.textContent = project ? "整个皮肤" : "当前面板"
+  aiDesignScope.title = project ? "AI 可以修改整个皮肤的所有面板，点击改为只改当前面板" : "AI 只修改当前面板及其引用的样式，点击改为整个皮肤"
 }
 
 export function aiPreviewImage(): { type: "image"; data: string; mimeType: string } | undefined {
@@ -238,7 +245,10 @@ export async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks, 
   aiDesignStatus.textContent = ""
   syncAiDesignControls()
   try {
-    const panelScope = aiWantsWholeProject(prompt) ? "project" as const : "panel" as const
+    if (aiWantsWholeProject(prompt)) setAiDesignScope(true)
+    const panelScope = aiDesignScope.getAttribute("aria-pressed") === "true" ? "project" as const : "panel" as const
+    const mode = aiDesignIntensity.value
+    const variantCount = mode === "variants" || aiWantsVariants(prompt) ? 3 : 1
     const sxiPanel = target.derivedPointer(appState.layoutPath)
     const panelPath = target.format === "bda"
       ? bdaConfigPath(target, theme.value, orientation.value, "appearance") ?? appState.layoutPath
@@ -265,7 +275,8 @@ export async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks, 
       imageModel: appState.savedImageModel,
       attachments,
       history: appState.aiDesignConversation,
-      variantCount: aiWantsVariants(prompt) ? 3 : 1,
+      variantCount,
+      intensity: mode === "refine" || mode === "bold" ? mode : "balanced",
       thinkingLevel: aiDesignThinking.value as "off" | "low" | "medium" | "high",
       signal: hooks.signal,
       onStatus: async (kind, text) => {
@@ -305,7 +316,7 @@ export async function runAiDesignRequest(prompt: string, hooks: AiChatRunHooks, 
         variants,
       })
       return {
-        fallback: "已生成多个设计方向，请选择一个方案预览并应用。",
+        fallback: `已生成 ${variants.length} 个设计方向，请选择一个方案预览并应用。`,
         summary: "方案已就绪 · 选择后才会写入皮肤",
       }
     }
@@ -538,7 +549,8 @@ export function ensureAiChat(): Promise<AiChatController> {
 
 export function syncAiDesignControls(): void {
   aiDesignModel.disabled = appState.aiDesignBusy || appState.savedModels.length === 0
-  aiDesignThinking.disabled = aiDesignModel.disabled
+  aiDesignThinking.disabled = aiDesignIntensity.disabled = aiDesignModel.disabled
+  aiDesignScope.disabled = appState.aiDesignBusy
   aiNewSession.disabled = appState.aiDesignBusy || Boolean(appState.aiDesignDraft)
   // A pending draft must be applied or discarded first; deep-chat keeps its stop
   // button during a run, so only the idle submit state is affected.
@@ -547,8 +559,20 @@ export function syncAiDesignControls(): void {
   aiDraftCancel.disabled = appState.aiDesignBusy
 }
 
-export function syncModelProfiles(all: ModelConfiguration[]): void {
+const AI_DESIGN_MODEL_KEY = "ai-design-model"
+
+/** The chat stays on the model the user picked last, across restarts. */
+export function rememberAiDesignModel(): void {
   const selected = appState.savedModels[Number(aiDesignModel.value)]
+  try {
+    if (selected) localStorage.setItem(AI_DESIGN_MODEL_KEY, modelConfigurationKey(selected))
+  } catch {}
+}
+
+export function syncModelProfiles(all: ModelConfiguration[]): void {
+  const current = appState.savedModels[Number(aiDesignModel.value)]
+  let remembered: string | null = null
+  try { remembered = localStorage.getItem(AI_DESIGN_MODEL_KEY) } catch {}
   const models = all.filter((model) => model.kind !== "image")
   appState.savedImageModel = all.find((model) => model.kind === "image")
   appState.savedModels = models
@@ -566,10 +590,11 @@ export function syncModelProfiles(all: ModelConfiguration[]): void {
   }))
   if (!models.length) aiDesignModel.replaceChildren(new Option("请先配置模型", ""))
   // Keep the chat on the same model when the list is reordered or shortened.
-  const index = selected ? models.findIndex((model) => modelConfigurationKey(model) === modelConfigurationKey(selected)) : -1
+  const key = current ? modelConfigurationKey(current) : remembered
+  const index = key ? models.findIndex((model) => modelConfigurationKey(model) === key) : -1
   if (models.length) aiDesignModel.value = String(Math.max(index, 0))
   aiDesignModel.hidden = models.length === 0
-  aiDesignThinking.hidden = aiDesignModel.hidden
+  aiDesignThinking.hidden = aiDesignIntensity.hidden = aiDesignModel.hidden
   aiModelSettings.hidden = models.length > 0
   syncAiDesignControls()
 }

@@ -773,11 +773,34 @@ await check("file: a Sogou .ssf lists only its own files: preview switching, pro
 /* ------------------------------------------------------------------------------------------------
  * 12 · Web build hides desktop-only entries
  * ---------------------------------------------------------------------------------------------- */
-await check("web: recent files and AI design are hidden", () => withPage(async (page) => {
+await check("web: recent files and AI design are hidden; AI composer keeps keys off the canvas", () => withPage(async (page) => {
   assert.equal(await page.locator("#welcome-recent-open").isVisible(), true)
   for (const selector of [".welcome-recent h2", "#welcome-recent-empty"]) assert.equal(await page.locator(selector).isHidden(), true, selector)
   await openTemplate(page)
   for (const selector of ["#recent-files", '[data-inspector-tab="ai"]']) assert.equal(await page.locator(selector).isHidden(), true, selector)
+  // 网页端隐藏了 AI 设计标签；面板本身与桌面端相同，在这里放出标签继续检查它。
+  await page.locator('[data-inspector-tab="ai"]').evaluate((tab) => { tab.hidden = false })
+  await editMode(page)
+  await selectKey(page)
+  await page.locator('[data-inspector-tab="ai"]').click()
+  await page.locator("#ai-design-panel").waitFor({ state: "visible" })
+  assert.match(await page.locator("#ai-context-key").textContent(), /KEY|按键/)
+  // Keys typed into the composer (inside deep-chat's shadow root) edit the prompt, never the canvas selection.
+  const composer = page.locator("#ai-design-chat #text-input")
+  await composer.click()
+  await page.keyboard.type("换成深色")
+  await page.keyboard.press("Backspace")
+  await page.keyboard.press("Backspace")
+  assert.equal((await composer.textContent()).trim(), "换成")
+  assert.equal(await undoEnabled(page), false, "Backspace in the composer must not delete the selected key")
+  assert.equal(await page.locator("#ai-context-key").isVisible(), true, "the key stays selected")
+  await page.keyboard.press(`${mod}+a`)
+  await page.keyboard.press("Backspace")
+  assert.equal(await composer.evaluate((input) => input.innerHTML), "", "an emptied composer shows its placeholder again")
+  await page.locator("#ai-design-scope").click()
+  assert.equal(await page.locator("#ai-design-scope").getAttribute("aria-pressed"), "true")
+  assert.equal(await page.locator("#ai-design-scope").textContent(), "整个皮肤")
+  await page.locator('[data-inspector-tab="properties"]').click()
 }))
 
 /* ------------------------------------------------------------------------------------------------

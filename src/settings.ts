@@ -52,11 +52,7 @@ export function initializeSettings(dialog: HTMLDialogElement, setGuides: (enable
     for (const button of dialog.querySelectorAll<HTMLButtonElement>('[data-setting-choice]')) {
       button.setAttribute('aria-pressed', String(input(button.dataset.settingChoice!).value === button.dataset.value))
     }
-    for (const [page, id] of [['device', 'default-device'], ['background', 'canvas-background']]) {
-      const control = input(id) as HTMLSelectElement
-      dialog.querySelector(`[data-settings-summary="${page}"]`)!.textContent = control.selectedOptions[0]?.textContent ?? ''
-    }
-    dialog.querySelector('[data-settings-summary="guides"]')!.textContent = safe.checked || guides.checked || (input('editor-crosshair') as HTMLInputElement).checked ? '已启用' : '已关闭'
+    dialog.querySelector('[data-settings-summary="canvas"]')!.textContent = (input('default-device') as HTMLSelectElement).selectedOptions[0]?.textContent ?? ''
   }
   for (const button of dialog.querySelectorAll<HTMLButtonElement>('[data-setting-choice]')) button.addEventListener('click', () => {
     const control = input(button.dataset.settingChoice!)
@@ -64,7 +60,7 @@ export function initializeSettings(dialog: HTMLDialogElement, setGuides: (enable
     control.dispatchEvent(new Event('change', { bubbles: true }))
   })
   // Directory actions retain their explicit, immediate semantics; the model page keeps its own draft.
-  const controls = [...dialog.querySelectorAll<Control>('input[id], select[id]')].filter(control => !control.id.startsWith('source-directory') && !control.id.startsWith('model-'))
+  const controls = [...dialog.querySelectorAll<Control>('input[id], select[id]')].filter(control => !/^(source-directory|model-|image-model-)/.test(control.id))
   const storageKeys = [...controls.map(control => control.id), 'window-glass-opacity', 'window-acrylic-opacity']
   let values = new Map<Control, string>()
   const draft = createSettingsDraft(localStorage, storageKeys)

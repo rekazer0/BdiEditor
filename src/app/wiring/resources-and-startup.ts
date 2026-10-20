@@ -1,4 +1,4 @@
-import { styleImageResourceOpen, styleImageResourceClose, styleImageResourceSearch, theme, orientation, $, inspectorResizeHandle, styleAddButton, newStyleID, newStyleDialog, newStyleForm, layout, resourceUploadButton, resourceUploadInput, resourceDownloadButton, resourceDeleteButton, resourceDetail, device, clearSimulationButton, simulatedOutput, toolbarMenus, windowMaterial, mode } from "../dom"
+import { aiDesignChat, styleImageResourceOpen, styleImageResourceClose, styleImageResourceSearch, theme, orientation, $, inspectorResizeHandle, styleAddButton, newStyleID, newStyleDialog, newStyleForm, layout, resourceUploadButton, resourceUploadInput, resourceDownloadButton, resourceDeleteButton, resourceDetail, device, clearSimulationButton, simulatedOutput, toolbarMenus, windowMaterial, mode } from "../dom"
 import { openStyleImageResourcePicker, closeStyleImageResourcePicker, clearImageSlicePicker, renderStyleImageResources, updateSelectedImageReference, pickerImageReference, resourcePickerPayload, selectImageResource, pickableImagePaths } from "../image-pickers"
 import { appState } from "../state"
 import { isTauri, playSoundPath, syncDeviceControlIcon, clearSimulatedOutput } from "../canvas-interaction"
@@ -353,6 +353,8 @@ export function wireResourcesAndStartup(): void {
       return
     }
     if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return
+    // The AI composer keeps its own text undo; the skin history is not what the user is typing.
+    if (event.composedPath().includes(aiDesignChat)) return
     event.preventDefault()
     if (event.shiftKey) redo()
     else undo()
