@@ -5,7 +5,7 @@ import { iconMarkup } from "./icons"
 export type AiChatRunHooks = {
   signal: AbortSignal
   onTextDelta: (delta: string) => Promise<void>
-  onStatus?: (text: string, kind?: "thinking" | "reading" | "editing" | "done") => Promise<void>
+  onStatus?: (text: string, kind?: StepKind) => Promise<void>
   onThinking?: (text: string) => Promise<void>
 }
 
@@ -70,7 +70,7 @@ function duration(seconds: number): string {
 function runMarkup(id: string, bodyId: string): string {
   return `<section class="ai-run" id="${id}" aria-label="AI 处理步骤" data-state="running">`
     + `<button class="ai-run-head" type="button" aria-expanded="true" aria-controls="${bodyId}">`
-    + '<span class="ai-run-spark" aria-hidden="true">✦</span>'
+    + `<span class="ai-run-spark" aria-hidden="true">${iconMarkup("sparkles", 14)}</span>`
     + '<span class="ai-run-label">思考中…</span>'
     + '<span class="ai-run-caret" aria-hidden="true">' + iconMarkup("chevron-down", 16) + "</span>"
     + "</button>"
@@ -81,26 +81,32 @@ function runMarkup(id: string, bodyId: string): string {
 }
 
 function configureAppearance(chat: DeepChat): void {
-  // The inspector tokens stay symbolic: deep-chat's styles are inline, so a
-  // `var()` keeps the conversation on the same palette as the panel around it
-  // and following the app theme after a theme switch, instead of freezing the
-  // palette at connect time.
-  const text = "var(--pin-ink, #14161b)"
-  const muted = "var(--pin-ink-faint, #8c93a1)"
-  const secondary = "var(--pin-ink-muted, #5a6070)"
-  const control = "var(--pin-surface, #ffffff)"
-  const sunken = "var(--pin-sunken, #f4f5f8)"
-  const line = "var(--pin-line, #e6e8ee)"
-  const lineStrong = "var(--pin-line-strong, #d2d6df)"
-  const accent = "var(--pin-accent, #3a6df0)"
-  const onAccent = "var(--pin-on-brand, #ffffff)"
-  const ok = "var(--pin-ok, #10a15a)"
-  const danger = "var(--pin-danger, #e5484d)"
-  const mono = "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)"
-  const radiusLg = "var(--pin-radius-lg, 12px)"
-  const radiusMd = "var(--pin-radius-md, 8px)"
-  const radiusSm = "var(--pin-radius-sm, 6px)"
-  const radiusPill = "var(--pen-radius-pill, 999px)"
+  // deep-chat's styles are inline or live in its shadow root; custom properties
+  // inherit through it, so referencing the design tokens keeps the conversation
+  // on the panel's palette and follows theme switches without reconnecting.
+  const text = "var(--text)"
+  const muted = "var(--tertiary)"
+  const secondary = "var(--secondary)"
+  const control = "var(--control)"
+  const sunken = "var(--material-content)"
+  const line = "var(--line)"
+  const lineStrong = "var(--line-strong)"
+  const accent = "var(--accent)"
+  const accentSoft = "var(--accent-soft)"
+  const onAccent = "var(--on-accent)"
+  const hover = "var(--hover)"
+  const ok = "var(--state-ok)"
+  const danger = "var(--state-danger)"
+  const mono = "var(--font-mono)"
+  const radiusLg = "var(--radius-lg)"
+  const radiusMd = "var(--radius-md)"
+  const radiusSm = "var(--radius-sm)"
+  const radiusFull = "var(--radius-full)"
+  const fast = "var(--duration-fast) var(--ease-standard)"
+  const xs = "var(--font-size-xs)"
+  const sm = "var(--font-size-sm)"
+  const md = "var(--font-size-md)"
+  const lg = "var(--font-size-lg)"
 
   chat.chatStyle = {
     width: "100%",
@@ -111,12 +117,12 @@ function configureAppearance(chat: DeepChat): void {
     color: text,
     // An explicit family also stops deep-chat from injecting its Google Fonts
     // stylesheet, which the CSP blocks and the offline desktop app cannot load.
-    fontFamily: "var(--font-ui, system-ui, sans-serif)",
+    fontFamily: "var(--font-ui)",
   }
   chat.inputAreaStyle = {
     width: "auto",
     alignSelf: "end",
-    margin: "0 14px 14px",
+    margin: "0 16px 16px",
     border: "0",
     backgroundColor: "transparent",
     boxShadow: "none",
@@ -124,19 +130,18 @@ function configureAppearance(chat: DeepChat): void {
   // The box grows with its text and its top edge drags it taller; the bottom band holds the model picker
   // (overlaid from the panel) and the send button.
   chat.textInput = {
-    placeholder: { text: "描述你想要的皮肤效果…", style: { color: muted } },
+    placeholder: { text: "描述想要的风格或改动，例如“换成深海蓝，回车键用亮青色”…", style: { color: muted } },
     characterLimit: 8_000,
     styles: {
-      text: { color: text, fontSize: "12.5px", lineHeight: "1.6", padding: "11px 12px 0",
-        boxSizing: "border-box", minHeight: "120px", maxHeight: "60vh", overflowY: "auto" },
+      text: { color: text, fontSize: sm, lineHeight: "1.6", padding: "12px 12px 0",
+        boxSizing: "border-box", minHeight: "96px", maxHeight: "60vh", overflowY: "auto" },
       container: {
         width: "100%", boxSizing: "border-box", margin: "0", paddingBottom: "40px",
         height: "auto", maxHeight: "none", overflow: "hidden",
         border: `1px solid ${lineStrong}`, borderRadius: radiusLg, backgroundColor: control,
-        boxShadow: `0 1px 2px color-mix(in srgb, ${text} 5%, transparent)`,
+        boxShadow: "var(--shadow-sm)",
       },
-      // A quiet border shift only; the accent ring read as a selection highlight.
-      focus: { borderColor: `color-mix(in srgb, ${text} 30%, ${lineStrong})` },
+      focus: { borderColor: accent, boxShadow: "var(--focus-ring)" },
     },
   }
 
@@ -147,8 +152,8 @@ function configureAppearance(chat: DeepChat): void {
   chat.auxiliaryStyle = `
     #chat-view { grid-template-rows: minmax(0, 1fr) auto; }
     #messages { min-height: 0; }
-    .outer-message-container { padding: 0 14px; }
-    .outer-message-container + .outer-message-container { margin-top: 6px; }
+    .outer-message-container { padding: 0 16px; }
+    .outer-message-container + .outer-message-container { margin-top: 8px; }
     /* The run timeline is injected, so it does not inherit messageStyles — it has
        to shed deep-chat's default grey bubble on its own. */
     .ai-run-holder .message-bubble { max-width: 100%; padding: 0; border: 0;
@@ -157,45 +162,50 @@ function configureAppearance(chat: DeepChat): void {
     /* --- empty state: sits on the composer, not in the middle of nowhere -- */
     .intro-panel { position: static; flex-direction: column; justify-content: flex-end;
       box-sizing: border-box; width: 100%; height: auto; min-height: 100%; margin: 0; }
-    .ai-welcome { display: grid; gap: 6px; box-sizing: border-box; padding: 16px 14px 14px;
+    .ai-welcome { display: grid; gap: 8px; box-sizing: border-box; padding: 16px 16px 12px;
       text-align: left; color: ${text}; }
-    .ai-welcome-mark { display: grid; place-items: center; width: 28px; height: 28px;
-      border-radius: ${radiusMd}; background: color-mix(in srgb, ${accent} 10%, transparent);
-      color: ${accent}; font-size: 13px; }
-    .ai-welcome h2 { margin: 6px 0 0; font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
-    .ai-welcome p { margin: 0 0 8px; color: ${secondary}; font-size: 11.5px; line-height: 1.6; }
-    .ai-suggestions { display: grid; gap: 6px; }
-    .ai-suggestions button { display: grid; gap: 2px; width: 100%; padding: 8px 11px;
-      font: inherit; text-align: left; color: ${text}; background: ${control};
-      border: 1px solid ${line}; border-radius: ${radiusMd}; cursor: pointer;
-      transition: background .15s, border-color .15s; }
-    .ai-suggestions strong { font-size: 12px; font-weight: 500; }
-    .ai-suggestions span { color: ${muted}; font-size: 11px; }
-    .ai-suggestions button:hover { border-color: color-mix(in srgb, ${accent} 40%, ${line});
-      background: color-mix(in srgb, ${accent} 5%, ${control}); }
-    .ai-suggestions button:focus-visible { outline: 2px solid ${accent}; outline-offset: 2px; }
-    .ai-suggestions button:active { transform: scale(.99); }
+    .ai-welcome h2 { margin: 0; font-size: ${lg}; font-weight: 600; }
+    .ai-welcome p { margin: 0 0 4px; color: ${secondary}; font-size: ${xs}; line-height: 1.6; }
+    .ai-welcome h3 { margin: 8px 0 0; color: ${muted}; font-size: ${xs}; font-weight: 500; }
+    .ai-suggestions { display: grid; gap: 4px; }
+    .ai-suggestions[data-layout="grid"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ai-suggestions[data-layout="chips"] { display: flex; flex-wrap: wrap; gap: 6px; }
+    .ai-suggestions[data-layout="chips"] button { width: auto; padding: 4px 12px; border-radius: ${radiusFull}; }
+    .ai-suggestions button { display: grid; gap: 2px; width: 100%; min-width: 0; padding: 8px 12px;
+      font: inherit; text-align: left; color: ${text}; background: ${sunken};
+      border: 1px solid transparent; border-radius: ${radiusMd}; cursor: default;
+      transition: background-color ${fast}, border-color ${fast}; }
+    .ai-suggestions strong { font-size: ${sm}; font-weight: 500; }
+    .ai-suggestions span { overflow: hidden; color: ${muted}; font-size: ${xs};
+      text-overflow: ellipsis; white-space: nowrap; }
+    @media (hover: hover) {
+      .ai-suggestions button:hover { border-color: ${line}; background: ${accentSoft}; }
+      .ai-suggestions button:hover strong { color: ${accent}; }
+    }
+    .ai-suggestions button:active { background: color-mix(in srgb, ${text} 10%, transparent); }
+    .ai-suggestions button:focus-visible { outline: 0; box-shadow: var(--focus-ring); }
 
     /* A pending draft replaces the composer until it is applied or discarded. */
     :host([data-draft]) #input { display: none; }
 
-    /* --- run timeline: “✦ 思考中 · 12s · 6 个步骤” -------------------------- */
-    .ai-run { margin: 2px 0 6px; }
+    /* --- run timeline: “处理中 · 12s · 6 个步骤” ----------------------------- */
+    .ai-run { margin: 2px 0 8px; }
     .ai-run-head { display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
-      margin: 0; padding: 3px 0; border: 0; background: none; font: inherit;
-      color: ${muted}; cursor: pointer; text-align: left; }
-    .ai-run-head:hover { color: ${secondary}; }
-    .ai-run-head:focus-visible { outline: 2px solid ${accent}; outline-offset: 2px; border-radius: 4px; }
-    .ai-run-spark { display: grid; place-items: center; width: 16px; height: 16px; font-size: 11px; line-height: 1; }
-    .ai-run-label { font-size: 12px; font-variant-numeric: tabular-nums; }
-    .ai-run-caret { display: grid; place-items: center; width: 13px; height: 13px;
-      transition: transform .16s ease; }
-    .ai-run-caret svg { width: 13px; height: 13px; }
+      margin: 0; padding: 4px 0; border: 0; background: none; font: inherit;
+      color: ${muted}; cursor: default; text-align: left; }
+    @media (hover: hover) { .ai-run-head:hover { color: ${secondary}; } }
+    .ai-run-head:focus-visible { outline: 0; box-shadow: var(--focus-ring); border-radius: ${radiusSm}; }
+    .ai-run-spark { display: grid; place-items: center; width: 16px; height: 16px; color: ${accent}; }
+    .ai-run-spark svg { width: 14px; height: 14px; }
+    .ai-run-label { font-size: ${sm}; font-variant-numeric: tabular-nums; }
+    .ai-run-caret { display: grid; place-items: center; width: 14px; height: 14px;
+      transition: transform var(--duration-base) var(--ease-standard); }
+    .ai-run-caret svg { width: 14px; height: 14px; }
     .ai-run-head[aria-expanded="false"] .ai-run-caret { transform: rotate(-90deg); }
     .ai-run-head[aria-expanded="false"] + .ai-run-body { display: none; }
     .ai-run-steps { display: grid; gap: 0; margin: 2px 0 0; padding: 0; list-style: none; }
     .ai-run-step { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: start;
-      gap: 8px; padding: 2px 0; color: ${secondary}; font-size: 11.5px; line-height: 1.6; }
+      gap: 8px; padding: 2px 0; color: ${secondary}; font-size: ${xs}; line-height: 1.6; }
     .ai-run-step-icon { display: grid; place-items: center; width: 16px; height: 16px;
       margin-top: 1px; color: ${muted}; }
     .ai-run-step-icon svg { display: block; width: 14px; height: 14px; }
@@ -206,15 +216,15 @@ function configureAppearance(chat: DeepChat): void {
     @keyframes ai-run-pulse { 50% { opacity: .35; } }
     .ai-run-step-text { min-width: 0; overflow-wrap: anywhere; }
     .ai-run-think { margin: 4px 0 0; }
-    .ai-run-think > summary { padding: 2px 0; color: ${muted}; font-size: 11px;
-      list-style: none; cursor: pointer; }
+    .ai-run-think > summary { padding: 2px 0; color: ${muted}; font-size: ${xs};
+      list-style: none; cursor: default; }
     .ai-run-think > summary::-webkit-details-marker { display: none; }
     .ai-run-think > summary::before { content: "▸ "; }
     .ai-run-think[open] > summary::before { content: "▾ "; }
-    .ai-run-think > summary:focus-visible { outline: 2px solid ${accent}; outline-offset: 2px; border-radius: 4px; }
+    .ai-run-think > summary:focus-visible { outline: 0; box-shadow: var(--focus-ring); border-radius: ${radiusSm}; }
     .ai-run-think-text { max-height: 240px; margin: 4px 0 0; overflow: auto;
       padding: 0 0 0 12px; border-left: 1px solid ${line};
-      color: ${muted}; font-family: ${mono}; font-size: 11px; line-height: 1.7;
+      color: ${muted}; font-family: ${mono}; font-size: ${xs}; line-height: 1.7;
       white-space: pre-wrap; overflow-wrap: anywhere; }
 
     /* --- prose: no bubbles, the panel already frames the conversation ------ */
@@ -224,75 +234,75 @@ function configureAppearance(chat: DeepChat): void {
     .message-bubble p { margin: 0 0 .6em; }
     .message-bubble :is(ul, ol) { margin: .2em 0 .7em; padding-left: 1.35em; }
     .message-bubble li { margin: .15em 0; }
-    .message-bubble pre { max-width: 100%; margin: .5em 0; padding: 8px 10px; overflow-x: auto;
+    .message-bubble pre { max-width: 100%; margin: .5em 0; padding: 8px 12px; overflow-x: auto;
       border: 1px solid ${line}; border-radius: ${radiusSm}; background: ${sunken};
-      font-family: ${mono}; font-size: 11px; line-height: 1.6; }
+      font-family: ${mono}; font-size: ${xs}; line-height: 1.6; }
     .message-bubble code { font-family: ${mono}; font-size: .94em; }
-    .message-bubble :not(pre) > code { padding: 1px 4px; border-radius: 5px;
+    .message-bubble :not(pre) > code { padding: 1px 4px; border-radius: ${radiusSm};
       background: color-mix(in srgb, ${text} 6%, transparent); }
     .message-bubble a { color: ${accent}; }
 
     /* The submit glyph is stroke-drawn; deep-chat's own rule fills it and colourises
-       it with a filter, which turns the plane into a grey blob. */
-    #submit-icon { width: 15px !important; height: 15px !important; filter: none !important;
-      fill: none !important; stroke: currentColor; stroke-width: 1.6; }
+       it with a filter, which turns the arrow into a grey blob. */
+    #submit-icon { width: 14px !important; height: 14px !important; filter: none !important;
+      fill: none !important; stroke: currentColor; stroke-width: 1.5; }
     #text-input:focus-visible { outline: none; }
     /* Pasted / dropped attachments sit above the text, inside the composer. */
-    #text-input-container { flex-wrap: wrap; }
-    .ai-attachments { display: flex; flex: 0 0 100%; flex-wrap: wrap; gap: 6px; box-sizing: border-box; padding: 10px 12px 0; }
+    #text-input-container { flex-wrap: wrap; transition: border-color ${fast}, box-shadow ${fast}; }
+    .ai-attachments { display: flex; flex: 0 0 100%; flex-wrap: wrap; gap: 6px; box-sizing: border-box; padding: 12px 12px 0; }
     .ai-attachments:empty { display: none; }
     .ai-attachment { display: inline-flex; align-items: center; gap: 6px; max-width: 180px; height: 28px;
-      padding: 0 4px 0 4px; border: 1px solid ${line}; border-radius: ${radiusSm}; background: ${sunken};
-      color: ${secondary}; font-size: 11px; }
-    .ai-attachment img { width: 20px; height: 20px; border-radius: 4px; object-fit: cover; }
+      padding: 0 4px; border: 1px solid ${line}; border-radius: ${radiusSm}; background: ${sunken};
+      color: ${secondary}; font-size: ${xs}; }
+    .ai-attachment img { width: 20px; height: 20px; border-radius: ${radiusSm}; object-fit: cover; }
     .ai-attachment-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .ai-attachment button { display: grid; place-items: center; width: 18px; height: 18px; padding: 0;
-      border: 0; border-radius: 4px; background: none; color: ${muted}; font: inherit; cursor: pointer; }
-    .ai-attachment button:hover { color: ${text}; background: color-mix(in srgb, ${text} 8%, transparent); }
-    .ai-attachment button:focus-visible { outline: 2px solid ${accent}; outline-offset: 1px; }
+    .ai-attachment button { display: grid; place-items: center; width: 20px; height: 20px; padding: 0;
+      border: 0; border-radius: ${radiusSm}; background: none; color: ${muted}; font: inherit; cursor: default; }
+    @media (hover: hover) { .ai-attachment button:hover { color: ${text}; background: ${hover}; } }
+    .ai-attachment button:focus-visible { outline: 0; box-shadow: var(--focus-ring); }
     #text-input-container[data-dropping] { border-color: ${accent} !important; }
 
     /* Top-edge grip: the composer is anchored to the bottom, so it grows upward. */
-    .ai-resize { position: absolute; top: 0; left: 0; right: 0; z-index: 2; height: 10px;
+    .ai-resize { position: absolute; top: 0; left: 0; right: 0; z-index: 2; height: 12px;
       cursor: ns-resize; touch-action: none; }
     .ai-resize::after { content: ""; position: absolute; top: 4px; left: 50%; width: 32px; height: 3px;
-      margin-left: -16px; border-radius: ${radiusPill}; background: ${lineStrong}; opacity: .55;
-      transition: opacity .15s; }
+      margin-left: -16px; border-radius: ${radiusFull}; background: ${lineStrong}; opacity: 0;
+      transition: opacity ${fast}; }
     #text-input-container:hover .ai-resize::after, .ai-resize:focus-visible::after,
     .ai-resize[data-dragging]::after { opacity: 1; }
     .ai-resize:focus-visible { outline: none; }
     .input-button { display: grid !important; place-items: center; padding: 0 !important; margin: 0 !important; }
-    .input-button > svg { width: 15px !important; height: 15px !important; fill: none !important;
+    .input-button > svg { width: 14px !important; height: 14px !important; fill: none !important;
       stroke: currentColor !important; filter: none !important; }
     #text-input:empty::before { font-weight: 400; }
-    #scroll-button { padding: 7px; border: 1px solid ${line}; border-radius: ${radiusPill};
-      background: ${control}; box-shadow: 0 2px 8px color-mix(in srgb, ${text} 12%, transparent); }
+    #scroll-button { padding: 8px; border: 1px solid ${line}; border-radius: ${radiusFull};
+      background: ${control}; box-shadow: var(--shadow-md); }
     #scroll-button svg { width: 12px; height: 12px; color: ${secondary}; }
 
-    /* Phones get half a screen at best: a two-line composer, suggestions as one
-       scrolling row of chips, and no drag grip. */
+    /* Phones get half a screen at best: a two-line composer, suggestions as
+       scrolling rows of chips, and no drag grip. */
     @media (max-width: 760px) {
-      #text-input { min-height: 44px !important; max-height: 30vh !important; padding-top: 10px !important; }
+      #text-input { min-height: 44px !important; max-height: 30vh !important; padding-top: 12px !important; }
       #text-input-container { padding-bottom: 36px !important; }
       .ai-resize { display: none; }
-      .ai-welcome { gap: 8px; padding: 8px 14px 10px; }
-      .ai-welcome-mark, .ai-welcome p { display: none; }
-      .ai-welcome h2 { margin: 0; font-size: 13px; }
-      .ai-suggestions { display: flex; gap: 6px; margin: 0 -14px; padding: 0 14px;
-        overflow-x: auto; scrollbar-width: none; scroll-padding: 0 14px; }
+      .ai-welcome { gap: 8px; padding: 8px 16px 12px; }
+      .ai-welcome p, .ai-welcome h3 { display: none; }
+      .ai-welcome h2 { font-size: ${md}; }
+      .ai-suggestions, .ai-suggestions[data-layout] { display: flex; flex-wrap: nowrap; gap: 6px; margin: 0 -16px; padding: 0 16px;
+        overflow-x: auto; scrollbar-width: none; scroll-padding: 0 16px; }
       .ai-suggestions::-webkit-scrollbar { display: none; }
-      .ai-suggestions button { flex: none; width: auto; padding: 6px 12px;
-        border-radius: ${radiusPill}; white-space: nowrap; }
+      .ai-suggestions button, .ai-suggestions[data-layout] button { flex: none; width: auto; padding: 6px 12px;
+        border-radius: ${radiusFull}; white-space: nowrap; }
       .ai-suggestions span { display: none; }
     }
 
     @media (prefers-reduced-motion: reduce) {
-      * { scroll-behavior: auto !important; animation: none !important; }
+      * { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
     }
   `
   chat.messageStyles = {
     default: {
-      shared: { bubble: { fontSize: "12.5px", lineHeight: "1.72" } },
+      shared: { bubble: { fontSize: sm, lineHeight: "1.7" } },
       user: {
         bubble: {
           color: text,
@@ -300,7 +310,7 @@ function configureAppearance(chat: DeepChat): void {
           border: "0",
           borderRadius: radiusLg,
           boxShadow: "none",
-          padding: "8px 11px",
+          padding: "8px 12px",
           maxWidth: "86%",
         },
       },
@@ -317,26 +327,23 @@ function configureAppearance(chat: DeepChat): void {
       },
     },
   }
+  const button = { borderRadius: radiusMd, boxSizing: "border-box", width: "28px", height: "28px", bottom: "6px", right: "6px", boxShadow: "none" }
   chat.submitButtonStyles = {
     position: "inside-end",
     tooltip: { text: "发送；生成时点击可停止" },
     submit: {
       // A symmetric arrow sits optically centred, unlike the default paper plane.
-      svg: { content: iconMarkup("arrow-up", 15, 1.6) },
+      svg: { content: iconMarkup("arrow-up", 14) },
       container: {
-        default: { backgroundColor: accent, color: onAccent, borderRadius: radiusMd, boxSizing: "border-box",
-          width: "28px", height: "28px", bottom: "6px", right: "6px", boxShadow: "none" },
-        hover: { filter: "brightness(1.06)", transform: "none" },
+        default: { ...button, backgroundColor: accent, color: onAccent },
+        hover: { backgroundColor: `color-mix(in srgb, ${accent} 88%, ${text})`, transform: "none" },
       },
     },
     disabled: {
-      container: { default: { backgroundColor: `color-mix(in srgb, ${text} 5%, ${sunken})`, border: `1px solid ${line}`, color: muted,
-        borderRadius: radiusMd, boxSizing: "border-box", width: "28px", height: "28px", bottom: "6px", right: "6px",
-        cursor: "not-allowed", boxShadow: "none" } },
+      container: { default: { ...button, backgroundColor: sunken, border: `1px solid ${line}`, color: muted, cursor: "not-allowed" } },
     },
     stop: {
-      container: { default: { border: `1px solid ${lineStrong}`, backgroundColor: sunken, color: secondary,
-        borderRadius: radiusMd, boxSizing: "border-box", width: "28px", height: "28px", bottom: "6px", right: "6px", boxShadow: "none" } },
+      container: { default: { ...button, border: `1px solid ${lineStrong}`, backgroundColor: sunken, color: secondary } },
     },
   }
   chat.focusMode = { smoothScroll: true, streamAutoScroll: true, fade: false }
@@ -423,6 +430,11 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
       attachmentStrip.setAttribute("aria-label", "附件")
       input.before(attachmentStrip)
       paintAttachments()
+      // Deleting everything can leave a stray <br>; deep-chat then treats the box as empty
+      // but :empty fails, so the placeholder never comes back.
+      input.addEventListener("input", () => {
+        if (input.textContent === "" && input.childNodes.length) input.replaceChildren()
+      })
       // Capture phase: deep-chat's own paste handler only keeps plain text.
       input.addEventListener("paste", (event) => {
         const files = [...event.clipboardData?.files ?? []]
@@ -446,11 +458,14 @@ export async function connectAiChat(element: HTMLElement, run: AiChatRun): Promi
       })
     }
     chat.shadowRoot?.querySelector(".input-button[role=button]")?.setAttribute("aria-label", "发送消息；生成时点击停止")
-    chat.shadowRoot?.querySelectorAll<HTMLButtonElement>("[data-ai-prompt]").forEach((button) => {
+    const suggestions = [...chat.shadowRoot?.querySelectorAll<HTMLButtonElement>("[data-ai-prompt]") ?? []]
+    const presets = new Set(suggestions.map((button) => button.dataset.aiPrompt))
+    suggestions.forEach((button) => {
       button.onclick = () => {
         if (!input) return
+        // Picking another preset swaps it in; the user's own words are kept and the preset appended.
         const draft = input.innerText.trim()
-        input.innerText = [draft, button.dataset.aiPrompt].filter(Boolean).join("\n")
+        input.innerText = presets.has(draft) ? button.dataset.aiPrompt ?? "" : [draft, button.dataset.aiPrompt].filter(Boolean).join("\n")
         input.dispatchEvent(new Event("input", { bubbles: true }))
         chat.focusInput()
         const range = document.createRange()

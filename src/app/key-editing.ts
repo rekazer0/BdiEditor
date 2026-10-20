@@ -203,9 +203,18 @@ export function moveSelectedKeys(
   updateDirty()
 }
 
+/**
+ * The element a key event is really meant for. Events from a shadow root (the AI composer
+ * is deep-chat's contenteditable) reach window retargeted to the host, so look inside it.
+ */
+export function keyEventElement(target: EventTarget | null): Element | null {
+  let element = target instanceof Element ? target : null
+  while (element?.shadowRoot?.activeElement) element = element.shadowRoot.activeElement
+  return element
+}
+
 export function isTextEditingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof Element)) return false
-  return Boolean(target.closest("input, textarea, select, button, [contenteditable]"))
+  return Boolean(keyEventElement(target)?.closest("input, textarea, select, button, [contenteditable]"))
 }
 
 export function moveMixedCoordinate(field: HTMLInputElement, direction: number, coalesce = false): boolean {

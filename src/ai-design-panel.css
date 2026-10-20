@@ -22,7 +22,7 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-#ai-design-panel button:disabled { opacity: .45; cursor: not-allowed; }
+#ai-design-panel button:disabled { opacity: var(--disabled-opacity); cursor: not-allowed; }
 
 /* —— 上下文条：模型这一轮能看到什么 —— */
 #ai-design-panel .ai-bar {
@@ -60,6 +60,23 @@
 #ai-design-panel .ai-chip[data-off="true"]::before { background: var(--tertiary); }
 #ai-design-panel #ai-context-key::before { border-radius: var(--radius-sm); background: var(--accent); }
 #ai-design-panel .ai-chip[hidden] { display: none; }
+/* 范围是唯一可点的标签：当前面板 ↔ 整个皮肤 */
+#ai-design-panel .ai-scope {
+  flex: none;
+  border: 0;
+  font: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: default;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+#ai-design-panel .ai-scope::before { border-radius: var(--radius-sm); background: var(--secondary); }
+#ai-design-panel .ai-scope[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+#ai-design-panel .ai-scope[aria-pressed="true"]::before { background: var(--accent); }
+@media (hover: hover) {
+#ai-design-panel .ai-scope:hover:not(:disabled) { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
+#ai-design-panel .ai-scope[aria-pressed="true"]:hover:not(:disabled) { color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+}
 
 #ai-design-panel .ai-new-session {
   display: inline-flex;
@@ -73,7 +90,7 @@
   background: transparent;
   color: var(--secondary);
   font: 500 var(--font-size-xs) var(--font-ui);
-  cursor: pointer;
+  cursor: default;
 }
 #ai-design-panel .ai-new-session svg {
   width: 14px;
@@ -146,9 +163,12 @@
   text-overflow: ellipsis;
   /* Size to the chosen option, not the longest one, so the chevron hugs the label. */
   field-sizing: content;
+  flex: none;
   min-width: 0;
-  cursor: pointer;
+  cursor: default;
 }
+/* 模型名最长，空间不够时只有它收缩 */
+#ai-design-panel .ai-design-toolbar #ai-design-model { flex: 0 1 auto; }
 #ai-design-panel .ai-design-toolbar select:is(:focus, :focus-visible) { outline: none; }
 @media (hover: hover) {
 #ai-design-panel .ai-design-toolbar select:hover:not(:disabled) { background-color: var(--material-content); color: var(--text); }
@@ -163,7 +183,7 @@
   background: color-mix(in srgb, var(--accent) 9%, transparent);
   color: var(--accent);
   font: 500 var(--font-size-xs) var(--font-ui);
-  cursor: pointer;
+  cursor: default;
 }
 @media (hover: hover) {
 #ai-design-panel .ai-design-settings:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
@@ -218,7 +238,7 @@
   gap: 8px;
   color: var(--text);
   font-size: var(--font-size-xs);
-  cursor: pointer;
+  cursor: default;
 }
 #ai-design-panel .ai-draft-file-head > span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: var(--font-mono); }
 #ai-design-panel .ai-draft-file-head > em { flex: none; color: var(--tertiary); font: normal var(--font-size-xs) var(--font-mono); }
@@ -240,7 +260,7 @@
 #ai-design-panel .ai-draft-images img { display: block; width: 100%; max-height: 140px; object-fit: contain; }
 #ai-design-panel .ai-draft-images figcaption { margin-top: 4px; color: var(--tertiary); font-size: var(--font-size-xs); }
 #ai-design-panel .ai-draft-full { margin-top: 6px; color: var(--secondary); font-size: var(--font-size-xs); }
-#ai-design-panel .ai-draft-full > summary { color: var(--accent); cursor: pointer; }
+#ai-design-panel .ai-draft-full > summary { color: var(--accent); cursor: default; }
 #ai-design-panel .ai-draft-full h4 { margin: 12px 0 4px; font-size: var(--font-size-xs); }
 #ai-design-panel .ai-draft-full pre {
   max-height: 240px;
@@ -265,7 +285,7 @@
   background: transparent;
   color: var(--text);
   text-align: left;
-  cursor: pointer;
+  cursor: default;
 }
 @media (hover: hover) {
 #ai-design-panel .ai-variant-select:hover { background: var(--accent-soft); }
@@ -304,7 +324,7 @@
   background: var(--material-panel);
   color: var(--text);
   font: 500 var(--font-size-sm) var(--font-ui);
-  cursor: pointer;
+  cursor: default;
 }
 #ai-design-panel .ai-draft-actions > .ai-draft-cancel { margin-left: auto; }
 @media (hover: hover) {
