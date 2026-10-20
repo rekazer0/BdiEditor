@@ -482,6 +482,28 @@ test('BDS → ssf → BDS keeps every key look', async () => {
   }
 })
 
+// Sogou's installer (theme.install.checker.e) picks the resolution from directory entries and then
+// unpacks only that folder (install.utils.c); without `1080/` it fails, or installs a blank skin.
+test('BDS / BDI / BDA → ssf lists every folder as its own entry', async () => {
+  const bdsDual = convertSsfToBaidu(await SsfPackage.open(ssfFixture()), bdsTemplate).archive
+  for (const [label, bytes] of [
+    ['BDS', (await convertBaiduToSsf(bdsTemplate)).bytes],
+    ['双外观 BDS', (await convertBaiduToSsf(bdsDual)).bytes],
+    ['BDA', (await exportSsf(bdaTemplate, bdaBase)).bytes],
+  ]) {
+    const names = Object.keys(unzipSync(bytes))
+    for (const name of names.filter((entry) => !entry.endsWith('/'))) {
+      const parts = name.split('/')
+      for (let index = 1; index < parts.length; index++) {
+        const folder = `${parts.slice(0, index).join('/')}/`
+        assert.ok(names.indexOf(folder) >= 0 && names.indexOf(folder) < names.indexOf(name), `${label}: ${name} 前缺少 ${folder}`)
+      }
+    }
+    assert.ok(names.includes('1080/'), label)
+  }
+  assert.ok(Object.keys(unzipSync((await convertBaiduToSsf(bdsDual)).bytes)).includes('1080/status2/'))
+})
+
 test('BDS → ssf: background stacking, FORE_OFFSET → FG_RECT and package files', async () => {
   const files = unzipSync(bdsTemplate.toBytes())
   const document = IniDocument.parse(strFromU8(files['port/py_26.ini']))

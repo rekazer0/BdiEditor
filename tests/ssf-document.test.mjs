@@ -31,7 +31,10 @@ test('ssf document: a ZIP is kept byte for byte, an encrypted container becomes 
   const zip = ssfFixture()
   assert.deepEqual(await ssfDocumentBytes(zip), zip)
   const fromContainer = await ssfDocumentBytes(await skinContainer(unzipSync(zip)))
-  assert.deepEqual(Object.keys(unzipSync(fromContainer)).sort(), Object.keys(unzipSync(zip)).sort())
+  const files = Object.keys(unzipSync(fromContainer))
+  assert.deepEqual(files.filter((name) => !name.endsWith('/')).sort(), Object.keys(unzipSync(zip)).sort())
+  // Sogou's installer finds the resolution folder only through its directory entry.
+  assert.ok(files.includes('1080/'))
   await assert.rejects(ssfDocumentBytes(zipSync({ 'skin.ini': strToU8('[General]') })), /电脑版/)
 })
 

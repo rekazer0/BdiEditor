@@ -75,6 +75,26 @@ export function parseZip(bytes: Uint8Array): { entries: ZipEntry[]; end: Uint8Ar
   }
 }
 
+/**
+ * Sets `name` after an entry for each folder above it. Sogou's installer finds the resolution folders
+ * (`1080/`) only through such entries; ZIP writers like fflate add none on their own.
+ */
+export function addZipEntry(output: Map<string, Uint8Array>, name: string, data: Uint8Array): void {
+  const parts = name.split("/")
+  for (let index = 1; index < parts.length; index++) {
+    const directory = `${parts.slice(0, index).join("/")}/`
+    if (!output.has(directory)) output.set(directory, new Uint8Array())
+  }
+  output.set(name, data)
+}
+
+/** The same files, each folder listed as its own entry ahead of its contents. */
+export function withDirectoryEntries(files: Iterable<[string, Uint8Array]>): Map<string, Uint8Array> {
+  const output = new Map<string, Uint8Array>()
+  for (const [name, data] of files) addZipEntry(output, name, data)
+  return output
+}
+
 export function writeUint32(bytes: Uint8Array, offset: number, value: number): void {
   view(bytes).setUint32(offset, value, true)
 }

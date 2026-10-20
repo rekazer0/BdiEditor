@@ -2,7 +2,7 @@ import { strFromU8, strToU8, unzipSync, zipSync } from "fflate"
 import type { ExportFormat } from "./export.ts"
 import { adaptPackageSounds } from "./sounds.ts"
 import { SXI_INFO_PATH, SXI_SKIN_PATH, encodeSkinJson, parseSkinJson, sxiDerivedFiles } from "./palm/sxi-projection.ts"
-import { parseZip, validateArchiveLimits, normalizeEntryCounts, MAX_FILES, safePath, MAX_UNPACKED_BYTES, unpackArchive, view, changedLocal, writeUint32, writeUint16 } from "./skin-zip.ts"
+import { parseZip, validateArchiveLimits, normalizeEntryCounts, MAX_FILES, safePath, MAX_UNPACKED_BYTES, unpackArchive, view, changedLocal, writeUint32, writeUint16, addZipEntry } from "./skin-zip.ts"
 
 const TEXT_EXTENSIONS = new Set(["ini", "css", "til", "cnd", "pop", "txt", "plist"])
 
@@ -462,14 +462,7 @@ export class SkinArchive {
   private packagedFiles(format: ExportFormat): Record<string, Uint8Array> {
     const output = new Map<string, Uint8Array>()
     const single = this.layout.endsWith("single")
-    const add = (name: string, data: Uint8Array) => {
-      const parts = name.split("/")
-      for (let index = 1; index < parts.length; index++) {
-        const directory = `${parts.slice(0, index).join("/")}/`
-        if (!output.has(directory)) output.set(directory, new Uint8Array())
-      }
-      output.set(name, data)
-    }
+    const add = (name: string, data: Uint8Array) => addZipEntry(output, name, data)
 
     for (const path of this.names()) {
       if (path.endsWith("/")) continue
