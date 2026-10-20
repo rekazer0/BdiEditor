@@ -89,9 +89,16 @@ export function bdaStyleValue(appearance: BdaAppearance, ref: BdaStyleRef, prope
 export function updateBdaRefs(refs: BdaStyleRef[], property: string, value: string): boolean {
   const info = currentBdaAppearance()
   if (!info || !refs.length) return false
+  // BDA has no way to drop a size or colour, and fields write on every keystroke: skip values that
+  // are empty or not finished yet instead of encoding 0 or throwing.
+  if (!value.trim() && property !== "FONT_NAME") return false
   let bytes = info.bytes
-  for (const ref of new Map(refs.map((item) => [`${item.type}:${item.key}`, item])).values()) {
-    bytes = updateBdaStyle(bytes, ref, property, value)
+  try {
+    for (const ref of new Map(refs.map((item) => [`${item.type}:${item.key}`, item])).values()) {
+      bytes = updateBdaStyle(bytes, ref, property, value)
+    }
+  } catch {
+    return false
   }
   commitBytes(info.path, info.bytes, bytes)
   refreshBdaLayout(appState.layoutPath)
