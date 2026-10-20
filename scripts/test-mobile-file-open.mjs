@@ -33,8 +33,23 @@ try {
         assert.match(await page.locator('#event-log').textContent(), /仅支持/)
         assert.equal(await page.locator('#document-name').textContent(), '安卓搜狗.ssf')
       }
+      if (platform === 'iPhone') {
+        // iOS 只在点击里同步调用 click() 时弹选择框：有未保存修改时先选文件，再询问是否保存。
+        await page.locator('.template-grid .template-card[data-template="official-android-bds"]').click()
+        await page.locator('#dirty').waitFor({ state: 'visible' })
+        await page.waitForFunction(() => !document.querySelector('#file-operation-dialog').open && !document.querySelector('#open').disabled)
+        assert.equal(await page.locator('#recent-files').isHidden(), true, '网页端不显示最近打开')
+        await page.locator('.mobile-command-menu summary').click()
+        const picker = page.waitForEvent('filechooser')
+        await page.locator('[data-mobile-command="open"]').click()
+        const chooser = await picker
+        assert.equal(await page.locator('#unsaved-dialog').evaluate((dialog) => dialog.open), false)
+        await chooser.setFiles({ name: '苹果搜狗.ssf', mimeType: 'application/octet-stream', buffer: Buffer.from(ssfFixture()) })
+        await page.locator('#unsaved-dialog').getByRole('button', { name: '不保存' }).click()
+        await page.waitForFunction(() => document.querySelector('#document-name').textContent === '苹果搜狗.ssf' && !document.querySelector('#open').disabled)
+      }
       assert.deepEqual(errors, [])
-      console.log(`PASS: ${platform} file picker${platform === 'Android' ? ', SSF import and invalid-file rejection' : ''}`)
+      console.log(`PASS: ${platform} file picker${platform === 'Android' ? ', SSF import and invalid-file rejection' : platform === 'iPhone' ? ', picker before unsaved prompt' : ''}`)
     } finally {
       await context.close()
     }

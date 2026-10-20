@@ -691,7 +691,6 @@ await check("file: a Sogou .ssf lists only its own files: preview switching, pro
   await page.locator('.sidebar-overview button[data-path="1080/status1/phoneSkin.ini"]').click()
   assert.equal(await page.locator('#source-name').textContent(), '1080/status1/phoneSkin.ini')
   await page.locator('.sidebar-overview button[data-path="light/skin/port/py_9.ini"]').click()
-  assert.equal(await page.locator('[data-inspector-tab="ai"]').isDisabled(), false)
   await editMode(page)
   await page.getByRole("combobox", { name: "预览布局", exact: true }).selectOption("py_9.ini")
   assert.equal(await page.locator("#selected-key").textContent(), "拼音 9 键")
@@ -772,10 +771,15 @@ await check("file: a Sogou .ssf lists only its own files: preview switching, pro
 }))
 
 /* ------------------------------------------------------------------------------------------------
- * 12 · AI design tab without a configured model
+ * 12 · Web build hides desktop-only entries
  * ---------------------------------------------------------------------------------------------- */
-await check("AI design: context chips and model configuration entry", () => withPage(async (page) => {
+await check("web: recent files and AI design are hidden; AI composer keeps keys off the canvas", () => withPage(async (page) => {
+  assert.equal(await page.locator("#welcome-recent-open").isVisible(), true)
+  for (const selector of [".welcome-recent h2", "#welcome-recent-empty"]) assert.equal(await page.locator(selector).isHidden(), true, selector)
   await openTemplate(page)
+  for (const selector of ["#recent-files", '[data-inspector-tab="ai"]']) assert.equal(await page.locator(selector).isHidden(), true, selector)
+  // 网页端隐藏了 AI 设计标签；面板本身与桌面端相同，在这里放出标签继续检查它。
+  await page.locator('[data-inspector-tab="ai"]').evaluate((tab) => { tab.hidden = false })
   await editMode(page)
   await selectKey(page)
   await page.locator('[data-inspector-tab="ai"]').click()

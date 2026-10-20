@@ -126,13 +126,8 @@ export function wireFilesAndSettings(): void {
   newButton.addEventListener("click", () => void startNewDocument())
   openButton.addEventListener("click", () => {
     if (isTauri()) void runFileOperation("打开", openNative)
-    else {
-      void runFileOperation("打开", async () => {
-        if (!(await prepareDocumentReplacement())) return false
-        browserOpen.click()
-        return false
-      })
-    }
+    // 文件选择框必须在点击里同步弹出：先等未保存确认再 click()，移动端浏览器会因失去用户手势而拦掉选择框。
+    else browserOpen.click()
   })
   $("#recent-clear")?.addEventListener("click", () => {
     localStorage.removeItem(recentFilesKey)
@@ -232,6 +227,10 @@ export function wireFilesAndSettings(): void {
   settingsModelNav.hidden = !nativeSettings
   if (!nativeSettings) settingsStorageSection.hidden = true
   settingsModelSection.toggleAttribute("data-platform-hidden", !nativeSettings)
+  // 网页端拿不到文件路径，不记录最近打开；也没有模型设置，AI 设计用不了。
+  $("#recent-files")!.hidden = !nativeSettings
+  $(".welcome-recent")!.toggleAttribute("data-platform-hidden", !nativeSettings)
+  $('[data-inspector-tab="ai"]')!.hidden = !nativeSettings
   showSettingsPage("appearance")
   aiNewSession.addEventListener("click", () => {
     if (appState.aiDesignBusy || appState.aiDesignDraft) return
@@ -416,6 +415,7 @@ export function wireFilesAndSettings(): void {
     if (file) {
       await runFileOperation("打开", async () => {
         if (!isSupportedSkinPath(file.name)) throw new Error(UNSUPPORTED_SKIN_MESSAGE)
+        if (!(await prepareDocumentReplacement())) return false
         return openSkinBytes(await readBrowserSkinFile(file), file.name)
       })
     }

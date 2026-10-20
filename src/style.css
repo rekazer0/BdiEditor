@@ -1517,6 +1517,12 @@ body:has(.canvas-wrap.empty) .workspace {
   align-self: center;
 }
 
+/* 网页端不记录最近打开：区块只留「打开皮肤…」按钮。 */
+.welcome-recent[data-platform-hidden] > :not(.welcome-section-head),
+.welcome-recent[data-platform-hidden] .welcome-section-head > :not(#welcome-recent-open) {
+  display: none;
+}
+
 .recent-card-folder {
   min-width: 0;
   overflow: hidden;
