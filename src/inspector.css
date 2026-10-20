@@ -357,7 +357,7 @@
   display: grid;
   grid-template-areas: ". up ." "left center right" ". down ." "hold hold hold";
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-xs);
+  gap: var(--space-sm);
 }
 .source .inspector-gesture[data-gesture="UP"] { grid-area: up; }
 .source .inspector-gesture[data-gesture="LEFT"] { grid-area: left; }
@@ -366,46 +366,53 @@
 .source .inspector-gesture[data-gesture="DOWN"] { grid-area: down; }
 .source .inspector-gesture[data-gesture="HOLD"] { grid-area: hold; }
 .source .inspector-gesture {
+  position: relative;
   display: grid;
   justify-items: center;
   align-content: center;
   gap: var(--space-2xs);
   min-width: 0;
-  height: 60px;
-  padding: 0 var(--space-xs);
+  min-height: 64px;
+  padding: var(--space-sm) var(--space-xs);
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  color: var(--tertiary);
+  border-radius: var(--radius-md);
+  color: var(--secondary);
   font-size: var(--font-size-xs);
   transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
 }
 .source .inspector-gesture.configured { border-color: transparent; background: var(--material-content); }
-.source .inspector-gesture > span { display: inline-flex; align-items: center; gap: var(--space-2xs); }
+.source .inspector-gesture > span { display: inline-flex; align-items: center; gap: var(--space-xs); }
 .source .inspector-gesture > input {
   order: -1;
   width: 100%;
-  height: auto;
+  height: var(--control-height-sm);
   padding: 0;
   border: 0;
   background: none;
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
   text-align: center;
   /* 焦点由整个格子表示（:focus-within） */
   outline: 0;
 }
-.source .inspector-gesture > small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.source .inspector-gesture > input:is(:focus, :disabled) { border-color: transparent; background: none; box-shadow: none; }
+.source .inspector-gesture > input::placeholder { color: var(--tertiary); font-weight: var(--font-weight-regular); }
+.source .inspector-gesture > small { max-width: 100%; overflow: hidden; color: var(--tertiary); font-size: var(--font-size-xs); text-overflow: ellipsis; white-space: nowrap; }
 .source .inspector-gesture > small:empty { display: none; }
+@media (hover: hover) {
+  .source .inspector-gesture:has(input:enabled):where(:not(:focus-within)):hover { border-color: var(--line-strong); background: var(--hover); }
+}
+.source .inspector-gesture:has(input:enabled):where(:not(:focus-within)):active { background: color-mix(in srgb, var(--text) 10%, transparent); }
 .source .inspector-gesture:focus-within { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.source .inspector-gesture:has(input:focus-visible) { box-shadow: var(--focus-ring); }
 /* 改过的格子：改动点放在格子左上角 */
-.source .inspector-gesture { position: relative; }
 .source .inspector-gesture > .inspector-modified { top: var(--space-2xs); left: var(--space-2xs); margin-top: 0; }
 /* 长按：一条横排，标签 · 动作码（靠右，未设置时尾部带「+」）· 释义 */
-.source .inspector-gesture[data-gesture="HOLD"] { display: flex; align-items: center; gap: var(--space-sm); height: 36px; padding: 0 var(--space-md); }
-.source .inspector-gesture[data-gesture="HOLD"] > span { color: var(--secondary); font-size: var(--font-size-sm); }
-.source .inspector-gesture[data-gesture="HOLD"] > input { order: 0; flex: 1; font-size: var(--font-size-sm); text-align: right; }
+.source .inspector-gesture[data-gesture="HOLD"] { display: flex; align-items: center; gap: var(--space-sm); min-height: var(--space-2xl); margin-top: var(--space-xs); padding: var(--space-xs) var(--space-md); }
+.source .inspector-gesture[data-gesture="HOLD"] > span { flex: none; font-size: var(--font-size-sm); }
+.source .inspector-gesture[data-gesture="HOLD"] > input { order: 0; flex: 1; width: 0; font-size: var(--font-size-sm); text-align: right; }
 .source .inspector-gesture[data-gesture="HOLD"] > input::placeholder { font-family: var(--font-ui); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); }
 .source .inspector-gesture[data-gesture="HOLD"]:not(.configured)::after { content: "+"; font-size: var(--font-size-md); }
 .source .inspector-gesture[data-gesture="HOLD"] > small { max-width: 45%; }
