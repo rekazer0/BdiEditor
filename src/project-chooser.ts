@@ -1,4 +1,5 @@
 import { save } from "@tauri-apps/plugin-dialog"
+import { builtInProjectTemplateExtension } from "./operations.ts"
 import { hydrateTemplateCardPreviews } from "./template-preview"
 
 export type ProjectChoice = { templateID: string; name: string; savePath: string }
@@ -83,7 +84,7 @@ export function initializeProjectChooser(form: HTMLFormElement): void {
   name.addEventListener("input", () => { validate(); path.value = ""; location.textContent = "首次保存时选择" })
   form.addEventListener("change", (event) => {
     if (!(event.target instanceof HTMLInputElement) || event.target.name !== "project-template") return
-    extension.value = event.target.value === "default-android" ? ".bda" : ".bds"
+    extension.value = builtInProjectTemplateExtension(event.target.value)
     path.value = ""
     location.textContent = "首次保存时选择"
   })
