@@ -26,8 +26,11 @@ function sharing({ activation, native = false, supported = true, outcome, format
     navigator: {
       userActivation: activation,
       canShare: () => true,
-      share: supported ? async ({ files }) => {
+      share: supported ? async (data) => {
+        const { files } = data
         assert.equal(tapping, true, 'file sharing must run inside the renewed tap')
+        // A title or text is a second share item, and iOS then leaves out the input method apps.
+        assert.deepEqual(Object.keys(data), ['files'])
         calls.push({ file: files[0] })
         if (outcome) throw outcome
       } : undefined,
