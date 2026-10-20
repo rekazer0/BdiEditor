@@ -1,6 +1,10 @@
+import { SXI_SKIN_PATH } from "../palm/sxi-projection.ts"
+import { setSxiStyleImage, addSxiImageStyle, setSxiForeground, sxiStylePointer } from "../palm/sxi-edit.ts"
+import { refreshSxiDocument } from "./sxi-documents"
+import { showError } from "./file-operations"
 import { IniDocument } from "../ini.ts"
 import { appState } from "./state"
-import { styleConfigPath, effectiveKeyValue, setSourceValue } from "./config-context"
+import { styleConfigPath, effectiveKeyValue, effectiveSelectedSections, setSourceValue } from "./config-context"
 import { isListCell } from "../layout.ts"
 import { type StyleImagePickerTarget, type NativeResourcePickerPayload } from "./types"
 import { setStyleField } from "../keyboard.ts"
@@ -47,6 +51,37 @@ export function selectedStyleImageSections(source: "BACK_STYLE" | "FORE_STYLE"):
 export function updateSelectedImageReference(target: StyleImagePickerTarget | undefined, value: string): boolean {
   if (!appState.archive || !target) return false
   const { document, path, sections } = target
+  if (appState.archive.format === "sxi") {
+    const archive = appState.archive
+    const stylePath = path ?? styleConfigPath()
+    const derived = archive.derivedPointer(stylePath)
+    if (!derived || !isEditing()) return false
+    try {
+      const before = archive.getText(SXI_SKIN_PATH)
+      const pointer = sxiStylePointer(before, derived, orientation.value)
+      if (sections?.length) {
+        commitText(SXI_SKIN_PATH, before, setSxiStyleImage(before, pointer, sections, target.property, value))
+      } else {
+        const input = appState.stylePickerTarget
+        if (!input || input.dataset.keyField !== "FORE_STYLE") return false
+        const added = addSxiImageStyle(before, pointer, target.property, value)
+        const layoutPointer = archive.derivedPointer(appState.layoutPath)
+        if (!layoutPointer) return false
+        let after = added.text
+        for (const section of effectiveSelectedSections()) {
+          const ids = (effectiveKeyValue(section, "FORE_STYLE") ?? "").split(",").map((id) => id.trim()).filter(Boolean)
+          if (input.dataset.styleReferenceAppend === "true") ids.push(added.id)
+          else ids[Number(input.dataset.styleReferenceIndex ?? 0)] = added.id
+          after = setSxiForeground(after, layoutPointer, [section], ids.join(","))
+        }
+        commitText(SXI_SKIN_PATH, before, after)
+        target.path = stylePath
+        target.sections = [`STYLE${added.id}`]
+      }
+      refreshSxiDocument()
+      return true
+    } catch (error) { showError(error, "修改手心前景图片"); return false }
+  }
   if (document && path && sections?.length) {
     const before = document.toString()
     setStyleField(document, sections, target.property, value)
@@ -199,8 +234,8 @@ export function renderStyleImageResources(): void {
 export function openStyleImageResourcePicker(): void {
   if (isTauri() || !appState.archive || (!appState.pickerTarget && !appState.resourcePickerSelect)) return
   styleImageSource.hidden = !(appState.pickerTarget?.path && appState.pickerTarget.sections?.length)
+  showStyleImageDialog()
   if (!appState.pickerTarget) {
-    showStyleImageDialog()
     styleImagePicker.hidden = true
     styleImageResourceOpen.hidden = true
     styleImageTitle.textContent = "选择图片资源"

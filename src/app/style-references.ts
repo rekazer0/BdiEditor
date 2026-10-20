@@ -109,6 +109,7 @@ export function decorateStyleReferenceInput(input: HTMLInputElement, key = style
       event.preventDefault()
       const target = input.cloneNode(false) as HTMLInputElement
       target.value = ""
+      target.dataset.styleReferenceAppend = "true"
       target.addEventListener("change", () => {
         if (!target.value.trim()) return
         input.value = [...input.value.split(",").map((value) => value.trim()).filter(Boolean), target.value.trim()].join(",")
@@ -132,6 +133,7 @@ export function renderStyleReferenceRows(button: HTMLElement, input: HTMLInputEl
     const rowInput = () => {
       const target = input.cloneNode(false) as HTMLInputElement
       target.value = styleID
+      target.dataset.styleReferenceIndex = String(styleIndex)
       target.addEventListener("change", () => {
         const values = input.value.split(",").map((value) => value.trim()).filter(Boolean)
         values[styleIndex] = target.value
@@ -364,7 +366,7 @@ export async function openStyleReferenceStateImage(
     .find((item) => item?.imagePath)
   // 颜色 / 动画样式没有图片可切，改为在样式库里更换引用的样式；不能回退去改背景图片。
   if (!visual && styleIDs.some((styleID) => ["color", "anim"].includes(styleKind(styleID)))) return openStylePicker(input, highlighted)
-  if (!visual && foreground) {
+  if (!visual && foreground && appState.archive?.format !== "sxi") {
     const backgroundID = pairedBackgroundStyleID(input, key)
     if (backgroundID) {
       styleIDs = [backgroundID]

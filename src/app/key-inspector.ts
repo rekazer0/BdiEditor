@@ -1,3 +1,4 @@
+import { updateSxiForeground } from "./sxi-documents"
 import { IniDocument } from "../ini.ts"
 import { type StylePropertySource, resolveStylePropertySources, resolveStylePropertyLayers } from "../style-properties.ts"
 import { appState } from "./state"
@@ -683,6 +684,10 @@ export function updateSelectedKey(field: HTMLInputElement): void {
   const name = field.dataset.keyField ?? ""
   if (appState.archive?.format === "bda") return
   if (!appState.archive || !appState.layoutDocument || !appState.selectedKeySections.length) return
+  if (name === "FORE_STYLE" && appState.archive.format === "sxi") {
+    updateSxiForeground(field.value)
+    return
+  }
   const rectNames = ["x", "y", "width", "height"]
   if (appState.selectedKeySections.length === 1 && isListCell(appState.selectedKeySections[0])) {
     // LIST 候选栏单元：几何字段写回定义处（布局或 gen.ini），其余写回布局的 [LIST]

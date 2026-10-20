@@ -1,3 +1,5 @@
+import { isSxiSourcePath } from "./sxi-documents"
+import { sxiSectionRanges } from "../palm/sxi-edit.ts"
 import { sourceEditPath } from "./ssf-documents"
 import { syncAtlasWorkspace } from "./tile-editing"
 import { files, sourceName, quickInspector, asset, resourceInspector, sourceEditor, aiDesignPanel, sourceToolbar, sourceFindToggle, sourceSearch, sourceValueHintsEnabled, sourceCompletionEnabled, sourceLineExplanationEnabled, sourceSearchCount, sourceSearchPrevious, sourceSearchNext, sourceReplacement, sourceReplace, sourceReplaceAll, sourceColorPicker, styleImageDialog, sourceStyleProxy } from "./dom"
@@ -150,10 +152,14 @@ export function updateSourceHighlight(): void {
   const bdaSource = Boolean(appState.archive?.format === "bda" && (
     appState.archive.isBdaConfig(appState.selectedPath) || isBdaVirtualTextPath(appState.selectedPath) || isBdaAppearancePartPath(appState.selectedPath)
   ))
-  source.setLanguage(bdaSource ? "json" : "ini")
+  const sxiSource = isSxiSourcePath(appState.selectedPath)
+  const jsonSource = bdaSource || sxiSource
+  source.setLanguage(jsonSource ? "json" : "ini")
   const matches = sourceSearchMatches()
   updateSourceSearchStatus(matches)
-  const selectedRanges = bdaSource
+  const selectedRanges = sxiSource
+    ? sxiSectionRanges(source.value, sections)
+    : bdaSource
     ? jsonPropertyRanges(source.value, selectedBdaSourceKeys())
     : sections.length ? iniSectionRanges(source.value, sections) : appState.sourceHistoryHighlight ? [appState.sourceHistoryHighlight] : []
   const searchRanges = matches.slice(0, SOURCE_SEARCH_HIGHLIGHT_LIMIT)
@@ -163,7 +169,7 @@ export function updateSourceHighlight(): void {
     selectedRanges,
     searchRanges,
     activeSearchRange: activeStart === undefined ? undefined : [activeStart, activeStart + query.length],
-    valueRanges: sourceValueHintsEnabled.checked ? sourceValueRanges(source.value, bdaSource ? "json" : "ini") : [],
+    valueRanges: sourceValueHintsEnabled.checked ? sourceValueRanges(source.value, jsonSource ? "json" : "ini") : [],
   })
   source.setFeatures({
     completion: sourceCompletionEnabled.checked,
@@ -309,7 +315,10 @@ export function selectKeyFromSourceOffset(offset: number): void {
     appState.archive.isBdaConfig(appState.selectedPath) || isBdaVirtualTextPath(appState.selectedPath) || isBdaAppearancePartPath(appState.selectedPath)
   )
   const property = bdaSource ? jsonPropertyAtOffset(source.value, offset) : undefined
-  const section = bdaSource ? undefined : iniSectionAtOffset(source.value, offset)
+  const sxiSection = appState.archive.format === "sxi"
+    ? appState.layoutDocument?.sections().find((name) => sxiSectionRanges(source.value, [name]).some(([a, b]) => offset >= a && offset < b))
+    : undefined
+  const section = sxiSection ?? (bdaSource ? undefined : iniSectionAtOffset(source.value, offset))
   const panelKey = property && property !== "cand" ? property : undefined
   if (!section && !panelKey) return
   if (!appState.layoutDocument) return

@@ -1,3 +1,4 @@
+import { sxiSectionRanges } from "../palm/sxi-edit.ts"
 import { appState } from "./state"
 import { skinState, sourceEditor, theme, orientation, colorPickers, colorAlphas, candidateArea, toolbarStrip, candidateBackgroundCanvas, candidateInputBackgroundCanvas, candidateInputBox, candidateInputText, toolbarCanvas } from "./dom"
 import { isListCell } from "../layout.ts"
@@ -66,7 +67,8 @@ export function scrollSelectedSource(): void {
   if (sourceEditor.hidden || !sections.length && !bdaKeys.length && !appState.sourceHistoryHighlight) return
   const bdaRange = jsonPropertyRanges(source.value, bdaKeys)[0]
   const iniRange = iniSectionRanges(source.value, sections)[0]
-  const range = bdaRange ?? iniRange ?? appState.sourceHistoryHighlight
+  const sxiRange = appState.archive?.derivedPointer(appState.selectedPath) ? sxiSectionRanges(source.value, sections)[0] : undefined
+  const range = sxiRange ?? bdaRange ?? iniRange ?? appState.sourceHistoryHighlight
   if (range) source.revealRange(range[0], range[1])
 }
 
