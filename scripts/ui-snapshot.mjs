@@ -97,6 +97,24 @@ async function railTabs(page, prefix) {
 }
 
 console.log(`ui-snapshot ${mode}`)
+for (const [name, colorScheme, viewport] of [
+  ["file-operation", "light", { width: 1440, height: 900 }],
+  ["file-operation-dark", "dark", { width: 1440, height: 900 }],
+  ["file-operation-mobile", "light", { width: 390, height: 844 }],
+]) await withPage(async (page) => {
+  await page.waitForSelector(".template-card")
+  await page.evaluate(async () => {
+    const { runFileOperation, showFileOperationProgress } = await import("/src/app/file-operations.ts")
+    await runFileOperation("保存", () => { showFileOperationProgress(); return true })
+  })
+  await capture(page, `${name}-success`)
+  await page.locator("#file-operation-close").click()
+  await page.evaluate(async () => {
+    const { runFileOperation, showFileOperationProgress } = await import("/src/app/file-operations.ts")
+    await runFileOperation("导出", () => { showFileOperationProgress(); throw new Error("无法写入所选位置，请重新选择保存位置。") })
+  })
+  await capture(page, `${name}-error`)
+}, { colorScheme, viewport })
 await withPage(async (page) => {
   await page.waitForSelector(".template-card")
   await capture(page, "welcome")

@@ -1,4 +1,4 @@
-// Export via the real menu, download and reopen. BDI/BDS must match the source SSF canvas pixels.
+// Export via the real menu, download and reopen. Keys retain SSF pixels; BDI uses native toolbar slots.
 // BDA has its own geometry and receives a separate reopen smoke check.
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
@@ -30,6 +30,7 @@ const snapshot = async (name) => {
     previews.forEach((item) => item.draw())
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
     await Promise.all(previews.map((item) => item.rendered()))
+    const nativeImages = await toolbarPreview.resolveToolbar()
     const canvas = document.createElement("canvas")
     canvas.width = preview.canvas.width
     canvas.height = preview.canvas.height + toolbarPreview.canvas.height
@@ -37,18 +38,70 @@ const snapshot = async (name) => {
     context.drawImage(candidateBackgroundPreview.canvas, 0, 0)
     context.drawImage(toolbarPreview.canvas, 0, 0)
     context.drawImage(preview.canvas, 0, toolbarPreview.canvas.height)
+    let nativePixels, expectedNativeImages
+    if (!nativeImages.length) {
+      const { drawVisual, foregroundLayerRect } = await import("/src/preview-draw.ts")
+      const nativeCanvas = document.createElement("canvas")
+      nativeCanvas.width = canvas.width
+      nativeCanvas.height = canvas.height
+      const nativeComposite = nativeCanvas.getContext("2d")
+      nativeComposite.drawImage(candidateBackgroundPreview.canvas, 0, 0)
+      const nativeToolbar = document.createElement("canvas")
+      nativeToolbar.width = toolbarPreview.canvas.width
+      nativeToolbar.height = toolbarPreview.canvas.height
+      const nativeContext = nativeToolbar.getContext("2d")
+      nativeContext.imageSmoothingQuality = "high"
+      nativeContext.save()
+      nativeContext.scale(toolbarPreview.canvas.width / toolbarPreview.panelWidth, toolbarPreview.canvas.height / toolbarPreview.panelHeight)
+      const icons = toolbarPreview.keys.filter((item) => /^ICON\d+$/.test(item.section))
+      const side = Math.round(toolbarPreview.panelWidth / 7)
+      const middle = await Promise.all(icons.slice(1, -1).map((key) => toolbarPreview.resolveVisual(key.foreStyle, false)))
+      const { appState } = await import('/src/app/state.ts')
+      if (appState.archive?.format === 'ssf') {
+        const { documentPackage } = await import('/src/ssf/ssf-convert.ts')
+        const bytes = documentPackage(appState.archive).file(toolbarPreview.theme, 'ime_function_textedit.png')
+        if (bytes) {
+          const image = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
+          middle.push({ image, source: [0, 0, image.width, image.height] })
+        }
+      }
+      const middleWidth = (toolbarPreview.panelWidth - side * 2) / middle.length
+      expectedNativeImages = middle.length
+      for (const [index, visual] of middle.entries()) {
+        const slot = { x: side + index * middleWidth, y: 0, width: middleWidth, height: toolbarPreview.panelHeight }
+        drawVisual(nativeContext, visual, foregroundLayerRect(slot, visual?.source), false)
+      }
+      for (const key of [icons[0], icons.at(-1)]) {
+        const visual = await toolbarPreview.resolveVisual(key.foreStyle, false)
+        drawVisual(nativeContext, visual, foregroundLayerRect(key.rect, visual?.source), false)
+      }
+      nativeContext.restore()
+      nativeComposite.drawImage(nativeToolbar, 0, 0)
+      nativeComposite.drawImage(preview.canvas, 0, toolbarPreview.canvas.height)
+      nativePixels = nativeCanvas.toDataURL("image/png").split(",")[1]
+    }
     return {
       panel: [preview.panelWidth, preview.panelHeight],
       keys: preview.keys.map(({ center, rect }) => ({ center, rect })),
       icons: toolbarPreview.keys.filter((item) => /^ICON\d+$/.test(item.section)).map(({ center, rect }) => ({ center, rect })),
+      nativeImages: nativeImages.length,
+      toolbarHeight: toolbarPreview.canvas.height,
+      nativePixels,
+      expectedNativeImages,
       pixels: canvas.toDataURL("image/png").split(",")[1],
     }
   })
   const png = Buffer.from(result.pixels, "base64")
   if (shots) writeFileSync(`${shots}/${name}.png`, png)
   const image = decodePng(png)
+  const nativeHash = result.nativePixels ? createHash("sha256").update(decodePng(Buffer.from(result.nativePixels, "base64")).data).digest("hex") : undefined
+  delete result.nativePixels
   delete result.pixels
-  return { ...result, hash: createHash("sha256").update(image.data).digest("hex"), imageSize: [image.width, image.height] }
+  const toolbarPixels = image.data.subarray(0, image.width * result.toolbarHeight * 4)
+  return {
+    ...result, hash: createHash("sha256").update(image.data).digest("hex"), imageSize: [image.width, image.height],
+    panelHash: createHash("sha256").update(image.data.subarray(toolbarPixels.length)).digest("hex"), nativeHash,
+  }
 }
 const closeDialog = async () => {
   await page.waitForFunction(() => {
@@ -138,7 +191,18 @@ try {
     for (const view of views) {
       await chooseView(view)
       const state = await snapshot(`${format}-${view.name}`)
-      assert.deepEqual(state, source.get(view.name), `${format} ${view.name}: geometry, toolbar and every canvas pixel match the SSF`)
+      const expected = source.get(view.name)
+      assert.deepEqual(state.panel, expected.panel, `${format} ${view.name}: panel size`)
+      assert.deepEqual(state.keys, expected.keys, `${format} ${view.name}: every key and action`)
+      assert.equal(state.panelHash, expected.panelHash, `${format} ${view.name}: every keyboard pixel`)
+      if (format === "bdi") {
+        assert.equal(state.nativeImages, expected.expectedNativeImages, `${view.name}: source toolbar and optional cursor artwork loaded`)
+        assert.deepEqual(state.icons.map(({ center }) => center), ["F31", "F14", "F8"])
+        assert.equal(state.hash, expected.nativeHash, `${view.name}: every pixel with native F14 slot geometry`)
+      } else {
+        assert.deepEqual(state.icons, expected.icons)
+        assert.equal(state.hash, expected.hash, `${view.name}: every canvas pixel`)
+      }
       comparisons.push({ format, view: view.name, hash: state.hash, imageSize: state.imageSize, equal: true })
     }
     await chooseView(views[0])
@@ -149,7 +213,7 @@ try {
   assert.ok(await keyCount() > 10)
   assert.deepEqual(errors, [])
   if (shots) writeFileSync(`${shots}/results.json`, JSON.stringify({ sample, broken, reported, comparisons, pageErrors: errors }, null, 2))
-  console.log(`SSF export: ${comparisons.length} BDI/BDS views match the source SSF pixel for pixel after menu export, download and reopen; BDA reopen smoke passed${sample ? ` (${sample})` : ""}${shots ? `; artifacts: ${shots}` : ""}`)
+  console.log(`SSF export: ${comparisons.length} BDI/BDS views preserve all keyboard pixels; BDI loads the source native toolbar images and BDS matches every canvas pixel; BDA reopen smoke passed${sample ? ` (${sample})` : ""}${shots ? `; artifacts: ${shots}` : ""}`)
 } catch (error) {
   await page.screenshot({ path: "/tmp/bdi-ssf-conversion-failure.png" }).catch(() => {})
   throw error

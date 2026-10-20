@@ -136,11 +136,18 @@ const boards = [
   ['en_26_pro', 'f/65544'], ['en_26_pro_digits', 'f/65545'],
 ]
 for (const orientation of ['port', 'land']) {
+  const offsets = new Map()
   const width = orientation === 'port' ? 1080 : 1920
   const genHeight = Math.round(width * Number(ini(root + orientation + '/9.ini').get('Keyboard', 'H')))
   const candHeight = Math.round(1080 * Number(cands.get('CandidateView', 'H')))
-  files[`${orientation}/gen.ini`] = strToU8(`[PANEL]\nSIZE=${width},${genHeight}\nBACK_STYLE=${panelStyle}\n[CAND]\nLAYOUT_NAME=cand1\nVIEW_RECT=0,0,${width},${candHeight}\n[INPUT]\nFORE_STYLE=${textStyle}\n`)
+  // Baidu's gen.ini identifies the normal candidate layout with TYPE=4.
+  files[`${orientation}/gen.ini`] = strToU8(`[PANEL]\nSIZE=${width},${genHeight}\nBACK_STYLE=${panelStyle}\n[CAND]\nTYPE=4\nLAYOUT_NAME=cand1\nVIEW_RECT=0,0,${width},${candHeight}\n[INPUT]\nFORE_STYLE=${textStyle}\n`)
   const cand = IniDocument.parse(`[CAND]\nBACK_STYLE=${candStyle}\nFORE_STYLE=${textStyle}\nPADDING=12,0,12,0\nFIRST_GAP=12\nCELL_W=60\n`)
+  // The Baidu skin manual requires SWITCH even when custom icons replace the F14 container.
+  cand.appendSection('SWITCH', [
+    { key: 'NML_FONT_STYLE', value: textStyle }, { key: 'SEL_FONT_STYLE', value: textStyle },
+    { key: 'PADDING', value: '0' },
+  ])
   // Sogou 20.x's default toolbar (the order its own skin previews show); the app sets it in code, not in an INI.
   const toolbar = ['logo_png', 'ime_function_expression_png', 'ime_function_switch_png', 'ime_function_voice_png', 'ime_function_sousou_png', 'ime_function_fanlingxi_png', 'close_png']
   const toolbarActions = ['F31', 'F7', 'F13', 'F72', 'F82', 'F68', 'F8']
@@ -198,6 +205,10 @@ for (const orientation of ['port', 'land']) {
         const texts = !icon && label && minor && /Switch/.test(fgStyle ?? '') && doc.get(fgStyle, 'MINOR_LABEL_VISIBLE') === '1' && doc.get(fgStyle, 'LABEL_ORIENTATION') === '1'
           ? labelRow(label, minor, (key) => doc.get(fgStyle, key), kw, kh)
           : undefined
+        const positions = texts?.map(({ offset }) => {
+          if (!offsets.has(offset)) offsets.set(offset, offsets.size + 1)
+          return offsets.get(offset)
+        })
         const fore = icon ? imageStyle(icon, doc.get(real, 'ICON_PRESSED'))
           : texts ? texts.map((text) => text.style).join(',')
             : label ? style({ SHOW: label, FONT_SIZE: fontSize, NM_COLOR: 'FF373737', HL_COLOR: 'FF373737' }) : undefined
@@ -207,7 +218,7 @@ for (const orientation of ['port', 'land']) {
           ...(doc.get(real, 'BG_IMAGES') ? [{ key: 'SSF_BG', value: doc.get(real, 'BG_IMAGES').split(',')[0] }] : []),
           { key: 'VIEW_RECT', value: rect.join(',') },
           ...(back ? [{ key: 'BACK_STYLE', value: back }] : []), ...(fore ? [{ key: 'FORE_STYLE', value: fore }] : []),
-          ...(texts ? [{ key: 'FORE_OFFSET', value: texts.map((text) => text.offset).join(';') }] : []),
+          ...(positions ? [{ key: 'POS_TYPE', value: positions.join(',') }] : []),
         ])
         x += kw + gap
         nextY = Math.max(nextY, y + kh)
@@ -229,6 +240,10 @@ for (const orientation of ['port', 'land']) {
     }
     files[`${orientation}/${name}.ini`] = strToU8(layout.toString())
   }
+  const gen = IniDocument.parse(strFromU8(files[`${orientation}/gen.ini`]))
+  gen.set('PANEL', 'OFFSET_NUM', String(offsets.size))
+  for (const [pos, id] of offsets) gen.appendSection(`OFFSET${id}`, [{ key: 'POS', value: pos }])
+  files[`${orientation}/gen.ini`] = strToU8(gen.toString())
 }
 css.appendSection('GLOBAL', [{ key: 'STYLE_NUM', value: String(nextStyle - 1) }])
 files['res/default.css'] = strToU8(css.toString())

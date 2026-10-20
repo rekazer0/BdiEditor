@@ -517,7 +517,8 @@ export function previewItems(
         : yAnchor === 3
           ? panelHeight + (position[1] || 0)
           : position[1] || 0
-    const fixed = document.get(section, "FIX_SIZE")?.split(",").map(Number)
+    // iOS stores FIX_SIZE in points; skin geometry and @3x artwork use pixels (V6 p158).
+    const fixed = document.get(section, "FIX_SIZE")?.split(",").map((value) => Number(value) * 3)
     const foreRect = fixed?.length === 2 && fixed.every(Number.isFinite)
       ? {
           x: x + (width - fixed[0]) / 2,

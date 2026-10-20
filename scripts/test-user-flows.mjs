@@ -602,6 +602,8 @@ await check("file: rename, save, export every format and unsaved prompt", () => 
         await item.click()
       })
       names.push(file.suggestedFilename().split(".").pop())
+      await page.locator('#file-operation-dialog[open][data-outcome="success"]').waitFor()
+      assert.equal(await page.locator("#file-operation-title").textContent(), "导出成功")
       await closeOperationDialog(page)
     }
     return names
@@ -620,6 +622,8 @@ await check("file: rename, save, export every format and unsaved prompt", () => 
     await page.locator("#save").click()
   })
   assert.match(saved.suggestedFilename(), /\.bds$/)
+  await page.locator('#file-operation-dialog[open][data-outcome="success"]').waitFor()
+  assert.equal(await page.locator("#file-operation-title").textContent(), "保存成功")
   await closeOperationDialog(page)
   await x.fill(String(Number(await x.inputValue()) + 1))
   await x.press("Enter")
@@ -647,6 +651,8 @@ await check("file: a BDA skin exports to every format", () => withPage(async (pa
     tapped.catch(() => {})
     if ((await Promise.race([pending, tapped])) === "tap") await tap.click()
     formats.push((await pending).suggestedFilename().split(".").pop())
+    await page.locator('#file-operation-dialog[open][data-outcome="success"]').waitFor()
+    assert.equal(await page.locator("#file-operation-title").textContent(), "导出成功")
     await closeOperationDialog(page)
   }
   assert.deepEqual(formats, ["bdi", "bds", "bda", "bda", "sxi", "ssf"])

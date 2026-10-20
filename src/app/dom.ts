@@ -199,6 +199,8 @@ export const fileOperationDialog = $("#file-operation-dialog") as HTMLDialogElem
 
 export const fileOperationTitle = $("#file-operation-title")
 
+export const fileOperationIcon = $("#file-operation-icon")
+
 export const fileOperationDetail = $("#file-operation-detail")
 
 export const fileOperationProgress = $("#file-operation-progress") as HTMLProgressElement

@@ -1,6 +1,6 @@
 import { IniDocument } from "../ini.ts"
 import { appState } from "./state"
-import { panelCopySource, panelSourceWidth, panelSourceHeight, panelTargetWidth, panelTargetHeight, panelScaleEnabled, panelScaleOptions, panelCopyTarget, panelScaleSummary, panelCopySourceOptions, panelCopyTargetOptions, theme, orientation, layout, panelScaleDialog, newButton, openButton, saveButton, mobileShareButton, eventLog, fileOperationDialog, fileOperationProgress, fileOperationPercent, fileOperationDetail, fileOperationTitle, fileOperationResult, fileOperationClose, workspaceImage, assetImage, deviceShell, workspaceImageFigure, sourceEditor, asset, sourceName, assetBackButton } from "./dom"
+import { panelCopySource, panelSourceWidth, panelSourceHeight, panelTargetWidth, panelTargetHeight, panelScaleEnabled, panelScaleOptions, panelCopyTarget, panelScaleSummary, panelCopySourceOptions, panelCopyTargetOptions, theme, orientation, layout, panelScaleDialog, newButton, openButton, saveButton, mobileShareButton, eventLog, fileOperationDialog, fileOperationProgress, fileOperationPercent, fileOperationDetail, fileOperationTitle, fileOperationIcon, fileOperationResult, fileOperationClose, workspaceImage, assetImage, deviceShell, workspaceImageFigure, sourceEditor, asset, sourceName, assetBackButton } from "./dom"
 import { archiveCopyPaths, archivePathOptions, scaleIniDocument } from "../panel-tools.ts"
 import { alphaMask } from "../layout-scan.ts"
 import { scheduleSourceAutosave } from "./source-workspace"
@@ -20,6 +20,7 @@ import { adaptIos26Variant, adaptIos26KeyboardLayout } from "../ios26.ts"
 import { type Change } from "../history.ts"
 import { replaceImagePreviewURL } from "../image-preview.ts"
 import { clearImagePreviewError } from "./resource-inspector"
+import { createIcon } from "../icons.ts"
 
 export function panelSizeFrom(document: IniDocument | undefined): [number, number] | undefined {
   const size = document?.get("PANEL", "SIZE")?.split(",").map(Number)
@@ -345,7 +346,10 @@ export async function runFileOperation(
   appState.fileOperationProgressVisible = false
   showStatus(`正在${action}…`, "progress")
   fileOperationDialog.dataset.outcome = "progress"
+  fileOperationIcon.replaceChildren(createIcon("keyboard", 20))
   fileOperationTitle.textContent = `正在${action}`
+  fileOperationClose.textContent = "关闭"
+  fileOperationClose.dataset.variant = "primary"
   fileOperationResult.hidden = true
   fileOperationResult.textContent = ""
   fileOperationClose.disabled = true
@@ -361,13 +365,16 @@ export async function runFileOperation(
     })
     const result = completed ? `${action}完成。` : `${action}已取消。`
     showStatus(result)
+    if (completed && /^(保存|导出)/.test(action)) showFileOperationProgress()
     if (appState.fileOperationProgressVisible) {
       fileOperationDialog.dataset.outcome = completed ? "success" : "cancelled"
-      fileOperationTitle.textContent = completed ? `${action}完成` : `${action}已取消`
-      updateFileOperationProgress(completed ? 100 : fileOperationProgress.value, completed ? "处理完成" : "未进行更改")
+      fileOperationIcon.replaceChildren(createIcon(completed ? "check" : "x", 20))
+      fileOperationTitle.textContent = completed ? `${action}成功` : `${action}已取消`
+      fileOperationClose.textContent = completed ? "完成" : "关闭"
+      updateFileOperationProgress(completed ? 100 : fileOperationProgress.value, completed ? "处理完成，可继续编辑皮肤。" : "未进行更改")
       fileOperationResult.textContent = result
-      fileOperationResult.hidden = false
-      if (completed && action === "打开") {
+      fileOperationResult.hidden = completed
+      if (completed && (action === "打开" || action.startsWith("下载"))) {
         fileOperationDialog.close()
         appState.fileOperationProgressVisible = false
       }
@@ -381,6 +388,7 @@ export async function runFileOperation(
     showError(error, action)
     if (appState.fileOperationProgressVisible) {
       fileOperationDialog.dataset.outcome = "error"
+      fileOperationIcon.replaceChildren(createIcon("circle-alert", 20))
       fileOperationTitle.textContent = `${action}失败`
       fileOperationDetail.textContent = "处理已停止"
       fileOperationResult.textContent = operationError(action, error)
@@ -388,7 +396,11 @@ export async function runFileOperation(
     }
   } finally {
     setFileOperationBusy(false)
-    if (appState.fileOperationProgressVisible) fileOperationClose.disabled = false
+    if (appState.fileOperationProgressVisible) {
+      fileOperationClose.disabled = false
+      fileOperationClose.dataset.variant = "primary"
+      fileOperationClose.focus()
+    }
   }
 }
 

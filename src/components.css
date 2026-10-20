@@ -46,6 +46,51 @@
 .ui-button:active, .ui-icon-button:active { background: color-mix(in srgb, var(--text) 12%, transparent); }
 .ui-button[aria-pressed="true"], .ui-icon-button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
 
+/* —— 文件操作弹窗：进度与结果共用同一个窗口 —— */
+.ui-operation-dialog {
+  width: min(400px, calc(100vw - var(--space-2xl)));
+  max-height: calc(100dvh - var(--space-2xl));
+  box-sizing: border-box;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--floating);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+}
+.ui-operation-dialog::backdrop { background: var(--backdrop); }
+.ui-operation-dialog[open]:focus-visible { outline: 0; border-radius: var(--radius-xl); }
+.ui-operation-dialog > form { display: grid; gap: var(--space-xl); padding: var(--space-xl); }
+.ui-operation-dialog header { display: flex; align-items: flex-start; gap: var(--space-md); }
+.ui-operation-dialog header > div { flex: 1; min-width: 0; }
+.ui-operation-dialog h2 { margin: 0 0 var(--space-xs); font-size: var(--font-size-lg); font-weight: 600; line-height: 1.5; }
+.ui-operation-dialog p { margin: 0; color: var(--secondary); font-size: var(--font-size-sm); line-height: 1.6; overflow-wrap: anywhere; }
+.ui-operation-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.ui-operation-dialog[data-outcome="success"] .ui-operation-icon { background: color-mix(in srgb, var(--state-ok) 12%, transparent); color: var(--state-ok); }
+.ui-operation-dialog[data-outcome="error"] .ui-operation-icon { background: color-mix(in srgb, var(--state-danger) 12%, transparent); color: var(--state-danger); }
+.ui-operation-dialog[data-outcome="cancelled"] .ui-operation-icon { background: var(--control); color: var(--secondary); }
+.ui-operation-dialog[data-outcome="error"] #file-operation-result { color: var(--state-danger); }
+.ui-operation-dialog:not([data-outcome="progress"]) .ui-operation-meter { display: none; }
+.ui-operation-progress-label { display: flex; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-sm); color: var(--secondary); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
+.ui-operation-dialog progress { display: block; width: 100%; height: 6px; overflow: hidden; border: 0; border-radius: var(--radius-full); background: var(--control); accent-color: var(--accent); }
+.ui-operation-dialog progress::-webkit-progress-bar { background: var(--control); }
+.ui-operation-dialog progress::-webkit-progress-value { background: var(--accent); }
+.ui-operation-dialog progress::-moz-progress-bar { background: var(--accent); }
+.ui-operation-dialog footer { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-sm); padding-top: var(--space-lg); border-top: 1px solid var(--line-soft); }
+.ui-operation-hint { flex: 1; color: var(--secondary); font-size: var(--font-size-xs); }
+.ui-operation-dialog .ui-button { flex-shrink: 0; min-width: 64px; }
+.ui-operation-dialog .ui-button:focus-visible { outline: 0; box-shadow: var(--focus-ring); }
+
 /* —— 输入框 —— */
 .ui-input {
   display: flex;

@@ -246,6 +246,10 @@ class ThemeConverter {
       const fore = candidates.get(section, "FORE_STYLE")?.trim()
       if (text && highlight && fore) candidates.set(section, "FORE_STYLE", this.resources.derivedStyle(fore, { NM_COLOR: text, HL_COLOR: highlight }))
     }
+    for (const field of ["NML_FONT_STYLE", "SEL_FONT_STYLE"]) {
+      const fore = candidates.get("SWITCH", field)?.trim()
+      if (text && highlight && fore) candidates.set("SWITCH", field, this.resources.derivedStyle(fore, { NM_COLOR: text, HL_COLOR: highlight }))
+    }
     // Sogou recolours the built-in toolbar icons a skin does not replace with its function icon colour.
     const iconColor = this.look.color("CandidateIMEFunctionView", "ICON_COLOR") ?? this.look.color("General", "ICON_COLOR")
     for (const section of candidates.sections().filter((name) => /^ICON\d+$/.test(name))) {

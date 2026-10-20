@@ -38,18 +38,45 @@ test('SSF → BDI and BDS reopen with every preview layout, toolbar, image and f
     for (const theme of ['light', 'dark']) {
       assert.equal(size(output, `${theme}/skin/port/gen.ini`), '1080,642', `${format} ${theme} port`)
       assert.equal(size(output, `${theme}/skin/land/gen.ini`), '1920,570', `${format} ${theme} land`)
+      for (const orientation of ['port', 'land']) {
+        const directory = `${theme}/skin/${orientation}`
+        const gen = IniDocument.parse(output.getText(`${directory}/gen.ini`))
+        assert.equal(gen.get('CAND', 'TYPE'), '4', `${format} ${directory}: Baidu candidate type`)
+        const candidate = IniDocument.parse(output.getText(`${directory}/${gen.get('CAND', 'LAYOUT_NAME')}.cnd`))
+        assert.ok(candidate.sections().includes('CAND'), `${format} ${directory}: candidate layout`)
+        assert.ok(gen.get('CAND', 'VIEW_RECT'), `${format} ${directory}: candidate bounds`)
+        assert.ok(candidate.sections().includes('SWITCH'), `${format} ${directory}: required toolbar configuration`)
+        const css = IniDocument.parse(output.getText(`${theme}/skin/res/default.css`))
+        for (const field of ['NML_FONT_STYLE', 'SEL_FONT_STYLE']) for (const color of ['NM_COLOR', 'HL_COLOR']) {
+          assert.equal(css.get(`STYLE${candidate.get('SWITCH', field)}`, color), css.get(`STYLE${candidate.get('CAND', 'FORE_STYLE')}`, color))
+        }
+        const offsets = gen.sections().filter((name) => /^OFFSET\d+$/.test(name))
+        assert.ok(offsets.length > 0, `${directory}: language switch label offsets`)
+        assert.equal(Number(gen.get('PANEL', 'OFFSET_NUM')), offsets.length)
+        for (const [path, document] of layouts(output).filter(([path]) => path.startsWith(`${directory}/`))) {
+          assert.ok(!document.entries().some(({ key }) => key === 'FORE_OFFSET'), `${path}: use portable POS_TYPE offsets`)
+          for (const { section, value } of document.entries().filter(({ key }) => key === 'POS_TYPE')) {
+            assert.equal(value.split(',').length, document.get(section, 'FORE_STYLE').split(',').length, `${path} ${section}`)
+            for (const id of value.split(',')) assert.ok(gen.get(`OFFSET${id}`, 'POS'), `${path} ${section}: OFFSET${id}`)
+          }
+        }
+      }
     }
     for (const [path, bytes] of preview) {
+      // iOS uses a native F14 container and plist images; its CND is checked separately.
+      if (format === 'bdi' && path.endsWith('.cnd')) continue
       if (/\.(?:ini|cnd)$/.test(path)) {
         const expected = IniDocument.parse(strFromU8(bytes))
         for (const { section, key } of expected.entries()) if (key.startsWith('SSF_')) expected.remove(section, key)
+        if (format === 'bdi' && path.endsWith('/gen.ini')) expected.appendSection('LOGO', [{ key: 'LAYOUT_NAME', value: 'logo' }])
         assert.deepEqual(output.getBytes(path), strToU8(expected.toString()), `${format}: ${path}`)
         assert.ok(!output.getText(path).includes('SSF_'), `${path}: editor metadata must not become exported properties`)
       } else if (/\.(?:png|til|ttf)$/.test(path)) assert.deepEqual(output.getBytes(path), bytes, `${format}: ${path}`)
     }
     const toolbar = IniDocument.parse(output.getText('light/skin/port/cand1.cnd'))
-    assert.equal(toolbar.get('CAND', 'ICON_NUM'), '7')
-    for (let i = 1; i <= 7; i++) {
+    const iconCount = format === 'bdi' ? 4 : 7
+    assert.equal(toolbar.get('CAND', 'ICON_NUM'), String(iconCount))
+    for (let i = 1; i <= iconCount; i++) {
       assert.ok(toolbar.get(`ICON${i}`, 'KEY'))
       assert.ok(toolbar.get(`ICON${i}`, 'SIZE'))
     }
@@ -60,7 +87,7 @@ test('SSF → BDI and BDS reopen with every preview layout, toolbar, image and f
   }
 })
 
-test('SSF → BDI and BDS convert the same layout tree, only packaged for their platform', async () => {
+test('SSF → BDI keeps the BDS key layouts and resources while adding the native iOS toolbar', async () => {
   const fixture = await open(ssfFixture())
   const trees = {}
   for (const format of ['bdi', 'bds']) {
@@ -70,10 +97,17 @@ test('SSF → BDI and BDS convert the same layout tree, only packaged for their 
       .filter((name) => /\.(?:ini|cnd|css|til|png|ttf)$/i.test(name))
       .map((name) => [name, output.getBytes(name)])
   }
-  assert.deepEqual(trees.bdi.map(([name]) => name), trees.bds.map(([name]) => name))
-  for (const [index, [name, bytes]] of trees.bds.entries()) {
-    const converted = trees.bdi[index][1]
-    assert.ok(converted && converted.length === bytes.length && converted.every((byte, offset) => byte === bytes[offset]), name)
+  const bdi = new Map(trees.bdi)
+  const bds = new Map(trees.bds)
+  for (const [name] of trees.bdi) if (!bds.has(name)) assert.match(name, /\/(?:res\/logo\/ssf-toolbar-.*\.png|(?:port|land)\/logo\.ini)$/)
+  for (const [name, bytes] of trees.bds) {
+    if (name.endsWith('.cnd')) continue
+    const converted = bdi.get(name)
+    if (name.endsWith('/gen.ini')) {
+      const expected = IniDocument.parse(strFromU8(bytes))
+      expected.appendSection('LOGO', [{ key: 'LAYOUT_NAME', value: 'logo' }])
+      assert.deepEqual(converted, strToU8(expected.toString()), name)
+    } else assert.ok(converted && converted.length === bytes.length && converted.every((byte, offset) => byte === bytes[offset]), name)
   }
 })
 

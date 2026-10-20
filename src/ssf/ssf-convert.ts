@@ -9,6 +9,7 @@ import { SsfPackage, unpackSsf } from "./ssf-package.ts"
 import { syncKeyStateTips } from "./ssf-state-tips.ts"
 import { convertSsfToBaidu, ssfToBaiduFiles } from "./ssf-to-baidu.ts"
 import { convertSsfToBda } from "./ssf-to-bda.ts"
+import { adaptSsfIosToolbar } from "./ssf-ios-toolbar.ts"
 
 /** The Sogou canvas/BDI/BDS skeleton and the native BDA template. */
 export type SsfTemplates = { bda: SkinArchive; sogou: SkinArchive }
@@ -45,9 +46,10 @@ export async function convertSsfDocument(archive: SkinArchive, format: "bdi" | "
     const { archive: converted, warnings } = convertSsfToBda(pkg, templates.bda)
     return { bytes: converted.toBytes(), warnings }
   }
-  // Export the same geometry, background and toolbar the SSF canvas shows.
+  // Keep the SSF canvas geometry and artwork; BDI additionally needs the native iOS toolbar format.
   const { archive: converted, warnings } = convertSsfToBaidu(pkg, templates.sogou, Number(pkg.resolution))
   syncKeyStateTips(converted)
+  if (format === "bdi") adaptSsfIosToolbar(converted, pkg, warnings)
   // Platform packaging also re-encodes the Sogou WAV key sounds into what the target IME plays.
   return { bytes: await converted.platformBytesAsync(format, warnings), warnings }
 }

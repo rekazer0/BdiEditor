@@ -132,6 +132,7 @@
 | 列表行 | `.ui-list-item` | 图标 + 标题 + 次要文字 + 尾部附件 |
 | 菜单 | `.ui-menu` | 浮层，`--radius-lg`，`--shadow-md` |
 | 角标 | `.ui-badge` | 计数、状态、“实验”标记（`data-variant="accent"`） |
+| 文件操作弹窗 | `.ui-operation-dialog` | 进度、成功、取消与失败共用，状态由 `data-outcome` 表示 |
 
 新组件要先在本表登记，写进 `components.css`，再在页面中使用。
 

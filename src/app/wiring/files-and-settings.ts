@@ -5,7 +5,7 @@ import { appState } from "../state"
 import { isEditing, commitBatch, prepareDocumentReplacement, undo, redo, commitBytes, updateDirty, commitText } from "../edit-history"
 import { sourceTargetFolder, sourceCopyPath, refreshAfterSourceMutation, setSourceTransfer, sourceSelection, sourcePaths, setSidebarView, revealSourceFile } from "../source-files"
 import { type Change } from "../../history.ts"
-import { preview, source, scheduleSelectionInspectorSync, isTauri, exportButtons, settingsNavItems, isAndroidTauri, isIOSWeb, LAST_SOURCE_WORKSPACE_KEY, currentDeviceValue } from "../canvas-interaction"
+import { preview, source, scheduleSelectionInspectorSync, isTauri, exportButtons, settingsNavItems, isAndroidTauri, isAndroidWeb, isIOSWeb, LAST_SOURCE_WORKSPACE_KEY, currentDeviceValue } from "../canvas-interaction"
 import { startNewDocument, newDocument } from "../new-document"
 import { runFileOperation, readBrowserSkinFile, showImage } from "../file-operations"
 import { openNative, saveArchive, currentExportFormat, shareArchiveToMobile, writeToChosenFile, isSupportedSkinPath, loadDroppedFile, openSkinBytes, UNSUPPORTED_SKIN_MESSAGE } from "../archive-io"
@@ -172,20 +172,22 @@ export function wireFilesAndSettings(): void {
   }
   checkUpdateButton.addEventListener("click", () => void refreshUpdateStatus())
   aboutDiagnostics.hidden = !isTauri()
-  exportLogsButton.addEventListener("click", async () => {
+  exportLogsButton.addEventListener("click", () => void runFileOperation("导出日志", async () => {
     exportLogsButton.disabled = true
     exportLogsStatus.textContent = "正在整理日志…"
     try {
       const date = new Date().toISOString().slice(0, 10)
       const path = await writeToChosenFile(`bdi-editor-logs-${date}.zip`, await clientLogZip(), "诊断日志")
       exportLogsStatus.textContent = path ? "日志已导出。" : "已取消导出。"
+      return Boolean(path)
     } catch (error) {
       exportLogsStatus.textContent = `导出失败：${error instanceof Error ? error.message : String(error)}`
       clientLog.error("logs.export_failed", {}, error)
+      throw error
     } finally {
       exportLogsButton.disabled = false
     }
-  })
+  }))
   copyQqGroupButton.addEventListener("click", async () => {
     const value = "228040912"
     try {
@@ -408,8 +410,8 @@ export function wireFilesAndSettings(): void {
   })
   undoButton.addEventListener("click", undo)
   redoButton.addEventListener("click", redo)
-  // iOS Safari 不认识这些自定义扩展名，带 accept 会把所有文件变灰；改由 change 里校验扩展名。
-  if (isIOSWeb()) browserOpen.removeAttribute("accept")
+  // 手机文件选择器无法可靠识别自定义扩展名，改由 change 里校验扩展名。
+  if (isIOSWeb() || isAndroidWeb()) browserOpen.removeAttribute("accept")
   browserOpen.addEventListener("change", async () => {
     const file = browserOpen.files?.[0]
     if (file) {

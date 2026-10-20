@@ -16,12 +16,6 @@
 
 /* 字体渲染优化 */
 
-/* Canvas 优化 */
-canvas {
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
-}
-
 /* 避免布局抖动 */
 .empty-state,
 .resource-detail-heading {
@@ -3722,34 +3716,6 @@ body:has(.canvas-wrap.empty) .workspace {
   overscroll-behavior: contain;
 }
 
-.file-operation-dialog {
-  width: min(400px, calc(100% - 32px));
-  border-radius: var(--radius-md);
-}
-
-.file-operation-dialog progress {
-  width: 100%;
-  height: 8px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  accent-color: var(--accent);
-}
-
-.file-operation-dialog progress::-webkit-progress-bar { background: var(--control); }
-.file-operation-dialog progress::-webkit-progress-value { background: var(--accent); }
-.file-operation-dialog[data-outcome="success"] progress::-webkit-progress-value { background: var(--state-ok); }
-.file-operation-dialog[data-outcome="error"] progress::-webkit-progress-value { background: var(--state-danger); }
-
-#file-operation-result {
-  margin: 0;
-  color: var(--secondary);
-  font-size: var(--font-size-lg);
-}
-
-.file-operation-dialog[data-outcome="success"] #file-operation-result { color: color-mix(in srgb, var(--state-ok) 75%, var(--text)); }
-.file-operation-dialog[data-outcome="error"] #file-operation-result { color: var(--state-danger); }
-
 .panel-scale-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -7080,7 +7046,7 @@ main {
 
 :root body .app-dialog header,
 :root body .project-dialog header,
-:root body :is(#settings-dialog, #about-dialog, #new-style-dialog, #layout-image-dialog, #unsaved-dialog, #edit-mode-dialog, #file-operation-dialog, #panel-scale-dialog, #ios26-dialog, #new-project-dialog) header {
+:root body :is(#settings-dialog, #about-dialog, #new-style-dialog, #layout-image-dialog, #unsaved-dialog, #edit-mode-dialog, #panel-scale-dialog, #ios26-dialog, #new-project-dialog) header {
   min-height: 56px;
   padding: 0 20px;
   gap: 12px;
@@ -8248,55 +8214,6 @@ main {
 :root body .welcome-note .system-symbol {
   color: var(--tertiary);
 }
-/* File operation sheet: bounded icon and a compact, readable progress layout. */
-:root body #file-operation-dialog {
-  width: min(400px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
-  overflow: auto;
-}
-:root body #file-operation-dialog > form { gap: 20px; padding: 24px; }
-:root body #file-operation-dialog header {
-  display: flex;
-  min-height: 0;
-  padding: 0;
-  gap: 12px;
-  border: 0;
-}
-:root body #file-operation-dialog .file-operation-icon {
-  display: grid;
-  place-items: center;
-  flex: 0 0 40px;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-lg);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-:root body #file-operation-dialog .file-operation-icon svg { width: 24px; height: 24px; }
-:root body #file-operation-dialog .file-operation-subtitle { font-size: var(--font-size-sm); line-height: 1.5; }
-:root body #file-operation-dialog .file-operation-progress-label {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-  font-size: var(--font-size-sm);
-  color: var(--secondary);
-}
-:root body #file-operation-detail { margin: 0; overflow-wrap: anywhere; }
-:root body #file-operation-percent { flex-shrink: 0; font-variant-numeric: tabular-nums; }
-:root body #file-operation-dialog progress { display: block; height: 6px; }
-:root body #file-operation-result { font-size: var(--font-size-sm); line-height: 1.6; overflow-wrap: anywhere; }
-:root body #file-operation-dialog[data-outcome="success"] #file-operation-result { display: none; }
-:root body #file-operation-dialog footer {
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-top: 16px;
-}
-:root body #file-operation-dialog .file-operation-hint { font-size: var(--font-size-xs); color: var(--secondary); }
-:root body #file-operation-close { flex-shrink: 0; min-width: 64px; }
-
 /* =================================================================================================
  * 8 · Replace-keyboard-style sheet  (弹层 · 替换键盘样式)
  *     §6 的 `.app-dialog button` 默认值（32px 实线按钮）会把投放区压成一行、把分段控件

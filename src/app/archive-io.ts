@@ -202,7 +202,8 @@ export async function openNative(): Promise<boolean> {
   if (!(await prepareDocumentReplacement())) return false
   const path = await open({
     multiple: false,
-    filters: [{ name: "输入法皮肤", extensions: ["bdi", "bds", "bda", "ssf", "mssf", "sxi"] }],
+    // Android filters by MIME type; custom skin extensions have no reliable mapping.
+    filters: isAndroidTauri() ? undefined : [{ name: "输入法皮肤", extensions: ["bdi", "bds", "bda", "ssf", "mssf", "sxi"] }],
   })
   if (typeof path !== "string") return false
   await loadNativePath(path)
@@ -629,9 +630,12 @@ export function waitForTap(detail: string, label: string, onTap?: () => void | P
     updateFileOperationProgress(90, detail)
     const share = document.createElement("button")
     share.type = "button"
-    share.className = "primary"
+    share.className = "ui-button primary"
+    share.dataset.variant = "primary"
+    share.dataset.size = "lg"
     share.textContent = label
     fileOperationClose.before(share)
+    fileOperationClose.dataset.variant = "quiet"
     fileOperationClose.disabled = false
     const finish = (confirmed: boolean) => {
       share.remove()
