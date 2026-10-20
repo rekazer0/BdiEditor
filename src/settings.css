@@ -1,257 +1,268 @@
-/* bdi.pen · 设置窗口 P6Oksd: 920 × 640, 232px navigation, 52/56px chrome. */
-:root body #settings-dialog { width: min(920px, calc(100vw - 32px)); height: min(640px, calc(100dvh - 32px)); padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--floating); color: var(--text); box-shadow: var(--shadow-sm); }
-:root body #settings-dialog form { display: grid; grid-template-rows: 52px minmax(0, 1fr) 56px; height: 100%; gap: 0; }
-:root body #settings-dialog header { min-height: 0; padding: 0 20px; border-bottom: 1px solid var(--line); }
-:root body #settings-dialog .settings-title-cluster { display: flex; align-items: center; gap: 8px; min-width: 0; }
-:root body #settings-dialog h2 { margin: 0; font-size: var(--font-size-lg); font-weight: 600; }
-:root body #settings-dialog .settings-title-cluster > .system-symbol { width: 15px; height: 15px; }
-:root body #settings-dialog #settings-close { width: 28px; height: 28px; padding: 0; border: 0; background: transparent; color: var(--secondary); font-size: var(--font-size-xl); }
-:root body #settings-dialog .settings-layout { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 0; overflow: hidden; }
-/* 侧栏与内部控件跟随 --content：材质打开时它是玻璃下沉层，材质关闭时仍是原来的 #f4f5f8，
-   设置窗口才不会在玻璃界面上留下一列不透明的导航。 */
-:root body #settings-dialog .settings-sidebar { padding: 12px 12px; gap: 2px; border-right: 1px solid var(--line); background: var(--content); overflow-y: auto; }
-:root body #settings-dialog .settings-group-label { padding: 12px 12px 6px; color: var(--tertiary); font: var(--font-size-xs) var(--font-mono); letter-spacing: .5px; }
-:root body #settings-dialog .settings-nav-item:not([hidden]) { display: flex; align-items: center; flex: 0 0 auto; height: 36px; padding: 0 12px; gap: 8px; font-size: var(--font-size-sm); border-radius: var(--radius-md); box-shadow: none; }
-:root body #settings-dialog .settings-nav-item[hidden], :root body #settings-dialog [hidden] { display: none; }
-:root body #settings-dialog .settings-nav-item > span:nth-child(2) { white-space: nowrap; }
-:root body #settings-dialog .settings-nav-item small { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tertiary); font-size: var(--font-size-xs); }
-:root body #settings-dialog .settings-nav-item[aria-selected="true"] { border-color: transparent; background: var(--accent-soft); color: var(--accent); font-weight: 500; }
-:root body #settings-dialog .settings-nav-item[aria-selected="true"] small { color: inherit; opacity: .75; }
-:root body #settings-dialog .settings-content { padding: 24px; overflow: auto; }
-:root body #settings-dialog .settings-section { padding: 0; }
-:root body #settings-dialog .settings-section-heading { gap: 4px; margin-bottom: 20px; }
-:root body #settings-dialog .settings-section-heading h3 { font-size: var(--font-size-xl); font-weight: 600; }
-:root body #settings-dialog .settings-section-heading p { margin: 0; color: var(--secondary); font-size: var(--font-size-sm); line-height: 1.6; }
-:root body #settings-dialog .settings-subheading { display: flex; align-items: center; gap: 8px; margin: 0; padding-bottom: 8px; font-size: var(--font-size-md); font-weight: 600; }
-:root body #settings-dialog .settings-subheading:not(:first-child) { margin-top: 20px; }
-:root body #settings-dialog .settings-subheading small { color: var(--tertiary); font: var(--font-size-xs) var(--font-mono); letter-spacing: .4px; }
-:root body #settings-dialog .settings-row { display: flex; justify-content: space-between; gap: 16px; min-height: 50px; padding: 12px 0; border: 0; border-bottom: 1px solid var(--line); font-size: var(--font-size-md); }
-:root body #settings-dialog .settings-row > span:first-child { font-weight: 500; }
-:root body #settings-dialog .settings-row > span:first-child small { display: block; margin-top: 2px; color: var(--tertiary); font-size: var(--font-size-xs); font-weight: 400; }
-:root body #settings-dialog select { height: 30px; border: 1px solid var(--line); border-radius: var(--radius-md); background-color: var(--content); font-size: var(--font-size-xs); }
-:root body #settings-dialog .settings-segmented { display: flex; align-items: center; width: fit-content; height: 32px; gap: 2px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--content); }
-:root body #settings-dialog .settings-segmented button { height: 24px; padding: 0 12px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--secondary); font-size: var(--font-size-xs); white-space: nowrap; }
-:root body #settings-dialog .settings-segmented button[aria-pressed="true"] { background: var(--panel); color: var(--text); box-shadow: var(--shadow-sm); }
-:root body #settings-dialog .settings-color-field { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--content); font: var(--font-size-xs) var(--font-mono); }
-:root body #settings-dialog input[type="color"] { width: 20px; height: 24px; padding: 0; border: 0; background: transparent; cursor: pointer; }
-:root body #settings-dialog .settings-storage-note { margin: 20px 0 0; padding: 12px 12px; border-radius: var(--radius-md); background: var(--content); color: var(--secondary); font: var(--font-size-xs)/1.6 var(--font-mono); }
-:root body #settings-dialog .settings-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px; border-top: 1px solid var(--line); }
-#settings-save-state { display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: var(--radius-full); background: var(--content); font-size: var(--font-size-xs); }
-#settings-save-state[data-dirty="true"] { background: var(--accent-soft); color: var(--accent); }
-#settings-save-state .settings-state-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--state-ok); }
-#settings-save-state[data-dirty="true"] .settings-state-dot { background: var(--accent); }
-#settings-saved-at { color: var(--secondary); font: var(--font-size-xs) var(--font-mono); }
-:root body #settings-dialog .settings-footer-actions { display: flex; gap: 8px; }
-:root body #settings-dialog .settings-footer-actions button { height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-md); }
-:root body #settings-dialog .settings-footer-actions .primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-:root body #settings-dialog :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* 大模型：上方为模型列表，下方编辑选中项；所有输入控件同宽，标签不换行。 */
-:root body #settings-dialog .settings-model-add { display: inline-flex; align-items: center; gap: 4px; height: 26px; margin-left: auto; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--content); color: var(--text); font-size: var(--font-size-xs); font-weight: 500; }
-:root body #settings-dialog .settings-model-add .system-symbol { width: 13px; height: 13px; }
-.model-profiles { display: grid; gap: 6px; margin: 0 0 16px; padding: 0; list-style: none; }
-.model-profiles li { display: flex; align-items: center; gap: 4px; }
-:root body #settings-dialog .model-profile { flex: 1; min-width: 0; height: auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; row-gap: 2px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--content); color: var(--text); text-align: left; }
-:root body #settings-dialog .model-profile[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
-.model-profile strong, .model-profile small { grid-column: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.model-profile strong { font: 600 var(--font-size-sm) var(--font-mono); }
-.model-profile small { color: var(--secondary); font-size: var(--font-size-xs); }
-.model-profile em { grid-column: 2; grid-row: 1 / 3; align-self: center; padding: 1px 8px; border: 1px solid var(--line); border-radius: var(--radius-full); background: var(--panel); color: var(--secondary); font-size: var(--font-size-xs); font-style: normal; }
-:root body #settings-dialog .model-profile-remove { display: grid; flex: none; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--tertiary); }
-@media (hover: hover) {
-:root body #settings-dialog .model-profile-remove:hover { background: var(--hover); color: var(--state-danger); } }
-.model-profiles-empty { padding: 20px 12px; border: 1px dashed var(--line); border-radius: var(--radius-md); color: var(--secondary); font-size: var(--font-size-sm); text-align: center; }
-:root body #settings-dialog .model-editor .settings-row > span:first-child { flex: none; white-space: nowrap; }
-:root body #settings-dialog .model-editor .settings-row > :last-child { flex: none; width: min(400px, 68%); }
-:root body #settings-dialog .model-editor select { width: 100%; font-size: var(--font-size-sm); }
-:root body #settings-dialog .settings-model-footer { align-items: center; border-top: 0; }
-:root body #settings-dialog #image-model-fields:not([hidden]) { display: contents; }
-:root body #settings-dialog .settings-model-hint { margin: 6px 0 0; color: var(--tertiary); font-size: var(--font-size-xs); }
-:root body #settings-dialog .settings-model-footer > div:first-child { flex: 1; }
-:root body #settings-dialog #model-configuration-path { max-width: none; }
-#model-configuration-status:empty { display: none; }
-/* 全局按钮的 min-height/padding 会让图标按钮比输入框高、图标被挤偏。 */
-:root body #settings-dialog .model-editor button, :root body #settings-dialog .model-profile-remove { min-height: 0; height: 30px; padding: 0; }
-:root body #settings-dialog #test-model-connection { height: 30px; padding: 0 12px; border-radius: var(--radius-md); }
-:root body #settings-dialog .model-editor input, :root body #settings-dialog .model-editor button { border-radius: var(--radius-md); }
-:root body #settings-dialog .model-choices-row { align-items: flex-start; }
-:root body #settings-dialog .model-choices-row > span:first-child { padding-top: 6px; }
-.model-choices-panel { display: grid; gap: 6px; }
-:root body #settings-dialog .model-choices-panel .settings-model-control { width: 100%; grid-template-columns: minmax(0, 1fr) 30px 30px; }
-.model-choices { display: grid; max-height: 184px; margin: 0; padding: 4px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--content); list-style: none; }
-.model-choices label { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: var(--radius-sm); font: var(--font-size-sm) var(--font-mono); cursor: pointer; }
-@media (hover: hover) {
-.model-choices label:hover { background: var(--hover); } }
-.model-choices label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-:root body #settings-dialog .model-choices input[type="checkbox"] { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
-.model-choices-empty { padding: 12px 8px; color: var(--secondary); font-size: var(--font-size-xs); }
-:root[data-interface-density="compact"] #files .raw-files .source-tree-row { height: 26px; min-height: 26px; }
-:root[data-interface-density="compact"] .inspector-grid { gap: 4px; }
-:root[data-interface-density="compact"] .inspector-grid input, :root[data-interface-density="compact"] .inspector-grid select { height: 26px; min-height: 26px; }
-:root[data-interface-density="compact"] .toolbar-button { height: 26px; }
-:root[data-safe-area-guides="true"] .keyboard-dock > .keyboard-accessories { outline: 1px dashed var(--selection); outline-offset: -1px; }
-@media (max-width: 640px) {
-  :root body #settings-dialog { width: calc(100vw - 16px); height: calc(100dvh - 16px); }
-  :root body #settings-dialog form { grid-template-rows: 48px minmax(0, 1fr) 56px; }
-  :root body #settings-dialog .settings-layout { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
-  :root body #settings-dialog .settings-sidebar { flex-direction: row; overflow-x: auto; padding: 8px; border-right: 0; border-bottom: 1px solid var(--line); }
-  :root body #settings-dialog .settings-group-label, :root body #settings-dialog .settings-nav-item small, #settings-saved-at { display: none; }
-  :root body #settings-dialog .settings-nav-item { height: 32px; }
-  :root body #settings-dialog .settings-content { padding: 16px; }
-  :root body #settings-dialog .settings-row { gap: 8px; flex-wrap: wrap; }
-  :root body #settings-dialog .model-editor .settings-row > :last-child { width: 100%; }
-  :root body #settings-dialog .settings-footer { padding: 0 12px; gap: 6px; }
-  #settings-save-state { padding: 4px 6px; font-size: var(--font-size-xs); }
+/*
+ * 设置窗口 — the only stylesheet for #settings-dialog.
+ *
+ * Left: category navigation. Right: one page per category, each a stack of
+ * groups (13/600 heading, optional note, flat rows divided by --line-soft).
+ * Native controls get their look from .ui-form (components.css); this file
+ * only lays them out.
+ */
+
+#settings-dialog {
+  width: min(800px, calc(100vw - 32px));
+  height: min(600px, calc(100dvh - 32px));
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--floating);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--font-size-sm);
 }
-/* 从 style.css 归并过来的同名规则（含响应式变体） */
+#settings-dialog::backdrop {
+  background: var(--backdrop);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+#settings-dialog > form {
+  display: grid;
+  grid-template-rows: 52px minmax(0, 1fr) 56px;
+  height: 100%;
+  margin: 0;
+}
+#settings-dialog [hidden] { display: none; }
+
+/* —— 标题栏 —— */
+#settings-dialog .settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: 0 var(--space-md) 0 var(--space-lg);
+  border-bottom: 1px solid var(--line-soft);
+}
+#settings-dialog .settings-header h2 { margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); }
+
+/* —— 分类导航 —— */
+#settings-dialog .settings-layout {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
+#settings-dialog .settings-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  min-width: 0;
+  padding: var(--space-md);
+  overflow-y: auto;
+  border-right: 1px solid var(--line-soft);
+  background: var(--content);
+}
+#settings-dialog .settings-nav-item {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-sm);
+  height: var(--control-height-lg);
+  padding: 0 var(--space-md);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-align: left;
+  cursor: default;
+  transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+#settings-dialog .settings-nav-item[hidden] { display: none; }
+#settings-dialog .settings-nav-item > span:nth-child(2) { white-space: nowrap; }
+#settings-dialog .settings-nav-item small {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (hover: hover) {
+  #settings-dialog .settings-nav-item:hover { background: var(--hover); color: var(--text); }
+}
+#settings-dialog .settings-nav-item:active { background: color-mix(in srgb, var(--text) 10%, transparent); }
+#settings-dialog .settings-nav-item[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+#settings-dialog .settings-nav-item[aria-selected="true"] small { color: inherit; }
+#settings-dialog .settings-nav-item:focus-visible { outline: 0; box-shadow: var(--focus-ring); }
+
+/* —— 页面、分组与行 —— */
+#settings-dialog .settings-content { min-width: 0; min-height: 0; padding: var(--space-xl); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+#settings-dialog .settings-page:not([hidden]) { display: grid; align-content: start; gap: var(--space-xl); max-width: 560px; }
+#settings-dialog .settings-group { display: grid; min-width: 0; }
+#settings-dialog .settings-group > h3,
+#settings-dialog .settings-group-header > h3 { margin: 0 0 var(--space-xs); font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); }
+#settings-dialog .settings-group-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); margin-bottom: var(--space-xs); }
+#settings-dialog .settings-group-header > h3 { margin: 0; }
+#settings-dialog .settings-group-note { margin: 0 0 var(--space-sm); color: var(--tertiary); font-size: var(--font-size-xs); line-height: 1.6; }
+
+#settings-dialog .settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  min-height: 44px;
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--text);
+  font-size: var(--font-size-sm);
+}
+#settings-dialog .settings-row:last-child { border-bottom: 0; }
+#settings-dialog .settings-row > span:first-child { display: grid; gap: var(--space-2xs); min-width: 0; font-weight: var(--font-weight-medium); }
+#settings-dialog .settings-row > span:first-child small { color: var(--tertiary); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); line-height: 1.5; }
+#settings-dialog .settings-row > span:first-child .ui-badge { margin-left: var(--space-sm); vertical-align: 1px; }
+#settings-dialog .settings-row > :is(.ui-select, .settings-secret, input:not([type="checkbox"])) { flex: none; width: min(320px, 60%); }
+#settings-dialog .settings-row > .ui-segmented { flex: none; }
+
+#settings-dialog .settings-color { flex: none; gap: var(--space-sm); padding-right: var(--space-sm); }
+#settings-dialog .settings-color output { color: var(--secondary); font: var(--font-size-xs) var(--font-mono); }
+#settings-dialog .settings-range { display: flex; flex: none; align-items: center; gap: var(--space-sm); }
+#settings-dialog .settings-range input { width: 140px; }
+#settings-dialog .settings-range output { min-width: 40px; color: var(--secondary); font: var(--font-size-xs) var(--font-mono); text-align: right; }
+#settings-dialog .settings-number { flex: none; width: 88px; }
+#settings-dialog .settings-secret { padding-right: var(--space-2xs); }
+
+/* —— 源码存储 —— */
+#settings-dialog .source-directory-setting { display: grid; gap: var(--space-xs); padding-top: var(--space-sm); }
+#settings-dialog .settings-path { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-xs); }
+#settings-dialog .source-directory-setting small { min-height: 16px; color: var(--secondary); font-size: var(--font-size-xs); }
+#settings-dialog .source-directory-setting[data-invalid="true"] small { color: var(--state-danger); }
+
+/* —— AI 模型：服务商列表 + 选中项的编辑区 —— */
+#settings-dialog .model-profiles { display: grid; gap: var(--space-xs); margin: 0 0 var(--space-sm); padding: 0; list-style: none; }
+#settings-dialog .model-profiles > li { display: flex; align-items: center; gap: var(--space-2xs); }
+#settings-dialog .model-profile {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--content);
+  color: var(--text);
+  text-align: left;
+  cursor: default;
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+@media (hover: hover) {
+  #settings-dialog .model-profile:hover { border-color: var(--line); }
+}
+#settings-dialog .model-profile[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+#settings-dialog .model-profile:focus-visible { outline: 0; box-shadow: var(--focus-ring); }
+#settings-dialog .model-profile-text { display: grid; flex: 1; gap: var(--space-2xs); min-width: 0; }
+#settings-dialog .model-profile-text > strong { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
+#settings-dialog .model-profile-text > :is(strong, small) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#settings-dialog .model-profile-text > small { color: var(--secondary); font: var(--font-size-xs) var(--font-mono); }
+#settings-dialog .model-profile-text > small[data-problem] { color: var(--state-warn); font-family: var(--font-ui); }
+#settings-dialog .model-profiles-empty { padding: var(--space-lg); border: 1px dashed var(--line); border-radius: var(--radius-md); color: var(--secondary); font-size: var(--font-size-xs); line-height: 1.6; text-align: center; }
+
+#settings-dialog .model-editor:not([hidden]) { display: grid; padding: 0 var(--space-lg) var(--space-md); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+#settings-dialog .model-choices-row { align-items: flex-start; }
+#settings-dialog .model-choices-row > span:first-child { padding-top: var(--space-xs); }
+#settings-dialog .model-choices-panel { display: grid; flex: none; gap: var(--space-sm); width: min(360px, 66%); }
+#settings-dialog .model-choices-tools { display: flex; align-items: center; gap: var(--space-xs); }
+#settings-dialog .model-choices-tools > .ui-input { flex: 1; }
+#settings-dialog .model-choices { display: grid; max-height: 200px; margin: 0; padding: var(--space-xs); overflow-y: auto; border: 1px solid var(--line-soft); border-radius: var(--radius-md); list-style: none; }
+#settings-dialog .model-choices label { display: flex; align-items: center; gap: var(--space-sm); height: var(--control-height-md); padding: 0 var(--space-sm); border-radius: var(--radius-sm); font: var(--font-size-sm) var(--font-mono); }
+@media (hover: hover) {
+  #settings-dialog .model-choices label:hover { background: var(--hover); }
+}
+#settings-dialog .model-choices label > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#settings-dialog .model-choices input[type="checkbox"] { flex: none; width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
+#settings-dialog .model-choices-empty { padding: var(--space-md) var(--space-sm); color: var(--tertiary); font-size: var(--font-size-xs); line-height: 1.5; }
+#settings-dialog .model-editor-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding-top: var(--space-md); }
+#settings-dialog #model-configuration-status { min-width: 0; margin: 0; color: var(--secondary); font-size: var(--font-size-xs); line-height: 1.5; overflow-wrap: anywhere; }
+#settings-dialog #model-configuration-status[data-state="busy"] { color: var(--accent); }
+#settings-dialog #model-configuration-status[data-state="success"] { color: var(--state-ok); }
+#settings-dialog #model-configuration-status[data-state="error"] { color: var(--state-danger); }
+#settings-dialog #image-model-fields:not([hidden]) { display: contents; }
+#settings-dialog .settings-footnote { margin: 0; color: var(--tertiary); font-size: var(--font-size-xs); overflow-wrap: anywhere; }
+#settings-dialog #model-configuration-path { font-family: var(--font-mono); }
+
+/* —— 关于 —— */
+#settings-dialog .settings-about-title { display: flex; align-items: center; gap: var(--space-sm); }
+#settings-dialog .about-contact-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-md); }
+#settings-dialog a { color: var(--accent); font-size: var(--font-size-sm); text-decoration: none; }
+@media (hover: hover) {
+  #settings-dialog a:hover { text-decoration: underline; }
+}
+#settings-dialog #download-update { justify-self: start; font-size: var(--font-size-xs); }
+
+/* —— 底栏 —— */
+#settings-dialog .settings-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: 0 var(--space-lg); border-top: 1px solid var(--line-soft); }
+#settings-save-state { display: flex; align-items: center; gap: var(--space-xs); min-width: 0; padding: var(--space-xs) var(--space-md); border-radius: var(--radius-full); background: var(--content); color: var(--secondary); font-size: var(--font-size-xs); }
+#settings-save-state[data-dirty="true"] { background: var(--accent-soft); color: var(--accent); }
+#settings-save-state .settings-state-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--state-ok); }
+#settings-save-state[data-dirty="true"] .settings-state-dot { background: var(--accent); }
+#settings-saved-at { color: var(--tertiary); font: var(--font-size-xs) var(--font-mono); }
+#settings-dialog .settings-footer-actions { display: flex; flex: none; gap: var(--space-sm); }
+
+/* —— 手机：全屏 sheet，分类变成一行可横滑的标签 —— */
 @media (max-width: 760px) {
-  :root body #settings-dialog {
+  #settings-dialog {
     width: 100vw;
-    max-width: 100vw;
     height: 100dvh;
-    max-height: 100dvh;
     margin: 0;
     border: 0;
     border-radius: 0;
-    background: var(--material-panel); /* full-screen sheet: nothing behind it should show through */
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog form {
-    grid-template-rows: auto minmax(0, 1fr) auto;
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog header {
+  }
+  #settings-dialog > form { grid-template-rows: auto minmax(0, 1fr) auto; }
+  #settings-dialog .settings-header {
     min-height: 52px;
     padding: var(--safe-area-top, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog .settings-title-cluster {
-    overflow: hidden;
-    white-space: nowrap;
-  } }
-@media (max-width: 760px) {
-  :root body #settings-dialog #settings-close {
-    width: 40px;
-    height: 40px;
-    flex: none;
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog .settings-layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog .settings-sidebar {
-    display: flex;
+  }
+  #settings-dialog .settings-header .ui-icon-button { --_height: 40px; }
+  #settings-dialog .settings-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  #settings-dialog .settings-sidebar {
     flex-direction: row;
-    flex-wrap: nowrap;
-    gap: 6px;
-    padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+    gap: var(--space-xs);
+    padding: var(--space-sm) max(12px, env(safe-area-inset-right)) var(--space-sm) max(12px, env(safe-area-inset-left));
     overflow-x: auto;
     overflow-y: hidden;
     overscroll-behavior-x: contain;
     scroll-snap-type: x proximity;
     scrollbar-width: none;
     border-right: 0;
-    border-bottom: 1px solid var(--line);
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog .settings-group-label,
-  :root body #settings-dialog .settings-nav-item small {
-    display: none;
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog .settings-nav-item {
-    width: auto;
-    min-width: 0;
-    height: 36px;
-    flex: none;
-    padding: 0 12px;
-    scroll-snap-align: start;
-    font-size: var(--font-size-md);
-    white-space: nowrap;
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog .settings-content {
-    padding: 20px max(16px, env(safe-area-inset-right)) 24px max(16px, env(safe-area-inset-left));
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog .settings-section-heading h3 {
-    font-size: var(--font-size-xl);
-    overflow-wrap: anywhere;
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog .settings-row {
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px 12px;
-    min-height: 52px;
-    font-size: var(--font-size-lg);
-  } }
-@media (max-width: 760px) {
-  :root body #settings-dialog .settings-row > span:first-child {
-    flex: 1 1 140px;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog .settings-row > span:first-child small {
-    margin: 0;
-    color: var(--tertiary);
-    font-size: var(--font-size-xs);
-    font-weight: 400;
-    line-height: 1.4;
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog select {
-    min-height: 40px;
-    font-size: var(--font-size-lg); /* ≥16px stops iOS Safari from zooming the sheet on focus */
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog .settings-segmented {
-    height: 36px;
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog .settings-segmented button {
-    height: 28px;
-    min-height: 0;
-    padding: 0 16px;
-    font-size: var(--font-size-md);
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog .model-editor .settings-row > :last-child {
-    width: 100%;
-    flex: 1 1 100%;
-  } }
-@media (max-width: 760px) {
-
-  :root body #settings-dialog .settings-footer {
+    border-bottom: 1px solid var(--line-soft);
+  }
+  #settings-dialog .settings-sidebar::-webkit-scrollbar { display: none; }
+  #settings-dialog .settings-nav-item { height: 36px; scroll-snap-align: start; font-size: var(--font-size-md); }
+  #settings-dialog .settings-nav-item small,
+  #settings-saved-at { display: none; }
+  #settings-dialog .settings-content { padding: var(--space-lg) max(16px, env(safe-area-inset-right)) var(--space-xl) max(16px, env(safe-area-inset-left)); }
+  #settings-dialog .settings-row { flex-wrap: wrap; gap: var(--space-sm) var(--space-md); min-height: 52px; font-size: var(--font-size-md); }
+  #settings-dialog .settings-row > span:first-child { flex: 1 1 140px; }
+  #settings-dialog .settings-row > :is(.ui-select, .settings-secret, input:not([type="checkbox"])),
+  #settings-dialog .model-choices-panel { flex: 1 1 100%; width: 100%; }
+  /* ≥16px stops iOS Safari from zooming the sheet on focus */
+  #settings-dialog :is(.ui-input, input:not([type="checkbox"], [type="range"], [type="color"])) { min-height: 40px; font-size: var(--font-size-lg); }
+  #settings-dialog .model-editor:not([hidden]) { padding: 0 var(--space-md) var(--space-md); }
+  #settings-dialog .settings-footer {
     min-height: 60px;
-    padding: 8px max(12px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
-  } }
-@media (max-width: 760px) {
+    padding: var(--space-sm) max(12px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+  #settings-dialog .settings-footer-actions .ui-button { --_height: 40px; min-width: 72px; font-size: var(--font-size-md); }
+}
 
-  :root body #settings-dialog .settings-footer-actions button {
-    height: 40px;
-    min-width: 72px;
-    padding: 0 16px;
-    font-size: var(--font-size-lg);
-  } }
+/* —— 设置项作用于编辑器的全局效果 —— */
+:root[data-interface-density="compact"] #files .raw-files .source-tree-row { height: 26px; min-height: 26px; }
+:root[data-interface-density="compact"] .inspector-grid { gap: 4px; }
+:root[data-interface-density="compact"] .inspector-grid input, :root[data-interface-density="compact"] .inspector-grid select { height: 26px; min-height: 26px; }
+:root[data-interface-density="compact"] .toolbar-button { height: 26px; }
+:root[data-safe-area-guides="true"] .keyboard-dock > .keyboard-accessories { outline: 1px dashed var(--selection); outline-offset: -1px; }

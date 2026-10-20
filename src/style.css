@@ -204,6 +204,7 @@
   .toolbar-menu,
   .glass-module,
   .app-dialog,
+  .settings-dialog,
   .project-dialog
 ) {
   -webkit-backdrop-filter: saturate(180%) blur(28px);
@@ -2877,45 +2878,6 @@ body:has(.canvas-wrap.empty) .workspace {
   line-height: 1.3;
 }
 
-.app-dialog .settings-switch {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.settings-switch input {
-  width: 34px;
-  height: 20px;
-  margin: 0;
-  position: relative;
-  appearance: none;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-full);
-  background: var(--control);
-  transition: background var(--duration-base) var(--ease-standard);
-}
-
-.settings-switch input::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--material-control);
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--duration-base) var(--ease-standard);
-}
-
-.settings-switch input:checked {
-  background: var(--accent);
-}
-
-.settings-switch input:checked::after {
-  transform: translateX(14px);
-}
-
 .app-dialog select,
 .app-dialog input[type="number"] {
   height: 30px;
@@ -2933,321 +2895,6 @@ body:has(.canvas-wrap.empty) .workspace {
   font-size: var(--font-size-xs);
 }
 
-#settings-dialog {
-  width: min(760px, calc(100vw - 32px));
-  height: min(560px, calc(100dvh - 32px));
-  max-height: none;
-  padding: 0;
-  overflow: hidden;
-}
-
-#settings-dialog form {
-  min-width: 0;
-  height: 100%;
-  gap: 0;
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-#settings-dialog header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.settings-layout {
-  min-height: 0;
-  display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
-  overflow: hidden;
-}
-
-.settings-sidebar {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 12px;
-  border-right: 1px solid var(--line-soft);
-  background: color-mix(in srgb, var(--control) 34%, transparent);
-}
-
-.settings-nav-item:not([hidden]) {
-  min-width: 0;
-  height: 34px;
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text);
-  font-size: var(--font-size-md);
-  text-align: left;
-}
-
-.settings-nav-item[hidden],
-.settings-page[hidden] {
-  display: none;
-}
-
-@media (hover: hover) {
-
-.settings-nav-item:hover {
-  background: color-mix(in srgb, var(--control) 72%, transparent);
-}
-}
-
-.settings-nav-item[aria-selected="true"] {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-.settings-nav-item .system-symbol {
-  width: 16px;
-  height: 16px;
-}
-
-.settings-content {
-  min-width: 0;
-  min-height: 0;
-  padding: 16px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior-x: none;
-  overflow-wrap: anywhere;
-}
-
-.settings-section {
-  min-width: 0;
-  padding: 0 2px;
-}
-
-.settings-storage {
-  padding-bottom: 12px;
-}
-
-.settings-section-heading {
-  display: grid;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-.settings-section-heading h3 {
-  margin: 0;
-  color: var(--text);
-  font-size: var(--font-size-md);
-  font-weight: 600;
-}
-
-.settings-section-heading p {
-  font-size: var(--font-size-xs);
-  line-height: 1.35;
-}
-
-.settings-list {
-  display: grid;
-}
-
-.app-dialog .settings-row {
-  min-height: 42px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  border-top: 1px solid var(--line-soft);
-  color: var(--text);
-}
-
-.app-dialog .settings-row[hidden] {
-  display: none;
-}
-
-.settings-row select {
-  width: 146px;
-  min-width: 0;
-}
-
-.settings-text-row > input,
-.settings-secret-control,
-.settings-model-control {
-  width: min(300px, 44vw);
-}
-
-.settings-text-row > input,
-.settings-secret-control input,
-.settings-model-control input,
-.settings-model-control select {
-  width: 100%;
-  min-width: 0;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--control);
-  color: var(--text);
-  font-size: var(--font-size-md);
-}
-
-.settings-secret-control {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px;
-  gap: 6px;
-}
-
-.settings-model-control {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px;
-  gap: 6px;
-}
-
-.settings-secret-control button,
-.settings-model-control button {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--control);
-  color: var(--text);
-}
-
-.settings-model-footer {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line-soft);
-}
-
-.settings-model-footer > div:first-child {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-#model-configuration-status {
-  margin: 0;
-  color: var(--secondary);
-  font-size: var(--font-size-sm);
-}
-
-#model-configuration-status[data-state="busy"] { color: var(--accent); }
-#model-configuration-status[data-state="success"] { color: var(--state-ok); }
-#model-configuration-status[data-state="error"] { color: var(--state-danger); }
-
-#model-configuration-path {
-  max-width: 330px;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: var(--font-size-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-#test-model-connection {
-  flex: 0 0 auto;
-  min-height: 30px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  background: var(--control);
-  font-size: var(--font-size-sm);
-}
-
-#test-model-connection:disabled,
-.settings-model-control button:disabled {
-  opacity: 0.5;
-}
-
-@media (max-width: 640px) {
-  .settings-layout { grid-template-columns: 128px minmax(0, 1fr); }
-  .settings-text-row > input,
-  .settings-secret-control,
-  .settings-model-control { width: min(220px, 50vw); }
-  .settings-model-footer { align-items: stretch; flex-direction: column; }
-}
-
-.settings-inline-control {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--secondary);
-}
-
-.settings-inline-control input[type="number"] {
-  width: 64px;
-}
-
-.settings-inline-control small {
-  font-size: var(--font-size-xs);
-}
-
-.settings-range-control {
-  display: grid;
-  grid-template-columns: 112px 34px;
-  align-items: center;
-  gap: 8px;
-}
-
-.settings-range-control input {
-  width: 112px;
-  accent-color: var(--accent);
-}
-
-.settings-range-control output {
-  color: var(--secondary);
-  font-size: var(--font-size-xs);
-  text-align: right;
-}
-
-.settings-range-control input:disabled {
-  opacity: 0.45;
-}
-
-.settings-path-control {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px 30px;
-  gap: 6px;
-}
-
-.settings-path-control input {
-  min-width: 0;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--control);
-  color: var(--text);
-  font-size: var(--font-size-md);
-}
-
-.settings-path-control button {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--control);
-  color: var(--text);
-}
-
-.source-directory-setting small {
-  min-height: 17px;
-  color: var(--secondary);
-  font-size: var(--font-size-xs);
-}
-
-.source-directory-setting[data-invalid="true"] small {
-  color: var(--state-danger);
-}
-
 .app-dialog p {
   margin: 0;
   color: var(--secondary);
@@ -3257,53 +2904,6 @@ body:has(.canvas-wrap.empty) .workspace {
 
 /* 关于页：说明在前，版本更新 / 诊断日志 / 联系方式各用一条 --line-soft 细线分隔。
    按钮不另画一套外观，沿用对话窗统一的 .app-dialog button。 */
-.settings-about .settings-section-heading h3 {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.settings-about-note + .settings-about-note {
-  margin-top: var(--space-xs);
-}
-
-.about-block {
-  display: grid;
-  gap: var(--space-sm);
-  padding-block: var(--space-lg);
-  border-top: 1px solid var(--line-soft);
-}
-
-.about-block > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  min-height: var(--control-height-lg);
-}
-
-.about-block > div > strong,
-.about-contact > strong {
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-}
-
-.about-contact {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm) var(--space-md);
-  padding-top: var(--space-lg);
-  border-top: 1px solid var(--line-soft);
-}
-
-.about-contact-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-sm) var(--space-md);
-}
 
 .app-dialog a {
   width: fit-content;
@@ -3971,88 +3571,6 @@ input[type="search"]:focus {
 }
 
 @media (max-width: 600px) {
-  #settings-dialog {
-    width: calc(100vw - 16px);
-    height: calc(100dvh - 16px);
-    max-height: none;
-    border-radius: var(--radius-xl);
-  }
-
-  #settings-dialog form {
-    height: 100%;
-  }
-
-  #settings-dialog header {
-    padding: 12px 16px;
-  }
-
-  .settings-layout {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  .settings-sidebar {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    padding: 8px 6px;
-    border-right: 0;
-    border-bottom: 1px solid var(--line-soft);
-  }
-
-  .settings-nav-item {
-    padding: 0 8px;
-  }
-
-  .settings-content {
-    padding: 12px;
-  }
-
-  .settings-section {
-    padding: 0;
-  }
-
-  .settings-storage {
-    padding-bottom: 12px;
-  }
-
-  .app-dialog .settings-row {
-    min-height: 48px;
-  }
-
-  .settings-row select {
-    width: 100%;
-    max-width: 100%;
-  }
-
-  .app-dialog .settings-row:not(.settings-switch):not(:has(.settings-inline-control)) {
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-    padding: 8px 0;
-  }
-
-  .settings-text-row > input,
-  .settings-secret-control,
-  .settings-model-control {
-    width: 100%;
-  }
-
-  .settings-range-control {
-    grid-template-columns: minmax(0, 1fr) 34px;
-  }
-
-  .settings-range-control input {
-    min-width: 0;
-    width: 100%;
-  }
-
-  .settings-path-control {
-    grid-template-columns: minmax(0, 1fr) 36px 36px;
-  }
-
-  .settings-path-control button {
-    width: 36px;
-    height: 36px;
-  }
 
   .titlebar {
     gap: 6px;
@@ -4993,7 +4511,6 @@ summary,
 .toolbar-button,
 .glass-module button,
 .project-template-option,
-.settings-nav-item,
 .source-tree-row,
 .template-card {
   transition:
@@ -5209,53 +4726,6 @@ dialog[open]::backdrop {
 .project-template-option:has(input:checked) {
   border-color: var(--accent);
   background: var(--accent-soft);
-}
-
-.settings-section-heading h3 {
-  font-size: var(--font-size-lg);
-  font-weight: 600;
-  color: var(--text);
-}
-
-.settings-section-heading p {
-  font-size: var(--font-size-xs);
-  color: var(--tertiary);
-}
-
-.settings-nav-item {
-  height: 34px;
-  padding: 0 12px;
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  color: var(--secondary);
-}
-
-.settings-nav-item[aria-selected="true"] {
-  background: var(--panel);
-  color: var(--text);
-  font-weight: 500;
-  box-shadow: var(--shadow-sm);
-}
-
-.settings-row {
-  min-height: 40px;
-  padding: 0 4px;
-  border-bottom: 1px solid var(--line);
-  font-size: var(--font-size-md);
-  color: var(--text);
-}
-
-.settings-row > span:first-child {
-  color: var(--text);
-}
-
-.settings-row small,
-.settings-path-control input {
-  color: var(--tertiary);
-}
-
-.settings-model-footer {
-  border-top: 1px solid var(--line);
 }
 
 /* ── 顶部栏控件 ── */
@@ -6593,12 +6063,11 @@ main {
 
 /* 浮层（设置/项目对话框、下拉菜单）压在内容之上，底下是内容而不是桌面材质，填充太低会让
    底层文字和画布透过来，所以单独给它们浮层系数，滑杆还没拉满时就已经接近不透明。
-   用 !important 是因为 settings.css 里 `:root body #settings-dialog` 这类 ID 选择器权重更高，
-   普通声明压不过它。
    菜单在 .titlebar 里，titlebar 自身有 backdrop-filter，嵌套的模糊取不到下面的内容，只能靠填充遮住，
    所以给浮层透明度设一个下限。 */
 :root[data-window-material-kind="glass"][data-window-material="on"] :is(
   .app-dialog,
+  .settings-dialog,
   .project-dialog,
   .toolbar-menu,
   .file-actions,
@@ -6841,8 +6310,7 @@ main {
  * ================================================================================================= */
 
 :root body .app-dialog select,
-:root body .app-dialog input[type="number"],
-:root body .settings-path-control input {
+:root body .app-dialog input[type="number"] {
   min-height: 30px;
   height: 30px;
   padding: 0 8px;
@@ -6905,12 +6373,7 @@ main {
  *     off = $bg-sunken + 1px $line-strong, on = $brand with no hairline.
  * ================================================================================================= */
 
-/* `#quick-inspector` / `#settings-dialog` prefixes are required: the retired
- * inspector layer in style.css pins these controls with an ID selector, and an
- * ID outranks any number of `:root body` class selectors. */
-:root body .settings-switch input,
-:root body input[role="switch"][type="checkbox"],
-:root body #settings-dialog .settings-switch input {
+:root body input[role="switch"][type="checkbox"] {
   width: 36px;
   height: 20px;
   margin: 0;
@@ -6925,9 +6388,7 @@ main {
   transition: background var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard);
 }
 
-:root body .settings-switch input::after,
-:root body input[role="switch"][type="checkbox"]::after,
-:root body #settings-dialog .settings-switch input::after {
+:root body input[role="switch"][type="checkbox"]::after {
   content: "";
   position: absolute;
   top: 1px;
@@ -6940,16 +6401,12 @@ main {
   transition: transform var(--duration-base) var(--ease-standard);
 }
 
-:root body .settings-switch input:checked,
-:root body input[role="switch"][type="checkbox"]:checked,
-:root body #settings-dialog .settings-switch input:checked {
+:root body input[role="switch"][type="checkbox"]:checked {
   border-color: transparent;
   background: var(--accent);
 }
 
-:root body .settings-switch input:checked::after,
-:root body input[role="switch"][type="checkbox"]:checked::after,
-:root body #settings-dialog .settings-switch input:checked::after {
+:root body input[role="switch"][type="checkbox"]:checked::after {
   transform: translateX(16px);
 }
 
@@ -6959,9 +6416,7 @@ main {
  *     ghost $bg-sunken + $ink-muted)
  * ================================================================================================= */
 
-/* `:where()` keeps the exclusion out of the specificity maths, so the header
- * close button below can still outrank this default. */
-:root body .app-dialog button:where(:not([data-settings-page])),
+:root body .app-dialog button,
 :root body .project-dialog button,
 :root body .toolbar-menu button {
   min-height: 32px;
@@ -7031,7 +6486,7 @@ main {
 }
 
 /* =================================================================================================
- * 7 · Settings sheet  (弹层 · 设置: header 56px · nav 172px $bg-sunken · content padding 22/24)
+ * 7 · Dialog sheet  (弹层: header 56px · 1px $line)
  * ================================================================================================= */
 
 :root body .app-dialog {
@@ -7046,7 +6501,7 @@ main {
 
 :root body .app-dialog header,
 :root body .project-dialog header,
-:root body :is(#settings-dialog, #about-dialog, #new-style-dialog, #layout-image-dialog, #unsaved-dialog, #edit-mode-dialog, #panel-scale-dialog, #ios26-dialog, #new-project-dialog) header {
+:root body :is(#about-dialog, #new-style-dialog, #layout-image-dialog, #unsaved-dialog, #edit-mode-dialog, #panel-scale-dialog, #ios26-dialog, #new-project-dialog) header {
   min-height: 56px;
   padding: 0 20px;
   gap: 12px;
@@ -7170,109 +6625,7 @@ main {
   line-height: 1.6;
 }
 
-:root body .settings-sidebar {
-  padding: 12px 12px;
-  gap: 2px;
-  border-right: 1px solid var(--line);
-  background: var(--material-content);
-}
-
 /* 172px is the pen's category rail; narrow sheets keep their stacked layout. */
-@media (min-width: 641px) {
-  :root body .settings-layout {
-    grid-template-columns: 172px minmax(0, 1fr);
-  }
-}
-
-:root body .settings-nav-item:not([hidden]) {
-  width: 100%;
-  height: 34px;
-  min-height: 34px;
-  padding: 0 12px;
-  gap: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--secondary);
-  box-shadow: none;
-  font-size: var(--font-size-sm);
-  font-weight: 400;
-}
-
-:root body .settings-nav-item .system-symbol,
-:root body .settings-nav-item .system-symbol svg {
-  flex: 0 0 14px;
-  width: 14px;
-  height: 14px;
-  color: var(--tertiary);
-}
-
-@media (hover: hover) {
-
-:root body .settings-nav-item:hover:not([aria-selected="true"]) {
-  background: color-mix(in srgb, var(--material-content) 76%, var(--line));
-  color: var(--text);
-}
-}
-
-:root body .settings-nav-item[aria-selected="true"] {
-  border-color: var(--line);
-  background: var(--material-panel);
-  color: var(--text);
-  font-weight: 500;
-  box-shadow: none;
-}
-
-:root body .settings-nav-item[aria-selected="true"] .system-symbol {
-  color: var(--accent);
-}
-
-:root body .settings-content {
-  padding: 24px 24px;
-  gap: 16px;
-}
-
-:root body .settings-section-heading h3 {
-  color: var(--text);
-  font-size: var(--font-size-lg);
-  font-weight: 600;
-}
-
-:root body .settings-section-heading p {
-  color: var(--tertiary);
-  font-size: var(--font-size-xs);
-}
-
-:root body .settings-list > h4 {
-  color: var(--secondary);
-  font-size: var(--font-size-xs);
-  font-weight: 500;
-}
-
-:root body .app-dialog .settings-row,
-:root body .settings-row {
-  min-height: 40px;
-  padding: 0 2px;
-  gap: 16px;
-  border-top: 1px solid var(--line);
-  border-bottom: 0;
-  color: var(--text);
-  font-size: var(--font-size-md);
-}
-
-:root body .settings-row > span:first-child {
-  color: var(--text);
-  font-size: var(--font-size-md);
-}
-
-:root body .settings-row small {
-  color: var(--secondary);
-  font-size: var(--font-size-sm);
-  font-family: var(--font-mono);
-}
 
 /* =================================================================================================
  * 9 · Floating multi-select toolbar  (多选对齐工具条: raised bar · r12 · 1px $line ·
@@ -9210,71 +8563,7 @@ main {
 
 @media (max-width: 760px) {
 
-  :root body #settings-dialog .settings-sidebar::-webkit-scrollbar {
-    display: none;
-  }
-
-  :root body #settings-dialog .settings-nav-item::after {
-    display: none;
-  }
-
   /* Labels with a hint stack the hint underneath instead of running into it. */
-
-  :root body #settings-dialog .settings-row > select,
-  :root body #settings-dialog .settings-row > input:not([type="checkbox"]),
-  :root body #settings-dialog .settings-text-row > :last-child,
-  :root body #settings-dialog .settings-row > .settings-secret-control,
-  :root body #settings-dialog .settings-row.settings-range > .settings-range-control {
-    flex: 1 1 100%;
-    width: 100%;
-    max-width: none;
-  }
-
-  :root body #settings-dialog input:not([type="checkbox"]):not([type="range"]):not([type="color"]) {
-    min-height: 40px;
-    font-size: var(--font-size-lg); /* ≥16px stops iOS Safari from zooming the sheet on focus */
-  }
-
-  :root body #settings-dialog .settings-switch input[type="checkbox"] {
-    flex: none;
-  }
-
-  :root body #settings-dialog .about-block > div,
-  :root body #settings-dialog .about-contact {
-    flex-wrap: wrap;
-    gap: 8px 12px;
-  }
-
-  :root body #settings-dialog .about-contact > strong,
-  :root body #settings-dialog .about-contact-actions {
-    flex: 1 1 100%;
-  }
-
-  :root body #settings-dialog .about-contact-actions > button {
-    flex: 1;
-    min-height: 40px;
-    font-size: var(--font-size-md);
-  }
-
-  :root body #settings-dialog .about-contact-actions > a {
-    font-size: var(--font-size-md);
-  }
-
-  :root body #settings-dialog .model-choices-panel {
-    width: 100%;
-    flex: 1 1 100%;
-  }
-
-  :root body #settings-dialog #settings-save-state {
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-  }
-
-  :root body #settings-dialog #settings-dirty-label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
 }
 
 /* -------------------------------------------------------------------------------------------------

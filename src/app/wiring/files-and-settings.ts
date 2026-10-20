@@ -1,6 +1,6 @@
 import { sourceEditPath } from "../ssf-documents"
 import { requestEditMode } from "../mobile-layout"
-import { sourceUploadButton, sourcePasteButton, sourceMoveButton, sourceDeleteButton, toolbarMenus, newButton, openButton, browserOpen, $, saveButton, mobileShareButton, checkUpdateButton, aboutDiagnostics, exportLogsButton, exportLogsStatus, copyQqGroupButton, appDialogButtons, settingsDialog, settingsStorageNav, settingsModelNav, settingsStorageSection, settingsModelSection, aiNewSession, aiDesignStatus, aiDesignPanel, aiDraftApply, aiDraftCancel, sourceDirectoryEnabled, sourceDirectory, chooseSourceDirectory, resetSourceDirectory, sourceDirectoryStatus, sidebarViewButtons, defaultDevice, device, canvasBackground, mobilePreviewPosition, hintPreviewEnabled, editorCrosshair, editorCoordinateSnap, appTheme, sourceFontSize, windowMaterial, windowMaterialOpacity, sidebarViewVisible, inspectorTabsVisible, sourceCompletionEnabled, sourceValueHintsEnabled, sourceLineExplanationEnabled, undoButton, redoButton, fileOperationDialog, canvasWrap, replaceAssetButton, imageOpen, assetBackButton, sourceColorPicker } from "../dom"
+import { sourceUploadButton, sourcePasteButton, sourceMoveButton, sourceDeleteButton, toolbarMenus, newButton, openButton, browserOpen, $, saveButton, mobileShareButton, checkUpdateButton, aboutDiagnostics, exportLogsButton, exportLogsStatus, copyQqGroupButton, appDialogButtons, settingsDialog, settingsModelNav, settingsStorageSection, settingsModelSection, aiNewSession, aiDesignStatus, aiDesignPanel, aiDraftApply, aiDraftCancel, sourceDirectoryEnabled, sourceDirectory, chooseSourceDirectory, resetSourceDirectory, sourceDirectoryStatus, sidebarViewButtons, defaultDevice, device, canvasBackground, mobilePreviewPosition, hintPreviewEnabled, editorCrosshair, editorCoordinateSnap, appTheme, sourceFontSize, windowMaterial, windowMaterialOpacity, sidebarViewVisible, inspectorTabsVisible, sourceCompletionEnabled, sourceValueHintsEnabled, sourceLineExplanationEnabled, undoButton, redoButton, fileOperationDialog, canvasWrap, replaceAssetButton, imageOpen, assetBackButton, sourceColorPicker } from "../dom"
 import { appState } from "../state"
 import { isEditing, commitBatch, prepareDocumentReplacement, undo, redo, commitBytes, updateDirty, commitText } from "../edit-history"
 import { sourceTargetFolder, sourceCopyPath, refreshAfterSourceMutation, setSourceTransfer, sourceSelection, sourcePaths, setSidebarView, revealSourceFile } from "../source-files"
@@ -29,6 +29,7 @@ import { IniDocument } from "../../ini.ts"
 import { tileSlices } from "../../tiles.ts"
 import { populateTileInspector, drawAtlas } from "../tile-editing"
 import { type SourceEditorCursorMove } from "../../lazy-source-editor.ts"
+import { keyEventElement } from "../key-editing"
 
 /** 源文件工具栏、源码目录、设置项、窗口事件与拖放。只在启动时由 main.ts 按顺序调用一次。 */
 export function wireFilesAndSettings(): void {
@@ -115,9 +116,8 @@ export function wireFilesAndSettings(): void {
     const menuOpen = toolbarMenus.some((menu) => menu.open)
     for (const menu of toolbarMenus) menu.open = false
     // Esc 取消画布上的按键选择（与点空白处一致）；输入框、弹窗和菜单里的 Esc 留给它们自己。
-    const target = event.target as Element | null
     if (menuOpen || !isEditing() || !appState.selectedKeySections.length || document.querySelector("dialog[open]")) return
-    if (target?.closest?.("input, textarea, select, [contenteditable], .cm-editor")) return
+    if (keyEventElement(event.target)?.closest("input, textarea, select, [contenteditable], .cm-editor")) return
     preview.setSelected([])
     appState.selectedKeySections = []
     source.collapseSelection()
@@ -229,9 +229,8 @@ export function wireFilesAndSettings(): void {
       next?.click()
     })
   }
-  settingsStorageNav.hidden = !nativeSettings
   settingsModelNav.hidden = !nativeSettings
-  settingsStorageSection.toggleAttribute("data-platform-hidden", !nativeSettings)
+  if (!nativeSettings) settingsStorageSection.hidden = true
   settingsModelSection.toggleAttribute("data-platform-hidden", !nativeSettings)
   showSettingsPage("appearance")
   aiNewSession.addEventListener("click", () => {

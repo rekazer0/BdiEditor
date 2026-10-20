@@ -9,9 +9,10 @@ interface ModelProviderPreset {
 }
 
 export const MODEL_PROVIDER_PRESETS: readonly ModelProviderPreset[] = [
-  { id: "anthropic", label: "Anthropic", protocol: "anthropic", apiUrl: "https://api.anthropic.com/v1", model: "claude-sonnet-4-20250514" },
+  { id: "anthropic", label: "Anthropic", protocol: "anthropic", apiUrl: "https://api.anthropic.com/v1", model: "claude-sonnet-5-5" },
   { id: "anthropic-compatible", label: "Anthropic 兼容格式", protocol: "anthropic", apiUrl: "", model: "" },
   { id: "openai", label: "OpenAI", protocol: "openai-chat", apiUrl: "https://api.openai.com/v1", model: "gpt-5" },
+  { id: "openai-compatible", label: "OpenAI 兼容格式", protocol: "openai-chat", apiUrl: "", model: "" },
   { id: "openai-responses", label: "OpenAI Responses 格式", protocol: "openai-responses", apiUrl: "https://api.openai.com/v1", model: "gpt-5" },
   { id: "chatgpt-codex", label: "ChatGPT 订阅 (Codex)", protocol: "openai-responses", apiUrl: "https://api.openai.com/v1", model: "gpt-5-codex" },
   { id: "xai-subscription", label: "xAI 订阅 (Grok)", protocol: "openai-chat", apiUrl: "https://api.x.ai/v1", model: "grok-4" },
