@@ -17,6 +17,21 @@ import { ssfPreview, ssfUnsupportedWarnings, type SsfConversion } from "./ssf-to
 
 const STYLE_TYPES = { image: 0, color: 1, text: 2 } as const
 
+/**
+ * Baidu Android 13.3.18.31 reads a BDA's toolbar icons by name: the Logo and hide buttons from `cand.candKeys`
+ * (CAND_F31, CAND_F8) and the F14 container's functions from `cand.menuKeys` (KeymapLoader → CandLoader.k;
+ * names from CandIconFunction, paired with each MenuFunction by MenuFunctionConvertor).
+ */
+const TOOLBAR_CAND_KEYS: Record<string, string> = { CAND_F31: "logo.png", CAND_F8: "close.png" }
+const TOOLBAR_MENU_KEYS: Record<string, string> = {
+  MENU_EMOJI: "ime_function_expression.png",
+  MENU_MODE: "ime_function_switch.png",
+  MENU_AUDIO: "ime_function_voice.png",
+  MENU_SEARCH: "ime_function_sousou.png",
+  MENU_MOVE: "ime_function_textedit.png",
+  MENU_PASTE: "ime_function_clipboard.png",
+}
+
 /** `KEY_F38_S34` → `F38`, `KEY_Q` → `q`: the action a Baidu INI key would carry in CENTER. */
 function bdaKeyAction(name: string): string {
   const action = name.replace(/^KEY_/, "").replace(/_S\d+$/, "")
@@ -261,11 +276,37 @@ class BdaThemeConverter {
         const fore = rawFields(candBytes).find((item) => item.number === 4)
         const recoloured = candidateColors && fore && refType(fore) === STYLE_TYPES.text ? writer.recolouredText(refKey(fore), candidateColors) : undefined
         if (recoloured) candBytes = replaceField(candBytes, 4, 2, recoloured)
-        return encodedField(4, 2, candBytes)
+        return encodedField(4, 2, this.toolbarKeys(writer, candBytes))
       }
       return original
     })))
     return writer.result()
+  }
+
+  /** Paints the skin's Logo, hide and function icons onto the template's candidate bar keys. */
+  private toolbarKeys(writer: AppearanceWriter, cand: Uint8Array): Uint8Array {
+    const icon = (file: string) => {
+      const pair = this.look.toolbarIcon(file)
+      return pair && encodedField(2, 2, writer.imageStyle(pair))
+    }
+    const menu = Object.entries(TOOLBAR_MENU_KEYS).flatMap(([name, file]) => {
+      const fore = icon(file)
+      return fore ? [{ name, fore }] : []
+    })
+    const replaced = new Set(menu.map(({ name }) => name))
+    const kept = rawFields(cand).flatMap((field) => {
+      const original = cand.slice(field.start, field.end)
+      if ((field.number !== 10 && field.number !== 12) || !field.bytes) return [original]
+      const entry = rawFields(field.bytes)
+      const name = rawString(entry.find((item) => item.number === 1))
+      if (field.number === 12) return replaced.has(name) ? [] : [original]
+      const value = entry.find((item) => item.number === 2)?.bytes
+      const fore = TOOLBAR_CAND_KEYS[name] && icon(TOOLBAR_CAND_KEYS[name])
+      if (!value || !fore) return [original]
+      return [encodedField(10, 2, replaceField(field.bytes, 2, 2, join([removeFields(value, new Set([2, 3])), fore])))]
+    })
+    const added = menu.map(({ name, fore }) => encodedField(12, 2, join([encodedField(1, 2, new TextEncoder().encode(name)), encodedField(2, 2, fore)])))
+    return join([...kept, ...added])
   }
 
   /** Default key sound plus per-key sounds that differ from it, in a soundConfig per orientation. */

@@ -1,9 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { SkinArchive } from '../src/skin.ts'
 import { IniDocument } from '../src/ini.ts'
 import { parseXmlPlist } from '../src/palm/palm-plist.ts'
+import { decodeBdaAppearance } from '../src/bda-decode.ts'
 import { strFromU8 } from 'fflate'
 import { convertSsfDocument, ssfDocumentBytes, ssfPreviewFiles } from '../src/ssf/ssf-convert.ts'
 import { decodePng, cropImage } from '../src/ssf/ssf-png.ts'
@@ -139,5 +141,30 @@ test('SSF → BDS gives Android the native F14 toolbar and the Sogou icons in th
     for (const [file, index] of [['ime_function_textedit', 25], ['ime_function_clipboard', 50]]) {
       assert.deepEqual(slice(index), decodePng(source.getBytes(`1080/${folder}/${file}.png`)), `${theme} ${file} → IMG${index}`)
     }
+  }
+})
+
+test('SSF → BDA puts the toolbar art into the candidate keys Android reads by name', async () => {
+  const source = SkinArchive.open(await ssfDocumentBytes(ssfFixture()), 'ssf')
+  const files = { 'logo.png': '902.png', 'close.png': 'delf_26.png', 'ime_function_expression.png': '26q_x.png', 'ime_function_switch.png': '902.png', 'ime_function_voice.png': 'delf_26.png', 'ime_function_sousou.png': '26q_x.png', 'ime_function_textedit.png': '902.png', 'ime_function_clipboard.png': 'delf_26.png' }
+  for (const folder of ['status1', 'status2']) for (const [name, from] of Object.entries(files)) source.setBytes(`1080/${folder}/${name}`, source.getBytes(`1080/${folder}/${from}`))
+  const bda = SkinArchive.open((await convertSsfDocument(source, 'bda', templates)).bytes, 'bda')
+  const path = 'light/skin/port/appearanceConfig'
+  const appearance = decodeBdaAppearance(bda.getBytes(path))
+  // Compare size and a digest: a deepEqual diff of two decoded images is too large to print.
+  const digest = ({ width, height, data }) => `${width}x${height}:${createHash('sha256').update(data).digest('hex')}`
+  const pixels = (ref) => {
+    const id = appearance.imageStyles.get(ref.key).normalImage.resource.resourceID
+    // Resource ids are numbered per theme, so look the image up next to this appearance.
+    return digest(decodePng(bda.getBytes(`${path.replace(/port\/appearanceConfig$/, '')}res/${id}.png`)))
+  }
+  const fromSource = (name) => digest(decodePng(source.getBytes(`1080/status1/${name}`)))
+  const cand = appearance.panels.get('py_9').cand
+  for (const [key, file] of [['CAND_F31', 'logo.png'], ['CAND_F8', 'close.png']]) {
+    assert.equal(pixels(cand.candKeys.get(key).foreStyles[0]), fromSource(file), key)
+  }
+  // CandIconFunction names for MenuFunction EMOJI, INPUT_MANAGER, VOICE, SEARCH, EDITOR, CLIPBOARD.
+  for (const [key, file] of [['MENU_EMOJI', 'ime_function_expression.png'], ['MENU_MODE', 'ime_function_switch.png'], ['MENU_AUDIO', 'ime_function_voice.png'], ['MENU_SEARCH', 'ime_function_sousou.png'], ['MENU_MOVE', 'ime_function_textedit.png'], ['MENU_PASTE', 'ime_function_clipboard.png']]) {
+    assert.equal(pixels(cand.menuKeys.get(key).foreStyles[0]), fromSource(file), key)
   }
 })
