@@ -126,13 +126,8 @@ export function wireFilesAndSettings(): void {
   newButton.addEventListener("click", () => void startNewDocument())
   openButton.addEventListener("click", () => {
     if (isTauri()) void runFileOperation("打开", openNative)
-    else {
-      void runFileOperation("打开", async () => {
-        if (!(await prepareDocumentReplacement())) return false
-        browserOpen.click()
-        return false
-      })
-    }
+    // 文件选择框必须在点击里同步弹出：先等未保存确认再 click()，移动端浏览器会因失去用户手势而拦掉选择框。
+    else browserOpen.click()
   })
   $("#recent-clear")?.addEventListener("click", () => {
     localStorage.removeItem(recentFilesKey)
@@ -417,6 +412,7 @@ export function wireFilesAndSettings(): void {
     if (file) {
       await runFileOperation("打开", async () => {
         if (!isSupportedSkinPath(file.name)) throw new Error(UNSUPPORTED_SKIN_MESSAGE)
+        if (!(await prepareDocumentReplacement())) return false
         return openSkinBytes(await readBrowserSkinFile(file), file.name)
       })
     }
