@@ -53,6 +53,8 @@ export const appState = {
   selectedKeySections: [] as string[],
   selectedToolbarSections: [] as string[],
   selectedCandidate: false,
+  /** Which text the 文字 group edits for the candidate bar or whole layout (候选字、首选、输入码……). */
+  textStyleTarget: "",
   unsavedNew: false,
   assetURL: "",
   assetReturnPath: "",

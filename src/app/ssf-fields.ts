@@ -15,6 +15,7 @@ import { sourceEditPath, ssfDocument, ssfPackage, ssfTheme } from "./ssf-documen
 import { rebuildSsfPreview } from "./ssf-preview"
 import { appState } from "./state"
 import { styleKindBadge } from "./style-picker"
+import { element } from "../dom-element.ts"
 
 export type SsfEntry = { key: string; value: string }
 
@@ -31,12 +32,6 @@ const QUADS: Record<string, string[]> = {
 }
 const COLOR_VALUE = /^(?:0x|#)?([0-9a-f]{6}|[0-9a-f]{8})$/i
 const NUMERIC_FIELDS = new Set(["BG_STYLE", "TEXT_SIZE", "TYPEFACE", "TYPE", "LABEL_VISIBLE", "MINOR_LABEL_VISIBLE", "LABEL_ORIENTATION", "LABEL_HORIZONTAL_OFFSET", "MINOR_LABEL_HORIZONTAL_OFFSET", "POPUP_OFFSET_VERTICAL", "LOOP_TYPE", "START", "END", "loop_count"])
-
-function element<K extends keyof HTMLElementTagNameMap>(name: K, className?: string): HTMLElementTagNameMap[K] {
-  const node = document.createElement(name)
-  if (className) node.className = className
-  return node
-}
 
 /**
  * Applies `change` to one Sogou file as a single undo step, then redraws the canvas from the edited

@@ -289,6 +289,14 @@ export const keyboardFieldsGroup = $(".keyboard-fields")
 
 export const toolbarFieldsGroup = $(".toolbar-fields")
 
+export const textStyleGroup = $(".text-style-fields")
+
+export const textStyleTargetSwitch = $("#text-style-targets")
+
+export const textStyleRows = $("#text-style-rows")
+
+export const textStyleNote = $("#text-style-note")
+
 export const toolbarFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-toolbar-field]"))
 
 export const skinFieldsGroup = $(".skin-fields")

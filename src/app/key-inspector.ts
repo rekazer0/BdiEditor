@@ -28,6 +28,7 @@ import { updateStylePreviews } from "./style-picker"
 import { ssfInspectorTitle } from "./ssf-inspector"
 import { populateDocumentInspector, populateBdaConfigInspector } from "./document-inspector"
 import { populateFontControls } from "./skin-fonts"
+import { populateTextStyleGroup, writeCssStyleProperty, type TextProperty } from "./text-styles"
 
 export function selectedStylePropertyContext(property: string, styles?: IniDocument):
   | { document: IniDocument; path: string; sources: StylePropertySource[] }
@@ -64,17 +65,6 @@ export function selectedBdaRefs(
     })
   const refs = collect(source)
   return refs.length || !fallbackSource ? refs : collect(fallbackSource)
-}
-
-export function bdaStyleHasProperty(appearance: BdaAppearance, ref: BdaStyleRef, property: string): boolean {
-  if (ref.type !== "text") return false
-  const style = appearance.textStyles.get(ref.key)
-  if (!style) return false
-  if (property === "FONT_NAME") return style.fontName !== undefined
-  if (property === "FONT_SIZE") return style.fontSize !== undefined
-  if (property === "NM_COLOR") return style.normalColor !== undefined
-  if (property === "HL_COLOR") return style.highlightColor !== undefined
-  return false
 }
 
 export function bdaStyleValue(appearance: BdaAppearance, ref: BdaStyleRef, property: string): string {
@@ -370,6 +360,7 @@ export function populateKeyInspector(): void {
   }
   populatePrimaryCssFields(hasSelection, sections)
   populateFontControls()
+  populateTextStyleGroup()
   const bdaKeyProperties = new Set(["FORE_OFFSET"])
   for (const field of keyFields) {
     if (!field.closest(".key-appearance-fields")) continue
@@ -389,11 +380,12 @@ export function populateKeyInspector(): void {
       const info = bdaTextInfo
       const refs = bdaTextRefs
       const values = info ? refs.map((ref) => bdaStyleValue(info.appearance, ref, property)) : []
-      const available = Boolean(info && refs.some((ref) => bdaStyleHasProperty(info.appearance, ref, property)))
+      // updateBdaStyle adds a missing field, so every text style can take every property.
+      const available = Boolean(info && refs.length)
       bdaTextPropertyAvailability.set(property, available)
       const common = values.length && values.every((value) => value === values[0]) ? values[0] : ""
       field.disabled = !available
-      field.placeholder = available && !common && new Set(values).size > 1 ? "混合" : available ? "" : "未配置"
+      field.placeholder = available && !common && new Set(values).size > 1 ? "混合" : available ? "未设置" : "未配置"
       field.value = common
       if (property.endsWith("COLOR")) syncColorControl(field)
       continue
@@ -406,7 +398,7 @@ export function populateKeyInspector(): void {
     field.placeholder = context && !common && new Set(values).size > 1
       ? "混合"
       : context
-        ? ""
+        ? "未设置"
         : hasSelection
           ? "未配置"
           : ""
@@ -706,15 +698,6 @@ export function updateSelectedStyle(field: HTMLInputElement): void {
     return
   }
   const context = selectedStylePropertyContext(property)
-  if (!appState.archive || !context) return
-  const before = context.document.toString()
-  for (const section of new Set(context.sources.map((source) => source.section))) {
-    context.document.set(section, property, field.value)
-  }
-  const text = context.document.toString()
-  commitText(context.path, before, text)
-  if (appState.selectedPath === context.path) setSourceValue(text)
-  refreshPreview()
-  populateKeyInspector()
-  updateDirty()
+  if (!context) return
+  writeCssStyleProperty([...new Set(context.sources.map((source) => source.section))], property as TextProperty, field.value.trim())
 }

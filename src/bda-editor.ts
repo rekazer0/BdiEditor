@@ -3,6 +3,7 @@ import { bdaStyleID, type BdaAppearance, type BdaAnimationFrame, type BdaKey, ty
 import { bdaColorHex } from "./bda-resolver.ts"
 import { decodeBdaAnimation, decodeBdaAppearance, decodeBdaSoundConfig } from "./bda-decode.ts"
 import { bdaLayoutStyleGroups, type BdaLayoutStyleItem } from "./bda-layout-styles.ts"
+import { element } from "./dom-element.ts"
 
 type BdaStyleChange = (ref: BdaStyleRef, property: string, value: string) => void
 export type BdaLayoutScope = "panel" | "candidate"
@@ -56,12 +57,6 @@ const bdaEntryNames: Record<string, string> = { short: "短按", long: "长按",
 /** BDA 提示 / 列表条目用内部键名（short、port…），界面上显示对应的中文。 */
 export function bdaEntryLabel(key: string): string {
   return bdaEntryNames[key] ?? key
-}
-
-function element<K extends keyof HTMLElementTagNameMap>(name: K, className?: string): HTMLElementTagNameMap[K] {
-  const node = document.createElement(name)
-  if (className) node.className = className
-  return node
 }
 
 function inspectorSection<T extends HTMLElement>(node: T, label: string): T {

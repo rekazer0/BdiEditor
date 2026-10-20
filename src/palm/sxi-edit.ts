@@ -35,17 +35,43 @@ export function sxiStylePointer(text: string, pointer: string[], orientation: st
   return asObject(sxiFragment(parseSkinJson(text), own)) ? own : pointer
 }
 
+function styleModel(styles: JsonObject, section: string): JsonObject {
+  const model = asObject(Object.entries(styles).find(([id, item]) => (asObject(item)?.id ?? `STYLE${id}`) === section)?.[1])
+  if (!model) throw new Error(`找不到手心样式 ${section}`)
+  return model
+}
+
 export function setSxiStyleImage(text: string, pointer: string[], sections: string[], property: "NM_IMG" | "HL_IMG", value: string): string {
   const skin = parseSkinJson(text)
   const styles = asObject(sxiFragment(skin, pointer))
   if (!styles) throw new Error("找不到手心样式")
   for (const section of sections) {
-    const style = Object.entries(styles).find(([id, item]) => (asObject(item)?.id ?? `STYLE${id}`) === section)?.[1]
-    const model = asObject(style)
-    if (!model) throw new Error(`找不到手心样式 ${section}`)
+    const model = styleModel(styles, section)
     const image = asObject(model.s_2) ?? {}
     image[property === "NM_IMG" ? "normal" : "hl"] = value
     model.s_2 = image
+  }
+  return encodeSkinJson(skin)
+}
+
+// default.css text keys and their `s_1` names (see `stylesText` in sxi-style.ts).
+const SXI_TEXT_FIELDS: Record<string, string> = { FONT_NAME: "f_n", FONT_SIZE: "f_s", NM_COLOR: "c_normal", HL_COLOR: "c_hl" }
+
+/** Sets one text property of each style; an empty value removes it so the skin default applies. */
+export function setSxiStyleText(text: string, pointer: string[], sections: string[], property: string, value: string): string {
+  const field = SXI_TEXT_FIELDS[property]
+  if (!field) throw new Error(`手心样式不支持 ${property}`)
+  const number = Number(value)
+  if (property === "FONT_SIZE" && value && !(Number.isFinite(number) && number > 0)) throw new Error("字号必须是正数")
+  const skin = parseSkinJson(text)
+  const styles = asObject(sxiFragment(skin, pointer))
+  if (!styles) throw new Error("找不到手心样式")
+  for (const section of sections) {
+    const model = styleModel(styles, section)
+    const info = asObject(model.s_1) ?? {}
+    if (value) info[field] = property === "FONT_SIZE" ? number : value
+    else delete info[field]
+    model.s_1 = info
   }
   return encodeSkinJson(skin)
 }

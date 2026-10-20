@@ -68,7 +68,7 @@ export function inputBarBox(
     : { width, paddingStart: metrics.textLeft, paddingEnd: metrics.inset * 2 }
 }
 
-function candidateInputForegroundStyle(
+export function candidateInputForegroundStyle(
   general: IniDocument | undefined,
   candidate?: IniDocument,
 ): string {
