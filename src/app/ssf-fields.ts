@@ -16,6 +16,10 @@ import { rebuildSsfPreview } from "./ssf-preview"
 import { appState } from "./state"
 import { styleKindBadge } from "./style-picker"
 import { element } from "../dom-element.ts"
+import { sanitizeFontFileName, skinFontFiles, uniqueFontFileName } from "../font-files.ts"
+import { type Change } from "../history.ts"
+import { showError, showStatus } from "./file-operations"
+import { validateFont } from "./skin-fonts"
 
 export type SsfEntry = { key: string; value: string }
 
@@ -41,7 +45,7 @@ export function editSsfFile(path: string, change: (document: IniDocument) => voi
   editTargets([{ path, section: "" }], change)
 }
 
-type SsfLocation = { path: string; section: string }
+export type SsfLocation = { path: string; section: string }
 
 function editTargets(targets: SsfLocation[], change: (document: IniDocument, target: SsfLocation) => void): void {
   const archive = appState.archive
@@ -261,6 +265,7 @@ function colorField(key: string, value: string, targets: SsfLocation[]): HTMLEle
   picker.setAttribute("aria-label", ssfFieldLabel(key))
   const text = element("input")
   text.value = value
+  if (!value) text.placeholder = "未设置"
   text.setAttribute("aria-label", `${ssfFieldLabel(key)}值`)
   const alpha = element("input")
   alpha.type = "number"
@@ -286,15 +291,36 @@ function colorField(key: string, value: string, targets: SsfLocation[]): HTMLEle
   return row
 }
 
+/** `BOLD=true` or no key at all (Sogou reads only "true"). */
+function switchField(key: string, value: string, targets: SsfLocation[]): HTMLElement {
+  const row = element("label", "document-property-field")
+  row.classList.add("ui-field")
+  caption(row, key)
+  const input = element("input", "ui-switch")
+  input.type = "checkbox"
+  input.setAttribute("role", "switch")
+  input.setAttribute("aria-label", ssfFieldLabel(key))
+  input.checked = value.trim().toLowerCase() === "true"
+  input.disabled = !isEditing()
+  input.addEventListener("change", () => editTargets(targets, (document, target) => {
+    if (input.checked) setSsfValue(document, target.section, key, "true")
+    else document.remove(target.section, key)
+  }))
+  row.append(input)
+  return row
+}
+
 function valueInput(key: string, value: string, targets: SsfLocation[]): HTMLInputElement {
   const input = element("input", "document-property-input")
   input.value = value
   input.title = `${ssfFieldLabel(key)}：${value}`
   input.disabled = !isEditing()
-  if (NUMERIC_FIELDS.has(key) && /^-?\d+(?:\.\d+)?$/.test(value)) {
+  // TEXT_SIZE is a fraction of the screen width (0.045), so a new one takes decimals too.
+  if (NUMERIC_FIELDS.has(key) && /^-?\d+(?:\.\d+)?$/.test(value) || !value && key === "TEXT_SIZE") {
     input.type = "number"
-    input.step = value.includes(".") ? "any" : "1"
+    input.step = value.includes(".") || key === "TEXT_SIZE" ? "any" : "1"
   }
+  if (!value) input.placeholder = key === "TEXT_SIZE" ? "未设置（屏宽比例，如 0.045）" : "未设置"
   input.setAttribute("aria-label", ssfFieldLabel(key))
   input.addEventListener("change", () => {
     if (input.type !== "number" || input.value !== "" && Number.isFinite(input.valueAsNumber)) writeValue(targets, key, input.value)
@@ -333,7 +359,8 @@ function ssfField(entry: SsfEntry, targets: SsfLocation[], options?: string[]): 
     }))
     return row
   }
-  if (/COLOR/i.test(key) && COLOR_VALUE.test(value.trim())) return colorField(key, value, targets)
+  if (key === "BOLD") return switchField(key, value, targets)
+  if (/COLOR/i.test(key) && (COLOR_VALUE.test(value.trim()) || !value)) return colorField(key, value, targets)
   if (parseSsfImage(value)) return imageCard(ssfFieldLabel(key), key, targets)
   return textField(key, value, targets, options)
 }
@@ -354,8 +381,55 @@ export type SsfBlock = {
   /** The field naming this block's image section, editable in its card. */
   reference?: CardReference
   options?: Record<string, string[]>
+  /** Keys offered even when the section lacks them, so they can be added (text size, typeface…). */
+  expect?: string[]
   /** Matching sections of the other selected keys. */
   peers?: SsfLocation[]
+}
+
+/** Font files a TYPEFACE can name: Sogou installs `default/` and the theme folder into one directory. */
+export function ssfFontOptions(): string[] {
+  return [...new Set(skinFontFiles(appState.archive?.names() ?? []).map((path) => path.split("/").pop()!))]
+}
+
+/** Imports a .ttf / .otf into default/ and points every target's TYPEFACE at it, as one undo step. */
+export function ssfFontImportButton(targets: SsfLocation[]): HTMLButtonElement {
+  return ssfButton("导入字体", "upload", () => {
+    const picker = element("input")
+    picker.type = "file"
+    picker.accept = ".ttf,.otf"
+    picker.addEventListener("change", () => {
+      const file = picker.files?.[0]
+      if (file) void importSsfFont(file, targets)
+    })
+    picker.click()
+  })
+}
+
+async function importSsfFont(file: File, targets: SsfLocation[]): Promise<void> {
+  const archive = appState.archive
+  if (!archive || archive.format !== "ssf" || !isEditing()) return
+  try {
+    if (!/\.(?:ttf|otf)$/i.test(file.name)) throw new Error("搜狗皮肤只支持 .ttf / .otf 字体文件")
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    await validateFont(bytes)
+    const name = uniqueFontFileName(sanitizeFontFileName(file.name), archive.names())
+    const changes: Change[] = [{ kind: "bytes", path: `default/${name}`, before: undefined, after: bytes }]
+    for (const path of new Set(targets.map((target) => target.path))) {
+      const before = archive.getText(path)
+      const document = IniDocument.parse(before)
+      for (const target of targets.filter((item) => item.path === path)) setSsfValue(document, target.section, "TYPEFACE", name)
+      changes.push({ kind: "text", path, before, after: document.toString() })
+    }
+    commitBatch(changes)
+    rebuildSsfPreview()
+    refreshPreview()
+    populateKeyInspector()
+    updateDirty()
+    showStatus(`已导入字体 ${name}。`)
+  } catch (error) {
+    showError(error, "导入字体")
+  }
 }
 
 export function ssfButton(label: string, icon: string, onClick: () => void): HTMLButtonElement {
@@ -456,6 +530,9 @@ function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
   for (const entry of entries) {
     if (used.has(entry.key)) continue
     grid.append(ssfField(entry, targets, block.options?.[entry.key]))
+  }
+  for (const key of block.expect ?? []) {
+    if (!used.has(key) && !keys.has(key)) grid.append(ssfField({ key, value: "" }, targets, block.options?.[key]))
   }
   for (const row of Array.from(grid.children) as HTMLElement[]) {
     const band = row.dataset.documentKey === "STRETCH"

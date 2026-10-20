@@ -316,6 +316,10 @@ await check("edit keys: geometry, keyboard nudge, undo/redo, multi-select, layou
   await page.locator('[data-inspector-tab="source"]').click()
   await page.waitForFunction(() => /SHOW=测/.test(document.querySelector("#source .cm-content")?.innerText ?? ""))
   await page.locator('[data-inspector-tab="properties"]').click()
+  // The skin font applies to every key, so it sits in the whole layout's 文字 group.
+  await page.evaluate(() => document.activeElement?.blur())
+  await page.keyboard.press("Escape")
+  await page.locator(".text-style-fields #font-file-field").waitFor({ state: "visible" })
   // The font is picked from the skin's own font files; the system font is always offered.
   assert.equal(await page.locator("#font-file-select option").first().textContent(), "系统默认")
   // Import is available in edit mode; removing the system default is not possible.
@@ -329,6 +333,7 @@ await check("edit keys: geometry, keyboard nudge, undo/redo, multi-select, layou
   })
   await page.waitForFunction(() => document.querySelector("#event-log")?.dataset.kind === "error")
   assert.match(await page.locator("#event-log").textContent(), /导入字体/)
+  await selectKey(page)
   await railTab(page, "手势")
   const up = page.locator("[data-key-field=UP]")
   await up.fill("F12")
@@ -347,6 +352,46 @@ await check("edit keys: geometry, keyboard nudge, undo/redo, multi-select, layou
 /* ------------------------------------------------------------------------------------------------
  * 6 · Styles: library, filters, search, apply, new style
  * ---------------------------------------------------------------------------------------------- */
+await check("text: candidate bar and whole layout edit their text styles", () => withPage(async (page) => {
+  const styleText = () => page.evaluate(async () => {
+    const { appState } = await import("/src/app/state.ts")
+    const { styleConfigPath } = await import("/src/app/config-context.ts")
+    return appState.archive.getText(styleConfigPath())
+  })
+  await openTemplate(page, "xiaomi-unified-rounded-blur")
+  await editMode(page)
+  // The candidate bar: candidate words, the first candidate and the input code, without a font row.
+  // Same as clicking the bar's background (the click handler opens the strip's .cnd); icons would select a toolbar item.
+  await page.evaluate(async () => {
+    const { selectFile } = await import("/src/app/navigation.ts")
+    selectFile(document.querySelector("#toolbar-strip").dataset.path)
+  })
+  const group = page.locator(".text-style-fields")
+  await group.waitFor({ state: "visible" })
+  assert.equal(await group.locator("#font-file-field").isVisible(), false)
+  assert.ok((await group.locator("#text-style-targets button").allTextContents()).includes("候选字"))
+  assert.equal(await group.locator("input[aria-label='候选字字体名称']").count(), 0)
+  const size = group.locator("input[aria-label='候选字字号']")
+  await size.fill("41")
+  await size.press("Enter")
+  await page.waitForFunction(() => document.querySelector(".text-style-fields input[aria-label='候选字字号']")?.value === "41")
+  assert.match(await styleText(), /FONT_SIZE\s*=\s*41/)
+  assert.equal(await undoEnabled(page), true)
+  // The whole layout writes every key's text style at once; mixed values say so.
+  await page.keyboard.press("Escape")
+  await page.evaluate(async () => {
+    const { selectFile } = await import("/src/app/navigation.ts")
+    const { appState } = await import("/src/app/state.ts")
+    selectFile(appState.layoutPath)
+  })
+  await group.waitFor({ state: "visible" })
+  const color = group.locator("input[aria-label='全部按键颜色值']")
+  await color.fill("FF123456")
+  await color.press("Enter")
+  await page.waitForFunction(() => document.querySelector(".text-style-fields input[aria-label='全部按键颜色值']")?.value === "FF123456")
+  assert.match(await styleText(), /NM_COLOR\s*=\s*FF123456/)
+}))
+
 await check("styles: library filters, search, preview, apply and new style", () => withPage(async (page) => {
   await openTemplate(page)
   await editMode(page)

@@ -198,7 +198,7 @@ export class SsfLook {
 
   private labelColor(binding: SsfKeyBinding, qwerty: boolean, pressed: boolean): string | undefined {
     const field = pressed ? "TEXT_COLOR_PRESSED" : "TEXT_COLOR"
-    for (const section of ssfTextSections(binding, qwerty)) {
+    for (const section of ssfTextSections(binding, qwerty, this.skin)) {
       const color = ssfColor(this.skin.get(section, field)) ?? (pressed ? ssfColor(this.skin.get(section, "TEXT_COLOR")) : undefined)
       if (color) return color
     }

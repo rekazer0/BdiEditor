@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict'
 import { chromium } from 'playwright'
 import { createServer } from 'vite'
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { ssfFixture } from '../tests/helpers/ssf-fixture.mjs'
+
+// Sogou reads key text through FG_STYLE → LABEL_STYLE; give Q and W the shared qwerty label style.
+const files = unzipSync(ssfFixture())
+files['1080/status1/phoneSkin.ini'] = strToU8(strFromU8(files['1080/status1/phoneSkin.ini'])
+  .replace('[Key_Q]\n', '[Key_Q]\nFG_STYLE=FGStyle_Qwerty\n')
+  .replace('[TextStyle_Qwerty]', '[Key_W]\nFG_STYLE=FGStyle_Qwerty\n[FGStyle_Qwerty]\nLABEL_STYLE=TextStyle_Qwerty\nLABEL_POSITION=0,0,1,1\n[TextStyle_Qwerty]'))
+const fixture = zipSync(files)
 
 const server = await createServer({ root: new URL('..', import.meta.url).pathname, logLevel: 'error', server: { port: 41796, strictPort: false, host: '127.0.0.1' } })
 await server.listen()
@@ -36,7 +44,7 @@ const skin = '1080/status1/phoneSkin.ini'
 const keys = '1080/status1/keys.ini'
 try {
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`)
-  await page.locator('#browser-open').setInputFiles({ name: '属性测试.ssf', mimeType: 'application/octet-stream', buffer: Buffer.from(ssfFixture()) })
+  await page.locator('#browser-open').setInputFiles({ name: '属性测试.ssf', mimeType: 'application/octet-stream', buffer: Buffer.from(fixture) })
   await page.waitForFunction(() => !document.querySelector('#open').disabled)
   const close = page.locator('#file-operation-dialog[open] #file-operation-close')
   if (await close.isVisible()) await close.click()
@@ -127,15 +135,28 @@ try {
   assert.equal(await read(skin, 'SMA_Key26Bg_Q', 'NORMAL'), '26fn.png,2,96,3,139')
   await page.locator('.inspector-reset').click()
   assert.equal(await read(skin, 'SMA_Key26Bg_Q', 'NORMAL'), '26keyq.png,2,96,3,139')
+  // 单独设置 copies the label style and the FG_STYLE naming it, so only Q changes.
   await fields.locator('[data-inspector-group-label="文字"]').getByRole('button', { name: '单独设置' }).click()
+  assert.equal(await read(skin, 'Key_Q', 'FG_STYLE'), 'FGStyle_Key_Q')
+  assert.equal(await read(skin, 'FGStyle_Key_Q', 'LABEL_STYLE'), 'TextStyle_Key_Q')
+  assert.equal(await read(skin, 'FGStyle_Key_Q', 'LABEL_POSITION'), '0,0,1,1')
+  assert.equal(await read(skin, 'TextStyle_Key_Q', 'TEXT_COLOR'), '0x7F112233')
   await change(row('TEXT_COLOR').locator('input:not([type])'), '0x7F556677')
+  // Size and bold are offered before the style has them.
+  assert.match(await row('TEXT_SIZE').locator('input').getAttribute('placeholder'), /^未设置/)
+  await change(row('TEXT_SIZE').locator('input'), '0.05')
+  assert.equal(await read(skin, 'TextStyle_Key_Q', 'TEXT_SIZE'), '0.05')
+  await row('BOLD').locator('input').check()
+  assert.equal(await read(skin, 'TextStyle_Key_Q', 'BOLD'), 'true')
+  await row('BOLD').locator('input').uncheck()
+  assert.equal(await read(skin, 'TextStyle_Key_Q', 'BOLD'), undefined)
   await selectKey('w', true)
   assert.equal(await row('TEXT_COLOR').locator('input:not([type])').getAttribute('placeholder'), '混合')
   await change(row('TEXT_COLOR').locator('input[type=number]'), '0.5')
-  assert.equal(await read(skin, 'Key_Q', 'TEXT_COLOR'), '0x80556677')
+  assert.equal(await read(skin, 'TextStyle_Key_Q', 'TEXT_COLOR'), '0x80556677')
   assert.equal(await read(skin, 'TextStyle_Qwerty', 'TEXT_COLOR'), '0x80112233')
   await page.locator('.inspector-reset').click()
-  assert.equal(await read(skin, 'Key_Q', 'TEXT_COLOR'), '0x7F556677')
+  assert.equal(await read(skin, 'TextStyle_Key_Q', 'TEXT_COLOR'), '0x7F556677')
   assert.equal(await read(skin, 'TextStyle_Qwerty', 'TEXT_COLOR'), '0x7F112233')
   assert.deepEqual(errors, [])
   await page.screenshot({ path: '/tmp/bdi-ssf-inspector.png' })

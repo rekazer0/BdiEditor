@@ -5,9 +5,9 @@
 import type { IniDocument } from "../ini.ts"
 import type { SsfKeyBinding } from "../ssf/ssf-keymap.ts"
 import { ssfSectionLabel } from "../ssf/ssf-labels.ts"
-import { firstValue, ssfBackground, ssfForeground, ssfSoundSection, ssfTextSections } from "../ssf/ssf-parts.ts"
+import { firstValue, ssfBackground, ssfForeground, ssfLabelStyle, ssfSoundSection, ssfTextSections } from "../ssf/ssf-parts.ts"
 import { orientation } from "./dom"
-import { editSsfFile, freeSectionName, renderGroup as renderSsfGroup, setSsfValue, ssfButton, ssfEntries, type SsfBlock } from "./ssf-fields"
+import { editSsfFile, freeSectionName, renderGroup as renderSsfGroup, setSsfValue, ssfButton, ssfEntries, ssfFontImportButton, ssfFontOptions, type SsfBlock } from "./ssf-fields"
 import { openImageResourceChooser } from "./resource-inspector"
 import { isSsfBoardPath, ssfDocument, ssfKeysPath, ssfPackage, ssfQwertyBoard, ssfSelectedBindings, ssfSkinPath, ssfThemeFolder, SSF_SOUNDS_PATH } from "./ssf-documents"
 import { appState } from "./state"
@@ -106,25 +106,47 @@ function foregroundGroup(skinPath: string, keysPath: string, skin: IniDocument, 
   return renderGroup("前景", blocks)
 }
 
-function textGroup(skinPath: string, skin: IniDocument, binding: SsfKeyBinding): Group | undefined {
-  const sections = ssfTextSections(binding, ssfQwertyBoard())
-  const source = sections.find((section) => skin.get(section, "TEXT_COLOR") !== undefined)
-  const own = binding.sections.includes(source ?? "")
-  const copy = ssfButton("单独设置", "copy-plus", () => editSsfFile(skinPath, (document) => {
-    const owner = ownSection(document, binding)
-    setSsfValue(document, owner, "TEXT_COLOR", (source && document.get(source, "TEXT_COLOR")) ?? "0xFF000000")
-    const pressed = source && document.get(source, "TEXT_COLOR_PRESSED")
-    if (pressed) setSsfValue(document, owner, "TEXT_COLOR_PRESSED", pressed)
-  }))
-  if (!source) {
-    return renderGroup("文字", [{ path: skinPath, section: sections.at(-2)!, title: "按键文字", template: COLOR_TEMPLATE, note: "没有文字颜色，使用输入法默认颜色。" }])
+// What Sogou's TextStyle parser reads (theme/parse/parseimpl/w0.java); missing keys can be added.
+const TEXT_KEYS = ["TEXT_COLOR", "TEXT_COLOR_PRESSED", "TEXT_SIZE", "TYPEFACE", "BOLD"]
+const CANDIDATE_TEXT_KEYS = ["TEXT_COLOR", "TEXT_SIZE", "TYPEFACE", "BOLD"]
+
+function textBlock(path: string, section: string, keys = TEXT_KEYS, extra: Partial<SsfBlock> = {}): SsfBlock {
+  return {
+    path,
+    section,
+    template: COLOR_TEMPLATE,
+    expect: keys,
+    options: { TYPEFACE: ssfFontOptions() },
+    ...extra,
+    actions: [...extra.actions ?? [], ssfFontImportButton([{ path, section }])],
   }
-  return renderGroup("文字", [{
-    path: skinPath,
-    section: source,
-    note: own ? undefined : `共享文字样式：修改会影响所有使用 ${source} 的按键。`,
-    actions: own ? undefined : [copy],
-  }], source)
+}
+
+/** Sogou draws a key's text with `FG_STYLE`'s `LABEL_STYLE`; without one the board's default style applies. */
+function textGroup(skinPath: string, skin: IniDocument, binding: SsfKeyBinding): Group | undefined {
+  const label = ssfLabelStyle(skin, binding)
+  const fallbacks = ssfTextSections(binding, ssfQwertyBoard()).filter((section) => !binding.sections.includes(section))
+  const source = label?.style ?? fallbacks.find((section) => skin.sections().includes(section)) ?? fallbacks[0]
+  if (!label?.style) {
+    return renderGroup("文字", [textBlock(skinPath, source, TEXT_KEYS, {
+      note: label ? `${label.fgStyle} 没有 LABEL_STYLE，使用整个键盘的默认文字样式。` : "这个按键没有 FG_STYLE，使用整个键盘的默认文字样式。",
+    })], source)
+  }
+  const { owner, fgStyle, style } = label
+  if (style.startsWith(`TextStyle_${owner}`)) return renderGroup("文字", [textBlock(skinPath, style)], style)
+  // A shared style restyles every key using it: copy it and the FG_STYLE that names it for this key alone.
+  const copy = ssfButton("单独设置", "copy-plus", () => editSsfFile(skinPath, (document) => {
+    const ownStyle = freeSectionName(document, `TextStyle_${owner}`)
+    document.appendSection(ownStyle, ssfEntries(skinPath, style))
+    const ownFgStyle = freeSectionName(document, `FGStyle_${owner}`)
+    document.appendSection(ownFgStyle, [...ssfEntries(skinPath, fgStyle).filter((entry) => entry.key !== "LABEL_STYLE"), { key: "LABEL_STYLE", value: ownStyle }])
+    const rest = (document.get(owner, "FG_STYLE") ?? "").split(",").slice(1)
+    setSsfValue(document, owner, "FG_STYLE", [ownFgStyle, ...rest].join(","))
+  }))
+  return renderGroup("文字", [textBlock(skinPath, style, TEXT_KEYS, {
+    note: `共享文字样式：修改会影响所有使用 ${style} 的按键。`,
+    actions: [copy],
+  })], style)
 }
 
 function animationGroup(keysPath: string, binding: SsfKeyBinding): Group | undefined {
@@ -194,21 +216,21 @@ function boardGroups(): Group[] {
   const groups: Array<[string, SsfBlock[]]> = [
     ["键盘背景", [block("RootView"), ...skin.sections().includes("WALLPAPER") ? [block("WALLPAPER")] : []]],
     ["候选栏", [block(candidate), ...referenced(candidate, "BG_IMAGE", "候选栏背景")]],
-    ["候选字", [block("TextStyle_Candidate", { template: COLOR_TEMPLATE }), block("TextStyle_Candidate_Highlight", { template: COLOR_TEMPLATE })]],
-    ["输入码", [block("ComposingView"), block("TextStyle_Composing", { template: COLOR_TEMPLATE })]],
+    ["候选字", [textBlock(skinPath, "TextStyle_Candidate", CANDIDATE_TEXT_KEYS), textBlock(skinPath, "TextStyle_Candidate_Highlight", ["TEXT_COLOR"])]],
+    ["输入码", [block("ComposingView"), textBlock(skinPath, "TextStyle_Composing", CANDIDATE_TEXT_KEYS)]],
     ["按键背景", (qwerty ? ["KeyBg_Default_Latin", "KeyBg_Function_Qwerty", "KeyBg_Space_Qwerty"] : ["KeyBg_Default", "KeyBg_Function", "KeyBg_Space"]).map((section) => block(section))],
     ["按键文字", [
-      block(qwerty ? "TextStyle_Qwerty" : "TextStyle_Phone_Label", { template: COLOR_TEMPLATE }),
-      block(qwerty ? "TextStyle_FuncKey_26char" : "TextStyle_FuncKey_T9", { template: COLOR_TEMPLATE }),
-      block("TextStyle_Space_Label"),
-      block("TextStyle", { template: COLOR_TEMPLATE }),
+      textBlock(skinPath, qwerty ? "TextStyle_Qwerty" : "TextStyle_Phone_Label"),
+      textBlock(skinPath, qwerty ? "TextStyle_FuncKey_26char" : "TextStyle_FuncKey_T9"),
+      textBlock(skinPath, "TextStyle_Space_Label"),
+      textBlock(skinPath, "TextStyle"),
       block("General"),
     ]],
     ...nineKey ? [["符号列", [
       block("CandidateCodeView"),
       ...referenced("CandidateCodeView", "BG_IMAGE", "符号列背景"),
       ...referenced("CandidateCodeView", "BG_IMAGES", "符号列单元格"),
-      block(firstValue(skin.get("CandidateCodeView", "TEXT_STYLE")) ?? "TextStyle_Text", { template: COLOR_TEMPLATE }),
+      textBlock(skinPath, firstValue(skin.get("CandidateCodeView", "TEXT_STYLE")) ?? "TextStyle_Text", CANDIDATE_TEXT_KEYS),
       block("TextStyle_Popup_Code"),
     ]] as [string, SsfBlock[]]] : [],
   ]

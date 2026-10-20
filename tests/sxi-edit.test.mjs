@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { addSxiImageStyle, setSxiForeground, setSxiStyleImage, sxiSectionRanges, sxiStylePointer } from '../src/palm/sxi-edit.ts'
+import { addSxiImageStyle, setSxiForeground, setSxiStyleImage, setSxiStyleText, sxiSectionRanges, sxiStylePointer } from '../src/palm/sxi-edit.ts'
 import { encodeSkinJson, parseSkinJson, sxiDerivedFiles } from '../src/palm/sxi-projection.ts'
 import { SkinArchive } from '../src/skin.ts'
 import { strToU8, zipSync } from 'fflate'
@@ -26,6 +26,22 @@ test('SXI foreground append and state image edits persist through save/reopen wi
   assert.deepEqual(parseSkinJson(archive.getText('skin.json')), parseSkinJson(original))
   assert.throws(() => setSxiForeground(original, layout, ['KEY9'], 'NaN'), /编号/)
   assert.throws(() => setSxiForeground(original, layout, ['KEY404'], '1'), /KEY404/)
+})
+
+test('SXI text properties write s_1 and project back to default.css', () => {
+  let after = setSxiStyleText(original, styles, ['STYLE1728'], 'FONT_SIZE', '36')
+  after = setSxiStyleText(after, styles, ['STYLE1728'], 'NM_COLOR', 'FF336699')
+  after = setSxiStyleText(after, styles, ['STYLE1728'], 'FONT_NAME', 'Roboto')
+  const skin = parseSkinJson(after)
+  assert.deepEqual(skin.default.s_info.ss_1[1728].s_1, { text: 'q', f_s: 36, c_normal: 'FF336699', f_n: 'Roboto' })
+  assert.deepEqual(skin.default.s_info.ss_1[1728].s_2, { normal: 'old,0', hl: 'old,1' })
+  const css = [...sxiDerivedFiles(skin)].find(([path]) => path.endsWith('default.css'))[1].text
+  assert.match(css, /FONT_SIZE=36/)
+  assert.match(css, /NM_COLOR=FF336699/)
+  // An empty value removes the property so the skin default applies again.
+  assert.deepEqual(parseSkinJson(setSxiStyleText(after, styles, ['STYLE1728'], 'FONT_NAME', '')).default.s_info.ss_1[1728].s_1, { text: 'q', f_s: 36, c_normal: 'FF336699' })
+  assert.throws(() => setSxiStyleText(original, styles, ['STYLE1728'], 'FONT_SIZE', '-1'), /字号/)
+  assert.throws(() => setSxiStyleText(original, styles, ['STYLE9'], 'NM_COLOR', 'FF000000'), /STYLE9/)
 })
 
 test('SXI source ranges follow key IDs, nested bases, escaped strings and state tips', () => {
