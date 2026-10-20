@@ -170,6 +170,14 @@ npm run tauri build -- --bundles nsis
 
 QQ群：228040912
 
+## 鸣谢
+
+感谢以下朋友对本项目的帮助与支持：
+
+@玩手机MAX、@ིᖭ༏ᖫྀ、@新一、@有酱
+
+特别感谢 @玩手机MAX 提供手心输入法适配的技术支持与赞助。
+
 ## License
 
 [LICENSE](LICENSE)
