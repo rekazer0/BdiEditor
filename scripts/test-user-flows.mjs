@@ -188,7 +188,7 @@ await check("welcome: one recent section, templates, no document controls", () =
 /* ------------------------------------------------------------------------------------------------
  * 2 · Every built-in template opens and renders in both modes
  * ---------------------------------------------------------------------------------------------- */
-for (const template of ["default-android", "official-android-bds", "xiaomi-unified-rounded-blur", "oppo-dual-color", "iqoo-rounded-black", "huawei-swipe-symbols-1080", "oppo-swipe-down", "palm-default"]) {
+for (const template of ["default-android", "official-android-bds", "xiaomi-unified-rounded-blur", "oppo-dual-color", "iqoo-rounded-black", "huawei-swipe-symbols-1080", "oppo-swipe-down", "palm-harmony"]) {
   await check(`template ${template}: opens, previews and edits`, () => withPage(async (page) => {
     await openTemplate(page, template)
     assert.match(await page.locator("#document-name").textContent(), /\.(bds|bda|sxi)$/)

@@ -25,7 +25,7 @@ const builtInProjectTemplatePaths: Record<string, string> = {
   "iqoo-rounded-black": "/templates/iqoo-rounded-black.bds",
   "xiaomi-unified-rounded-blur": "/templates/xiaomi-unified-rounded-blur.bds",
   "huawei-swipe-symbols-1080": "/templates/huawei-swipe-symbols-1080.bds",
-  "palm-default": "/templates/palm-default.sxi",
+  "palm-harmony": "/templates/palm-harmony.sxi",
 }
 
 /**

@@ -687,7 +687,7 @@
 .template-card[data-template="iqoo-rounded-black"] { --_tone-bg: #14161A; --_tone-key: #26292F; --_tone-cand: #26292F; }
 .template-card[data-template="huawei-swipe-symbols-1080"] { --_tone-bg: #F0F1F4; --_tone-key: #FFFFFF; --_tone-cand: #FFFFFF; }
 .template-card[data-template="oppo-swipe-down"] { --_tone-bg: #F3F4F7; --_tone-key: #FFFFFF; --_tone-cand: #FFFFFF; }
-.template-card[data-template="palm-default"] { --_tone-bg: #D0D3D9; --_tone-key: #FFFFFF; --_tone-cand: #FFFFFF; }
+.template-card[data-template="palm-harmony"] { --_tone-bg: #D0D3D9; --_tone-key: #FFFFFF; --_tone-cand: #FFFFFF; }
 /*
  从 style.css 归并过来的同名规则（含响应式变体）
  */
