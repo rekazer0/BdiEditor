@@ -606,14 +606,14 @@ export async function shareArchiveToMobile(): Promise<boolean> {
     await invoke("share_file", { name, data: exported.bytes })
     return true
   }
-  // iOS offers an app only for a file type it declares; a generic MIME type makes the file plain data, so there
-  // the type is left empty and the .bdi/.bda/.ssf/.sxi extension decides which input method can take it.
-  const file = new File([new Uint8Array(exported.bytes).buffer], name, { type: ios ? "" : "application/octet-stream" })
+  // WebKit shares the file under its name and types it by extension (WKShareSheet), so the .bdi/.bda/.ssf/.sxi
+  // suffix decides which input method iOS offers; Baidu declares com.baidu.inputMethod.skinFile for bdt/bdi/bds/bda.
+  const file = new File([new Uint8Array(exported.bytes).buffer], name, { type: "application/octet-stream" })
   if (!navigator.share || navigator.canShare && !navigator.canShare({ files: [file] })) {
     throw new Error("当前设备不支持系统文件分享")
   }
-  // Only the file: a title becomes a second (text) item, and iOS then hides "copy to app" targets such as the
-  // input methods, which accept the skin file alone.
+  // Only the file: with no URL or text, WebKit adds the title as a string item ahead of the files, and iOS then
+  // hides "copy to app" targets such as the input methods, which accept the skin file alone.
   const share = () => navigator.share!({ files: [file] }).then(() => true).catch((error) => {
     if (error instanceof DOMException && error.name === "AbortError") return false
     throw error
