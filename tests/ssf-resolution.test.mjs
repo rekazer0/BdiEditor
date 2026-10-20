@@ -107,6 +107,13 @@ test('SSF → BDI keeps the BDS key layouts and resources while adding the nativ
       const expected = IniDocument.parse(strFromU8(bytes))
       expected.appendSection('LOGO', [{ key: 'LAYOUT_NAME', value: 'logo' }])
       assert.deepEqual(converted, strToU8(expected.toString()), name)
+    } else if (name.endsWith('/default.css')) {
+      // BDI only adds the LOGO menu background colour after the BDS styles.
+      const added = IniDocument.parse(strFromU8(converted))
+      const id = added.get('GLOBAL', 'STYLE_NUM')
+      added.removeSections([`STYLE${id}`])
+      added.set('GLOBAL', 'STYLE_NUM', String(Number(id) - 1))
+      assert.equal(added.toString(), IniDocument.parse(strFromU8(bytes)).toString(), name)
     } else assert.ok(converted && converted.length === bytes.length && converted.every((byte, offset) => byte === bytes[offset]), name)
   }
 })

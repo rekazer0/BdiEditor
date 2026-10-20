@@ -63,10 +63,11 @@ export function adaptSsfIosToolbar(archive: SkinArchive, source: SsfPackage, war
       archive.setText(`${prefix}res/logo/${name}`, plist(entries))
     }
     const logo = "ssf-toolbar-logo"
-    writeImage("F31", "NM_IMG", `${logo}_Normal`)
-    writeImage("F31", "HL_IMG", `${logo}_Highlight`)
-    writeImage("F31", "NM_IMG", `${logo}_Selected`)
-    archive.setText(`${prefix}res/logo/customImageConfig.plist`, plist([`<dict><key>Name</key><string>0</string>${images(logo, logo)}</dict>`]))
+    // The client appends only "_iphone@3x.png" to a plist image name (native skins: "lg/jianpan" → lg/jianpan_iphone@3x.png).
+    const logoNormal = writeImage("F31", "NM_IMG", `${logo}_Normal`)
+    const logoStates = `<dict><key>Normal</key><string>${logoNormal}</string><key>Highlight</key><string>${writeImage("F31", "HL_IMG", `${logo}_Highlight`)}</string><key>Selected</key><string>${logoNormal}</string></dict>`
+    archive.setText(`${prefix}res/logo/customImageConfig.plist`, plist([`<dict><key>Name</key><string>0</string><key>Images</key><dict><key>Normal</key>${logoStates}<key>Theme</key>${logoStates}</dict></dict>`]))
+    const logoMenu = logoMenuStyles(archive, prefix, css, port)
 
     for (const orientation of ["port", "land"]) {
       const path = `${prefix}${orientation}/cand1.cnd`
@@ -78,7 +79,8 @@ export function adaptSsfIosToolbar(archive: SkinArchive, source: SsfPackage, war
       if (!gen.sections().includes("LOGO")) gen.appendSection("LOGO", [])
       gen.set("LOGO", "LAYOUT_NAME", "logo")
       archive.setText(genPath, gen.toString())
-      archive.setText(`${prefix}${orientation}/logo.ini`, "[GLOBAL]\nICON_NUM=1\nVERSION=1\n")
+      // V6 p160: logo.ini declares the LOGO menu's colours; ICON_NUM=1 needs the [ICON1] it counts (native skins write both).
+      archive.setText(`${prefix}${orientation}/logo.ini`, `[GLOBAL]\nICON_NUM=1\nVERSION=1\n\n[PANEL]\nBACK_STYLE=${logoMenu.back}\nICON_INDEX=1\n\n[ICON1]\nFORE_STYLE=${logoMenu.text}\nTEXT_STYLE=${logoMenu.text}\n`)
       const [,, width, height] = gen.get("CAND", "VIEW_RECT")!.split(",").map(Number)
       const side = Math.round(width / 7)
       const logoEntries = document.entries(icon(document, "F31"))
@@ -98,7 +100,7 @@ export function adaptSsfIosToolbar(archive: SkinArchive, source: SsfPackage, war
         const style = port.get(icon(port, action), "FORE_STYLE")
         const [resource, tile] = css.get(`STYLE${style}`, "NM_IMG")!.split(",")
         const rect = IniDocument.parse(archive.getText(`${prefix}res/${resource}.til`)).get(`IMG${tile}`, "SOURCE_RECT")!.split(",").map(Number)
-        document.set(section, "FIX_SIZE", `${rect[2] / 3},${rect[3] / 3}`)
+        document.set(section, "FIX_SIZE", `${Math.round(rect[2] / 3)},${Math.round(rect[3] / 3)}`)
       }
       document.set("CAND", "ICON_NUM", "4")
       document.set("CAND", "PADDING", `12,0,${side},0`)
@@ -106,4 +108,25 @@ export function adaptSsfIosToolbar(archive: SkinArchive, source: SsfPackage, war
     }
   }
   warnings.push("iOS 工具栏按百度原生功能适配：搜狗灵犀映射为 AI侃侃；显示哪些功能、数量及顺序由百度客户端设置决定，不能保证搜狗七图标排列")
+}
+
+/** The LOGO menu takes the candidate bar's text colour and a solid colour sampled from its background. */
+function logoMenuStyles(archive: SkinArchive, prefix: string, css: IniDocument, candidates: IniDocument): { back: string; text: string } {
+  const text = candidates.get("CAND", "FORE_STYLE")?.trim() ?? ""
+  const back = candidates.get("CAND", "BACK_STYLE")?.trim() ?? ""
+  if (css.get(`STYLE${back}`, "NM_COLOR")) return { back, text }
+  const [resource, tile] = css.get(`STYLE${back}`, "NM_IMG")?.split(",") ?? []
+  const bytes = resource ? archive.getBytes(`${prefix}res/${resource}.png`) : undefined
+  const rect = resource && archive.isText(`${prefix}res/${resource}.til`)
+    ? IniDocument.parse(archive.getText(`${prefix}res/${resource}.til`)).get(`IMG${tile}`, "SOURCE_RECT")?.split(",").map(Number)
+    : undefined
+  if (!bytes || !rect || rect.length !== 4) return { back, text }
+  const image = decodePng(bytes)
+  const offset = ((rect[1] + Math.floor(rect[3] / 2)) * image.width + rect[0] + Math.floor(rect[2] / 2)) * 4
+  const color = [...image.data.subarray(offset, offset + 3)].map((value) => value.toString(16).padStart(2, "0")).join("").toUpperCase()
+  const id = String(Number(css.get("GLOBAL", "STYLE_NUM") ?? 0) + 1)
+  css.appendSection(`STYLE${id}`, [{ key: "NM_COLOR", value: color }, { key: "HL_COLOR", value: color }])
+  css.set("GLOBAL", "STYLE_NUM", id)
+  archive.setText(`${prefix}res/default.css`, css.toString())
+  return { back: id, text }
 }

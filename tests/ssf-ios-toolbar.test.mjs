@@ -39,9 +39,9 @@ test('SSF → BDI packages native iOS toolbar plists, exact normal/pressed artwo
         const til = IniDocument.parse(bds.getText(`${prefix}res/${resource}.til`))
         const rect = til.get(`IMG${tile}`, 'SOURCE_RECT').split(',').map(Number)
         const expected = cropImage(decodePng(bds.getBytes(`${prefix}res/${resource}.png`)), ...rect)
+        // Every plist image name resolves to <name>_iphone@3x.png, the way native skins ship them.
         const name = item.Images.Normal[state]
-        const suffix = item === logo[0] ? `_${state}` : ''
-        const actual = decodePng(bdi.getBytes(`${prefix}res/logo/${name}${suffix}_iphone@3x.png`))
+        const actual = decodePng(bdi.getBytes(`${prefix}res/logo/${name}_iphone@3x.png`))
         assert.deepEqual(actual, expected, `${theme} ${action} ${state}`)
         assert.equal(item.Images.Theme[state], name)
       }
@@ -51,6 +51,11 @@ test('SSF → BDI packages native iOS toolbar plists, exact normal/pressed artwo
       assert.equal(gen.get('LOGO', 'LAYOUT_NAME'), 'logo', `${theme}/${orientation}: load native logo resources`)
       const logoLayout = IniDocument.parse(bdi.getText(`${prefix}${orientation}/${gen.get('LOGO', 'LAYOUT_NAME')}.ini`))
       assert.equal(logoLayout.get('GLOBAL', 'VERSION'), '1')
+      // ICON_NUM=1 counts an [ICON1]; the menu colours come from the candidate bar (V6 p160).
+      const bdiCss = IniDocument.parse(bdi.getText(`${prefix}res/default.css`))
+      assert.equal(logoLayout.get('PANEL', 'ICON_INDEX'), '1')
+      assert.match(bdiCss.get(`STYLE${logoLayout.get('PANEL', 'BACK_STYLE')}`, 'NM_COLOR'), /^[0-9A-F]{6}$/)
+      assert.equal(logoLayout.get('ICON1', 'TEXT_STYLE'), cand.get('CAND', 'FORE_STYLE'))
       const native = IniDocument.parse(bdi.getText(`${prefix}${orientation}/cand1.cnd`))
       assert.deepEqual([1, 2, 3, 4].map((id) => native.get(`ICON${id}`, 'KEY')), ['F31', 'F14', 'F8', 'F9'])
       assert.equal(native.get('CAND', 'ICON_NUM'), '4')
@@ -61,7 +66,8 @@ test('SSF → BDI packages native iOS toolbar plists, exact normal/pressed artwo
         const style = native.get(section, 'FORE_STYLE')
         const [resource, tile] = css.get(`STYLE${style}`, 'NM_IMG').split(',')
         const rect = IniDocument.parse(bds.getText(`${prefix}res/${resource}.til`)).get(`IMG${tile}`, 'SOURCE_RECT').split(',').map(Number)
-        assert.deepEqual(native.get(section, 'FIX_SIZE').split(',').map(Number), rect.slice(2).map((size) => size / 3))
+        // Points as whole numbers, like native skins (100 px artwork → FIX_SIZE=33,33).
+        assert.equal(native.get(section, 'FIX_SIZE'), rect.slice(2).map((size) => Math.round(size / 3)).join(','))
       }
       for (const field of ['BACK_STYLE', 'FORE_STYLE']) {
         assert.equal(native.get('CAND', field), IniDocument.parse(bds.getText(`${prefix}${orientation}/cand1.cnd`)).get('CAND', field))
