@@ -3,5 +3,9 @@
   <queries>
     <package android:name="com.baidu.input" />
     <package android:name="com.baidu.input_mi" />
+    <package android:name="com.sohu.inputmethod.sogou" />
+    <package android:name="com.sohu.inputmethod.sogou.xiaomi" />
+    <package android:name="com.sohu.inputmethod.sogou.vivo" />
+    <package android:name="com.sohu.inputmethod.sogouoem" />
   </queries>
 </manifest>

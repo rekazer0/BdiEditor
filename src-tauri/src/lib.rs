@@ -754,7 +754,7 @@ fn valid_share_filename(name: &str) -> bool {
                 .and_then(|value| value.to_str())
                 .map(str::to_ascii_lowercase)
                 .as_deref(),
-            Some("bdi" | "bds" | "bda" | "sxi")
+            Some("bdi" | "bds" | "bda" | "ssf" | "sxi")
         )
 }
 
@@ -1472,6 +1472,7 @@ mod tests {
     fn share_filename_accepts_skin_files_without_path_components() {
         assert!(valid_share_filename("我的皮肤.bds"));
         assert!(valid_share_filename("sample.BDA"));
+        assert!(valid_share_filename("搜狗皮肤.ssf"));
         assert!(!valid_share_filename("../sample.bds"));
         assert!(!valid_share_filename("sample.zip"));
         assert!(!valid_share_filename(""));
