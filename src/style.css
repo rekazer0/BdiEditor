@@ -3261,40 +3261,54 @@ body:has(.canvas-wrap.empty) .workspace {
   line-height: 1.5;
 }
 
-.about-update {
+/* 关于页：说明在前，版本更新 / 诊断日志 / 联系方式各用一条 --line-soft 细线分隔。
+   按钮不另画一套外观，沿用对话窗统一的 .app-dialog button。 */
+.settings-about .settings-section-heading h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.settings-about-note + .settings-about-note {
+  margin-top: var(--space-xs);
+}
+
+.about-block {
   display: grid;
-  gap: 8px;
-  padding-block: 12px;
-  border-block: 1px solid var(--line);
+  gap: var(--space-sm);
+  padding-block: var(--space-lg);
+  border-top: 1px solid var(--line-soft);
 }
 
-.about-diagnostics[hidden] {
-  display: none;
-}
-
-.about-update > div {
+.about-block > div {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-md);
+  min-height: var(--control-height-lg);
 }
 
-.about-update button {
-  height: 28px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--control);
-  color: inherit;
-  font-size: var(--font-size-sm);
-  line-height: 1.2;
+.about-block > div > strong,
+.about-contact > strong {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
 }
 
-.about-update button:disabled {
-  opacity: 0.55;
+.about-contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-md);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--line-soft);
 }
 
-.about-update a[hidden] {
-  display: none;
+.about-contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
 }
 
 .app-dialog a {
@@ -3307,21 +3321,6 @@ body:has(.canvas-wrap.empty) .workspace {
 @media (hover: hover) {
 
 .app-dialog a:hover {
-  text-decoration: underline;
-}
-}
-
-.qq-group-copy {
-  padding: 0;
-  color: var(--accent);
-  background: transparent;
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-}
-
-@media (hover: hover) {
-
-.qq-group-copy:hover {
   text-decoration: underline;
 }
 }
@@ -3385,11 +3384,10 @@ body:has(.canvas-wrap.empty) .workspace {
   z-index: 5;
   min-width: 0;
   display: grid;
-  gap: 6px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--line-soft);
-  background: var(--toolbar);
-  box-shadow: var(--shadow-sm);
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-top: 1px solid var(--line);
+  background: var(--material-glass-surface);
   animation: source-find-slide-up var(--duration-base) var(--ease-emphasized);
 }
 
@@ -3407,88 +3405,44 @@ body:has(.canvas-wrap.empty) .workspace {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-sm);
 }
 
 .source-replace-row[hidden] {
   display: none;
 }
 
-.source-toolbar .search-control {
-  height: 28px;
+.source-toolbar .ui-input {
   flex: 1;
 }
 
-.source-toolbar .search-control > input {
-  min-height: 0;
-}
-
-/* 放大镜图标更清晰，和输入框高度更协调。 */
-.source-toolbar .search-control .system-symbol,
-.source-toolbar .search-control .system-symbol svg {
-  width: 16px;
-  height: 16px;
-}
-
-.source-toolbar .search-control .system-symbol svg {
-  stroke-width: 1.9;
-}
-
 #source-search-count {
-  min-width: 30px;
   flex: none;
   color: var(--secondary);
   font-size: var(--font-size-xs);
-  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+#source-search-count:empty {
+  display: none;
 }
 
 .source-search-actions {
   display: flex;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--control);
-}
-
-.source-toolbar button {
-  height: 28px;
-  padding: 0 8px;
-  border-radius: var(--radius-md);
-  color: var(--text);
-  background: var(--control);
-  font-size: var(--font-size-xs);
-}
-
-.source-search-actions button {
-  width: 28px;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.source-search-actions button + button {
-  border-left: 1px solid var(--line);
+  flex: none;
+  gap: var(--space-2xs);
 }
 
 .source-search-actions button[aria-expanded="true"] {
   color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: var(--accent-soft);
 }
 
-@media (hover: hover) {
-
-.source-toolbar button:hover:not(:disabled) {
-  background: var(--hover);
-}
-}
-
-.source-toolbar button:disabled {
-  opacity: 0.35;
-}
-
-.source-toolbar button .system-symbol {
-  width: 14px;
-  height: 14px;
+.source-toolbar .system-symbol,
+.source-toolbar .ui-input-affix {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
 }
 
 .source-code {
@@ -4846,13 +4800,7 @@ input[type="search"]:focus {
 /* 背景等单个样式引用也提高输入字号与点击区域，保持视觉层级一致。 */
 
 /* Shared inspector surfaces and keyboard focus in both themes. */
-.source :is(#source-editor, .source-toolbar) { background: var(--inspector); }
-.source .source-toolbar .search-control:focus-within {
-  border-color: transparent;
-  box-shadow: none;
-}
-.source .source-toolbar .search-control > input:focus-visible { outline: none; }
-.source .source-toolbar :is(button, .search-control) { height: 32px; }
+.source #source-editor { background: var(--inspector); }
 /* One object summary and category navigation for both layout and key editing. */
 
 /* Inspector surfaces share the window glass material used by the left overview. */
@@ -5225,11 +5173,6 @@ dialog[open]::backdrop {
 }
 
 /* ── 源代码面板 ── */
-.source-toolbar {
-  border-bottom: 1px solid var(--line);
-  background: var(--toolbar);
-}
-
 .search-control {
   height: 28px;
   border: 1px solid var(--line);
@@ -6868,6 +6811,21 @@ main {
   box-shadow: none;
 }
 
+:root body .preview-choice > .mobile-choice-toggle {
+  display: none;
+}
+
+@media (max-width: 760px), (max-width: 950px) and (max-height: 600px) and (orientation: landscape) {
+  :root body .preview-choice > button:not(.mobile-choice-toggle) {
+    display: none;
+  }
+
+  :root body .preview-choice > .mobile-choice-toggle {
+    display: grid;
+    color: var(--accent);
+  }
+}
+
 :root body .preview-choice button .system-symbol,
 :root body .preview-choice button .system-symbol svg,
 :root body .sidebar-view-control button .system-symbol,
@@ -6916,8 +6874,6 @@ main {
  *     box 30px · padding 0 9 · r8 · $bg-sunken · 1px $line · value 12 $ink)
  * ================================================================================================= */
 
-:root body .source .source-toolbar input:not([type="checkbox"]):not([type="radio"]),
-:root body .source .source-toolbar select,
 :root body .app-dialog select,
 :root body .app-dialog input[type="number"],
 :root body .settings-path-control input {
@@ -7667,16 +7623,7 @@ main {
  * 14 · Source panel chrome
  * ================================================================================================= */
 
-:root body .source-toolbar {
-  padding: 8px 12px;
-  gap: 8px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  background: var(--material-panel);
-  box-shadow: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
+
 
 /* =================================================================================================
  * 16 · Inspector sub-controls that older layers styled with the retired card palette
@@ -9375,34 +9322,25 @@ main {
     flex: none;
   }
 
-  :root body #settings-dialog .about-update > div,
+  :root body #settings-dialog .about-block > div,
   :root body #settings-dialog .about-contact {
-    display: flex;
     flex-wrap: wrap;
-    align-items: center;
     gap: 8px 12px;
   }
 
-  :root body #settings-dialog .about-contact {
-    margin-top: 20px;
-  }
-
-  :root body #settings-dialog .about-contact strong {
+  :root body #settings-dialog .about-contact > strong,
+  :root body #settings-dialog .about-contact-actions {
     flex: 1 1 100%;
   }
 
-  :root body #settings-dialog .about-contact .qq-group-copy,
-  :root body #settings-dialog .about-contact a {
-    min-height: 36px;
-    display: inline-flex;
-    align-items: center;
-    padding: 0 12px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-md);
-    background: var(--content);
-    box-shadow: none;
+  :root body #settings-dialog .about-contact-actions > button {
+    flex: 1;
+    min-height: 40px;
     font-size: var(--font-size-md);
-    text-decoration: none;
+  }
+
+  :root body #settings-dialog .about-contact-actions > a {
+    font-size: var(--font-size-md);
   }
 
   :root body #settings-dialog .model-choices-panel {

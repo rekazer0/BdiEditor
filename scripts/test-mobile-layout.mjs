@@ -133,6 +133,26 @@ const portraitPhones = [
   { width: 430, height: 932 },
 ]
 
+async function assertPreviewToggles(page) {
+  for (const [choice, values, icons] of [
+    ["orientation", ["port", "land"], ["rectangle-vertical", "rectangle-horizontal"]],
+    ["theme", ["light", "dark"], ["sun", "moon"]],
+  ]) {
+    const button = page.locator(`.preview-choice [data-mobile-choice="${choice}"]`)
+    const group = button.locator("..")
+    assert.equal(await group.locator("button:visible").count(), 1, `${choice} has one mobile button`)
+    for (const [step, index] of [0, 1, 0].entries()) {
+      await page.waitForFunction(([choice, value]) => document.querySelector(`#${choice}`).value === value, [choice, values[index]])
+      await button.locator(`svg[data-pen-icon="${icons[index]}"]`).waitFor({ state: "visible" })
+      assert.equal(await page.locator(`#${choice}`).inputValue(), values[index], `${choice} state at step ${step}`)
+      assert.equal(await group.locator("svg:visible").count(), 1, `${choice} shows one icon`)
+      assert.ok(await button.locator(`svg[data-pen-icon="${icons[index]}"]`).isVisible(), `${choice} icon follows state`)
+      if (step === 0) await button.click()
+      if (step === 1) await button.press("Enter")
+    }
+  }
+}
+
 for (const viewport of portraitPhones) {
   const tag = `${viewport.width}×${viewport.height}`
 
@@ -154,7 +174,8 @@ for (const viewport of portraitPhones) {
   }))
 
   await check(`${tag} split editor layout`, () => withPage(viewport, async (page) => {
-    await openTemplate(page)
+    await openTemplate(page, "official-android-bds")
+    await assertPreviewToggles(page)
     await assertTitlebarClean(page, "editor")
     await assertNoPageOverflow(page, "editor")
     const main = await rect(page, "main")
@@ -368,7 +389,8 @@ for (const colorScheme of ["light", "dark"]) {
 
 await check("844×390 landscape phone keeps the canvas", () => withPage({ width: 844, height: 390 }, async (page) => {
   await assertNoPageOverflow(page, "landscape welcome")
-  await openTemplate(page)
+  await openTemplate(page, "official-android-bds")
+  await assertPreviewToggles(page)
   await assertTitlebarClean(page, "landscape")
   const workspace = await rect(page, "main > .workspace")
   const canvasWrap = await rect(page, "main > .workspace > .canvas-wrap")
@@ -378,6 +400,8 @@ await check("844×390 landscape phone keeps the canvas", () => withPage({ width:
 await check("1280×800 desktop title bar is unchanged", () => withPage({ width: 1280, height: 800 }, async (page) => {
   await openTemplate(page)
   await assertTitlebarClean(page, "desktop")
+  assert.equal(await page.locator('.preview-choice [data-mobile-choice]:visible').count(), 0, "mobile toggles hidden on desktop")
+  assert.equal(await page.locator('.preview-choice button:visible').count(), 4, "desktop keeps both options")
   assert.equal((await rect(page, ".pen-file-menu")).visible, true, "desktop file menu")
   assert.equal((await rect(page, ".mobile-command-menu")).visible, false, "phone menu hidden")
   assert.equal((await rect(page, ".mobile-workspace-tabs")).visible, false, "phone dock hidden")

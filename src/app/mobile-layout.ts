@@ -1,7 +1,7 @@
 import { modeChoiceButtons, mode, themeChoiceButtons, theme, orientationChoiceButtons, orientation, mobileChoiceButtons, mobileInspectorSelection, selectedKeyName, sourceHeading, quickInspector, resourceInspector, mobileInspectorGroups, keyTypographyFieldsGroup, bdaConfigFieldsGroup, documentFieldsGroup, documentFields, bdaConfigFields, bdaSelectedStyleHeading, mobilePaneButtons, sidebarPane, inspectorPane, mobileSplitHandle, panelScaleButton, replaceLayoutImageButton, adaptIos26Button, editorCrosshair, previewCoordinates, deviceShell, replaceAssetButton, editModeDialog, keyFields, styleFields, toolbarFields, skinFields, gapFields } from "./dom"
 import { appState } from "./state"
 import { redrawStyleStateCanvases } from "./style-references"
-import { groupIcon } from "../icons"
+import { createIcon, groupIcon } from "../icons"
 import { bdaConfigPath } from "../bda.ts"
 import { selectFile } from "./navigation"
 import { mobilePortraitQuery, preview, toolbarPreview, source, keyboardFields, layoutActionButtons } from "./canvas-interaction"
@@ -35,6 +35,11 @@ export function syncSegmentedControls(): void {
     const label = labels[value] ?? value
     const labelNode = button.querySelector<HTMLElement>(".mobile-choice-label")
     if (labelNode) labelNode.textContent = label
+    const currentIcon = button.querySelector<HTMLElement>("[data-mobile-current-icon]")
+    if (currentIcon) {
+      const icons: Record<string, string> = { port: "rectangle-vertical", land: "rectangle-horizontal", light: "sun", dark: "moon" }
+      currentIcon.replaceChildren(createIcon(icons[value]))
+    }
     for (const icon of Array.from(button.querySelectorAll<HTMLElement>("[data-mobile-choice-value]"))) {
       icon.classList.toggle("active", icon.dataset.mobileChoiceValue === value)
     }
