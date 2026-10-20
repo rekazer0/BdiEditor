@@ -31,7 +31,7 @@ jobs:
           npx tcb login --apiKeyId "$TCB_SECRET_ID" --apiKey "$TCB_SECRET_KEY"
           for attempt in 1 2 3; do
             echo "Deploy attempt ${attempt}/3"
-            if npx tcb app deploy bdieditor -e "$TCB_ENV_ID" --framework vite --install-command "npm ci" --build-command "npm run build" --output-dir dist --deploy-path / --force --enable-git-ignore; then
+            if npx tcb app deploy bdieditor -e "$TCB_ENV_ID" --framework vite --install-command "npm ci" --build-command "npm run build" --output-dir dist --deploy-path / --force --enable-git-ignore --ignore "src-tauri/**,tests/**,research/**,readme-assets/**,scripts/**"; then
               exit 0
             fi
             echo "Deploy attempt ${attempt}/3 failed; retrying in 60s..."

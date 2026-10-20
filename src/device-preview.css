@@ -183,7 +183,7 @@
     radial-gradient(circle at 52% 56%, rgb(235 172 136 / 24%), transparent 52%),
     radial-gradient(ellipse 45% 36% at 92% 100%, rgb(117 203 145 / 30%), transparent 100%),
     radial-gradient(circle at 48% 94%, rgb(155 174 231 / 18%), transparent 46%),
-    url("/iphone-notes-reference-blank.png");
+    url("/iphone-notes-reference-blank.webp");
 }
 
 .device-shell[data-reference-frame="true"][data-theme="dark"] {
@@ -199,7 +199,7 @@
     radial-gradient(ellipse 64% 54% at 2% 94%, rgb(38 91 161 / 34%), transparent 78%),
     radial-gradient(ellipse 80% 72% at 51% 61%, rgb(131 61 32 / 32%), transparent 79%),
     radial-gradient(ellipse 64% 54% at 98% 94%, rgb(34 104 61 / 36%), transparent 78%),
-    url("/iphone-notes-reference-dark-blank.png");
+    url("/iphone-notes-reference-dark-blank.webp");
 }
 
 .device-shell[data-reference-frame="true"]:not(.canvas-only) .device-status,
