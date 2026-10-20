@@ -18,12 +18,12 @@
   color: var(--text);
   font-size: var(--font-size-sm);
 }
-.source > .pane-heading { flex: none; display: block; height: auto; min-height: 0; padding: var(--space-md) var(--_gutter) 0; border: 0; background: none; }
+.source > .pane-heading { flex: none; display: block; height: auto; min-height: 0; padding: calc(var(--space-sm) - 1px / 2) var(--_gutter) 0; border: 0; background: none; }
 .source :is(.inspector-context, .ai-design-heading) { display: none; }
 .source .inspector-view-controls { display: grid; gap: var(--space-md); }
 .source .inspector-tabs[hidden] { display: none; }
 /* 对象头隐藏时（源代码等视图）由标题栏自己留出底边，别让编辑器贴住切换条 */
-.source:has(#quick-inspector[hidden]) > .pane-heading { padding-bottom: var(--space-md); border-bottom: 1px solid var(--line); }
+.source:has(#quick-inspector[hidden]) > .pane-heading { padding-bottom: calc(var(--space-sm) - 1px / 2); border-bottom: 1px solid var(--line); }
 
 /* —— 对象头：图标 · 名称/路径 · 对象操作 —— */
 .source .key-inspector-title {
