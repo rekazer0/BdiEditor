@@ -38,9 +38,10 @@ try {
         await page.locator('.template-grid .template-card[data-template="official-android-bds"]').click()
         await page.locator('#dirty').waitFor({ state: 'visible' })
         await page.waitForFunction(() => !document.querySelector('#file-operation-dialog').open && !document.querySelector('#open').disabled)
-        await page.locator('#recent-files').evaluate((button) => button.click())
+        assert.equal(await page.locator('#recent-files').isHidden(), true, '网页端不显示最近打开')
+        await page.locator('.mobile-command-menu summary').click()
         const picker = page.waitForEvent('filechooser')
-        await page.locator('#welcome-recent-open').click()
+        await page.locator('[data-mobile-command="open"]').click()
         const chooser = await picker
         assert.equal(await page.locator('#unsaved-dialog').evaluate((dialog) => dialog.open), false)
         await chooser.setFiles({ name: '苹果搜狗.ssf', mimeType: 'application/octet-stream', buffer: Buffer.from(ssfFixture()) })

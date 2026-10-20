@@ -228,6 +228,10 @@ export function wireFilesAndSettings(): void {
   settingsModelNav.hidden = !nativeSettings
   settingsStorageSection.toggleAttribute("data-platform-hidden", !nativeSettings)
   settingsModelSection.toggleAttribute("data-platform-hidden", !nativeSettings)
+  // 网页端拿不到文件路径，不记录最近打开；也没有模型设置，AI 设计用不了。
+  $("#recent-files")!.hidden = !nativeSettings
+  $(".welcome-recent")!.toggleAttribute("data-platform-hidden", !nativeSettings)
+  $('[data-inspector-tab="ai"]')!.hidden = !nativeSettings
   showSettingsPage("appearance")
   aiNewSession.addEventListener("click", () => {
     if (appState.aiDesignBusy || appState.aiDesignDraft) return

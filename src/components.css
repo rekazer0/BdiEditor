@@ -172,6 +172,7 @@ input.ui-input, select.ui-input { padding: 0 var(--space-sm); }
 }
 .ui-segmented[data-size="sm"] { height: var(--control-height-sm); }
 .ui-segmented[data-fill] { display: flex; }
+.ui-segmented > button[hidden] { display: none; }
 .ui-segmented > button {
   flex: 1;
   display: inline-flex;
