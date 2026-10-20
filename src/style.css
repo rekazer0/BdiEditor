@@ -8402,7 +8402,10 @@ main {
     align-items: center;
   }
 
+  /* 窄屏控件只有 58–72px，且移动端下拉不画箭头；沿用桌面端给箭头留的 26px 会把“默认”裁掉一截。 */
   :root body .preview-toolbar #skin-state-control .skin-state-value {
+    left: var(--space-sm);
+    right: var(--space-sm);
     line-height: 30px;
   }
 
