@@ -13,14 +13,16 @@
 
 ### PC 端
 
-<img width="1440" height="882" alt="image" src="https://github.com/user-attachments/assets/30050874-c96f-4051-a131-f22fd39e75dc" />
-<img width="1440" height="882" alt="image" src="https://github.com/user-attachments/assets/f3bba23e-240c-4df3-a885-e7ff9fb2476f" />
-<img width="1440" height="882" alt="image" src="https://github.com/user-attachments/assets/23b334ca-d19e-474f-993c-1566f940fa12" />
+<img width="1440" height="900" alt="image" src="https://github.com/user-attachments/assets/7a9c95d3-261a-4963-a33c-c9758ec7de1a" />
+<img width="1440" height="900" alt="image" src="https://github.com/user-attachments/assets/bf8b3055-e6fd-4252-a8d5-21a3d3c079b8" />
+<img width="1440" height="900" alt="image" src="https://github.com/user-attachments/assets/f6c00a0c-f0cb-43f0-8686-b5bddd8df832" />
+
 
 ### 移动端
 
 <p align="center">
-  <img src="readme-assets/mobile-editor.png" width="390" alt="移动端编辑界面">
+  <img width="475" height="978" alt="image" src="https://github.com/user-attachments/assets/19b2e76f-adfb-4083-8006-55c5030d56f8" />
+  <img width="455" height="969" alt="image" src="https://github.com/user-attachments/assets/a2e943ad-26cf-414c-a711-0efab44786c7" />
 </p>
 
 ## 支持的格式
