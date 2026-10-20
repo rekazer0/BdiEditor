@@ -76,7 +76,22 @@ class ApplyChangesArgs {
 
 @TauriPlugin
 class SharePlugin(private val activity: Activity) : Plugin(activity) {
+  private class SkinApp(val name: String, val extensions: Set<String>, val packages: List<Pair<String, String>>)
+
   companion object {
+    // 包名需同步写进 AndroidManifest.xml 的 <queries>，否则 Android 11+ 查不到已安装的应用。
+    private val SKIN_APPS = listOf(
+      SkinApp("百度输入法", setOf("bdi", "bds", "bda"), listOf(
+        "百度输入法（com.baidu.input）" to "com.baidu.input",
+        "百度输入法小米版（com.baidu.input_mi）" to "com.baidu.input_mi",
+      )),
+      SkinApp("搜狗输入法", setOf("ssf"), listOf(
+        "搜狗输入法（com.sohu.inputmethod.sogou）" to "com.sohu.inputmethod.sogou",
+        "搜狗输入法小米版（com.sohu.inputmethod.sogou.xiaomi）" to "com.sohu.inputmethod.sogou.xiaomi",
+        "搜狗输入法 vivo 版（com.sohu.inputmethod.sogou.vivo）" to "com.sohu.inputmethod.sogou.vivo",
+        "搜狗输入法定制版（com.sohu.inputmethod.sogouoem）" to "com.sohu.inputmethod.sogouoem",
+      )),
+    )
     private const val MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
     private const val MAX_SOURCE_FILES = 4096
     private const val MAX_SOURCE_BYTES = 256L * 1024 * 1024
@@ -153,27 +168,36 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
         "${activity.packageName}.fileprovider",
         file,
       )
-      val targets = listOf(
-        "百度输入法（com.baidu.input）" to Intent(Intent.ACTION_VIEW).apply {
-          setDataAndType(uri, args.mimeType)
-          setPackage("com.baidu.input")
+      val extension = file.extension.lowercase()
+      val app = SKIN_APPS.firstOrNull { extension in it.extensions }
+      if (app == null) {
+        // 手心 Android 只接收 .piska，.sxi 没有可直接导入的应用，交给系统分享。
+        val send = Intent(Intent.ACTION_SEND).apply {
+          type = args.mimeType
+          putExtra(Intent.EXTRA_STREAM, uri)
           addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        },
-        "百度输入法小米版（com.baidu.input_mi）" to Intent(Intent.ACTION_VIEW).apply {
+        }
+        openSkin(invoke, Intent.createChooser(send, args.name), "没有可接收此皮肤的应用")
+        return
+      }
+      // 百度、搜狗都以 VIEW 接收 content:// 下的皮肤文件（按扩展名匹配，MIME 为 */*）。
+      val targets = app.packages.map { (label, packageName) ->
+        label to Intent(Intent.ACTION_VIEW).apply {
           setDataAndType(uri, args.mimeType)
-          setPackage("com.baidu.input_mi")
+          setPackage(packageName)
           addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        },
-      ).filter { (_, intent) ->
+        }
+      }.filter { (_, intent) ->
         activity.packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY) != null
       }
+      val unsupported = "当前${app.name}版本不支持导入皮肤"
       when (targets.size) {
-        0 -> invoke.reject("未安装支持导入皮肤的百度输入法")
-        1 -> openSkin(invoke, targets[0].second)
+        0 -> invoke.reject("未安装支持导入皮肤的${app.name}")
+        1 -> openSkin(invoke, targets[0].second, unsupported)
         else -> AlertDialog.Builder(activity)
-          .setTitle("选择百度输入法")
+          .setTitle("选择${app.name}")
           .setItems(targets.map { it.first }.toTypedArray()) { _, index ->
-            openSkin(invoke, targets[index].second)
+            openSkin(invoke, targets[index].second, unsupported)
           }
           .setOnCancelListener { invoke.reject("已取消导入皮肤") }
           .show()
@@ -183,12 +207,12 @@ class SharePlugin(private val activity: Activity) : Plugin(activity) {
     }
   }
 
-  private fun openSkin(invoke: Invoke, viewIntent: Intent) {
+  private fun openSkin(invoke: Invoke, intent: Intent, unsupported: String) {
     try {
-      activity.startActivity(viewIntent)
+      activity.startActivity(intent)
       invoke.resolve()
     } catch (error: ActivityNotFoundException) {
-      invoke.reject("当前百度输入法版本不支持导入皮肤", error)
+      invoke.reject(unsupported, error)
     } catch (error: Exception) {
       invoke.reject(error.message ?: "Unable to share skin", error)
     }
