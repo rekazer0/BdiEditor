@@ -3,6 +3,7 @@
 import { zipSync } from "fflate"
 import { convertBdaArchive } from "../bda-convert.ts"
 import type { SkinArchive } from "../skin.ts"
+import { withDirectoryEntries } from "../skin-zip.ts"
 import { convertBaiduToSsf } from "./baidu-to-ssf.ts"
 import { isSkinContainer } from "./ssf-container.ts"
 import { SsfPackage, unpackSsf } from "./ssf-package.ts"
@@ -30,7 +31,7 @@ export function documentPackage(archive: SkinArchive): SsfPackage {
 export async function ssfDocumentBytes(bytes: Uint8Array): Promise<Uint8Array> {
   const files = await unpackSsf(bytes)
   SsfPackage.fromFiles(files)
-  return isSkinContainer(bytes) ? zipSync(Object.fromEntries(files), { level: 6 }) : bytes
+  return isSkinContainer(bytes) ? zipSync(Object.fromEntries(withDirectoryEntries(files)), { level: 6 }) : bytes
 }
 
 /** Sogou's official skeleton in the canvas's INI schema, for `SkinArchive.setOverlay`. */

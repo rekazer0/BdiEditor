@@ -11,6 +11,7 @@ import { strToU8, zipSync } from "fflate"
 import { IniDocument } from "../ini.ts"
 import { offsetFromSection } from "../preview-items.ts"
 import type { SkinArchive } from "../skin.ts"
+import { withDirectoryEntries } from "../skin-zip.ts"
 import { soundAsWav } from "../sounds.ts"
 import { ssfBoard, ssfKeyBinding, type SsfKeyBinding } from "./ssf-keymap.ts"
 import { compositeImage, cropImage, decodePng, encodePng, placeImage, resizeImage, type RgbaImage } from "./ssf-png.ts"
@@ -477,5 +478,5 @@ export async function convertBaiduToSsf(archive: SkinArchive): Promise<{ bytes: 
   }
   await soundFiles(archive, themes[0], output, warnings)
   if (archive.names().some((path) => /\/anim\.ini$/i.test(path))) warnings.push("百度按键动画在搜狗皮肤中没有对应，已忽略")
-  return { bytes: zipSync(Object.fromEntries(output), { level: 6 }), warnings: [...new Set(warnings)] }
+  return { bytes: zipSync(Object.fromEntries(withDirectoryEntries(output)), { level: 6 }), warnings: [...new Set(warnings)] }
 }
