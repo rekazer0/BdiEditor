@@ -612,7 +612,9 @@ export async function shareArchiveToMobile(): Promise<boolean> {
   if (!navigator.share || navigator.canShare && !navigator.canShare({ files: [file] })) {
     throw new Error("当前设备不支持系统文件分享")
   }
-  const share = () => navigator.share!({ title: name, files: [file] }).then(() => true).catch((error) => {
+  // Only the file: a title becomes a second (text) item, and iOS then hides "copy to app" targets such as the
+  // input methods, which accept the skin file alone.
+  const share = () => navigator.share!({ files: [file] }).then(() => true).catch((error) => {
     if (error instanceof DOMException && error.name === "AbortError") return false
     throw error
   })
