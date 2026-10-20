@@ -591,7 +591,9 @@ export async function shareArchiveToMobile(): Promise<boolean> {
     showFileOperationProgress()
     if (!navigator.share) throw new Error("当前浏览器不支持系统文件分享")
   }
-  if (ios && (appState.archive.format !== "bdi" && (appState.archive.format !== "bda" || bdaPlatform(appState.archive) !== "ios"))) {
+  // .ssf and .sxi go to the Sogou and Palm apps in their own format; Baidu on iOS reads .bdi and iOS .bda.
+  const ownFormat = appState.archive.format === "ssf" || appState.archive.format === "sxi"
+  if (ios && !ownFormat && appState.archive.format !== "bdi" && (appState.archive.format !== "bda" || bdaPlatform(appState.archive) !== "ios")) {
     throw new Error("当前格式不支持 iOS，请先打开 .bdi 或 iOS 版 .bda 皮肤")
   }
   const format = mobileShareFormat()
@@ -604,7 +606,9 @@ export async function shareArchiveToMobile(): Promise<boolean> {
     await invoke("share_file", { name, data: exported.bytes })
     return true
   }
-  const file = new File([new Uint8Array(exported.bytes).buffer], name, { type: "application/octet-stream" })
+  // iOS offers an app only for a file type it declares; a generic MIME type makes the file plain data, so there
+  // the type is left empty and the .bdi/.bda/.ssf/.sxi extension decides which input method can take it.
+  const file = new File([new Uint8Array(exported.bytes).buffer], name, { type: ios ? "" : "application/octet-stream" })
   if (!navigator.share || navigator.canShare && !navigator.canShare({ files: [file] })) {
     throw new Error("当前设备不支持系统文件分享")
   }
