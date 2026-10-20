@@ -1,5 +1,6 @@
 import { IniDocument } from "./ini.ts"
 import { SkinArchive } from "./skin.ts"
+import { fontSearchDirectories, resolveFontReference } from "./font-files.ts"
 
 export type Visual = {
   image?: ImageBitmap
@@ -16,7 +17,6 @@ export type Visual = {
 export type TextVisual = {
   fontSize?: number
   fontName?: string
-  fontWeight?: number
   color?: string
   clearType?: number
 }
@@ -85,7 +85,7 @@ export function drawVisualText(
   if (!visual.text) return
   context.save()
   context.fillStyle = visual.text.color ?? "#202124"
-  context.font = `${visual.text.fontWeight ?? 400} ${destination.height * 0.55}px ${canvasFontFamily(visual.text.fontName)}`
+  context.font = `${destination.height * 0.55}px ${canvasFontFamily(visual.text.fontName)}`
   context.textAlign = "center"
   context.textBaseline = "middle"
   context.fillText(visual.text.text, destination.x + destination.width / 2, destination.y + destination.height / 2, destination.width * 0.9)
@@ -198,7 +198,6 @@ function resolveTextVisual(
       visited.add(section)
       const fontSize = Number(styles.get(section, "FONT_SIZE"))
       const fontName = styles.get(section, "FONT_NAME")?.trim()
-      const fontWeight = Number(styles.get(section, "FONT_WEIGHT"))
       const clearType = Number(styles.get(section, "FONT_CLEARTYPE"))
       const color = parseColor(
         (highlighted ? styles.get(section, "HL_COLOR") : undefined) ??
@@ -206,12 +205,6 @@ function resolveTextVisual(
       )
       if (result.fontSize === undefined && Number.isFinite(fontSize)) result.fontSize = fontSize
       if (result.fontName === undefined && fontName) result.fontName = fontName
-      if (
-        result.fontWeight === undefined &&
-        Number.isFinite(fontWeight) &&
-        fontWeight >= 1 &&
-        fontWeight <= 1000
-      ) result.fontWeight = fontWeight
       if (result.clearType === undefined && Number.isFinite(clearType)) result.clearType = clearType
       if (result.color === undefined && color) result.color = color
     }
@@ -320,31 +313,19 @@ function toolbarImagePaths(plist: string, limit = Number.POSITIVE_INFINITY): str
 type EmbeddedFont = { family: string; ready: Promise<void> }
 
 let embeddedFontID = 0
-const embeddedFonts = new WeakMap<SkinArchive, Map<string, EmbeddedFont>>()
+// 字体缓存按归档里的字节对象复用：同一份字体只加载一次；重新导入同名文件后字节对象变了，
+// 这里会加载新的 FontFace，预览不会继续用旧字形。
+const embeddedFonts = new WeakMap<SkinArchive, Map<string, { bytes: Uint8Array; font: EmbeddedFont }>>()
 
 function embeddedFontPath(
   names: readonly string[],
   stylePath: string,
-  configuredPath: string | undefined,
+  reference: string | undefined,
+  extensions = false,
 ): string | undefined {
-  const clean = configuredPath
-    ?.split(",")[0]
-    ?.trim()
-    .replace(/^['"]|['"]$/g, "")
-    .replaceAll("\\", "/")
-    .replace(/^\/+/, "")
-  if (!clean || clean.split("/").includes("..")) return
-  const styleDirectory = stylePath.slice(0, stylePath.lastIndexOf("/"))
-  const skinRoot = stylePath.match(/^(.*\/skin)\//)?.[1]
-  const candidates = [
-    `${styleDirectory}/${clean}`,
-    skinRoot ? `${skinRoot}/${clean}` : "",
-  ]
-  const byLowercase = new Map(names.map((name) => [name.toLowerCase(), name]))
-  return candidates.flatMap((candidate) => {
-    const found = byLowercase.get(candidate.toLowerCase())
-    return found ? [found] : []
-  })[0]
+  const clean = reference?.split(",")[0]?.trim()
+  if (!clean) return
+  return resolveFontReference(names, clean, fontSearchDirectories(stylePath), { extensions })
 }
 
 function loadEmbeddedFont(archive: SkinArchive, path: string): EmbeddedFont | undefined {
@@ -356,7 +337,7 @@ function loadEmbeddedFont(archive: SkinArchive, path: string): EmbeddedFont | un
     embeddedFonts.set(archive, cache)
   }
   const cached = cache.get(path)
-  if (cached) return cached
+  if (cached?.bytes === bytes) return cached.font
 
   const family = `BdiEmbeddedFont${++embeddedFontID}`
   const data = new Uint8Array(bytes.byteLength)
@@ -367,7 +348,7 @@ function loadEmbeddedFont(archive: SkinArchive, path: string): EmbeddedFont | un
     document.fonts.add(face)
   })().catch(() => {})
   const result = { family, ready }
-  cache.set(path, result)
+  cache.set(path, { bytes, font: result })
   return result
 }
 
@@ -397,13 +378,27 @@ export class AtlasResolver {
     const embeddedFont = fontPath ? loadEmbeddedFont(archive, fontPath) : undefined
     this.embeddedFontFamily = embeddedFont?.family
     const fonts = [embeddedFont?.ready]
-    if (path && this.styles) for (const { section, key, value } of this.styles.entries()) {
-      if (key !== "FONT_NAME" || !/\.(ttf|otf|woff2?)$/i.test(value)) continue
-      const source = embeddedFontPath(archive.names(), path, value)
-      const font = source && loadEmbeddedFont(archive, source)
-      if (!font) continue
-      this.styles.set(section, key, font.family)
-      fonts.push(font.ready)
+    if (path && this.styles) {
+      // iOS 专有的 [STYLE*] FONT_PATH：皮肤里已经写了才支持，内嵌字体优先于 FONT_NAME。
+      for (const { section, key, value } of this.styles.entries()) {
+        if (key !== "FONT_PATH" || section === "GLOBAL") continue
+        const source = embeddedFontPath(archive.names(), path, value)
+        const font = source && loadEmbeddedFont(archive, source)
+        if (!font) continue
+        this.styles.set(section, "FONT_NAME", font.family)
+        fonts.push(font.ready)
+      }
+      // FONT_NAME 可以写 benxu、DROIDSANSFALLBACK.ttf 或系统字体名；只有落到归档文件才内嵌，
+      // 系统字体名保持原样，由 canvasFontFamily 走系统字体回退。
+      for (const { section, key, value } of this.styles.entries()) {
+        if (key !== "FONT_NAME" || section === "GLOBAL") continue
+        const source = embeddedFontPath(archive.names(), path, value, true)
+        const font = source && loadEmbeddedFont(archive, source)
+        if (!font) continue
+        if (this.styles.get(section, key) === font.family) continue
+        this.styles.set(section, key, font.family)
+        fonts.push(font.ready)
+      }
     }
     this.embeddedFontReady = Promise.all(fonts).then(() => {})
   }

@@ -415,14 +415,13 @@ export function infoModel(entries: Ini, sectionName: string): Json {
 }
 
 function textStyleModel(entries: Ini): Json {
-  const keys = ["SHOW", "FONT_CLEARTYPE", "FONT_SIZE", "FONT_WEIGHT", "FONT_NAME", "NM_COLOR", "HL_COLOR", "FONT_PATH"]
+  const keys = ["SHOW", "FONT_CLEARTYPE", "FONT_SIZE", "FONT_NAME", "NM_COLOR", "HL_COLOR", "FONT_PATH"]
   if (keys.every((key) => entries[key] === undefined)) return undefined
-  const backKeys = ["SHOW", "FONT_CLEARTYPE", "FONT_SIZE", "FONT_WEIGHT", "FONT_NAME", "FONT_PATH"]
+  const backKeys = ["SHOW", "FONT_CLEARTYPE", "FONT_SIZE", "FONT_NAME", "FONT_PATH"]
   return {
     text: entries["SHOW"],
     c_type: toInt(entries["FONT_CLEARTYPE"]),
     f_s: toDouble(entries["FONT_SIZE"]),
-    f_w: toInt(entries["FONT_WEIGHT"]),
     f_n: entries["FONT_NAME"],
     c_normal: entries["NM_COLOR"],
     c_hl: entries["HL_COLOR"],

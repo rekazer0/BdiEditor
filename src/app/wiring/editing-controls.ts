@@ -1,9 +1,9 @@
 import { source, keyboardFields, layoutActionButtons, preview, inspectorTabButtons, mobilePortraitQuery, activateSkinState } from "../canvas-interaction"
 import { type SourceEditorValueClick } from "../../lazy-source-editor.ts"
 import { openSourceColorPicker, openSourceStyleDefinition, openSourceStylePicker, scheduleSourceSearch, closeSourceFind, findSourceMatch, openSourceFind, syncSourceFindBarOffset, replaceSourceMatches, updateInspectorView, updateSourceHighlight } from "../source-panel"
-import { sourceSearch, sourceSearchPrevious, sourceSearchNext, sourceFindToggle, sourceEditor, sourceReplaceToggle, sourceReplaceRow, sourceReplacement, sourceReplace, sourceReplaceAll, keyFields, styleFields, toolbarFields, skinFields, gapFields, quickInspector, colorPickers, colorAlphas, keyModeButtons, keyActionButtons, aiDesignPanel, aiDesignStatus, theme, orientation, layout, mode, eventLog, modeChoiceButtons, themeChoiceButtons, orientationChoiceButtons, mobileChoiceButtons, toggleGuides, mobileToggleGuides, newTileButton, duplicateTileButton, deleteTileButton, resourceBackButton, resourceSearch, resourceCategory, bdaTileUsage, tileModeButtons, atlasCanvas, workspaceImage, tileSourceFields, tileInnerFields, skinState, panelScaleButton, adaptIos26Button, ios26Dialog, ios26Form, replaceLayoutImageButton, layoutImageFile, layoutImageOpen, layoutImageDialog, layoutImageTargetInputs, layoutImageScope, layoutImageError, layoutImageConfigButtons, layoutImageConfigFieldset, layoutImageForm, panelCopySource, panelTargetWidth, panelTargetHeight, panelCopyTarget, panelScaleEnabled, panelScaleForm, panelScaleDialog, candidateArea, toolbarCanvas, toolbarStrip, styleImagePicker, styleImagePickerCanvas, styleImageClose, styleImageSource, styleImageDialog, fontFileSelect } from "../dom"
+import { sourceSearch, sourceSearchPrevious, sourceSearchNext, sourceFindToggle, sourceEditor, sourceReplaceToggle, sourceReplaceRow, sourceReplacement, sourceReplace, sourceReplaceAll, keyFields, styleFields, toolbarFields, skinFields, gapFields, quickInspector, colorPickers, colorAlphas, keyModeButtons, keyActionButtons, aiDesignPanel, aiDesignStatus, theme, orientation, layout, mode, eventLog, modeChoiceButtons, themeChoiceButtons, orientationChoiceButtons, mobileChoiceButtons, toggleGuides, mobileToggleGuides, newTileButton, duplicateTileButton, deleteTileButton, resourceBackButton, resourceSearch, resourceCategory, bdaTileUsage, tileModeButtons, atlasCanvas, workspaceImage, tileSourceFields, tileInnerFields, skinState, panelScaleButton, adaptIos26Button, ios26Dialog, ios26Form, replaceLayoutImageButton, layoutImageFile, layoutImageOpen, layoutImageDialog, layoutImageTargetInputs, layoutImageScope, layoutImageError, layoutImageConfigButtons, layoutImageConfigFieldset, layoutImageForm, panelCopySource, panelTargetWidth, panelTargetHeight, panelCopyTarget, panelScaleEnabled, panelScaleForm, panelScaleDialog, candidateArea, toolbarCanvas, toolbarStrip, styleImagePicker, styleImagePickerCanvas, styleImageClose, styleImageSource, styleImageDialog, fontFileSelect, fontImportButton, fontImportInput, fontRemoveButton } from "../dom"
 import { appState } from "../state"
-import { syncActionCodeSuggestions, updateSelectedKey, updateSelectedStyle, updateKeyboard, updateToolbar, updateSkinInfo, populateKeyInspector, setFontFile } from "../key-inspector"
+import { syncActionCodeSuggestions, updateSelectedKey, updateSelectedStyle, updateKeyboard, updateToolbar, updateSkinInfo, populateKeyInspector } from "../key-inspector"
 import { syncColorControl, writeColorControl, scrollSelectedSource } from "../config-context"
 import { applyExactGap, moveMixedCoordinate, applyLayoutAction, copySelectedKeys, deleteSelectedKeys } from "../key-editing"
 import { shouldClearMixedInput } from "../../mixed-input.ts"
@@ -15,6 +15,7 @@ import { preferredPath, createMissingVariant, bdaAvailableLayoutPaths, bdaAppear
 import { renderFiles } from "../file-tree"
 import { selectFile } from "../navigation"
 import { IniDocument } from "../../ini.ts"
+import { importFontFile, removeSelectedFont, setGlobalFont } from "../skin-fonts"
 import { populateTileInspector, setDrawingTile, duplicateSelectedTile, deleteSelectedTile, drawAtlas, atlasPoint, scheduleAtlasDraw, commitTile, updateSelectedTile } from "../tile-editing"
 import { canvasEditable, isEditing } from "../edit-history"
 import { selectStyleResource, showResourceList, renderResourceInspector } from "../resource-inspector"
@@ -31,7 +32,17 @@ import { drawImageSlicePicker, updateSelectedImageReference, pickerImageReferenc
 
 /** 源码编辑器、属性字段、主题与方向、资源与键盘图替换。只在启动时由 main.ts 按顺序调用一次。 */
 export function wireEditingControls(): void {
-  fontFileSelect.addEventListener("change", () => setFontFile(fontFileSelect.value))
+  fontFileSelect.addEventListener("change", () => setGlobalFont(fontFileSelect.value))
+  fontImportButton.addEventListener("click", () => {
+    if (!isEditing()) return
+    fontImportInput.value = ""
+    fontImportInput.click()
+  })
+  fontImportInput.addEventListener("change", () => {
+    const file = fontImportInput.files?.[0]
+    if (file) void importFontFile(file)
+  })
+  fontRemoveButton.addEventListener("click", () => removeSelectedFont())
   source.addEventListener("valueclick", (event) => {
     const detail = (event as CustomEvent<SourceEditorValueClick>).detail
     if (!detail || detail.kind === "action") return

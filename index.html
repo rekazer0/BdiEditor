@@ -416,20 +416,25 @@
               <label class="ui-field"><span>名称</span><input data-skin-field="Name" /></label>
               <label class="ui-field"><span>描述</span><input data-skin-field="Description" /></label>
               <label class="ui-field"><span>作者</span><input data-skin-field="Author" /></label>
-              <label class="ui-field"><span>版本</span><input data-skin-field="Version" /></label>
+              <label class="ui-field"><span>版本号</span><input data-skin-field="VersionCode" /></label>
               <label class="ui-field"><span>最低输入法版本</span><input data-skin-field="MinImeCode" /></label>
-              <label class="ui-field"><span>支持平台</span><input data-skin-field="SupportPlatform" /></label>
-              <label class="ui-field"><span>支持深色模式</span><input data-skin-field="SupportDarkMode" /></label>
+              <label class="ui-field" title="SupportPlatform：I=iOS，A=Android，SWIA=全平台（可组合）"><span>支持平台</span><input data-skin-field="SupportPlatform" placeholder="I / A / SWIA" /></label>
+              <label class="ui-field" title="SupportDarkMode：0 关闭 / 1 开启"><span>支持深色模式</span><input data-skin-field="SupportDarkMode" placeholder="0 / 1" /></label>
+              <label class="ui-field" title="Style：皮肤风格，例如 default"><span>皮肤风格</span><input data-skin-field="Style" /></label>
+              <label class="ui-field" title="SkinType：0 支持加载主题 / 1 不支持"><span>加载主题</span><input data-skin-field="SkinType" placeholder="0 / 1" /></label>
+              <label class="ui-field" title="SkinFlags：0 强制拉升半屏手写 / 1 不拉升，由皮肤控制高度"><span>半屏手写高度</span><input data-skin-field="SkinFlags" placeholder="0 / 1" /></label>
+              <label class="ui-field" title="Abilities：皮肤功能标识，逗号分隔，例如 Sound,Animation,3DTouch"><span>功能标识</span><input data-skin-field="Abilities" placeholder="Sound,Animation" /></label>
+              <label class="ui-field" title="SupportPatch：动态补丁支持，例如 Accessory|Sound|Anim"><span>动态补丁支持</span><input data-skin-field="SupportPatch" placeholder="Accessory|Sound|Anim" /></label>
             </div>
           </section>
           <div class="keyboard-fields" hidden></div>
           <section class="inspector-group toolbar-fields" hidden>
             <h3>候选栏与工具栏</h3>
             <div class="inspector-grid action-fields">
-              <label class="ui-field"><span>显示区域</span><input data-toolbar-field="VIEW_RECT" /></label>
+              <label class="ui-field" title="cand 文件 [CAND] VIEW_RECT，格式 X,Y,W,H"><span>显示区域</span><input data-toolbar-field="VIEW_RECT" /></label>
               <label class="ui-field"><span>背景样式</span><span class="style-field"><input data-toolbar-field="BACK_STYLE" /></span></label>
               <label class="ui-field"><span>前景样式</span><span class="style-field"><input data-toolbar-field="FORE_STYLE" /></span></label>
-              <label class="ui-field"><span>内边距</span><input data-toolbar-field="PADDING" /></label>
+              <label class="ui-field" title="cand 文件 [CAND] PADDING，格式 左,上,右,下"><span>内边距</span><input data-toolbar-field="PADDING" /></label>
               <label class="ui-field"><span>首个候选前景</span><span class="style-field"><input data-toolbar-field="FIRST_FORE" /></span></label>
               <label class="ui-field"><span>首个候选背景</span><span class="style-field"><input data-toolbar-field="FIRST_BACK" /></span></label>
             </div>
@@ -497,7 +502,7 @@
               <label class="ui-field style-ref-row" title="按键引用的共享前景样式编号（FORE_STYLE）"><span>前景</span><span class="style-field"><input data-key-field="FORE_STYLE" /></span></label>
               <label class="ui-field appearance-sound-field" title="按键引用的按键音效样式编号（SOUND_STYLE）"><span>音效</span><span class="style-field"><input data-key-field="SOUND_STYLE" /></span></label>
               <div class="appearance-layout-fields appearance-property-grid">
-                  <label class="ui-field" title="STAT_STYLE：S状态_样式，多组用 | 分隔；S0 表示无状态样式"><span>状态样式</span><span class="style-field"><input data-key-field="STAT_STYLE" /></span></label>
+                  <label class="ui-field" title="STAT_STYLE：S状态_补丁序号，多组用 | 分隔；S0 是零（空）状态，用于叠层，不是“无状态”"><span>状态样式</span><span class="style-field"><input data-key-field="STAT_STYLE" /></span></label>
                   <label class="ui-field" title="FORE_OFFSET：每层前景偏移 x,y，多组用 ; 分隔"><span>前景偏移</span><span class="style-field"><input data-key-field="FORE_OFFSET" /></span></label>
                   <label class="ui-field" title="POS_TYPE：每层前景位置类型，逗号分隔"><span>位置类型</span><span class="style-field"><input data-key-field="POS_TYPE" /></span></label>
               </div>
@@ -507,13 +512,14 @@
             <h3><span class="typography-heading-default">文字</span><span class="typography-heading-override">文字覆盖</span></h3>
             <p class="inspector-group-subtitle"><span class="typography-subtitle-default">显示内容与字体颜色</span><span class="typography-subtitle-override">仅当前状态</span></p>
             <div class="inspector-grid typography-content-fields">
-              <label class="ui-field"><span>内容</span><input data-key-field="SHOW" /></label>
+              <label class="ui-field" title="SHOW：直接点击后传给内核的键值，不是显示文字；显示文字请改样式 SHOW"><span>键值</span><input data-key-field="SHOW" /></label>
               <div id="primary-css-fields" class="primary-css-fields"></div>
             </div>
             <div class="appearance-typography-fields">
-              <label id="font-file-field" class="ui-field" title="GLOBAL FONT_PATH：整套皮肤共用的字体文件"><span>字体</span><span class="ui-input ui-select"><select id="font-file-select" aria-label="字体文件"></select></span></label>
-              <label class="ui-field" data-text-style><span>字体名称</span><input data-style-field="FONT_NAME" /></label>
-              <label class="ui-field" data-text-style><span>字重</span><input data-style-field="FONT_WEIGHT" type="number" min="1" max="1000" /></label>
+              <div id="font-file-field" class="ui-field" title="GLOBAL FONT_PATH：按键前景内嵌字体，会写入每份 CSS；Android 主要支持全局声明，STYLE 级 FONT_PATH 仅 iOS（手册第 163 页）"><span>字体</span><span class="font-file-controls"><span class="ui-input ui-select"><select id="font-file-select" aria-label="字体文件"></select></span><button id="font-import" class="ui-icon-button" type="button" title="导入字体文件（.ttf / .otf / .ttc）" aria-label="导入字体文件" data-icon="upload"></button><button id="font-remove" class="ui-icon-button" type="button" title="移除皮肤字体" aria-label="移除皮肤字体" data-icon="trash-2" disabled></button></span></div>
+              <input id="font-import-input" type="file" accept=".ttf,.otf,.ttc" hidden>
+              <label class="ui-field" data-text-style title="FONT_NAME：字体名称，可填皮肤内字体文件名或系统字体名；Android 13.3.16.2 的 CSS 样式不解析此键，内嵌字体优先用全局字体"><span>字体名称</span><input data-style-field="FONT_NAME" aria-label="字体名称" list="skin-font-names" /></label>
+              <datalist id="skin-font-names"></datalist>
               <label class="ui-field" data-text-style><span>字号</span><input data-style-field="FONT_SIZE" type="number" /></label>
               <div class="color-pair-field" data-text-style>
                 <label class="ui-field"><span>颜色</span><span class="color-control ui-input ui-color"><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色"><input data-style-field="NM_COLOR" aria-label="文字正常颜色值" /><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度"></span></label>

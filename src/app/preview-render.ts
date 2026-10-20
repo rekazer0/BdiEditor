@@ -32,7 +32,6 @@ export function applyCandidateTextVisual(
 ): void {
   element.style.color = visual?.color ?? ""
   element.style.fontFamily = canvasFontFamily(visual?.fontName)
-  element.style.fontWeight = visual?.fontWeight ? String(visual.fontWeight) : ""
   element.style.fontSize = visual?.fontSize
     ? `${(visual.fontSize / canvasWidth) * 100}cqw`
     : ""

@@ -28,29 +28,32 @@ export const documentFieldLabels: Record<string, string> = {
   SIZE: "尺寸",
   TYPE: "类型",
   LAYOUT_NAME: "布局名称",
+  Style: "皮肤风格",
+  SkinType: "加载主题（0支持/1不支持）",
+  SkinFlags: "半屏手写高度",
+  Abilities: "功能标识（音效/动效等）",
+  SupportPatch: "动态补丁支持",
+  CoupleSkinName: "配套皮肤名",
+  AtomSkinName: "主题目录",
   KEY_NUM: "按键数量",
   TIP_NUM: "补丁数量",
   LIST_NUM: "列表数量",
-  LIST_ORDER: "列表顺序",
+  LIST_ORDER: "列表排列方向（0竖排/1横排）",
   CELL_SIZE: "单元格尺寸",
   GRID: "网格",
   POS: "位置",
   NO_BLUR: "精确输入模式",
   OFFSET_NUM: "偏移数量",
-  OFFSET: "偏移",
-  FORE_STYLE_NUM: "前景样式数量",
   INPUT_STYLE: "输入码样式",
   SCAND_STYLE: "云输入样式",
-  MORE_STYLE: "更多按钮样式",
-  BG_COLOR: "背景颜色",
-  FONT_NAME: "字体",
-  FONT_WEIGHT: "字重",
+  FONT_NAME: "字体名称",
   FONT_SIZE: "字号",
+  FONT_CLEARTYPE: "字体平滑",
   NM_COLOR: "正常颜色",
   HL_COLOR: "按下颜色",
   SHOW: "显示内容",
   INFO: "说明",
-  ANIM_STYLE: "动画样式",
+  ANIM_STYLE: "整体动画样式（全景动效）",
   PRESS_ANIM: "按下动画",
   SHOW_ANIM: "显示动画",
   EVENT1: "动画事件",
@@ -89,13 +92,13 @@ export const documentFieldLabels: Record<string, string> = {
   // 以下键只出现在文档配置节（LIST / BAR / SWITCH / CAND / ICON…），此前都显示为英文原名。
   NAMES: "列表名称",
   VALUES: "列表值",
-  NAME: "名称",
-  VERSION: "版本",
-  TEXT_STYLE: "文字样式",
+  NAME: "事件名称（NAME）",
+  VERSION: "Logo 模式（1=二次元）",
+  TEXT_STYLE: "图标文字颜色样式（logo/emoji）",
   BACK_ANIM_STYLE: "背景动画样式",
   FORE_ANIM_STYLE: "前景动画样式",
-  HW_FORE_STYLE: "手写前景样式",
-  ANIM_LEVEL: "动画层级",
+  HW_FORE_STYLE: "手写笔刷颜色样式",
+  ANIM_LEVEL: "动画显示层级（0下/1上）",
   ICON_NUM: "图标数量",
   ICON_INDEX: "图标序号",
   BACK_ICON: "背景图标",
@@ -116,9 +119,9 @@ export const documentFieldLabels: Record<string, string> = {
   VLINE_STYLE: "竖线样式",
   SCROLL_SIDE: "滚动条位置",
   SYM_LAYOUT: "符号面板布局",
-  EVENT_NUM: "事件数量",
-  IDLE_TIME: "空闲时间",
-  FIX_SIZE: "固定尺寸",
+  EVENT_NUM: "事件数量（EVENT_NUM）",
+  IDLE_TIME: "屏保触发时间（ms）",
+  FIX_SIZE: "图标固定大小（iOS）",
 }
 
 export const documentSectionLabels: Record<string, string> = {
@@ -161,9 +164,10 @@ const documentPartAffixes: Record<string, string> = {
 export const documentSwitchFields = new Set(["NO_BLUR"])
 
 export const documentNumericFields = new Set([
-  "KEY_NUM", "TIP_NUM", "LIST_NUM", "OFFSET_NUM", "FORE_STYLE_NUM", "ANIM_NUM", "BUILD_NUM",
-  "REPEAT_CNT", "FONT_SIZE", "FONT_WEIGHT",
-  "CELL_W", "FIRST_GAP", "ICON_NUM", "ICON_INDEX", "EVENT_NUM",
+  "KEY_NUM", "TIP_NUM", "LIST_NUM", "OFFSET_NUM", "ANIM_NUM", "BUILD_NUM",
+  "REPEAT_CNT", "FONT_SIZE", "BORDER_SIZE", "STYLE_NUM", "TILE_NUM", "VERSION",
+  "CELL_W", "FIRST_GAP", "ICON_NUM", "ICON_INDEX", "EVENT_NUM", "ANCHOR_TYPE",
+  "PERSIST", "SCROLL_SIDE", "HINT_TYPE", "ANIM_LEVEL", "HOLDFLAG",
 ])
 
 /** number 输入框会清空非数字值，只有纯数字才切换到数字类型。 */
@@ -213,6 +217,12 @@ export const layoutIDLabels: Record<string, string> = {
   def_26_new: "五笔 26 键",
   en_9_pad: "英文 9 键加高",
   en_9s_pad: "英文 9 键 Shift 加高",
+  net_shift: "网址键盘 Shift",
+  en_26_num: "英文 26 键数字行",
+  en_26s_num: "英文 26 键 Shift 数字行",
+  en_26_pad: "英文 26 键加高",
+  en_26s_pad: "英文 26 键 Shift 加高",
+  sym_26_pad: "中文 26 键符号（加高）",
 }
 
 export function translatedConfigLabel(key: string): string {
@@ -288,7 +298,8 @@ export async function renderParticleImages(container: HTMLElement, value: string
 }
 
 export function particleNumberStep(key: string): string {
-  return /SCALE|VELOCITY|ACCELERATION/.test(key) ? "0.1" : "1"
+  // 手册第 180 页：EMIT_REGION 与缩放/速度一样是相对坐标，允许小数。
+  return key === "EMIT_REGION" || /SCALE|VELOCITY|ACCELERATION/.test(key) ? "0.1" : "1"
 }
 
 export function populateDocumentInspector(): void {
@@ -376,7 +387,8 @@ export function populateDocumentInspector(): void {
       while (values.length < count) values.push(values.at(-1) ?? "0")
       const row = document.createElement("span")
       row.className = `particle-range-inputs particle-range-${count}`
-      const names = count === 4 ? ["X", "Y", "宽", "高"] : ["最小", "最大"]
+      // 手册第 180 页：EMIT_REGION=left,top,right,bottom（相对 location），不是 X/Y/W/H。
+      const names = count === 4 ? ["左", "上", "右", "下"] : ["最小", "最大"]
       for (let index = 0; index < count; index += 1) {
         const input = document.createElement("input")
         input.type = "number"

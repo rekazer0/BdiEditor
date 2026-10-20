@@ -156,7 +156,7 @@ function imageGuide(project: AiDesignProject, canGenerate: boolean): string {
   if (project.format === "ssf") {
     return `按键背景、前景图和图标的颜色画在 PNG 里。先按格式技能从按键类找到 NORMAL/PRESSED 引用的图片（\`图片.png,左,右,上,下\` 的第一项），用 view_image 确认（只查看目标按键实际引用的图片），再用 recolor_image 改色${canGenerate ? "；需要新图案或新风格时用 generate_image 生成" : "；当前未配置生图模型，用户要求新图案时直接告诉用户“未配置生图模型，请在 设置 > 大模型 > 生图模型 中配置”"}。同一张图片常被多个按键类共享，常态与按下态通常要一起改。可授权图片：${project.images.map((image) => image.path).join("、")}。`
   }
-  return `按键背景、图标的颜色常常直接画在 PNG 里，样式表没有颜色字段可改。此时先用 NM_IMG/HL_IMG 找到 \`图片名,切片序号\`，对应 res/图片名.png 的 IMG切片序号，用 view_image 确认（只查看目标按键实际引用的图片，不要逐张浏览全部资源），再用 recolor_image 改色${canGenerate ? "；需要新图案、新风格或质感重绘时用 generate_image 生成" : "。当前未配置生图模型：纯改色仍可用 recolor_image 完成；用户明确要求生成、重绘或编辑图片的图案/风格时，不要用改色或叠加色凑合，直接告诉用户“未配置生图模型，请在 设置 > 大模型 > 生图模型 中配置”"}。同一张图片的切片可能被多个样式共享，改前在样式表里确认引用范围；常态与按下态（NM_IMG/HL_IMG）通常要一起改。可授权图片：${project.images.map((image) => image.path).join("、")}。`
+  return `按键背景、图标的颜色常常直接画在 PNG 里；样式表里的 NM_COLOR/HL_COLOR 是图片叠加色/滤镜，不能改图片本身的像素。要改图时先用 NM_IMG/HL_IMG 找到 \`图片名,切片序号\`，对应 res/图片名.png 的 IMG切片序号，用 view_image 确认（只查看目标按键实际引用的图片，不要逐张浏览全部资源），再用 recolor_image 改色${canGenerate ? "；需要新图案、新风格或质感重绘时用 generate_image 生成" : "。当前未配置生图模型：纯改色仍可用 recolor_image 完成；用户明确要求生成、重绘或编辑图片的图案/风格时，不要用改色或叠加色凑合，直接告诉用户“未配置生图模型，请在 设置 > 大模型 > 生图模型 中配置”"}。同一张图片的切片可能被多个样式共享，改前在样式表里确认引用范围；常态与按下态（NM_IMG/HL_IMG）通常要一起改。可授权图片：${project.images.map((image) => image.path).join("、")}。`
 }
 
 function systemPrompt(project: AiDesignProject, canGenerate: boolean): string {

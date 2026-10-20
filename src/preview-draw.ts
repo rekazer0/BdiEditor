@@ -327,8 +327,7 @@ export function drawStyleText(
   theme: "light" | "dark",
 ): void {
   context.fillStyle = visual.color ?? (theme === "dark" ? "#f5f5f7" : "#17191c")
-  const weight = visual.fontWeight ? `${visual.fontWeight} ` : ""
-  context.font = `${weight}${visual.fontSize ?? 24}px ${canvasFontFamily(visual.fontName)}`
+  context.font = `${visual.fontSize ?? 24}px ${canvasFontFamily(visual.fontName)}`
   context.textAlign = "center"
   context.textBaseline = "middle"
   context.fillText(visual.text, point.x, point.y)

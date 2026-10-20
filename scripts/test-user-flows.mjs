@@ -318,6 +318,17 @@ await check("edit keys: geometry, keyboard nudge, undo/redo, multi-select, layou
   await page.locator('[data-inspector-tab="properties"]').click()
   // The font is picked from the skin's own font files; the system font is always offered.
   assert.equal(await page.locator("#font-file-select option").first().textContent(), "系统默认")
+  // Import is available in edit mode; removing the system default is not possible.
+  assert.equal(await page.locator("#font-import").isVisible(), true)
+  assert.equal(await page.locator("#font-remove").isDisabled(), true)
+  // A broken font file is rejected with a status error, not a crash or a silent no-op.
+  await page.locator("#font-import-input").setInputFiles({
+    name: "broken.ttf",
+    mimeType: "font/ttf",
+    buffer: Buffer.from("not a font file"),
+  })
+  await page.waitForFunction(() => document.querySelector("#event-log")?.dataset.kind === "error")
+  assert.match(await page.locator("#event-log").textContent(), /导入字体/)
   await railTab(page, "手势")
   const up = page.locator("[data-key-field=UP]")
   await up.fill("F12")

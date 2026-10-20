@@ -88,14 +88,18 @@ export function resolveCandidateInputTextVisual(
   inKeyboard = false,
 ): TextVisual | undefined {
   const visual = resolver.resolveText(candidateInputForegroundStyle(general, candidate), false)
-  if (!inKeyboard || !visual) return visual
+  if (!visual) return
+  // 和候选字一样，输入码文字在真机用用户字体（InputBarView/CandHandler），皮肤只提供字号与颜色；
+  // 预览不能套 FONT_NAME，否则真机与画布不一致。
+  const userFont = { ...visual, fontName: undefined }
+  if (!inKeyboard) return userFont
   const input = resolver.resolveText([
     candidate?.get("CAND", "INPUT_STYLE"),
     candidate?.get("INPUT", "FORE_STYLE"),
     general?.get("INPUT", "FORE_STYLE"),
   ].map((value) => value?.trim() ?? "").find(Boolean) ?? "", false)
   // shortcut: iOS 的 INPUT 字号与 SCAND 颜色已按真机截图校准，取得 iOS 绘制代码后核对更多皮肤。
-  return { ...input, ...visual, fontSize: input?.fontSize ?? visual.fontSize }
+  return { ...input, ...userFont, fontSize: input?.fontSize ?? visual.fontSize }
 }
 
 /** iOS draws the inline row with SCAND; Android's popup uses INPUT. */
@@ -112,17 +116,23 @@ export function candidateInputBackgroundStyle(
   ].map((value) => value?.split(",")[0].trim() ?? "").find(Boolean) ?? ""
 }
 
+// 真机候选字使用用户字体（含字重），皮肤样式只提供字号与颜色。编辑器无法得知用户字体，
+// 因此预览固定用系统字体，不能套用皮肤 FONT_NAME / FONT_PATH，否则会与真机不一致。
+function candidateUserFont(visual: TextVisual | undefined): TextVisual | undefined {
+  return visual && { ...visual, fontName: undefined }
+}
+
 export function resolveCandidateTextVisuals(
   candidate: IniDocument | undefined,
   general: IniDocument | undefined,
   resolver: VisualResolver,
 ): { normal: TextVisual | undefined; first: TextVisual | undefined } {
   return {
-    normal: resolver.resolveText(
+    normal: candidateUserFont(resolver.resolveText(
       candidate?.get("CAND", "FORE_STYLE") ?? general?.get("SCAND", "SCAND_STYLE") ?? "",
       false,
-    ),
-    first: resolver.resolveText(candidate?.get("CAND", "FIRST_FORE") ?? "", false),
+    )),
+    first: candidateUserFont(resolver.resolveText(candidate?.get("CAND", "FIRST_FORE") ?? "", false)),
   }
 }
 

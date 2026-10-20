@@ -296,8 +296,7 @@ export async function paintPreview(self: Preview): Promise<void> {
     const textVisual: TextVisual | undefined = visuals[index].text
     context.fillStyle = textVisual?.color ?? (self.theme === "dark" ? "#f5f5f7" : "#17191c")
     const fontSize = textVisual?.fontSize ?? Math.max(18, Math.min(42, key.rect.height * 0.25))
-    const fontWeight = textVisual?.fontWeight ? `${textVisual.fontWeight} ` : ""
-    context.font = `${fontWeight}${fontSize}px ${canvasFontFamily(textVisual?.fontName)}`
+    context.font = `${fontSize}px ${canvasFontFamily(textVisual?.fontName)}`
     context.textAlign = "center"
     context.textBaseline = "middle"
     const fallbackText = previewFallbackText(key, hasForeground)
@@ -373,7 +372,7 @@ export async function paintPreview(self: Preview): Promise<void> {
         drawVisual(hintContext, hintCellVisuals[index === selected ? 1 : 0], cell, true)
         const text = index === selected ? hintSelectedTextVisual ?? hintTextVisual : hintTextVisual
         hintContext.fillStyle = text?.color ?? (self.theme === "dark" ? "#f5f5f7" : "#17191c")
-        hintContext.font = `${text?.fontWeight ? `${text.fontWeight} ` : ""}${text?.fontSize ?? Math.max(18, Math.min(42, height * 0.25))}px ${canvasFontFamily(text?.fontName)}`
+        hintContext.font = `${text?.fontSize ?? Math.max(18, Math.min(42, height * 0.25))}px ${canvasFontFamily(text?.fontName)}`
         hintContext.textAlign = "center"
         hintContext.textBaseline = "middle"
         hintContext.fillText(action, cell.x + cell.width / 2, cell.y + cell.height / 2)
@@ -382,7 +381,7 @@ export async function paintPreview(self: Preview): Promise<void> {
       const action = legacyHintText(key, hintDirection)
       if (action) {
         hintContext.fillStyle = hintTextVisual?.color ?? (self.theme === "dark" ? "#f5f5f7" : "#17191c")
-        hintContext.font = `${hintTextVisual?.fontWeight ? `${hintTextVisual.fontWeight} ` : ""}${hintTextVisual?.fontSize ?? Math.max(18, Math.min(42, height * 0.25))}px ${canvasFontFamily(hintTextVisual?.fontName)}`
+        hintContext.font = `${hintTextVisual?.fontSize ?? Math.max(18, Math.min(42, height * 0.25))}px ${canvasFontFamily(hintTextVisual?.fontName)}`
         hintContext.textAlign = "center"
         hintContext.textBaseline = "middle"
         hintContext.fillText(action, rect.x + left + (width - left - right) / 2, rect.y + top + (height - top - bottom) / 2)

@@ -686,10 +686,14 @@ export function renderBdaMetadataEditor(container: HTMLElement, options: Metadat
     Name: "皮肤名称",
     Description: "描述",
     Author: "作者",
-    Version: "版本",
+    VersionCode: "版本号",
     MinImeCode: "最低输入法版本",
     SupportPlatform: "支持平台",
     SupportDarkMode: "支持深色模式",
+    Style: "皮肤风格",
+    SkinType: "加载主题",
+    SkinFlags: "半屏手写高度",
+    Abilities: "功能标识",
     AtomSkinName: "主题目录",
   }
   const card = inspectorSection(element("article", "bda-metadata-card"), "皮肤")

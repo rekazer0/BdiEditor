@@ -169,7 +169,7 @@ export async function renderStyleResourceDetail(): Promise<void> {
   }
   styleDetailFields.replaceChildren()
   const existing = stylesDocument.entries(section)
-  const common = ["NM_COLOR", "HL_COLOR", "FONT_NAME", "FONT_WEIGHT", "FONT_SIZE", "SHOW", "INFO"]
+  const common = ["NM_COLOR", "HL_COLOR", "FONT_NAME", "FONT_SIZE", "SHOW", "INFO"]
   const keys = [...common, ...existing.map((entry) => entry.key).filter((key) => !common.includes(key) && key !== "NM_IMG" && key !== "HL_IMG")]
   const groups = [
     ["colors", "状态颜色", (key: string) => key === "NM_COLOR" || key === "HL_COLOR"],

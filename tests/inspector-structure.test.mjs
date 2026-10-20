@@ -73,9 +73,12 @@ test("style references are one shared card: number and kind on the left, normal 
   assert.match(read("src/inspector.css"), /:is\(\.style-reference-row, \.bda-style-reference-input\) \{/)
 })
 
-test("the text group picks one of the skin's font files as GLOBAL FONT_PATH", () => {
+test("the text group imports skin fonts and writes GLOBAL FONT_PATH to every CSS", () => {
   assert.match(pane, /<select id="font-file-select"/)
-  assert.match(read("src/app/key-inspector.ts"), /document\.set\("GLOBAL", "FONT_PATH", value\)/)
+  assert.match(pane, /id="font-import"/)
+  assert.match(pane, /id="font-remove"/)
+  assert.match(read("src/app/skin-fonts.ts"), /withGlobalFontPath/)
+  assert.match(read("src/app/skin-fonts.ts"), /skinStylePaths/)
 })
 
 test("gestures form a cross: tap in the middle, swipes around it, long press below", () => {

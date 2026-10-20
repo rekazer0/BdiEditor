@@ -277,6 +277,11 @@ export const primaryCssFields = $("#primary-css-fields")
 
 export const fontFileField = $("#font-file-field")
 export const fontFileSelect = $("#font-file-select") as HTMLSelectElement
+export const fontImportButton = $("#font-import") as HTMLButtonElement
+export const fontImportInput = $("#font-import-input") as HTMLInputElement
+export const fontRemoveButton = $("#font-remove") as HTMLButtonElement
+export const fontNameInput = $('[data-style-field="FONT_NAME"]') as HTMLInputElement
+export const skinFontNames = $("#skin-font-names") as HTMLDataListElement
 
 export const skinFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-skin-field]"))
 

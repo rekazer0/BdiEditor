@@ -24,7 +24,6 @@ export function stylesText(value: Json): string {
       ["text", "SHOW", "string"],
       ["c_type", "FONT_CLEARTYPE", "number"],
       ["f_s", "FONT_SIZE", "number"],
-      ["f_w", "FONT_WEIGHT", "number"],
       ["f_n", "FONT_NAME", "string"],
       ["c_normal", "NM_COLOR", "string"],
       ["c_hl", "HL_COLOR", "string"],
