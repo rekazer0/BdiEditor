@@ -566,7 +566,7 @@ test('BDS → ssf: the OGG key sound becomes WAV and a SOURCE_RECT past its atla
   const py26 = IniDocument.parse(strFromU8(files['port/py_26.ini']))
   const q = py26.sections().find((name) => py26.get(name, 'CENTER') === 'q')
   const [image] = css.get(`STYLE${py26.get(q, 'BACK_STYLE')}`, 'NM_IMG').split(',')
-  files[`res/${image}.til`] = strToU8('[GLOBAL]\nIMG_NUM=1\n\n[IMG1]\nSOURCE_RECT=0,0,99999,99999\n')
+  files[`res/${image}.til`] = strToU8('[GLOBAL]\nTILE_NUM=1\n\n[IMG1]\nSOURCE_RECT=0,0,99999,99999\n')
   const { bytes, warnings } = await convertBaiduToSsf(SkinArchive.open(zipSync(files)))
   assert.deepEqual(warnings, [])
   const pkg = await SsfPackage.open(bytes)

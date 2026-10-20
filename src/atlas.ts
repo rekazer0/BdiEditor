@@ -476,7 +476,7 @@ export class AtlasResolver {
 
   async resolveToolbarImages(limit?: number): Promise<Visual[]> {
     const plistPath = `${this.theme}/skin/res/logo/com.baidu.inputmethod.toolbarMenuItems.plist`
-    if (!this.archive.isText(plistPath)) return []
+    if (!this.archive.isText(plistPath)) return this.resolveAndroidToolbarImages(limit)
     const names = this.archive.names()
     const paths = toolbarImagePaths(this.archive.getText(plistPath), limit).flatMap((base) => {
       const prefix = `${this.theme}/skin/res/logo/${base}`
@@ -493,6 +493,23 @@ export class AtlasResolver {
       return image ? { image, imagePath: path, source: [0, 0, image.width, image.height] as [number, number, number, number] } : undefined
     }))
     return visuals.filter((visual): visual is Visual => Boolean(visual))
+  }
+
+  /**
+   * Android fills the F14 container from the user's function list, drawing each function with IMG<bitmap index>
+   * of res/logo/pop_menu_icons (Baidu 13.3.18.31 LogoIconSource). The preview shows the toolbar functions the atlas
+   * covers — 表情 26, 输入方式 27, 语音 29, 搜索 31, 编辑 25, 剪贴板 50 — since the real list lives on the phone.
+   */
+  private async resolveAndroidToolbarImages(limit = Number.POSITIVE_INFINITY): Promise<Visual[]> {
+    const path = `${this.theme}/skin/res/logo/pop_menu_icons`
+    if (!this.archive.isText(`${path}.til`)) return []
+    const tiles = IniDocument.parse(this.archive.getText(`${path}.til`))
+    const image = await this.bitmap(`${path}.png`)
+    if (!image) return []
+    return [26, 27, 29, 31, 25, 50].flatMap((index) => {
+      const source = numbers(tiles.get(`IMG${index}`, "SOURCE_RECT"))
+      return source ? [{ image, imagePath: `${path}.png`, source }] : []
+    }).slice(0, Math.max(0, limit))
   }
 
   resolveText(foreground: string, highlighted: boolean): TextVisual | undefined {

@@ -79,7 +79,7 @@ function image(ref) {
     const band = stretch.slice(0, 4).map(Number)
     const inner = band.length === 4 && band[0] < band[1] && band[2] < band[3]
       ? `INNER_RECT=${band[0]},${band[2]},${band[1] - band[0]},${band[3] - band[2]}\n` : ''
-    files[`res/${name}.til`] = strToU8(`[GLOBAL]\nIMG_NUM=1\n[IMG1]\nSOURCE_RECT=0,0,${w},${h}\n${inner}`)
+    files[`res/${name}.til`] = strToU8(`[GLOBAL]\nTILE_NUM=1\n[IMG1]\nSOURCE_RECT=0,0,${w},${h}\n${inner}`)
   }
   return `${name},1`
 }
