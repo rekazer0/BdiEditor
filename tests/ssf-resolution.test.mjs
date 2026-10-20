@@ -19,7 +19,7 @@ const templates = { bda, sogou: SkinArchive.open(read('../public/sogou-template.
 const open = async (bytes) => SkinArchive.open(await ssfDocumentBytes(bytes), 'ssf')
 const size = (archive, path) => IniDocument.parse(archive.getText(path)).get('PANEL', 'SIZE')
 const layouts = (output) => output.names()
-  .filter((name) => /\/(?:port|land)\/[^/]+\.ini$/.test(name) && !name.endsWith('/gen.ini'))
+  .filter((name) => /\/(?:port|land)\/[^/]+\.ini$/.test(name) && !/\/(?:gen|logo)\.ini$/.test(name))
   .map((name) => [name, IniDocument.parse(output.getText(name))])
 
 test('SSF export uses the Sogou canvas skeleton at 1080', () => {
@@ -63,18 +63,25 @@ test('SSF → BDI and BDS reopen with every preview layout, toolbar, image and f
       }
     }
     for (const [path, bytes] of preview) {
-      // iOS uses a native F14 container and plist images; its CND is checked separately.
-      if (format === 'bdi' && path.endsWith('.cnd')) continue
+      // Both platforms use Baidu's native F14 container; the CND is checked in ssf-native-toolbar.test.mjs.
+      if (path.endsWith('.cnd')) continue
       if (/\.(?:ini|cnd)$/.test(path)) {
         const expected = IniDocument.parse(strFromU8(bytes))
         for (const { section, key } of expected.entries()) if (key.startsWith('SSF_')) expected.remove(section, key)
-        if (format === 'bdi' && path.endsWith('/gen.ini')) expected.appendSection('LOGO', [{ key: 'LAYOUT_NAME', value: 'logo' }])
+        if (path.endsWith('/gen.ini')) expected.appendSection('LOGO', [{ key: 'LAYOUT_NAME', value: 'logo' }])
         assert.deepEqual(output.getBytes(path), strToU8(expected.toString()), `${format}: ${path}`)
         assert.ok(!output.getText(path).includes('SSF_'), `${path}: editor metadata must not become exported properties`)
+      } else if (path.endsWith('/default.css')) {
+        // The export only adds the LOGO menu background colour after the canvas styles.
+        const added = IniDocument.parse(output.getText(path))
+        const id = added.get('GLOBAL', 'STYLE_NUM')
+        added.removeSections([`STYLE${id}`])
+        added.set('GLOBAL', 'STYLE_NUM', String(Number(id) - 1))
+        assert.equal(added.toString(), IniDocument.parse(strFromU8(bytes)).toString(), `${format}: ${path}`)
       } else if (/\.(?:png|til|ttf)$/.test(path)) assert.deepEqual(output.getBytes(path), bytes, `${format}: ${path}`)
     }
     const toolbar = IniDocument.parse(output.getText('light/skin/port/cand1.cnd'))
-    const iconCount = format === 'bdi' ? 4 : 7
+    const iconCount = 4
     assert.equal(toolbar.get('CAND', 'ICON_NUM'), String(iconCount))
     for (let i = 1; i <= iconCount; i++) {
       assert.ok(toolbar.get(`ICON${i}`, 'KEY'))
@@ -87,34 +94,27 @@ test('SSF → BDI and BDS reopen with every preview layout, toolbar, image and f
   }
 })
 
-test('SSF → BDI keeps the BDS key layouts and resources while adding the native iOS toolbar', async () => {
+test('SSF → BDI and BDS share keys and resources and differ only in each platform\'s toolbar artwork', async () => {
   const fixture = await open(ssfFixture())
   const trees = {}
   for (const format of ['bdi', 'bds']) {
     const { bytes } = await convertSsfDocument(fixture, format, templates)
     const output = SkinArchive.open(bytes, format)
-    trees[format] = output.names()
+    trees[format] = new Map(output.names()
       .filter((name) => /\.(?:ini|cnd|css|til|png|ttf)$/i.test(name))
-      .map((name) => [name, output.getBytes(name)])
+      .map((name) => [name, output.getBytes(name)]))
   }
-  const bdi = new Map(trees.bdi)
-  const bds = new Map(trees.bds)
-  for (const [name] of trees.bdi) if (!bds.has(name)) assert.match(name, /\/(?:res\/logo\/ssf-toolbar-.*\.png|(?:port|land)\/logo\.ini)$/)
+  for (const name of trees.bdi.keys()) if (!trees.bds.has(name)) assert.match(name, /\/res\/logo\/ssf-(?:toolbar|menu)-.*\.png$/)
+  for (const name of trees.bds.keys()) if (!trees.bdi.has(name)) assert.match(name, /\/res\/logo\/pop_menu_icons\.(?:png|til)$/)
   for (const [name, bytes] of trees.bds) {
-    if (name.endsWith('.cnd')) continue
-    const converted = bdi.get(name)
-    if (name.endsWith('/gen.ini')) {
-      const expected = IniDocument.parse(strFromU8(bytes))
-      expected.appendSection('LOGO', [{ key: 'LAYOUT_NAME', value: 'logo' }])
-      assert.deepEqual(converted, strToU8(expected.toString()), name)
-    } else if (name.endsWith('/default.css')) {
-      // BDI only adds the LOGO menu background colour after the BDS styles.
-      const added = IniDocument.parse(strFromU8(converted))
-      const id = added.get('GLOBAL', 'STYLE_NUM')
-      added.removeSections([`STYLE${id}`])
-      added.set('GLOBAL', 'STYLE_NUM', String(Number(id) - 1))
-      assert.equal(added.toString(), IniDocument.parse(strFromU8(bytes)).toString(), name)
-    } else assert.ok(converted && converted.length === bytes.length && converted.every((byte, offset) => byte === bytes[offset]), name)
+    const converted = trees.bdi.get(name)
+    if (!converted) continue
+    if (name.endsWith('.cnd')) {
+      // FIX_SIZE is the iOS-only icon size patch (V6 p158).
+      const ios = IniDocument.parse(strFromU8(converted))
+      for (const { section, key } of ios.entries()) if (key === 'FIX_SIZE') ios.remove(section, key)
+      assert.equal(ios.toString(), strFromU8(bytes), name)
+    } else assert.ok(converted.length === bytes.length && converted.every((byte, offset) => byte === bytes[offset]), name)
   }
 })
 

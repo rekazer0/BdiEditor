@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs'
 import { SkinArchive } from '../src/skin.ts'
 import { IniDocument } from '../src/ini.ts'
 import { parseXmlPlist } from '../src/palm/palm-plist.ts'
-import { convertSsfDocument, ssfDocumentBytes } from '../src/ssf/ssf-convert.ts'
+import { strFromU8 } from 'fflate'
+import { convertSsfDocument, ssfDocumentBytes, ssfPreviewFiles } from '../src/ssf/ssf-convert.ts'
 import { decodePng, cropImage } from '../src/ssf/ssf-png.ts'
 import { ssfFixture } from './helpers/ssf-fixture.mjs'
 
@@ -17,7 +18,9 @@ const templates = {
 test('SSF → BDI packages native iOS toolbar plists, exact normal/pressed artwork and an F14 container', async () => {
   const original = await ssfDocumentBytes(ssfFixture())
   const source = SkinArchive.open(original, 'ssf')
-  const bds = SkinArchive.open((await convertSsfDocument(source, 'bds', templates)).bytes)
+  // The SSF canvas (its seven toolbar ICONs) is the reference for the artwork the export moves.
+  const canvas = ssfPreviewFiles(source, templates.sogou).files
+  const canvasText = (path) => strFromU8(canvas.get(path))
   const converted = await convertSsfDocument(source, 'bdi', templates)
   const bdi = SkinArchive.open(converted.bytes, 'bdi')
   assert.ok(converted.warnings.some((text) => text.includes('AI侃侃')))
@@ -30,15 +33,15 @@ test('SSF → BDI packages native iOS toolbar plists, exact normal/pressed artwo
     assert.equal(bdi.getText(menuPath), bdi.getText(menuPath.replace('.plist', '.nijigen.plist')))
     const logo = parseXmlPlist(bdi.getBytes(`${prefix}res/logo/customImageConfig.plist`))
     assert.equal(logo[0].Name, '0')
-    const cand = IniDocument.parse(bds.getText(`${prefix}port/cand1.cnd`))
-    const css = IniDocument.parse(bds.getText(`${prefix}res/default.css`))
+    const cand = IniDocument.parse(canvasText(`${prefix}port/cand1.cnd`))
+    const css = IniDocument.parse(canvasText(`${prefix}res/default.css`))
     for (const [item, action] of [...items.map((item, index) => [item, ['F7', 'F13', 'F72', 'F82', 'F68'][index]]), [logo[0], 'F31']]) {
       const section = cand.sections().find((name) => cand.get(name, 'KEY') === action)
       for (const [state, field] of [['Normal', 'NM_IMG'], ['Highlight', 'HL_IMG']]) {
         const [resource, tile] = css.get(`STYLE${cand.get(section, 'FORE_STYLE')}`, field).split(',')
-        const til = IniDocument.parse(bds.getText(`${prefix}res/${resource}.til`))
+        const til = IniDocument.parse(canvasText(`${prefix}res/${resource}.til`))
         const rect = til.get(`IMG${tile}`, 'SOURCE_RECT').split(',').map(Number)
-        const expected = cropImage(decodePng(bds.getBytes(`${prefix}res/${resource}.png`)), ...rect)
+        const expected = cropImage(decodePng(canvas.get(`${prefix}res/${resource}.png`)), ...rect)
         // Every plist image name resolves to <name>_iphone@3x.png, the way native skins ship them.
         const name = item.Images.Normal[state]
         const actual = decodePng(bdi.getBytes(`${prefix}res/logo/${name}_iphone@3x.png`))
@@ -65,17 +68,16 @@ test('SSF → BDI packages native iOS toolbar plists, exact normal/pressed artwo
       for (const section of ['ICON1', 'ICON3', 'ICON4']) {
         const style = native.get(section, 'FORE_STYLE')
         const [resource, tile] = css.get(`STYLE${style}`, 'NM_IMG').split(',')
-        const rect = IniDocument.parse(bds.getText(`${prefix}res/${resource}.til`)).get(`IMG${tile}`, 'SOURCE_RECT').split(',').map(Number)
+        const rect = IniDocument.parse(canvasText(`${prefix}res/${resource}.til`)).get(`IMG${tile}`, 'SOURCE_RECT').split(',').map(Number)
         // Points as whole numbers, like native skins (100 px artwork → FIX_SIZE=33,33).
         assert.equal(native.get(section, 'FIX_SIZE'), rect.slice(2).map((size) => Math.round(size / 3)).join(','))
       }
       for (const field of ['BACK_STYLE', 'FORE_STYLE']) {
-        assert.equal(native.get('CAND', field), IniDocument.parse(bds.getText(`${prefix}${orientation}/cand1.cnd`)).get('CAND', field))
+        assert.equal(native.get('CAND', field), IniDocument.parse(canvasText(`${prefix}${orientation}/cand1.cnd`)).get('CAND', field))
       }
     }
   }
   assert.deepEqual(source.toBytes(), original)
-  assert.equal(bds.names().some((path) => path.includes('/res/logo/')), false)
 })
 
 test('SSF → BDI maps native cursor 18 and clipboard 35 from the source menu artwork, including theme and pressed fallback', async () => {
@@ -96,6 +98,46 @@ test('SSF → BDI maps native cursor 18 and clipboard 35 from the source menu ar
         const original = source.getBytes(`1080/${folder}/${file}${state === 'Highlight' ? '_p' : ''}.png`) ?? source.getBytes(`1080/${folder}/${file}.png`)
         assert.deepEqual(bdi.getBytes(`${prefix}${item.Images.Normal[state]}_iphone@3x.png`), original)
       }
+    }
+  }
+})
+
+test('SSF → BDS gives Android the native F14 toolbar and the Sogou icons in the logo menu atlas', async () => {
+  const source = SkinArchive.open(await ssfDocumentBytes(ssfFixture()), 'ssf')
+  for (const folder of ['status1', 'status2']) {
+    source.setBytes(`1080/${folder}/ime_function_textedit.png`, source.getBytes(`1080/${folder}/902.png`))
+    source.setBytes(`1080/${folder}/ime_function_clipboard.png`, source.getBytes(`1080/${folder}/delf_26.png`))
+  }
+  const canvas = ssfPreviewFiles(source, templates.sogou).files
+  const canvasText = (path) => strFromU8(canvas.get(path))
+  const converted = await convertSsfDocument(source, 'bds', templates)
+  const bds = SkinArchive.open(converted.bytes, 'bds')
+  assert.ok(converted.warnings.some((text) => text.startsWith('Android 工具栏')))
+  for (const [theme, folder] of [['light', 'status1'], ['dark', 'status2']]) {
+    const prefix = `${theme}/skin/`
+    for (const orientation of ['port', 'land']) {
+      const cand = IniDocument.parse(bds.getText(`${prefix}${orientation}/cand1.cnd`))
+      assert.deepEqual([1, 2, 3, 4].map((id) => cand.get(`ICON${id}`, 'KEY')), ['F31', 'F14', 'F8', 'F9'])
+      assert.ok(!cand.entries().some(({ key }) => key === 'FIX_SIZE'), 'FIX_SIZE is iOS only')
+      // LogoLoader reads [GLOBAL] VERSION; only 1 loads the skin's pop_menu_icons.
+      assert.equal(IniDocument.parse(bds.getText(`${prefix}${orientation}/logo.ini`)).get('GLOBAL', 'VERSION'), '1')
+    }
+    assert.deepEqual(bds.names().filter((path) => path.startsWith(`${prefix}res/logo/`) && !path.endsWith('/')).sort(), [`${prefix}res/logo/pop_menu_icons.png`, `${prefix}res/logo/pop_menu_icons.til`])
+    const til = IniDocument.parse(bds.getText(`${prefix}res/logo/pop_menu_icons.til`))
+    const atlas = decodePng(bds.getBytes(`${prefix}res/logo/pop_menu_icons.png`))
+    // MenuFunction bitmap indexes of Baidu 13.3.18.31; LogoIconSource reads IMG<n> only for n < TILE_NUM.
+    assert.equal(til.get('GLOBAL', 'TILE_NUM'), '68')
+    const slice = (index) => cropImage(atlas, ...til.get(`IMG${index}`, 'SOURCE_RECT').split(',').map(Number))
+    const reference = IniDocument.parse(canvasText(`${prefix}port/cand1.cnd`))
+    const css = IniDocument.parse(canvasText(`${prefix}res/default.css`))
+    for (const [action, index] of [['F7', 26], ['F13', 27], ['F72', 29], ['F82', 31], ['F8', 67]]) {
+      const section = reference.sections().find((name) => reference.get(name, 'KEY') === action)
+      const [resource, tile] = css.get(`STYLE${reference.get(section, 'FORE_STYLE')}`, 'NM_IMG').split(',')
+      const rect = IniDocument.parse(canvasText(`${prefix}res/${resource}.til`)).get(`IMG${tile}`, 'SOURCE_RECT').split(',').map(Number)
+      assert.deepEqual(slice(index), cropImage(decodePng(canvas.get(`${prefix}res/${resource}.png`)), ...rect), `${theme} ${action} → IMG${index}`)
+    }
+    for (const [file, index] of [['ime_function_textedit', 25], ['ime_function_clipboard', 50]]) {
+      assert.deepEqual(slice(index), decodePng(source.getBytes(`1080/${folder}/${file}.png`)), `${theme} ${file} → IMG${index}`)
     }
   }
 })
