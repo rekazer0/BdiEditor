@@ -2,17 +2,18 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { declarations, run } from './helpers/app-source.mjs'
 
-function sharing({ activation, native = false, supported = true, outcome } = {}) {
+function sharing({ activation, native = false, supported = true, outcome, format = 'bdi' } = {}) {
   const calls = []
   const bytes = new Uint8Array([80, 75, 3, 4, 7, 8])
   let tapping = false
   const context = run(declarations('shareArchiveToMobile'), {
-    archive: { format: 'bdi' },
+    archive: { format },
+    bdaPlatform: () => 'android',
     File, Uint8Array, DOMException,
-    documentName: { textContent: '测试.bdi' },
+    documentName: { textContent: `测试.${format}` },
     isIOSWeb: () => !native,
     isAndroidTauri: () => native,
-    mobileShareFormat: () => native ? 'bds' : 'bdi',
+    mobileShareFormat: () => ['ssf', 'sxi', 'bda'].includes(format) ? format : native ? 'bds' : 'bdi',
     exportName: (_name, format) => `测试.${format}`,
     exportArchive: async () => {
       await new Promise(setImmediate)
@@ -25,8 +26,11 @@ function sharing({ activation, native = false, supported = true, outcome } = {})
     navigator: {
       userActivation: activation,
       canShare: () => true,
-      share: supported ? async ({ files }) => {
+      share: supported ? async (data) => {
+        const { files } = data
         assert.equal(tapping, true, 'file sharing must run inside the renewed tap')
+        // A title or text is a second share item, and iOS then leaves out the input method apps.
+        assert.deepEqual(Object.keys(data), ['files'])
         calls.push({ file: files[0] })
         if (outcome) throw outcome
       } : undefined,
@@ -51,6 +55,20 @@ for (const activation of [undefined, { isActive: true }, { isActive: false }]) {
     assert.deepEqual(new Uint8Array(await file.arrayBuffer()), bytes)
   })
 }
+
+for (const format of ['ssf', 'sxi']) {
+  test(`iOS shares an open .${format} to its own input method in its own format`, async () => {
+    const { context, calls } = sharing({ format })
+    assert.equal(await context.shareArchiveToMobile(), true)
+    assert.equal(calls.find((call) => call.file).file.name, `测试.${format}`)
+  })
+}
+
+test('iOS still refuses an Android-only BDA before packaging', async () => {
+  const { context, calls } = sharing({ format: 'bda' })
+  await assert.rejects(context.shareArchiveToMobile(), /当前格式不支持 iOS/)
+  assert.deepEqual(calls, ['progress'])
+})
 
 test('unsupported file sharing is visible and fails before packaging', async () => {
   const { context, calls } = sharing({ supported: false })

@@ -591,7 +591,9 @@ export async function shareArchiveToMobile(): Promise<boolean> {
     showFileOperationProgress()
     if (!navigator.share) throw new Error("当前浏览器不支持系统文件分享")
   }
-  if (ios && (appState.archive.format !== "bdi" && (appState.archive.format !== "bda" || bdaPlatform(appState.archive) !== "ios"))) {
+  // .ssf and .sxi go to the Sogou and Palm apps in their own format; Baidu on iOS reads .bdi and iOS .bda.
+  const ownFormat = appState.archive.format === "ssf" || appState.archive.format === "sxi"
+  if (ios && !ownFormat && appState.archive.format !== "bdi" && (appState.archive.format !== "bda" || bdaPlatform(appState.archive) !== "ios")) {
     throw new Error("当前格式不支持 iOS，请先打开 .bdi 或 iOS 版 .bda 皮肤")
   }
   const format = mobileShareFormat()
@@ -604,11 +606,15 @@ export async function shareArchiveToMobile(): Promise<boolean> {
     await invoke("share_file", { name, data: exported.bytes })
     return true
   }
+  // WebKit shares the file under its name and types it by extension (WKShareSheet), so the .bdi/.bda/.ssf/.sxi
+  // suffix decides which input method iOS offers; Baidu declares com.baidu.inputMethod.skinFile for bdt/bdi/bds/bda.
   const file = new File([new Uint8Array(exported.bytes).buffer], name, { type: "application/octet-stream" })
   if (!navigator.share || navigator.canShare && !navigator.canShare({ files: [file] })) {
     throw new Error("当前设备不支持系统文件分享")
   }
-  const share = () => navigator.share!({ title: name, files: [file] }).then(() => true).catch((error) => {
+  // Only the file: with no URL or text, WebKit adds the title as a string item ahead of the files, and iOS then
+  // hides "copy to app" targets such as the input methods, which accept the skin file alone.
+  const share = () => navigator.share!({ files: [file] }).then(() => true).catch((error) => {
     if (error instanceof DOMException && error.name === "AbortError") return false
     throw error
   })

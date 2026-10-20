@@ -1,4 +1,4 @@
-// Export via the real menu, download and reopen. Keys retain SSF pixels; BDI uses native toolbar slots.
+// Export via the real menu, download and reopen. Keys retain SSF pixels; BDI/BDS use native toolbar slots.
 // BDA has its own geometry and receives a separate reopen smoke check.
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
@@ -38,47 +38,54 @@ const snapshot = async (name) => {
     context.drawImage(candidateBackgroundPreview.canvas, 0, 0)
     context.drawImage(toolbarPreview.canvas, 0, 0)
     context.drawImage(preview.canvas, 0, toolbarPreview.canvas.height)
-    let nativePixels, expectedNativeImages
+    // The SSF canvas draws seven fixed icons; exports move them into Baidu's native F14 container.
+    const native = {}
     if (!nativeImages.length) {
       const { drawVisual, foregroundLayerRect } = await import("/src/preview-draw.ts")
-      const nativeCanvas = document.createElement("canvas")
-      nativeCanvas.width = canvas.width
-      nativeCanvas.height = canvas.height
-      const nativeComposite = nativeCanvas.getContext("2d")
-      nativeComposite.drawImage(candidateBackgroundPreview.canvas, 0, 0)
-      const nativeToolbar = document.createElement("canvas")
-      nativeToolbar.width = toolbarPreview.canvas.width
-      nativeToolbar.height = toolbarPreview.canvas.height
-      const nativeContext = nativeToolbar.getContext("2d")
-      nativeContext.imageSmoothingQuality = "high"
-      nativeContext.save()
-      nativeContext.scale(toolbarPreview.canvas.width / toolbarPreview.panelWidth, toolbarPreview.canvas.height / toolbarPreview.panelHeight)
       const icons = toolbarPreview.keys.filter((item) => /^ICON\d+$/.test(item.section))
       const side = Math.round(toolbarPreview.panelWidth / 7)
-      const middle = await Promise.all(icons.slice(1, -1).map((key) => toolbarPreview.resolveVisual(key.foreStyle, false)))
+      const fixed = await Promise.all(icons.slice(1, -1).map((key) => toolbarPreview.resolveVisual(key.foreStyle, false)))
       const { appState } = await import('/src/app/state.ts')
-      if (appState.archive?.format === 'ssf') {
+      const menuArt = async (file) => {
+        if (appState.archive?.format !== 'ssf') return []
         const { documentPackage } = await import('/src/ssf/ssf-convert.ts')
-        const bytes = documentPackage(appState.archive).file(toolbarPreview.theme, 'ime_function_textedit.png')
-        if (bytes) {
-          const image = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
-          middle.push({ image, source: [0, 0, image.width, image.height] })
+        const bytes = documentPackage(appState.archive).file(toolbarPreview.theme, `${file}.png`)
+        if (!bytes) return []
+        const image = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
+        return [{ image, source: [0, 0, image.width, image.height] }]
+      }
+      const compose = async (middle) => {
+        const nativeCanvas = document.createElement("canvas")
+        nativeCanvas.width = canvas.width
+        nativeCanvas.height = canvas.height
+        const nativeComposite = nativeCanvas.getContext("2d")
+        nativeComposite.drawImage(candidateBackgroundPreview.canvas, 0, 0)
+        const nativeToolbar = document.createElement("canvas")
+        nativeToolbar.width = toolbarPreview.canvas.width
+        nativeToolbar.height = toolbarPreview.canvas.height
+        const nativeContext = nativeToolbar.getContext("2d")
+        nativeContext.imageSmoothingQuality = "high"
+        nativeContext.save()
+        nativeContext.scale(toolbarPreview.canvas.width / toolbarPreview.panelWidth, toolbarPreview.canvas.height / toolbarPreview.panelHeight)
+        const middleWidth = (toolbarPreview.panelWidth - side * 2) / middle.length
+        for (const [index, visual] of middle.entries()) {
+          const slot = { x: side + index * middleWidth, y: 0, width: middleWidth, height: toolbarPreview.panelHeight }
+          drawVisual(nativeContext, visual, foregroundLayerRect(slot, visual?.source), false)
         }
+        for (const key of [icons[0], icons.at(-1)]) {
+          const visual = await toolbarPreview.resolveVisual(key.foreStyle, false)
+          drawVisual(nativeContext, visual, foregroundLayerRect(key.rect, visual?.source), false)
+        }
+        nativeContext.restore()
+        nativeComposite.drawImage(nativeToolbar, 0, 0)
+        nativeComposite.drawImage(preview.canvas, 0, toolbarPreview.canvas.height)
+        return { images: middle.length, pixels: nativeCanvas.toDataURL("image/png").split(",")[1] }
       }
-      const middleWidth = (toolbarPreview.panelWidth - side * 2) / middle.length
-      expectedNativeImages = middle.length
-      for (const [index, visual] of middle.entries()) {
-        const slot = { x: side + index * middleWidth, y: 0, width: middleWidth, height: toolbarPreview.panelHeight }
-        drawVisual(nativeContext, visual, foregroundLayerRect(slot, visual?.source), false)
-      }
-      for (const key of [icons[0], icons.at(-1)]) {
-        const visual = await toolbarPreview.resolveVisual(key.foreStyle, false)
-        drawVisual(nativeContext, visual, foregroundLayerRect(key.rect, visual?.source), false)
-      }
-      nativeContext.restore()
-      nativeComposite.drawImage(nativeToolbar, 0, 0)
-      nativeComposite.drawImage(preview.canvas, 0, toolbarPreview.canvas.height)
-      nativePixels = nativeCanvas.toDataURL("image/png").split(",")[1]
+      const cursor = await menuArt('ime_function_textedit')
+      // iOS plist toolbar entries: the five Sogou functions, then the cursor (18).
+      native.bdi = await compose([...fixed, ...cursor])
+      // Android pop_menu_icons: 表情 26, 输入方式 27, 语音 29, 搜索 31, 编辑 25, 剪贴板 50 (灵犀 has no Android function).
+      native.bds = await compose([...fixed.slice(0, 4), ...cursor, ...await menuArt('ime_function_clipboard')])
     }
     return {
       panel: [preview.panelWidth, preview.panelHeight],
@@ -86,21 +93,22 @@ const snapshot = async (name) => {
       icons: toolbarPreview.keys.filter((item) => /^ICON\d+$/.test(item.section)).map(({ center, rect }) => ({ center, rect })),
       nativeImages: nativeImages.length,
       toolbarHeight: toolbarPreview.canvas.height,
-      nativePixels,
-      expectedNativeImages,
+      native,
       pixels: canvas.toDataURL("image/png").split(",")[1],
     }
   })
   const png = Buffer.from(result.pixels, "base64")
   if (shots) writeFileSync(`${shots}/${name}.png`, png)
   const image = decodePng(png)
-  const nativeHash = result.nativePixels ? createHash("sha256").update(decodePng(Buffer.from(result.nativePixels, "base64")).data).digest("hex") : undefined
-  delete result.nativePixels
+  const native = Object.fromEntries(Object.entries(result.native).map(([format, { images, pixels }]) => [
+    format, { images, hash: createHash("sha256").update(decodePng(Buffer.from(pixels, "base64")).data).digest("hex") },
+  ]))
+  delete result.native
   delete result.pixels
   const toolbarPixels = image.data.subarray(0, image.width * result.toolbarHeight * 4)
   return {
     ...result, hash: createHash("sha256").update(image.data).digest("hex"), imageSize: [image.width, image.height],
-    panelHash: createHash("sha256").update(image.data.subarray(toolbarPixels.length)).digest("hex"), nativeHash,
+    panelHash: createHash("sha256").update(image.data.subarray(toolbarPixels.length)).digest("hex"), native,
   }
 }
 const closeDialog = async () => {
@@ -195,14 +203,10 @@ try {
       assert.deepEqual(state.panel, expected.panel, `${format} ${view.name}: panel size`)
       assert.deepEqual(state.keys, expected.keys, `${format} ${view.name}: every key and action`)
       assert.equal(state.panelHash, expected.panelHash, `${format} ${view.name}: every keyboard pixel`)
-      if (format === "bdi") {
-        assert.equal(state.nativeImages, expected.expectedNativeImages, `${view.name}: source toolbar and optional cursor artwork loaded`)
-        assert.deepEqual(state.icons.map(({ center }) => center), ["F31", "F14", "F8"])
-        assert.equal(state.hash, expected.nativeHash, `${view.name}: every pixel with native F14 slot geometry`)
-      } else {
-        assert.deepEqual(state.icons, expected.icons)
-        assert.equal(state.hash, expected.hash, `${view.name}: every canvas pixel`)
-      }
+      // Both platforms draw the native toolbar: F31 and F8 around the F14 container with each platform's icons.
+      assert.equal(state.nativeImages, expected.native[format].images, `${format} ${view.name}: native toolbar images loaded`)
+      assert.deepEqual(state.icons.map(({ center }) => center), ["F31", "F14", "F8"])
+      assert.equal(state.hash, expected.native[format].hash, `${format} ${view.name}: every pixel with native F14 slot geometry`)
       comparisons.push({ format, view: view.name, hash: state.hash, imageSize: state.imageSize, equal: true })
     }
     await chooseView(views[0])
@@ -213,7 +217,7 @@ try {
   assert.ok(await keyCount() > 10)
   assert.deepEqual(errors, [])
   if (shots) writeFileSync(`${shots}/results.json`, JSON.stringify({ sample, broken, reported, comparisons, pageErrors: errors }, null, 2))
-  console.log(`SSF export: ${comparisons.length} BDI/BDS views preserve all keyboard pixels; BDI loads the source native toolbar images and BDS matches every canvas pixel; BDA reopen smoke passed${sample ? ` (${sample})` : ""}${shots ? `; artifacts: ${shots}` : ""}`)
+  console.log(`SSF export: ${comparisons.length} BDI/BDS views preserve all keyboard pixels; BDI and BDS load the source artwork into each platform's native toolbar; BDA reopen smoke passed${sample ? ` (${sample})` : ""}${shots ? `; artifacts: ${shots}` : ""}`)
 } catch (error) {
   await page.screenshot({ path: "/tmp/bdi-ssf-conversion-failure.png" }).catch(() => {})
   throw error

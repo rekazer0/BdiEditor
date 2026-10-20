@@ -19,7 +19,7 @@ function tile(width: number, height: number, stretch?: LookImage["stretch"]): Ui
   const inner = stretch && stretch[1] <= width && stretch[3] <= height
     ? [`INNER_RECT=${stretch[0]},${stretch[2]},${stretch[1] - stretch[0]},${stretch[3] - stretch[2]}`]
     : []
-  return strToU8(["[GLOBAL]", "IMG_NUM=1", "", "[IMG1]", `SOURCE_RECT=0,0,${width},${height}`, ...inner, ""].join("\n"))
+  return strToU8(["[GLOBAL]", "TILE_NUM=1", "", "[IMG1]", `SOURCE_RECT=0,0,${width},${height}`, ...inner, ""].join("\n"))
 }
 
 function numbers(value: string | undefined): number[] {

@@ -44,7 +44,7 @@ function sourceImage(
 function tile(width: number, height: number, inner?: BdaImageAtom["innerRect"]): Uint8Array {
   return strToU8([
     "[GLOBAL]",
-    "IMG_NUM=1",
+    "TILE_NUM=1",
     "",
     "[IMG1]",
     `SOURCE_RECT=0,0,${width},${height}`,
