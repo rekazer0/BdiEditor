@@ -97,8 +97,10 @@ export function wireEditingControls(): void {
       updateSelectedKey(field)
     })
   }
+  // Style and skin-info text commits once per edit (Enter / leaving the field): one undo step, and no
+  // half-typed colour or font name is written.
   for (const field of styleFields) {
-    field.addEventListener("input", () => updateSelectedStyle(field))
+    field.addEventListener("change", () => updateSelectedStyle(field))
   }
   for (const field of [...keyboardFields, ...styleFields]) {
     if (!field.dataset.keyboardField?.endsWith("COLOR") && !field.dataset.styleField?.endsWith("COLOR")) continue
@@ -112,7 +114,7 @@ export function wireEditingControls(): void {
     field.addEventListener("change", () => updateToolbar(field))
   }
   for (const field of skinFields) {
-    field.addEventListener("input", () => updateSkinInfo(field))
+    field.addEventListener("change", () => updateSkinInfo(field))
   }
   for (const field of gapFields) {
     field.addEventListener("change", () => applyExactGap(field))
@@ -133,13 +135,13 @@ export function wireEditingControls(): void {
     field.dispatchEvent(new Event("input", { bubbles: true }))
   })
   for (const picker of colorPickers) {
-    picker.addEventListener("input", () => {
+    picker.addEventListener("change", () => {
       const alpha = colorAlphas.find((item) => item.dataset.colorAlphaFor === picker.dataset.colorPickerFor)
-      writeColorControl(picker, Number(alpha?.value ?? 100))
+      writeColorControl(picker, alpha?.value ? Number(alpha.value) : 1)
     })
   }
   for (const alpha of colorAlphas) {
-    alpha.addEventListener("input", () => writeColorControl(alpha, Number(alpha.value)))
+    alpha.addEventListener("change", () => { if (alpha.value !== "" && alpha.checkValidity()) writeColorControl(alpha, Number(alpha.value)) })
   }
   for (const button of layoutActionButtons) {
     button.addEventListener("click", () => applyLayoutAction(button.dataset.layoutAction ?? ""))

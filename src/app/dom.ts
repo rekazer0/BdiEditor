@@ -289,6 +289,14 @@ export const keyboardFieldsGroup = $(".keyboard-fields")
 
 export const toolbarFieldsGroup = $(".toolbar-fields")
 
+export const textStyleGroup = $(".text-style-fields")
+
+export const textStyleTargetSwitch = $("#text-style-targets")
+
+export const textStyleRows = $("#text-style-rows")
+
+export const textStyleNote = $("#text-style-note")
+
 export const toolbarFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-toolbar-field]"))
 
 export const skinFieldsGroup = $(".skin-fields")
@@ -515,6 +523,7 @@ export const tileSourceFields = Array.from(document.querySelectorAll<HTMLInputEl
 export const tileInnerFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-tile-inner]"))
 
 export const textStyleLabels = Array.from(document.querySelectorAll<HTMLElement>("[data-text-style]"))
+export const keyTextLayerSwitch = $("#key-text-layers")
 
 export const simulatedOutput = $("#simulated-output") as HTMLTextAreaElement
 

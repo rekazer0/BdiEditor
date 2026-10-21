@@ -40,10 +40,10 @@ export function selectedStyleImageSections(source: "BACK_STYLE" | "FORE_STYLE"):
         const foreStyle = isListCell(key)
           ? appState.layoutDocument?.get("LIST", "FORE_STYLE") ?? ""
           : effectiveKeyValue(key, source) ?? ""
-        return foreStyle.split(",").map((token) => token.trim()).flatMap((token) => {
-          const value = Number(token)
-          return [`STYLE${token}`, Number.isFinite(value) ? `STYLE${Math.floor(value / 100)}` : ""]
-        }).filter((section) => section && document.sections().includes(section))
+        // Images live in STYLE<id> only (STYLE<id/100> is a text fallback, see styleWriteTarget), and a
+        // text layer of the same foreground must not turn into an image.
+        return foreStyle.split(",").map((token) => `STYLE${token.trim()}`).filter((section) =>
+          document.get(section, "NM_IMG") !== undefined || document.get(section, "HL_IMG") !== undefined)
       }))]
   return sections.length ? { document, path, sections } : undefined
 }

@@ -37,6 +37,11 @@ export function ssfBoard(layout: string): SsfBoard {
 
 const isQwerty = (board: SsfBoard) => board === "py26" || board === "en26" || board === "num26"
 
+/** 26-key boards (and Sogou's variants styled like them, such as py_14) read the `_Qwerty` / `_Latin` classes. */
+export function ssfQwerty(layout: string): boolean {
+  return isQwerty(ssfBoard(layout))
+}
+
 /** Function keys whose Sogou class only differs by the `_Qwerty` suffix on 26-key boards. */
 const FUNCTION_KEYS: Record<string, [qwerty: string[], nine: string[]]> = {
   F36: [["Key_Backspace_Qwerty"], ["Key_Backspace"]],

@@ -19,6 +19,8 @@ export type TextVisual = {
   fontName?: string
   color?: string
   clearType?: number
+  /** Only Sogou styles have a weight (the preview's `SSF_BOLD`). */
+  bold?: boolean
 }
 
 export type StyleTextVisual = TextVisual & { text: string }
@@ -75,6 +77,10 @@ export function canvasFontFamily(fontName: string | undefined): string {
   const name = fontName?.trim()
   if (!name || /^\.SF(?:UI|NS)/i.test(name)) return "system-ui"
   return `"${name.replaceAll('"', '\\"')}", system-ui`
+}
+
+export function canvasFont(size: number, visual: TextVisual | undefined): string {
+  return `${visual?.bold ? "bold " : ""}${size}px ${canvasFontFamily(visual?.fontName)}`
 }
 
 export function drawVisualText(
@@ -207,6 +213,8 @@ function resolveTextVisual(
       if (result.fontName === undefined && fontName) result.fontName = fontName
       if (result.clearType === undefined && Number.isFinite(clearType)) result.clearType = clearType
       if (result.color === undefined && color) result.color = color
+      const bold = styles.get(section, "SSF_BOLD")
+      if (result.bold === undefined && bold) result.bold = bold === "1"
     }
   }
   if (result.fontName === undefined && defaultFontName) result.fontName = defaultFontName

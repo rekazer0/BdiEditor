@@ -9,7 +9,7 @@ import { IniDocument } from "../ini.ts"
 import { scaleIniDocument } from "../panel-tools.ts"
 import { SkinArchive } from "../skin.ts"
 import { cached, fingerprint } from "./ssf-cache.ts"
-import { SsfLook, type LookColors, type LookImage, type LookPair } from "./ssf-look.ts"
+import { SsfLook, type LookColors, type LookImage, type LookPair, type LookText } from "./ssf-look.ts"
 import type { SsfPackage, SsfTheme } from "./ssf-package.ts"
 import { cropImage, decodePng, encodePng, isPng, pngSize, tintImage, whiteMask, type RgbaImage } from "./ssf-png.ts"
 
@@ -133,15 +133,24 @@ class ThemeConverter {
     this.resources = new ThemeResources(theme, output, base.getText("light/skin/res/default.css"), panelWidth ? scale : 1)
   }
 
-  /** Template glyph slices recoloured to the Sogou label colour, for keys Sogou draws as text; `show` replaces a text style's text. */
-  private tintedTemplateStyle(styleID: string, colors: LookColors, white = false, show?: string): string | undefined {
+  /**
+   * Template glyph slices recoloured to the Sogou label colour, for keys Sogou draws as text; a text
+   * style also takes the skin's `show` text, size, typeface and weight.
+   */
+  private tintedTemplateStyle(styleID: string, colors: LookColors | undefined, white = false, show?: string, text?: LookText): string | undefined {
     const value = this.resources.styles.get(`STYLE${styleID}`, "NM_IMG")
     const [imageName, tileValue] = value?.split(",").map((part) => part.trim()) ?? []
     if (!imageName || !tileValue) {
-      return this.resources.styles.sections().includes(`STYLE${styleID}`)
-        ? this.resources.derivedStyle(styleID, { NM_COLOR: colors.normal, HL_COLOR: colors.pressed, ...(show ? { SHOW: show } : {}) })
+      const overrides = {
+        ...colors ? { NM_COLOR: colors.normal, HL_COLOR: colors.pressed } : {},
+        ...show ? { SHOW: show } : {},
+        ...this.textFields(text),
+      }
+      return this.resources.styles.sections().includes(`STYLE${styleID}`) && Object.keys(overrides).length
+        ? this.resources.derivedStyle(styleID, overrides)
         : undefined
     }
+    if (!colors) return
     const atlasBytes = this.base.getBytes(`light/skin/res/${imageName}.png`)
     const tilePath = `light/skin/res/${imageName}.til`
     const source = numbers(this.base.isText(tilePath) ? IniDocument.parse(this.base.getText(tilePath)).get(`IMG${tileValue}`, "SOURCE_RECT") : undefined)
@@ -160,6 +169,18 @@ class ThemeConverter {
     const normal = tinted(colors.normal)
     const pressed = tinted(colors.pressed)
     return normal && pressed ? this.resources.imageStyle({ normal, pressed }) : undefined
+  }
+
+  /** Baidu style fields for a Sogou text look; the typeface file is copied next to the styles. */
+  private textFields(text: LookText | undefined): Record<string, string> {
+    if (!text) return {}
+    if (text.font) this.output.set(`${this.theme}/skin/res/${text.font.name}`, text.font.bytes)
+    return {
+      ...text.fontSize ? { FONT_SIZE: String(text.fontSize) } : {},
+      ...text.font ? { FONT_NAME: text.font.name } : {},
+      // Baidu styles have no weight; the preview reads this and the export strips it with the other SSF_ fields.
+      ...text.bold ? { SSF_BOLD: "1" } : {},
+    }
   }
 
   private soundStyle(sound: { filename: string; bytes: Uint8Array } | undefined): string | undefined {
@@ -184,9 +205,11 @@ class ThemeConverter {
         layout.set(section, "FORE_STYLE", this.resources.imageStyle(look.fore))
         layout.remove(section, "FORE_OFFSET")
         layout.remove(section, "POS_TYPE")
-      } else if (look.label) {
+      } else if (look.label || look.labelText) {
         const templateFore = layout.get(section, "FORE_STYLE")?.split(",").map((value) => value.trim()).filter(Boolean)
-        if (templateFore?.length) layout.set(section, "FORE_STYLE", templateFore.map((id, index) => this.tintedTemplateStyle(id, look.label!, false, look.texts[index]) ?? id).join(","))
+        // The size is the main label's; a second layer (中/英's 英) keeps its own smaller size.
+        const text = (index: number) => look.labelText && (index ? { ...look.labelText, fontSize: undefined } : look.labelText)
+        if (templateFore?.length) layout.set(section, "FORE_STYLE", templateFore.map((id, index) => this.tintedTemplateStyle(id, look.label, false, look.texts[index], text(index)) ?? id).join(","))
       }
       const sound = this.soundStyle(this.look.sound(look.binding))
       if (sound) layout.set(section, "SOUND_STYLE", sound)
@@ -201,11 +224,9 @@ class ThemeConverter {
       if (back && layout.get(section, "BACK_STYLE")) layout.set(section, "BACK_STYLE", back)
       if (cell && layout.get(section, "CELL_STYLE")) layout.set(section, "CELL_STYLE", cell)
       const fore = layout.get(section, "FORE_STYLE")?.trim()
-      if (list.font) this.output.set(`${this.theme}/skin/res/${list.font.name}`, list.font.bytes)
       if (fore) layout.set(section, "FORE_STYLE", this.resources.derivedStyle(fore, {
         ...(list.text ? { NM_COLOR: list.text, HL_COLOR: list.text } : {}),
-        ...(list.font ? { FONT_NAME: list.font.name } : {}),
-        ...(list.fontSize ? { FONT_SIZE: String(list.fontSize) } : {}),
+        ...this.textFields(list),
       }))
     }
   }
@@ -232,7 +253,11 @@ class ThemeConverter {
     if (composing && gen.get("INPUT", "BACK_STYLE")) gen.set("INPUT", "BACK_STYLE", this.resources.colorStyle(composing))
     const composingText = this.look.color("TextStyle_Composing")
     const inputFore = gen.get("INPUT", "FORE_STYLE")?.trim()
-    if (composingText && inputFore) gen.set("INPUT", "FORE_STYLE", this.resources.derivedStyle(inputFore, { NM_COLOR: composingText, HL_COLOR: composingText }))
+    const inputFields = {
+      ...composingText ? { NM_COLOR: composingText, HL_COLOR: composingText } : {},
+      ...this.textFields(this.look.textStyle("TextStyle_Composing")),
+    }
+    if (inputFore && Object.keys(inputFields).length) gen.set("INPUT", "FORE_STYLE", this.resources.derivedStyle(inputFore, inputFields))
 
     const candName = gen.get("CAND", "LAYOUT_NAME")?.trim()
     const candPath = candName && `${this.theme}/skin/${orientation}/${candName}.cnd`
@@ -241,10 +266,14 @@ class ThemeConverter {
     const candidates = IniDocument.parse(new TextDecoder().decode(candBytes))
     const text = this.look.color("TextStyle_Candidate")
     const highlight = this.look.color("TextStyle_Candidate_Highlight") ?? text
+    const candidateFields = {
+      ...text && highlight ? { NM_COLOR: text, HL_COLOR: highlight } : {},
+      ...this.textFields(this.look.textStyle("TextStyle_Candidate")),
+    }
     for (const section of ["CAND", "TAB"]) {
       if (cand && candidates.get(section, "BACK_STYLE")) candidates.set(section, "BACK_STYLE", cand)
       const fore = candidates.get(section, "FORE_STYLE")?.trim()
-      if (text && highlight && fore) candidates.set(section, "FORE_STYLE", this.resources.derivedStyle(fore, { NM_COLOR: text, HL_COLOR: highlight }))
+      if (fore && Object.keys(candidateFields).length) candidates.set(section, "FORE_STYLE", this.resources.derivedStyle(fore, candidateFields))
     }
     for (const field of ["NML_FONT_STYLE", "SEL_FONT_STYLE"]) {
       const fore = candidates.get("SWITCH", field)?.trim()
@@ -347,7 +376,7 @@ export function convertSsfToBaidu(pkg: SsfPackage, base: SkinArchive, panelWidth
   const dual = pkg.themes.size > 1
   const raw = Object.fromEntries([...files].map(([path, bytes]) => {
     if (path === "Info.txt" || path === "demo.png") return [path, bytes]
-    if (/\.(?:ini|cnd)$/i.test(path)) {
+    if (/\.(?:ini|cnd|css)$/i.test(path)) {
       const document = IniDocument.parse(new TextDecoder().decode(bytes))
       const metadata = document.entries().filter(({ key }) => key.startsWith("SSF_"))
       for (const { section, key } of metadata) document.remove(section, key)

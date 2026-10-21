@@ -6,6 +6,7 @@ import { createIcon } from "../icons"
 import { IniDocument } from "../ini.ts"
 import { ssfFieldLabel, ssfSectionLabel } from "../ssf/ssf-labels.ts"
 import { parseSsfImage, type SsfStretch } from "../ssf/ssf-package.ts"
+import { mirrorSsfEdit, ssfResolutionOf, ssfResolutionTwins } from "../ssf/ssf-resolutions.ts"
 import { setSourceValue } from "./config-context"
 import { commitBatch, commitText, isEditing, updateDirty } from "./edit-history"
 import { populateKeyInspector } from "./key-inspector"
@@ -15,6 +16,11 @@ import { sourceEditPath, ssfDocument, ssfPackage, ssfTheme } from "./ssf-documen
 import { rebuildSsfPreview } from "./ssf-preview"
 import { appState } from "./state"
 import { styleKindBadge } from "./style-picker"
+import { element } from "../dom-element.ts"
+import { sanitizeFontFileName, skinFontFiles, uniqueFontFileName } from "../font-files.ts"
+import { type Change } from "../history.ts"
+import { showError, showStatus } from "./file-operations"
+import { validateFont } from "./skin-fonts"
 
 export type SsfEntry = { key: string; value: string }
 
@@ -32,12 +38,6 @@ const QUADS: Record<string, string[]> = {
 const COLOR_VALUE = /^(?:0x|#)?([0-9a-f]{6}|[0-9a-f]{8})$/i
 const NUMERIC_FIELDS = new Set(["BG_STYLE", "TEXT_SIZE", "TYPEFACE", "TYPE", "LABEL_VISIBLE", "MINOR_LABEL_VISIBLE", "LABEL_ORIENTATION", "LABEL_HORIZONTAL_OFFSET", "MINOR_LABEL_HORIZONTAL_OFFSET", "POPUP_OFFSET_VERTICAL", "LOOP_TYPE", "START", "END", "loop_count"])
 
-function element<K extends keyof HTMLElementTagNameMap>(name: K, className?: string): HTMLElementTagNameMap[K] {
-  const node = document.createElement(name)
-  if (className) node.className = className
-  return node
-}
-
 /**
  * Applies `change` to one Sogou file as a single undo step, then redraws the canvas from the edited
  * skin right away (the inspector is not typing, so it skips the preview's debounce).
@@ -46,7 +46,10 @@ export function editSsfFile(path: string, change: (document: IniDocument) => voi
   editTargets([{ path, section: "" }], change)
 }
 
-type SsfLocation = { path: string; section: string }
+type TextChange = Extract<Change, { kind: "text" }>
+
+/** A section rows write to; `create` is what a missing section starts with (RootView needs BG_STYLE). */
+export type SsfLocation = { path: string; section: string; create?: SsfEntry[] }
 
 function editTargets(targets: SsfLocation[], change: (document: IniDocument, target: SsfLocation) => void): void {
   const archive = appState.archive
@@ -59,8 +62,9 @@ function editTargets(targets: SsfLocation[], change: (document: IniDocument, tar
     return before === after ? [] : [{ kind: "text" as const, path, before, after }]
   })
   if (!changes.length) return
-  if (changes.length === 1) commitText(changes[0].path, changes[0].before, changes[0].after)
-  else commitBatch(changes)
+  const all: TextChange[] = [...changes, ...resolutionTwins(changes)]
+  if (all.length === 1) commitText(all[0].path, all[0].before, all[0].after)
+  else commitBatch(all)
   if (changes.some((change) => change.path === appState.selectedPath)) appState.selectedDocument = ssfDocument(appState.selectedPath)
   const source = changes.find((change) => change.path === sourceEditPath())
   if (source) setSourceValue(source.after)
@@ -71,13 +75,13 @@ function editTargets(targets: SsfLocation[], change: (document: IniDocument, tar
 }
 
 function writeValue(targets: SsfLocation[], key: string, value: string): void {
-  editTargets(targets, (document, target) => setSsfValue(document, target.section, key, value))
+  editTargets(targets, (document, target) => setSsfValue(document, target.section, key, value, target.create))
 }
 
-/** Sets a value, adding the section at the end of the file when it does not exist yet. */
-export function setSsfValue(document: IniDocument, section: string, key: string, value: string): void {
+/** Sets a value, adding the section (with `create` first) at the end of the file when it does not exist yet. */
+export function setSsfValue(document: IniDocument, section: string, key: string, value: string, create: readonly SsfEntry[] = []): void {
   if (document.sections().includes(section)) document.set(section, key, value)
-  else document.appendSection(section, [{ key, value }])
+  else document.appendSection(section, [...create.filter((entry) => entry.key !== key), { key, value }])
 }
 
 /** One value per key: duplicate sections are read like IniDocument.get, the first definition wins. */
@@ -254,6 +258,15 @@ function stretchField(path: string, section: string, targets = [{ path, section 
   return row
 }
 
+/**
+ * A colour as Sogou reads it: `Long.decode` on `0xAARRGGBB` (theme/parse/utils/f.java). Six digits or a
+ * `#` would decode with alpha 0, so they are written out in full.
+ */
+function sogouColor(value: string): string {
+  const hex = value.trim().match(COLOR_VALUE)![1].toUpperCase()
+  return `0x${hex.length === 6 ? `FF${hex}` : hex}`
+}
+
 function colorField(key: string, value: string, targets: SsfLocation[]): HTMLElement {
   const row = element("div", "ui-field document-property-field")
   caption(row, key)
@@ -266,6 +279,7 @@ function colorField(key: string, value: string, targets: SsfLocation[]): HTMLEle
   picker.setAttribute("aria-label", ssfFieldLabel(key))
   const text = element("input")
   text.value = value
+  if (!value) text.placeholder = "未设置"
   text.setAttribute("aria-label", `${ssfFieldLabel(key)}值`)
   const alpha = element("input")
   alpha.type = "number"
@@ -281,13 +295,36 @@ function colorField(key: string, value: string, targets: SsfLocation[]): HTMLEle
     const argb = current.length === 6 ? `FF${current}` : current
     const alphaHex = component === "alpha" ? Math.round(Number(alpha.value) * 255).toString(16).padStart(2, "0") : argb.slice(0, 2)
     const rgb = component === "color" ? picker.value.slice(1) : argb.slice(2)
-    setSsfValue(document, target.section, key, `0x${alphaHex}${rgb}`.toUpperCase().replace(/^0X/, "0x"))
+    setSsfValue(document, target.section, key, `0x${alphaHex}${rgb}`.toUpperCase().replace(/^0X/, "0x"), target.create)
   })
   picker.addEventListener("change", () => fromControls("color"))
   alpha.addEventListener("change", () => { if (alpha.value !== "" && alpha.checkValidity()) fromControls("alpha") })
-  text.addEventListener("change", () => { if (COLOR_VALUE.test(text.value.trim())) write(text.value.trim()) })
+  text.addEventListener("change", () => {
+    const value = text.value.trim()
+    if (!value) editTargets(targets, (document, target) => { document.remove(target.section, key) })
+    else if (COLOR_VALUE.test(value)) write(sogouColor(value))
+  })
   control.append(picker, text, alpha)
   row.append(control)
+  return row
+}
+
+/** `BOLD=true` or no key at all (Sogou reads only "true"). */
+function switchField(key: string, value: string, targets: SsfLocation[]): HTMLElement {
+  const row = element("label", "document-property-field")
+  row.classList.add("ui-field")
+  caption(row, key)
+  const input = element("input", "ui-switch")
+  input.type = "checkbox"
+  input.setAttribute("role", "switch")
+  input.setAttribute("aria-label", ssfFieldLabel(key))
+  input.checked = value.trim() === "true"
+  input.disabled = !isEditing()
+  input.addEventListener("change", () => editTargets(targets, (document, target) => {
+    if (input.checked) setSsfValue(document, target.section, key, "true", target.create)
+    else document.remove(target.section, key)
+  }))
+  row.append(input)
   return row
 }
 
@@ -296,10 +333,12 @@ function valueInput(key: string, value: string, targets: SsfLocation[]): HTMLInp
   input.value = value
   input.title = `${ssfFieldLabel(key)}：${value}`
   input.disabled = !isEditing()
-  if (NUMERIC_FIELDS.has(key) && /^-?\d+(?:\.\d+)?$/.test(value)) {
+  if (NUMERIC_FIELDS.has(key) && /^-?\d+(?:\.\d+)?$/.test(value) || !value && key === "TEXT_SIZE") {
     input.type = "number"
-    input.step = value.includes(".") ? "any" : "1"
+    // TEXT_SIZE up to 1 is a fraction of the screen width (0.045) and steps by 0.001; above 1 it is pixels.
+    input.step = key === "TEXT_SIZE" ? (Number(value || 0) <= 1 ? "0.001" : "1") : value.includes(".") ? "any" : "1"
   }
+  if (!value) input.placeholder = key === "TEXT_SIZE" ? "未设置（屏宽比例，如 0.045）" : "未设置"
   input.setAttribute("aria-label", ssfFieldLabel(key))
   input.addEventListener("change", () => {
     if (input.type !== "number" || input.value !== "" && Number.isFinite(input.valueAsNumber)) writeValue(targets, key, input.value)
@@ -338,7 +377,8 @@ function ssfField(entry: SsfEntry, targets: SsfLocation[], options?: string[]): 
     }))
     return row
   }
-  if (/COLOR/i.test(key) && COLOR_VALUE.test(value.trim())) return colorField(key, value, targets)
+  if (key === "BOLD") return switchField(key, value, targets)
+  if (/COLOR/i.test(key) && (COLOR_VALUE.test(value.trim()) || !value)) return colorField(key, value, targets)
   if (parseSsfImage(value)) return imageCard(ssfFieldLabel(key), key, targets)
   return textField(key, value, targets, options)
 }
@@ -359,8 +399,84 @@ export type SsfBlock = {
   /** The field naming this block's image section, editable in its card. */
   reference?: CardReference
   options?: Record<string, string[]>
+  /** Keys offered even when the section (or the key) is missing; the first write creates them. */
+  expect?: string[]
+  /** Entries a missing section starts with when one of its rows is first written. */
+  create?: SsfEntry[]
   /** Matching sections of the other selected keys. */
   peers?: SsfLocation[]
+}
+
+/** Font files a TYPEFACE can name: Sogou installs `default/` and the theme folder into one directory. */
+export function ssfFontOptions(): string[] {
+  return [...new Set(skinFontFiles(appState.archive?.names() ?? []).map((path) => path.split("/").pop()!))]
+}
+
+/** Imports a .ttf / .otf into default/ and points every target's TYPEFACE at it, as one undo step. */
+export function ssfFontImportButton(targets: SsfLocation[]): HTMLButtonElement {
+  return ssfButton("导入字体", "upload", () => {
+    const picker = element("input")
+    picker.type = "file"
+    picker.accept = ".ttf,.otf"
+    picker.addEventListener("change", () => {
+      const file = picker.files?.[0]
+      if (file) void importSsfFont(file, targets)
+    })
+    picker.click()
+  })
+}
+
+/**
+ * The same edits in the skin's other resolution folders: the phone installs only the folder nearest
+ * its screen width, so an edit made in the 1080 copy alone never reaches a 720 phone.
+ */
+function resolutionTwins(changes: readonly TextChange[]): TextChange[] {
+  const archive = appState.archive!
+  const names = archive.names()
+  const present = new Set(names)
+  const folderOf = (path: string) => path.slice(0, path.lastIndexOf("/") + 1)
+  const inLook = (path: string, file: string) => present.has(`${folderOf(path)}${file}`) || present.has(`${ssfResolutionOf(path)}/${file}`)
+  const dayStatus = ssfPackage()?.folder("light").split("/")[1] || undefined
+  const edited = new Set(changes.map((change) => change.path))
+  const twins = new Map<string, { before: string; after: string }>()
+  for (const change of changes) {
+    for (const twin of ssfResolutionTwins(names, change.path, dayStatus)) {
+      if (edited.has(twin)) continue
+      const before = twins.get(twin)?.after ?? archive.getText(twin)
+      const copy = {
+        scale: ssfResolutionOf(twin)! / ssfResolutionOf(change.path)!,
+        sharedImage: (file: string) => !inLook(change.path, file) && !inLook(twin, file),
+      }
+      twins.set(twin, { before: twins.get(twin)?.before ?? before, after: mirrorSsfEdit(change.before, change.after, before, copy) })
+    }
+  }
+  return [...twins].flatMap(([path, { before, after }]) => before === after ? [] : [{ kind: "text" as const, path, before, after }])
+}
+
+async function importSsfFont(file: File, targets: SsfLocation[]): Promise<void> {
+  const archive = appState.archive
+  if (!archive || archive.format !== "ssf" || !isEditing()) return
+  try {
+    if (!/\.(?:ttf|otf)$/i.test(file.name)) throw new Error("搜狗皮肤只支持 .ttf / .otf 字体文件")
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    await validateFont(bytes)
+    const name = uniqueFontFileName(sanitizeFontFileName(file.name), archive.names())
+    const changes: Change[] = [{ kind: "bytes", path: `default/${name}`, before: undefined, after: bytes }]
+    for (const path of new Set(targets.map((target) => target.path))) {
+      const before = archive.getText(path)
+      const document = IniDocument.parse(before)
+      for (const target of targets.filter((item) => item.path === path)) setSsfValue(document, target.section, "TYPEFACE", name)
+      changes.push({ kind: "text", path, before, after: document.toString() })
+    }
+    commitBatch([...changes, ...resolutionTwins(changes.filter((change): change is TextChange => change.kind === "text"))])
+    rebuildSsfPreview()
+    refreshPreview()
+    populateKeyInspector()
+    updateDirty()
+    showStatus(`已导入字体 ${name}。`)
+  } catch (error) {
+    showError(error, "导入字体")
+  }
 }
 
 export function ssfButton(label: string, icon: string, onClick: () => void): HTMLButtonElement {
@@ -418,7 +534,7 @@ function markMixed(row: HTMLElement, targets: SsfLocation[], keys: string[]): vo
 function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
   const nodes: HTMLElement[] = []
   const exists = ssfDocument(block.path).sections().includes(block.section)
-  if (!exists && !block.template) return nodes
+  if (!exists && !block.template && !block.expect) return nodes
   if (showHeading) nodes.push(blockHeading(block))
   if (block.note) {
     const note = element("p", "inspector-group-subtitle")
@@ -427,7 +543,7 @@ function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
   }
   const actions = [...block.actions ?? []]
   const template = block.template
-  if (!exists && template?.length) {
+  if (!exists && template?.length && !block.expect) {
     actions.unshift(ssfButton("添加", "plus", () => editSsfFile(block.path, (document) => document.appendSection(block.section, template))))
   }
   if (actions.length) {
@@ -435,11 +551,11 @@ function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
     row.append(...actions)
     nodes.push(row)
   }
-  if (!exists) return nodes
-  const entries = ssfEntries(block.path, block.section).filter((entry) => !block.only || block.only.includes(entry.key))
+  if (!exists && !block.expect) return nodes
+  const entries = exists ? ssfEntries(block.path, block.section).filter((entry) => !block.only || block.only.includes(entry.key)) : []
   const keys = new Set(entries.map((entry) => entry.key))
   const grid = element("div", "document-property-grid")
-  const targets = [{ path: block.path, section: block.section }, ...block.peers ?? []]
+  const targets = [{ path: block.path, section: block.section, create: block.create }, ...block.peers ?? []]
   const used = new Set(block.omit ?? [])
   const rowTargets = new Map<HTMLElement, SsfLocation[]>()
   if (block.reference) {
@@ -461,6 +577,9 @@ function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
   for (const entry of entries) {
     if (used.has(entry.key)) continue
     grid.append(ssfField(entry, targets, block.options?.[entry.key]))
+  }
+  for (const key of block.expect ?? []) {
+    if (!used.has(key) && !keys.has(key)) grid.append(ssfField({ key, value: "" }, targets, block.options?.[key]))
   }
   for (const row of Array.from(grid.children) as HTMLElement[]) {
     const band = row.dataset.documentKey === "STRETCH"
@@ -498,7 +617,7 @@ function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
 
 /** One inspector group (a rail entry): several sections under one title, each with its own subheading. */
 export function renderGroup(label: string, blocks: SsfBlock[], code?: string, key = label): HTMLElement | undefined {
-  const shown = blocks.filter((block) => block.template || ssfDocument(block.path).sections().includes(block.section))
+  const shown = blocks.filter((block) => block.template || block.expect || ssfDocument(block.path).sections().includes(block.section))
   if (!shown.length) return
   const section = element("section", "ui-section document-property-section")
   section.dataset.inspectorGroupLabel = label

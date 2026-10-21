@@ -3,6 +3,7 @@ import { bdaStyleID, type BdaAppearance, type BdaAnimationFrame, type BdaKey, ty
 import { bdaColorHex } from "./bda-resolver.ts"
 import { decodeBdaAnimation, decodeBdaAppearance, decodeBdaSoundConfig } from "./bda-decode.ts"
 import { bdaLayoutStyleGroups, type BdaLayoutStyleItem } from "./bda-layout-styles.ts"
+import { element } from "./dom-element.ts"
 
 type BdaStyleChange = (ref: BdaStyleRef, property: string, value: string) => void
 export type BdaLayoutScope = "panel" | "candidate"
@@ -56,12 +57,6 @@ const bdaEntryNames: Record<string, string> = { short: "短按", long: "长按",
 /** BDA 提示 / 列表条目用内部键名（short、port…），界面上显示对应的中文。 */
 export function bdaEntryLabel(key: string): string {
   return bdaEntryNames[key] ?? key
-}
-
-function element<K extends keyof HTMLElementTagNameMap>(name: K, className?: string): HTMLElementTagNameMap[K] {
-  const node = document.createElement(name)
-  if (className) node.className = className
-  return node
 }
 
 function inspectorSection<T extends HTMLElement>(node: T, label: string): T {
@@ -381,17 +376,18 @@ function styleCard(
   } else if (ref.type === "color") {
     const style = appearance.colorStyles.get(ref.key)
     if (!style) return
-    if (style.normalColor !== undefined) controls.append(colorField("正常颜色", style.normalColor, !editable, (value) => onChange(ref, "NM_COLOR", value)))
-    if (style.highlightColor !== undefined) controls.append(colorField("按下颜色", style.highlightColor, !editable, (value) => onChange(ref, "HL_COLOR", value)))
+    // An absent proto3 colour reads as 0 (transparent); every field is offered so it can be set.
+    controls.append(colorField("正常颜色", style.normalColor ?? 0, !editable, (value) => onChange(ref, "NM_COLOR", value)))
+    controls.append(colorField("按下颜色", style.highlightColor ?? 0, !editable, (value) => onChange(ref, "HL_COLOR", value)))
   } else {
     const style = appearance.textStyles.get(ref.key)
     if (!style) return
-    if (style.fontName !== undefined) controls.append(textField("字体", style.fontName, !editable, (value) => onChange(ref, "FONT_NAME", value)))
-    if (style.fontSize !== undefined) controls.append(rangeField("字号", style.fontSize, 1, 160, !editable, (value) => onChange(ref, "FONT_SIZE", String(value))))
-    if (style.normalColor !== undefined) controls.append(colorField("正常文字", style.normalColor, !editable, (value) => onChange(ref, "NM_COLOR", value)))
-    if (style.highlightColor !== undefined) controls.append(colorField("按下文字", style.highlightColor, !editable, (value) => onChange(ref, "HL_COLOR", value)))
+    controls.append(textField("字体", style.fontName ?? "", !editable, (value) => onChange(ref, "FONT_NAME", value)))
+    controls.append(rangeField("字号", style.fontSize ?? 0, 1, 160, !editable, (value) => onChange(ref, "FONT_SIZE", String(value))))
+    controls.append(colorField("正常文字", style.normalColor ?? 0, !editable, (value) => onChange(ref, "NM_COLOR", value)))
+    controls.append(colorField("按下文字", style.highlightColor ?? 0, !editable, (value) => onChange(ref, "HL_COLOR", value)))
     if (style.resource) controls.append(readonlyField("字体资源", `${style.resource.type}:${style.resource.resourceID}`))
-    if (style.contentText !== undefined) controls.append(readonlyField("固定文字", style.contentText))
+    controls.append(textField("显示文字", style.contentText ?? "", !editable, (value) => onChange(ref, "CONTENT_TEXT", value)))
   }
   if (controls.childElementCount) card.append(controls)
   return card
@@ -444,17 +440,24 @@ export function renderBdaLayoutEditor(container: HTMLElement, options: LayoutEdi
     const control = element("span", "style-reference-input bda-style-reference-input")
     const keyInput = element("input")
     keyInput.className = "document-property-input"
-    keyInput.value = String(item.ref.key)
-    keyInput.disabled = !options.editable
+    keyInput.value = item.ref && !item.mixed ? String(item.ref.key) : ""
+    keyInput.placeholder = item.mixed ? "混合" : "未设置"
+    // Mixed keys may reference different kinds of style: only the picker (which names the kind) changes them.
+    keyInput.disabled = !options.editable || Boolean(item.mixed)
     keyInput.setAttribute("aria-label", `${item.label}编号`)
-    const currentRef = (): BdaStyleRef => ({ type: item.ref.type, key: Number(keyInput.value) })
-    const commit = () => {
+    const styles = { image: options.appearance.imageStyles, text: options.appearance.textStyles, color: options.appearance.colorStyles }[item.type]
+    const currentRef = (): BdaStyleRef | undefined => {
       const key = Number(keyInput.value)
-      if (!Number.isInteger(key) || key < 0) return
-      options.onStyleRefChange?.(item.paths ?? [item.path], {
-        type: item.ref.type,
-        key,
-      }, field)
+      return keyInput.value.trim() && Number.isInteger(key) ? { type: item.type, key } : undefined
+    }
+    const commit = () => {
+      const ref = currentRef()
+      // A number naming no style of this kind would leave a dangling reference.
+      if (!ref || !styles.has(ref.key)) {
+        keyInput.value = item.ref && !item.mixed ? String(item.ref.key) : ""
+        return
+      }
+      options.onStyleRefChange?.(item.paths ?? [item.path], ref, field)
     }
     keyInput.addEventListener("change", commit)
     const preview = element("button", "style-picker-trigger bda-style-reference-preview")
@@ -470,17 +473,20 @@ export function renderBdaLayoutEditor(container: HTMLElement, options: LayoutEdi
       canvas.setAttribute("aria-label", `${label}状态`)
       state.append(canvas)
       states.append(state)
-      void options.resolver?.resolve(bdaStyleID(item.ref), highlighted)
+      if (item.ref && !item.mixed) void options.resolver?.resolve(bdaStyleID(item.ref), highlighted)
         .then((visual) => { if (canvas.isConnected) drawVisual(canvas, visual) })
         .catch(() => {})
     }
     preview.append(states)
     preview.addEventListener("click", (event) => {
+      const edit = event.metaKey || event.ctrlKey
+      const ref = currentRef()
+      if (edit && !ref) return
       options.onStyleRefAction?.(
         item.paths ?? [item.path],
-        currentRef(),
+        ref ?? { type: item.type, key: -1 },
         item.field,
-        event.metaKey || event.ctrlKey ? "edit" : "replace",
+        edit ? "edit" : "replace",
         field,
       )
     })
@@ -555,14 +561,13 @@ export function renderBdaLayoutEditor(container: HTMLElement, options: LayoutEdi
     const title = element("h3")
     title.textContent = group.title
     const grid = element("div", "document-property-grid")
+    // Panel switches and the swipe trail colour are proto3 values: absent means off / transparent.
     if (scope === "panel" && !options.keys.length && group.key === "panel") {
-      if (panel.shouldBgBlur !== undefined) grid.append(booleanField("背景模糊", panel.shouldBgBlur, !options.editable, (value) => options.onPanelPropertyChange("shouldBgBlur", value), "shouldBgBlur"))
-      if (panel.shouldKeySlotting !== undefined) grid.append(booleanField("按键开槽", panel.shouldKeySlotting, !options.editable, (value) => options.onPanelPropertyChange("shouldKeySlotting", value), "shouldKeySlotting"))
-      if (panel.trackColor !== undefined) {
-        const field = colorField("滑动轨迹颜色", panel.trackColor, !options.editable, (value) => options.onPanelPropertyChange("trackColor", value))
-        field.classList.add("document-property-field", "wide")
-        grid.append(field)
-      }
+      grid.append(booleanField("背景模糊", panel.shouldBgBlur ?? false, !options.editable, (value) => options.onPanelPropertyChange("shouldBgBlur", value), "shouldBgBlur"))
+      grid.append(booleanField("按键开槽", panel.shouldKeySlotting ?? false, !options.editable, (value) => options.onPanelPropertyChange("shouldKeySlotting", value), "shouldKeySlotting"))
+      const field = colorField("滑动轨迹颜色", panel.trackColor ?? 0, !options.editable, (value) => options.onPanelPropertyChange("trackColor", value))
+      field.classList.add("document-property-field", "wide")
+      grid.append(field)
     }
     appendStyleReferences(grid, group.items)
     section.append(title, grid)

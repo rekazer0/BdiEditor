@@ -32,6 +32,7 @@ export function applyCandidateTextVisual(
 ): void {
   element.style.color = visual?.color ?? ""
   element.style.fontFamily = canvasFontFamily(visual?.fontName)
+  element.style.fontWeight = visual?.bold ? "bold" : ""
   element.style.fontSize = visual?.fontSize
     ? `${(visual.fontSize / canvasWidth) * 100}cqw`
     : ""
@@ -195,9 +196,10 @@ export function refreshPreview(): void {
       context.gen,
       context.styles,
     )
-    const inputVisual = resolveCandidateInputTextVisual(context.gen, resolver, candidateLayout, inputBarInKeyboard())
+    const skinFont = appState.archive.format === "ssf"
+    const inputVisual = resolveCandidateInputTextVisual(context.gen, resolver, candidateLayout, inputBarInKeyboard(), skinFont)
     const { normal: candidateVisual, first: firstCandidateVisual } =
-      resolveCandidateTextVisuals(candidateLayout, context.gen, resolver)
+      resolveCandidateTextVisuals(candidateLayout, context.gen, resolver, skinFont)
     appState.firstCandidateTextVisual = firstCandidateVisual
     appState.candidateTextWidth = config.width
     applyCandidateTextVisual(candidateInput, inputVisual, appState.candidateTextWidth)

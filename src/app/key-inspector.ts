@@ -1,20 +1,20 @@
-import { updateSxiForeground } from "./sxi-documents"
 import { IniDocument } from "../ini.ts"
-import { type StylePropertySource, resolveStylePropertySources, resolveStylePropertyLayers } from "../style-properties.ts"
+import { resolveStylePropertyLayers, textStyleSections } from "../style-properties.ts"
 import { appState } from "./state"
 import { styleConfigPath, effectiveKeyValue, isSkinInfoPath, isToolbarPath, effectiveToolbarSections, currentSkinState, genConfigPath, keyboardContext, syncColorControl, listGeometryDocument, effectiveKeySection, setSourceValue } from "./config-context"
 import { isListCell, listCellValue, setListCellValue } from "../layout.ts"
 import { type BdaStyleRef, bdaStyleRef, type BdaAppearance } from "../bda.ts"
 import { bdaColorHex } from "../bda-resolver.ts"
-import { updateBdaStyle } from "../bda-encode.ts"
+import { addBdaStyle, updateBdaStyle } from "../bda-encode.ts"
 import { decodedBdaAppearancePart, applyDecodedBdaAppearancePart } from "../bda-source.ts"
 import { currentBdaAppearance, refreshBdaLayout, refreshSelectedBdaSource, bdaAppearancePart, visualResolver } from "./bda-documents"
 import { commitBytes, updateDirty, isEditing, commitText } from "./edit-history"
 import { refreshPreview } from "./preview-render"
+import { showError, showStatus } from "./file-operations"
 import { refreshBdaStyleReferenceField } from "../bda-editor.ts"
 import { actionFieldNames, bdaKeyFieldLabels, preview, keyboardFields, layoutActionButtons, actionMeaningNodes } from "./canvas-interaction"
 import { shouldSuggestActionCodes, actionDescription } from "../actions.ts"
-import { keyFields, styleFields, primaryCssFields, skinFieldsGroup, toolbarFieldsGroup, keyboardFieldsGroup, keyOnlyGroups, keyTypographyFieldsGroup, selectedKeyName, selectedKeyPreview, selectedKeyContext, quickInspector, skinFields, toolbarFields, textStyleLabels, $, canvasMultiToolbar, canvasMultiCount, keyLayoutFieldsGroup, keyModeButtons, keyActionButtons, gapFields, mode, theme } from "./dom"
+import { keyFields, styleFields, primaryCssFields, skinFieldsGroup, toolbarFieldsGroup, keyboardFieldsGroup, keyOnlyGroups, keyTypographyFieldsGroup, selectedKeyName, selectedKeyPreview, selectedKeyContext, quickInspector, skinFields, toolbarFields, textStyleLabels, keyTextLayerSwitch, $, canvasMultiToolbar, canvasMultiCount, keyLayoutFieldsGroup, keyModeButtons, keyActionButtons, gapFields, mode, theme } from "./dom"
 import { deferNumberInputRefresh } from "../number-input-wheel.ts"
 import { effectivePanelSection } from "../panel-tools.ts"
 import { createIcon } from "../icons"
@@ -28,25 +28,8 @@ import { updateStylePreviews } from "./style-picker"
 import { ssfInspectorTitle } from "./ssf-inspector"
 import { populateDocumentInspector, populateBdaConfigInspector } from "./document-inspector"
 import { populateFontControls } from "./skin-fonts"
-
-export function selectedStylePropertyContext(property: string, styles?: IniDocument):
-  | { document: IniDocument; path: string; sources: StylePropertySource[] }
-  | undefined {
-  if (!appState.archive || !appState.layoutDocument || !appState.selectedKeySections.length) return
-  const path = styleConfigPath()
-  if (!appState.archive.isText(path)) return
-  const document = styles ?? IniDocument.parse(appState.archive.getText(path))
-  const sources = resolveStylePropertySources(
-    document,
-    appState.selectedKeySections.map((section) =>
-      isListCell(section)
-        ? (appState.layoutDocument?.get("LIST", "FORE_STYLE") ?? "").trim()
-        : effectiveKeyValue(section, "FORE_STYLE") ?? "",
-    ),
-    property,
-  )
-  return sources ? { document, path, sources } : undefined
-}
+import { populateTextStyleGroup, selectedKeyTextRefs, textRefValues, writeTextRefs, type TextProperty } from "./text-styles"
+import { canCreateBdaKeyText, createBdaKeyText, renderBdaTextLayerSwitch, selectedBdaTextRefs } from "./bda-key-text"
 
 export function selectedBdaRefs(
   source: "BACK_STYLE" | "FORE_STYLE",
@@ -54,9 +37,10 @@ export function selectedBdaRefs(
   fallbackSource?: "BACK_STYLE" | "FORE_STYLE",
 ): BdaStyleRef[] {
   if (appState.archive?.format !== "bda" || !appState.layoutDocument) return []
+  // A key shown in a state (Shift on…) draws its state key's styles from the state's TIP section.
   const collect = (name: "BACK_STYLE" | "FORE_STYLE") =>
     appState.selectedKeySections.flatMap((section) => {
-      const ref = (appState.layoutDocument?.get(section, name) ?? "")
+      const ref = (appState.layoutDocument?.get(effectiveKeySection(section), name) ?? "")
         .split(",")
         .map(bdaStyleRef)
         .find((item) => item?.type === type)
@@ -64,17 +48,6 @@ export function selectedBdaRefs(
     })
   const refs = collect(source)
   return refs.length || !fallbackSource ? refs : collect(fallbackSource)
-}
-
-export function bdaStyleHasProperty(appearance: BdaAppearance, ref: BdaStyleRef, property: string): boolean {
-  if (ref.type !== "text") return false
-  const style = appearance.textStyles.get(ref.key)
-  if (!style) return false
-  if (property === "FONT_NAME") return style.fontName !== undefined
-  if (property === "FONT_SIZE") return style.fontSize !== undefined
-  if (property === "NM_COLOR") return style.normalColor !== undefined
-  if (property === "HL_COLOR") return style.highlightColor !== undefined
-  return false
 }
 
 export function bdaStyleValue(appearance: BdaAppearance, ref: BdaStyleRef, property: string): string {
@@ -93,15 +66,27 @@ export function bdaStyleValue(appearance: BdaAppearance, ref: BdaStyleRef, prope
   if (property === "FONT_SIZE") return style.fontSize === undefined ? "" : String(style.fontSize)
   if (property === "NM_COLOR") return style.normalColor === undefined ? "" : bdaColorHex(style.normalColor)
   if (property === "HL_COLOR") return style.highlightColor === undefined ? "" : bdaColorHex(style.highlightColor)
+  if (property === "CONTENT_TEXT") return style.contentText ?? ""
   return ""
 }
 
 export function updateBdaRefs(refs: BdaStyleRef[], property: string, value: string): boolean {
   const info = currentBdaAppearance()
   if (!info || !refs.length) return false
+  // An emptied size or colour keeps its value (BDA has no "unset" for them); an invalid value says why.
+  if (!value.trim() && property !== "FONT_NAME" && property !== "CONTENT_TEXT") {
+    populateKeyInspector()
+    return false
+  }
   let bytes = info.bytes
-  for (const ref of new Map(refs.map((item) => [`${item.type}:${item.key}`, item])).values()) {
-    bytes = updateBdaStyle(bytes, ref, property, value)
+  try {
+    for (const ref of new Map(refs.map((item) => [`${item.type}:${item.key}`, item])).values()) {
+      bytes = updateBdaStyle(bytes, ref, property, value)
+    }
+  } catch (error) {
+    showStatus(error instanceof Error ? error.message : String(error))
+    populateKeyInspector()
+    return false
   }
   commitBytes(info.path, info.bytes, bytes)
   refreshBdaLayout(appState.layoutPath)
@@ -112,32 +97,68 @@ export function updateBdaRefs(refs: BdaStyleRef[], property: string, value: stri
   return true
 }
 
+/** `bytes` with the panel's references at `paths` set to `ref`, creating messages it lacks (input, cand.switch). */
+export function withBdaPanelRefs(path: string, bytes: Uint8Array, part: NonNullable<ReturnType<typeof bdaAppearancePart>>, paths: string[][], ref: BdaStyleRef): Uint8Array {
+  const source = JSON.parse(decodedBdaAppearancePart(bytes, part)) as Record<string, unknown>
+  for (const steps of paths) {
+    let target: unknown = source
+    for (const [index, step] of steps.slice(0, -1).entries()) {
+      if (target === null || typeof target !== "object") throw new Error(`BDA 面板缺少 ${steps.join(".")}`)
+      const holder = target as Record<string, unknown>
+      // A key without foreground layers has no foreStyles list yet.
+      if (!Array.isArray(target) && holder[step] === undefined) holder[step] = /^\d+$/.test(steps[index + 1]) ? [] : {}
+      target = Array.isArray(target) ? target[Number(step)] : holder[step]
+    }
+    if (target === null || typeof target !== "object") throw new Error(`BDA 面板缺少 ${steps.join(".")}`)
+    const last = steps[steps.length - 1]
+    if (Array.isArray(target)) target[Number(last)] = { type: ref.type, key: ref.key }
+    else (target as Record<string, unknown>)[last] = { type: ref.type, key: ref.key }
+  }
+  return applyDecodedBdaAppearancePart(path, bytes, JSON.stringify(source), part)
+}
+
+/**
+ * Gives the selected panel a new text style at `refPath` (the candidate words, 首选 or input code the
+ * skin does not style yet) with `property` set, starting from `copyFrom`; one undo step.
+ */
+export function createBdaPanelTextStyle(refPath: string[], copyFrom: BdaStyleRef | undefined, property: string, value: string): void {
+  const info = currentBdaAppearance()
+  const part = bdaAppearancePart(appState.selectedPath)
+  if (!info || part?.kind !== "panel" || !value.trim() || !isEditing()) return
+  try {
+    const added = addBdaStyle(info.bytes, "text", copyFrom?.type === "text" ? copyFrom.key : undefined)
+    const styled = updateBdaStyle(added.bytes, added.ref, property, value)
+    commitBytes(info.path, info.bytes, withBdaPanelRefs(info.path, styled, part, [refPath], added.ref))
+  } catch (error) {
+    showStatus(error instanceof Error ? error.message : String(error))
+    return
+  }
+  refreshBdaLayout(appState.layoutPath)
+  refreshSelectedBdaSource()
+  refreshPreview()
+  populateKeyInspector()
+  updateDirty()
+}
+
 // 将样式引用写回 appearanceConfig 的面板片段，path 指向解码 JSON 中的字段位置。
 export function updateBdaAppearanceStyleRef(paths: string[][], ref: BdaStyleRef, owner?: HTMLElement): boolean {
   const info = currentBdaAppearance()
   const part = bdaAppearancePart(appState.selectedPath)
   if (!info || part?.kind !== "panel" || !paths.length) return false
-  const source = JSON.parse(decodedBdaAppearancePart(info.bytes, part)) as Record<string, unknown>
-  const value = { type: ref.type, key: ref.key }
-  for (const path of paths) {
-    let target: unknown = source
-    for (const step of path.slice(0, -1)) {
-      if (target === null || typeof target !== "object") return false
-      target = Array.isArray(target)
-        ? target[Number(step)]
-        : (target as Record<string, unknown>)[step]
-    }
-    if (target === null || typeof target !== "object") return false
-    const last = path[path.length - 1]
-    if (Array.isArray(target)) target[Number(last)] = value
-    else (target as Record<string, unknown>)[last] = value
+  let after: Uint8Array
+  try {
+    after = withBdaPanelRefs(info.path, info.bytes, part, paths, ref)
+  } catch (error) {
+    showError(error, "修改 BDA 样式引用")
+    return false
   }
-  const after = applyDecodedBdaAppearancePart(info.path, info.bytes, JSON.stringify(source), part)
   commitBytes(info.path, info.bytes, after)
   refreshBdaLayout(appState.layoutPath)
   refreshSelectedBdaSource()
   refreshPreview()
-  if (owner) void refreshBdaStyleReferenceField(owner, ref, visualResolver())
+  // Rebuild the inspector: rows and the 文字 group hold the old reference (and its kind) otherwise.
+  populateKeyInspector()
+  if (owner?.isConnected) void refreshBdaStyleReferenceField(owner, ref, visualResolver())
   updateDirty()
   return true
 }
@@ -208,7 +229,7 @@ export function populatePrimaryCssFields(hasSelection: boolean, sections: string
     input.value = source.value
     input.disabled = !isEditing()
     input.setAttribute("aria-label", caption)
-    input.addEventListener("input", () => {
+    input.addEventListener("change", () => {
       const before = styles.toString()
       if (!styles.set(source.section, "SHOW", input.value)) return
       const text = styles.toString()
@@ -288,9 +309,13 @@ export function populateKeyInspector(): void {
   }
   setInspectorKind(appState.archive?.format === "bda" ? "bda" : appState.archive ? "bds" : "")
   syncMobileInspectorHeader()
+  // A Palm skin's Info.txt only carries what skin.json `info` has (sxi-style.ts infoIni).
+  const sxiInfo = new Set(["Name", "Description", "Author", "SupportDarkMode", "MinImeCode"])
   for (const field of skinFields) {
     field.value = skinSelected ? appState.selectedDocument?.get("", field.dataset.skinField ?? "") ?? "" : ""
     field.disabled = !skinSelected
+    const label = field.closest("label")
+    if (label) label.hidden = appState.archive?.format === "sxi" && !sxiInfo.has(field.dataset.skinField ?? "")
   }
   const general = appState.archive?.isText(genConfigPath())
     ? IniDocument.parse(appState.archive.getText(genConfigPath()))
@@ -370,62 +395,61 @@ export function populateKeyInspector(): void {
   }
   populatePrimaryCssFields(hasSelection, sections)
   populateFontControls()
+  populateTextStyleGroup()
   const bdaKeyProperties = new Set(["FORE_OFFSET"])
   for (const field of keyFields) {
     if (!field.closest(".key-appearance-fields")) continue
     const label = field.closest<HTMLElement>("label")
+    // Palm keys have no per-layer foreground offset (palm-models.ts baseModel).
     if (label) label.hidden = Boolean(bdaSelected && (
       !bdaKeyProperties.has(field.dataset.keyField ?? "") || !field.value && field.placeholder !== "混合"
-    ))
+    ) || appState.archive?.format === "sxi" && field.dataset.keyField === "FORE_OFFSET")
   }
   const bdaTextPropertyAvailability = new Map<string, boolean>()
   // Decoding the appearance file is the expensive part: do it once per refresh, not per field.
   const bdaTextInfo = bdaSelected ? currentBdaAppearance() : undefined
-  const bdaTextRefs = bdaSelected ? selectedBdaRefs("FORE_STYLE", "text") : []
+  const bdaTextRefs = bdaSelected ? selectedBdaTextRefs() : []
+  // A key with only image layers gets a text layer on its first text edit.
+  const bdaTextCreatable = bdaSelected && hasSelection && !bdaTextRefs.length && canCreateBdaKeyText()
+  if (bdaSelected && hasSelection) renderBdaTextLayerSwitch()
+  else keyTextLayerSwitch.hidden = true
   let hasTextStyle = bdaTextRefs.length > 0
+  const keyTextRefs = hasSelection && !bdaSelected ? selectedKeyTextRefs() : []
+  const styles = keyboard?.styles
   for (const field of styleFields) {
     const property = field.dataset.styleField ?? ""
     if (bdaSelected) {
       const info = bdaTextInfo
       const refs = bdaTextRefs
       const values = info ? refs.map((ref) => bdaStyleValue(info.appearance, ref, property)) : []
-      const available = Boolean(info && refs.some((ref) => bdaStyleHasProperty(info.appearance, ref, property)))
+      // updateBdaStyle adds a missing field, so every text style can take every property.
+      const available = Boolean(info && (refs.length || bdaTextCreatable))
       bdaTextPropertyAvailability.set(property, available)
       const common = values.length && values.every((value) => value === values[0]) ? values[0] : ""
       field.disabled = !available
-      field.placeholder = available && !common && new Set(values).size > 1 ? "混合" : available ? "" : "未配置"
+      field.placeholder = available && !common && new Set(values).size > 1 ? "混合" : available ? "未设置" : "未配置"
       field.value = common
       if (property.endsWith("COLOR")) syncColorControl(field)
       continue
     }
-    const context = selectedStylePropertyContext(property, keyboard?.styles)
-    hasTextStyle ||= Boolean(context)
-    const values = context?.sources.map((source) => source.value)
-    const common = values?.every((value) => value === values[0]) ? values[0] : ""
-    field.disabled = !context
-    field.placeholder = context && !common && new Set(values).size > 1
-      ? "混合"
-      : context
-        ? ""
-        : hasSelection
-          ? "未配置"
-          : ""
-    field.value = common ?? ""
+    // Every selected key can take text: a key without a text layer gets one on its first edit.
+    const values = textRefValues(keyTextRefs, property as TextProperty)
+    hasTextStyle ||= Boolean(styles && keyTextRefs.some((ref) => textStyleSections(styles, ref.foreground).length))
+    const common = values.every((value) => value === values[0]) ? values[0] ?? "" : ""
+    field.disabled = !hasSelection || !isEditing()
+    field.placeholder = !hasSelection ? "" : !common && new Set(values).size > 1 ? "混合" : "未设置"
+    field.value = common
     if (property.endsWith("COLOR")) syncColorControl(field)
   }
   for (const label of textStyleLabels) {
-    if (!hasSelection || !hasTextStyle) {
+    if (!hasSelection || bdaSelected && !hasTextStyle && !bdaTextCreatable) {
       label.hidden = true
       continue
     }
     if (appState.archive?.format !== "bda") {
-      // 样式里没有的属性无法编辑，整行隐藏，避免留下没有输入框的空行
-      const field = label.querySelector<HTMLInputElement>("[data-style-field]")
-      label.hidden = Boolean(field?.disabled)
-      for (const fieldLabel of Array.from(label.querySelectorAll<HTMLLabelElement>("label"))) {
-        fieldLabel.hidden = Boolean(fieldLabel.querySelector<HTMLInputElement>("[data-style-field]")?.disabled)
-      }
-      if (label.classList.contains("color-pair-field")) label.hidden = Array.from(label.querySelectorAll<HTMLLabelElement>("label")).every((fieldLabel) => fieldLabel.hidden)
+      // 显示文字 is a BDA text style's own text; INI keys show their style SHOW (primary CSS fields).
+      label.hidden = label.hasAttribute("data-bda-text")
+      for (const fieldLabel of Array.from(label.querySelectorAll<HTMLLabelElement>("label"))) fieldLabel.hidden = false
       continue
     }
     if (label.classList.contains("color-pair-field")) {
@@ -440,9 +464,11 @@ export function populateKeyInspector(): void {
     label.hidden = !bdaTextPropertyAvailability.get(property)
   }
   const typographySubtitle = quickInspector.querySelector(".typography-subtitle-default")
-  if (typographySubtitle) typographySubtitle.textContent = hasSelection && !hasTextStyle ? "前景样式不含文字属性，只能修改显示内容" : "显示内容与字体颜色"
+  if (typographySubtitle) typographySubtitle.textContent = !hasSelection || hasTextStyle ? "显示内容与字体颜色"
+    : bdaSelected && !bdaTextCreatable ? "前景没有文字样式，只能修改显示内容" : "前景没有文字层：修改文字会新建一个文字层"
   const paddingSection = quickInspector.querySelector<HTMLElement>(".inspector-padding-section")
-  if (paddingSection) paddingSection.hidden = bdaSelected || !hasSelection || sections.some(isListCell) || !sections.every((section) => effectiveKeyValue(section, "PADDING") !== undefined)
+  // Unset padding reads as 0,0,0,0 (see the PADDING field values above); a LIST cell has none.
+  if (paddingSection) paddingSection.hidden = bdaSelected || !hasSelection || sections.some(isListCell)
   const multiLayout = $("#inspector-multi-layout")
   const multiAvailable = sections.length > 1 && !bdaSelected && !ssfSelected && !sections.some(isListCell)
   multiLayout.dataset.available = String(multiAvailable)
@@ -460,10 +486,12 @@ export function populateKeyInspector(): void {
   // Sogou skins carry no key geometry, so there is nothing to move, copy or delete.
   for (const button of [...keyModeButtons, ...keyActionButtons]) button.hidden = ssfSelected
   for (const button of keyModeButtons) button.disabled = !keyToolsAvailable
+  // Copying or deleting a Palm key adds or drops a skin.json key: not something its views can write.
+  const sxiSelected = appState.archive?.format === "sxi"
   for (const button of keyActionButtons) {
     button.disabled = !keyToolsAvailable || (
       button.dataset.keyAction === "swap" && appState.selectedKeySections.length !== 2
-    )
+    ) || sxiSelected && button.dataset.keyAction !== "swap"
   }
   if (!keyToolsAvailable && appState.keyMode === "move") {
     appState.keyMode = "select"
@@ -471,7 +499,7 @@ export function populateKeyInspector(): void {
     preview.setEditTool(appState.keyMode)
   }
   for (const button of layoutActionButtons) {
-    button.disabled = bdaSelected || ssfSelected || listSelected || (
+    button.disabled = bdaSelected || ssfSelected || listSelected || sxiSelected && button.dataset.layoutAction === "merge" || (
       button.dataset.layoutAction === "swap" || button.dataset.layoutAction === "merge"
         ? appState.selectedKeySections.length !== 2
         : appState.selectedKeySections.length < 2
@@ -622,11 +650,16 @@ export function updateToolbar(field: HTMLInputElement): void {
   const [section, key] = (field.dataset.toolbarField ?? "").split(".")
   const property = key || section
   const targetSection = key ? section : "CAND"
-  const path = property === "VIEW_RECT" ? genConfigPath() : appState.selectedPath
-  if (!appState.archive.isText(path)) return
-  const document = path === appState.selectedPath ? appState.selectedDocument : IniDocument.parse(appState.archive.getText(path))
+  // Write where the field reads from (the .cnd first, then gen.ini [CAND], as the preview does);
+  // a value neither file has goes to gen.ini for VIEW_RECT and to the .cnd otherwise.
+  const general = appState.archive.isText(genConfigPath()) ? IniDocument.parse(appState.archive.getText(genConfigPath())) : undefined
+  const path = appState.selectedDocument.get(targetSection, property) !== undefined
+    ? appState.selectedPath
+    : general?.get(targetSection, property) !== undefined || property === "VIEW_RECT" && general ? genConfigPath() : appState.selectedPath
+  const document = path === appState.selectedPath ? appState.selectedDocument : general!
   const before = document.toString()
-  if (!document.set(targetSection, property, field.value)) return
+  if (document.sections().includes(targetSection)) document.set(targetSection, property, field.value)
+  else if (field.value) document.appendSection(targetSection, [{ key: property, value: field.value }])
   const text = document.toString()
   commitText(path, before, text)
   if (path === appState.selectedPath) setSourceValue(text)
@@ -639,11 +672,9 @@ export function updateSelectedKey(field: HTMLInputElement): void {
   const name = field.dataset.keyField ?? ""
   if (appState.archive?.format === "bda") return
   if (!appState.archive || !appState.layoutDocument || !appState.selectedKeySections.length) return
-  if (name === "FORE_STYLE" && appState.archive.format === "sxi") {
-    updateSxiForeground(field.value)
-    return
-  }
   const rectNames = ["x", "y", "width", "height"]
+  // Clearing a number (or a mixed one) or typing "-" leaves an empty value: that is no number, not 0.
+  if ((rectNames.includes(name) || name.startsWith("PADDING.")) && !field.value.trim()) return
   if (appState.selectedKeySections.length === 1 && isListCell(appState.selectedKeySections[0])) {
     // LIST 候选栏单元：几何字段写回定义处（布局或 gen.ini），其余写回布局的 [LIST]
     if (rectNames.includes(name)) {
@@ -671,15 +702,16 @@ export function updateSelectedKey(field: HTMLInputElement): void {
     updateDirty()
     return
   }
-  const before = appState.layoutDocument.toString()
   const rectIndex = rectNames.indexOf(name)
+  const before = appState.layoutDocument.toString()
   for (const section of preview.expandSections(appState.selectedKeySections)) {
     if (rectIndex >= 0) {
       const rect = appState.layoutDocument.get(section, "VIEW_RECT")?.split(",").map(Number)
       const value = Number(field.value)
       if (!rect || rect.length !== 4 || !Number.isFinite(value)) continue
-      rect[rectIndex] = value
-      appState.layoutDocument.set(section, "VIEW_RECT", rect.map(Math.round).join(","))
+      // Only the edited number is rounded: Palm keys keep fractional positions (9.5) that must not move.
+      rect[rectIndex] = Math.round(value)
+      appState.layoutDocument.set(section, "VIEW_RECT", rect.join(","))
     } else {
       const target = name === "STAT_STYLE" ? section : effectiveKeySection(section)
       if (name.startsWith("PADDING.")) {
@@ -701,20 +733,12 @@ export function updateSelectedKey(field: HTMLInputElement): void {
 
 export function updateSelectedStyle(field: HTMLInputElement): void {
   const property = field.dataset.styleField ?? ""
+  if (field.type === "number" && field.value && !field.checkValidity()) return
   if (appState.archive?.format === "bda") {
-    updateBdaRefs(selectedBdaRefs("FORE_STYLE", "text"), property, field.value)
+    const refs = selectedBdaTextRefs()
+    if (refs.length) updateBdaRefs(refs, property, field.value)
+    else createBdaKeyText(property, field.value)
     return
   }
-  const context = selectedStylePropertyContext(property)
-  if (!appState.archive || !context) return
-  const before = context.document.toString()
-  for (const section of new Set(context.sources.map((source) => source.section))) {
-    context.document.set(section, property, field.value)
-  }
-  const text = context.document.toString()
-  commitText(context.path, before, text)
-  if (appState.selectedPath === context.path) setSourceValue(text)
-  refreshPreview()
-  populateKeyInspector()
-  updateDirty()
+  writeTextRefs(selectedKeyTextRefs(), property as TextProperty, field.value.trim())
 }

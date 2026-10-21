@@ -504,6 +504,25 @@ test('BDS / BDI / BDA → ssf lists every folder as its own entry', async () => 
   assert.ok(Object.keys(unzipSync((await convertBaiduToSsf(bdsDual)).bytes)).includes('1080/status2/'))
 })
 
+// Sogou reads key text only from text styles (Key_X FG_STYLE → LABEL_STYLE, by default the class
+// style), never TEXT_COLOR in Key_X, so a Baidu text layer's colour becomes its class style's.
+test('BDS → ssf: key text colours go to the class text style', async () => {
+  const files = unzipSync(bdsTemplate.toBytes())
+  const document = IniDocument.parse(strFromU8(files['port/py_26.ini']))
+  const css = IniDocument.parse(strFromU8(files['res/default.css']))
+  css.appendSection('STYLE99003', [{ key: 'NM_COLOR', value: 'ff112233' }, { key: 'HL_COLOR', value: 'ff445566' }])
+  for (const action of ['q', 'w', 'e']) {
+    const section = document.sections().find((name) => document.get(name, 'CENTER') === action)
+    document.set(section, 'FORE_STYLE', [...(document.get(section, 'FORE_STYLE') ?? '').split(',').filter(Boolean), '99003'].join(','))
+  }
+  files['port/py_26.ini'] = strToU8(document.toString())
+  files['res/default.css'] = strToU8(css.toString())
+  const skin = (await SsfPackage.open((await convertBaiduToSsf(SkinArchive.open(zipSync(files)))).bytes)).skin('light')
+  assert.equal(skin.get('TextStyle_Qwerty', 'TEXT_COLOR'), '0xFF112233')
+  assert.equal(skin.get('TextStyle_Qwerty', 'TEXT_COLOR_PRESSED'), '0xFF445566')
+  assert.equal(skin.get('Key_Q', 'TEXT_COLOR'), undefined)
+})
+
 test('BDS → ssf: background stacking, FORE_OFFSET → FG_RECT and package files', async () => {
   const files = unzipSync(bdsTemplate.toBytes())
   const document = IniDocument.parse(strFromU8(files['port/py_26.ini']))

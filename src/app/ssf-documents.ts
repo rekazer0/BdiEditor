@@ -3,7 +3,7 @@
 
 import { IniDocument } from "../ini.ts"
 import { documentPackage } from "../ssf/ssf-convert.ts"
-import { ssfBoard, ssfKeyBinding, type SsfKeyBinding } from "../ssf/ssf-keymap.ts"
+import { ssfKeyBinding, ssfQwerty, type SsfKeyBinding } from "../ssf/ssf-keymap.ts"
 import type { SsfPackage, SsfTheme } from "../ssf/ssf-package.ts"
 import { orientation, theme } from "./dom"
 import { appState } from "./state"
@@ -70,9 +70,9 @@ export function ssfSelectedBindings(): Array<{ section: string; action: string; 
   })
 }
 
-/** 26-key boards read their own `_Qwerty` / `_Latin` classes. */
+/** 26-key boards read their own `_Qwerty` / `_Latin` classes (the preview decides the same way). */
 export function ssfQwertyBoard(path = appState.layoutPath): boolean {
-  return ["py26", "en26", "num26"].includes(ssfBoard(path))
+  return ssfQwerty(path)
 }
 
 /**

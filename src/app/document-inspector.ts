@@ -5,7 +5,7 @@ import { thumbnailRecycler, drawVisualPreview } from "../atlas.ts"
 import { documentFields, documentFieldsGroup, skinFields, toolbarFields, bdaConfigFields, bdaConfigFieldsGroup } from "./dom"
 import { appState } from "./state"
 import { preview } from "./canvas-interaction"
-import { isToolbarPath, effectiveToolbarSections, isSkinInfoPath, setSourceValue, effectiveKeySection } from "./config-context"
+import { isToolbarPath, effectiveToolbarSections, isSkinInfoPath, setSourceValue, effectiveKeySection, currentSkinState } from "./config-context"
 import { parseLegacyParticleEmitter } from "../preview-animation.ts"
 import { commitText, updateDirty, isEditing, commitBytes } from "./edit-history"
 import { refreshPreview } from "./preview-render"
@@ -584,12 +584,20 @@ export function populateDocumentInspector(): void {
 }
 
 export function selectedBdaKeyNames(): string[] {
-  if (!appState.layoutDocument || !appState.selectedKeySections.length) return []
+  const layout = appState.layoutDocument
+  if (!layout || !appState.selectedKeySections.length) return []
+  const state = currentSkinState()
+  const panel = currentBdaAppearance()?.appearance.panels.get(appState.layoutPath.split("/").pop()?.replace(/\.ini$/i, "") ?? "")
   return [...new Set(appState.selectedKeySections.flatMap((section) => {
-    const effective = effectiveKeySection(section)
-    return [appState.layoutDocument?.get(effective, "CENTER"), appState.layoutDocument?.get(section, "CENTER"), appState.layoutDocument?.get(section, "DOWN")]
+    const names = [layout.get(section, "CENTER"), layout.get(section, "DOWN")]
       .filter((value): value is string => Boolean(value))
       .map(bdaPanelKeyName)
+    // In a key state (Shift on, a mode lit…) the canvas draws the `_S<n>` state key: that is what is edited.
+    if (state !== undefined && effectiveKeySection(section) !== section) {
+      const stateKeys = names.map((name) => `${name}_S${state}`).filter((name) => panel?.keys.has(name))
+      if (stateKeys.length) return stateKeys
+    }
+    return names
   }))]
 }
 
