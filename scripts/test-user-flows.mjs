@@ -385,10 +385,10 @@ await check("text: candidate bar and whole layout edit their text styles", () =>
     selectFile(appState.layoutPath)
   })
   await group.waitFor({ state: "visible" })
-  const color = group.locator("input[aria-label='全部按键颜色值']")
+  const color = group.locator("input[aria-label='按键文字颜色值']")
   await color.fill("FF123456")
   await color.press("Enter")
-  await page.waitForFunction(() => document.querySelector(".text-style-fields input[aria-label='全部按键颜色值']")?.value === "FF123456")
+  await page.waitForFunction(() => document.querySelector(".text-style-fields input[aria-label='按键文字颜色值']")?.value === "FF123456")
   assert.match(await styleText(), /NM_COLOR\s*=\s*FF123456/)
 }))
 
