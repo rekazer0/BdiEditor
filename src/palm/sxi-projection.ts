@@ -11,7 +11,8 @@ export const SXI_SKIN_PATH = "skin.json"
 export const SXI_INFO_PATH = "info.json"
 
 /** A read-only view of skin.json; `writer` knows where each of its values came from. */
-export type SxiDerivedFile = { text: string; pointer: string[]; writer: IniWriter }
+/** `writer` maps an INI view's keys back to skin.json; a non-INI view (the toolbar plist) has none. */
+export type SxiDerivedFile = { text: string; pointer: string[]; writer?: IniWriter }
 
 const THEMES = [["default", "light"], ["night", "dark"]] as const
 const ORIENTATIONS = ["port", "land"] as const
@@ -118,9 +119,9 @@ export function sxiDerivedFiles(skin: JsonObject): Map<string, SxiDerivedFile> {
     const logo = `${theme}/skin/res/logo`
     const menus = Array.isArray(struct.menu) ? struct.menu.filter(Array.isArray) : []
     const menu = menus.find((items) => items.some((item) => asObject(item)?.Position === "toolbar")) ?? menus[0]
-    if (menu) add(`${logo}/com.baidu.inputmethod.toolbarMenuItems.plist`, [themeKey, "menu"], toolbarPlist(menu))
-    if (Array.isArray(struct.a_m)) add(`${logo}/pop_menu_icons.til`, [themeKey, "a_m"], tilesText(struct.a_m))
-    if (Array.isArray(struct.a_i)) add(`${logo}/pop_input_icons.til`, [themeKey, "a_i"], tilesText(struct.a_i))
+    if (menu) files.set(`${logo}/com.baidu.inputmethod.toolbarMenuItems.plist`, { text: toolbarPlist(menu), pointer: [themeKey, "menu"] })
+    if (Array.isArray(struct.a_m)) add(`${logo}/pop_menu_icons.til`, [themeKey, "a_m"], tilesIni(struct.a_m))
+    if (Array.isArray(struct.a_i)) add(`${logo}/pop_input_icons.til`, [themeKey, "a_i"], tilesIni(struct.a_i))
   }
   return files
 }
