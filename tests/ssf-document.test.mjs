@@ -227,3 +227,32 @@ test('ssf document: rebuilt previews reuse unchanged images but never a replaced
   archive.setBytes('1080/status1/bg.png', encodePng(solid(...SIZES.background, [9, 8, 7])))
   assert.deepEqual(panelPixel(ssfPreviewFiles(archive, template).files), [9, 8, 7])
 })
+
+// Sogou TEXT_SIZE (a fraction of the screen width up to 1), TYPEFACE and BOLD reach the canvas.
+test('ssf preview: key, candidate and composing text take the skin size, typeface and weight', async () => {
+  const files = unzipSync(ssfFixture())
+  files['1080/status1/phoneSkin.ini'] = strToU8(strFromU8(files['1080/status1/phoneSkin.ini'])
+    .replace('[TextStyle_Qwerty]\n', '[TextStyle_Qwerty]\nTEXT_SIZE=0.05\nTYPEFACE=skin.ttf\nBOLD=true\n')
+    .replace('[TextStyle_Candidate]\n', '[TextStyle_Candidate]\nTEXT_SIZE=48\nBOLD=true\n')
+    .concat('[TextStyle_Composing]\nTEXT_SIZE=0.03\n'))
+  files['default/skin.ttf'] = new Uint8Array([0, 1, 0, 0])
+  const { files: preview } = ssfPreviewFiles(await open(zipSync(files)), sogouTemplate)
+  const read = (path) => IniDocument.parse(strFromU8(preview.get(path)))
+  const css = read('light/skin/res/default.css')
+  const layout = read('light/skin/port/py_26.ini')
+  // W has no foreground image, so the template draws its letter as text.
+  const w = layout.sections().find((section) => layout.get(section, 'CENTER') === 'w')
+  const style = `STYLE${layout.get(w, 'FORE_STYLE').split(',')[0]}`
+  assert.equal(css.get(style, 'FONT_SIZE'), '54')
+  assert.equal(css.get(style, 'FONT_NAME'), 'skin.ttf')
+  assert.equal(css.get(style, 'SSF_BOLD'), '1')
+  assert.ok(preview.has('light/skin/res/skin.ttf'))
+  const resolver = new AtlasResolver(SkinArchive.open(zipSync({ 'light/skin/res/default.css': strToU8(css.toString()) })), 'light', 'port')
+  assert.equal(resolver.resolveText(style.slice(5), false)?.bold, true, 'the canvas draws the label bold')
+  const gen = read('light/skin/port/gen.ini')
+  const candidates = read(`light/skin/port/${gen.get('CAND', 'LAYOUT_NAME')}.cnd`)
+  const candidate = `STYLE${candidates.get('CAND', 'FORE_STYLE')}`
+  assert.equal(css.get(candidate, 'FONT_SIZE'), '48')
+  assert.equal(css.get(candidate, 'SSF_BOLD'), '1')
+  assert.equal(css.get(`STYLE${gen.get('INPUT', 'FORE_STYLE')}`, 'FONT_SIZE'), '32')
+})

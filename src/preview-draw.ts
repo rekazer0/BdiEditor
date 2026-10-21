@@ -1,4 +1,4 @@
-import { type StyleTextVisual, type Visual, canvasFontFamily, isTransparentColor } from "./atlas.ts"
+import { type StyleTextVisual, type Visual, canvasFont, isTransparentColor } from "./atlas.ts"
 import { type Rect } from "./preview-items.ts"
 
 
@@ -327,7 +327,7 @@ export function drawStyleText(
   theme: "light" | "dark",
 ): void {
   context.fillStyle = visual.color ?? (theme === "dark" ? "#f5f5f7" : "#17191c")
-  context.font = `${visual.fontSize ?? 24}px ${canvasFontFamily(visual.fontName)}`
+  context.font = canvasFont(visual.fontSize ?? 24, visual)
   context.textAlign = "center"
   context.textBaseline = "middle"
   context.fillText(visual.text, point.x, point.y)

@@ -17,8 +17,10 @@ import { MAX_PIXELS, compositeImage, cropImage, decodePng, encodePng, isPng, pla
 export type LookImage = { id: string; bytes: Uint8Array; stretch?: SsfStretch }
 export type LookPair = { normal: LookImage; pressed: LookImage }
 export type LookColors = { normal: string; pressed: string }
+/** Text size in target pixels, typeface file and weight, each only when the skin sets it. */
+export type LookText = { fontSize?: number; font?: { name: string; bytes: Uint8Array }; bold?: boolean }
 /** `texts` is the skin's own LABEL and MINOR_LABEL for keys Sogou draws as text. */
-type KeyLook = { binding: SsfKeyBinding; back?: LookPair; fore?: LookPair; label?: LookColors; texts: Array<string | undefined> }
+type KeyLook = { binding: SsfKeyBinding; back?: LookPair; fore?: LookPair; label?: LookColors; labelText?: LookText; texts: Array<string | undefined> }
 
 type Foreground = { normal: string; pressed: string; rect?: number[] }
 
@@ -205,6 +207,27 @@ export class SsfLook {
     if (binding.keyClass === "function") return ssfColor(this.skin.get("General", pressed ? "HIGH_LIGHT_ICON_COLOR" : "ICON_COLOR"))
   }
 
+  /** Size, typeface and weight a chain of text styles sets, each from the first style that has it. */
+  private textLook(sections: readonly string[], defaultFont?: string): LookText {
+    const value = (key: string) => sections.map((section) => this.skin.get(section, key)?.trim()).find(Boolean)
+    const size = Number(value("TEXT_SIZE"))
+    // TEXT_SIZE up to 1 is a fraction of the screen width; above 1 it is Sogou pixels.
+    const pixels = size > 0 ? (size <= 1 ? size * this.sogouWidth : size) * (this.scale ?? 1) : undefined
+    const name = value("TYPEFACE") ?? defaultFont
+    const bytes = name && this.pkg.file(this.theme, name)
+    const bold = value("BOLD")
+    return {
+      ...pixels ? { fontSize: Math.max(1, Math.round(pixels)) } : {},
+      ...name && bytes ? { font: { name, bytes } } : {},
+      // Sogou's parser takes only the exact "true".
+      ...bold !== undefined ? { bold: bold === "true" } : {},
+    }
+  }
+
+  textStyle(section: string): LookText {
+    return this.textLook([section])
+  }
+
   key(layout: string, action: string, landscape: boolean, size?: [number, number], sourceSection?: string, sourceBackground?: string): KeyLook {
     const binding = ssfKeyBinding(layout, action, landscape, sourceSection, sourceBackground)
     const sogouBack = this.background(binding)
@@ -223,8 +246,11 @@ export class SsfLook {
     const qwerty = ssfQwerty(layout)
     const labelNormal = this.labelColor(binding, qwerty, false)
     const label = labelNormal ? { normal: labelNormal, pressed: this.labelColor(binding, qwerty, true) ?? labelNormal } : undefined
+    // Sogou lays a skin's style over its built-in one of the same name, so a size, typeface or weight
+    // the key's own style leaves out is the built-in one, not the next style's.
+    const labelText = this.textLook(ssfTextSections(binding, qwerty, this.skin).slice(0, 1))
     const text = (field: string) => binding.sections.map((section) => firstValue(this.skin.get(section, field))).find(Boolean)
-    return { binding, back, fore, label, texts: [text("LABEL"), text("MINOR_LABEL")] }
+    return { binding, back, fore, label, labelText: Object.keys(labelText).length ? labelText : undefined, texts: [text("LABEL"), text("MINOR_LABEL")] }
   }
 
   /**
@@ -284,19 +310,15 @@ export class SsfLook {
   }
 
   /** The 9-key symbol column, which Sogou styles as the candidate code view. */
-  list(textStyle = "TextStyle_Text"): { back?: LookPair; cell?: LookPair; text?: string; font?: { name: string; bytes: Uint8Array }; fontSize?: number } {
+  list(textStyle = "TextStyle_Text"): { back?: LookPair; cell?: LookPair; text?: string } & LookText {
     textStyle = firstValue(this.skin.get("CandidateCodeView", "TEXT_STYLE")) ?? textStyle
     const back = firstValue(this.skin.get("CandidateCodeView", "BG_IMAGE"))
     const cell = firstValue(this.skin.get("CandidateCodeView", "BG_IMAGES"))
-    const name = this.skin.get(textStyle, "TYPEFACE") ?? "DROIDSANSFALLBACK.ttf"
-    const bytes = this.pkg.file(this.theme, name)
-    const size = Number(this.skin.get(textStyle, "TEXT_SIZE"))
     return {
       back: this.scaledPair(back ? this.statePair(back) : undefined),
       cell: this.scaledPair(cell ? this.statePair(cell) : undefined),
       text: [textStyle, "TextStyle"].map((section) => ssfColor(this.skin.get(section, "TEXT_COLOR"))).find(Boolean),
-      font: bytes ? { name, bytes } : undefined,
-      fontSize: size > 0 ? Math.round(size * (this.scale ?? 1) * this.sogouWidth) : undefined,
+      ...this.textLook([textStyle], "DROIDSANSFALLBACK.ttf"),
     }
   }
 
