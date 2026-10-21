@@ -45,7 +45,8 @@ export function editSsfFile(path: string, change: (document: IniDocument) => voi
   editTargets([{ path, section: "" }], change)
 }
 
-export type SsfLocation = { path: string; section: string }
+/** A section rows write to; `create` is what a missing section starts with (RootView needs BG_STYLE). */
+export type SsfLocation = { path: string; section: string; create?: SsfEntry[] }
 
 function editTargets(targets: SsfLocation[], change: (document: IniDocument, target: SsfLocation) => void): void {
   const archive = appState.archive
@@ -70,13 +71,13 @@ function editTargets(targets: SsfLocation[], change: (document: IniDocument, tar
 }
 
 function writeValue(targets: SsfLocation[], key: string, value: string): void {
-  editTargets(targets, (document, target) => setSsfValue(document, target.section, key, value))
+  editTargets(targets, (document, target) => setSsfValue(document, target.section, key, value, target.create))
 }
 
-/** Sets a value, adding the section at the end of the file when it does not exist yet. */
-export function setSsfValue(document: IniDocument, section: string, key: string, value: string): void {
+/** Sets a value, adding the section (with `create` first) at the end of the file when it does not exist yet. */
+export function setSsfValue(document: IniDocument, section: string, key: string, value: string, create: readonly SsfEntry[] = []): void {
   if (document.sections().includes(section)) document.set(section, key, value)
-  else document.appendSection(section, [{ key, value }])
+  else document.appendSection(section, [...create.filter((entry) => entry.key !== key), { key, value }])
 }
 
 /** One value per key: duplicate sections are read like IniDocument.get, the first definition wins. */
@@ -253,6 +254,15 @@ function stretchField(path: string, section: string, targets = [{ path, section 
   return row
 }
 
+/**
+ * A colour as Sogou reads it: `Long.decode` on `0xAARRGGBB` (theme/parse/utils/f.java). Six digits or a
+ * `#` would decode with alpha 0, so they are written out in full.
+ */
+function sogouColor(value: string): string {
+  const hex = value.trim().match(COLOR_VALUE)![1].toUpperCase()
+  return `0x${hex.length === 6 ? `FF${hex}` : hex}`
+}
+
 function colorField(key: string, value: string, targets: SsfLocation[]): HTMLElement {
   const row = element("div", "ui-field document-property-field")
   caption(row, key)
@@ -281,11 +291,15 @@ function colorField(key: string, value: string, targets: SsfLocation[]): HTMLEle
     const argb = current.length === 6 ? `FF${current}` : current
     const alphaHex = component === "alpha" ? Math.round(Number(alpha.value) * 255).toString(16).padStart(2, "0") : argb.slice(0, 2)
     const rgb = component === "color" ? picker.value.slice(1) : argb.slice(2)
-    setSsfValue(document, target.section, key, `0x${alphaHex}${rgb}`.toUpperCase().replace(/^0X/, "0x"))
+    setSsfValue(document, target.section, key, `0x${alphaHex}${rgb}`.toUpperCase().replace(/^0X/, "0x"), target.create)
   })
   picker.addEventListener("change", () => fromControls("color"))
   alpha.addEventListener("change", () => { if (alpha.value !== "" && alpha.checkValidity()) fromControls("alpha") })
-  text.addEventListener("change", () => { if (COLOR_VALUE.test(text.value.trim())) write(text.value.trim()) })
+  text.addEventListener("change", () => {
+    const value = text.value.trim()
+    if (!value) editTargets(targets, (document, target) => { document.remove(target.section, key) })
+    else if (COLOR_VALUE.test(value)) write(sogouColor(value))
+  })
   control.append(picker, text, alpha)
   row.append(control)
   return row
@@ -300,10 +314,10 @@ function switchField(key: string, value: string, targets: SsfLocation[]): HTMLEl
   input.type = "checkbox"
   input.setAttribute("role", "switch")
   input.setAttribute("aria-label", ssfFieldLabel(key))
-  input.checked = value.trim().toLowerCase() === "true"
+  input.checked = value.trim() === "true"
   input.disabled = !isEditing()
   input.addEventListener("change", () => editTargets(targets, (document, target) => {
-    if (input.checked) setSsfValue(document, target.section, key, "true")
+    if (input.checked) setSsfValue(document, target.section, key, "true", target.create)
     else document.remove(target.section, key)
   }))
   row.append(input)
@@ -315,10 +329,10 @@ function valueInput(key: string, value: string, targets: SsfLocation[]): HTMLInp
   input.value = value
   input.title = `${ssfFieldLabel(key)}：${value}`
   input.disabled = !isEditing()
-  // TEXT_SIZE is a fraction of the screen width (0.045), so a new one takes decimals too.
   if (NUMERIC_FIELDS.has(key) && /^-?\d+(?:\.\d+)?$/.test(value) || !value && key === "TEXT_SIZE") {
     input.type = "number"
-    input.step = value.includes(".") || key === "TEXT_SIZE" ? "any" : "1"
+    // TEXT_SIZE up to 1 is a fraction of the screen width (0.045) and steps by 0.001; above 1 it is pixels.
+    input.step = key === "TEXT_SIZE" ? (Number(value || 0) <= 1 ? "0.001" : "1") : value.includes(".") ? "any" : "1"
   }
   if (!value) input.placeholder = key === "TEXT_SIZE" ? "未设置（屏宽比例，如 0.045）" : "未设置"
   input.setAttribute("aria-label", ssfFieldLabel(key))
@@ -381,8 +395,10 @@ export type SsfBlock = {
   /** The field naming this block's image section, editable in its card. */
   reference?: CardReference
   options?: Record<string, string[]>
-  /** Keys offered even when the section lacks them, so they can be added (text size, typeface…). */
+  /** Keys offered even when the section (or the key) is missing; the first write creates them. */
   expect?: string[]
+  /** Entries a missing section starts with when one of its rows is first written. */
+  create?: SsfEntry[]
   /** Matching sections of the other selected keys. */
   peers?: SsfLocation[]
 }
@@ -487,7 +503,7 @@ function markMixed(row: HTMLElement, targets: SsfLocation[], keys: string[]): vo
 function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
   const nodes: HTMLElement[] = []
   const exists = ssfDocument(block.path).sections().includes(block.section)
-  if (!exists && !block.template) return nodes
+  if (!exists && !block.template && !block.expect) return nodes
   if (showHeading) nodes.push(blockHeading(block))
   if (block.note) {
     const note = element("p", "inspector-group-subtitle")
@@ -496,7 +512,7 @@ function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
   }
   const actions = [...block.actions ?? []]
   const template = block.template
-  if (!exists && template?.length) {
+  if (!exists && template?.length && !block.expect) {
     actions.unshift(ssfButton("添加", "plus", () => editSsfFile(block.path, (document) => document.appendSection(block.section, template))))
   }
   if (actions.length) {
@@ -504,11 +520,11 @@ function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
     row.append(...actions)
     nodes.push(row)
   }
-  if (!exists) return nodes
-  const entries = ssfEntries(block.path, block.section).filter((entry) => !block.only || block.only.includes(entry.key))
+  if (!exists && !block.expect) return nodes
+  const entries = exists ? ssfEntries(block.path, block.section).filter((entry) => !block.only || block.only.includes(entry.key)) : []
   const keys = new Set(entries.map((entry) => entry.key))
   const grid = element("div", "document-property-grid")
-  const targets = [{ path: block.path, section: block.section }, ...block.peers ?? []]
+  const targets = [{ path: block.path, section: block.section, create: block.create }, ...block.peers ?? []]
   const used = new Set(block.omit ?? [])
   const rowTargets = new Map<HTMLElement, SsfLocation[]>()
   if (block.reference) {
@@ -570,7 +586,7 @@ function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
 
 /** One inspector group (a rail entry): several sections under one title, each with its own subheading. */
 export function renderGroup(label: string, blocks: SsfBlock[], code?: string, key = label): HTMLElement | undefined {
-  const shown = blocks.filter((block) => block.template || ssfDocument(block.path).sections().includes(block.section))
+  const shown = blocks.filter((block) => block.template || block.expect || ssfDocument(block.path).sections().includes(block.section))
   if (!shown.length) return
   const section = element("section", "ui-section document-property-section")
   section.dataset.inspectorGroupLabel = label

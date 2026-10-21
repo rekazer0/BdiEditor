@@ -7,7 +7,7 @@
 // writer passes the panel width and the look shrinks Sogou pixels to match.
 
 import type { IniDocument } from "../ini.ts"
-import { ssfBoard, ssfKeyBinding, type SsfKeyBinding } from "./ssf-keymap.ts"
+import { ssfBoard, ssfKeyBinding, ssfQwerty, type SsfKeyBinding } from "./ssf-keymap.ts"
 import { firstValue, ssfBackground, ssfForeground, ssfSoundSection, ssfTextSections } from "./ssf-parts.ts"
 import { parseSsfImage, ssfColor, type SsfImageRef, type SsfPackage, type SsfStretch, type SsfTheme } from "./ssf-package.ts"
 import { cached, fingerprint } from "./ssf-cache.ts"
@@ -220,7 +220,7 @@ export class SsfLook {
     const normal = source && foreground(source.normal)
     const fore = source && normal ? { normal, pressed: foreground(source.pressed) ?? normal } : undefined
     const back = this.scaledPair(sogouBack)
-    const qwerty = /_26/.test(layout)
+    const qwerty = ssfQwerty(layout)
     const labelNormal = this.labelColor(binding, qwerty, false)
     const label = labelNormal ? { normal: labelNormal, pressed: this.labelColor(binding, qwerty, true) ?? labelNormal } : undefined
     const text = (field: string) => binding.sections.map((section) => firstValue(this.skin.get(section, field))).find(Boolean)

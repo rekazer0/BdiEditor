@@ -158,6 +158,14 @@ try {
   await page.locator('.inspector-reset').click()
   assert.equal(await read(skin, 'TextStyle_Key_Q', 'TEXT_COLOR'), '0x7F556677')
   assert.equal(await read(skin, 'TextStyle_Qwerty', 'TEXT_COLOR'), '0x7F112233')
+  // Board text styles the skin lacks still show their rows; the first write creates the section, and a
+  // six-digit colour is stored the way Sogou's Long.decode reads it (0xAARRGGBB, opaque).
+  await page.evaluate(() => document.activeElement?.blur())
+  await page.keyboard.press('Escape')
+  const space = fields.locator('[data-inspector-group-label="按键文字"] .ui-subsection').filter({ hasText: '[TextStyle_Space_Label]' })
+  assert.equal(await read(skin, 'TextStyle_Space_Label', 'TEXT_COLOR'), undefined)
+  await change(space.locator('[data-document-key="TEXT_COLOR"] input:not([type])'), '#336699')
+  assert.equal(await read(skin, 'TextStyle_Space_Label', 'TEXT_COLOR'), '0xFF336699')
   assert.deepEqual(errors, [])
   await page.screenshot({ path: '/tmp/bdi-ssf-inspector.png' })
   console.log('SSF inspector: shared structure, readonly prompt, persistent filter, paired values, gesture undo, mixed multi-selection, image edits and exact reset passed')

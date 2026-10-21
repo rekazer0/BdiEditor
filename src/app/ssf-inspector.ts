@@ -16,11 +16,9 @@ import { layoutLabel } from "./file-tree"
 type Group = { label: string; blocks: SsfBlock[]; code?: string; key?: string }
 
 function renderGroup(label: string, blocks: SsfBlock[], code?: string): Group | undefined {
-  const shown = blocks.filter((block) => block.template || ssfDocument(block.path).sections().includes(block.section))
+  const shown = blocks.filter((block) => block.template || block.expect || ssfDocument(block.path).sections().includes(block.section))
   return shown.length ? { label, blocks: shown, code } : undefined
 }
-
-const COLOR_TEMPLATE = [{ key: "TEXT_COLOR", value: "0xFF000000" }]
 
 /** The key section a per-key override is written to: one that already exists, else the portrait class. */
 function ownSection(document: IniDocument, binding: SsfKeyBinding): string {
@@ -114,7 +112,6 @@ function textBlock(path: string, section: string, keys = TEXT_KEYS, extra: Parti
   return {
     path,
     section,
-    template: COLOR_TEMPLATE,
     expect: keys,
     options: { TYPEFACE: ssfFontOptions() },
     ...extra,
@@ -151,11 +148,18 @@ function textGroup(skinPath: string, skin: IniDocument, binding: SsfKeyBinding):
 
 function animationGroup(keysPath: string, binding: SsfKeyBinding): Group | undefined {
   const keys = ssfDocument(keysPath)
-  const owner = binding.sections.find((section) => keys.get(section, "ANIM_STYLE"))
-  if (!owner) return
+  const owner = binding.sections.find((section) => keys.get(section, "ANIM_STYLE")) ?? ownSection(keys, binding)
   const style = firstValue(keys.get(owner, "ANIM_STYLE"))
   const animPath = `${ssfThemeFolder()}anim.ini`
-  const blocks: SsfBlock[] = [{ path: keysPath, section: owner, title: "动画引用", omit: ["FG_IMAGES", "FG_RECT"] }]
+  const blocks: SsfBlock[] = [{
+    path: keysPath,
+    section: owner,
+    title: "动画引用",
+    omit: ["FG_IMAGES", "FG_RECT"],
+    expect: ["ANIM_STYLE"],
+    options: { ANIM_STYLE: ssfDocument(animPath).sections() },
+    note: style ? undefined : "这个按键没有按键动画。",
+  }]
   if (style) blocks.push({ path: animPath, section: style, title: "动画样式" })
   return renderGroup("动画", blocks)
 }
@@ -173,16 +177,26 @@ function soundGroup(binding: SsfKeyBinding | undefined): Group | undefined {
     }], section)
   }
   const owner = binding ? binding.sections.find((name) => !/_Land/.test(name)) ?? binding.sections[0] : "Key"
-  return renderGroup("音效", [{ path: SSF_SOUNDS_PATH, section: owner, title: "按键音效", template: [{ key: "sound", value: options.sound[0] ?? "" }], options }])
+  return renderGroup("音效", [{
+    path: SSF_SOUNDS_PATH,
+    section: owner,
+    title: "按键音效",
+    expect: ["sound"],
+    options,
+    note: binding && sounds.get("Key", "sound") ? `未单独设置，使用默认按键音效 ${sounds.get("Key", "sound")}。` : undefined,
+  }])
 }
 
 /** Remaining values of the key's own classes (labels, long-press key, type…). */
 function keyGroup(skinPath: string, binding: SsfKeyBinding): Group | undefined {
   const handled = ["BG_IMAGES", "ICON", "ICON_PRESSED", "FG_STYLE", "TEXT_COLOR", "TEXT_COLOR_PRESSED"]
-  const blocks = binding.sections
+  const blocks: SsfBlock[] = binding.sections
     .filter((section) => ssfEntries(skinPath, section).some((entry) => !handled.includes(entry.key)))
     .map((section) => ({ path: skinPath, section, omit: handled }))
-  return blocks.length ? renderGroup("按键", blocks) : undefined
+  // The key's own labels (parseimpl/a.java LABEL / MINOR_LABEL) can be set even when it has none.
+  if (!blocks.length) blocks.push({ path: skinPath, section: ownSection(ssfDocument(skinPath), binding), omit: handled })
+  blocks[0].expect = ["LABEL", "MINOR_LABEL"]
+  return renderGroup("按键", blocks)
 }
 
 function keyGroups(binding: SsfKeyBinding): Group[] {
@@ -214,17 +228,18 @@ function boardGroups(): Group[] {
   }
   const candidate = orientation.value === "land" && skin.sections().includes("CandidateViewLand") ? "CandidateViewLand" : "CandidateView"
   const groups: Array<[string, SsfBlock[]]> = [
-    ["键盘背景", [block("RootView"), ...skin.sections().includes("WALLPAPER") ? [block("WALLPAPER")] : []]],
-    ["候选栏", [block(candidate), ...referenced(candidate, "BG_IMAGE", "候选栏背景")]],
+    // Sogou skips RootView / CandidateView without BG_STYLE (frame/b0.java), so a new one starts with it.
+    ["键盘背景", [block("RootView", { expect: ["BG_STYLE", "BG_IMAGE", "BG_COLOR", "BG_FUNCTION_COLOR"], create: [{ key: "BG_STYLE", value: "1" }] }), ...skin.sections().includes("WALLPAPER") ? [block("WALLPAPER")] : []]],
+    ["候选栏", [block(candidate, { expect: ["BG_STYLE", "BG_IMAGE", "BG_COLOR", "MARGINS"], create: [{ key: "BG_STYLE", value: "1" }] }), ...referenced(candidate, "BG_IMAGE", "候选栏背景")]],
     ["候选字", [textBlock(skinPath, "TextStyle_Candidate", CANDIDATE_TEXT_KEYS), textBlock(skinPath, "TextStyle_Candidate_Highlight", ["TEXT_COLOR"])]],
-    ["输入码", [block("ComposingView"), textBlock(skinPath, "TextStyle_Composing", CANDIDATE_TEXT_KEYS)]],
-    ["按键背景", (qwerty ? ["KeyBg_Default_Latin", "KeyBg_Function_Qwerty", "KeyBg_Space_Qwerty"] : ["KeyBg_Default", "KeyBg_Function", "KeyBg_Space"]).map((section) => block(section))],
+    ["输入码", [block("ComposingView", { expect: ["BG_STYLE", "BG_COLOR"], create: [{ key: "BG_STYLE", value: "2" }] }), textBlock(skinPath, "TextStyle_Composing", CANDIDATE_TEXT_KEYS)]],
+    ["按键背景", (qwerty ? ["KeyBg_Default_Latin", "KeyBg_Function_Qwerty", "KeyBg_Space_Qwerty"] : ["KeyBg_Default", "KeyBg_Function", "KeyBg_Space"]).map((section) => block(section, { expect: ["NORMAL", "PRESSED"] }))],
     ["按键文字", [
       textBlock(skinPath, qwerty ? "TextStyle_Qwerty" : "TextStyle_Phone_Label"),
       textBlock(skinPath, qwerty ? "TextStyle_FuncKey_26char" : "TextStyle_FuncKey_T9"),
       textBlock(skinPath, "TextStyle_Space_Label"),
       textBlock(skinPath, "TextStyle"),
-      block("General"),
+      block("General", { expect: ["ICON_COLOR", "HIGH_LIGHT_ICON_COLOR", "POPUP_BG_COLOR"] }),
     ]],
     ...nineKey ? [["符号列", [
       block("CandidateCodeView"),
@@ -272,7 +287,7 @@ function commonKeyGroups(selections: Group[][]): Group[] {
       if (matches.some((match) => !match || (match.title ?? "") !== (block.title ?? ""))) return []
       const entries = matches.map((match) => ssfEntries(match.path, match.section).filter((entry) => !match.omit?.includes(entry.key) && (!match.only || match.only.includes(entry.key))))
       const only = entries[0].filter((entry) => entries.every((list) => list.some((item) => item.key === entry.key))).map((entry) => entry.key)
-      return only.length ? [{ path: block.path, section: block.section, title: block.title, only, options: block.options,
+      return only.length || block.expect ? [{ path: block.path, section: block.section, title: block.title, only, options: block.options, expect: block.expect, create: block.create,
         note: "修改会作用于所有选中按键；共享样式也会影响其他引用它的按键。",
         peers: matches.slice(1).map(({ path, section }) => ({ path, section })),
       }] : []
