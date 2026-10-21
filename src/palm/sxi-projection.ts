@@ -11,7 +11,8 @@ export const SXI_SKIN_PATH = "skin.json"
 export const SXI_INFO_PATH = "info.json"
 
 /** A read-only view of skin.json; `writer` knows where each of its values came from. */
-export type SxiDerivedFile = { text: string; pointer: string[]; writer: IniWriter }
+/** `writer` maps an INI view's keys back to skin.json; a non-INI view (the toolbar plist) has none. */
+export type SxiDerivedFile = { text: string; pointer: string[]; writer?: IniWriter }
 
 const THEMES = [["default", "light"], ["night", "dark"]] as const
 const ORIENTATIONS = ["port", "land"] as const
@@ -112,6 +113,26 @@ export function sxiDerivedFiles(skin: JsonObject): Map<string, SxiDerivedFile> {
         add(`${directory}/${name}.til`, [themeKey, styleKey, "info", name], tilesIni(tiles))
       }
     }
+
+    // The export drops res/logo's plists and tile maps into `menu`/`a_m`/`a_i`; the toolbar
+    // renderer still reads them from res/logo (iOS plist first, Android atlas otherwise).
+    const logo = `${theme}/skin/res/logo`
+    const menus = Array.isArray(struct.menu) ? struct.menu.filter(Array.isArray) : []
+    const menu = menus.find((items) => items.some((item) => asObject(item)?.Position === "toolbar")) ?? menus[0]
+    if (menu) files.set(`${logo}/com.baidu.inputmethod.toolbarMenuItems.plist`, { text: toolbarPlist(menu), pointer: [themeKey, "menu"] })
+    if (Array.isArray(struct.a_m)) add(`${logo}/pop_menu_icons.til`, [themeKey, "a_m"], tilesIni(struct.a_m))
+    if (Array.isArray(struct.a_i)) add(`${logo}/pop_input_icons.til`, [themeKey, "a_i"], tilesIni(struct.a_i))
   }
   return files
+}
+
+// Menu items hold only strings and dicts.
+function plistValue(value: Json): string {
+  if (typeof value === "string") return `<string>${value.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</string>`
+  if (Array.isArray(value)) return `<array>${value.map(plistValue).join("")}</array>`
+  return `<dict>${Object.entries(asObject(value) ?? {}).map(([key, item]) => `<key>${key}</key>${plistValue(item)}`).join("")}</dict>`
+}
+
+function toolbarPlist(items: Json[]): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">${plistValue(items)}</plist>\n`
 }

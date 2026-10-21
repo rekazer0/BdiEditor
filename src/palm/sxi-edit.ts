@@ -107,6 +107,7 @@ export function applySxiViewEdit(skinText: string, path: string, before: string,
   const skin = parseSkinJson(skinText)
   let file = sxiDerivedFiles(skin).get(path)
   if (!file) throw new Error(`${path} 不是手心皮肤生成的文件`)
+  if (!file.writer) throw new Error(`手心皮肤的 ${path} 只能在源码面板编辑 skin.json`)
   const previous = IniDocument.parse(before)
   const next = IniDocument.parse(after)
   const removed = previous.sections().filter((section) => !next.sections().includes(section))
@@ -132,7 +133,7 @@ export function applySxiViewEdit(skinText: string, path: string, before: string,
     for (const key of keys) {
       const value = next.get(section, key)
       if (value === previous.get(section, key)) continue
-      const write = file.writer.origin(section, key)
+      const write = file.writer!.origin(section, key)
       if (!write) throw new Error(`手心皮肤的 ${section ? `[${section}] ` : ""}${key} 没有对应的 skin.json 字段，请在源码面板编辑`)
       write(value)
     }
