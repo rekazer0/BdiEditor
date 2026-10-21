@@ -414,7 +414,8 @@ export function openStyleReferenceEditor(styleID: string): void {
 
 export function openBdaStyleReferencePicker(paths: string[][], ref: BdaStyleRef, field: string, owner: HTMLElement): void {
   const input = document.createElement("input")
-  input.value = bdaStyleID(ref)
+  // A reference the skin does not set yet (key -1) opens the picker with nothing chosen.
+  input.value = ref.key >= 0 ? bdaStyleID(ref) : ""
   input.dataset.documentStyleKey = field
   input.dataset.bdaStyleType = ref.type
   input.addEventListener("change", () => {

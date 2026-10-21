@@ -295,9 +295,11 @@ export function updateBdaStyle(
     }
     const field = { FONT_NAME: 2, FONT_SIZE: 3, NM_COLOR: 4, HL_COLOR: 5 }[property]
     if (!field) throw new Error(`BDA 文字样式不支持：${property}`)
-    if (property === "FONT_NAME") return replaceField(style, field, 2, new TextEncoder().encode(value))
+    if (property === "FONT_NAME") {
+      return value.trim() ? replaceField(style, field, 2, new TextEncoder().encode(value.trim())) : removeFields(style, new Set([field]))
+    }
     const numeric = property === "FONT_SIZE" ? Number(value) : colorValue(value)
-    if (!Number.isFinite(numeric) || numeric < 0) throw new Error("BDA 数值无效")
+    if (property === "FONT_SIZE" && (!Number.isInteger(numeric) || numeric < 1)) throw new Error("字号应为正整数")
     return replaceField(style, field, 0, encodeVarint(numeric))
   })
 }

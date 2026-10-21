@@ -10,6 +10,7 @@ import { decodedBdaAppearancePart, applyDecodedBdaAppearancePart } from "../bda-
 import { currentBdaAppearance, refreshBdaLayout, refreshSelectedBdaSource, bdaAppearancePart, visualResolver } from "./bda-documents"
 import { commitBytes, updateDirty, isEditing, commitText } from "./edit-history"
 import { refreshPreview } from "./preview-render"
+import { showError, showStatus } from "./file-operations"
 import { refreshBdaStyleReferenceField } from "../bda-editor.ts"
 import { actionFieldNames, bdaKeyFieldLabels, preview, keyboardFields, layoutActionButtons, actionMeaningNodes } from "./canvas-interaction"
 import { shouldSuggestActionCodes, actionDescription } from "../actions.ts"
@@ -69,15 +70,19 @@ export function bdaStyleValue(appearance: BdaAppearance, ref: BdaStyleRef, prope
 export function updateBdaRefs(refs: BdaStyleRef[], property: string, value: string): boolean {
   const info = currentBdaAppearance()
   if (!info || !refs.length) return false
-  // BDA has no way to drop a size or colour, and fields write on every keystroke: skip values that
-  // are empty or not finished yet instead of encoding 0 or throwing.
-  if (!value.trim() && property !== "FONT_NAME") return false
+  // An emptied size or colour keeps its value (BDA has no "unset" for them); an invalid value says why.
+  if (!value.trim() && property !== "FONT_NAME") {
+    populateKeyInspector()
+    return false
+  }
   let bytes = info.bytes
   try {
     for (const ref of new Map(refs.map((item) => [`${item.type}:${item.key}`, item])).values()) {
       bytes = updateBdaStyle(bytes, ref, property, value)
     }
-  } catch {
+  } catch (error) {
+    showStatus(error instanceof Error ? error.message : String(error))
+    populateKeyInspector()
     return false
   }
   commitBytes(info.path, info.bytes, bytes)
@@ -100,21 +105,30 @@ export function updateBdaAppearanceStyleRef(paths: string[][], ref: BdaStyleRef,
     let target: unknown = source
     for (const step of path.slice(0, -1)) {
       if (target === null || typeof target !== "object") return false
-      target = Array.isArray(target)
-        ? target[Number(step)]
-        : (target as Record<string, unknown>)[step]
+      // A reference the skin lacks may sit in a message it lacks too (input, cand.switch): create it.
+      const holder = target as Record<string, unknown>
+      if (!Array.isArray(target) && holder[step] === undefined) holder[step] = {}
+      target = Array.isArray(target) ? target[Number(step)] : holder[step]
     }
     if (target === null || typeof target !== "object") return false
     const last = path[path.length - 1]
     if (Array.isArray(target)) target[Number(last)] = value
     else (target as Record<string, unknown>)[last] = value
   }
-  const after = applyDecodedBdaAppearancePart(info.path, info.bytes, JSON.stringify(source), part)
+  let after: Uint8Array
+  try {
+    after = applyDecodedBdaAppearancePart(info.path, info.bytes, JSON.stringify(source), part)
+  } catch (error) {
+    showError(error, "修改 BDA 样式引用")
+    return false
+  }
   commitBytes(info.path, info.bytes, after)
   refreshBdaLayout(appState.layoutPath)
   refreshSelectedBdaSource()
   refreshPreview()
-  if (owner) void refreshBdaStyleReferenceField(owner, ref, visualResolver())
+  // Rebuild the inspector: rows and the 文字 group hold the old reference (and its kind) otherwise.
+  populateKeyInspector()
+  if (owner?.isConnected) void refreshBdaStyleReferenceField(owner, ref, visualResolver())
   updateDirty()
   return true
 }
