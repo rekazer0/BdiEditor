@@ -1,18 +1,18 @@
 // Palm and Sogou skins are painted from their own files (skin.json, phoneSkin.ini); the layout the
 // canvas lists only names the key sections the editor selects and edits, and their geometry.
 
-import { AtlasResolver } from "../atlas.ts"
+import { AtlasResolver, type TextVisual } from "../atlas.ts"
 import { IniDocument } from "../ini.ts"
 import type { NativeScene, SceneLayer } from "../native-scene.ts"
 import { palmBoardScene, palmCandidateScene, type PalmOrientation, type PalmTheme } from "../palm/palm-scene.ts"
 import { SXI_SKIN_PATH, parseSkinJson } from "../palm/sxi-projection.ts"
 import type { JsonObject } from "../palm/sxi-ini.ts"
 import type { SkinArchive } from "../skin.ts"
-import { documentPackage } from "../ssf/ssf-convert.ts"
-import type { SsfPackage, SsfTheme } from "../ssf/ssf-package.ts"
+import type { SsfTheme } from "../ssf/ssf-package.ts"
 import { SsfStyles, ssfBoardScene, ssfCandidateScene } from "../ssf/ssf-scene.ts"
 import { candidateBackgroundPreview, preview, toolbarPreview } from "./canvas-interaction"
 import { toolbarConfigPath } from "./config-context"
+import { ssfDocumentPackage } from "./ssf-preview"
 import { appState } from "./state"
 
 type CandidateScene = { bar: SceneLayer[]; icons: NativeScene }
@@ -23,14 +23,6 @@ function palmSkin(archive: SkinArchive): JsonObject {
   const skin = parseSkinJson(archive.getText(SXI_SKIN_PATH))
   appState.palmSkin = { archive, revision: archive.revision, skin }
   return skin
-}
-
-function ssfPackage(archive: SkinArchive): SsfPackage {
-  const cached = appState.ssfPackage
-  if (cached?.archive === archive && cached.revision === archive.revision) return cached.pkg
-  const pkg = documentPackage(archive)
-  appState.ssfPackage = { archive, revision: archive.revision, pkg }
-  return pkg
 }
 
 /** The toolbar canvas follows the keyboard state; the bar's backdrop does not change with it. */
@@ -66,7 +58,7 @@ function ssfScenes(archive: SkinArchive): boolean {
   const templateText = (file: string) => template.isText(templatePath(file)) ? IniDocument.parse(template.getText(templatePath(file))) : undefined
   const templateLayout = templateText(`${name}.ini`)
   if (!templateLayout) return false
-  const pkg = ssfPackage(archive)
+  const pkg = ssfDocumentPackage(archive)
   const styles = new SsfStyles(archive, pkg, theme as SsfTheme)
   const resolver = new AtlasResolver(template, "light", orientation)
   const templateGen = templateText("gen.ini")
@@ -94,4 +86,35 @@ export function refreshNativeScenes(): void {
   const archive = appState.archive
   const native = archive?.format === "sxi" ? palmScenes(archive) : archive?.format === "ssf" ? ssfScenes(archive) : false
   if (!native) for (const canvas of [preview, toolbarPreview, candidateBackgroundPreview]) canvas.setScene(undefined)
+}
+
+type CandidateText = { words?: TextVisual; first?: TextVisual; input?: TextVisual }
+
+function ssfCandidateText(archive: SkinArchive, width: number): CandidateText | undefined {
+  const theme = appState.layoutPath.match(/^(light|dark)\//)?.[1] as SsfTheme | undefined
+  if (!theme) return
+  const styles = new SsfStyles(archive, ssfDocumentPackage(archive), theme)
+  const scale = width / styles.sogouWidth
+  const visual = (section: string): TextVisual | undefined => {
+    const look = styles.text([section], scale)
+    const color = styles.color(section)
+    const visual: TextVisual = {
+      ...color ? { color } : {},
+      ...look.size ? { fontSize: look.size } : {},
+      ...look.font ? { fontName: look.font } : {},
+      ...look.weight ? { bold: look.weight >= 700 } : {},
+    }
+    return Object.keys(visual).length ? visual : undefined
+  }
+  // Sogou highlights the first candidate with its own style.
+  return { words: visual("TextStyle_Candidate"), first: visual("TextStyle_Candidate_Highlight"), input: visual("TextStyle_Composing") }
+}
+
+/**
+ * The candidate words, first candidate and input code as the open Palm or Sogou skin styles them;
+ * a field the skin leaves out keeps the built-in look.
+ */
+export function nativeCandidateText(width: number): CandidateText | undefined {
+  const archive = appState.archive
+  return archive?.format === "ssf" ? ssfCandidateText(archive, width) : undefined
 }

@@ -7,7 +7,8 @@ import { IniDocument } from '../src/ini.ts'
 import { parseXmlPlist } from '../src/palm/palm-plist.ts'
 import { decodeBdaAppearance } from '../src/bda-decode.ts'
 import { strFromU8 } from 'fflate'
-import { convertSsfDocument, ssfDocumentBytes, ssfPreviewFiles } from '../src/ssf/ssf-convert.ts'
+import { convertSsfDocument, documentPackage, ssfDocumentBytes } from '../src/ssf/ssf-convert.ts'
+import { ssfToBaiduFiles } from '../src/ssf/ssf-to-baidu.ts'
 import { decodePng, cropImage } from '../src/ssf/ssf-png.ts'
 import { ssfFixture } from './helpers/ssf-fixture.mjs'
 
@@ -20,8 +21,8 @@ const templates = {
 test('SSF → BDI packages native iOS toolbar plists, exact normal/pressed artwork and an F14 container', async () => {
   const original = await ssfDocumentBytes(ssfFixture())
   const source = SkinArchive.open(original, 'ssf')
-  // The SSF canvas (its seven toolbar ICONs) is the reference for the artwork the export moves.
-  const canvas = ssfPreviewFiles(source, templates.sogou).files
+  // The SSF look on the skeleton (its seven toolbar ICONs) is the reference for the artwork the export moves.
+  const canvas = ssfToBaiduFiles(documentPackage(source), templates.sogou, Number(documentPackage(source).resolution)).files
   const canvasText = (path) => strFromU8(canvas.get(path))
   const converted = await convertSsfDocument(source, 'bdi', templates)
   const bdi = SkinArchive.open(converted.bytes, 'bdi')
@@ -110,7 +111,7 @@ test('SSF → BDS gives Android the native F14 toolbar and the Sogou icons in th
     source.setBytes(`1080/${folder}/ime_function_textedit.png`, source.getBytes(`1080/${folder}/902.png`))
     source.setBytes(`1080/${folder}/ime_function_clipboard.png`, source.getBytes(`1080/${folder}/delf_26.png`))
   }
-  const canvas = ssfPreviewFiles(source, templates.sogou).files
+  const canvas = ssfToBaiduFiles(documentPackage(source), templates.sogou, Number(documentPackage(source).resolution)).files
   const canvasText = (path) => strFromU8(canvas.get(path))
   const converted = await convertSsfDocument(source, 'bds', templates)
   const bds = SkinArchive.open(converted.bytes, 'bds')

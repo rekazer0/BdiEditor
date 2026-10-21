@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs'
 import { strFromU8, strToU8 } from 'fflate'
 import { IniDocument } from '../src/ini.ts'
 import { SkinArchive } from '../src/skin.ts'
-import { convertSsfDocument, ssfDocumentBytes, ssfPreviewFiles } from '../src/ssf/ssf-convert.ts'
+import { convertSsfDocument, documentPackage, ssfDocumentBytes } from '../src/ssf/ssf-convert.ts'
+import { ssfToBaiduFiles } from '../src/ssf/ssf-to-baidu.ts'
 import { convertBdaArchive } from '../src/bda-convert.ts'
 import { convertSsfToBaidu } from '../src/ssf/ssf-to-baidu.ts'
 import { syncKeyStateTips } from '../src/ssf/ssf-state-tips.ts'
@@ -31,7 +32,7 @@ test('SSF export uses the Sogou canvas skeleton at 1080', () => {
 
 test('SSF → BDI and BDS reopen with every preview layout, toolbar, image and font unchanged', async () => {
   const fixture = await open(ssfFixture())
-  const preview = ssfPreviewFiles(fixture, templates.sogou).files
+  const preview = ssfToBaiduFiles(documentPackage(fixture), templates.sogou, Number(documentPackage(fixture).resolution)).files
   for (const format of ['bdi', 'bds']) {
     const { bytes } = await convertSsfDocument(fixture, format, templates)
     const output = SkinArchive.open(bytes, format)

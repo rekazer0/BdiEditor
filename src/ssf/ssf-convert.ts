@@ -8,7 +8,8 @@ import { convertBaiduToSsf } from "./baidu-to-ssf.ts"
 import { isSkinContainer } from "./ssf-container.ts"
 import { SsfPackage, unpackSsf } from "./ssf-package.ts"
 import { syncKeyStateTips } from "./ssf-state-tips.ts"
-import { convertSsfToBaidu, ssfToBaiduFiles } from "./ssf-to-baidu.ts"
+import { copySsfSkeleton } from "./ssf-skeleton.ts"
+import { convertSsfToBaidu } from "./ssf-to-baidu.ts"
 import { convertSsfToBda } from "./ssf-to-bda.ts"
 import { adaptSsfNativeToolbar } from "./ssf-native-toolbar.ts"
 
@@ -34,10 +35,14 @@ export async function ssfDocumentBytes(bytes: Uint8Array): Promise<Uint8Array> {
   return isSkinContainer(bytes) ? zipSync(Object.fromEntries(withDirectoryEntries(files)), { level: 6 }) : bytes
 }
 
-/** Sogou's official skeleton in the canvas's INI schema, for `SkinArchive.setOverlay`. */
-export function ssfPreviewFiles(archive: SkinArchive, template: SkinArchive): { files: Map<string, Uint8Array>; warnings: string[] } {
-  const pkg = documentPackage(archive)
-  return ssfToBaiduFiles(pkg, template, Number(pkg.resolution))
+/**
+ * Sogou's official skeleton for each look of the skin, for `SkinArchive.setOverlay`: the canvas takes
+ * its boards (key sections, geometry, built-in labels) from here and paints the skin itself.
+ */
+export function ssfPreviewFiles(pkg: SsfPackage, template: SkinArchive): Map<string, Uint8Array> {
+  const files = new Map<string, Uint8Array>()
+  for (const theme of pkg.themes.keys()) copySsfSkeleton(template, theme, files, Number(pkg.resolution))
+  return files
 }
 
 /** Converts an SSF document into a Baidu package of `format`. */

@@ -1,5 +1,5 @@
 import { appState } from "./state"
-import { scheduleSsfPreview } from "./ssf-preview"
+import { rebuildSsfPreview } from "./ssf-preview"
 import { type TextVisual, canvasFontFamily } from "../atlas.ts"
 import { setSimulatedComposition, toolbarPreview, currentDeviceValue, deviceGeometryProperties, preview, resizeKeyboardPreviews, schedulePreviewInteractionFrame, paintPreviewInteraction, applySkinState, REFERENCE_PHONE_WIDTH_SCALE, deviceFrameProperties } from "./canvas-interaction"
 import { simulatedOutput, skinState, candidateComposition, candidateInput, candidateInputText, candidateWords, candidateArea, toolbarStrip, deviceShell, orientation, theme, layout, hintPreviewEnabled, canvasWrap, toolbarCanvas, panelStatus, previewZoomOut, previewZoomIn, $, skinStateValue, skinStateControl, toggleGuides, mobileToggleGuides } from "./dom"
@@ -20,7 +20,7 @@ import { resolveCandidateInputTextVisual, resolveCandidateTextVisuals } from "..
 import { availableSkinStates, canvasFitWidth, previewScalePercent } from "../panel-tools.ts"
 import { populateKeyInspector } from "./key-inspector"
 import { setDrawingTile, drawAtlas } from "./tile-editing"
-import { refreshNativeScenes } from "./native-preview"
+import { nativeCandidateText, refreshNativeScenes } from "./native-preview"
 
 export function simulationLanguage(): "zh" | "en" {
   return /^en_/i.test(appState.layoutPath.split("/").pop() ?? "") ? "en" : "zh"
@@ -131,9 +131,14 @@ export function devicePreviewTransparent(): boolean {
   return true
 }
 
+/** A built-in text look with the skin's own fields laid over it. */
+function merged(base: TextVisual | undefined, own: TextVisual | undefined): TextVisual | undefined {
+  return base || own ? { ...base, ...own } : undefined
+}
+
 export function refreshPreview(): void {
   if (!appState.archive) return
-  scheduleSsfPreview()
+  rebuildSsfPreview()
   const currentArchive = appState.archive
   const composing = refreshSimulationState()
   const resolver = visualResolver()
@@ -198,9 +203,11 @@ export function refreshPreview(): void {
       context.styles,
     )
     const skinFont = appState.archive.format === "ssf"
-    const inputVisual = resolveCandidateInputTextVisual(context.gen, resolver, candidateLayout, inputBarInKeyboard(), skinFont)
-    const { normal: candidateVisual, first: firstCandidateVisual } =
-      resolveCandidateTextVisuals(candidateLayout, context.gen, resolver, skinFont)
+    const native = nativeCandidateText(config.width)
+    const builtIn = resolveCandidateTextVisuals(candidateLayout, context.gen, resolver, skinFont)
+    const inputVisual = merged(resolveCandidateInputTextVisual(context.gen, resolver, candidateLayout, inputBarInKeyboard(), skinFont), native?.input)
+    const candidateVisual = merged(builtIn.normal, native?.words)
+    const firstCandidateVisual = native?.first ? merged(builtIn.first ?? builtIn.normal, native.first) : builtIn.first
     appState.firstCandidateTextVisual = firstCandidateVisual
     appState.candidateTextWidth = config.width
     applyCandidateTextVisual(candidateInput, inputVisual, appState.candidateTextWidth)

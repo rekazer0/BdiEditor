@@ -32,7 +32,7 @@ test('SSF edits to multiple files commit together and preview only after committ
     IniDocument, archive: { format: 'ssf', isText: (path) => files.has(path), getText: (path) => files.get(path) }, isEditing: () => true,
     commitBatch: (changes) => { for (const change of changes) files.set(change.path, change.after); events.push('batch') },
     commitText: () => assert.fail('Expected one batch'), selectedPath: '', sourceEditPath: () => '',
-    rebuildSsfPreview: () => events.push('preview'), refreshPreview() {}, populateKeyInspector() {}, updateDirty() {}, resolutionTwins: () => [],
+    refreshPreview: () => events.push('preview'), populateKeyInspector() {}, updateDirty() {}, resolutionTwins: () => [],
   })
   context.editTargets([{ path: 'one', section: 'A' }, { path: 'two', section: 'B' }], (document, target) => context.setSsfValue(document, target.section, 'TYPE', '3'))
   assert.equal(IniDocument.parse(files.get('one')).get('A', 'TYPE'), '3')

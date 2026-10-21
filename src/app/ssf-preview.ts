@@ -1,10 +1,11 @@
-// An SSF document is edited as its own files; the canvas uses the official Sogou skeleton as a
-// read-only overlay, rebuilt after each edit.
+// An SSF document is edited as its own files; the canvas takes its boards from the official Sogou
+// skeleton, laid over the document read-only, and paints the skin's own files onto them.
 
 import { IniDocument } from "../ini.ts"
 import { loadBuiltInProjectTemplate } from "../operations.ts"
 import { SkinArchive } from "../skin.ts"
-import { ssfPreviewFiles, type SsfTemplates } from "../ssf/ssf-convert.ts"
+import { documentPackage, ssfPreviewFiles, type SsfTemplates } from "../ssf/ssf-convert.ts"
+import type { SsfPackage } from "../ssf/ssf-package.ts"
 import { selectedVariant } from "./bda-documents"
 import { layout, orientation, theme } from "./dom"
 import { showStatus } from "./file-operations"
@@ -16,8 +17,14 @@ import { renderFiles } from "./file-tree"
 import { selectFile } from "./navigation"
 import { isSsfBoardPath } from "./ssf-documents"
 
-/** How long typing pauses before the preview is rebuilt; a rebuild converts every image again. */
-const REBUILD_DELAY = 300
+/** The open SSF document's own files as a package, read again only when the document changes. */
+export function ssfDocumentPackage(archive: SkinArchive): SsfPackage {
+  const cached = appState.ssfPackage
+  if (cached?.archive === archive && cached.revision === archive.revision) return cached.pkg
+  const pkg = documentPackage(archive)
+  appState.ssfPackage = { archive, revision: archive.revision, pkg }
+  return pkg
+}
 
 export async function ssfTemplates(): Promise<SsfTemplates> {
   if (!appState.ssfTemplates) {
@@ -34,38 +41,26 @@ export async function ssfTemplates(): Promise<SsfTemplates> {
   return appState.ssfTemplates
 }
 
-/** Converts the open SSF document for the preview now; returns what the conversion could not carry over. */
+/**
+ * Lays the official skeleton over the open SSF document for the looks and resolution it has; the
+ * skeleton does not change with the skin's styles, so it is rebuilt only when those do. Returns the
+ * package's warnings (looks it cannot show).
+ */
 export function rebuildSsfPreview(): string[] {
   const archive = appState.archive
   if (archive?.format !== "ssf" || !appState.ssfTemplates) return []
-  let warnings: string[] = []
-  try {
-    const preview = ssfPreviewFiles(archive, appState.ssfTemplates.sogou)
-    archive.setOverlay(preview.files)
-    warnings = preview.warnings
-  } catch (error) {
-    showStatus(`预览未更新：${error instanceof Error ? error.message : String(error)}`)
+  const pkg = ssfDocumentPackage(archive)
+  const key = `${pkg.resolution}|${[...pkg.themes.keys()].join(",")}`
+  if (appState.ssfPreviewKey?.archive !== archive || appState.ssfPreviewKey.key !== key) {
+    archive.setOverlay(ssfPreviewFiles(pkg, appState.ssfTemplates.sogou))
+    appState.ssfPreviewKey = { archive, key }
+    if (archive.isText(appState.layoutPath)) appState.layoutDocument = IniDocument.parse(archive.getText(appState.layoutPath))
   }
-  appState.ssfPreviewRevision = archive.revision
-  if (archive.isText(appState.layoutPath)) appState.layoutDocument = IniDocument.parse(archive.getText(appState.layoutPath))
-  return warnings
-}
-
-/** Rebuilds the preview shortly after the SSF document last changed. */
-export function scheduleSsfPreview(): void {
-  const archive = appState.archive
-  if (archive?.format !== "ssf" || archive.revision === appState.ssfPreviewRevision) return
-  window.clearTimeout(appState.ssfPreviewTimer)
-  appState.ssfPreviewTimer = window.setTimeout(() => {
-    appState.ssfPreviewTimer = undefined
-    if (appState.archive !== archive) return
-    rebuildSsfPreview()
-    refreshPreview()
-  }, REBUILD_DELAY)
+  return pkg.warnings
 }
 
 /**
- * Switching theme, orientation or layout only changes which converted layout the canvas shows: the
+ * Switching theme, orientation or layout only changes which skeleton board the canvas shows: the
  * file selection stays, and a look the skin lacks is not created (that would add Baidu files to it).
  */
 export function switchSsfPreviewLayout(path: string): void {
