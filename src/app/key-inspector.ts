@@ -5,7 +5,7 @@ import { styleConfigPath, effectiveKeyValue, isSkinInfoPath, isToolbarPath, effe
 import { isListCell, listCellValue, setListCellValue } from "../layout.ts"
 import { type BdaStyleRef, bdaStyleRef, type BdaAppearance } from "../bda.ts"
 import { bdaColorHex } from "../bda-resolver.ts"
-import { updateBdaStyle } from "../bda-encode.ts"
+import { addBdaStyle, updateBdaStyle } from "../bda-encode.ts"
 import { decodedBdaAppearancePart, applyDecodedBdaAppearancePart } from "../bda-source.ts"
 import { currentBdaAppearance, refreshBdaLayout, refreshSelectedBdaSource, bdaAppearancePart, visualResolver } from "./bda-documents"
 import { commitBytes, updateDirty, isEditing, commitText } from "./edit-history"
@@ -94,30 +94,56 @@ export function updateBdaRefs(refs: BdaStyleRef[], property: string, value: stri
   return true
 }
 
+/** `bytes` with the panel's references at `paths` set to `ref`, creating messages it lacks (input, cand.switch). */
+function withBdaPanelRefs(path: string, bytes: Uint8Array, part: NonNullable<ReturnType<typeof bdaAppearancePart>>, paths: string[][], ref: BdaStyleRef): Uint8Array {
+  const source = JSON.parse(decodedBdaAppearancePart(bytes, part)) as Record<string, unknown>
+  for (const steps of paths) {
+    let target: unknown = source
+    for (const step of steps.slice(0, -1)) {
+      if (target === null || typeof target !== "object") throw new Error(`BDA 面板缺少 ${steps.join(".")}`)
+      const holder = target as Record<string, unknown>
+      if (!Array.isArray(target) && holder[step] === undefined) holder[step] = {}
+      target = Array.isArray(target) ? target[Number(step)] : holder[step]
+    }
+    if (target === null || typeof target !== "object") throw new Error(`BDA 面板缺少 ${steps.join(".")}`)
+    const last = steps[steps.length - 1]
+    if (Array.isArray(target)) target[Number(last)] = { type: ref.type, key: ref.key }
+    else (target as Record<string, unknown>)[last] = { type: ref.type, key: ref.key }
+  }
+  return applyDecodedBdaAppearancePart(path, bytes, JSON.stringify(source), part)
+}
+
+/**
+ * Gives the selected panel a new text style at `refPath` (the candidate words, 首选 or input code the
+ * skin does not style yet) with `property` set, starting from `copyFrom`; one undo step.
+ */
+export function createBdaPanelTextStyle(refPath: string[], copyFrom: BdaStyleRef | undefined, property: string, value: string): void {
+  const info = currentBdaAppearance()
+  const part = bdaAppearancePart(appState.selectedPath)
+  if (!info || part?.kind !== "panel" || !value.trim() || !isEditing()) return
+  try {
+    const added = addBdaStyle(info.bytes, "text", copyFrom?.type === "text" ? copyFrom.key : undefined)
+    const styled = updateBdaStyle(added.bytes, added.ref, property, value)
+    commitBytes(info.path, info.bytes, withBdaPanelRefs(info.path, styled, part, [refPath], added.ref))
+  } catch (error) {
+    showStatus(error instanceof Error ? error.message : String(error))
+    return
+  }
+  refreshBdaLayout(appState.layoutPath)
+  refreshSelectedBdaSource()
+  refreshPreview()
+  populateKeyInspector()
+  updateDirty()
+}
+
 // 将样式引用写回 appearanceConfig 的面板片段，path 指向解码 JSON 中的字段位置。
 export function updateBdaAppearanceStyleRef(paths: string[][], ref: BdaStyleRef, owner?: HTMLElement): boolean {
   const info = currentBdaAppearance()
   const part = bdaAppearancePart(appState.selectedPath)
   if (!info || part?.kind !== "panel" || !paths.length) return false
-  const source = JSON.parse(decodedBdaAppearancePart(info.bytes, part)) as Record<string, unknown>
-  const value = { type: ref.type, key: ref.key }
-  for (const path of paths) {
-    let target: unknown = source
-    for (const step of path.slice(0, -1)) {
-      if (target === null || typeof target !== "object") return false
-      // A reference the skin lacks may sit in a message it lacks too (input, cand.switch): create it.
-      const holder = target as Record<string, unknown>
-      if (!Array.isArray(target) && holder[step] === undefined) holder[step] = {}
-      target = Array.isArray(target) ? target[Number(step)] : holder[step]
-    }
-    if (target === null || typeof target !== "object") return false
-    const last = path[path.length - 1]
-    if (Array.isArray(target)) target[Number(last)] = value
-    else (target as Record<string, unknown>)[last] = value
-  }
   let after: Uint8Array
   try {
-    after = applyDecodedBdaAppearancePart(info.path, info.bytes, JSON.stringify(source), part)
+    after = withBdaPanelRefs(info.path, info.bytes, part, paths, ref)
   } catch (error) {
     showError(error, "修改 BDA 样式引用")
     return false

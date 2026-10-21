@@ -11,13 +11,22 @@ import { isListCell } from "../layout.ts"
 import { styleConfigPath, genConfigPath, isToolbarPath, effectiveToolbarSections, effectiveKeyValue, effectiveKeySection } from "./config-context"
 import { commitTextChanges, isEditing } from "./edit-history"
 import { currentBdaAppearance, bdaAppearancePart } from "./bda-documents"
-import { bdaStyleValue, updateBdaRefs } from "./key-inspector"
+import { bdaStyleValue, createBdaPanelTextStyle, updateBdaRefs } from "./key-inspector"
 import { parseStyleColor } from "./resource-inspector"
 import { fontFileField, textStyleGroup, textStyleNote, textStyleRows, textStyleTargetSwitch } from "./dom"
 
 export type TextProperty = "FONT_NAME" | "FONT_SIZE" | "NM_COLOR" | "HL_COLOR"
 
-type TextTarget = { id: string; label: string; properties: TextProperty[]; css?: TextStyleRef[]; bda?: BdaStyleRef[]; note?: string }
+type TextTarget = {
+  id: string
+  label: string
+  properties: TextProperty[]
+  css?: TextStyleRef[]
+  bda?: BdaStyleRef[]
+  /** Where a BDA panel gets a new text style when it has none here, and the style it starts from. */
+  bdaCreate?: { path: string[]; copyFrom?: BdaStyleRef }
+  note?: string
+}
 
 const LABELS: Record<TextProperty, string> = { FONT_NAME: "字体名称", FONT_SIZE: "字号", NM_COLOR: "颜色", HL_COLOR: "按下颜色" }
 const KEY_PROPERTIES: TextProperty[] = ["FONT_NAME", "FONT_SIZE", "NM_COLOR", "HL_COLOR"]
@@ -148,9 +157,9 @@ function bdaTargets(): { scope: "candidate" | "layout"; targets: TextTarget[] } 
     return {
       scope: "candidate",
       targets: [
-        { id: "candidate", label: "候选字", properties: CANDIDATE_PROPERTIES, note: CANDIDATE_NOTE, bda: text([panel.cand?.cellForeStyle]) },
-        { id: "first", label: "首选", properties: CANDIDATE_PROPERTIES, note: CANDIDATE_NOTE, bda: text([panel.cand?.firstCellForeStyle]) },
-        { id: "input", label: "输入码", properties: CANDIDATE_PROPERTIES, note: CANDIDATE_NOTE, bda: text([panel.input?.textStyle]) },
+        { id: "candidate", label: "候选字", properties: CANDIDATE_PROPERTIES, note: CANDIDATE_NOTE, bda: text([panel.cand?.cellForeStyle]), bdaCreate: { path: ["cand", "cellForeStyle"] } },
+        { id: "first", label: "首选", properties: CANDIDATE_PROPERTIES, note: CANDIDATE_NOTE, bda: text([panel.cand?.firstCellForeStyle]), bdaCreate: { path: ["cand", "firstCellForeStyle"], copyFrom: panel.cand?.cellForeStyle } },
+        { id: "input", label: "输入码", properties: CANDIDATE_PROPERTIES, note: CANDIDATE_NOTE, bda: text([panel.input?.textStyle]), bdaCreate: { path: ["input", "textStyle"] } },
       ],
     }
   }
@@ -182,13 +191,14 @@ function targetValues(target: TextTarget, property: TextProperty): string[] {
 }
 
 function writeTarget(target: TextTarget, property: TextProperty, value: string): void {
-  if (target.bda) updateBdaRefs(target.bda, property, value)
+  if (target.bda?.length) updateBdaRefs(target.bda, property, value)
+  else if (target.bdaCreate) createBdaPanelTextStyle(target.bdaCreate.path, target.bdaCreate.copyFrom, property, value)
   else writeTextRefs(target.css ?? [], property, value)
 }
 
 /** A target nothing can be written to yet (a layout whose keys have no text, a BDA bar without a style). */
 function writable(target: TextTarget): boolean {
-  return target.bda ? target.bda.length > 0 : (target.css ?? []).some((ref) => ref.owner || ref.foreground)
+  return target.bda ? target.bda.length > 0 || Boolean(target.bdaCreate) : (target.css ?? []).some((ref) => ref.owner || ref.foreground)
 }
 
 function fieldRow(label: string, property: TextProperty, control: HTMLElement): HTMLElement {

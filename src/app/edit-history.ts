@@ -18,7 +18,7 @@ import { populateTileInspector, drawAtlas, loadTiles } from "./tile-editing"
 import { refreshPreview } from "./preview-render"
 import { populateKeyInspector } from "./key-inspector"
 import { renderFiles } from "./file-tree"
-import { isBdaAppearancePartPath, refreshBdaLayout } from "./bda-documents"
+import { isBdaAppearancePartPath, refreshBdaLayout, refreshSelectedBdaSource } from "./bda-documents"
 import { selectFile } from "./navigation"
 import { selectResourceImage, renderResourceInspector } from "./resource-inspector"
 import { decodedBdaEditorSource } from "../bda-source.ts"
@@ -260,8 +260,10 @@ export function applyBytesSnapshot(path: string, bytes?: Uint8Array): void {
   if (bytes) appState.archive.setBytes(path, bytes)
   else appState.archive.delete(path)
   scheduleSourceAutosave([path])
-  refreshBdaLayout()
+  refreshBdaLayout(appState.layoutPath || undefined)
   if (appState.selectedPath === path && bytes && appState.archive.isBdaConfig(path)) setSourceValue(decodedBdaEditorSource(path, bytes))
+  // A BDA panel or style table is a view of appearanceConfig: re-read it, or a later source edit re-applies the undone value.
+  else refreshSelectedBdaSource()
   if (appState.resourceConfigActive && appState.archive.format === "bda" && appState.selectedResourcePath) {
     loadTiles(appState.selectedResourcePath)
     renderResourceInspector()
