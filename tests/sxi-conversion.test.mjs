@@ -7,6 +7,7 @@ import { buildSxiZip } from "../src/palm/palm-export.ts"
 import { convertSxiToBaidu, convertSxiToBda, sxiToBaiduArchive } from "../src/palm/sxi-to-baidu.ts"
 import { canExport } from "../src/export.ts"
 import { IniDocument } from "../src/ini.ts"
+import { parseXmlPlist } from "../src/palm/palm-plist.ts"
 import { bdsFixture } from "./helpers/baidu-fixture.mjs"
 
 function sxi() {
@@ -62,4 +63,22 @@ test("an .sxi exports to BDA on the official template", async () => {
   const reopened = SkinArchive.open(bytes, "bda")
   assert.equal(reopened.format, "bda")
   assert.ok(reopened.names().some((path) => /appearanceConfig$/.test(path)))
+})
+
+test("an .sxi keeps the toolbar plist and menu atlas the export folds into skin.json", () => {
+  const files = unzipSync(bdsFixture())
+  const toolbar = `<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><array><dict><key>Position</key><string>toolbar</string><key>Name</key><string>23</string><key>Titles</key><dict><key>Normal</key><dict><key>Normal</key><string>语音&amp;输入</string><key>Selected</key><string>语音</string></dict></dict><key>Images</key><dict><key>Normal</key><dict><key>Normal</key><string>lg/yuyin</string></dict><key>Theme</key><dict><key>Normal</key><string>lg/yuyin</string></dict></dict></dict></array></plist>`
+  files["light/res/logo/com.baidu.inputmethod.toolbarMenuItems.plist"] = strToU8(toolbar)
+  files["light/res/logo/lg/yuyin_iphone@3x.png"] = files["light/res/btn.png"]
+  files["light/res/logo/pop_menu_icons.til"] = strToU8("[IMG26]\nSOURCE_RECT=0,0,2,2\n")
+  files["light/res/logo/pop_menu_icons.png"] = files["light/res/btn.png"]
+  const archive = SkinArchive.open(buildSxiZip(SkinArchive.open(zipSync(files))).bytes, "sxi")
+  const plistPath = "light/skin/res/logo/com.baidu.inputmethod.toolbarMenuItems.plist"
+  for (const skin of [archive, sxiToBaiduArchive(archive)]) {
+    const [item] = parseXmlPlist(skin.getBytes(plistPath))
+    assert.equal(item.Position, "toolbar")
+    assert.equal(item.Titles.Normal.Normal, "语音&输入")
+    assert.equal(item.Images.Normal.Normal, "lg/yuyin")
+    assert.equal(IniDocument.parse(skin.getText("light/skin/res/logo/pop_menu_icons.til")).get("IMG26", "SOURCE_RECT"), "0,0,2,2")
+  }
 })

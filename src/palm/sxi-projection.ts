@@ -111,6 +111,26 @@ export function sxiDerivedFiles(skin: JsonObject): Map<string, SxiDerivedFile> {
         add(`${directory}/${name}.til`, [themeKey, styleKey, "info", name], tilesText(tiles))
       }
     }
+
+    // The export drops res/logo's plists and tile maps into `menu`/`a_m`/`a_i`; the toolbar
+    // renderer still reads them from res/logo (iOS plist first, Android atlas otherwise).
+    const logo = `${theme}/skin/res/logo`
+    const menus = Array.isArray(struct.menu) ? struct.menu.filter(Array.isArray) : []
+    const menu = menus.find((items) => items.some((item) => asObject(item)?.Position === "toolbar")) ?? menus[0]
+    if (menu) add(`${logo}/com.baidu.inputmethod.toolbarMenuItems.plist`, [themeKey, "menu"], toolbarPlist(menu))
+    if (Array.isArray(struct.a_m)) add(`${logo}/pop_menu_icons.til`, [themeKey, "a_m"], tilesText(struct.a_m))
+    if (Array.isArray(struct.a_i)) add(`${logo}/pop_input_icons.til`, [themeKey, "a_i"], tilesText(struct.a_i))
   }
   return files
+}
+
+// Menu items hold only strings and dicts.
+function plistValue(value: Json): string {
+  if (typeof value === "string") return `<string>${value.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</string>`
+  if (Array.isArray(value)) return `<array>${value.map(plistValue).join("")}</array>`
+  return `<dict>${Object.entries(asObject(value) ?? {}).map(([key, item]) => `<key>${key}</key>${plistValue(item)}`).join("")}</dict>`
+}
+
+function toolbarPlist(items: Json[]): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">${plistValue(items)}</plist>\n`
 }
