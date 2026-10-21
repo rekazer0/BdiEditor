@@ -142,8 +142,9 @@ export function colorControlKey(field: HTMLInputElement): string {
 
 export function syncColorControl(field: HTMLInputElement): void {
   const value = field.value.trim().replace(/^#/, "")
-  if (!/^[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(value)) return
-  const hex = value.length === 6 ? `FF${value}` : value.toUpperCase()
+  // An unset colour resets the picker; otherwise it would keep (and re-write) the previous key's colour.
+  if (value && !/^[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(value)) return
+  const hex = !value ? "FF000000" : value.length === 6 ? `FF${value}` : value.toUpperCase()
   const picker = colorPickers.find((item) => item.dataset.colorPickerFor === colorControlKey(field))
   const alpha = colorAlphas.find((item) => item.dataset.colorAlphaFor === colorControlKey(field))
   if (picker) {
@@ -165,7 +166,7 @@ export function writeColorControl(control: HTMLInputElement, alphaValue: number)
   const rgb = control.type === "color" ? control.value.slice(1).toUpperCase() : colorPickers.find((item) => item.dataset.colorPickerFor === key)?.value.slice(1).toUpperCase()
   if (!rgb || rgb.length !== 6) return
   field.value = `${Math.round(Math.max(0, Math.min(1, alphaValue)) * 255).toString(16).padStart(2, "0")}${rgb}`.toUpperCase()
-  field.dispatchEvent(new Event(field.hasAttribute("data-keyboard-field") ? "change" : "input", { bubbles: true }))
+  field.dispatchEvent(new Event("change", { bubbles: true }))
 }
 
 export function keyboardContext():

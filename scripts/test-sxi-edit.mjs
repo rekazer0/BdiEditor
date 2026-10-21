@@ -104,6 +104,7 @@ try {
   // Text edits on a key and on the whole layout land in the styles' s_1 inside skin.json.
   await page.locator('#mobile-inspector-groups').getByRole('button', { name: '文字', exact: true }).click()
   await page.locator('[data-style-field="FONT_SIZE"]').fill('44')
+  await page.locator('[data-style-field="FONT_SIZE"]').press('Enter')
   await page.waitForFunction(async () => {
     const { appState } = await import('/src/app/state.ts')
     return JSON.parse(appState.archive.getText('skin.json')).default.s_info.ss_1[3].s_1.f_s === 44

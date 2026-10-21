@@ -1,6 +1,6 @@
 import { updateSxiForeground } from "./sxi-documents"
 import { IniDocument } from "../ini.ts"
-import { type StylePropertySource, resolveStylePropertySources, resolveStylePropertyLayers } from "../style-properties.ts"
+import { resolveStylePropertyLayers, textStyleSections } from "../style-properties.ts"
 import { appState } from "./state"
 import { styleConfigPath, effectiveKeyValue, isSkinInfoPath, isToolbarPath, effectiveToolbarSections, currentSkinState, genConfigPath, keyboardContext, syncColorControl, listGeometryDocument, effectiveKeySection, setSourceValue } from "./config-context"
 import { isListCell, listCellValue, setListCellValue } from "../layout.ts"
@@ -28,26 +28,7 @@ import { updateStylePreviews } from "./style-picker"
 import { ssfInspectorTitle } from "./ssf-inspector"
 import { populateDocumentInspector, populateBdaConfigInspector } from "./document-inspector"
 import { populateFontControls } from "./skin-fonts"
-import { populateTextStyleGroup, writeCssStyleProperty, type TextProperty } from "./text-styles"
-
-export function selectedStylePropertyContext(property: string, styles?: IniDocument):
-  | { document: IniDocument; path: string; sources: StylePropertySource[] }
-  | undefined {
-  if (!appState.archive || !appState.layoutDocument || !appState.selectedKeySections.length) return
-  const path = styleConfigPath()
-  if (!appState.archive.isText(path)) return
-  const document = styles ?? IniDocument.parse(appState.archive.getText(path))
-  const sources = resolveStylePropertySources(
-    document,
-    appState.selectedKeySections.map((section) =>
-      isListCell(section)
-        ? (appState.layoutDocument?.get("LIST", "FORE_STYLE") ?? "").trim()
-        : effectiveKeyValue(section, "FORE_STYLE") ?? "",
-    ),
-    property,
-  )
-  return sources ? { document, path, sources } : undefined
-}
+import { populateTextStyleGroup, selectedKeyTextRefs, textRefValues, writeTextRefs, type TextProperty } from "./text-styles"
 
 export function selectedBdaRefs(
   source: "BACK_STYLE" | "FORE_STYLE",
@@ -205,7 +186,7 @@ export function populatePrimaryCssFields(hasSelection: boolean, sections: string
     input.value = source.value
     input.disabled = !isEditing()
     input.setAttribute("aria-label", caption)
-    input.addEventListener("input", () => {
+    input.addEventListener("change", () => {
       const before = styles.toString()
       if (!styles.set(source.section, "SHOW", input.value)) return
       const text = styles.toString()
@@ -381,6 +362,8 @@ export function populateKeyInspector(): void {
   const bdaTextInfo = bdaSelected ? currentBdaAppearance() : undefined
   const bdaTextRefs = bdaSelected ? selectedBdaRefs("FORE_STYLE", "text") : []
   let hasTextStyle = bdaTextRefs.length > 0
+  const keyTextRefs = hasSelection && !bdaSelected ? selectedKeyTextRefs() : []
+  const styles = keyboard?.styles
   for (const field of styleFields) {
     const property = field.dataset.styleField ?? ""
     if (bdaSelected) {
@@ -397,34 +380,23 @@ export function populateKeyInspector(): void {
       if (property.endsWith("COLOR")) syncColorControl(field)
       continue
     }
-    const context = selectedStylePropertyContext(property, keyboard?.styles)
-    hasTextStyle ||= Boolean(context)
-    const values = context?.sources.map((source) => source.value)
-    const common = values?.every((value) => value === values[0]) ? values[0] : ""
-    field.disabled = !context
-    field.placeholder = context && !common && new Set(values).size > 1
-      ? "混合"
-      : context
-        ? "未设置"
-        : hasSelection
-          ? "未配置"
-          : ""
-    field.value = common ?? ""
+    // Every selected key can take text: a key without a text layer gets one on its first edit.
+    const values = textRefValues(keyTextRefs, property as TextProperty)
+    hasTextStyle ||= Boolean(styles && keyTextRefs.some((ref) => textStyleSections(styles, ref.foreground).length))
+    const common = values.every((value) => value === values[0]) ? values[0] ?? "" : ""
+    field.disabled = !hasSelection || !isEditing()
+    field.placeholder = !hasSelection ? "" : !common && new Set(values).size > 1 ? "混合" : "未设置"
+    field.value = common
     if (property.endsWith("COLOR")) syncColorControl(field)
   }
   for (const label of textStyleLabels) {
-    if (!hasSelection || !hasTextStyle) {
+    if (!hasSelection || bdaSelected && !hasTextStyle) {
       label.hidden = true
       continue
     }
     if (appState.archive?.format !== "bda") {
-      // 样式里没有的属性无法编辑，整行隐藏，避免留下没有输入框的空行
-      const field = label.querySelector<HTMLInputElement>("[data-style-field]")
-      label.hidden = Boolean(field?.disabled)
-      for (const fieldLabel of Array.from(label.querySelectorAll<HTMLLabelElement>("label"))) {
-        fieldLabel.hidden = Boolean(fieldLabel.querySelector<HTMLInputElement>("[data-style-field]")?.disabled)
-      }
-      if (label.classList.contains("color-pair-field")) label.hidden = Array.from(label.querySelectorAll<HTMLLabelElement>("label")).every((fieldLabel) => fieldLabel.hidden)
+      label.hidden = false
+      for (const fieldLabel of Array.from(label.querySelectorAll<HTMLLabelElement>("label"))) fieldLabel.hidden = false
       continue
     }
     if (label.classList.contains("color-pair-field")) {
@@ -439,9 +411,11 @@ export function populateKeyInspector(): void {
     label.hidden = !bdaTextPropertyAvailability.get(property)
   }
   const typographySubtitle = quickInspector.querySelector(".typography-subtitle-default")
-  if (typographySubtitle) typographySubtitle.textContent = hasSelection && !hasTextStyle ? "前景样式不含文字属性，只能修改显示内容" : "显示内容与字体颜色"
+  if (typographySubtitle) typographySubtitle.textContent = !hasSelection || hasTextStyle ? "显示内容与字体颜色"
+    : bdaSelected ? "前景没有文字样式，只能修改显示内容" : "前景没有文字层：修改字号或颜色会新建一个文字层"
   const paddingSection = quickInspector.querySelector<HTMLElement>(".inspector-padding-section")
-  if (paddingSection) paddingSection.hidden = bdaSelected || !hasSelection || sections.some(isListCell) || !sections.every((section) => effectiveKeyValue(section, "PADDING") !== undefined)
+  // Unset padding reads as 0,0,0,0 (see the PADDING field values above); a LIST cell has none.
+  if (paddingSection) paddingSection.hidden = bdaSelected || !hasSelection || sections.some(isListCell)
   const multiLayout = $("#inspector-multi-layout")
   const multiAvailable = sections.length > 1 && !bdaSelected && !ssfSelected && !sections.some(isListCell)
   multiLayout.dataset.available = String(multiAvailable)
@@ -621,11 +595,16 @@ export function updateToolbar(field: HTMLInputElement): void {
   const [section, key] = (field.dataset.toolbarField ?? "").split(".")
   const property = key || section
   const targetSection = key ? section : "CAND"
-  const path = property === "VIEW_RECT" ? genConfigPath() : appState.selectedPath
-  if (!appState.archive.isText(path)) return
-  const document = path === appState.selectedPath ? appState.selectedDocument : IniDocument.parse(appState.archive.getText(path))
+  // Write where the field reads from (the .cnd first, then gen.ini [CAND], as the preview does);
+  // a value neither file has goes to gen.ini for VIEW_RECT and to the .cnd otherwise.
+  const general = appState.archive.isText(genConfigPath()) ? IniDocument.parse(appState.archive.getText(genConfigPath())) : undefined
+  const path = appState.selectedDocument.get(targetSection, property) !== undefined
+    ? appState.selectedPath
+    : general?.get(targetSection, property) !== undefined || property === "VIEW_RECT" && general ? genConfigPath() : appState.selectedPath
+  const document = path === appState.selectedPath ? appState.selectedDocument : general!
   const before = document.toString()
-  if (!document.set(targetSection, property, field.value)) return
+  if (document.sections().includes(targetSection)) document.set(targetSection, property, field.value)
+  else if (field.value) document.appendSection(targetSection, [{ key: property, value: field.value }])
   const text = document.toString()
   commitText(path, before, text)
   if (path === appState.selectedPath) setSourceValue(text)
@@ -643,6 +622,8 @@ export function updateSelectedKey(field: HTMLInputElement): void {
     return
   }
   const rectNames = ["x", "y", "width", "height"]
+  // Clearing a number (or a mixed one) or typing "-" leaves an empty value: that is no number, not 0.
+  if ((rectNames.includes(name) || name.startsWith("PADDING.")) && !field.value.trim()) return
   if (appState.selectedKeySections.length === 1 && isListCell(appState.selectedKeySections[0])) {
     // LIST 候选栏单元：几何字段写回定义处（布局或 gen.ini），其余写回布局的 [LIST]
     if (rectNames.includes(name)) {
@@ -670,8 +651,8 @@ export function updateSelectedKey(field: HTMLInputElement): void {
     updateDirty()
     return
   }
-  const before = appState.layoutDocument.toString()
   const rectIndex = rectNames.indexOf(name)
+  const before = appState.layoutDocument.toString()
   for (const section of preview.expandSections(appState.selectedKeySections)) {
     if (rectIndex >= 0) {
       const rect = appState.layoutDocument.get(section, "VIEW_RECT")?.split(",").map(Number)
@@ -700,11 +681,10 @@ export function updateSelectedKey(field: HTMLInputElement): void {
 
 export function updateSelectedStyle(field: HTMLInputElement): void {
   const property = field.dataset.styleField ?? ""
+  if (field.type === "number" && field.value && !field.checkValidity()) return
   if (appState.archive?.format === "bda") {
     updateBdaRefs(selectedBdaRefs("FORE_STYLE", "text"), property, field.value)
     return
   }
-  const context = selectedStylePropertyContext(property)
-  if (!context) return
-  writeCssStyleProperty([...new Set(context.sources.map((source) => source.section))], property as TextProperty, field.value.trim())
+  writeTextRefs(selectedKeyTextRefs(), property as TextProperty, field.value.trim())
 }

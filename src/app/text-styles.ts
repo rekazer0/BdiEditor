@@ -1,86 +1,140 @@
-// 候选栏与整体布局的「文字」分组。百度 BDS/BDI 写 default.css 的 STYLE 文字属性，手心写 skin.json
-// 对应样式的 s_1，BDA 写 appearanceConfig 的文字样式；搜狗皮肤的文字由 ssf-inspector.ts 处理。
+// 候选栏与整体布局的「文字」分组，以及按键文字的写入。百度 BDS/BDI 与手心写 default.css 的 STYLE 文字
+// 属性（手心的派生 CSS 由 edit-history 转回 skin.json），BDA 写 appearanceConfig 的文字样式；
+// 搜狗皮肤的文字由 ssf-inspector.ts 处理。皮肤没有的文字样式在第一次修改时新建。
 import { appState } from "./state"
 import { IniDocument } from "../ini.ts"
-import { textStyleSections } from "../style-properties.ts"
-import { candidateInputForegroundStyle } from "../candidate-style.ts"
+import { textStyleSections, textStyleValue, writeTextStyleProperty, type TextStyleRef } from "../style-properties.ts"
+import { candidateFirstForeground, candidateInputForegroundStyle, candidateInputSizeForeground, candidateWordsForeground } from "../candidate-style.ts"
 import { type BdaStyleRef } from "../bda.ts"
 import { element } from "../dom-element.ts"
-import { setSxiStyleText, sxiStylePointer } from "../palm/sxi-edit.ts"
-import { SXI_SKIN_PATH } from "../palm/sxi-projection.ts"
-import { styleConfigPath, genConfigPath, isToolbarPath, effectiveToolbarSections, effectiveKeyValue, setSourceValue } from "./config-context"
-import { commitText, isEditing, updateDirty } from "./edit-history"
-import { refreshPreview } from "./preview-render"
+import { isListCell } from "../layout.ts"
+import { styleConfigPath, genConfigPath, isToolbarPath, effectiveToolbarSections, effectiveKeyValue, effectiveKeySection } from "./config-context"
+import { commitTextChanges, isEditing } from "./edit-history"
 import { currentBdaAppearance, bdaAppearancePart } from "./bda-documents"
-import { refreshSxiDocument } from "./sxi-documents"
-import { showError } from "./file-operations"
-import { bdaStyleValue, populateKeyInspector, updateBdaRefs } from "./key-inspector"
+import { bdaStyleValue, updateBdaRefs } from "./key-inspector"
 import { parseStyleColor } from "./resource-inspector"
-import { fontFileField, orientation, textStyleGroup, textStyleNote, textStyleRows, textStyleTargetSwitch } from "./dom"
+import { fontFileField, textStyleGroup, textStyleNote, textStyleRows, textStyleTargetSwitch } from "./dom"
 
 export type TextProperty = "FONT_NAME" | "FONT_SIZE" | "NM_COLOR" | "HL_COLOR"
 
-type TextTarget = { id: string; label: string; properties: TextProperty[]; css?: string[]; bda?: BdaStyleRef[] }
+type TextTarget = { id: string; label: string; properties: TextProperty[]; css?: TextStyleRef[]; bda?: BdaStyleRef[]; note?: string }
 
 const LABELS: Record<TextProperty, string> = { FONT_NAME: "字体名称", FONT_SIZE: "字号", NM_COLOR: "颜色", HL_COLOR: "按下颜色" }
 const KEY_PROPERTIES: TextProperty[] = ["FONT_NAME", "FONT_SIZE", "NM_COLOR", "HL_COLOR"]
 // 真机候选字用用户字体（candidate-style.ts），皮肤只能改字号与颜色。
 const CANDIDATE_PROPERTIES: TextProperty[] = ["FONT_SIZE", "NM_COLOR", "HL_COLOR"]
+const CANDIDATE_NOTE = "真机候选字使用用户字体，皮肤只能改字号与颜色"
 
-/** Writes one text property into STYLE sections of the current default.css; Palm skins keep it in skin.json. */
-export function writeCssStyleProperty(sections: string[], property: TextProperty, value: string): void {
+function iniDocument(path: string): IniDocument | undefined {
+  return appState.archive?.isText(path) ? IniDocument.parse(appState.archive.getText(path)) : undefined
+}
+
+/** The selected keys' texts: each key's FORE_STYLE, given a new text layer on first edit when it has none. */
+export function selectedKeyTextRefs(): TextStyleRef[] {
+  const layout = appState.layoutDocument
+  if (!layout) return []
+  return appState.selectedKeySections.map((section) => isListCell(section)
+    ? { foreground: layout.get("LIST", "FORE_STYLE") ?? "", owner: { path: appState.layoutPath, section: "LIST", key: "FORE_STYLE", append: true } }
+    : { foreground: effectiveKeyValue(section, "FORE_STYLE") ?? "", owner: { path: appState.layoutPath, section: effectiveKeySection(section), key: "FORE_STYLE", append: true } })
+}
+
+/** What `refs` show for `property` in the current default.css, read like the preview. */
+export function textRefValues(refs: readonly TextStyleRef[], property: TextProperty): string[] {
+  const styles = iniDocument(styleConfigPath())
+  return styles ? refs.map((ref) => textStyleValue(styles, ref, property)) : []
+}
+
+/**
+ * Writes one text property for `refs` into the current default.css, creating a text style (and the
+ * reference to it) for texts that have none, as one undo step across every file it touches.
+ */
+export function writeTextRefs(refs: readonly TextStyleRef[], property: TextProperty, value: string): void {
   const archive = appState.archive
-  const path = styleConfigPath()
-  if (!archive || !sections.length || !isEditing() || !archive.isText(path)) return
-  if (archive.format === "sxi") {
-    const derived = archive.derivedPointer(path)
-    if (!derived) return
-    try {
-      const before = archive.getText(SXI_SKIN_PATH)
-      commitText(SXI_SKIN_PATH, before, setSxiStyleText(before, sxiStylePointer(before, derived, orientation.value), sections, property, value))
-      refreshSxiDocument()
-    } catch (error) { showError(error, "修改手心文字") }
-    return
+  const stylePath = styleConfigPath()
+  const styles = iniDocument(stylePath)
+  if (!archive || !styles || !refs.length || !isEditing()) return
+  const before = new Map([[stylePath, archive.getText(stylePath)]])
+  const documents = new Map([[stylePath, styles]])
+  for (const owner of writeTextStyleProperty(styles, refs, property, value)) {
+    if (!documents.has(owner.path)) {
+      before.set(owner.path, archive.isText(owner.path) ? archive.getText(owner.path) : "")
+      documents.set(owner.path, iniDocument(owner.path) ?? IniDocument.parse(""))
+    }
+    const document = documents.get(owner.path)!
+    if (document.sections().includes(owner.section)) document.set(owner.section, owner.key, owner.value)
+    else document.appendSection(owner.section, [{ key: owner.key, value: owner.value }])
   }
-  const before = archive.getText(path)
-  const document = IniDocument.parse(before)
-  for (const section of sections) {
-    if (value) document.set(section, property, value)
-    else document.remove(section, property)
+  commitTextChanges([...documents].map(([path, document]) => ({ path, before: before.get(path)!, after: document.toString() })))
+}
+
+/** Text styles the other layouts of this folder draw, so a layout-wide edit can say what else it changes. */
+function otherLayoutTextStyles(styles: IniDocument): Set<string> {
+  const folder = appState.layoutPath.slice(0, appState.layoutPath.lastIndexOf("/") + 1)
+  const used = new Set<string>()
+  for (const path of appState.archive?.names() ?? []) {
+    if (path === appState.layoutPath || !path.startsWith(folder) || !/^[^/]+\.ini$/i.test(path.slice(folder.length))) continue
+    const document = iniDocument(path)
+    for (const section of document?.sections() ?? []) {
+      for (const style of textStyleSections(styles, document!.get(section, "FORE_STYLE") ?? "")) used.add(style)
+    }
   }
-  const after = document.toString()
-  commitText(path, before, after)
-  if (appState.selectedPath === path) setSourceValue(after)
-  refreshPreview()
-  populateKeyInspector()
-  updateDirty()
+  return used
 }
 
 function cssTargets(): { scope: "candidate" | "layout"; targets: TextTarget[] } | undefined {
-  const archive = appState.archive!
-  const stylePath = styleConfigPath()
-  if (!archive.isText(stylePath)) return
-  const styles = IniDocument.parse(archive.getText(stylePath))
-  const sections = (foregrounds: string[]) => [...new Set(foregrounds.flatMap((value) => textStyleSections(styles, value)))]
+  const styles = iniDocument(styleConfigPath())
+  if (!styles) return
   if (isToolbarPath(appState.selectedPath)) {
     if (effectiveToolbarSections().length) return
     const candidate = appState.selectedDocument
-    const general = archive.isText(genConfigPath()) ? IniDocument.parse(archive.getText(genConfigPath())) : undefined
-    // Same lookups as the preview (resolveCandidateTextVisuals / resolveCandidateInputTextVisual).
+    const general = iniDocument(genConfigPath())
+    const cnd = { path: appState.selectedPath, section: "CAND" }
+    const words = candidateWordsForeground(candidate, general)
+    const input = candidateInputForegroundStyle(general, candidate)
+    // The preview's lookups (candidate-style.ts). A missing style is created on first edit; a new 首选
+    // style starts from the candidate words, which it otherwise inherits entirely.
     return {
       scope: "candidate",
       targets: [
-        { id: "candidate", label: "候选字", properties: CANDIDATE_PROPERTIES, css: sections([candidate?.get("CAND", "FORE_STYLE") ?? general?.get("SCAND", "SCAND_STYLE") ?? ""]) },
-        { id: "first", label: "首选", properties: CANDIDATE_PROPERTIES, css: sections([candidate?.get("CAND", "FIRST_FORE") ?? ""]) },
-        { id: "input", label: "输入码", properties: CANDIDATE_PROPERTIES, css: sections([candidateInputForegroundStyle(general, candidate)]) },
-      ].filter((target) => target.css.length),
+        { id: "candidate", label: "候选字", properties: CANDIDATE_PROPERTIES, note: CANDIDATE_NOTE, css: [{ foreground: words, owner: { ...cnd, key: "FORE_STYLE" } }] },
+        { id: "first", label: "首选", properties: CANDIDATE_PROPERTIES, note: CANDIDATE_NOTE, css: [{ foreground: candidateFirstForeground(candidate, general), owner: { ...cnd, key: "FIRST_FORE" }, copyFrom: words }] },
+        {
+          id: "input",
+          label: "输入码",
+          properties: CANDIDATE_PROPERTIES,
+          note: CANDIDATE_NOTE,
+          // iOS keyboards size the inline code from INPUT and colour it from SCAND: edit both.
+          css: input
+            ? [...new Set([input, candidateInputSizeForeground(general, candidate)])].filter(Boolean).map((foreground) => ({ foreground }))
+            : [{ foreground: "", owner: { path: genConfigPath(), section: "INPUT", key: "FORE_STYLE" } }],
+        },
+      ],
     }
   }
   const layout = appState.layoutDocument
   if (appState.selectedPath !== appState.layoutPath || !layout) return
-  const keys = layout.sections().filter((section) => /^KEY\d+$/.test(section)).map((section) => effectiveKeyValue(section, "FORE_STYLE") ?? "")
-  const css = sections(keys)
-  return { scope: "layout", targets: css.length ? [{ id: "keys", label: "全部按键", properties: KEY_PROPERTIES, css }] : [] }
+  // A key's first text layer is its label; further text layers are hints (smaller, often another colour).
+  const label: TextStyleRef[] = []
+  const hint: TextStyleRef[] = []
+  for (const section of layout.sections().filter((name) => /^KEY\d+$/.test(name))) {
+    const tokens = (effectiveKeyValue(section, "FORE_STYLE") ?? "").split(",").map((token) => token.trim())
+      .filter((token) => textStyleSections(styles, token).length)
+    if (tokens[0]) label.push({ foreground: tokens[0] })
+    hint.push(...tokens.slice(1).map((foreground) => ({ foreground })))
+  }
+  const others = otherLayoutTextStyles(styles)
+  const note = (refs: TextStyleRef[]) => {
+    const sections = new Set(refs.flatMap((ref) => textStyleSections(styles, ref.foreground)))
+    const shared = [...sections].filter((section) => others.has(section)).length
+    return `修改本布局按键用到的 ${sections.size} 个文字样式${shared ? `，其中 ${shared} 个也用于其他布局，会一并改变` : ""}`
+  }
+  return {
+    scope: "layout",
+    targets: [
+      { id: "label", label: "按键文字", properties: KEY_PROPERTIES, css: label, note: label.length ? note(label) : "本布局的按键没有文字层（字画在图片里）；选中按键修改文字会为它新建文字层" },
+      ...hint.length ? [{ id: "hint", label: "提示文字", properties: KEY_PROPERTIES, css: hint, note: note(hint) }] : [],
+    ],
+  }
 }
 
 function bdaTargets(): { scope: "candidate" | "layout"; targets: TextTarget[] } | undefined {
@@ -94,14 +148,22 @@ function bdaTargets(): { scope: "candidate" | "layout"; targets: TextTarget[] } 
     return {
       scope: "candidate",
       targets: [
-        { id: "candidate", label: "候选字", properties: CANDIDATE_PROPERTIES, bda: text([panel.cand?.cellForeStyle]) },
-        { id: "first", label: "首选", properties: CANDIDATE_PROPERTIES, bda: text([panel.cand?.firstCellForeStyle]) },
-        { id: "input", label: "输入码", properties: CANDIDATE_PROPERTIES, bda: text([panel.input?.textStyle]) },
-      ].filter((target) => target.bda.length),
+        { id: "candidate", label: "候选字", properties: CANDIDATE_PROPERTIES, note: CANDIDATE_NOTE, bda: text([panel.cand?.cellForeStyle]) },
+        { id: "first", label: "首选", properties: CANDIDATE_PROPERTIES, note: CANDIDATE_NOTE, bda: text([panel.cand?.firstCellForeStyle]) },
+        { id: "input", label: "输入码", properties: CANDIDATE_PROPERTIES, note: CANDIDATE_NOTE, bda: text([panel.input?.textStyle]) },
+      ],
     }
   }
-  const bda = text([...panel.keys.values()].flatMap((key) => key.foreStyles))
-  return { scope: "layout", targets: bda.length ? [{ id: "keys", label: "全部按键", properties: KEY_PROPERTIES, bda }] : [] }
+  const keys = [...panel.keys.values()].map((key) => key.foreStyles.filter((ref) => ref.type === "text"))
+  const label = text(keys.map((refs) => refs[0]))
+  const hint = text(keys.flatMap((refs) => refs.slice(1)))
+  return {
+    scope: "layout",
+    targets: [
+      { id: "label", label: "按键文字", properties: KEY_PROPERTIES, bda: label, note: label.length ? `修改本面板按键用到的 ${label.length} 个文字样式，其他面板共用的样式会一并改变` : "本面板的按键没有文字层" },
+      ...hint.length ? [{ id: "hint", label: "提示文字", properties: KEY_PROPERTIES, bda: hint, note: `修改本面板按键用到的 ${hint.length} 个提示文字样式，其他面板共用的样式会一并改变` }] : [],
+    ],
+  }
 }
 
 /** The candidate bar's or whole layout's text targets; keys keep their own 文字 group. */
@@ -116,14 +178,17 @@ function targetValues(target: TextTarget, property: TextProperty): string[] {
     const info = currentBdaAppearance()
     return info ? target.bda.map((ref) => bdaStyleValue(info.appearance, ref, property)) : []
   }
-  const path = styleConfigPath()
-  const styles = appState.archive?.isText(path) ? IniDocument.parse(appState.archive.getText(path)) : undefined
-  return (target.css ?? []).map((section) => styles?.get(section, property)?.trim() ?? "")
+  return textRefValues(target.css ?? [], property)
 }
 
 function writeTarget(target: TextTarget, property: TextProperty, value: string): void {
   if (target.bda) updateBdaRefs(target.bda, property, value)
-  else writeCssStyleProperty(target.css ?? [], property, value)
+  else writeTextRefs(target.css ?? [], property, value)
+}
+
+/** A target nothing can be written to yet (a layout whose keys have no text, a BDA bar without a style). */
+function writable(target: TextTarget): boolean {
+  return target.bda ? target.bda.length > 0 : (target.css ?? []).some((ref) => ref.owner || ref.foreground)
 }
 
 function fieldRow(label: string, property: TextProperty, control: HTMLElement): HTMLElement {
@@ -135,16 +200,20 @@ function fieldRow(label: string, property: TextProperty, control: HTMLElement): 
   return row
 }
 
+function placeholder(values: string[]): string {
+  return new Set(values).size > 1 ? "混合" : "未设置"
+}
+
 function valueRow(target: TextTarget, property: TextProperty, values: string[]): HTMLElement {
   const input = element("input")
-  const common = values.every((value) => value === values[0]) ? values[0] ?? "" : ""
-  input.value = common
-  input.placeholder = new Set(values).size > 1 ? "混合" : "未设置"
+  input.value = values.every((value) => value === values[0]) ? values[0] ?? "" : ""
+  input.placeholder = placeholder(values)
   input.setAttribute("aria-label", `${target.label}${LABELS[property]}`)
-  input.disabled = !isEditing()
+  input.disabled = !isEditing() || !writable(target)
   if (property === "FONT_SIZE") {
     input.type = "number"
     input.min = "1"
+    input.step = "1"
   } else input.setAttribute("list", "skin-font-names")
   input.addEventListener("change", () => {
     if (input.type === "number" && input.value && !input.checkValidity()) return
@@ -153,7 +222,7 @@ function valueRow(target: TextTarget, property: TextProperty, values: string[]):
   return fieldRow(LABELS[property], property, input)
 }
 
-/** Picker, AARRGGBB text and opacity, as in the key 文字 group; empty values can be added from the picker. */
+/** Picker, AARRGGBB text and opacity; an unchanged opacity keeps its exact byte when only the hue changes. */
 function colorRow(target: TextTarget, property: TextProperty, values: string[]): HTMLElement {
   const control = element("span", "color-control ui-input ui-color")
   const picker = element("input")
@@ -166,24 +235,26 @@ function colorRow(target: TextTarget, property: TextProperty, values: string[]):
   alpha.step = "0.01"
   const common = values.every((value) => value === values[0]) ? values[0] ?? "" : ""
   const parsed = parseStyleColor(common)
+  const shownAlpha = String(parsed ? Math.round(parsed.alpha * 100) / 100 : 1)
+  const alphaByte = parsed ? Math.round(parsed.alpha * 255) : 255
   text.value = common
-  text.placeholder = new Set(values).size > 1 ? "混合" : "未设置"
+  text.placeholder = placeholder(values)
   picker.value = `#${parsed?.hex ?? "000000"}`
-  alpha.value = String(parsed ? Math.round(parsed.alpha * 100) / 100 : 1)
+  alpha.value = shownAlpha
   const label = `${target.label}${LABELS[property]}`
   picker.setAttribute("aria-label", label)
   text.setAttribute("aria-label", `${label}值`)
   alpha.setAttribute("aria-label", `${label}透明度`)
-  for (const input of [picker, text, alpha]) input.disabled = !isEditing()
+  for (const input of [picker, text, alpha]) input.disabled = !isEditing() || !writable(target)
   const fromControls = () => {
-    const opacity = Math.max(0, Math.min(1, Number(alpha.value) || 0))
-    writeTarget(target, property, `${Math.round(opacity * 255).toString(16).padStart(2, "0")}${picker.value.slice(1)}`.toUpperCase())
+    const opacity = alpha.value === shownAlpha ? alphaByte : Math.round(Math.max(0, Math.min(1, Number(alpha.value))) * 255)
+    writeTarget(target, property, `${opacity.toString(16).padStart(2, "0")}${picker.value.slice(1)}`.toUpperCase())
   }
   picker.addEventListener("change", fromControls)
   alpha.addEventListener("change", () => { if (alpha.value !== "" && alpha.checkValidity()) fromControls() })
   text.addEventListener("change", () => {
-    const value = text.value.trim()
-    if (!value || parseStyleColor(value)) writeTarget(target, property, value)
+    const value = text.value.trim().replace(/^#/, "")
+    if (!value || parseStyleColor(value)) writeTarget(target, property, value.toUpperCase())
   })
   control.append(picker, text, alpha)
   return fieldRow(LABELS[property], property, control)
@@ -191,16 +262,13 @@ function colorRow(target: TextTarget, property: TextProperty, values: string[]):
 
 export function populateTextStyleGroup(): void {
   const context = textTargets()
-  const globalFont = context?.scope === "layout" && !fontFileField.hidden
   if (context?.scope !== "layout") fontFileField.hidden = true
-  textStyleGroup.hidden = !context || !context.targets.length && !globalFont
+  textStyleGroup.hidden = !context
   textStyleTargetSwitch.replaceChildren()
   textStyleRows.replaceChildren()
-  if (!context || textStyleGroup.hidden) return
+  if (!context) return
   const target = context.targets.find((item) => item.id === appState.textStyleTarget) ?? context.targets[0]
-  textStyleNote.textContent = context.scope === "candidate"
-    ? "真机候选字使用用户字体，皮肤只能改字号与颜色"
-    : target ? "同时修改本布局全部按键的文字" : ""
+  textStyleNote.textContent = target.note ?? ""
   textStyleNote.hidden = !textStyleNote.textContent
   textStyleTargetSwitch.hidden = context.targets.length < 2
   for (const item of context.targets) {
@@ -214,7 +282,6 @@ export function populateTextStyleGroup(): void {
     })
     textStyleTargetSwitch.append(button)
   }
-  if (!target) return
   textStyleRows.append(...target.properties.map((property) => {
     const values = targetValues(target, property)
     return property.endsWith("COLOR") ? colorRow(target, property, values) : valueRow(target, property, values)

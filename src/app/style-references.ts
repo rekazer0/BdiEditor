@@ -136,8 +136,9 @@ export function renderStyleReferenceRows(button: HTMLElement, input: HTMLInputEl
       target.dataset.styleReferenceIndex = String(styleIndex)
       target.addEventListener("change", () => {
         const values = input.value.split(",").map((value) => value.trim()).filter(Boolean)
-        values[styleIndex] = target.value
-        input.value = values.join(",")
+        values[styleIndex] = target.value.trim()
+        // An emptied card drops its layer instead of leaving ",205" behind.
+        input.value = values.filter(Boolean).join(",")
         input.dispatchEvent(new Event("input", { bubbles: true }))
         input.dispatchEvent(new Event("change", { bubbles: true }))
       })
@@ -329,10 +330,9 @@ export function styleWriteTarget(
   const path = styleConfigPath()
   if (!appState.archive?.isText(path)) return { source, property }
   const document = IniDocument.parse(appState.archive.getText(path))
-  const sections = [...new Set(styleIDs.flatMap((token) => {
-    const value = Number(token)
-    return [`STYLE${token}`, source === "FORE_STYLE" && Number.isFinite(value) ? `STYLE${Math.floor(value / 100)}` : ""]
-  }).filter((section) => section && document.sections().includes(section)))]
+  // Images are read from STYLE<id> only (atlas.ts resolveVisualSpec); STYLE<id/100> is a text fallback
+  // and is often another key's text style, so an image must never be written there.
+  const sections = [...new Set(styleIDs.map((token) => `STYLE${token.trim()}`).filter((section) => document.sections().includes(section)))]
   return sections.length ? { source, property, document, path, sections } : { source, property }
 }
 

@@ -68,6 +68,25 @@ export function inputBarBox(
     : { width, paddingStart: metrics.textLeft, paddingEnd: metrics.inset * 2 }
 }
 
+/** Candidate words: the bar's .cnd [CAND], then gen.ini [CAND] (Palm projections keep it there), then SCAND. */
+export function candidateWordsForeground(candidate: IniDocument | undefined, general: IniDocument | undefined): string {
+  return candidate?.get("CAND", "FORE_STYLE") ?? general?.get("CAND", "FORE_STYLE") ?? general?.get("SCAND", "SCAND_STYLE") ?? ""
+}
+
+/** The first candidate's own style; without one it is drawn like the others. */
+export function candidateFirstForeground(candidate: IniDocument | undefined, general: IniDocument | undefined): string {
+  return candidate?.get("CAND", "FIRST_FORE") ?? general?.get("CAND", "FIRST_FORE") ?? ""
+}
+
+/** iOS sizes the in-keyboard input code from INPUT (its colour still comes from candidateInputForegroundStyle). */
+export function candidateInputSizeForeground(general: IniDocument | undefined, candidate?: IniDocument): string {
+  return [
+    candidate?.get("CAND", "INPUT_STYLE"),
+    candidate?.get("INPUT", "FORE_STYLE"),
+    general?.get("INPUT", "FORE_STYLE"),
+  ].map((value) => value?.trim() ?? "").find(Boolean) ?? ""
+}
+
 export function candidateInputForegroundStyle(
   general: IniDocument | undefined,
   candidate?: IniDocument,
@@ -93,11 +112,7 @@ export function resolveCandidateInputTextVisual(
   // 预览不能套 FONT_NAME，否则真机与画布不一致。
   const userFont = { ...visual, fontName: undefined }
   if (!inKeyboard) return userFont
-  const input = resolver.resolveText([
-    candidate?.get("CAND", "INPUT_STYLE"),
-    candidate?.get("INPUT", "FORE_STYLE"),
-    general?.get("INPUT", "FORE_STYLE"),
-  ].map((value) => value?.trim() ?? "").find(Boolean) ?? "", false)
+  const input = resolver.resolveText(candidateInputSizeForeground(general, candidate), false)
   // shortcut: iOS 的 INPUT 字号与 SCAND 颜色已按真机截图校准，取得 iOS 绘制代码后核对更多皮肤。
   return { ...input, ...userFont, fontSize: input?.fontSize ?? visual.fontSize }
 }
@@ -128,11 +143,8 @@ export function resolveCandidateTextVisuals(
   resolver: VisualResolver,
 ): { normal: TextVisual | undefined; first: TextVisual | undefined } {
   return {
-    normal: candidateUserFont(resolver.resolveText(
-      candidate?.get("CAND", "FORE_STYLE") ?? general?.get("SCAND", "SCAND_STYLE") ?? "",
-      false,
-    )),
-    first: candidateUserFont(resolver.resolveText(candidate?.get("CAND", "FIRST_FORE") ?? "", false)),
+    normal: candidateUserFont(resolver.resolveText(candidateWordsForeground(candidate, general), false)),
+    first: candidateUserFont(resolver.resolveText(candidateFirstForeground(candidate, general), false)),
   }
 }
 

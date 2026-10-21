@@ -133,6 +133,27 @@ export function commitBatch(changes: Change[]): void {
   updateHistoryButtons()
 }
 
+/**
+ * Commits text edits of several INI files as one undo step, then shows them: the source panel if it
+ * holds one of the files, the layout document, the canvas and the inspector.
+ */
+export function commitTextChanges(changes: ReadonlyArray<{ path: string; before: string; after: string }>): void {
+  const edited = changes.filter((change) => change.before !== change.after)
+  if (!appState.archive || !edited.length) return
+  if (edited.length === 1) commitText(edited[0].path, edited[0].before, edited[0].after)
+  else commitBatch(edited.map((change) => ({ kind: "text" as const, ...change })))
+  const selected = edited.find((change) => change.path === appState.selectedPath)
+  if (selected && appState.archive.getText(selected.path) === selected.after) {
+    appState.selectedDocument = IniDocument.parse(selected.after)
+    setSourceValue(selected.after)
+  }
+  const layout = edited.find((change) => change.path === appState.layoutPath)
+  if (layout && appState.archive.getText(layout.path) === layout.after) appState.layoutDocument = IniDocument.parse(layout.after)
+  refreshPreview()
+  populateKeyInspector()
+  updateDirty()
+}
+
 export function applyTextSnapshot(path: string, text: string): void {
   if (!appState.archive) return
   if (path === appState.selectedPath) appState.sourceHistoryHighlight = insertedTextRange(appState.archive.getText(path), text)

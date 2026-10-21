@@ -537,7 +537,7 @@
             <div class="appearance-typography-fields">
               <label class="ui-field" data-text-style title="FONT_NAME：字体名称，可填皮肤内字体文件名或系统字体名；Android 13.3.16.2 的 CSS 样式不解析此键，内嵌字体优先用全局字体"><span>字体名称</span><input data-style-field="FONT_NAME" aria-label="字体名称" list="skin-font-names" /></label>
               <datalist id="skin-font-names"></datalist>
-              <label class="ui-field" data-text-style><span>字号</span><input data-style-field="FONT_SIZE" type="number" /></label>
+              <label class="ui-field" data-text-style><span>字号</span><input data-style-field="FONT_SIZE" type="number" min="1" step="1" /></label>
               <div class="color-pair-field" data-text-style>
                 <label class="ui-field"><span>颜色</span><span class="color-control ui-input ui-color"><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色"><input data-style-field="NM_COLOR" aria-label="文字正常颜色值" /><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度"></span></label>
                 <label class="ui-field"><span>按下颜色</span><span class="color-control ui-input ui-color"><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色"><input data-style-field="HL_COLOR" aria-label="文字按下颜色值" /><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度"></span></label>
