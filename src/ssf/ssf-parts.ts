@@ -61,16 +61,20 @@ export function ssfLabelStyle(skin: IniDocument, binding: SsfKeyBinding): { fgSt
 }
 
 /**
- * Sections a key's label colour is looked up in, most specific first: the FG_STYLE label style, the
- * key's own classes (older editor exports wrote TEXT_COLOR there), then the board's default styles.
+ * Sections a key's label is drawn with, most specific first: the FG_STYLE label style, then the
+ * board's default style for the key's class (what Sogou's built-in FG_STYLE of the key names).
  */
 export function ssfTextSections(binding: SsfKeyBinding, qwerty: boolean, skin?: IniDocument): string[] {
-  const styles = binding.keyClass === "function"
+  const label = skin && ssfLabelStyle(skin, binding)?.style
+  return [...new Set([...label ? [label] : [], ...ssfClassTextStyles(binding, qwerty)])]
+}
+
+/** The board's default text styles for a key's class, most specific first. */
+export function ssfClassTextStyles(binding: SsfKeyBinding, qwerty: boolean): string[] {
+  return binding.keyClass === "function"
     ? [qwerty ? "TextStyle_FuncKey_26char" : "TextStyle_FuncKey_T9", "TextStyle"]
     : binding.keyClass === "space" ? ["TextStyle_Space_Label", "TextStyle"]
       : [qwerty ? "TextStyle_Qwerty" : "TextStyle_Phone_Label", "TextStyle"]
-  const label = skin && ssfLabelStyle(skin, binding)?.style
-  return [...new Set([...label ? [label] : [], ...binding.sections, ...styles])]
 }
 
 /** sound_android.ini section that gives a key (or, without a binding, every key) its sound. */

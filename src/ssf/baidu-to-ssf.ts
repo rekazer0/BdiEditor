@@ -13,7 +13,8 @@ import { offsetFromSection } from "../preview-items.ts"
 import type { SkinArchive } from "../skin.ts"
 import { withDirectoryEntries } from "../skin-zip.ts"
 import { soundAsWav } from "../sounds.ts"
-import { ssfBoard, ssfKeyBinding, type SsfKeyBinding } from "./ssf-keymap.ts"
+import { ssfBoard, ssfKeyBinding, ssfQwerty, type SsfKeyBinding } from "./ssf-keymap.ts"
+import { ssfClassTextStyles } from "./ssf-parts.ts"
 import { compositeImage, cropImage, decodePng, encodePng, placeImage, resizeImage, type RgbaImage } from "./ssf-png.ts"
 
 type Theme = "light" | "dark"
@@ -358,6 +359,9 @@ function convertTheme(archive: SkinArchive, theme: Theme, folder: string, output
   const writer = new StatusWriter(folder, output)
   const samples = sampleKeys(archive, theme, warnings)
   const defaults = new Set<string>()
+  // Sogou has no per-key text colour: a key's label takes its class's TextStyle (through the FG_STYLE
+  // the app gives the key), so each class gets the colour most of its keys use.
+  const labelColors = new Map<string, Map<string, number>>()
   for (const [section, sample] of samples) {
     const isDefault = !sample.binding.sections.length
     const bgName = isDefault ? section : bgSectionName(section, sample.layout)
@@ -368,9 +372,13 @@ function convertTheme(archive: SkinArchive, theme: Theme, folder: string, output
       writer.stateSection(fallback, sample.back)
     }
     if (isDefault) continue
-    const entries = [{ key: "BG_IMAGES", value: bgName }]
-    if (sample.labelColor) entries.push({ key: "TEXT_COLOR", value: sample.labelColor }, { key: "TEXT_COLOR_PRESSED", value: sample.labelPressedColor ?? sample.labelColor })
-    writer.skin.appendSection(section, entries)
+    writer.skin.appendSection(section, [{ key: "BG_IMAGES", value: bgName }])
+    if (sample.labelColor) {
+      const style = ssfClassTextStyles(sample.binding, ssfQwerty(sample.layout))[0]
+      const colors = labelColors.get(style) ?? new Map<string, number>()
+      const pair = `${sample.labelColor},${sample.labelPressedColor ?? sample.labelColor}`
+      labelColors.set(style, colors.set(pair, (colors.get(pair) ?? 0) + 1))
+    }
     if (sample.fore) {
       const foreName = `Foground_${section}`
       writer.keys.appendSection(section, [
@@ -387,6 +395,11 @@ function convertTheme(archive: SkinArchive, theme: Theme, folder: string, output
         { key: "PRESSED_ON", value: pressed },
       ])
     }
+  }
+
+  for (const [style, colors] of labelColors) {
+    const [normal, pressed] = [...colors].sort((a, b) => b[1] - a[1])[0][0].split(",")
+    writer.skin.appendSection(style, [{ key: "TEXT_COLOR", value: normal }, { key: "TEXT_COLOR_PRESSED", value: pressed }])
   }
 
   const { background, bar } = keyboardBackground(styles, archive, theme)

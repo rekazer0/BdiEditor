@@ -122,7 +122,7 @@ function textBlock(path: string, section: string, keys = TEXT_KEYS, extra: Parti
 /** Sogou draws a key's text with `FG_STYLE`'s `LABEL_STYLE`; without one the board's default style applies. */
 function textGroup(skinPath: string, skin: IniDocument, binding: SsfKeyBinding): Group | undefined {
   const label = ssfLabelStyle(skin, binding)
-  const fallbacks = ssfTextSections(binding, ssfQwertyBoard()).filter((section) => !binding.sections.includes(section))
+  const fallbacks = ssfTextSections(binding, ssfQwertyBoard())
   const source = label?.style ?? fallbacks.find((section) => skin.sections().includes(section)) ?? fallbacks[0]
   if (!label?.style) {
     return renderGroup("文字", [textBlock(skinPath, source, TEXT_KEYS, {

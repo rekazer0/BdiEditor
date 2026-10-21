@@ -29,12 +29,13 @@ test('ssf parts: foregrounds come from keys.ini first, then a phoneSkin icon; tr
 })
 
 test('ssf parts: label colours and sounds are looked up from the key class to the shared styles', () => {
-  assert.deepEqual(ssfTextSections(ssfKeyBinding('py_26.ini', 'q', false), true), ['Key_Q', 'TextStyle_Qwerty', 'TextStyle'])
-  assert.deepEqual(ssfTextSections(ssfKeyBinding('py_9.ini', 'F36', false), false), ['Key_Backspace', 'TextStyle_FuncKey_T9', 'TextStyle'])
+  // Sogou reads no TEXT_COLOR from a key's own section, only from text styles.
+  assert.deepEqual(ssfTextSections(ssfKeyBinding('py_26.ini', 'q', false), true), ['TextStyle_Qwerty', 'TextStyle'])
+  assert.deepEqual(ssfTextSections(ssfKeyBinding('py_9.ini', 'F36', false), false), ['TextStyle_FuncKey_T9', 'TextStyle'])
   // Sogou reads key text through FG_STYLE → LABEL_STYLE, ahead of the class defaults.
   const labelled = IniDocument.parse('[Key_Q]\nFG_STYLE=FGStyle_Q,FGStyle_2\n[FGStyle_Q]\nLABEL_STYLE=TextStyle_Q\n')
   assert.deepEqual(ssfLabelStyle(labelled, ssfKeyBinding('py_26.ini', 'q', false)), { fgStyle: 'FGStyle_Q', owner: 'Key_Q', style: 'TextStyle_Q' })
-  assert.deepEqual(ssfTextSections(ssfKeyBinding('py_26.ini', 'q', false), true, labelled), ['TextStyle_Q', 'Key_Q', 'TextStyle_Qwerty', 'TextStyle'])
+  assert.deepEqual(ssfTextSections(ssfKeyBinding('py_26.ini', 'q', false), true, labelled), ['TextStyle_Q', 'TextStyle_Qwerty', 'TextStyle'])
   assert.equal(ssfLabelStyle(labelled, ssfKeyBinding('py_26.ini', 'w', false)), undefined)
   assert.equal(ssfSoundSection(sounds, ssfKeyBinding('py_26.ini', 'F36', false)), 'Key_Backspace_Qwerty')
   assert.equal(ssfSoundSection(sounds, ssfKeyBinding('py_26.ini', 'q', false)), undefined)
