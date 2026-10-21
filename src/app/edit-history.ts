@@ -23,6 +23,9 @@ import { selectFile } from "./navigation"
 import { selectResourceImage, renderResourceInspector } from "./resource-inspector"
 import { decodedBdaEditorSource } from "../bda-source.ts"
 import { sourceEditPath } from "./ssf-documents"
+import { refreshSxiDocument } from "./sxi-documents"
+import { applySxiViewEdit } from "../palm/sxi-edit.ts"
+import { SXI_SKIN_PATH } from "../palm/sxi-projection.ts"
 
 export function isEditing(): boolean {
   return mode.value === "edit"
@@ -88,14 +91,31 @@ export function updateHistoryButtons(): void {
 
 // SXI layouts and styles are read-only views of skin.json; an inspector edit is dropped and
 // the view reloaded, so the mutated in-memory document does not linger.
-function rejectDerivedEdit(): void {
-  showStatus("手心皮肤的布局与样式由 skin.json 生成：请在源码面板编辑对应 JSON")
+function rejectDerivedEdit(error?: unknown): void {
+  showStatus(error instanceof Error ? error.message : "手心皮肤的布局与样式由 skin.json 生成：请在源码面板编辑对应 JSON")
   if (appState.selectedPath) selectFile(appState.selectedPath, appState.sidebarView)
+}
+
+/**
+ * Edits of a Palm skin's read-only views (layouts, .cnd, default.css, Info.txt) folded into one skin.json
+ * change. The views are regenerated after the caller has finished with its own documents.
+ */
+function derivedSkinChange(changes: ReadonlyArray<{ path: string; before: string; after: string }>): Change | undefined {
+  const archive = appState.archive!
+  const before = archive.getText(SXI_SKIN_PATH)
+  const after = changes.reduce((skin, change) => applySxiViewEdit(skin, change.path, change.before, change.after), before)
+  queueMicrotask(refreshSxiDocument)
+  return before === after ? undefined : { kind: "text", path: SXI_SKIN_PATH, before, after }
 }
 
 export function commitText(path: string, before: string, after: string, coalesce = false): void {
   if (!appState.archive || before === after) return
-  if (appState.archive.derivedPointer(path)) return rejectDerivedEdit()
+  if (appState.archive.derivedPointer(path)) {
+    let change: Change | undefined
+    try { change = derivedSkinChange([{ path, before, after }]) } catch (error) { return rejectDerivedEdit(error) }
+    if (change?.kind === "text") commitText(change.path, change.before, change.after, coalesce)
+    return
+  }
   acceptAiDraftPreview()
   appState.sourceHistoryHighlight = undefined
   appState.archive.setText(path, after)
@@ -118,7 +138,15 @@ export function commitBytes(path: string, before: Uint8Array | undefined, after:
 
 export function commitBatch(changes: Change[]): void {
   if (!appState.archive || !changes.length) return
-  if (changes.some((change) => change.kind !== "batch" && appState.archive!.derivedPointer(change.path))) return rejectDerivedEdit()
+  const isDerived = (change: Change) => change.kind !== "batch" && Boolean(appState.archive!.derivedPointer(change.path))
+  if (changes.some(isDerived)) {
+    const derived = changes.filter(isDerived)
+    if (derived.some((change) => change.kind !== "text")) return rejectDerivedEdit()
+    let skin: Change | undefined
+    try { skin = derivedSkinChange(derived as Array<Extract<Change, { kind: "text" }>>) } catch (error) { return rejectDerivedEdit(error) }
+    changes = [...changes.filter((change) => !isDerived(change)), ...skin ? [skin] : []]
+    if (!changes.length) return
+  }
   acceptAiDraftPreview()
   for (const change of changes) {
     if (change.kind === "text") appState.archive.setText(change.path, change.after)

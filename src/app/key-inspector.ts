@@ -1,4 +1,3 @@
-import { updateSxiForeground } from "./sxi-documents"
 import { IniDocument } from "../ini.ts"
 import { resolveStylePropertyLayers, textStyleSections } from "../style-properties.ts"
 import { appState } from "./state"
@@ -266,9 +265,13 @@ export function populateKeyInspector(): void {
   }
   setInspectorKind(appState.archive?.format === "bda" ? "bda" : appState.archive ? "bds" : "")
   syncMobileInspectorHeader()
+  // A Palm skin's Info.txt only carries what skin.json `info` has (sxi-style.ts infoIni).
+  const sxiInfo = new Set(["Name", "Description", "Author", "SupportDarkMode", "MinImeCode"])
   for (const field of skinFields) {
     field.value = skinSelected ? appState.selectedDocument?.get("", field.dataset.skinField ?? "") ?? "" : ""
     field.disabled = !skinSelected
+    const label = field.closest("label")
+    if (label) label.hidden = appState.archive?.format === "sxi" && !sxiInfo.has(field.dataset.skinField ?? "")
   }
   const general = appState.archive?.isText(genConfigPath())
     ? IniDocument.parse(appState.archive.getText(genConfigPath()))
@@ -353,9 +356,10 @@ export function populateKeyInspector(): void {
   for (const field of keyFields) {
     if (!field.closest(".key-appearance-fields")) continue
     const label = field.closest<HTMLElement>("label")
+    // Palm keys have no per-layer foreground offset (palm-models.ts baseModel).
     if (label) label.hidden = Boolean(bdaSelected && (
       !bdaKeyProperties.has(field.dataset.keyField ?? "") || !field.value && field.placeholder !== "混合"
-    ))
+    ) || appState.archive?.format === "sxi" && field.dataset.keyField === "FORE_OFFSET")
   }
   const bdaTextPropertyAvailability = new Map<string, boolean>()
   // Decoding the appearance file is the expensive part: do it once per refresh, not per field.
@@ -433,10 +437,12 @@ export function populateKeyInspector(): void {
   // Sogou skins carry no key geometry, so there is nothing to move, copy or delete.
   for (const button of [...keyModeButtons, ...keyActionButtons]) button.hidden = ssfSelected
   for (const button of keyModeButtons) button.disabled = !keyToolsAvailable
+  // Copying or deleting a Palm key adds or drops a skin.json key: not something its views can write.
+  const sxiSelected = appState.archive?.format === "sxi"
   for (const button of keyActionButtons) {
     button.disabled = !keyToolsAvailable || (
       button.dataset.keyAction === "swap" && appState.selectedKeySections.length !== 2
-    )
+    ) || sxiSelected && button.dataset.keyAction !== "swap"
   }
   if (!keyToolsAvailable && appState.keyMode === "move") {
     appState.keyMode = "select"
@@ -444,7 +450,7 @@ export function populateKeyInspector(): void {
     preview.setEditTool(appState.keyMode)
   }
   for (const button of layoutActionButtons) {
-    button.disabled = bdaSelected || ssfSelected || listSelected || (
+    button.disabled = bdaSelected || ssfSelected || listSelected || sxiSelected && button.dataset.layoutAction === "merge" || (
       button.dataset.layoutAction === "swap" || button.dataset.layoutAction === "merge"
         ? appState.selectedKeySections.length !== 2
         : appState.selectedKeySections.length < 2
@@ -617,10 +623,6 @@ export function updateSelectedKey(field: HTMLInputElement): void {
   const name = field.dataset.keyField ?? ""
   if (appState.archive?.format === "bda") return
   if (!appState.archive || !appState.layoutDocument || !appState.selectedKeySections.length) return
-  if (name === "FORE_STYLE" && appState.archive.format === "sxi") {
-    updateSxiForeground(field.value)
-    return
-  }
   const rectNames = ["x", "y", "width", "height"]
   // Clearing a number (or a mixed one) or typing "-" leaves an empty value: that is no number, not 0.
   if ((rectNames.includes(name) || name.startsWith("PADDING.")) && !field.value.trim()) return
@@ -658,8 +660,9 @@ export function updateSelectedKey(field: HTMLInputElement): void {
       const rect = appState.layoutDocument.get(section, "VIEW_RECT")?.split(",").map(Number)
       const value = Number(field.value)
       if (!rect || rect.length !== 4 || !Number.isFinite(value)) continue
-      rect[rectIndex] = value
-      appState.layoutDocument.set(section, "VIEW_RECT", rect.map(Math.round).join(","))
+      // Only the edited number is rounded: Palm keys keep fractional positions (9.5) that must not move.
+      rect[rectIndex] = Math.round(value)
+      appState.layoutDocument.set(section, "VIEW_RECT", rect.join(","))
     } else {
       const target = name === "STAT_STYLE" ? section : effectiveKeySection(section)
       if (name.startsWith("PADDING.")) {

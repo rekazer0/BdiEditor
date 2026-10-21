@@ -5,8 +5,14 @@
 import { iniCodeFromBoardType } from "./palm-board-types.ts"
 import {
   IniWriter,
+  READERS,
   actionText,
+  actionValue,
   asObject,
+  attach,
+  bind,
+  fieldWrite,
+  tipsValue,
   numberText,
   put,
   putBase,
@@ -20,11 +26,25 @@ import {
 
 const BUTTON_KEYS = ["UP", "DOWN", "LEFT", "RIGHT", "CENTER", "SHOW", "HOLD", "HOLDSYM", "BAR_SYM", "BAR_SYM_SEL"]
 
-function putValues(entries: Map<string, string>, values: Json): void {
-  if (!Array.isArray(values)) return
+// Gestures live in a flat `[button, action, ...]` list; an edit replaces, appends or drops one pair.
+function putValues(entries: Map<string, string>, owner: JsonObject, field: string): void {
+  const values = Array.isArray(owner[field]) ? owner[field] as Json[] : []
   for (let index = 0; index + 1 < values.length; index += 2) {
     const key = typeof values[index] === "number" ? BUTTON_KEYS[values[index] as number] : undefined
     if (key) put(entries, key, actionText(values[index + 1]))
+  }
+  for (const [button, key] of BUTTON_KEYS.entries()) {
+    bind(entries, key, (text) => {
+      const list = Array.isArray(owner[field]) ? [...owner[field] as Json[]] : []
+      const at = list.findIndex((item, index) => index % 2 === 0 && item === button)
+      if (text?.trim()) {
+        if (at >= 0) list[at + 1] = actionValue(text)
+        else list.push(button, actionValue(text))
+      } else if (at >= 0) list.splice(at, 2)
+      if (list.length) owner[field] = list
+      else delete owner[field]
+      attach(owner)
+    }, values.some((item, index) => index % 2 === 0 && item === button))
   }
 }
 
@@ -36,22 +56,31 @@ function sameRect(left: Json, right: Json): boolean {
 
 function putKey(writer: IniWriter, key: JsonObject): void {
   const entries = writer.section(`KEY${key.id ?? ""}`)
-  putBase(entries, key.b)
+  putBase(entries, key)
+  // A touch area equal to the key is not projected, so moving the key moves it too.
+  bind(entries, "VIEW_RECT", (text) => {
+    const follows = key.hit_rect !== undefined && sameRect(key.hit_rect, key.rect)
+    fieldWrite(key, "rect", READERS.rect)(text)
+    if (follows) key.hit_rect = key.rect
+  }, key.rect !== undefined)
   put(entries, "VIEW_RECT", rectText(key.rect))
+  bind(entries, "TOUCH_RECT", fieldWrite(key, "hit_rect", READERS.rect), key.hit_rect !== undefined)
   if (key.hit_rect !== undefined && !sameRect(key.hit_rect, key.rect)) put(entries, "TOUCH_RECT", rectText(key.hit_rect))
-  putValues(entries, key.values)
+  putValues(entries, key, "values")
+  bind(entries, "STAT_STYLE", fieldWrite(key, "fix_a", tipsValue), key.fix_a !== undefined)
   put(entries, "STAT_STYLE", tipsText(key.fix_a))
 }
 
 function putTip(writer: IniWriter, name: string, tip: JsonObject): void {
   const entries = writer.section(name)
-  putBase(entries, tip.b)
+  putBase(entries, tip)
+  bind(entries, "KEY", fieldWrite(tip, "k", actionValue), tip.k !== undefined)
   put(entries, "KEY", actionText(tip.k))
-  putValues(entries, tip.v)
+  putValues(entries, tip, "v")
 }
 
 function putCandidate(entries: Map<string, string>, model: JsonObject): void {
-  putBase(entries, model.b)
+  putBase(entries, model)
   putFields(entries, model, [
     ["f_size", "FIX_SIZE", "point"],
     ["rect", "VIEW_RECT", "rect"],
@@ -69,7 +98,7 @@ function putCandidate(entries: Map<string, string>, model: JsonObject): void {
 }
 
 function putTable(entries: Map<string, string>, model: JsonObject): void {
-  putBase(entries, model.b)
+  putBase(entries, model)
   putFields(entries, model, [
     ["order", "LIST_ORDER", "bool"],
     ["side", "SCROLL_SIDE", "bool"],
@@ -95,7 +124,7 @@ export function boardFileName(type: string): string {
 }
 
 // `keyboardModel`.
-export function boardText(value: Json): string {
+export function boardIni(value: Json): IniWriter {
   const model = asObject(value) ?? {}
   const writer = new IniWriter()
   const sectionOf = (name: string, field: string): [Map<string, string>, JsonObject] | undefined => {
@@ -109,7 +138,7 @@ export function boardText(value: Json): string {
   const board = sectionOf("PANEL", "board")
   if (board) {
     const [entries, part] = board
-    putBase(entries, part.b)
+    putBase(entries, part)
     putFields(entries, part, [
       ["exact", "NO_BLUR", "bool"],
       ["right", "NO_F3_FIX", "bool"],
@@ -131,7 +160,7 @@ export function boardText(value: Json): string {
 
   const input = sectionOf("INPUT", "input")
   if (input) {
-    putBase(input[0], input[1].b)
+    putBase(input[0], input[1])
     putFields(input[0], input[1], [
       ["type", "TYPE", "number"],
       ["pos", "POS", "point"],
@@ -146,7 +175,7 @@ export function boardText(value: Json): string {
 
   const hint = sectionOf("HINT", "hint")
   if (hint) {
-    putBase(hint[0], hint[1].b)
+    putBase(hint[0], hint[1])
     putFields(hint[0], hint[1], [
       ["anchor", "ANCHOR_TYPE", "number"],
       ["hint", "TYPE", "number"],
@@ -159,11 +188,11 @@ export function boardText(value: Json): string {
   // shortcut: `logoModel` inlines the PANEL/ICON of a separate logo layout; that file name
   // is not in skin.json, so only the LOGO base is projected.
   const logo = sectionOf("LOGO", "logo")
-  if (logo) putBase(logo[0], logo[1].b)
+  if (logo) putBase(logo[0], logo[1])
 
   const emoji = sectionOf("EMOJI", "emoji")
   if (emoji) {
-    putBase(emoji[0], emoji[1].b)
+    putBase(emoji[0], emoji[1])
     putFields(emoji[0], emoji[1], [
       ["i_text", "PANEL_BACK_STYLE_INDEX", "number"],
       ["index_t", "TAB_BACK_STYLE_INDEX", "number"],
@@ -176,7 +205,7 @@ export function boardText(value: Json): string {
   const more = sectionOf("MORE", "more")
   if (more) {
     const [entries, part] = more
-    putBase(entries, part.b)
+    putBase(entries, part)
     if (typeof part.row === "number" && typeof part.col === "number") put(entries, "GRID", `${part.col},${part.row}`)
     putFields(entries, part, [
       ["i_h", "H_LINE_STYLE_INDEX", "number"],
@@ -196,7 +225,7 @@ export function boardText(value: Json): string {
 
   const topCand = sectionOf("SCAND", "top_cand")
   if (topCand) {
-    putBase(topCand[0], topCand[1].b)
+    putBase(topCand[0], topCand[1])
     putFields(topCand[0], topCand[1], [
       ["i_i", "INPUT_STYLE", "number"],
       ["s_i", "SCAND_STYLE", "number"],
@@ -223,18 +252,18 @@ export function boardText(value: Json): string {
       ["value", "VALUE", "number"],
     ])
   }
-  return writer.toString()
+  return writer
 }
 
 // `candidateModelFromFile` (`*.cnd`).
-export function candidateText(value: Json): string {
+export function candidateIni(value: Json): IniWriter {
   const model = asObject(value) ?? {}
   const writer = new IniWriter()
   if (model.b !== undefined) putCandidate(writer.section("CAND"), model)
   const switchModel = asObject(model.switch)
   if (switchModel) {
     const entries = writer.section("SWITCH")
-    putBase(entries, switchModel.b)
+    putBase(entries, switchModel)
     putFields(entries, switchModel, [
       ["i_normal", "NML_BACK_STYLE", "number"],
       ["i_select", "SEL_BACK_STYLE", "number"],
@@ -248,7 +277,7 @@ export function candidateText(value: Json): string {
     // Baidu candidate/cell icons are numbered from 1, the way real `.cnd` files spell them.
     const entries = writer.section(`ICON${index + 1}`)
     put(entries, "STAT_STYLE", tipsText(record.t))
-    putBase(entries, record.b)
+    putBase(entries, record)
     put(entries, "KEY", actionText(record.k))
     putFields(entries, record, [
       ["p", "POS", "point"],
@@ -264,11 +293,11 @@ export function candidateText(value: Json): string {
     const record = asObject(tip)
     if (record) putTip(writer, `TIP${index}`, record)
   }
-  return writer.toString()
+  return writer
 }
 
 // `bubbleModelFromFile` (`*.pop`): `info` is a flat `[type, icon index, ...]` array.
-export function bubbleText(value: Json): string {
+export function bubbleIni(value: Json): IniWriter {
   const model = asObject(value) ?? {}
   const indexes = new Map<number, string>()
   const info = Array.isArray(model.info) ? model.info : []
@@ -294,7 +323,7 @@ export function bubbleText(value: Json): string {
     const record = asObject(icon) ?? {}
     // `icon_info` keeps the section numbering the `.pop` file had.
     const entries = writer.section(`ICON${index}`)
-    putBase(entries, record.b)
+    putBase(entries, record)
     putFields(entries, record, [
       ["anchor", "ANCHOR_TYPE", "number"],
       ["i_cell", "CELL_STYLE", "number"],
@@ -304,5 +333,5 @@ export function bubbleText(value: Json): string {
       ["insets", "PADDING", "insets"],
     ])
   }
-  return writer.toString()
+  return writer
 }

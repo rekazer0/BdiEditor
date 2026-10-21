@@ -111,13 +111,32 @@ try {
   })
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Escape')
-  const layoutSize = page.locator(".text-style-fields input[aria-label='全部按键字号']")
+  // Labels (each key's first text layer) change; the second layer (STYLE4, a hint) keeps its size.
+  const layoutSize = page.locator(".text-style-fields input[aria-label='按键文字字号']")
   await layoutSize.fill('33')
   await layoutSize.press('Enter')
   await page.waitForFunction(async () => {
     const { appState } = await import('/src/app/state.ts')
     const styles = JSON.parse(appState.archive.getText('skin.json')).default.s_info.ss_1
-    return styles[3].s_1.f_s === 33 && styles[4].s_1.f_s === 33
+    return styles[3].s_1.f_s === 33 && styles[4].s_1.f_s === undefined
+  })
+  // Gestures and geometry are written to the key in skin.json too.
+  await selectKey(1)
+  await page.locator('#mobile-inspector-groups').getByRole('button', { name: '手势', exact: true }).click()
+  await page.locator('[data-key-field="UP"]').fill('F12')
+  await page.locator('[data-key-field="UP"]').press('Tab')
+  await page.waitForFunction(async () => {
+    const { appState } = await import('/src/app/state.ts')
+    const key = JSON.parse(appState.archive.getText('skin.json')).default.port_layout.b.full26Pinyin.keys.find((item) => item.id === '1')
+    return key.values.includes(0)
+  })
+  await page.locator('#mobile-inspector-groups').getByRole('button', { name: '布局', exact: true }).click()
+  await page.locator('[data-key-field="x"]').fill('5')
+  await page.locator('[data-key-field="x"]').press('Enter')
+  await page.waitForFunction(async () => {
+    const { appState } = await import('/src/app/state.ts')
+    const key = JSON.parse(appState.archive.getText('skin.json')).default.port_layout.b.full26Pinyin.keys.find((item) => item.id === '1')
+    return key.rect[0][0] === 5
   })
   const saved = await page.evaluate(async () => {
     const { appState } = await import('/src/app/state.ts')
