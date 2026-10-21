@@ -183,12 +183,13 @@ export class SsfPackage {
   }
 
   /** Files are looked up next to the theme's INI first, then in the shared folders. */
-  file(theme: SsfTheme, name: string): Uint8Array | undefined {
+  path(theme: SsfTheme, name: string): string | undefined {
     const folder = this.folder(theme)
-    const candidates = [`${folder}${name}`, `${this.resolution}/${name}`, `default/${name}`, `default/res/${name}`, name]
-    for (const candidate of candidates) {
-      const bytes = this.files.get(candidate)
-      if (bytes) return bytes
-    }
+    return [`${folder}${name}`, `${this.resolution}/${name}`, `default/${name}`, `default/res/${name}`, name].find((candidate) => this.files.has(candidate))
+  }
+
+  file(theme: SsfTheme, name: string): Uint8Array | undefined {
+    const path = this.path(theme, name)
+    return path === undefined ? undefined : this.files.get(path)
   }
 }

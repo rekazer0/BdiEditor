@@ -49,6 +49,9 @@ const snapshot = async () => {
   const { preview, toolbarPreview, candidateBackgroundPreview } = await import("/src/app/canvas-interaction.ts")
   const previews = [preview, toolbarPreview, candidateBackgroundPreview]
   await Promise.all(previews.map((item) => item.resolver?.ready?.()))
+  // The source canvas paints its native scene; exports carry the converted layout, so both sides
+  // are compared on the converted styles. scripts/test-native-preview.mjs covers the native scene.
+  previews.forEach((item) => item.setScene(undefined))
   previews.forEach((item) => item.draw())
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   await Promise.all(previews.map((item) => item.rendered()))

@@ -36,6 +36,7 @@ import { legacyHintText } from "./preview-hints.ts"
 import { dynamicToolbarRect } from "./preview-items.ts"
 import { type PreviewItem } from "./preview-items.ts"
 import { DEFAULT_PANEL_WIDTH } from "./keyboard.ts"
+import { drawSceneLayer, type SceneLayer } from "./native-scene.ts"
 
 export async function paintPreview(self: Preview): Promise<void> {
   const drawID = ++self.drawID
@@ -51,6 +52,12 @@ export async function paintPreview(self: Preview): Promise<void> {
     }
   }
 
+  // A native scene (Palm, Sogou) replaces the resolver's panel, key and toolbar visuals.
+  const scene = await self.sceneForState()?.catch((error) => {
+    console.warn("预览场景生成失败:", error)
+    return undefined
+  })
+  const sceneKeys = new Map(scene?.keys.map((key) => [key.section, key]))
   const panelAnimationElapsed = self.legacyPanelAnimationStartedAt
     ? Date.now() - self.legacyPanelAnimationStartedAt
     : -1
@@ -100,7 +107,11 @@ export async function paintPreview(self: Preview): Promise<void> {
   let visuals: Array<{ back: Visual | undefined; fore: Array<Visual | undefined>; text: TextVisual | undefined; styleTexts: Array<StyleTextVisual | undefined> }>
   let toolbarImages: Visual[]
 
-  if (isDragging && self.lastRenderCache) {
+  if (scene) {
+    panel = undefined
+    visuals = keys.map(() => ({ back: undefined, fore: [], text: undefined, styleTexts: [] }))
+    toolbarImages = []
+  } else if (isDragging && self.lastRenderCache) {
     // 使用缓存数据进行快速拖拽渲染
     panel = self.lastRenderCache.panel
     visuals = self.lastRenderCache.visuals
@@ -171,19 +182,10 @@ export async function paintPreview(self: Preview): Promise<void> {
       : Promise.resolve([undefined, undefined]),
   ])
   if (drawID !== self.drawID) return
-  const context = self.canvas.getContext("2d")
+  const context = beginCanvas(self)
   if (!context) return
-  context.setTransform(1, 0, 0, 1, 0, 0)
-  context.clearRect(0, 0, self.canvas.width, self.canvas.height)
-  context.setTransform(self.canvas.width / self.panelWidth, 0, 0, self.canvas.height / self.surfaceHeight, 0, 0)
-  context.imageSmoothingEnabled = true
-  context.imageSmoothingQuality = "high"
-  const surfaceColor = previewSurfaceColor(self.theme, self.transparent)
-  if (surfaceColor) {
-    context.fillStyle = surfaceColor
-    context.fillRect(0, 0, self.panelWidth, self.surfaceHeight)
-  }
-  drawVisual(
+  if (scene) for (const layer of scene.background) drawSceneLayer(context, layer)
+  else drawVisual(
     context,
     panel,
     { x: 0, y: 0, width: self.panelWidth, height: self.surfaceHeight },
@@ -191,7 +193,6 @@ export async function paintPreview(self: Preview): Promise<void> {
   )
 
   for (const [index, key] of keys.entries()) {
-    const selected = previewSelectionVisible(self.mode, self.itemSelected(key))
     const animationElapsed = self.legacyAnimationState?.key.section === key.section
       ? Date.now() - self.legacyAnimationState.startedAt
       : -1
@@ -211,6 +212,35 @@ export async function paintPreview(self: Preview): Promise<void> {
     const backOpacity = animationElapsed >= 0
       ? legacyAnimationOpacity(self.legacyAnimation, backAnimationStyle, animationElapsed)
       : bdaBack.opacity
+    const sceneKey = sceneKeys.get(key.section)
+    if (scene) {
+      const pressed = self.active?.key.section === key.section || self.legacyAnimationState?.key.section === key.section || self.keyPressed(key)
+      const layers = sceneKey?.layers(pressed)
+      if (sceneKey && layers) {
+        // Scene layers sit where the skin puts the key; a key being dragged takes them along.
+        const draw = (group: SceneLayer[]) => {
+          context.save()
+          context.translate(key.rect.x, key.rect.y)
+          context.scale(key.rect.width / sceneKey.rect.width, key.rect.height / sceneKey.rect.height)
+          context.translate(-sceneKey.rect.x, -sceneKey.rect.y)
+          for (const layer of group) drawSceneLayer(context, layer)
+          context.restore()
+        }
+        withTransform(context, key.rect, backScale, backTranslation, backRotation, backOpacity, () => draw(layers.back))
+        const animationStyle = key.foreAnimStyle || key.animStyle
+        withTransform(
+          context,
+          key.rect,
+          animationElapsed >= 0 ? legacyAnimationScale(self.legacyAnimation, animationStyle, animationElapsed) : bdaFore.scale,
+          animationElapsed >= 0 ? legacyAnimationTranslation(self.legacyAnimation, animationStyle, animationElapsed, key.rect) : bdaFore.translation,
+          animationElapsed >= 0 ? legacyAnimationRotation(self.legacyAnimation, animationStyle, animationElapsed) : bdaFore.rotation,
+          animationElapsed >= 0 ? legacyAnimationOpacity(self.legacyAnimation, animationStyle, animationElapsed) : bdaFore.opacity,
+          () => draw(layers.fore),
+        )
+      }
+      strokeSelection(self, context, key)
+      continue
+    }
     const styleTexts = visuals[index].styleTexts
     const foregrounds = phoneForegroundLayers(visuals[index].fore)
     const hasForeground = foregrounds.some(Boolean) || styleTexts.some(Boolean)
@@ -270,28 +300,7 @@ export async function paintPreview(self: Preview): Promise<void> {
       })
     }
 
-    if (selected) {
-      // A press flash in edit mode is marked in the selection orange so it
-      // reads as "momentary feedback", not as the blue selection state.
-      const flash = self.mode === "edit" && self.keyPressed(key)
-      context.strokeStyle = flash ? "#ff6b2c" : "#087ff5"
-      context.lineWidth = 4
-      context.strokeRect(key.rect.x + 2, key.rect.y + 2, key.rect.width - 4, key.rect.height - 4)
-    } else if (self.mode === "edit" && self.itemDrafted(key)) {
-      // Unconfirmed AI draft: dashed orange, distinct from any solid selection.
-      const inset = 3
-      context.save()
-      context.strokeStyle = "#ff6b2c"
-      context.lineWidth = 3
-      context.setLineDash([9, 6])
-      context.strokeRect(
-        key.rect.x + inset,
-        key.rect.y + inset,
-        Math.max(0, key.rect.width - inset * 2),
-        Math.max(0, key.rect.height - inset * 2),
-      )
-      context.restore()
-    }
+    strokeSelection(self, context, key)
 
     const textVisual: TextVisual | undefined = visuals[index].text
     context.fillStyle = textVisual?.color ?? (self.theme === "dark" ? "#f5f5f7" : "#17191c")
@@ -431,6 +440,47 @@ export async function paintPreview(self: Preview): Promise<void> {
 
   drawGuides(self, visiblePreviewItems(self.keys, self.skinState))
   self.lastDrawnID = drawID
+}
+
+function beginCanvas(self: Preview): CanvasRenderingContext2D | undefined {
+  const context = self.canvas.getContext("2d")
+  if (!context) return
+  context.setTransform(1, 0, 0, 1, 0, 0)
+  context.clearRect(0, 0, self.canvas.width, self.canvas.height)
+  context.setTransform(self.canvas.width / self.panelWidth, 0, 0, self.canvas.height / self.surfaceHeight, 0, 0)
+  context.imageSmoothingEnabled = true
+  context.imageSmoothingQuality = "high"
+  const surfaceColor = previewSurfaceColor(self.theme, self.transparent)
+  if (surfaceColor) {
+    context.fillStyle = surfaceColor
+    context.fillRect(0, 0, self.panelWidth, self.surfaceHeight)
+  }
+  return context
+}
+
+function strokeSelection(self: Preview, context: CanvasRenderingContext2D, key: PreviewItem): void {
+  if (previewSelectionVisible(self.mode, self.itemSelected(key))) {
+    // A press flash in edit mode is marked in the selection orange so it
+    // reads as "momentary feedback", not as the blue selection state.
+    const flash = self.mode === "edit" && self.keyPressed(key)
+    context.strokeStyle = flash ? "#ff6b2c" : "#087ff5"
+    context.lineWidth = 4
+    context.strokeRect(key.rect.x + 2, key.rect.y + 2, key.rect.width - 4, key.rect.height - 4)
+  } else if (self.mode === "edit" && self.itemDrafted(key)) {
+    // Unconfirmed AI draft: dashed orange, distinct from any solid selection.
+    const inset = 3
+    context.save()
+    context.strokeStyle = "#ff6b2c"
+    context.lineWidth = 3
+    context.setLineDash([9, 6])
+    context.strokeRect(
+      key.rect.x + inset,
+      key.rect.y + inset,
+      Math.max(0, key.rect.width - inset * 2),
+      Math.max(0, key.rect.height - inset * 2),
+    )
+    context.restore()
+  }
 }
 
 export function drawGuides(self: Preview, keys: readonly PreviewItem[]): void {

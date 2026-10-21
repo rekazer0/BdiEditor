@@ -20,6 +20,7 @@ import { resolveCandidateInputTextVisual, resolveCandidateTextVisuals } from "..
 import { availableSkinStates, canvasFitWidth, previewScalePercent } from "../panel-tools.ts"
 import { populateKeyInspector } from "./key-inspector"
 import { setDrawingTile, drawAtlas } from "./tile-editing"
+import { refreshNativeScenes } from "./native-preview"
 
 export function simulationLanguage(): "zh" | "en" {
   return /^en_/i.test(appState.layoutPath.split("/").pop() ?? "") ? "en" : "zh"
@@ -283,6 +284,7 @@ export function refreshPreview(): void {
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
   }
   preview.setDocument(appState.layoutDocument)
+  refreshNativeScenes()
 }
 
 export function refreshSimulationPreview(): void {

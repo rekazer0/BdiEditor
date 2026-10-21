@@ -8,6 +8,7 @@ import { type LegacyAnimation, type LegacyParticleEmitter, bdaAnimationBindingsF
 import { type LegacyHint } from "./preview-hints.ts"
 import { constrainedCanvasSize, setCanvasSize } from "./preview-draw.ts"
 import { paintPreview } from "./preview-paint.ts"
+import type { NativeScene } from "./native-scene.ts"
 import { pointerDown } from "./preview-pointer.ts"
 import { pointerMove } from "./preview-pointer.ts"
 import { pointerUp } from "./preview-pointer.ts"
@@ -30,6 +31,9 @@ export class Preview {
   private defaults?: IniDocument
   offsets?: IniDocument
   resolver?: VisualResolver
+  /** Palm and Sogou skins paint a scene read from their own files instead of resolving styles. */
+  scene?: (state: number | undefined) => Promise<NativeScene | undefined>
+  private readonly scenes = new Map<number | undefined, Promise<NativeScene | undefined>>()
   // Resolver lookups are asynchronous and can involve stylesheet/tile parsing
   // and image decoding. Keep the resolved values for the lifetime of a
   // resolver; drag frames then only redraw geometry instead of repeating the
@@ -298,6 +302,20 @@ export class Preview {
     this.toolbarImagesCache = undefined
     this.lastRenderCache = undefined
     void this.draw()
+  }
+
+  setScene(scene?: (state: number | undefined) => Promise<NativeScene | undefined>): void {
+    this.scene = scene
+    this.scenes.clear()
+    void this.draw()
+  }
+
+  /** The scene for the current keyboard state, built once per state. */
+  sceneForState(): Promise<NativeScene | undefined> | undefined {
+    if (!this.scene) return
+    let scene = this.scenes.get(this.skinState)
+    if (!scene) this.scenes.set(this.skinState, scene = this.scene(this.skinState))
+    return scene
   }
 
   resolveVisual(styleID: string, highlighted: boolean): Promise<Visual | undefined> {

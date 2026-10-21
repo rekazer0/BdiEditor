@@ -325,7 +325,7 @@ let embeddedFontID = 0
 // 这里会加载新的 FontFace，预览不会继续用旧字形。
 const embeddedFonts = new WeakMap<SkinArchive, Map<string, { bytes: Uint8Array; font: EmbeddedFont }>>()
 
-function embeddedFontPath(
+export function embeddedFontPath(
   names: readonly string[],
   stylePath: string,
   reference: string | undefined,
@@ -336,7 +336,7 @@ function embeddedFontPath(
   return resolveFontReference(names, clean, fontSearchDirectories(stylePath), { extensions })
 }
 
-function loadEmbeddedFont(archive: SkinArchive, path: string): EmbeddedFont | undefined {
+export function loadEmbeddedFont(archive: SkinArchive, path: string): EmbeddedFont | undefined {
   const bytes = archive.getBytes(path)
   if (!bytes) return
   let cache = embeddedFonts.get(archive)
