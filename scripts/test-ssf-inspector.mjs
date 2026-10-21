@@ -9,6 +9,8 @@ const files = unzipSync(ssfFixture())
 files['1080/status1/phoneSkin.ini'] = strToU8(strFromU8(files['1080/status1/phoneSkin.ini'])
   .replace('[Key_Q]\n', '[Key_Q]\nFG_STYLE=FGStyle_Qwerty\n')
   .replace('[TextStyle_Qwerty]', '[Key_W]\nFG_STYLE=FGStyle_Qwerty\n[FGStyle_Qwerty]\nLABEL_STYLE=TextStyle_Qwerty\nLABEL_POSITION=0,0,1,1\n[TextStyle_Qwerty]'))
+// The phone installs only the folder nearest its width, so a 720 copy must receive the same edits.
+for (const name of Object.keys(files)) if (name.startsWith('1080/status1/')) files[name.replace('1080/', '720/')] = files[name]
 const fixture = zipSync(files)
 
 const server = await createServer({ root: new URL('..', import.meta.url).pathname, logLevel: 'error', server: { port: 41796, strictPort: false, host: '127.0.0.1' } })
@@ -42,6 +44,7 @@ async function selectKey(action, shift = false) {
 async function change(input, value) { await input.fill(value); await input.press('Enter') }
 const skin = '1080/status1/phoneSkin.ini'
 const keys = '1080/status1/keys.ini'
+const twin = '720/status1/phoneSkin.ini'
 try {
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`)
   await page.locator('#browser-open').setInputFiles({ name: '属性测试.ssf', mimeType: 'application/octet-stream', buffer: Buffer.from(fixture) })
@@ -99,6 +102,7 @@ try {
   assert.equal(await stretch.first().getAttribute('placeholder'), '混合')
   await change(stretch.first(), '5')
   assert.equal(await read(skin, 'SMA_Key26Bg_Q', 'NORMAL'), '26keyq.png,5,96,3,139')
+  assert.equal(await read(twin, 'SMA_Key26Bg_Q', 'NORMAL'), '26keyq.png,2,96,3,139', 'the 720 copy keeps its own stretch band')
   assert.equal(await read(skin, 'KeyBg_Default_Latin', 'NORMAL'), '26key.png,5,97,1,141')
   await page.locator('.inspector-reset').click()
   assert.equal(await read(skin, 'SMA_Key26Bg_Q', 'NORMAL'), '26keyq.png,2,96,3,139')
@@ -148,8 +152,12 @@ try {
   assert.equal(await read(skin, 'TextStyle_Key_Q', 'TEXT_SIZE'), '0.05')
   await row('BOLD').locator('input').check()
   assert.equal(await read(skin, 'TextStyle_Key_Q', 'BOLD'), 'true')
+  assert.equal(await read(twin, 'TextStyle_Key_Q', 'BOLD'), 'true')
   await row('BOLD').locator('input').uncheck()
   assert.equal(await read(skin, 'TextStyle_Key_Q', 'BOLD'), undefined)
+  for (const [section, key, value] of [['Key_Q', 'FG_STYLE', 'FGStyle_Key_Q'], ['FGStyle_Key_Q', 'LABEL_STYLE', 'TextStyle_Key_Q'], ['TextStyle_Key_Q', 'TEXT_COLOR', '0x7F556677'], ['TextStyle_Key_Q', 'TEXT_SIZE', '0.05'], ['TextStyle_Key_Q', 'BOLD', undefined]]) {
+    assert.equal(await read(twin, section, key), value, `720 copy: [${section}] ${key}`)
+  }
   await selectKey('w', true)
   assert.equal(await row('TEXT_COLOR').locator('input:not([type])').getAttribute('placeholder'), '混合')
   await change(row('TEXT_COLOR').locator('input[type=number]'), '0.5')

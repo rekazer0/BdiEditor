@@ -6,6 +6,7 @@ import { createIcon } from "../icons"
 import { IniDocument } from "../ini.ts"
 import { ssfFieldLabel, ssfSectionLabel } from "../ssf/ssf-labels.ts"
 import { parseSsfImage, type SsfStretch } from "../ssf/ssf-package.ts"
+import { mirrorSsfEdit, ssfResolutionOf, ssfResolutionTwins } from "../ssf/ssf-resolutions.ts"
 import { setSourceValue } from "./config-context"
 import { commitBatch, commitText, isEditing, updateDirty } from "./edit-history"
 import { populateKeyInspector } from "./key-inspector"
@@ -45,6 +46,8 @@ export function editSsfFile(path: string, change: (document: IniDocument) => voi
   editTargets([{ path, section: "" }], change)
 }
 
+type TextChange = Extract<Change, { kind: "text" }>
+
 /** A section rows write to; `create` is what a missing section starts with (RootView needs BG_STYLE). */
 export type SsfLocation = { path: string; section: string; create?: SsfEntry[] }
 
@@ -59,8 +62,9 @@ function editTargets(targets: SsfLocation[], change: (document: IniDocument, tar
     return before === after ? [] : [{ kind: "text" as const, path, before, after }]
   })
   if (!changes.length) return
-  if (changes.length === 1) commitText(changes[0].path, changes[0].before, changes[0].after)
-  else commitBatch(changes)
+  const all: TextChange[] = [...changes, ...resolutionTwins(changes)]
+  if (all.length === 1) commitText(all[0].path, all[0].before, all[0].after)
+  else commitBatch(all)
   if (changes.some((change) => change.path === appState.selectedPath)) appState.selectedDocument = ssfDocument(appState.selectedPath)
   const source = changes.find((change) => change.path === sourceEditPath())
   if (source) setSourceValue(source.after)
@@ -422,6 +426,33 @@ export function ssfFontImportButton(targets: SsfLocation[]): HTMLButtonElement {
   })
 }
 
+/**
+ * The same edits in the skin's other resolution folders: the phone installs only the folder nearest
+ * its screen width, so an edit made in the 1080 copy alone never reaches a 720 phone.
+ */
+function resolutionTwins(changes: readonly TextChange[]): TextChange[] {
+  const archive = appState.archive!
+  const names = archive.names()
+  const present = new Set(names)
+  const folderOf = (path: string) => path.slice(0, path.lastIndexOf("/") + 1)
+  const inLook = (path: string, file: string) => present.has(`${folderOf(path)}${file}`) || present.has(`${ssfResolutionOf(path)}/${file}`)
+  const dayStatus = ssfPackage()?.folder("light").split("/")[1] || undefined
+  const edited = new Set(changes.map((change) => change.path))
+  const twins = new Map<string, { before: string; after: string }>()
+  for (const change of changes) {
+    for (const twin of ssfResolutionTwins(names, change.path, dayStatus)) {
+      if (edited.has(twin)) continue
+      const before = twins.get(twin)?.after ?? archive.getText(twin)
+      const copy = {
+        scale: ssfResolutionOf(twin)! / ssfResolutionOf(change.path)!,
+        sharedImage: (file: string) => !inLook(change.path, file) && !inLook(twin, file),
+      }
+      twins.set(twin, { before: twins.get(twin)?.before ?? before, after: mirrorSsfEdit(change.before, change.after, before, copy) })
+    }
+  }
+  return [...twins].flatMap(([path, { before, after }]) => before === after ? [] : [{ kind: "text" as const, path, before, after }])
+}
+
 async function importSsfFont(file: File, targets: SsfLocation[]): Promise<void> {
   const archive = appState.archive
   if (!archive || archive.format !== "ssf" || !isEditing()) return
@@ -437,7 +468,7 @@ async function importSsfFont(file: File, targets: SsfLocation[]): Promise<void> 
       for (const target of targets.filter((item) => item.path === path)) setSsfValue(document, target.section, "TYPEFACE", name)
       changes.push({ kind: "text", path, before, after: document.toString() })
     }
-    commitBatch(changes)
+    commitBatch([...changes, ...resolutionTwins(changes.filter((change): change is TextChange => change.kind === "text"))])
     rebuildSsfPreview()
     refreshPreview()
     populateKeyInspector()
