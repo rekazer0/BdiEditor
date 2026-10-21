@@ -1746,6 +1746,7 @@ body:has(.canvas-wrap.empty) .workspace {
 }
 
 .welcome-note p {
+  flex: 1;
   margin: 0;
   font-size: var(--font-size-xs);
   line-height: 1.5;

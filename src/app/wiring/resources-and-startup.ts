@@ -34,6 +34,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview"
 import { setSourceDropTarget, sourceDropFolder, commitSourceUploads } from "../source-files"
 import { updateSourceHighlight, updateInspectorView } from "../source-panel"
 import { initInspectorShell } from "../../inspector-shell.ts"
+import { startOnboarding, startOnboardingOnFirstLaunch } from "../onboarding"
 
 /** 样式图片资源、面板缩放、模拟输入与启动时的初始状态。只在启动时由 main.ts 按顺序调用一次。 */
 export function wireResourcesAndStartup(): void {
@@ -472,4 +473,7 @@ export function wireResourcesAndStartup(): void {
   void refreshUpdateStatus()
   // 检查器外壳：搜索 / 状态作用域 / 常驻动作条 / 分区折叠
   initInspectorShell()
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-start-tour]")) button.addEventListener("click", startOnboarding)
+  // 电脑版与安卓版首次打开时自动播放使用教程
+  if (isTauri()) requestAnimationFrame(startOnboardingOnFirstLaunch)
 }
