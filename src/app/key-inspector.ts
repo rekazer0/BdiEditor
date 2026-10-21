@@ -26,6 +26,7 @@ import { soundStyleForKey } from "../sounds.ts"
 import { selectedRects } from "./key-editing"
 import { updateStylePreviews } from "./style-picker"
 import { ssfInspectorTitle } from "./ssf-inspector"
+import { sxiInspectorTitle } from "./sxi-inspector"
 import { populateDocumentInspector, populateBdaConfigInspector } from "./document-inspector"
 import { populateFontControls } from "./skin-fonts"
 import { populateTextStyleGroup, selectedKeyTextRefs, textRefValues, writeTextRefs, type TextProperty } from "./text-styles"
@@ -261,16 +262,19 @@ export function populateKeyInspector(): void {
     : toolbarSection
   const bdaConfigSelected = Boolean(appState.archive?.isBdaConfig(appState.selectedPath))
   const bdaSelected = appState.archive?.format === "bda"
-  // A Sogou skin's keys and boards are inspected by ssf-inspector.ts (through the document fields).
+  // Sogou and Palm skins have inspectors of their own (ssf-inspector.ts, sxi-inspector.ts), shown
+  // through the document fields; the Baidu groups stay hidden for them.
   const ssfSelected = appState.archive?.format === "ssf"
+  const sxiSelected = appState.archive?.format === "sxi"
+  const nativeSelected = ssfSelected || sxiSelected
   const candidateSelected = Boolean(bdaSelected && appState.selectedCandidate && appState.selectedPath === appState.layoutPath)
   syncBdaKeyFieldLabels(bdaSelected)
-  skinFieldsGroup.hidden = !skinSelected || bdaSelected
-  toolbarFieldsGroup.hidden = !toolbarSelected || bdaSelected || toolbarHasSelection
-  keyboardFieldsGroup.hidden = bdaSelected || ssfSelected || skinSelected || toolbarSelected || bdaConfigSelected || candidateSelected || appState.selectedPath !== appState.layoutPath || hasSelection
+  skinFieldsGroup.hidden = !skinSelected || bdaSelected || sxiSelected
+  toolbarFieldsGroup.hidden = !toolbarSelected || bdaSelected || sxiSelected || toolbarHasSelection
+  keyboardFieldsGroup.hidden = bdaSelected || nativeSelected || skinSelected || toolbarSelected || bdaConfigSelected || candidateSelected || appState.selectedPath !== appState.layoutPath || hasSelection
   for (const group of keyOnlyGroups) {
     const availableForBda = group === keyTypographyFieldsGroup
-    group.hidden = skinSelected || bdaConfigSelected || !hasSelection || ssfSelected || bdaSelected && !availableForBda
+    group.hidden = skinSelected || bdaConfigSelected || !hasSelection || nativeSelected || bdaSelected && !availableForBda
   }
   selectedKeyName.textContent = hasSelection
     ? sections.length > 1 ? `已选 ${sections.length} 个按键` : `按键 ${sections[0]?.match(/\d+$/)?.[0] ?? ""}`.trim()
@@ -293,11 +297,11 @@ export function populateKeyInspector(): void {
     ? `${appState.selectedPath.split("/").pop()} · ${sections.length > 1 ? "keys.*" : sections[0]}`
     : appState.selectedPath || "选择文件以查看属性"
   selectedKeyContext.title = appState.selectedPath
-  const ssfTitle = ssfSelected ? ssfInspectorTitle() : undefined
-  if (ssfTitle) {
-    selectedKeyName.textContent = ssfTitle.name
-    selectedKeyContext.textContent = ssfTitle.context
-    selectedKeyContext.title = ssfTitle.context
+  const nativeTitle = ssfSelected ? ssfInspectorTitle() : sxiSelected ? sxiInspectorTitle() : undefined
+  if (nativeTitle) {
+    selectedKeyName.textContent = nativeTitle.name
+    selectedKeyContext.textContent = nativeTitle.context
+    selectedKeyContext.title = nativeTitle.context
   }
   selectedKeyName.title = selectedKeyName.textContent ?? ""
   syncAiDesignContext()
@@ -309,13 +313,9 @@ export function populateKeyInspector(): void {
   }
   setInspectorKind(appState.archive?.format === "bda" ? "bda" : appState.archive ? "bds" : "")
   syncMobileInspectorHeader()
-  // A Palm skin's Info.txt only carries what skin.json `info` has (sxi-style.ts infoIni).
-  const sxiInfo = new Set(["Name", "Description", "Author", "SupportDarkMode", "MinImeCode"])
   for (const field of skinFields) {
     field.value = skinSelected ? appState.selectedDocument?.get("", field.dataset.skinField ?? "") ?? "" : ""
     field.disabled = !skinSelected
-    const label = field.closest("label")
-    if (label) label.hidden = appState.archive?.format === "sxi" && !sxiInfo.has(field.dataset.skinField ?? "")
   }
   const general = appState.archive?.isText(genConfigPath())
     ? IniDocument.parse(appState.archive.getText(genConfigPath()))
@@ -400,10 +400,9 @@ export function populateKeyInspector(): void {
   for (const field of keyFields) {
     if (!field.closest(".key-appearance-fields")) continue
     const label = field.closest<HTMLElement>("label")
-    // Palm keys have no per-layer foreground offset (palm-models.ts baseModel).
     if (label) label.hidden = Boolean(bdaSelected && (
       !bdaKeyProperties.has(field.dataset.keyField ?? "") || !field.value && field.placeholder !== "混合"
-    ) || appState.archive?.format === "sxi" && field.dataset.keyField === "FORE_OFFSET")
+    ))
   }
   const bdaTextPropertyAvailability = new Map<string, boolean>()
   // Decoding the appearance file is the expensive part: do it once per refresh, not per field.
@@ -487,7 +486,6 @@ export function populateKeyInspector(): void {
   for (const button of [...keyModeButtons, ...keyActionButtons]) button.hidden = ssfSelected
   for (const button of keyModeButtons) button.disabled = !keyToolsAvailable
   // Copying or deleting a Palm key adds or drops a skin.json key: not something its views can write.
-  const sxiSelected = appState.archive?.format === "sxi"
   for (const button of keyActionButtons) {
     button.disabled = !keyToolsAvailable || (
       button.dataset.keyAction === "swap" && appState.selectedKeySections.length !== 2

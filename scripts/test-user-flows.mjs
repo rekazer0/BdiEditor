@@ -105,8 +105,8 @@ async function clickCanvas(page, fx, fy, options) {
 
 async function selectKey(page, { timeout = 30000 } = {}) {
   await clickCanvas(page, 0.45, 0.45)
-  // BDS/BDI 显示布局分组；BDA 的几何只读，检查器切到按键样式。
-  await page.waitForSelector('.key-layout-fields:not([hidden]), #bda-config-fields[data-bda-scope="key"]', { state: "visible", timeout })
+  // BDS/BDI 显示布局分组；手心显示 skin.json 里按键的「布局」；BDA 的几何只读，检查器切到按键样式。
+  await page.waitForSelector('.key-layout-fields:not([hidden]), #document-fields [data-inspector-group-label="布局"], #bda-config-fields[data-bda-scope="key"]', { state: "visible", timeout })
 }
 
 async function clickCanvasWith(page, key, fx, fy) {

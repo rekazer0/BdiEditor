@@ -21,6 +21,7 @@ import { sanitizeFontFileName, skinFontFiles, uniqueFontFileName } from "../font
 import { type Change } from "../history.ts"
 import { showError, showStatus } from "./file-operations"
 import { validateFont } from "./skin-fonts"
+import { fieldCaption, numberParts } from "./property-rows"
 
 export type SsfEntry = { key: string; value: string }
 
@@ -141,13 +142,7 @@ function thumbnail(value: string | undefined): HTMLCanvasElement {
 }
 
 function caption(row: HTMLElement, key: string, label = ssfFieldLabel(key)): void {
-  row.dataset.documentKey = key
-  const span = element("span", "document-field-caption")
-  span.title = label === key ? key : `${label}（${key}）`
-  const name = element("span", "document-field-name")
-  name.textContent = label
-  span.append(name)
-  row.append(span)
+  fieldCaption(row, key, label)
 }
 
 /** Replaces the file of an image value and keeps its stretch band. */
@@ -230,26 +225,8 @@ function imageCard(label: string, keys: readonly string[], targets: SsfLocation[
   return row
 }
 
-function numberParts(row: HTMLElement, key: string, affixes: string[], values: string[], onChange: (values: string[]) => void): void {
-  const pair = element("span", "ui-field-pair")
-  if (affixes.length === 4 && key !== "FG_RECT") pair.dataset.columns = "4"
-  affixes.forEach((affix, index) => {
-    const box = element("span", "ui-input")
-    const prefix = element("span", "ui-input-affix")
-    prefix.textContent = affix
-    const input = element("input")
-    input.type = "number"
-    input.step = values.some((value) => value.includes(".")) ? "any" : "1"
-    input.value = values[index] ?? ""
-    input.disabled = !isEditing()
-    input.setAttribute("aria-label", `${ssfFieldLabel(key)} ${affix}`)
-    input.addEventListener("change", () => {
-      if (input.value !== "" && Number.isFinite(input.valueAsNumber)) onChange(Array.from(pair.querySelectorAll("input"), (field) => field.value))
-    })
-    box.append(prefix, input)
-    pair.append(box)
-  })
-  row.append(pair)
+function ssfNumberParts(row: HTMLElement, key: string, affixes: string[], values: string[], onChange: (values: string[]) => void): void {
+  numberParts(row, ssfFieldLabel(key), affixes, values, onChange, affixes.length === 4 && key !== "FG_RECT" ? 4 : undefined)
 }
 
 /** The stretch band shared by a section's state images: Sogou's order is left, right, top, bottom. */
@@ -261,7 +238,7 @@ function stretchField(path: string, section: string, targets = [{ path, section 
   row.dataset.stack = ""
   caption(row, "STRETCH", "拉伸区域")
   row.title = "九宫格可拉伸的像素区间：左、右、上、下"
-  numberParts(row, "STRETCH", ["左", "右", "上", "下"], stretch.map(String), (values) => {
+  ssfNumberParts(row, "STRETCH", ["左", "右", "上", "下"], stretch.map(String), (values) => {
     const bands = targets.map((target) => {
       const current = parseSsfImage(ssfDocument(target.path).get(target.section, "NORMAL"))?.stretch
       return values.map((value, index) => value === "" ? current?.[index] : Number(value)) as SsfStretch
@@ -392,7 +369,7 @@ function ssfField(entry: SsfEntry, targets: SsfLocation[], options?: string[]): 
     const row = element("div", "ui-field document-property-field")
     row.dataset.stack = ""
     caption(row, key)
-    numberParts(row, key, quad, parts, (values) => editTargets(targets, (document, target) => {
+    ssfNumberParts(row, key, quad, parts, (values) => editTargets(targets, (document, target) => {
       const current = document.get(target.section, key)!.split(",")
       setSsfValue(document, target.section, key, values.map((value, index) => value || current[index]).join(","))
     }))
@@ -511,7 +488,7 @@ export function ssfButton(label: string, icon: string, onClick: () => void): HTM
 }
 
 function blockHeading(block: SsfBlock): HTMLElement {
-  const heading = element("h4", "ssf-block-heading")
+  const heading = element("h4", "inspector-block-heading")
   const title = element("span")
   title.textContent = block.title ?? ssfSectionLabel(block.section)
   heading.append(title)
@@ -568,7 +545,7 @@ function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
     actions.unshift(ssfButton("添加", "plus", () => editSsfFile(block.path, (document) => document.appendSection(block.section, template))))
   }
   if (actions.length) {
-    const row = element("div", "ssf-block-actions")
+    const row = element("div", "inspector-block-actions")
     row.append(...actions)
     nodes.push(row)
   }

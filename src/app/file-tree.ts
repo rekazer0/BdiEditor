@@ -6,6 +6,7 @@ import { selectFile, overviewGroupState } from "./navigation"
 import { isSsfBoardPath, ssfThemeFolder, SSF_SOUNDS_PATH } from "./ssf-documents"
 import { mobilePortraitQuery, sourceThumbnail } from "./canvas-interaction"
 import { setMobilePane } from "./mobile-layout"
+import { palmBoardLabel } from "../palm/palm-labels.ts"
 import { bdaAppearancePath, bdaConfigPaths } from "../bda.ts"
 import { decodeBdaAppearance } from "../bda-decode.ts"
 import { toolbarConfigPath, styleConfigPath, legacyAnimationConfigPath } from "./config-context"
@@ -360,6 +361,15 @@ export function renderFiles(): void {
         icon,
         navMode: kind === "sound" ? "sound" : undefined,
       })
+    }
+  }
+  // 手心皮肤的条目都来自 skin.json：用手心自己的键盘名称，注脚是它在 skin.json 里的位置。
+  if (appState.archive.format === "sxi") {
+    for (const entry of entries) {
+      const pointer = appState.archive.derivedPointer(entry.path)
+      if (!pointer) continue
+      entry.meta = pointer.filter((step, index) => index > 0 && !/_layout$/.test(step)).join(".") || pointer[0]
+      if (pointer[2] === "b") entry.label = palmBoardLabel(pointer[3])
     }
   }
   // 每个文件一个图标：未登记或与前面撞图标的文件按名字归族，取族里还没用过的图标。

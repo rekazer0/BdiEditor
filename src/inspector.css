@@ -656,11 +656,11 @@
   }
 }
 
-/* —— 搜狗皮肤（ssf-inspector.ts）：分组与百度共用同一套样式；一个分组里的多个配置段各有一行小标题 —— */
-.source .ssf-block-heading { display: grid; gap: var(--space-xs); min-width: 0; margin: 0; color: var(--secondary); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
-.source .ssf-block-heading > span { flex: none; }
-.source .ssf-block-heading > code { min-width: 0; overflow: hidden; color: var(--tertiary); font-family: var(--font-mono); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); text-overflow: ellipsis; white-space: nowrap; }
-.source .ssf-block-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+/* —— 搜狗、手心（ssf-inspector.ts / sxi-inspector.ts）：分组与百度共用同一套样式；一个分组里的多个配置段各有一行小标题 —— */
+.source .inspector-block-heading { display: grid; gap: var(--space-xs); min-width: 0; margin: 0; color: var(--secondary); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+.source .inspector-block-heading > span { flex: none; }
+.source .inspector-block-heading > code { min-width: 0; overflow: hidden; color: var(--tertiary); font-family: var(--font-mono); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); text-overflow: ellipsis; white-space: nowrap; }
+.source .inspector-block-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
 .source .ssf-image-card > .style-reference-meta { gap: var(--space-xs); }
 /* 正常、按下并排的卡片和百度一样；配置段里只有一张图时只放一个预览，不带状态名 */
 .source .ssf-image-card .style-picker-states:has(> :only-child) { grid-template-columns: minmax(0, 1fr); }

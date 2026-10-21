@@ -13,6 +13,8 @@ test("every selected INI layout can open its property inspector", () => {
   assert.match(main, /function showsLayoutProperties\(path: string\): boolean \{\s*if \(appState\.archive\?\.format === "ssf"\) return \/\\\.ini\$\/i\.test\(path\) && !appState\.archive\.isOverlay\(path\)\s*return appState\.archive\?\.format !== "bda" && isConfigLayoutPath\(path\)/)
   // 搜狗皮肤的属性由 ssf-inspector.ts 填进文档分区，不走百度的文档解释。
   assert.match(main, /if \(appState\.archive\?\.format === "ssf"\) \{\s*documentFieldsGroup\.hidden = !populateSsfInspector\(documentFields\)/)
+  // 手心皮肤同样由自己的检查器（sxi-inspector.ts）读写 skin.json。
+  assert.match(main, /if \(appState\.archive\?\.format === "sxi"\) \{\s*documentFieldsGroup\.hidden = !populateSxiInspector\(documentFields\)/)
   // 从任意侧边栏点开布局文件都落到属性页。
   assert.match(main, /preferredSidebarView === "overview" \|\| showsLayoutProperties\(path\)/)
   // “源文件”侧边栏不再把布局文件顶到源代码页。
