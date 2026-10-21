@@ -308,8 +308,12 @@ export function updateBdaStyle(
       if (!field) throw new Error(`BDA 颜色样式不支持：${property}`)
       return replaceField(style, field, 0, encodeVarint(colorValue(value)))
     }
-    const field = { FONT_NAME: 2, FONT_SIZE: 3, NM_COLOR: 4, HL_COLOR: 5 }[property]
+    const field = { FONT_NAME: 2, FONT_SIZE: 3, NM_COLOR: 4, HL_COLOR: 5, CONTENT_TEXT: 6 }[property]
     if (!field) throw new Error(`BDA 文字样式不支持：${property}`)
+    // The text a key draws is the style's own (contentText): the keys of the official skins all set it.
+    if (property === "CONTENT_TEXT") {
+      return value ? replaceField(style, field, 2, new TextEncoder().encode(value)) : removeFields(style, new Set([field]))
+    }
     if (property === "FONT_NAME") {
       return value.trim() ? replaceField(style, field, 2, new TextEncoder().encode(value.trim())) : removeFields(style, new Set([field]))
     }

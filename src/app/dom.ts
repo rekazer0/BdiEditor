@@ -523,6 +523,7 @@ export const tileSourceFields = Array.from(document.querySelectorAll<HTMLInputEl
 export const tileInnerFields = Array.from(document.querySelectorAll<HTMLInputElement>("[data-tile-inner]"))
 
 export const textStyleLabels = Array.from(document.querySelectorAll<HTMLElement>("[data-text-style]"))
+export const keyTextLayerSwitch = $("#key-text-layers")
 
 export const simulatedOutput = $("#simulated-output") as HTMLTextAreaElement
 

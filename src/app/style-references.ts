@@ -12,6 +12,7 @@ import { type StyleImagePickerTarget } from "./types"
 import { openImageSlicePicker } from "./image-pickers"
 import { openStyleImageResourceChooser, selectStyleResource } from "./resource-inspector"
 import { bdaStyleRef, type BdaAppearanceStyleGroup, type BdaStyleRef, bdaStyleID } from "../bda.ts"
+import { NEW_FORE_LAYER } from "../bda-layout-styles.ts"
 import { selectFile } from "./navigation"
 import { updateBdaAppearanceStyleRef } from "./key-inspector"
 
@@ -417,7 +418,8 @@ export function openBdaStyleReferencePicker(paths: string[][], ref: BdaStyleRef,
   // A reference the skin does not set yet (key -1) opens the picker with nothing chosen.
   input.value = ref.key >= 0 ? bdaStyleID(ref) : ""
   input.dataset.documentStyleKey = field
-  input.dataset.bdaStyleType = ref.type
+  // A new foreground layer can be any kind of style: an image, a text or a colour.
+  if (field !== NEW_FORE_LAYER) input.dataset.bdaStyleType = ref.type
   input.addEventListener("change", () => {
     const next = bdaStyleRef(input.value)
     if (next) updateBdaAppearanceStyleRef(paths, next, owner)

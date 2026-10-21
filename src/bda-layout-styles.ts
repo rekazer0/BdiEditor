@@ -27,11 +27,14 @@ export function uniqueStyleItems(items: BdaLayoutStyleItem[]): BdaLayoutStyleIte
   return [...new Map(items.map((item) => [item.path.join("."), item])).values()]
 }
 
-// Foreground layers are only listed as they exist: bda-source.ts cannot add one to `foreStyles` yet.
+/** The slot after a key's last foreground layer: picking a style there adds a layer (`foreStyles[+]`). */
+export const NEW_FORE_LAYER = "foreStyles[+]"
+
 export function keyStyleItems(name: string, key: BdaKey, path: string[]): BdaLayoutStyleItem[] {
   return [
     { ...slot(key.backStyle, "背景样式", "backStyle", [...path, "backStyle"]), owner: name },
     ...key.foreStyles.map((ref, index) => ({ ...slot(ref, `前景样式 ${index + 1}`, `foreStyles[${index}]`, [...path, "foreStyles", String(index)]), owner: name })),
+    { ...slot(undefined, "新增前景层", NEW_FORE_LAYER, [...path, "foreStyles", String(key.foreStyles.length)]), owner: name },
     { ...slot(key.backStyleState, "状态背景样式", "backStyleState", [...path, "backStyleState"]), owner: name },
   ]
 }

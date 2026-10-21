@@ -531,13 +531,14 @@
             </div>
           </section>
           <section class="inspector-group key-only key-typography-fields" data-inspector-group-label="文字">
-            <h3><span class="typography-heading-default">文字</span><span class="typography-heading-override">文字覆盖</span></h3>
+            <h3><span class="typography-heading-default">文字</span><span class="typography-heading-override">文字覆盖</span><span id="key-text-layers" class="ui-segmented" data-size="sm" role="group" aria-label="文字层" hidden></span></h3>
             <p class="inspector-group-subtitle"><span class="typography-subtitle-default">显示内容与字体颜色</span><span class="typography-subtitle-override">仅当前状态</span></p>
             <div class="inspector-grid typography-content-fields">
               <label class="ui-field" title="SHOW：直接点击后传给内核的键值，不是显示文字；显示文字请改样式 SHOW"><span>键值</span><input data-key-field="SHOW" /></label>
               <div id="primary-css-fields" class="primary-css-fields"></div>
             </div>
             <div class="appearance-typography-fields">
+              <label class="ui-field" data-text-style data-bda-text title="contentText：BDA 文字样式自带的显示文字"><span>显示文字</span><input data-style-field="CONTENT_TEXT" aria-label="显示文字" /></label>
               <label class="ui-field" data-text-style title="FONT_NAME：字体名称，可填皮肤内字体文件名或系统字体名；Android 13.3.16.2 的 CSS 样式不解析此键，内嵌字体优先用全局字体"><span>字体名称</span><input data-style-field="FONT_NAME" aria-label="字体名称" list="skin-font-names" /></label>
               <datalist id="skin-font-names"></datalist>
               <label class="ui-field" data-text-style><span>字号</span><input data-style-field="FONT_SIZE" type="number" min="1" step="1" /></label>

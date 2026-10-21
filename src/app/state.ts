@@ -55,6 +55,8 @@ export const appState = {
   selectedCandidate: false,
   /** Which text the 文字 group edits for the candidate bar or whole layout (候选字、首选、输入码……). */
   textStyleTarget: "",
+  /** Which text layers of the selected BDA keys the 文字 fields edit: the main text or the hints after it. */
+  bdaTextLayer: "label" as "label" | "hint",
   unsavedNew: false,
   assetURL: "",
   assetReturnPath: "",

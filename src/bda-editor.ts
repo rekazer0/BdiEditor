@@ -387,7 +387,7 @@ function styleCard(
     controls.append(colorField("正常文字", style.normalColor ?? 0, !editable, (value) => onChange(ref, "NM_COLOR", value)))
     controls.append(colorField("按下文字", style.highlightColor ?? 0, !editable, (value) => onChange(ref, "HL_COLOR", value)))
     if (style.resource) controls.append(readonlyField("字体资源", `${style.resource.type}:${style.resource.resourceID}`))
-    if (style.contentText !== undefined) controls.append(readonlyField("固定文字", style.contentText))
+    controls.append(textField("显示文字", style.contentText ?? "", !editable, (value) => onChange(ref, "CONTENT_TEXT", value)))
   }
   if (controls.childElementCount) card.append(controls)
   return card

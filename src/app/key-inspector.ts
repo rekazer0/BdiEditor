@@ -14,7 +14,7 @@ import { showError, showStatus } from "./file-operations"
 import { refreshBdaStyleReferenceField } from "../bda-editor.ts"
 import { actionFieldNames, bdaKeyFieldLabels, preview, keyboardFields, layoutActionButtons, actionMeaningNodes } from "./canvas-interaction"
 import { shouldSuggestActionCodes, actionDescription } from "../actions.ts"
-import { keyFields, styleFields, primaryCssFields, skinFieldsGroup, toolbarFieldsGroup, keyboardFieldsGroup, keyOnlyGroups, keyTypographyFieldsGroup, selectedKeyName, selectedKeyPreview, selectedKeyContext, quickInspector, skinFields, toolbarFields, textStyleLabels, $, canvasMultiToolbar, canvasMultiCount, keyLayoutFieldsGroup, keyModeButtons, keyActionButtons, gapFields, mode, theme } from "./dom"
+import { keyFields, styleFields, primaryCssFields, skinFieldsGroup, toolbarFieldsGroup, keyboardFieldsGroup, keyOnlyGroups, keyTypographyFieldsGroup, selectedKeyName, selectedKeyPreview, selectedKeyContext, quickInspector, skinFields, toolbarFields, textStyleLabels, keyTextLayerSwitch, $, canvasMultiToolbar, canvasMultiCount, keyLayoutFieldsGroup, keyModeButtons, keyActionButtons, gapFields, mode, theme } from "./dom"
 import { deferNumberInputRefresh } from "../number-input-wheel.ts"
 import { effectivePanelSection } from "../panel-tools.ts"
 import { createIcon } from "../icons"
@@ -29,6 +29,7 @@ import { ssfInspectorTitle } from "./ssf-inspector"
 import { populateDocumentInspector, populateBdaConfigInspector } from "./document-inspector"
 import { populateFontControls } from "./skin-fonts"
 import { populateTextStyleGroup, selectedKeyTextRefs, textRefValues, writeTextRefs, type TextProperty } from "./text-styles"
+import { canCreateBdaKeyText, createBdaKeyText, renderBdaTextLayerSwitch, selectedBdaTextRefs } from "./bda-key-text"
 
 export function selectedBdaRefs(
   source: "BACK_STYLE" | "FORE_STYLE",
@@ -36,9 +37,10 @@ export function selectedBdaRefs(
   fallbackSource?: "BACK_STYLE" | "FORE_STYLE",
 ): BdaStyleRef[] {
   if (appState.archive?.format !== "bda" || !appState.layoutDocument) return []
+  // A key shown in a state (Shift on…) draws its state key's styles from the state's TIP section.
   const collect = (name: "BACK_STYLE" | "FORE_STYLE") =>
     appState.selectedKeySections.flatMap((section) => {
-      const ref = (appState.layoutDocument?.get(section, name) ?? "")
+      const ref = (appState.layoutDocument?.get(effectiveKeySection(section), name) ?? "")
         .split(",")
         .map(bdaStyleRef)
         .find((item) => item?.type === type)
@@ -64,6 +66,7 @@ export function bdaStyleValue(appearance: BdaAppearance, ref: BdaStyleRef, prope
   if (property === "FONT_SIZE") return style.fontSize === undefined ? "" : String(style.fontSize)
   if (property === "NM_COLOR") return style.normalColor === undefined ? "" : bdaColorHex(style.normalColor)
   if (property === "HL_COLOR") return style.highlightColor === undefined ? "" : bdaColorHex(style.highlightColor)
+  if (property === "CONTENT_TEXT") return style.contentText ?? ""
   return ""
 }
 
@@ -71,7 +74,7 @@ export function updateBdaRefs(refs: BdaStyleRef[], property: string, value: stri
   const info = currentBdaAppearance()
   if (!info || !refs.length) return false
   // An emptied size or colour keeps its value (BDA has no "unset" for them); an invalid value says why.
-  if (!value.trim() && property !== "FONT_NAME") {
+  if (!value.trim() && property !== "FONT_NAME" && property !== "CONTENT_TEXT") {
     populateKeyInspector()
     return false
   }
@@ -95,14 +98,15 @@ export function updateBdaRefs(refs: BdaStyleRef[], property: string, value: stri
 }
 
 /** `bytes` with the panel's references at `paths` set to `ref`, creating messages it lacks (input, cand.switch). */
-function withBdaPanelRefs(path: string, bytes: Uint8Array, part: NonNullable<ReturnType<typeof bdaAppearancePart>>, paths: string[][], ref: BdaStyleRef): Uint8Array {
+export function withBdaPanelRefs(path: string, bytes: Uint8Array, part: NonNullable<ReturnType<typeof bdaAppearancePart>>, paths: string[][], ref: BdaStyleRef): Uint8Array {
   const source = JSON.parse(decodedBdaAppearancePart(bytes, part)) as Record<string, unknown>
   for (const steps of paths) {
     let target: unknown = source
-    for (const step of steps.slice(0, -1)) {
+    for (const [index, step] of steps.slice(0, -1).entries()) {
       if (target === null || typeof target !== "object") throw new Error(`BDA 面板缺少 ${steps.join(".")}`)
       const holder = target as Record<string, unknown>
-      if (!Array.isArray(target) && holder[step] === undefined) holder[step] = {}
+      // A key without foreground layers has no foreStyles list yet.
+      if (!Array.isArray(target) && holder[step] === undefined) holder[step] = /^\d+$/.test(steps[index + 1]) ? [] : {}
       target = Array.isArray(target) ? target[Number(step)] : holder[step]
     }
     if (target === null || typeof target !== "object") throw new Error(`BDA 面板缺少 ${steps.join(".")}`)
@@ -404,7 +408,11 @@ export function populateKeyInspector(): void {
   const bdaTextPropertyAvailability = new Map<string, boolean>()
   // Decoding the appearance file is the expensive part: do it once per refresh, not per field.
   const bdaTextInfo = bdaSelected ? currentBdaAppearance() : undefined
-  const bdaTextRefs = bdaSelected ? selectedBdaRefs("FORE_STYLE", "text") : []
+  const bdaTextRefs = bdaSelected ? selectedBdaTextRefs() : []
+  // A key with only image layers gets a text layer on its first text edit.
+  const bdaTextCreatable = bdaSelected && hasSelection && !bdaTextRefs.length && canCreateBdaKeyText()
+  if (bdaSelected && hasSelection) renderBdaTextLayerSwitch()
+  else keyTextLayerSwitch.hidden = true
   let hasTextStyle = bdaTextRefs.length > 0
   const keyTextRefs = hasSelection && !bdaSelected ? selectedKeyTextRefs() : []
   const styles = keyboard?.styles
@@ -415,7 +423,7 @@ export function populateKeyInspector(): void {
       const refs = bdaTextRefs
       const values = info ? refs.map((ref) => bdaStyleValue(info.appearance, ref, property)) : []
       // updateBdaStyle adds a missing field, so every text style can take every property.
-      const available = Boolean(info && refs.length)
+      const available = Boolean(info && (refs.length || bdaTextCreatable))
       bdaTextPropertyAvailability.set(property, available)
       const common = values.length && values.every((value) => value === values[0]) ? values[0] : ""
       field.disabled = !available
@@ -434,12 +442,13 @@ export function populateKeyInspector(): void {
     if (property.endsWith("COLOR")) syncColorControl(field)
   }
   for (const label of textStyleLabels) {
-    if (!hasSelection || bdaSelected && !hasTextStyle) {
+    if (!hasSelection || bdaSelected && !hasTextStyle && !bdaTextCreatable) {
       label.hidden = true
       continue
     }
     if (appState.archive?.format !== "bda") {
-      label.hidden = false
+      // 显示文字 is a BDA text style's own text; INI keys show their style SHOW (primary CSS fields).
+      label.hidden = label.hasAttribute("data-bda-text")
       for (const fieldLabel of Array.from(label.querySelectorAll<HTMLLabelElement>("label"))) fieldLabel.hidden = false
       continue
     }
@@ -456,7 +465,7 @@ export function populateKeyInspector(): void {
   }
   const typographySubtitle = quickInspector.querySelector(".typography-subtitle-default")
   if (typographySubtitle) typographySubtitle.textContent = !hasSelection || hasTextStyle ? "显示内容与字体颜色"
-    : bdaSelected ? "前景没有文字样式，只能修改显示内容" : "前景没有文字层：修改字号或颜色会新建一个文字层"
+    : bdaSelected && !bdaTextCreatable ? "前景没有文字样式，只能修改显示内容" : "前景没有文字层：修改文字会新建一个文字层"
   const paddingSection = quickInspector.querySelector<HTMLElement>(".inspector-padding-section")
   // Unset padding reads as 0,0,0,0 (see the PADDING field values above); a LIST cell has none.
   if (paddingSection) paddingSection.hidden = bdaSelected || !hasSelection || sections.some(isListCell)
@@ -726,7 +735,9 @@ export function updateSelectedStyle(field: HTMLInputElement): void {
   const property = field.dataset.styleField ?? ""
   if (field.type === "number" && field.value && !field.checkValidity()) return
   if (appState.archive?.format === "bda") {
-    updateBdaRefs(selectedBdaRefs("FORE_STYLE", "text"), property, field.value)
+    const refs = selectedBdaTextRefs()
+    if (refs.length) updateBdaRefs(refs, property, field.value)
+    else createBdaKeyText(property, field.value)
     return
   }
   writeTextRefs(selectedKeyTextRefs(), property as TextProperty, field.value.trim())
