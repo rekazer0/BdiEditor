@@ -737,7 +737,7 @@ await check("file: a Sogou .ssf lists only its own files: preview switching, pro
   assert.equal(await page.locator('#source-name').textContent(), '1080/status1/phoneSkin.ini')
   await page.locator('.sidebar-overview button[data-path="light/skin/port/py_9.ini"]').click()
   await editMode(page)
-  await page.getByRole("combobox", { name: "预览布局", exact: true }).selectOption("py_9.ini")
+  await page.locator('.sidebar-overview button[data-path="light/skin/port/py_9.ini"]').click()
   assert.equal(await page.locator("#selected-key").textContent(), "拼音 9 键")
   assert.equal(await page.locator("#selected-key-context").textContent(), "1080/status1/phoneSkin.ini")
   await page.locator('[data-orientation-choice="land"]').click()
@@ -779,7 +779,7 @@ await check("file: a Sogou .ssf lists only its own files: preview switching, pro
   assert.equal(await page.locator("#source-name").textContent(), "1080/status1/phoneSkin.ini")
   await page.locator('[data-inspector-tab="properties"]').click()
   // Clicking a key selects it and shows the Sogou classes it is drawn from; it cannot be moved or deleted.
-  await page.getByRole("combobox", { name: "预览布局", exact: true }).selectOption("py_26.ini")
+  await page.locator('.sidebar-overview button[data-path="light/skin/port/py_26.ini"]').click()
   await clickCanvas(page, 0.5, 0.4)
   await page.waitForSelector('#document-fields [data-inspector-group-label="背景"]')
   assert.match(await page.locator("#selected-key-context").textContent(), /^status1\/phoneSkin\.ini · Key_/)

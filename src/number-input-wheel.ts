@@ -154,7 +154,7 @@ export function installNumberInputWheel(root: NumberInputRoot = document, option
       rest -= steps * SCRUB_PX_PER_STEP
       nudge(field, steps * (moveEvent.shiftKey ? SHIFT_STEPS : 1))
     }
-    const end = () => {
+    const end = (endEvent: PointerEvent) => {
       handle.removeEventListener("pointermove", move)
       handle.removeEventListener("pointerup", end)
       handle.removeEventListener("pointercancel", end)
@@ -168,6 +168,8 @@ export function installNumberInputWheel(root: NumberInputRoot = document, option
         setTimeout(() => handle.removeEventListener("click", swallow, { capture: true }), 0)
         return
       }
+      // 手机上竖向滑动交给页面滚动（touch-action: pan-y），浏览器接管后发 pointercancel，不当作点击。
+      if (endEvent.type === "pointercancel") return
       field.focus()
       field.select()
     }

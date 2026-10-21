@@ -155,7 +155,7 @@ for (const colorScheme of ["light", "dark"]) await withPage(async (page) => {
   const close = page.locator("#file-operation-dialog[open] #file-operation-close")
   if (await close.isVisible()) await close.click()
   await page.getByRole("button", { name: "编辑模式", exact: true }).click()
-  await page.getByRole("combobox", { name: "预览布局", exact: true }).selectOption("py_26.ini")
+  await page.locator('.sidebar-overview button[data-path="light/skin/port/py_26.ini"]').click()
   await capture(page, `${colorScheme}-ssf-board`)
   const box = await page.locator("#preview").boundingBox()
   await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.4)

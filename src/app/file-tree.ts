@@ -123,7 +123,6 @@ export function renderFiles(): void {
   files.replaceChildren()
   appState.selectedFileButton = undefined
   document.documentElement.dataset.archiveFormat = appState.archive?.format ?? ""
-  layout.hidden = appState.archive?.format !== "ssf"
   if (!appState.archive) return
 
   const overview = document.createElement("div")

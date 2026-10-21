@@ -1,7 +1,7 @@
 import { source, keyboardFields, layoutActionButtons, preview, inspectorTabButtons, mobilePortraitQuery, activateSkinState } from "../canvas-interaction"
 import { type SourceEditorValueClick } from "../../lazy-source-editor.ts"
 import { openSourceColorPicker, openSourceStyleDefinition, openSourceStylePicker, scheduleSourceSearch, closeSourceFind, findSourceMatch, openSourceFind, syncSourceFindBarOffset, replaceSourceMatches, updateInspectorView, updateSourceHighlight } from "../source-panel"
-import { sourceSearch, sourceSearchPrevious, sourceSearchNext, sourceFindToggle, sourceEditor, sourceReplaceToggle, sourceReplaceRow, sourceReplacement, sourceReplace, sourceReplaceAll, keyFields, styleFields, toolbarFields, skinFields, gapFields, quickInspector, colorPickers, colorAlphas, keyModeButtons, keyActionButtons, aiDesignPanel, aiDesignStatus, theme, orientation, layout, mode, eventLog, modeChoiceButtons, themeChoiceButtons, orientationChoiceButtons, mobileChoiceButtons, toggleGuides, mobileToggleGuides, newTileButton, duplicateTileButton, deleteTileButton, resourceBackButton, resourceSearch, resourceCategory, bdaTileUsage, tileModeButtons, atlasCanvas, workspaceImage, tileSourceFields, tileInnerFields, skinState, panelScaleButton, adaptIos26Button, ios26Dialog, ios26Form, replaceLayoutImageButton, layoutImageFile, layoutImageOpen, layoutImageDialog, layoutImageTargetInputs, layoutImageScope, layoutImageError, layoutImageConfigButtons, layoutImageConfigFieldset, layoutImageForm, panelCopySource, panelTargetWidth, panelTargetHeight, panelCopyTarget, panelScaleEnabled, panelScaleForm, panelScaleDialog, candidateArea, toolbarCanvas, toolbarStrip, styleImagePicker, styleImagePickerCanvas, styleImageClose, styleImageSource, styleImageDialog, fontFileSelect, fontImportButton, fontImportInput, fontRemoveButton } from "../dom"
+import { sourceSearch, sourceSearchPrevious, sourceSearchNext, sourceFindToggle, sourceEditor, sourceReplaceToggle, sourceReplaceRow, sourceReplacement, sourceReplace, sourceReplaceAll, keyFields, styleFields, toolbarFields, skinFields, gapFields, quickInspector, colorPickers, colorAlphas, keyModeButtons, keyActionButtons, aiDesignPanel, aiDesignStatus, theme, orientation, mode, eventLog, modeChoiceButtons, themeChoiceButtons, orientationChoiceButtons, mobileChoiceButtons, toggleGuides, mobileToggleGuides, newTileButton, duplicateTileButton, deleteTileButton, resourceBackButton, resourceSearch, resourceCategory, bdaTileUsage, tileModeButtons, atlasCanvas, workspaceImage, tileSourceFields, tileInnerFields, skinState, panelScaleButton, adaptIos26Button, ios26Dialog, ios26Form, replaceLayoutImageButton, layoutImageFile, layoutImageOpen, layoutImageDialog, layoutImageTargetInputs, layoutImageScope, layoutImageError, layoutImageConfigButtons, layoutImageConfigFieldset, layoutImageForm, panelCopySource, panelTargetWidth, panelTargetHeight, panelCopyTarget, panelScaleEnabled, panelScaleForm, panelScaleDialog, candidateArea, toolbarCanvas, toolbarStrip, styleImagePicker, styleImagePickerCanvas, styleImageClose, styleImageSource, styleImageDialog, fontFileSelect, fontImportButton, fontImportInput, fontRemoveButton } from "../dom"
 import { appState } from "../state"
 import { syncActionCodeSuggestions, updateSelectedKey, updateSelectedStyle, updateKeyboard, updateToolbar, updateSkinInfo, populateKeyInspector } from "../key-inspector"
 import { syncColorControl, writeColorControl, scrollSelectedSource } from "../config-context"
@@ -173,14 +173,14 @@ export function wireEditingControls(): void {
       }
     })
   }
-  for (const control of [theme, orientation, layout]) {
+  for (const control of [theme, orientation]) {
     control.addEventListener("change", () => {
       const path = preferredPath()
       // 切换外观或横竖屏时，搜狗皮肤停留在当前键盘（概览里选的可能不是 9 / 26 键）。
       if (appState.archive?.format === "ssf") {
-        return switchSsfPreviewLayout(control === layout ? path : path.replace(/[^/]+$/, appState.layoutPath.split("/").pop()!))
+        return switchSsfPreviewLayout(path.replace(/[^/]+$/, appState.layoutPath.split("/").pop()!))
       }
-      if (control !== layout && !createMissingVariant(path)) return
+      if (!createMissingVariant(path)) return
       let selected = false
       if (appState.archive?.format === "bda") {
         renderFiles()
