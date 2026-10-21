@@ -1,0 +1,142 @@
+import { canvasWrap, mode, toolbarMenus } from "./dom"
+import { appState } from "./state"
+import { mobilePortraitQuery } from "./canvas-interaction"
+import { runTour, type TourStep } from "../tour.ts"
+
+const ONBOARDING_KEY = "onboarding-tour-v1"
+
+const hasSkin = () => Boolean(appState.archive) && !canvasWrap.classList.contains("empty")
+const closeMenus = () => { for (const menu of toolbarMenus) menu.open = false }
+
+/** 首次打开的使用教程：电脑（宽屏）与手机竖屏的界面不同，按启动时的布局选一套说明。 */
+function onboardingSteps(compact: boolean): TourStep[] {
+  const menu = toolbarMenus.find((item) => item.classList.contains(compact ? "mobile-command-menu" : "pen-file-menu"))
+  const menuSelector = compact ? ".mobile-command-menu" : ".pen-file-menu"
+  const welcome = !hasSkin()
+  const steps: TourStep[] = [
+    {
+      title: "欢迎使用键设",
+      body: compact
+        ? "键设可以直接在手机上编辑百度、搜狗、手心输入法皮肤。接下来花一分钟，跟着提示完成一次：新建皮肤 → 预览 → 修改按键 → 导出。点右上角 × 可随时退出。"
+        : "键设是百度、搜狗、手心输入法皮肤的可视化编辑器。接下来花一分钟，跟着提示完成一次：新建皮肤 → 预览 → 修改按键 → 保存导出。按 Esc 或点右上角 × 可随时退出。",
+    },
+  ]
+  if (welcome) steps.push(
+    {
+      target: ["#welcome-recent-open"],
+      title: "打开已有皮肤",
+      body: compact
+        ? "已经有皮肤文件（.bdi / .bds / .bda / .ssf / .sxi）时点这里导入；也可以在其他应用里把皮肤文件分享给键设。"
+        : "已经有皮肤文件（.bdi / .bds / .bda / .ssf / .sxi）时点这里导入，也可以直接把文件拖进窗口。打开过的皮肤会列在「最近打开」里。",
+      when: () => !hasSkin(),
+    },
+    {
+      target: ['.template-card[data-template="default-android"]'],
+      title: "从模板新建皮肤",
+      body: "第一次使用建议从模板开始：模板保留了官方的基础布局和资源，改起来不容易出错。",
+      action: { hint: compact ? "轻点高亮的「百度 BDA 默认」模板" : "点击高亮的「百度 BDA 默认」模板", done: hasSkin },
+    },
+  )
+  steps.push(
+    {
+      target: [".canvas-wrap"],
+      title: "画布：实时预览",
+      body: compact
+        ? "下半屏是键盘的实际效果。「交互预览」模式下轻点按键会模拟打字，双指可以缩放画布。"
+        : "这里显示键盘的实际效果。「交互预览」模式下点击按键会模拟打字；滚轮或右下角的按钮可以缩放画布。",
+      when: hasSkin,
+    },
+    {
+      target: [".preview-toolbar"],
+      title: "预览选项",
+      body: compact
+        ? "切换辅助线、预览设备（各款手机或纯画布）、竖屏 / 横屏和浅色 / 深色。皮肤里的每种组合都可以分别编辑。"
+        : "依次是辅助线、皮肤状态、预览设备（各款手机或纯画布）、竖屏 / 横屏、浅色 / 深色。皮肤里的每种组合都可以分别编辑。",
+      when: hasSkin,
+    },
+    {
+      target: compact ? [".mode-control .mobile-choice-toggle"] : ['[data-mode-choice="edit"]'],
+      title: "切换到编辑模式",
+      body: "打开皮肤后默认处于「交互预览」，配置只读。切换到「编辑模式」后才能选中、拖动和修改按键。",
+      action: { hint: compact ? "轻点右上角的「交互预览」按钮，切换到编辑模式" : "点击右上角的「编辑模式」", done: () => mode.value === "edit" },
+      when: hasSkin,
+    },
+    {
+      target: [".canvas-wrap"],
+      title: "选中一个按键",
+      body: compact
+        ? "编辑模式下轻点按键即可选中，选中后上半屏会自动切到「属性检查器」。"
+        : "编辑模式下点击按键即可选中，拖动可以移动位置；按住 Ctrl（macOS 为 ⌘）单击可以多选。",
+      action: { hint: compact ? "轻点画布上任意一个按键" : "点击画布上任意一个按键", done: () => appState.selectedKeySections.length > 0 },
+      when: () => hasSkin() && mode.value === "edit",
+    },
+    {
+      target: ["section.source"],
+      title: "属性检查器",
+      body: compact
+        ? "在这里修改选中按键的位置、尺寸、样式、文字和手势，改动立即显示在画布上，点顶部的撤销按钮可以撤回。右侧分类栏可快速跳到对应分组。"
+        : "在这里修改选中对象的位置、尺寸、样式、文字和手势，改动立即显示在画布上，可随时撤销（Ctrl/⌘ + Z）。右侧分类栏点击即可跳到对应分组，放大镜可以筛选属性。",
+      when: hasSkin,
+    },
+    compact
+      ? {
+          target: [".mobile-workspace-tabs"],
+          title: "切换编辑区域",
+          body: "上半屏可以在「文件与布局」和「属性检查器」之间切换，也可以左右滑动。「文件与布局」里可以换到 9 键、26 键、符号等面板；拖动右侧的手柄可以调整画布与编辑区的比例。",
+          when: hasSkin,
+        }
+      : {
+          target: ["aside.sidebar"],
+          title: "概览与源文件",
+          body: "「概览」列出皮肤信息、资源和全部键盘面板（9 键、26 键、符号……），点击即可切换要编辑的面板；「源文件」用来查看和管理皮肤包里的所有文件。",
+          when: hasSkin,
+        },
+    {
+      target: [".titlebar-preferences"],
+      title: "设置",
+      body: "外观主题、强调色、默认预览设备、画布背景等偏好都在这里调整。",
+    },
+    {
+      target: [`${menuSelector} > summary`],
+      title: "保存与导出",
+      body: "新建、打开、保存和导出皮肤都在左上角的菜单里。",
+      action: { hint: compact ? "轻点左上角的菜单按钮" : "点击左上角的菜单按钮", done: () => Boolean(menu?.open) },
+    },
+    {
+      target: [`${menuSelector}[open] .toolbar-menu`],
+      title: "导出给输入法",
+      body: compact
+        ? "改好后先「保存皮肤」，再按要使用的输入法选择导出格式；「分享皮肤」可以把皮肤直接发给输入法安装。"
+        : "改好后先「保存皮肤」，再按要使用的输入法选择导出格式：百度 iOS / Android、新版 BDA、手心或搜狗。",
+      when: () => Boolean(menu?.open),
+      leave: closeMenus,
+    },
+    {
+      title: "准备就绪",
+      body: "以上就是基本流程。想再看一遍时，打开左上角菜单里的「使用教程」。祝你做出满意的皮肤！",
+    },
+  )
+  return steps
+}
+
+function markOnboardingSeen(): void {
+  try { localStorage.setItem(ONBOARDING_KEY, "done") } catch {}
+}
+
+export function startOnboarding(): void {
+  appState.stopOnboarding?.()
+  closeMenus()
+  appState.stopOnboarding = runTour(onboardingSteps(mobilePortraitQuery.matches), {
+    busy: () => appState.fileOperationRunning || Boolean(document.querySelector("dialog[open]")),
+    onEnd: () => {
+      appState.stopOnboarding = undefined
+      markOnboardingSeen()
+    },
+  })
+}
+
+/** 软件首次打开时自动开始教程；看完或跳过后不再出现。 */
+export function startOnboardingOnFirstLaunch(): void {
+  try { if (localStorage.getItem(ONBOARDING_KEY)) return } catch { return }
+  startOnboarding()
+}

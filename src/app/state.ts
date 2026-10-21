@@ -218,6 +218,8 @@ export const appState = {
   resolveNativeProjectChoice: undefined as ((templateID: string | undefined) => void) | undefined,
   nativeProjectWindowReady: false,
   recentPreviewRunning: false,
+  // 使用教程进行中时的停止函数
+  stopOnboarding: undefined as (() => void) | undefined,
   // 持久缩略图缓存：重启后不必再读整包解 demo 图。按路径存，条目随最近列表裁剪（最多 9 个）。
   recentThumbDb: undefined as Promise<IDBDatabase> | undefined,
   windowMaterialKind: "glass" as WindowMaterialKind,
