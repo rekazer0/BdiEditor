@@ -4,7 +4,7 @@
 
 ### 新增功能
 
-- 手心（`.sxi`）与搜狗（`.ssf`）皮肤的画布改为直接读取 `skin.json` / `phoneSkin.ini` 绘制，不再先转成百度样式：手心的字重（`f_w`）、纯色背景、透明键盘背景下的手心底色、输入状态换层；搜狗的 `[Keyboard]` 背景、九宫格拉伸、`FG_RECT`、拼音键盘大写、九键数字副标签、FG_STYLE 标签框与皮肤自带的标签文字，都按输入法自身的规则显示。对照依据与仍无法从皮肤得出的差异见 [research/native-preview.md](research/native-preview.md)。
+- 手心（`.sxi`）与搜狗（`.ssf`）皮肤的画布改为原生渲染，不再先转成百度格式：手心画布的键位、状态换层、候选栏、样式与图片全部直接读 `skin.json`（字重 `f_w`、纯色背景、透明键盘背景下的手心底色都按手心规则显示）；搜狗画布只叠加官方键盘骨架，直接读 `phoneSkin.ini` / `keys.ini` 绘制（`[Keyboard]` 背景、九宫格拉伸、`FG_RECT`、拼音键盘大写、九键数字副标签、FG_STYLE 标签框、皮肤自带的标签文字、候选字与输入码样式），编辑时不再整包转换图片。对照依据与仍无法从皮肤得出的差异见 [research/native-preview.md](research/native-preview.md)。
 
 ## 2.0.0-beta5 - 2026-10-21
 

@@ -1,6 +1,7 @@
-// Palm `.sxi` and Sogou `.ssf` documents paint a scene read from their own files (skin.json,
-// phoneSkin.ini), not the Baidu styles of the projected layout. The scene must name exactly the key
-// sections the canvas selects, follow the keyboard state, and draw what the skin's own data says.
+// Palm `.sxi` and Sogou `.ssf` documents are drawn from their own files (skin.json, phoneSkin.ini),
+// not from Baidu styles: a Palm canvas lists skin.json's keys, a Sogou canvas the official skeleton's
+// with no converted look. Scenes must name exactly the keys the canvas lists, follow the keyboard
+// state, and draw what the skin's own data says.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
@@ -48,6 +49,19 @@ try {
   await selectLayout('light/skin/port/py_9.ini')
   const palm = await scene(undefined, [3, 300])
   assert.deepEqual(palm.unknown, [], 'every Palm scene key is a canvas key section')
+  // The canvas lists skin.json's own keys and reads no projected layout.
+  const listed = await page.evaluate(async () => {
+    const { preview } = await import('/src/app/canvas-interaction.ts')
+    const { appState } = await import('/src/app/state.ts')
+    const board = JSON.parse(appState.archive.getText('skin.json')).default.port_layout.b.t9Pinyin
+    return {
+      document: preview.stateDocument === undefined,
+      keys: preview.keys.filter((key) => /^KEY/.test(key.section)).map((key) => key.section).sort(),
+      skin: board.keys.filter((key) => key.rect).map((key) => `KEY${key.id}`).sort(),
+    }
+  })
+  assert.ok(listed.document, 'the Palm canvas has no layout document')
+  assert.deepEqual(listed.keys, listed.skin)
   assert.deepEqual(palm.pixel.slice(0, 3), [208, 211, 217], 'transparent board shows the Palm backdrop')
   assert.deepEqual(palm.texts.KEY2.map(({ text }) => text), ['ABC', '2'])
   // `f_w` is Palm-only: the Baidu projection drops it, the scene keeps the skin's light weight.
@@ -68,6 +82,12 @@ try {
   const sogou = await scene(undefined)
   assert.deepEqual(sogou.unknown, [], 'every Sogou scene key is a canvas key section')
   assert.ok(sogou.background > 0, 'the Sogou keyboard background is drawn')
+  // The skeleton laid over the skin carries no converted copy of its look.
+  const converted = await page.evaluate(async () => {
+    const { appState } = await import('/src/app/state.ts')
+    return appState.archive.names().filter((name) => /\/res\/ssf\d+\.png$/.test(name))
+  })
+  assert.deepEqual(converted, [])
   // KEY2 carries the fixture's keys.ini glyph, so it draws no built-in label.
   assert.deepEqual(sogou.texts.KEY2, [])
   assert.deepEqual(sogou.texts.KEY3.map(({ text }) => text), ['DEF'])

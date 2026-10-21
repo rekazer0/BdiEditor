@@ -99,7 +99,7 @@ export async function paintPreview(self: Preview): Promise<void> {
   const hintIcon = hintIconID ? hintConfig?.icons.get(hintIconID) : undefined
   const keys = previewDrawOrder(visiblePreviewItems(self.keys, self.skinState)
     .map((key) =>
-      self.document ? effectivePreviewItem(self.document, key, self.skinState ?? 0) : key,
+      self.stateDocument ? effectivePreviewItem(self.stateDocument, key, self.skinState ?? 0) : key,
     ), self.panelWidth, self.panelHeight, self.legacyAnimationState?.key.section)
 
   // 拖拽时优先使用缓存的视觉数据，避免重复异步解析

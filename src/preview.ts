@@ -34,6 +34,8 @@ export class Preview {
   /** Palm and Sogou skins paint a scene read from their own files instead of resolving styles. */
   scene?: (state: number | undefined) => Promise<NativeScene | undefined>
   private readonly scenes = new Map<number | undefined, Promise<NativeScene | undefined>>()
+  /** Palm documents list their keys themselves, per keyboard state and composition. */
+  private nativeItems?: (state: number | undefined, persistentOnly: boolean) => PreviewItem[]
   // Resolver lookups are asynchronous and can involve stylesheet/tile parsing
   // and image decoding. Keep the resolved values for the lifetime of a
   // resolver; drag frames then only redraw geometry instead of repeating the
@@ -358,15 +360,7 @@ export class Preview {
     this.defaults = defaults
     this.visualCache.clear()
     this.lastRenderCache = undefined
-    this.keys = this.document
-      ? previewItems(
-          this.document,
-          this.panelWidth,
-          this.panelHeight,
-          defaults,
-          this.persistentOnly,
-        )
-      : []
+    this.keys = this.layoutItems()
     this.fitCanvas()
     void this.draw()
   }
@@ -389,6 +383,7 @@ export class Preview {
 
   setSkinState(state?: number): void {
     this.skinState = state
+    if (this.nativeItems) this.keys = this.layoutItems()
     void this.draw()
   }
 
@@ -397,16 +392,14 @@ export class Preview {
     this.persistentOnly = persistentOnly
     this.visualCache.clear()
     this.toolbarImagesCache = undefined
-    this.keys = this.document
-      ? previewItems(
-          this.document,
-          this.panelWidth,
-          this.panelHeight,
-          this.defaults,
-          persistentOnly,
-        )
-      : []
+    this.keys = this.layoutItems()
     void this.draw()
+  }
+
+  /** The keys the canvas shows: the native list, else the layout document's. */
+  private layoutItems(persistentOnly = this.persistentOnly): PreviewItem[] {
+    if (this.nativeItems) return this.nativeItems(this.skinState, persistentOnly)
+    return this.document ? previewItems(this.document, this.panelWidth, this.panelHeight, this.defaults, persistentOnly) : []
   }
 
   expandSections(sections: readonly string[]): string[] {
@@ -455,27 +448,25 @@ export class Preview {
     this.panelAnimationStyle = animationStyle
     this.panelWidth = width
     this.panelHeight = height
-    this.keys = this.document
-      ? previewItems(this.document, width, height, this.defaults, this.persistentOnly)
-      : []
+    this.keys = this.layoutItems()
     this.fitCanvas()
     if (animationChanged) this.restartLegacyPanelAnimation()
     void this.draw()
   }
 
+  /** Lists the canvas keys from the skin's own data instead of the layout document. */
+  setNativeItems(items?: (state: number | undefined, persistentOnly: boolean) => PreviewItem[]): void {
+    this.nativeItems = items
+    this.setDocument(this.document)
+  }
+
   setDocument(document?: IniDocument): void {
     this.document = document
+    // An edit to the layout is an edit to the skin a scene is built from.
+    this.scenes.clear()
     this.visualCache.clear()
     this.lastRenderCache = undefined
-    this.keys = document
-      ? previewItems(
-          document,
-          this.panelWidth,
-          this.panelHeight,
-          this.defaults,
-          this.persistentOnly,
-        )
-      : []
+    this.keys = this.layoutItems()
     const available = new Set(this.keys.map((key) => key.section))
     this.selected = new Set([...this.selected].filter((section) => available.has(section)))
     this.fitCanvas()
@@ -503,7 +494,7 @@ export class Preview {
       // Measure every layout key, not only the persistent subset, so the canvas
       // keeps the same aspect as the viewport the editor sizes around it.
       this.surfaceHeightValue = previewSurfaceHeight(
-        this.document ? previewItems(this.document, this.panelWidth, this.panelHeight) : this.keys,
+        this.document || this.nativeItems ? this.layoutItems(false) : this.keys,
         this.panelHeight,
       )
     }
@@ -524,10 +515,15 @@ export class Preview {
     )
   }
 
+  /** The layout document whose TIP sections swap keys per state; native key lists are already swapped. */
+  get stateDocument(): IniDocument | undefined {
+    return this.nativeItems ? undefined : this.document
+  }
+
   hit(point: { x: number; y: number }): PreviewItem | undefined {
-    return this.document
+    return this.stateDocument
       ? effectivePreviewHitItem(
-        this.document,
+        this.stateDocument,
         this.keys,
         point,
         this.mode,

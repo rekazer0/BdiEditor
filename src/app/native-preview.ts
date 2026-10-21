@@ -1,29 +1,35 @@
-// Palm and Sogou skins are painted from their own files (skin.json, phoneSkin.ini); the layout the
-// canvas lists only names the key sections the editor selects and edits, and their geometry.
+// Palm and Sogou documents are drawn from their own files. A Palm canvas reads skin.json for
+// everything: the board's size, keys and states, the candidate bar, the styles, animations and hint
+// bubbles. A Sogou canvas lists the keys of Sogou's official skeleton (the skin has no layout) and
+// paints phoneSkin.ini onto them.
 
 import { AtlasResolver, type TextVisual } from "../atlas.ts"
+import { inputBarMetrics } from "../candidate-style.ts"
 import { IniDocument } from "../ini.ts"
 import type { NativeScene, SceneLayer } from "../native-scene.ts"
-import { palmBoardScene, palmCandidateScene, type PalmOrientation, type PalmTheme } from "../palm/palm-scene.ts"
-import { SXI_SKIN_PATH, parseSkinJson } from "../palm/sxi-projection.ts"
-import type { JsonObject } from "../palm/sxi-ini.ts"
+import { PalmBoard, type PalmOrientation, type PalmTheme } from "../palm/palm-board.ts"
+import { palmBoardScene, palmCandidateScene } from "../palm/palm-scene.ts"
+import type { PalmStyles } from "../palm/palm-styles.ts"
+import { asObject, type Json } from "../palm/sxi-ini.ts"
+import { bubbleIni } from "../palm/sxi-layout.ts"
+import { animationsIni, stylesIni } from "../palm/sxi-style.ts"
+import { parseLegacyAnimation } from "../preview-animation.ts"
+import { parseLegacyHint } from "../preview-hints.ts"
 import type { SkinArchive } from "../skin.ts"
 import type { SsfTheme } from "../ssf/ssf-package.ts"
 import { SsfStyles, ssfBoardScene, ssfCandidateScene } from "../ssf/ssf-scene.ts"
+import { visualResolver } from "./bda-documents"
 import { candidateBackgroundPreview, preview, toolbarPreview } from "./canvas-interaction"
-import { toolbarConfigPath } from "./config-context"
+import { applyCandidateSpacing, hideCandidateInputBar, showCandidateInputBar, toolbarConfigPath } from "./config-context"
+import { candidateArea, candidateBackgroundCanvas, candidateInput, candidateWords, hintPreviewEnabled, theme as themeInput, toolbarCanvas, toolbarStrip } from "./dom"
+import { canvasEditable } from "./edit-history"
+import { applyCandidateTextVisual, applyDeviceKeyboardGeometry, devicePreviewTransparent, inputBarInKeyboard, updatePanelTools } from "./preview-render"
 import { ssfDocumentPackage } from "./ssf-preview"
+import { palmSkin } from "./sxi-documents"
 import { appState } from "./state"
 
 type CandidateScene = { bar: SceneLayer[]; icons: NativeScene }
-
-function palmSkin(archive: SkinArchive): JsonObject {
-  const cached = appState.palmSkin
-  if (cached?.archive === archive && cached.revision === archive.revision) return cached.skin
-  const skin = parseSkinJson(archive.getText(SXI_SKIN_PATH))
-  appState.palmSkin = { archive, revision: archive.revision, skin }
-  return skin
-}
+type CandidateText = { words?: TextVisual; first?: TextVisual; input?: TextVisual }
 
 /** The toolbar canvas follows the keyboard state; the bar's backdrop does not change with it. */
 function setCandidateScenes(build: (state: number | undefined) => Promise<CandidateScene>): void {
@@ -37,14 +43,131 @@ function setCandidateScenes(build: (state: number | undefined) => Promise<Candid
   candidateBackgroundPreview.setScene(() => scene(undefined).then(({ bar }) => ({ background: bar, keys: [] })))
 }
 
-function palmScenes(archive: SkinArchive): boolean {
-  const pointer = archive.derivedPointer(appState.layoutPath)
-  if (pointer?.[2] !== "b") return false
-  const skin = palmSkin(archive)
+/** The Palm board the open document shows, read from its skin.json as it is now. */
+function palmBoard(): PalmBoard | undefined {
+  const archive = appState.archive
+  const pointer = archive?.format === "sxi" ? archive.derivedPointer(appState.layoutPath) : undefined
+  if (!archive || pointer?.[2] !== "b") return
   const [theme, layoutKey, , type] = pointer as [PalmTheme, string, string, string]
-  const orientation = layoutKey.replace(/_layout$/, "") as PalmOrientation
-  preview.setScene((state) => palmBoardScene(archive, skin, theme, orientation, type, state))
-  setCandidateScenes((state) => palmCandidateScene(archive, skin, theme, orientation, type, state))
+  return new PalmBoard(palmSkin(archive), theme, layoutKey.replace(/_layout$/, "") as PalmOrientation, type)
+}
+
+function styleID(value: Json): string {
+  return value === undefined || value === null ? "" : String(value)
+}
+
+/** Press and show animations and hint bubbles, from the theme's `ss_1` / `ss_2` and the board's `h`. */
+function palmEffects(board: PalmBoard, skin: ReturnType<typeof palmSkin>): void {
+  const struct = asObject(skin[board.theme]) ?? {}
+  const set = (field: string) => {
+    const shared = asObject(asObject(struct.s_info)?.[field] ?? null)
+    const own = asObject(asObject(struct[board.orientation === "port" ? "s_port" : "s_land"])?.[field] ?? null)
+    return { ...shared, ...own }
+  }
+  // Palm keeps Baidu's animation fields under its own names; the shared engine reads them once renamed.
+  const animation = parseLegacyAnimation(IniDocument.parse(stylesIni(set("ss_1")).toString()), IniDocument.parse(animationsIni(set("ss_2")).toString()))
+  preview.setAnimation(undefined)
+  preview.setLegacyAnimation(animation)
+  toolbarPreview.setLegacyAnimation(animation)
+  const hint = board.hint && hintPreviewEnabled.checked ? parseLegacyHint(IniDocument.parse(bubbleIni(board.hint).toString())) : undefined
+  preview.setLegacyHints(hint, hint, false)
+}
+
+/** Candidate words, first candidate and input code as Baidu's engine looks them up; Palm draws them in the user's font. */
+function palmCandidateText(board: PalmBoard, styles: PalmStyles, inKeyboard: boolean): CandidateText {
+  const ids = board.candidateTextStyles
+  const text = (id: Json) => {
+    const visual = styles.resolveText(styleID(id), false)
+    return visual && { ...visual, fontName: undefined }
+  }
+  const input = text(ids.input)
+  const size = inKeyboard ? text(ids.inputSize) : undefined
+  return { words: text(ids.words), first: text(ids.first), input: input && { ...input, fontSize: size?.fontSize ?? input.fontSize } }
+}
+
+/** The toolbar strip and its backdrop for `board`; returns their size, or none on a symbol board. */
+function palmCandidateBar(board: PalmBoard, styles: PalmStyles, text: CandidateText, inKeyboard: boolean): { height: number; inputHeight: number } | undefined {
+  const size = board.candidateSize
+  if (candidateArea.hidden || !size) {
+    delete toolbarStrip.dataset.path
+    toolbarStrip.hidden = true
+    candidateBackgroundCanvas.hidden = true
+    hideCandidateInputBar()
+    return
+  }
+  const dark = themeInput.value === "dark" ? "dark" : "light"
+  toolbarStrip.hidden = false
+  const path = toolbarConfigPath()
+  if (path) toolbarStrip.dataset.path = path
+  for (const canvas of [toolbarPreview, candidateBackgroundPreview]) {
+    canvas.setResolver(styles)
+    canvas.setOffsets(undefined)
+    canvas.setDefaults(undefined)
+    canvas.setTheme(dark)
+    canvas.setPanel("", size.width, size.height)
+  }
+  toolbarPreview.setTransparent(true)
+  candidateBackgroundPreview.setTransparent(devicePreviewTransparent())
+  candidateBackgroundCanvas.hidden = false
+  candidateBackgroundPreview.setNativeItems(() => [])
+  toolbarPreview.setNativeItems((state, composing) => palmBoard()?.candidateItems(state, composing) ?? [])
+  toolbarPreview.setMode(canvasEditable() ? "edit" : "preview")
+  const ids = board.candidateTextStyles
+  const inlineBack = inKeyboard ? styles.sourceSize(styleID(ids.inlineBack), false) : undefined
+  const metrics = inputBarMetrics(text.input?.fontSize, size.width, inlineBack)
+  showCandidateInputBar(styles, metrics, size.width, styleID(inKeyboard ? ids.inlineBack ?? ids.inputBack : ids.inputBack))
+  toolbarCanvas.style.setProperty("--toolbar-width", String(size.width))
+  toolbarCanvas.style.setProperty("--toolbar-height", String(size.height))
+  toolbarCanvas.style.setProperty("--candidate-input-height", String(metrics.height))
+  applyCandidateSpacing(board.candidateSpacing, size.width)
+  return { height: size.height, inputHeight: metrics.height }
+}
+
+/**
+ * Refreshes every canvas of an open Palm document from skin.json, without its projected layout.
+ * Returns false when the document is not a Palm board.
+ */
+export function refreshPalmPreview(): boolean {
+  const archive = appState.archive
+  const board = palmBoard()
+  const styles = visualResolver()
+  if (!archive || !board || !styles) return false
+  const palmStyles = styles as PalmStyles
+  const skin = palmSkin(archive)
+  const inKeyboard = inputBarInKeyboard()
+  const text = palmCandidateText(board, palmStyles, inKeyboard)
+  const bar = palmCandidateBar(board, palmStyles, text, inKeyboard)
+  palmEffects(board, skin)
+  preview.setResolver(styles)
+  preview.setOffsets(undefined)
+  preview.setDefaults(undefined)
+  preview.setTheme(board.theme === "night" ? "dark" : "light")
+  preview.setTransparent(devicePreviewTransparent())
+  appState.firstCandidateTextVisual = text.first
+  appState.candidateTextWidth = board.width
+  applyCandidateTextVisual(candidateInput, text.input, board.width)
+  applyCandidateTextVisual(candidateWords, text.words ?? { color: "#ffffff" }, board.width)
+  const firstCandidate = candidateWords.firstElementChild as HTMLElement | null
+  if (firstCandidate) applyCandidateTextVisual(firstCandidate, text.first, board.width)
+  preview.setPanel("", board.width, board.height, board.panelAnimation)
+  preview.setNativeItems((state) => palmBoard()?.items(state) ?? [])
+  const candidateHeight = bar?.height ?? 0
+  const candidateInputHeight = bar?.inputHeight ?? 0
+  const surfaceHeight = updatePanelTools(board.width, board.height, candidateHeight, { items: board.items(undefined), states: board.states() })
+  appState.activeKeyboardGeometry = { panelWidth: board.width, panelHeight: surfaceHeight, candidateHeight, candidateInputHeight }
+  applyDeviceKeyboardGeometry(board.width, surfaceHeight, candidateHeight, candidateInputHeight)
+  preview.setDocument(undefined)
+  // The board is read again for each state and after each edit, so the scene follows skin.json.
+  preview.setScene((state) => {
+    const current = palmBoard()
+    return current ? palmBoardScene(current, palmStyles, state) : Promise.resolve(undefined)
+  })
+  setCandidateScenes((state) => {
+    const current = palmBoard()
+    return current
+      ? palmCandidateScene(current, palmStyles, state)
+      : Promise.resolve({ bar: [], icons: { background: [], keys: [] } })
+  })
   return true
 }
 
@@ -81,14 +204,13 @@ function ssfScenes(archive: SkinArchive): boolean {
   return true
 }
 
-/** Points the canvases at the open document's native scenes, or back at the layout's styles. */
+/** Points a Sogou document's canvases at its native scenes; other formats paint their layout's styles. */
 export function refreshNativeScenes(): void {
   const archive = appState.archive
-  const native = archive?.format === "sxi" ? palmScenes(archive) : archive?.format === "ssf" ? ssfScenes(archive) : false
-  if (!native) for (const canvas of [preview, toolbarPreview, candidateBackgroundPreview]) canvas.setScene(undefined)
+  for (const canvas of [preview, toolbarPreview, candidateBackgroundPreview]) canvas.setNativeItems(undefined)
+  if (archive?.format === "ssf" && ssfScenes(archive)) return
+  for (const canvas of [preview, toolbarPreview, candidateBackgroundPreview]) canvas.setScene(undefined)
 }
-
-type CandidateText = { words?: TextVisual; first?: TextVisual; input?: TextVisual }
 
 function ssfCandidateText(archive: SkinArchive, width: number): CandidateText | undefined {
   const theme = appState.layoutPath.match(/^(light|dark)\//)?.[1] as SsfTheme | undefined
@@ -110,10 +232,7 @@ function ssfCandidateText(archive: SkinArchive, width: number): CandidateText | 
   return { words: visual("TextStyle_Candidate"), first: visual("TextStyle_Candidate_Highlight"), input: visual("TextStyle_Composing") }
 }
 
-/**
- * The candidate words, first candidate and input code as the open Palm or Sogou skin styles them;
- * a field the skin leaves out keeps the built-in look.
- */
+/** A Sogou skin's candidate words, first candidate and input code; a field it leaves out keeps the built-in look. */
 export function nativeCandidateText(width: number): CandidateText | undefined {
   const archive = appState.archive
   return archive?.format === "ssf" ? ssfCandidateText(archive, width) : undefined

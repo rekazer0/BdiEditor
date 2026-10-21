@@ -160,12 +160,17 @@ export function resolveCandidateInputStyle(
 ): CandidateInputStyle {
   const foregroundStyle = candidateInputForegroundStyle(general, candidate)
   const fontSize = resolveCandidateInputTextVisual(general, resolver, candidate, inKeyboard)?.fontSize
-  if (!fontSize || fontSize <= 0) return { foregroundStyle, height: 0, inset: 0, textLeft: 0 }
-  const density = skinDensity(width)
-  const inset = Math.trunc(density * 2.5)
   const background = inKeyboard
     ? resolver.sourceSize?.(candidateInputBackgroundStyle(general, candidate, true), false)
     : undefined
+  return { foregroundStyle, ...inputBarMetrics(fontSize, width, background) }
+}
+
+/** The bar for a code `fontSize` high; iOS's in-keyboard row takes a full-width background's height. */
+export function inputBarMetrics(fontSize: number | undefined, width: number, background?: { width: number; height: number }): InputBarMetrics {
+  if (!fontSize || fontSize <= 0) return { height: 0, inset: 0, textLeft: 0 }
+  const density = skinDensity(width)
+  const inset = Math.trunc(density * 2.5)
   const height = background?.width === width && background.height > 0 ? background.height : fontSize + inset * 2
-  return { foregroundStyle, height, inset, textLeft: Math.trunc(density * 6) }
+  return { height, inset, textLeft: Math.trunc(density * 6) }
 }

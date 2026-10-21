@@ -8,6 +8,17 @@ import { refreshPreview } from "./preview-render"
 import { populateKeyInspector } from "./key-inspector"
 import { IniDocument } from "../ini.ts"
 import { SXI_SKIN_PATH, applySxiFragments, encodeSkinJson, parseSkinJson, parseSkinJsonValue, sxiFragment, sxiFragmentPath } from "../palm/sxi-projection.ts"
+import type { JsonObject } from "../palm/sxi-ini.ts"
+import type { SkinArchive } from "../skin.ts"
+
+/** The open `.sxi` document's skin.json, parsed again only when the document changes. */
+export function palmSkin(archive: SkinArchive): JsonObject {
+  const cached = appState.palmSkin
+  if (cached?.archive === archive && cached.revision === archive.revision) return cached.skin
+  const skin = parseSkinJson(archive.getText(SXI_SKIN_PATH))
+  appState.palmSkin = { archive, revision: archive.revision, skin }
+  return skin
+}
 
 // `.sxi` sources are JSON: a derived layout/style shows its `skin.json` fragment, stored JSON
 // files show their own text.

@@ -24,7 +24,8 @@ import {
   type JsonObject,
 } from "./sxi-ini.ts"
 
-const BUTTON_KEYS = ["UP", "DOWN", "LEFT", "RIGHT", "CENTER", "SHOW", "HOLD", "HOLDSYM", "BAR_SYM", "BAR_SYM_SEL"]
+/** Palm `values` button indexes, in order. */
+export const BUTTON_KEYS = ["UP", "DOWN", "LEFT", "RIGHT", "CENTER", "SHOW", "HOLD", "HOLDSYM", "BAR_SYM", "BAR_SYM_SEL"]
 
 // Gestures live in a flat `[button, action, ...]` list; an edit replaces, appends or drops one pair.
 function putValues(entries: Map<string, string>, owner: JsonObject, field: string): void {

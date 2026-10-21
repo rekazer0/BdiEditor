@@ -4,12 +4,18 @@
 
 ## 改动
 
-此前两种格式都先转成百度 INI 再交给百度渲染器：手心把 `skin.json` 投影成 `default.css` / `*.til` / `*.ini`，搜狗把 `phoneSkin.ini` 的外观转成百度样式、套在官方骨架上。现在画布直接读皮肤自己的文件绘制：
+此前两种格式都先转成百度 INI 再交给百度渲染器：手心把 `skin.json` 投影成 `default.css` / `*.til` / `*.ini`，搜狗把 `phoneSkin.ini` 的外观转成百度样式、套在官方骨架上。现在画布完全不经过这一步：
 
-- `src/native-scene.ts`：与格式无关的场景（背景层 + 每个按键的正常 / 按下两组「背景、前景」层），由预览的主绘制循环逐键绘制，按键动画、气泡、粒子、选中描边照旧。
-- `src/palm/palm-scene.ts`：直接读 `skin.json`。`defaultGlobal` 与各键盘的 `board` / `offset` / `list` 逐字段回退；`base_b` / `base_f` / `base_o`；`fix_a` → `key_fix` 的状态换层；`ss_1` 的 `s_1`（含百度投影里没有的 `f_w` 字重、`for_back` 纯色背景）、`s_2` 图片（`info` 切片，`rect2` 九宫格）、`s_3` 描边；候选栏 `icon_list` 的锚点、`keep`、`f_size`，工具栏功能取 `menu` 里位于 toolbar 的项或 Android `a_m` 图集。
-- `src/ssf/ssf-scene.ts`：直接读 `phoneSkin.ini` / `keys.ini`。RootView（旧皮肤为 `[Keyboard]`）背景同时铺在候选栏和键盘后面；按键背景按 Android 九宫格拉伸；`FG_IMAGES` 按 `FG_RECT` 等比放入；`ICON` 原尺寸居中；没有前景的键用官方骨架的内置文字 / 字形，按皮肤的 TextStyle 上色、取字号字体，放进 FG_STYLE 的 `LABEL_POSITION` / `MINOR_LABEL_POSITION`。
-- 键位几何仍来自布局视图（手心即 `skin.json` 自身的数值；搜狗皮肤不含键位，来自 APK 提取的官方骨架），区块名不变，选中、检查器和编辑不受影响。
+- **手心**：画布的键位、触摸区、动作、状态换层（`fix_a` → `key_fix`）、面板与候选栏尺寸、候选栏图标及其 `keep`、候选字 / 输入码样式、输入码条高度，全部由 `src/palm/palm-board.ts` 从 `skin.json` 读出；样式、切片、图片由 `src/palm/palm-styles.ts` 读出，它同时是手心文档的样式解析器，气泡、粒子和检查器里的样式缩略图也直接读 `skin.json`；`src/palm/palm-scene.ts` 绘制。画布不再持有投影出来的布局文档。
+- **搜狗**：画布叠加层只剩官方骨架（从 APK 提取的布局与内置图形，按皮肤分辨率缩放，`src/ssf/ssf-skeleton.ts`），不再把皮肤外观转换成百度样式和图片；骨架只随分辨率和外观数量变化，不再每次编辑都重建。`src/ssf/ssf-scene.ts` 直接读 `phoneSkin.ini` / `keys.ini` 绘制，候选字、首选和输入码读 `TextStyle_Candidate(_Highlight)` / `TextStyle_Composing`。
+- `src/native-scene.ts`：与格式无关的场景（背景层 + 每个按键的正常 / 按下两组「背景、前景」层），由预览主循环逐键绘制，按键动画、气泡、粒子、选中描边照旧。
+- 区块名（`KEY<id>`、`LIST:<n>`、`ICON<n>`）与编辑视图一致，选中、检查器和编辑照常工作。
+
+仍经过百度格式的部分：
+
+- 手心的按键动画（`ss_2`）与气泡布局（`h`）由共用的百度动画 / 气泡解析器读取，读取前用投影的字段改名函数把 JSON 转成它的输入；数值与 `skin.json` 一一对应。
+- 手心检查器仍在投影视图上编辑，修改经字段指针写回 `skin.json`。
+- 导出 BDI/BDS/BDA 本身就是转换，仍走原有转换器。
 
 ## 依据
 
@@ -43,4 +49,9 @@ APK 下载地址在本环境被网络策略拒绝，未能重新反编译；上�
 npm run typecheck
 npm test
 npm run test:e2e   # 新增 scripts/test-native-preview.mjs
+```
+
+`test-sxi-conversion` 原样通过：手心画布直接读 `skin.json`，导出的 BDI/BDS 走百度 INI，两者预览逐像素一致。`test-ssf-conversion` 的源侧改为直接铺上导出所用的转换结果再截图（画布本身不再持有转换结果），仍要求导出后逐像素还原；搜狗转换的单元测试改为直接调用转换函数。
+
+```sh
 ```

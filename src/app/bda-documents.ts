@@ -17,6 +17,8 @@ import { refreshPreview } from "./preview-render"
 import { populateKeyInspector } from "./key-inspector"
 import { IniDocument } from "../ini.ts"
 import { type VisualResolver, AtlasResolver } from "../atlas.ts"
+import { PalmStyles } from "../palm/palm-styles.ts"
+import { palmSkin } from "./sxi-documents"
 
 export function preferredPath(): string {
   return `${theme.value}/skin/${orientation.value}/${layout.value}`
@@ -209,6 +211,7 @@ export function refreshBdaLayout(path = preferredPath()): boolean {
   return true
 }
 
+/** Palm documents resolve styles from skin.json itself, not its projected default.css. */
 export function visualResolver(): VisualResolver | undefined {
   if (!appState.archive) return
   const appearancePath = appState.archive.format === "bda" ? bdaAppearancePath(appState.archive, theme.value, orientation.value) : undefined
@@ -218,7 +221,9 @@ export function visualResolver(): VisualResolver | undefined {
   if (appState.cachedVisualResolver?.key.every((value, index) => value === key[index])) return appState.cachedVisualResolver.resolver
   const resolver = appearanceBytes
     ? new BdaResolver(appState.archive, appearanceBytes, appState.bdaBase, theme.value, orientation.value)
-    : new AtlasResolver(appState.archive, theme.value, orientation.value)
+    : appState.archive.format === "sxi"
+      ? new PalmStyles(appState.archive, palmSkin(appState.archive), theme.value === "dark" ? "night" : "default", orientation.value === "land" ? "land" : "port")
+      : new AtlasResolver(appState.archive, theme.value, orientation.value)
   appState.cachedVisualResolver = { key, resolver }
   return resolver
 }
