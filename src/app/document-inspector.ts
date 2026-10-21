@@ -17,6 +17,7 @@ import { renderBdaMetadataEditor, renderBdaLayoutEditor, renderBdaConfigEditor }
 import { updateBdaRefs, updateSelectedBdaPanelProperty, updateBdaAppearanceStyleRef } from "./key-inspector"
 import { openImageResourceChooser } from "./resource-inspector"
 import { populateSsfInspector } from "./ssf-inspector"
+import { populateSxiInspector } from "./sxi-inspector"
 import { disconnectSsfThumbnails } from "./ssf-fields"
 
 export const documentFieldLabels: Record<string, string> = {
@@ -307,6 +308,10 @@ export function populateDocumentInspector(): void {
   documentFields.replaceChildren()
   if (appState.archive?.format === "ssf") {
     documentFieldsGroup.hidden = !populateSsfInspector(documentFields)
+    return
+  }
+  if (appState.archive?.format === "sxi") {
+    documentFieldsGroup.hidden = !populateSxiInspector(documentFields)
     return
   }
   const hasSelection = appState.selectedPath === appState.layoutPath && appState.selectedKeySections.length > 0

@@ -376,8 +376,10 @@
 }
 
 #dirty {
+  flex: none;
   color: var(--secondary);
   font-size: var(--font-size-xs);
+  white-space: nowrap;
 }
 
 .spacer {
@@ -1373,6 +1375,10 @@ canvas {
   border: 0;
   border-radius: 0;
   background: transparent;
+}
+
+/* 键盘画布与切片选择器的拖拽、点选由脚本处理；检查器、列表里的缩略图保持默认，手机上从缩略图开始滑动也能滚动。 */
+.canvas-wrap canvas {
   touch-action: none;
 }
 
@@ -2560,6 +2566,7 @@ body:has(.canvas-wrap.empty) .workspace {
 
 #style-image-picker-canvas {
   flex: none;
+  touch-action: none;
   margin: auto auto 0;
   display: block;
   border: 1px solid var(--line);
@@ -5655,7 +5662,6 @@ main {
 }
 
 .field-control select,
-#layout,
 #device,
 #orientation,
 #theme,
@@ -7222,6 +7228,8 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  /* 标题居中浮在两侧按钮之间：名字再长也只截断，不压住撤销、模式切换等按钮 */
+  max-width: min(420px, calc(100vw - 520px));
   height: auto;
   padding: 6px 12px;
   border: 0;
@@ -7232,6 +7240,7 @@ main {
 
 :root body .titlebar .document-title .document-icon,
 :root body .titlebar .document-title .document-icon svg {
+  flex: none;
   width: 14px;
   height: 14px;
   display: block;
@@ -7239,6 +7248,7 @@ main {
 }
 
 :root body .titlebar .document-title strong {
+  min-width: 0;
   color: var(--text);
   font-family: var(--font-ui);
   font-size: var(--font-size-md);

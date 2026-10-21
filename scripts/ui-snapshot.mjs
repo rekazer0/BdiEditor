@@ -84,7 +84,7 @@ async function editAndSelectKey(page) {
   await page.waitForFunction(() => document.querySelector("#mode").value === "edit")
   const box = await page.locator("#preview").boundingBox()
   await page.mouse.click(box.x + box.width * 0.45, box.y + box.height * 0.45)
-  await page.waitForSelector('.key-layout-fields:not([hidden]), #bda-config-fields[data-bda-scope="key"]', { state: "visible" })
+  await page.waitForSelector('.key-layout-fields:not([hidden]), #document-fields [data-inspector-group-label="布局"], #bda-config-fields[data-bda-scope="key"]', { state: "visible" })
 }
 
 async function railTabs(page, prefix) {
@@ -149,13 +149,21 @@ await withPage(async (page) => {
   await capture(page, "bda-key")
   await railTabs(page, "bda-key")
 })
+await withPage(async (page) => {
+  await openTemplate(page, "palm-harmony")
+  await page.getByRole("button", { name: "编辑模式", exact: true }).click()
+  await capture(page, "palm-board")
+  await editAndSelectKey(page)
+  await capture(page, "palm-key")
+  await railTabs(page, "palm-key")
+})
 for (const colorScheme of ["light", "dark"]) await withPage(async (page) => {
   await page.locator("#browser-open").setInputFiles({ name: "检查器.ssf", mimeType: "application/octet-stream", buffer: Buffer.from(ssfFixture()) })
   await page.waitForFunction(() => !document.querySelector("#open")?.disabled)
   const close = page.locator("#file-operation-dialog[open] #file-operation-close")
   if (await close.isVisible()) await close.click()
   await page.getByRole("button", { name: "编辑模式", exact: true }).click()
-  await page.getByRole("combobox", { name: "预览布局", exact: true }).selectOption("py_26.ini")
+  await page.locator('.sidebar-overview button[data-path="light/skin/port/py_26.ini"]').click()
   await capture(page, `${colorScheme}-ssf-board`)
   const box = await page.locator("#preview").boundingBox()
   await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.4)

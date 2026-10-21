@@ -56,7 +56,9 @@ try {
   await page.locator('[data-inspector-tab="properties"]').click()
   await selectKey(1)
   await page.locator('#mobile-inspector-groups').getByRole('button', { name: '样式', exact: true }).click()
-  const add = page.locator('.style-reference-add')
+  // The Palm inspector shows the key's skin.json model: styles, text styles, gestures and rect.
+  const fields = page.locator('#document-fields')
+  const add = fields.locator('.style-reference-add')
   await add.click()
   await page.locator('#style-picker-dialog').waitFor({ state: 'visible' })
   await page.locator('#style-picker-grid > button').filter({ hasText: '样式 120' }).click()
@@ -91,7 +93,7 @@ try {
   await undoRedo('redo')
   assert.deepEqual((await state()).skin, added.skin)
   await page.locator('#mobile-inspector-groups').getByRole('button', { name: '样式', exact: true }).click()
-  const normal = page.locator('[data-key-field="FORE_STYLE"]').locator('..').locator('.style-reference-row').last().locator('[data-style-state="normal"]')
+  const normal = fields.locator('[data-key-field="FORE_STYLE"]').locator('..').locator('.style-reference-row').last().locator('[data-style-state="normal"]')
   await normal.click()
   await page.locator('#style-image-dialog').waitFor({ state: 'visible' })
   await page.evaluate(async () => {
@@ -103,8 +105,9 @@ try {
   await page.locator('#style-image-close').click()
   // Text edits on a key and on the whole layout land in the styles' s_1 inside skin.json.
   await page.locator('#mobile-inspector-groups').getByRole('button', { name: '文字', exact: true }).click()
-  await page.locator('[data-style-field="FONT_SIZE"]').fill('44')
-  await page.locator('[data-style-field="FONT_SIZE"]').press('Enter')
+  const keySize = fields.locator('[data-inspector-group-label="文字"] .ui-subsection').filter({ hasText: 'ss_1.3.s_1' }).locator('[data-document-key="f_s"] input')
+  await keySize.fill('44')
+  await keySize.press('Enter')
   await page.waitForFunction(async () => {
     const { appState } = await import('/src/app/state.ts')
     return JSON.parse(appState.archive.getText('skin.json')).default.s_info.ss_1[3].s_1.f_s === 44
@@ -123,21 +126,46 @@ try {
   // Gestures and geometry are written to the key in skin.json too.
   await selectKey(1)
   await page.locator('#mobile-inspector-groups').getByRole('button', { name: '手势', exact: true }).click()
-  await page.locator('[data-key-field="UP"]').fill('F12')
-  await page.locator('[data-key-field="UP"]').press('Tab')
+  const up = fields.locator('[data-gesture="UP"] input')
+  await up.fill('F12')
+  await up.press('Tab')
   await page.waitForFunction(async () => {
     const { appState } = await import('/src/app/state.ts')
     const key = JSON.parse(appState.archive.getText('skin.json')).default.port_layout.b.full26Pinyin.keys.find((item) => item.id === '1')
-    return key.values.includes(0)
+    return key.values.includes(0) && key.values[key.values.indexOf(0) + 1] === 'webBoard'
   })
   await page.locator('#mobile-inspector-groups').getByRole('button', { name: '布局', exact: true }).click()
-  await page.locator('[data-key-field="x"]').fill('5')
-  await page.locator('[data-key-field="x"]').press('Enter')
+  const x = fields.locator('[data-document-key="rect.origin"] input').first()
+  await x.fill('5')
+  await x.press('Enter')
   await page.waitForFunction(async () => {
     const { appState } = await import('/src/app/state.ts')
     const key = JSON.parse(appState.archive.getText('skin.json')).default.port_layout.b.full26Pinyin.keys.find((item) => item.id === '1')
     return key.rect[0][0] === 5
   })
+  // The inspector speaks Palm: skin.json locations and names, none of the Baidu groups or file names.
+  assert.equal(await page.locator('.key-layout-fields').isHidden(), true)
+  assert.match(await page.locator('#selected-key-context').textContent(), /^full26Pinyin · keys\.\d+$/)
+  const board = page.locator('.sidebar-overview button[data-path="light/skin/port/py_26.ini"]')
+  assert.equal(await board.locator('.nav-label').textContent(), '拼音全键')
+  assert.equal(await board.locator('.nav-meta').textContent(), 'b.full26Pinyin')
+  // A changed row keeps its marker across the rebuild that follows every write, and reset restores it.
+  const width = fields.locator('[data-document-key="rect.size"] input').first()
+  const widthBefore = await width.inputValue()
+  const changes = async () => Number((await page.locator('.inspector-changes').textContent()).replace(/\D/g, ''))
+  const changedBefore = await changes()
+  await width.fill('77')
+  await width.press('Enter')
+  assert.equal(await changes(), changedBefore + 1)
+  await page.locator('.inspector-reset').click()
+  assert.equal(await fields.locator('[data-document-key="rect.size"] input').first().inputValue(), widthBefore)
+  // Skin info is skin.json `info`, edited in place.
+  await page.locator('.sidebar-overview button[data-path="Info.txt"]').click()
+  assert.equal(await page.locator('.skin-fields').isHidden(), true)
+  const name = fields.locator('[data-document-key="name"] input')
+  await name.fill('手心测试')
+  await name.press('Enter')
+  assert.equal((await state()).skin.info.name, '手心测试')
   const saved = await page.evaluate(async () => {
     const { appState } = await import('/src/app/state.ts')
     return Array.from(appState.archive.toBytes('sxi'))

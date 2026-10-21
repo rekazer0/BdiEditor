@@ -57,7 +57,7 @@ try {
   await page.waitForSelector('#edit-mode-dialog[open]')
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: '编辑模式', exact: true }).click()
-  await page.getByRole("combobox", { name: "预览布局", exact: true }).selectOption("py_26.ini")
+  await page.locator('.sidebar-overview button[data-path="light/skin/port/py_26.ini"]').click()
   assert.ok(await fields.locator(':scope > .ui-section').count() > 3)
   assert.equal(await fields.locator('details, summary').count(), 0)
   // Raw property names filter rows; unmatched subsections disappear as a unit.
@@ -71,8 +71,16 @@ try {
   await page.locator('#inspector-filter').press('Escape')
   // A composite edit preserves its other coordinates; reset survives inspector reconstruction.
   const coord = () => row('FG_RECT').locator('input')
-  assert.equal(await fields.locator('[data-inspector-group-label="背景"] .ssf-image-card').count(), 2)
-  assert.equal(await fields.locator('.ssf-image-card').evaluateAll((cards) => cards.every((card) => card.querySelectorAll('canvas').length === 1)), true)
+  // A section's normal and pressed images share one Baidu-style card: two names, two labelled previews.
+  const backgroundCard = fields.locator('[data-inspector-group-label="背景"] .ssf-image-card')
+  assert.equal(await backgroundCard.count(), 1)
+  assert.deepEqual(await backgroundCard.locator('.style-picker-state').evaluateAll((states) => states.map((state) => state.dataset.stateLabel)), ['正常', '按下'])
+  assert.equal(await backgroundCard.locator('.style-reference-name').count(), 2)
+  // Boards are picked in the overview, not a 9 / 26 key switch; on phones a swipe that starts on a
+  // thumbnail still scrolls the inspector, and a crowded category rail scrolls by itself.
+  assert.equal(await page.locator('#layout').isHidden(), true)
+  assert.equal(await backgroundCard.locator('canvas').first().evaluate((canvas) => getComputedStyle(canvas).touchAction), 'auto')
+  assert.equal(await page.locator('.inspector-rail').evaluate((rail) => getComputedStyle(rail).overflowY), 'auto')
   assert.equal(await coord().count(), 4)
   await change(coord().nth(0), '0.1')
   assert.equal(await read(keys, 'Key_Q', 'FG_RECT'), '0.1,0.25,1,0.75')

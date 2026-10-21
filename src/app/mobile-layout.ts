@@ -89,13 +89,26 @@ export function setMobileInspectorGroup(id: string, scroll = true): void {
   // Each group owns its scrolling area. Scrolling the outer grid here moves the
   // summary card and category rail together, so switching tabs appears to make
   // the controls jump away from the pointer.
+  revealActiveRailButton()
   if (scroll) {
     quickInspector.scrollTop = 0
-    mobileInspectorGroups.querySelector<HTMLButtonElement>("button.active")?.scrollIntoView({ block: "nearest", inline: "nearest" })
     // 样式引用缩略图只在可见时才量得到卡片尺寸，切到该分组时补绘一次。
     redrawStyleStateCanvases()
     scrollToSinglePageInspectorGroup()
   }
+}
+
+/** 分类栏放不下时自己滚动：只滚分类栏让当前项露出来，不带动属性列表。 */
+function revealActiveRailButton(): void {
+  const rail = mobileInspectorGroups.parentElement
+  const button = mobileInspectorGroups.querySelector<HTMLElement>("button.active")
+  if (!rail || !button) return
+  const view = rail.getBoundingClientRect()
+  const box = button.getBoundingClientRect()
+  // 第一项连同上面的筛选按钮一起露出来
+  if (!button.previousElementSibling) rail.scrollTop = 0
+  else if (box.top < view.top) rail.scrollTop -= view.top - box.top
+  else if (box.bottom > view.bottom) rail.scrollTop += box.bottom - view.bottom
 }
 
 /** 一页显示时把当前分区滚到检查器顶部；第一个分区保留顶部留白。 */

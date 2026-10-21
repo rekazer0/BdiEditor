@@ -21,6 +21,7 @@ import { sanitizeFontFileName, skinFontFiles, uniqueFontFileName } from "../font
 import { type Change } from "../history.ts"
 import { showError, showStatus } from "./file-operations"
 import { validateFont } from "./skin-fonts"
+import { fieldCaption, numberParts } from "./property-rows"
 
 export type SsfEntry = { key: string; value: string }
 
@@ -141,13 +142,7 @@ function thumbnail(value: string | undefined): HTMLCanvasElement {
 }
 
 function caption(row: HTMLElement, key: string, label = ssfFieldLabel(key)): void {
-  row.dataset.documentKey = key
-  const span = element("span", "document-field-caption")
-  span.title = label === key ? key : `${label}（${key}）`
-  const name = element("span", "document-field-name")
-  name.textContent = label
-  span.append(name)
-  row.append(span)
+  fieldCaption(row, key, label)
 }
 
 /** Replaces the file of an image value and keeps its stretch band. */
@@ -156,10 +151,15 @@ function withFile(value: string | undefined, file: string): string {
   return [file, ...rest].join(",")
 }
 
+/** A state image as Sogou draws it: a missing pressed image shows the normal one. */
+function stateImage(document: IniDocument, section: string, key: string): string | undefined {
+  return document.get(section, key) ?? document.get(section, key === "ICON_PRESSED" ? "ICON" : "NORMAL")
+}
+
 /** Replace one state's file while preserving each target's own stretch band and linked states. */
 function replaceImage(targets: SsfLocation[], key: string, file: string): void {
   editTargets(targets, (document, { section }) => {
-    const current = document.get(section, key) ?? document.get(section, key === "ICON_PRESSED" ? "ICON" : "NORMAL")
+    const current = stateImage(document, section, key)
     for (const linked of [key, ...LINKED_STATES[key] ?? []]) {
       const old = document.get(section, linked)
       if (linked === key || old !== undefined && old === current) setSsfValue(document, section, linked, withFile(old ?? current, file))
@@ -174,61 +174,59 @@ function chooseImage(targets: SsfLocation[], key: string): void {
 
 type CardReference = { path: string; section: string; key: string }
 
-/** SSF uses one image per card; each state's filename and preview edit that image independently. */
-function imageCard(label: string, key: string, targets: SsfLocation[]): HTMLElement {
+/**
+ * The style card (DESIGN.md §10): file names and type on the left, one preview per state on the right.
+ * A section's normal and pressed images share one card, like Baidu's; a lone image gets a card of its own.
+ * Each state's file name and preview edit that state independently.
+ */
+function imageCard(label: string, keys: readonly string[], targets: SsfLocation[]): HTMLElement {
   const { path, section } = targets[0]
   const document = ssfDocument(path)
-  const own = document.get(section, key)
-  const value = own ?? document.get(section, key === "ICON_PRESSED" ? "ICON" : "NORMAL")
   const row = element("div", "ui-field document-property-field style-reference-field")
-  caption(row, key, label)
+  caption(row, keys.join(" "), label)
   const card = element("div", "style-reference-row ssf-image-card")
   const meta = element("span", "style-reference-meta")
-  const name = element("input", "style-reference-number style-reference-name")
-  name.value = parseSsfImage(value)?.file ?? ""
-  name.disabled = !isEditing()
-  name.title = `${path} · [${section}] ${key}`
-  name.setAttribute("aria-label", `${label}文件名`)
-  name.addEventListener("change", () => {
-    const image = parseSsfImage(name.value.trim())
-    if (image) replaceImage(targets, key, image.file)
-  })
-  meta.append(name, styleKindBadge("image"))
   const states = element("span", "style-picker-states")
-  const state = element("button", "style-picker-state")
-  state.type = "button"
-  state.dataset.styleState = /PRESSED/.test(key) ? "highlighted" : "normal"
-  state.title = `${label}：${parseSsfImage(value)?.file ?? "未设置"}${own ? "" : "（沿用正常图片）"}，点击更换图片`
-  state.setAttribute("aria-label", state.title)
-  state.disabled = !isEditing()
-  state.append(thumbnail(value))
-  state.addEventListener("click", () => chooseImage(targets, key))
-  states.append(state)
+  for (const key of keys) {
+    const own = document.get(section, key)
+    const value = stateImage(document, section, key)
+    const file = parseSsfImage(value)?.file
+    const stateLabel = keys.length > 1 ? (/PRESSED/.test(key) ? "按下" : "正常") : ""
+    // A pressed image the section leaves out is drawn from the normal one: its name stays empty.
+    const inherited = stateLabel === "按下" && !own
+    const name = element("input", "style-reference-number style-reference-name")
+    name.value = inherited ? "" : file ?? ""
+    name.placeholder = inherited && file ? "同正常" : "未设置"
+    name.disabled = !isEditing()
+    name.title = `${path} · [${section}] ${key}`
+    name.setAttribute("aria-label", `${stateLabel}${label}文件名`)
+    name.addEventListener("change", () => {
+      const image = parseSsfImage(name.value.trim())
+      if (image) replaceImage(targets, key, image.file)
+      // Emptying the pressed name goes back to drawing the normal image.
+      else if (!name.value.trim() && stateLabel === "按下") editTargets(targets, (document, target) => { document.remove(target.section, key) })
+      else name.value = inherited ? "" : file ?? ""
+    })
+    meta.append(name)
+    const state = element("button", "style-picker-state")
+    state.type = "button"
+    state.dataset.styleState = /PRESSED/.test(key) ? "highlighted" : "normal"
+    if (stateLabel) state.dataset.stateLabel = stateLabel
+    state.title = `${stateLabel}${label}：${file ?? "未设置"}${own ? "" : "（沿用正常图片）"}，点击更换图片`
+    state.setAttribute("aria-label", state.title)
+    state.disabled = !isEditing()
+    state.append(thumbnail(value))
+    state.addEventListener("click", () => chooseImage(targets, key))
+    states.append(state)
+  }
+  meta.append(styleKindBadge("image"))
   card.append(meta, states)
   row.append(card)
   return row
 }
 
-function numberParts(row: HTMLElement, key: string, affixes: string[], values: string[], onChange: (values: string[]) => void): void {
-  const pair = element("span", "ui-field-pair")
-  if (affixes.length === 4 && key !== "FG_RECT") pair.dataset.columns = "4"
-  affixes.forEach((affix, index) => {
-    const box = element("span", "ui-input")
-    const prefix = element("span", "ui-input-affix")
-    prefix.textContent = affix
-    const input = element("input")
-    input.type = "number"
-    input.step = values.some((value) => value.includes(".")) ? "any" : "1"
-    input.value = values[index] ?? ""
-    input.disabled = !isEditing()
-    input.setAttribute("aria-label", `${ssfFieldLabel(key)} ${affix}`)
-    input.addEventListener("change", () => {
-      if (input.value !== "" && Number.isFinite(input.valueAsNumber)) onChange(Array.from(pair.querySelectorAll("input"), (field) => field.value))
-    })
-    box.append(prefix, input)
-    pair.append(box)
-  })
-  row.append(pair)
+function ssfNumberParts(row: HTMLElement, key: string, affixes: string[], values: string[], onChange: (values: string[]) => void): void {
+  numberParts(row, ssfFieldLabel(key), affixes, values, onChange, affixes.length === 4 && key !== "FG_RECT" ? 4 : undefined)
 }
 
 /** The stretch band shared by a section's state images: Sogou's order is left, right, top, bottom. */
@@ -240,7 +238,7 @@ function stretchField(path: string, section: string, targets = [{ path, section 
   row.dataset.stack = ""
   caption(row, "STRETCH", "拉伸区域")
   row.title = "九宫格可拉伸的像素区间：左、右、上、下"
-  numberParts(row, "STRETCH", ["左", "右", "上", "下"], stretch.map(String), (values) => {
+  ssfNumberParts(row, "STRETCH", ["左", "右", "上", "下"], stretch.map(String), (values) => {
     const bands = targets.map((target) => {
       const current = parseSsfImage(ssfDocument(target.path).get(target.section, "NORMAL"))?.stretch
       return values.map((value, index) => value === "" ? current?.[index] : Number(value)) as SsfStretch
@@ -371,7 +369,7 @@ function ssfField(entry: SsfEntry, targets: SsfLocation[], options?: string[]): 
     const row = element("div", "ui-field document-property-field")
     row.dataset.stack = ""
     caption(row, key)
-    numberParts(row, key, quad, parts, (values) => editTargets(targets, (document, target) => {
+    ssfNumberParts(row, key, quad, parts, (values) => editTargets(targets, (document, target) => {
       const current = document.get(target.section, key)!.split(",")
       setSsfValue(document, target.section, key, values.map((value, index) => value || current[index]).join(","))
     }))
@@ -379,7 +377,7 @@ function ssfField(entry: SsfEntry, targets: SsfLocation[], options?: string[]): 
   }
   if (key === "BOLD") return switchField(key, value, targets)
   if (/COLOR/i.test(key) && (COLOR_VALUE.test(value.trim()) || !value)) return colorField(key, value, targets)
-  if (parseSsfImage(value)) return imageCard(ssfFieldLabel(key), key, targets)
+  if (parseSsfImage(value)) return imageCard(ssfFieldLabel(key), [key], targets)
   return textField(key, value, targets, options)
 }
 
@@ -490,7 +488,7 @@ export function ssfButton(label: string, icon: string, onClick: () => void): HTM
 }
 
 function blockHeading(block: SsfBlock): HTMLElement {
-  const heading = element("h4", "ssf-block-heading")
+  const heading = element("h4", "inspector-block-heading")
   const title = element("span")
   title.textContent = block.title ?? ssfSectionLabel(block.section)
   heading.append(title)
@@ -504,16 +502,16 @@ function blockHeading(block: SsfBlock): HTMLElement {
 function markMixed(row: HTMLElement, targets: SsfLocation[], keys: string[]): void {
   const values = targets.map(({ path, section }) => ssfDocument(path).get(section, keys[0]) ?? "")
   if (row.classList.contains("style-reference-field")) {
-    const key = keys[0]
-    const files = targets.map(({ path, section }) => parseSsfImage(ssfDocument(path).get(section, key) ?? ssfDocument(path).get(section, key === "ICON_PRESSED" ? "ICON" : "NORMAL"))?.file)
-    if (files.some((file) => file !== files[0])) {
-      const name = row.querySelector("input")!
-      name.value = ""
-      name.placeholder = "混合"
-      const state = row.querySelector<HTMLButtonElement>(".style-picker-state")!
-      state.replaceChildren("混合")
-      state.title = `${ssfFieldLabel(key)}：混合（点击更换图片）`
-      state.setAttribute("aria-label", state.title)
+    const names = row.querySelectorAll<HTMLInputElement>(".style-reference-name")
+    const states = row.querySelectorAll<HTMLButtonElement>(".style-picker-state")
+    for (const [index, key] of keys.entries()) {
+      const files = targets.map(({ path, section }) => parseSsfImage(stateImage(ssfDocument(path), section, key))?.file)
+      if (files.every((file) => file === files[0])) continue
+      names[index].value = ""
+      names[index].placeholder = "混合"
+      states[index].replaceChildren("混合")
+      states[index].title = `${ssfFieldLabel(key)}：混合（点击更换图片）`
+      states[index].setAttribute("aria-label", states[index].title)
     }
     return
   }
@@ -547,7 +545,7 @@ function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
     actions.unshift(ssfButton("添加", "plus", () => editSsfFile(block.path, (document) => document.appendSection(block.section, template))))
   }
   if (actions.length) {
-    const row = element("div", "ssf-block-actions")
+    const row = element("div", "inspector-block-actions")
     row.append(...actions)
     nodes.push(row)
   }
@@ -567,7 +565,7 @@ function renderBlock(block: SsfBlock, showHeading: boolean): HTMLElement[] {
   }
   for (const [normal, pressed, label] of [["NORMAL", "PRESSED", "图片"], ["ICON", "ICON_PRESSED", "图标"]] as const) {
     if (used.has(normal) || !keys.has(normal) || !parseSsfImage(entries.find((entry) => entry.key === normal)?.value)) continue
-    grid.append(imageCard(`正常${label}`, normal, targets), imageCard(`按下${label}`, pressed, targets))
+    grid.append(imageCard(label, [normal, pressed], targets))
     used.add(normal).add(pressed)
     if (normal === "NORMAL") {
       const stretch = stretchField(block.path, block.section, targets)

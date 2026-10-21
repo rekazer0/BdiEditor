@@ -105,8 +105,8 @@ async function clickCanvas(page, fx, fy, options) {
 
 async function selectKey(page, { timeout = 30000 } = {}) {
   await clickCanvas(page, 0.45, 0.45)
-  // BDS/BDI 显示布局分组；BDA 的几何只读，检查器切到按键样式。
-  await page.waitForSelector('.key-layout-fields:not([hidden]), #bda-config-fields[data-bda-scope="key"]', { state: "visible", timeout })
+  // BDS/BDI 显示布局分组；手心显示 skin.json 里按键的「布局」；BDA 的几何只读，检查器切到按键样式。
+  await page.waitForSelector('.key-layout-fields:not([hidden]), #document-fields [data-inspector-group-label="布局"], #bda-config-fields[data-bda-scope="key"]', { state: "visible", timeout })
 }
 
 async function clickCanvasWith(page, key, fx, fy) {
@@ -737,7 +737,7 @@ await check("file: a Sogou .ssf lists only its own files: preview switching, pro
   assert.equal(await page.locator('#source-name').textContent(), '1080/status1/phoneSkin.ini')
   await page.locator('.sidebar-overview button[data-path="light/skin/port/py_9.ini"]').click()
   await editMode(page)
-  await page.getByRole("combobox", { name: "预览布局", exact: true }).selectOption("py_9.ini")
+  await page.locator('.sidebar-overview button[data-path="light/skin/port/py_9.ini"]').click()
   assert.equal(await page.locator("#selected-key").textContent(), "拼音 9 键")
   assert.equal(await page.locator("#selected-key-context").textContent(), "1080/status1/phoneSkin.ini")
   await page.locator('[data-orientation-choice="land"]').click()
@@ -779,7 +779,7 @@ await check("file: a Sogou .ssf lists only its own files: preview switching, pro
   assert.equal(await page.locator("#source-name").textContent(), "1080/status1/phoneSkin.ini")
   await page.locator('[data-inspector-tab="properties"]').click()
   // Clicking a key selects it and shows the Sogou classes it is drawn from; it cannot be moved or deleted.
-  await page.getByRole("combobox", { name: "预览布局", exact: true }).selectOption("py_26.ini")
+  await page.locator('.sidebar-overview button[data-path="light/skin/port/py_26.ini"]').click()
   await clickCanvas(page, 0.5, 0.4)
   await page.waitForSelector('#document-fields [data-inspector-group-label="背景"]')
   assert.match(await page.locator("#selected-key-context").textContent(), /^status1\/phoneSkin\.ini · Key_/)

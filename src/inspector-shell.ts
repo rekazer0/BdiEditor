@@ -307,14 +307,17 @@ function renderEmptyState(): void {
   pane.append(empty)
 }
 
+/** 每个手势十字（百度的静态分组、手心检查器生成的分组）各自统计已配置数。 */
 function syncGestures(): void {
-  const cells = Array.from(document.querySelectorAll<HTMLElement>("#quick-inspector [data-gesture]"))
-  for (const cell of cells) {
-    const code = cell.querySelector<HTMLInputElement>("input")?.value ?? ""
-    cell.classList.toggle("configured", Boolean(code && code !== "None"))
+  for (const grid of Array.from(document.querySelectorAll<HTMLElement>("#quick-inspector .inspector-gestures"))) {
+    const cells = Array.from(grid.querySelectorAll<HTMLElement>("[data-gesture]"))
+    for (const cell of cells) {
+      const code = cell.querySelector<HTMLInputElement>("input")?.value ?? ""
+      cell.classList.toggle("configured", Boolean(code && code !== "None"))
+    }
+    const count = grid.closest(SECTION_SELECTOR)?.querySelector(".inspector-gesture-count")
+    if (count) count.textContent = `${cells.filter((cell) => cell.classList.contains("configured")).length} / ${cells.length}`
   }
-  const count = document.querySelector(".inspector-gesture-count")
-  if (count) count.textContent = `${cells.filter((cell) => cell.classList.contains("configured")).length} / ${cells.length}`
 }
 
 // WebKit 不会按位图内存及时触发 GC；移除的缩略图主动释放，同步复用的画布保留。

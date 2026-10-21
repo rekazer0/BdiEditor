@@ -33,15 +33,14 @@ try {
   await page.screenshot({ path: '/tmp/bdi-sogou-canvas-fixed.png' })
   if (sample) await page.screenshot({ path: '/tmp/bdi-sogou-skin-fixed.png' })
   await page.getByRole('button', { name: '编辑模式', exact: true }).click()
-  const layout = page.getByRole('combobox', { name: '预览布局', exact: true })
-  const layouts = await layout.locator('option').evaluateAll((options) => options.map((option) => option.value))
+  const layouts = ['py_9.ini', 'py_26.ini']
   const choose = (kind, value) => page.locator(`[data-${kind}-choice="${value}"]`).click()
   for (const theme of ['light', 'dark']) {
     await choose('theme', theme)
     for (const orientation of ['port', 'land']) {
       await choose('orientation', orientation)
       for (const name of layouts) {
-        await layout.selectOption(name)
+        await page.locator(`.sidebar-overview button[data-path="${theme}/skin/${orientation}/${name}"]`).click()
         const result = await state()
         assert.match(result.path, new RegExp(`${theme}/skin/${orientation}/${name.replace('.', '\\.')}$`))
         assert.ok(result.keys.length > 10, `${result.path}: missing keys`)
@@ -89,7 +88,7 @@ try {
   await choose('theme', 'dark')
   assert.match((await state()).path, /dark\/skin\/port\/en_26\.ini$/)
   await choose('theme', 'light')
-  await layout.selectOption('py_9.ini')
+  await page.locator('.sidebar-overview button[data-path="light/skin/port/py_9.ini"]').click()
   // Selection must edit the very same Sogou class as the canvas, including new function slots.
   for (const action of ['F36', 'F40', 'F1', 'F6', 'F38', 'F16', 'F39']) {
     const result = await state()

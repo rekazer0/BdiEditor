@@ -79,10 +79,16 @@
   height: 100%;
   margin-right: calc(-1 * var(--_rail));
   padding: var(--space-sm) var(--space-xs);
+  /* 分组多、检查器矮时分类栏自己滚动，不遮住后面的分组 */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
   border-left: 1px solid var(--line-soft);
 }
+.source .inspector-rail::-webkit-scrollbar { display: none; }
 .source .inspector-rail > .inspector-filter-open { flex: none; width: 100%; }
 .source #mobile-inspector-groups {
+  flex: none;
   display: grid;
   gap: var(--space-sm);
   width: 100%;
@@ -109,7 +115,7 @@
 @media (hover: hover) { .source :is(#mobile-inspector-groups > button, .inspector-reset):hover { background: var(--hover); color: var(--text); } }
 .source :is(#mobile-inspector-groups > button, .inspector-reset):active { background: color-mix(in srgb, var(--text) 10%, transparent); }
 .source #mobile-inspector-groups > button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: var(--font-weight-medium); }
-.source .inspector-reset { margin-top: auto; }
+.source .inspector-reset { flex: none; margin-top: auto; }
 .source :is(#mobile-inspector-groups > button, .inspector-reset)[hidden] { display: none; }
 .source .inspector-changes { padding: 0 var(--space-xs); border-radius: var(--radius-full); background: var(--accent-soft); color: var(--accent); font-weight: var(--font-weight-medium); white-space: nowrap; }
 
@@ -227,7 +233,7 @@
 }
 
 /* 数值把手：标签与单位前缀左右拖动调整数值 */
-.source [data-scrub] { cursor: ew-resize; touch-action: none; }
+.source [data-scrub] { cursor: ew-resize; touch-action: pan-y; }
 .source #quick-inspector[data-readonly="true"] [data-scrub] { cursor: default; }
 @media (hover: hover) { .source .ui-input > [data-scrub]:hover { color: var(--text); } }
 .source [data-scrub][data-scrubbing] { color: var(--accent); }
@@ -650,13 +656,13 @@
   }
 }
 
-/* —— 搜狗皮肤（ssf-inspector.ts）：一个分组里的多个配置段各有一行小标题，图片值前面是缩略图 —— */
-.source .ui-section.document-property-section { padding: var(--space-lg) var(--_gutter) var(--space-xl); border-top: 1px solid var(--line-soft); }
-.source .ui-section.document-property-section:first-child { border-top: 0; }
-.source .ssf-block-heading { display: grid; gap: var(--space-xs); min-width: 0; margin: 0; color: var(--secondary); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
-.source .ssf-block-heading > span { flex: none; }
-.source .ssf-block-heading > code { min-width: 0; overflow: hidden; color: var(--tertiary); font-family: var(--font-mono); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); text-overflow: ellipsis; white-space: nowrap; }
-.source .ssf-block-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
-.source .ssf-image-card .style-picker-states { grid-template-columns: minmax(0, 1fr); }
-.source .ssf-image-card .style-picker-state { grid-template-rows: minmax(0, 1fr); }
-.source .ssf-image-card .style-picker-state::before { display: none; }
+/* —— 搜狗、手心（ssf-inspector.ts / sxi-inspector.ts）：分组与百度共用同一套样式；一个分组里的多个配置段各有一行小标题 —— */
+.source .inspector-block-heading { display: grid; gap: var(--space-xs); min-width: 0; margin: 0; color: var(--secondary); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+.source .inspector-block-heading > span { flex: none; }
+.source .inspector-block-heading > code { min-width: 0; overflow: hidden; color: var(--tertiary); font-family: var(--font-mono); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); text-overflow: ellipsis; white-space: nowrap; }
+.source .inspector-block-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+.source .ssf-image-card > .style-reference-meta { gap: var(--space-xs); }
+/* 正常、按下并排的卡片和百度一样；配置段里只有一张图时只放一个预览，不带状态名 */
+.source .ssf-image-card .style-picker-states:has(> :only-child) { grid-template-columns: minmax(0, 1fr); }
+.source .ssf-image-card .style-picker-state:not([data-state-label]) { grid-template-rows: minmax(0, 1fr); }
+.source .ssf-image-card .style-picker-state:not([data-state-label])::before { display: none; }
