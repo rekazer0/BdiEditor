@@ -53,6 +53,10 @@ export const appState = {
   selectedKeySections: [] as string[],
   selectedToolbarSections: [] as string[],
   selectedCandidate: false,
+  /** Which text the 文字 group edits for the candidate bar or whole layout (候选字、首选、输入码……). */
+  textStyleTarget: "",
+  /** Which text layers of the selected BDA keys the 文字 fields edit: the main text or the hints after it. */
+  bdaTextLayer: "label" as "label" | "hint",
   unsavedNew: false,
   assetURL: "",
   assetReturnPath: "",
@@ -216,6 +220,8 @@ export const appState = {
   resolveNativeProjectChoice: undefined as ((templateID: string | undefined) => void) | undefined,
   nativeProjectWindowReady: false,
   recentPreviewRunning: false,
+  // 使用教程进行中时的停止函数
+  stopOnboarding: undefined as (() => void) | undefined,
   // 持久缩略图缓存：重启后不必再读整包解 demo 图。按路径存，条目随最近列表裁剪（最多 9 个）。
   recentThumbDb: undefined as Promise<IDBDatabase> | undefined,
   windowMaterialKind: "glass" as WindowMaterialKind,

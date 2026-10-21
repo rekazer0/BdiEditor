@@ -1,6 +1,7 @@
 import { jsonPropertyRanges } from "../highlight.ts"
 import { asObject, type JsonObject } from "./sxi-ini.ts"
-import { encodeSkinJson, parseSkinJson, sxiFragment } from "./sxi-projection.ts"
+import { IniDocument } from "../ini.ts"
+import { encodeSkinJson, parseSkinJson, same, sxiDerivedFiles, sxiFragment } from "./sxi-projection.ts"
 
 function sectionModel(model: JsonObject, section: string): JsonObject | undefined {
   const key = /^KEY(.+)$/.exec(section)
@@ -35,14 +36,18 @@ export function sxiStylePointer(text: string, pointer: string[], orientation: st
   return asObject(sxiFragment(parseSkinJson(text), own)) ? own : pointer
 }
 
+function styleModel(styles: JsonObject, section: string): JsonObject {
+  const model = asObject(Object.entries(styles).find(([id, item]) => (asObject(item)?.id ?? `STYLE${id}`) === section)?.[1])
+  if (!model) throw new Error(`找不到手心样式 ${section}`)
+  return model
+}
+
 export function setSxiStyleImage(text: string, pointer: string[], sections: string[], property: "NM_IMG" | "HL_IMG", value: string): string {
   const skin = parseSkinJson(text)
   const styles = asObject(sxiFragment(skin, pointer))
   if (!styles) throw new Error("找不到手心样式")
   for (const section of sections) {
-    const style = Object.entries(styles).find(([id, item]) => (asObject(item)?.id ?? `STYLE${id}`) === section)?.[1]
-    const model = asObject(style)
-    if (!model) throw new Error(`找不到手心样式 ${section}`)
+    const model = styleModel(styles, section)
     const image = asObject(model.s_2) ?? {}
     image[property === "NM_IMG" ? "normal" : "hl"] = value
     model.s_2 = image
@@ -91,4 +96,50 @@ export function sxiSectionRanges(text: string, sections: readonly string[]): Arr
     if (tip && fixes) ranges.push(...jsonPropertyRanges(text.slice(fixes[0], fixes[1]), [tip[1]]).map(([a, b]) => [a + fixes[0], b + fixes[0]] as const))
   }
   return ranges
+}
+
+/**
+ * Writes an edit of one read-only `.sxi` view (layout INI, .cnd, default.css, Info.txt…) back into
+ * skin.json: each changed `[section] key` goes to the JSON value it was projected from, and a new
+ * `STYLE<n>` section in default.css becomes a new style. Throws for values skin.json has no place for.
+ */
+export function applySxiViewEdit(skinText: string, path: string, before: string, after: string): string {
+  const skin = parseSkinJson(skinText)
+  let file = sxiDerivedFiles(skin).get(path)
+  if (!file) throw new Error(`${path} 不是手心皮肤生成的文件`)
+  const previous = IniDocument.parse(before)
+  const next = IniDocument.parse(after)
+  const removed = previous.sections().filter((section) => !next.sections().includes(section))
+  if (removed.length) throw new Error(`手心皮肤不能在这里删除 [${removed[0]}]，请在源码面板编辑 skin.json`)
+  // An orientation table equal to the shared one is hidden by the projection; it follows the edit.
+  const [theme, table, part] = file.pointer
+  const twins = table === "s_info" && part ? ["s_port", "s_land"].filter((name) => {
+    const own = sxiFragment(skin, [theme, name, part])
+    return own !== undefined && same(own, sxiFragment(skin, file!.pointer))
+  }) : []
+  const added = next.sections().filter((section) => !previous.sections().includes(section))
+  if (added.length) {
+    const styles = part === "ss_1" ? asObject(sxiFragment(skin, file.pointer)) : undefined
+    for (const section of added) {
+      const id = /^STYLE(\d+)$/.exec(section)?.[1]
+      if (!styles || !id || styles[id] !== undefined) throw new Error(`手心皮肤不能在这里新增 [${section}]，请在源码面板编辑 skin.json`)
+      styles[id] = { f: 0, id: section }
+    }
+    file = sxiDerivedFiles(skin).get(path)!
+  }
+  for (const section of ["", ...next.sections()]) {
+    const keys = new Set([...previous.entries(section), ...next.entries(section)].filter((entry) => entry.section === section).map((entry) => entry.key))
+    for (const key of keys) {
+      const value = next.get(section, key)
+      if (value === previous.get(section, key)) continue
+      const write = file.writer.origin(section, key)
+      if (!write) throw new Error(`手心皮肤的 ${section ? `[${section}] ` : ""}${key} 没有对应的 skin.json 字段，请在源码面板编辑`)
+      write(value)
+    }
+  }
+  for (const name of twins) {
+    const shared = sxiFragment(skin, file.pointer)
+    asObject(skin[theme])![name] = { ...asObject(asObject(skin[theme])![name]), [part]: structuredClone(shared) }
+  }
+  return encodeSkinJson(skin)
 }

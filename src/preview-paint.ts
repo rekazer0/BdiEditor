@@ -26,7 +26,7 @@ import { offsetFromSection } from "./preview-items.ts"
 import { foregroundLayerRect } from "./preview-draw.ts"
 import { foregroundTextPoint } from "./preview-draw.ts"
 import { drawStyleText } from "./preview-draw.ts"
-import { canvasFontFamily } from "./atlas.ts"
+import { canvasFont } from "./atlas.ts"
 import { previewFallbackText } from "./preview-items.ts"
 import { drawListText } from "./preview-draw.ts"
 import { isLegacyHintInputKey } from "./preview-hints.ts"
@@ -296,7 +296,7 @@ export async function paintPreview(self: Preview): Promise<void> {
     const textVisual: TextVisual | undefined = visuals[index].text
     context.fillStyle = textVisual?.color ?? (self.theme === "dark" ? "#f5f5f7" : "#17191c")
     const fontSize = textVisual?.fontSize ?? Math.max(18, Math.min(42, key.rect.height * 0.25))
-    context.font = `${fontSize}px ${canvasFontFamily(textVisual?.fontName)}`
+    context.font = canvasFont(fontSize, textVisual)
     context.textAlign = "center"
     context.textBaseline = "middle"
     const fallbackText = previewFallbackText(key, hasForeground)
@@ -372,7 +372,7 @@ export async function paintPreview(self: Preview): Promise<void> {
         drawVisual(hintContext, hintCellVisuals[index === selected ? 1 : 0], cell, true)
         const text = index === selected ? hintSelectedTextVisual ?? hintTextVisual : hintTextVisual
         hintContext.fillStyle = text?.color ?? (self.theme === "dark" ? "#f5f5f7" : "#17191c")
-        hintContext.font = `${text?.fontSize ?? Math.max(18, Math.min(42, height * 0.25))}px ${canvasFontFamily(text?.fontName)}`
+        hintContext.font = canvasFont(text?.fontSize ?? Math.max(18, Math.min(42, height * 0.25)), text)
         hintContext.textAlign = "center"
         hintContext.textBaseline = "middle"
         hintContext.fillText(action, cell.x + cell.width / 2, cell.y + cell.height / 2)
@@ -381,7 +381,7 @@ export async function paintPreview(self: Preview): Promise<void> {
       const action = legacyHintText(key, hintDirection)
       if (action) {
         hintContext.fillStyle = hintTextVisual?.color ?? (self.theme === "dark" ? "#f5f5f7" : "#17191c")
-        hintContext.font = `${hintTextVisual?.fontSize ?? Math.max(18, Math.min(42, height * 0.25))}px ${canvasFontFamily(hintTextVisual?.fontName)}`
+        hintContext.font = canvasFont(hintTextVisual?.fontSize ?? Math.max(18, Math.min(42, height * 0.25)), hintTextVisual)
         hintContext.textAlign = "center"
         hintContext.textBaseline = "middle"
         hintContext.fillText(action, rect.x + left + (width - left - right) / 2, rect.y + top + (height - top - bottom) / 2)

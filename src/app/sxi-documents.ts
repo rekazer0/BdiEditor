@@ -1,5 +1,3 @@
-import { effectiveSelectedSections } from "./config-context"
-import { setSxiForeground } from "../palm/sxi-edit.ts"
 import { appState } from "./state"
 import { source } from "./canvas-interaction"
 import { sourceName } from "./dom"
@@ -70,15 +68,4 @@ export function refreshSxiDocument(): void {
   refreshPreview()
   populateKeyInspector()
   updateDirty()
-}
-
-export function updateSxiForeground(value: string): void {
-  const archive = appState.archive
-  const pointer = archive?.derivedPointer(appState.layoutPath)
-  if (!archive || !pointer || !isEditing()) return
-  try {
-    const before = archive.getText(SXI_SKIN_PATH)
-    commitText(SXI_SKIN_PATH, before, setSxiForeground(before, pointer, effectiveSelectedSections(), value))
-    refreshSxiDocument()
-  } catch (error) { showError(error, "修改手心前景") }
 }

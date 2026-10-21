@@ -3,14 +3,15 @@
 // INI/CSS/TIL views from `skin.json`, each tagged with the JSON pointer it came from.
 
 import { compactPalmJSON, encodePalmJSON, PALM_INT_MAX } from "./palm-json.ts"
-import { asObject, type Json, type JsonObject } from "./sxi-ini.ts"
-import { boardFileName, boardText, bubbleText, candidateText } from "./sxi-layout.ts"
-import { animationsText, infoText, stylesText, tilesText } from "./sxi-style.ts"
+import { IniWriter, asObject, type Json, type JsonObject } from "./sxi-ini.ts"
+import { boardFileName, boardIni, bubbleIni, candidateIni } from "./sxi-layout.ts"
+import { animationsIni, infoIni, stylesIni, tilesIni } from "./sxi-style.ts"
 
 export const SXI_SKIN_PATH = "skin.json"
 export const SXI_INFO_PATH = "info.json"
 
-export type SxiDerivedFile = { text: string; pointer: string[] }
+/** A read-only view of skin.json; `writer` knows where each of its values came from. */
+export type SxiDerivedFile = { text: string; pointer: string[]; writer: IniWriter }
 
 const THEMES = [["default", "light"], ["night", "dark"]] as const
 const ORIENTATIONS = ["port", "land"] as const
@@ -52,7 +53,7 @@ function hasEntries(value: Json): boolean {
   return Object.keys(asObject(value) ?? {}).length > 0
 }
 
-function same(left: Json, right: Json): boolean {
+export function same(left: Json, right: Json): boolean {
   return compactPalmJSON(left) === compactPalmJSON(right)
 }
 
@@ -69,8 +70,8 @@ export function applySxiFragments(skinText: string, fragments: ReadonlyArray<{ p
 
 export function sxiDerivedFiles(skin: JsonObject): Map<string, SxiDerivedFile> {
   const files = new Map<string, SxiDerivedFile>()
-  const add = (path: string, pointer: string[], text: string) => files.set(path, { text, pointer })
-  if (skin.info !== undefined) add("Info.txt", ["info"], infoText(skin.info))
+  const add = (path: string, pointer: string[], writer: IniWriter) => files.set(path, { text: writer.toString(), pointer, writer })
+  if (skin.info !== undefined) add("Info.txt", ["info"], infoIni(skin))
 
   for (const [themeKey, theme] of THEMES) {
     const struct = asObject(skin[themeKey])
@@ -81,13 +82,13 @@ export function sxiDerivedFiles(skin: JsonObject): Map<string, SxiDerivedFile> {
       if (!layout) continue
       const directory = `${theme}/skin/${orientation}`
       for (const [type, board] of Object.entries(asObject(layout.b) ?? {})) {
-        add(`${directory}/${boardFileName(type)}`, [themeKey, layoutKey, "b", type], boardText(board))
+        add(`${directory}/${boardFileName(type)}`, [themeKey, layoutKey, "b", type], boardIni(board))
       }
       for (const [name, cand] of Object.entries(asObject(layout.c) ?? {})) {
-        add(`${directory}/${name}.cnd`, [themeKey, layoutKey, "c", name], candidateText(cand))
+        add(`${directory}/${name}.cnd`, [themeKey, layoutKey, "c", name], candidateIni(cand))
       }
       for (const [name, hint] of Object.entries(asObject(layout.h) ?? {})) {
-        add(`${directory}/${name}.pop`, [themeKey, layoutKey, "h", name], bubbleText(hint))
+        add(`${directory}/${name}.pop`, [themeKey, layoutKey, "h", name], bubbleIni(hint))
       }
     }
 
@@ -100,15 +101,15 @@ export function sxiDerivedFiles(skin: JsonObject): Map<string, SxiDerivedFile> {
       if (!style) continue
       const own = styleKey === "s_info"
       if (hasEntries(style.ss_1) && (own || !same(style.ss_1, shared?.ss_1))) {
-        add(`${directory}/default.css`, [themeKey, styleKey, "ss_1"], stylesText(style.ss_1))
+        add(`${directory}/default.css`, [themeKey, styleKey, "ss_1"], stylesIni(style.ss_1))
       }
       if (hasEntries(style.ss_2) && (own || !same(style.ss_2, shared?.ss_2))) {
-        add(`${directory}/anim.ini`, [themeKey, styleKey, "ss_2"], animationsText(style.ss_2))
+        add(`${directory}/anim.ini`, [themeKey, styleKey, "ss_2"], animationsIni(style.ss_2))
       }
       const sharedTiles = asObject(shared?.info)
       for (const [name, tiles] of Object.entries(asObject(style.info) ?? {})) {
         if (!own && sharedTiles && name in sharedTiles && same(tiles, sharedTiles[name])) continue
-        add(`${directory}/${name}.til`, [themeKey, styleKey, "info", name], tilesText(tiles))
+        add(`${directory}/${name}.til`, [themeKey, styleKey, "info", name], tilesIni(tiles))
       }
     }
 

@@ -184,7 +184,8 @@ export function removeSelectedFont(): void {
   showStatus(`已移除字体 ${fileName}。`)
 }
 
-async function validateFont(bytes: Uint8Array): Promise<void> {
+/** Rejects bytes the browser cannot load as a font. */
+export async function validateFont(bytes: Uint8Array): Promise<void> {
   if (typeof FontFace === "undefined") return
   const data = bytes.slice().buffer
   await new FontFace("BdiFontValidation", data).load()

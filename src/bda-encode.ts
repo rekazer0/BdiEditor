@@ -272,6 +272,21 @@ export function colorValue(value: string): number {
   return Number.parseInt(hex.length === 6 ? `FF${hex}` : hex, 16) >>> 0
 }
 
+/**
+ * Appends a style of `type` under the next free key of its map; `from` copies that existing style of
+ * the same type (a 首选 style starting from the candidate words). Returns the new reference.
+ */
+export function addBdaStyle(bytes: Uint8Array, type: BdaStyleRef["type"], from?: number): { bytes: Uint8Array; ref: BdaStyleRef } {
+  const rootField = { image: 1, text: 2, color: 3 }[type]
+  const entries = rawFields(bytes).filter((field) => field.number === rootField && field.bytes)
+  const keyOf = (field: RawField) => rawFields(field.bytes!).find((item) => item.number === 1)?.varint
+  const key = Math.max(0, ...entries.map((field) => keyOf(field) ?? 0)) + 1
+  const source = from === undefined ? undefined : entries.find((field) => keyOf(field) === from)
+  const value = source ? rawFields(source.bytes!).find((item) => item.number === 2)?.bytes ?? new Uint8Array() : new Uint8Array()
+  const entry = join([encodedField(1, 0, encodeVarint(key)), encodedField(2, 2, value)])
+  return { bytes: join([bytes, encodedField(rootField, 2, entry)]), ref: { type, key } }
+}
+
 export function updateBdaStyle(
   bytes: Uint8Array,
   ref: BdaStyleRef,
@@ -293,11 +308,17 @@ export function updateBdaStyle(
       if (!field) throw new Error(`BDA 颜色样式不支持：${property}`)
       return replaceField(style, field, 0, encodeVarint(colorValue(value)))
     }
-    const field = { FONT_NAME: 2, FONT_SIZE: 3, NM_COLOR: 4, HL_COLOR: 5 }[property]
+    const field = { FONT_NAME: 2, FONT_SIZE: 3, NM_COLOR: 4, HL_COLOR: 5, CONTENT_TEXT: 6 }[property]
     if (!field) throw new Error(`BDA 文字样式不支持：${property}`)
-    if (property === "FONT_NAME") return replaceField(style, field, 2, new TextEncoder().encode(value))
+    // The text a key draws is the style's own (contentText): the keys of the official skins all set it.
+    if (property === "CONTENT_TEXT") {
+      return value ? replaceField(style, field, 2, new TextEncoder().encode(value)) : removeFields(style, new Set([field]))
+    }
+    if (property === "FONT_NAME") {
+      return value.trim() ? replaceField(style, field, 2, new TextEncoder().encode(value.trim())) : removeFields(style, new Set([field]))
+    }
     const numeric = property === "FONT_SIZE" ? Number(value) : colorValue(value)
-    if (!Number.isFinite(numeric) || numeric < 0) throw new Error("BDA 数值无效")
+    if (property === "FONT_SIZE" && (!Number.isInteger(numeric) || numeric < 1)) throw new Error("字号应为正整数")
     return replaceField(style, field, 0, encodeVarint(numeric))
   })
 }

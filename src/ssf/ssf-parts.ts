@@ -52,13 +52,29 @@ export function ssfForeground(skin: IniDocument, keys: IniDocument, binding: Ssf
   }
 }
 
-/** Sections a key's label colour is looked up in, most specific first. */
-export function ssfTextSections(binding: SsfKeyBinding, qwerty: boolean): string[] {
-  const styles = binding.keyClass === "function"
+/** The key's `FG_STYLE` section and the TextStyle its `LABEL_STYLE` names (Sogou reads key text only this way). */
+export function ssfLabelStyle(skin: IniDocument, binding: SsfKeyBinding): { fgStyle: string; owner: string; style?: string } | undefined {
+  for (const owner of binding.sections) {
+    const fgStyle = firstValue(skin.get(owner, "FG_STYLE"))
+    if (fgStyle) return { fgStyle, owner, style: firstValue(skin.get(fgStyle, "LABEL_STYLE")) }
+  }
+}
+
+/**
+ * Sections a key's label is drawn with, most specific first: the FG_STYLE label style, then the
+ * board's default style for the key's class (what Sogou's built-in FG_STYLE of the key names).
+ */
+export function ssfTextSections(binding: SsfKeyBinding, qwerty: boolean, skin?: IniDocument): string[] {
+  const label = skin && ssfLabelStyle(skin, binding)?.style
+  return [...new Set([...label ? [label] : [], ...ssfClassTextStyles(binding, qwerty)])]
+}
+
+/** The board's default text styles for a key's class, most specific first. */
+export function ssfClassTextStyles(binding: SsfKeyBinding, qwerty: boolean): string[] {
+  return binding.keyClass === "function"
     ? [qwerty ? "TextStyle_FuncKey_26char" : "TextStyle_FuncKey_T9", "TextStyle"]
     : binding.keyClass === "space" ? ["TextStyle_Space_Label", "TextStyle"]
       : [qwerty ? "TextStyle_Qwerty" : "TextStyle_Phone_Label", "TextStyle"]
-  return [...binding.sections, ...styles]
 }
 
 /** sound_android.ini section that gives a key (or, without a binding, every key) its sound. */

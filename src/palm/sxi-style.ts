@@ -4,23 +4,23 @@
 import {
   IniWriter,
   asObject,
-  boolText,
+  child,
   listText,
-  numberText,
   put,
   putFields,
   rectParts,
   type FieldKind,
   type Json,
+  type JsonObject,
 } from "./sxi-ini.ts"
 
 // `infoModel` (`ss_1`).
-export function stylesText(value: Json): string {
+export function stylesIni(value: Json): IniWriter {
   const writer = new IniWriter()
   for (const [index, style] of Object.entries(asObject(value) ?? {})) {
     const model = asObject(style) ?? {}
     const entries = writer.section(typeof model.id === "string" ? model.id : `STYLE${index}`)
-    putFields(entries, asObject(model.s_1) ?? {}, [
+    putFields(entries, child(model, "s_1"), [
       ["text", "SHOW", "string"],
       ["c_type", "FONT_CLEARTYPE", "number"],
       ["f_s", "FONT_SIZE", "number"],
@@ -29,14 +29,14 @@ export function stylesText(value: Json): string {
       ["c_hl", "HL_COLOR", "string"],
       ["file", "FONT_PATH", "string"],
     ])
-    putFields(entries, asObject(model.s_2) ?? {}, [["normal", "NM_IMG", "string"], ["hl", "HL_IMG", "string"]])
-    putFields(entries, asObject(model.s_3) ?? {}, [["size", "BORDER_SIZE", "number"], ["color", "BORDER_COLOR", "string"]])
-    putFields(entries, asObject(model.s_4) ?? {}, [
+    putFields(entries, child(model, "s_2"), [["normal", "NM_IMG", "string"], ["hl", "HL_IMG", "string"]])
+    putFields(entries, child(model, "s_3"), [["size", "BORDER_SIZE", "number"], ["color", "BORDER_COLOR", "string"]])
+    putFields(entries, child(model, "s_4"), [
       ["path_1", "PRESS_SOUND_PATH", "string"],
       ["path_2", "PANEL_SHOW_SOUND_PATH", "string"],
       ["path_3", "PANEL_HIDE_SOUND_PATH", "string"],
     ])
-    putFields(entries, asObject(model.s_5) ?? {}, [
+    putFields(entries, child(model, "s_5"), [
       ["1", "PRESS_ANIM", "number"],
       ["2", "RELEASE_ANIM", "number"],
       ["3", "SHOW_ANIM", "number"],
@@ -44,11 +44,11 @@ export function stylesText(value: Json): string {
       ["5", "HOLD_ANIM", "number"],
     ])
   }
-  return writer.toString()
+  return writer
 }
 
 // `tileModel` (`.til`).
-export function tilesText(value: Json): string {
+export function tilesIni(value: Json): IniWriter {
   const writer = new IniWriter()
   for (const [index, tile] of (Array.isArray(value) ? value : []).entries()) {
     const model = asObject(tile) ?? {}
@@ -64,7 +64,7 @@ export function tilesText(value: Json): string {
     ])
     if (Array.isArray(model.scales) && model.scales.length) put(entries, "SCALE", listText(model.scales))
   }
-  return writer.toString()
+  return writer
 }
 
 const BASE_FIELDS: Array<[string, string, FieldKind]> = [
@@ -243,7 +243,7 @@ const FLOATER_FIELDS: Array<[string, string, FieldKind]> = [
 const GROUP_METHODS: Record<string, string> = { simultaneous: "0", sequential: "1", random: "2" }
 
 // `buildAnimationWrap` (`ss_2`): exactly one of `a1`..`a14` per wrap.
-export function animationsText(value: Json): string {
+export function animationsIni(value: Json): IniWriter {
   const writer = new IniWriter()
   for (const [index, wrap] of Object.entries(asObject(value) ?? {})) {
     const model = asObject(wrap) ?? {}
@@ -277,18 +277,18 @@ export function animationsText(value: Json): string {
       }
     }
   }
-  return writer.toString()
+  return writer
 }
 
-// `skinInfoJson` (`info`).
-export function infoText(value: Json): string {
-  const info = asObject(value) ?? {}
-  const lines = [
-    ["Name", typeof info.name === "string" ? info.name : undefined],
-    ["Description", typeof info.description === "string" ? info.description : undefined],
-    ["Author", typeof info.author === "string" ? info.author : undefined],
-    ["SupportDarkMode", boolText(info.dark_mode)],
-    ["MinImeCode", numberText(info.core_ability)],
-  ]
-  return lines.filter(([, text]) => text !== undefined).map(([key, text]) => `${key}=${text}`).join("\n") + "\n"
+// `skinInfoJson` (`info`) of the skin, as Info.txt.
+export function infoIni(skin: JsonObject): IniWriter {
+  const writer = new IniWriter()
+  putFields(writer.section(""), child(skin, "info"), [
+    ["name", "Name", "string"],
+    ["description", "Description", "string"],
+    ["author", "Author", "string"],
+    ["dark_mode", "SupportDarkMode", "bool"],
+    ["core_ability", "MinImeCode", "number"],
+  ])
+  return writer
 }

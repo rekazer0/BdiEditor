@@ -339,6 +339,35 @@ input.ui-input, select.ui-input { padding: 0 var(--space-sm); }
 }
 .ui-menu[hidden] { display: none; }
 
+/* —— 新手引导：遮罩挖空高亮目标，旁边是说明卡片；几何位置由 src/tour.ts 写入 —— */
+.ui-tour { position: fixed; inset: 0; z-index: 200; pointer-events: none; animation: ui-tour-in var(--duration-base) var(--ease-emphasized); }
+.ui-tour[hidden] { display: none; }
+.ui-tour-shade, .ui-tour-block, .ui-tour-ring, .ui-tour-card { position: fixed; }
+.ui-tour-shade { background: var(--backdrop); pointer-events: auto; }
+.ui-tour-block { pointer-events: auto; }
+.ui-tour[data-action] .ui-tour-block { display: none; }
+.ui-tour-ring { border: 2px solid var(--accent); border-radius: var(--radius-md); box-shadow: 0 0 0 4px var(--accent-soft); }
+.ui-tour-card {
+  display: grid;
+  gap: var(--space-sm);
+  width: min(320px, calc(100vw - 32px));
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--menu);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+}
+.ui-tour-card:focus-visible { outline: 0; }
+.ui-tour-card > header { display: flex; align-items: center; justify-content: space-between; margin: calc(var(--space-xs) * -1) calc(var(--space-sm) * -1) 0 0; }
+.ui-tour-step { color: var(--tertiary); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
+.ui-tour-card h2 { margin: 0; font-size: var(--font-size-lg); font-weight: 600; line-height: 1.4; }
+.ui-tour-card p { margin: 0; color: var(--secondary); font-size: var(--font-size-sm); line-height: 1.6; }
+.ui-tour-card .ui-tour-action { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-md); background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.ui-tour-card :is(.ui-tour-action, .ui-button)[hidden] { display: none; }
+.ui-tour-card > footer { display: flex; justify-content: flex-end; gap: var(--space-sm); padding-top: var(--space-xs); }
+@keyframes ui-tour-in { from { opacity: 0; } }
+
 /* —— 统一的焦点与禁用 —— */
 :where(.ui-button, .ui-icon-button, .ui-segmented > button, .ui-switch, .ui-list-item, .ui-section-toggle):focus-visible {
   outline: 0;

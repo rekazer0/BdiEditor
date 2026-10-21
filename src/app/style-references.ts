@@ -12,6 +12,7 @@ import { type StyleImagePickerTarget } from "./types"
 import { openImageSlicePicker } from "./image-pickers"
 import { openStyleImageResourceChooser, selectStyleResource } from "./resource-inspector"
 import { bdaStyleRef, type BdaAppearanceStyleGroup, type BdaStyleRef, bdaStyleID } from "../bda.ts"
+import { NEW_FORE_LAYER } from "../bda-layout-styles.ts"
 import { selectFile } from "./navigation"
 import { updateBdaAppearanceStyleRef } from "./key-inspector"
 
@@ -136,8 +137,9 @@ export function renderStyleReferenceRows(button: HTMLElement, input: HTMLInputEl
       target.dataset.styleReferenceIndex = String(styleIndex)
       target.addEventListener("change", () => {
         const values = input.value.split(",").map((value) => value.trim()).filter(Boolean)
-        values[styleIndex] = target.value
-        input.value = values.join(",")
+        values[styleIndex] = target.value.trim()
+        // An emptied card drops its layer instead of leaving ",205" behind.
+        input.value = values.filter(Boolean).join(",")
         input.dispatchEvent(new Event("input", { bubbles: true }))
         input.dispatchEvent(new Event("change", { bubbles: true }))
       })
@@ -329,10 +331,9 @@ export function styleWriteTarget(
   const path = styleConfigPath()
   if (!appState.archive?.isText(path)) return { source, property }
   const document = IniDocument.parse(appState.archive.getText(path))
-  const sections = [...new Set(styleIDs.flatMap((token) => {
-    const value = Number(token)
-    return [`STYLE${token}`, source === "FORE_STYLE" && Number.isFinite(value) ? `STYLE${Math.floor(value / 100)}` : ""]
-  }).filter((section) => section && document.sections().includes(section)))]
+  // Images are read from STYLE<id> only (atlas.ts resolveVisualSpec); STYLE<id/100> is a text fallback
+  // and is often another key's text style, so an image must never be written there.
+  const sections = [...new Set(styleIDs.map((token) => `STYLE${token.trim()}`).filter((section) => document.sections().includes(section)))]
   return sections.length ? { source, property, document, path, sections } : { source, property }
 }
 
@@ -414,9 +415,11 @@ export function openStyleReferenceEditor(styleID: string): void {
 
 export function openBdaStyleReferencePicker(paths: string[][], ref: BdaStyleRef, field: string, owner: HTMLElement): void {
   const input = document.createElement("input")
-  input.value = bdaStyleID(ref)
+  // A reference the skin does not set yet (key -1) opens the picker with nothing chosen.
+  input.value = ref.key >= 0 ? bdaStyleID(ref) : ""
   input.dataset.documentStyleKey = field
-  input.dataset.bdaStyleType = ref.type
+  // A new foreground layer can be any kind of style: an image, a text or a colour.
+  if (field !== NEW_FORE_LAYER) input.dataset.bdaStyleType = ref.type
   input.addEventListener("change", () => {
     const next = bdaStyleRef(input.value)
     if (next) updateBdaAppearanceStyleRef(paths, next, owner)

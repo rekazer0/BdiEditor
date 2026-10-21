@@ -55,7 +55,7 @@ test('undoing image and sound creation removes new files; redo restores their by
   const noop = () => {}
   const context = withAppState(vm.createContext({ acceptAiDraftPreview: () => {}, recordChange: (stack, change) => stack.push(change), numberInputGesture: () => undefined,
     archive, undoStack: [], redoStack: [], Uint8Array, sourceHistoryHighlight: undefined,
-    scheduleSourceAutosave: noop, updateHistoryButtons: noop, refreshBdaLayout: noop,
+    scheduleSourceAutosave: noop, updateHistoryButtons: noop, refreshBdaLayout: noop, refreshSelectedBdaSource: noop,
     refreshPreview: noop, populateKeyInspector: noop, updateDirty: noop,
     resourceConfigActive: false, selectedPath: '', selectedSoundID: '',
     isSoundPath: () => true, isEditing: () => true, currentSoundEntries: () => [], soundResourcePaths: () => [],
@@ -147,7 +147,7 @@ test('asset replacement uses history and autosave, keeps its target, and rejects
       archive, selectedPath: 'light/skin/res/a.png', undoStack: [], redoStack: [],
       Uint8Array, Blob, isEditing: () => true, sourceHistoryHighlight: undefined,
       scheduleSourceAutosave: paths => autosaved.push(...paths), updateHistoryButtons: noop,
-      refreshBdaLayout: noop, refreshPreview: noop, populateKeyInspector: noop, updateDirty: noop,
+      refreshBdaLayout: noop, refreshSelectedBdaSource: noop, refreshPreview: noop, populateKeyInspector: noop, updateDirty: noop,
       resourceConfigActive: false, showImage: noop,
       createImageBitmap: async () => { if (invalid) throw Error('invalid image'); return { close: noop } },
       runFileOperation: async (_name, operation) => operation(),

@@ -37,6 +37,7 @@
             <button type="button" data-mobile-command="replace-layout-image"><span class="system-symbol" data-icon="image-down" aria-hidden="true"></span><span>替换键盘样式</span></button>
             <button type="button" data-mobile-command="adapt-ios26"><span class="system-symbol" data-icon="smartphone" aria-hidden="true"></span><span>适配 iOS 26 透明背景</span></button>
             <span class="mobile-menu-separator" role="separator"></span>
+            <button type="button" data-start-tour><span class="system-symbol" data-icon="circle-help" aria-hidden="true"></span><span>使用教程</span></button>
           </div>
         </details>
         <details class="toolbar-more pen-file-menu">
@@ -67,6 +68,7 @@
             <button id="redo" type="button" role="menuitem" disabled title="重做" aria-label="重做"><span class="system-symbol" data-icon="redo-2" aria-hidden="true"></span><span>重做</span></button>
             <span class="toolbar-menu-separator" role="separator"></span>
             <button type="button" role="menuitem" data-app-dialog="settings"><span class="system-symbol" data-icon="settings" aria-hidden="true"></span><span>设置</span></button>
+            <button type="button" role="menuitem" data-start-tour><span class="system-symbol" data-icon="circle-help" aria-hidden="true"></span><span>使用教程</span></button>
           </div>
         </details>
         <span class="spacer" data-tauri-drag-region></span>
@@ -307,6 +309,7 @@
               <div class="welcome-note">
                 <span class="icon system-symbol" data-icon="lightbulb" aria-hidden="true"></span>
                 <p>新建后可在左侧切换 9 键 / 26 键布局；macOS 使用 ⌘ 单击多选按键，Windows 使用 Ctrl 单击。</p>
+                <button class="ui-button" data-size="sm" type="button" data-start-tour>使用教程</button>
               </div>
             </div>
 
@@ -449,6 +452,15 @@
               <label class="ui-field"><span>首个候选背景</span><span class="style-field"><input data-toolbar-field="FIRST_BACK" /></span></label>
             </div>
           </section>
+          <section class="inspector-group text-style-fields" data-inspector-group-label="文字" hidden>
+            <h3>文字<span id="text-style-targets" class="ui-segmented" data-size="sm" role="group" aria-label="文字对象"></span></h3>
+            <p id="text-style-note" class="inspector-group-subtitle"></p>
+            <div class="inspector-grid">
+              <div id="font-file-field" class="ui-field" title="GLOBAL FONT_PATH：按键前景内嵌字体，会写入每份 CSS；Android 主要支持全局声明，STYLE 级 FONT_PATH 仅 iOS（手册第 163 页）"><span>字体</span><span class="font-file-controls"><span class="ui-input ui-select"><select id="font-file-select" aria-label="字体文件"></select></span><button id="font-import" class="ui-icon-button" type="button" title="导入字体文件（.ttf / .otf / .ttc）" aria-label="导入字体文件" data-icon="upload"></button><button id="font-remove" class="ui-icon-button" type="button" title="移除皮肤字体" aria-label="移除皮肤字体" data-icon="trash-2" disabled></button></span></div>
+              <input id="font-import-input" type="file" accept=".ttf,.otf,.ttc" hidden>
+              <div id="text-style-rows" class="inspector-grid"></div>
+            </div>
+          </section>
           <div class="inspector-group document-fields" hidden>
             <div id="document-fields"></div>
           </div>
@@ -519,18 +531,17 @@
             </div>
           </section>
           <section class="inspector-group key-only key-typography-fields" data-inspector-group-label="文字">
-            <h3><span class="typography-heading-default">文字</span><span class="typography-heading-override">文字覆盖</span></h3>
+            <h3><span class="typography-heading-default">文字</span><span class="typography-heading-override">文字覆盖</span><span id="key-text-layers" class="ui-segmented" data-size="sm" role="group" aria-label="文字层" hidden></span></h3>
             <p class="inspector-group-subtitle"><span class="typography-subtitle-default">显示内容与字体颜色</span><span class="typography-subtitle-override">仅当前状态</span></p>
             <div class="inspector-grid typography-content-fields">
               <label class="ui-field" title="SHOW：直接点击后传给内核的键值，不是显示文字；显示文字请改样式 SHOW"><span>键值</span><input data-key-field="SHOW" /></label>
               <div id="primary-css-fields" class="primary-css-fields"></div>
             </div>
             <div class="appearance-typography-fields">
-              <div id="font-file-field" class="ui-field" title="GLOBAL FONT_PATH：按键前景内嵌字体，会写入每份 CSS；Android 主要支持全局声明，STYLE 级 FONT_PATH 仅 iOS（手册第 163 页）"><span>字体</span><span class="font-file-controls"><span class="ui-input ui-select"><select id="font-file-select" aria-label="字体文件"></select></span><button id="font-import" class="ui-icon-button" type="button" title="导入字体文件（.ttf / .otf / .ttc）" aria-label="导入字体文件" data-icon="upload"></button><button id="font-remove" class="ui-icon-button" type="button" title="移除皮肤字体" aria-label="移除皮肤字体" data-icon="trash-2" disabled></button></span></div>
-              <input id="font-import-input" type="file" accept=".ttf,.otf,.ttc" hidden>
+              <label class="ui-field" data-text-style data-bda-text title="contentText：BDA 文字样式自带的显示文字"><span>显示文字</span><input data-style-field="CONTENT_TEXT" aria-label="显示文字" /></label>
               <label class="ui-field" data-text-style title="FONT_NAME：字体名称，可填皮肤内字体文件名或系统字体名；Android 13.3.16.2 的 CSS 样式不解析此键，内嵌字体优先用全局字体"><span>字体名称</span><input data-style-field="FONT_NAME" aria-label="字体名称" list="skin-font-names" /></label>
               <datalist id="skin-font-names"></datalist>
-              <label class="ui-field" data-text-style><span>字号</span><input data-style-field="FONT_SIZE" type="number" /></label>
+              <label class="ui-field" data-text-style><span>字号</span><input data-style-field="FONT_SIZE" type="number" min="1" step="1" /></label>
               <div class="color-pair-field" data-text-style>
                 <label class="ui-field"><span>颜色</span><span class="color-control ui-input ui-color"><input type="color" data-color-picker-for="style-NM_COLOR" value="#ffffff" aria-label="文字正常颜色"><input data-style-field="NM_COLOR" aria-label="文字正常颜色值" /><input type="number" data-color-alpha-for="style-NM_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字正常颜色透明度"></span></label>
                 <label class="ui-field"><span>按下颜色</span><span class="color-control ui-input ui-color"><input type="color" data-color-picker-for="style-HL_COLOR" value="#ffffff" aria-label="文字按下颜色"><input data-style-field="HL_COLOR" aria-label="文字按下颜色值" /><input type="number" data-color-alpha-for="style-HL_COLOR" min="0" max="1" step="0.01" value="1" aria-label="文字按下颜色透明度"></span></label>

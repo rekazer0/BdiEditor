@@ -133,6 +133,7 @@
 | 菜单 | `.ui-menu` | 浮层，`--radius-lg`，`--shadow-md` |
 | 角标 | `.ui-badge` | 计数、状态、“实验”标记（`data-variant="accent"`） |
 | 文件操作弹窗 | `.ui-operation-dialog` | 进度、成功、取消与失败共用，状态由 `data-outcome` 表示 |
+| 新手引导 | `.ui-tour` | 由 `src/tour.ts` 的 `runTour()` 生成：遮罩挖空高亮目标，旁边是说明卡片；要求点击的步骤（`data-action`）允许点穿挖空处 |
 
 新组件要先在本表登记，写进 `components.css`，再在页面中使用。
 

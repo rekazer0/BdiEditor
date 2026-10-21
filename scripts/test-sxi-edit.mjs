@@ -101,6 +101,43 @@ try {
   })
   assert.equal((await state()).skin.default.s_info.ss_1[id].s_2.normal, 'btn,1')
   await page.locator('#style-image-close').click()
+  // Text edits on a key and on the whole layout land in the styles' s_1 inside skin.json.
+  await page.locator('#mobile-inspector-groups').getByRole('button', { name: '文字', exact: true }).click()
+  await page.locator('[data-style-field="FONT_SIZE"]').fill('44')
+  await page.locator('[data-style-field="FONT_SIZE"]').press('Enter')
+  await page.waitForFunction(async () => {
+    const { appState } = await import('/src/app/state.ts')
+    return JSON.parse(appState.archive.getText('skin.json')).default.s_info.ss_1[3].s_1.f_s === 44
+  })
+  await page.evaluate(() => document.activeElement?.blur())
+  await page.keyboard.press('Escape')
+  // Labels (each key's first text layer) change; the second layer (STYLE4, a hint) keeps its size.
+  const layoutSize = page.locator(".text-style-fields input[aria-label='按键文字字号']")
+  await layoutSize.fill('33')
+  await layoutSize.press('Enter')
+  await page.waitForFunction(async () => {
+    const { appState } = await import('/src/app/state.ts')
+    const styles = JSON.parse(appState.archive.getText('skin.json')).default.s_info.ss_1
+    return styles[3].s_1.f_s === 33 && styles[4].s_1.f_s === undefined
+  })
+  // Gestures and geometry are written to the key in skin.json too.
+  await selectKey(1)
+  await page.locator('#mobile-inspector-groups').getByRole('button', { name: '手势', exact: true }).click()
+  await page.locator('[data-key-field="UP"]').fill('F12')
+  await page.locator('[data-key-field="UP"]').press('Tab')
+  await page.waitForFunction(async () => {
+    const { appState } = await import('/src/app/state.ts')
+    const key = JSON.parse(appState.archive.getText('skin.json')).default.port_layout.b.full26Pinyin.keys.find((item) => item.id === '1')
+    return key.values.includes(0)
+  })
+  await page.locator('#mobile-inspector-groups').getByRole('button', { name: '布局', exact: true }).click()
+  await page.locator('[data-key-field="x"]').fill('5')
+  await page.locator('[data-key-field="x"]').press('Enter')
+  await page.waitForFunction(async () => {
+    const { appState } = await import('/src/app/state.ts')
+    const key = JSON.parse(appState.archive.getText('skin.json')).default.port_layout.b.full26Pinyin.keys.find((item) => item.id === '1')
+    return key.rect[0][0] === 5
+  })
   const saved = await page.evaluate(async () => {
     const { appState } = await import('/src/app/state.ts')
     return Array.from(appState.archive.toBytes('sxi'))
@@ -108,7 +145,7 @@ try {
   const reopened = SkinArchive.open(new Uint8Array(saved), 'sxi')
   assert.deepEqual(JSON.parse(reopened.getText('skin.json')), (await state()).skin)
   assert.deepEqual(errors, [])
-  console.log('SXI editing: canvas → JSON location, add foreground image, one-step undo/redo, image state update and save/reopen passed')
+  console.log('SXI editing: canvas → JSON location, add foreground image, one-step undo/redo, image state update, key and layout text and save/reopen passed')
 } catch (error) {
   await page.screenshot({ path: '/tmp/bdi-sxi-edit-failure.png' }).catch(() => {})
   throw error

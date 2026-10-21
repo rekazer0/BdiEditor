@@ -161,6 +161,9 @@
 }
 .source h3 small, .source .document-section-code { margin-left: auto; color: var(--tertiary); font-family: var(--font-mono); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); }
 .source .inspector-gesture-count { font-family: var(--font-ui); }
+/* 文字分组标题右侧的对象切换（候选字 / 首选 / 输入码） */
+.source h3 > .ui-segmented { margin-left: auto; font-weight: var(--font-weight-regular); }
+.source h3 > .ui-segmented[hidden] { display: none; }
 .source .inspector-group-subtitle { margin: 0; color: var(--tertiary); font-size: var(--font-size-xs); }
 .source :is(.typography-heading-override, .typography-subtitle-override) { display: none; }
 .source .inspector-grid,

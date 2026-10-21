@@ -326,24 +326,44 @@ export function replaceRepeatedMessage(bytes: Uint8Array, fieldNumber: number, i
   return join([bytes.slice(0, field.start), encodedField(fieldNumber, 2, payload), bytes.slice(field.end)])
 }
 
+function removeRepeatedMessage(bytes: Uint8Array, fieldNumber: number, index: number): Uint8Array {
+  const field = rawFields(bytes).filter((item) => item.number === fieldNumber)[index]
+  if (!field) throw new Error(`BDA 重复字段不存在：${fieldNumber}[${index}]`)
+  return join([bytes.slice(0, field.start), bytes.slice(field.end)])
+}
+
+/** Adds one more `fieldNumber` entry right after the existing ones, keeping the message's field order. */
+function appendRepeatedMessage(bytes: Uint8Array, fieldNumber: number, payload: Uint8Array): Uint8Array {
+  const fields = rawFields(bytes)
+  const last = fields.filter((item) => item.number === fieldNumber).at(-1)
+  const at = last?.end ?? fields.find((item) => item.number > fieldNumber)?.start ?? bytes.length
+  return join([bytes.slice(0, at), encodedField(fieldNumber, 2, payload), bytes.slice(at)])
+}
+
 export function patchPanelMessage(bytes: Uint8Array, desired: JsonObject, current: JsonObject, schema: PanelPatchSchema): Uint8Array {
   let output = bytes
   for (const [property, spec] of Object.entries(schema)) {
     const wanted = desired[property]
     const old = current[property]
     if (sameJson(wanted, old)) continue
-    if (wanted === undefined) throw new Error(`暂不支持删除 BDA 面板字段：${property}`)
+    if (wanted === undefined && spec.kind !== "styleList") throw new Error(`暂不支持删除 BDA 面板字段：${property}`)
     if (spec.kind === "style") {
       const original = rawFields(output).find((field) => field.number === spec.field)?.bytes ?? new Uint8Array()
       output = replaceField(output, spec.field, 2, patchStyleRef(original, wanted))
       continue
     }
     if (spec.kind === "styleList") {
-      if (!Array.isArray(wanted) || !Array.isArray(old) || wanted.length !== old.length) {
-        throw new Error(`暂不支持增删 BDA 样式引用：${property}`)
-      }
-      wanted.forEach((value, index) => {
-        if (sameJson(value, old[index])) return
+      // The decoded source leaves an empty list out.
+      const wantedList = wanted ?? []
+      const oldList = old ?? []
+      if (!Array.isArray(wantedList) || !Array.isArray(oldList)) throw new Error(`BDA 样式引用列表无效：${property}`)
+      for (let index = oldList.length - 1; index >= wantedList.length; index--) output = removeRepeatedMessage(output, spec.field, index)
+      wantedList.forEach((value, index) => {
+        if (index >= oldList.length) {
+          output = appendRepeatedMessage(output, spec.field, patchStyleRef(new Uint8Array(), value))
+          return
+        }
+        if (sameJson(value, oldList[index])) return
         const original = rawFields(output).filter((field) => field.number === spec.field)[index]?.bytes ?? new Uint8Array()
         output = replaceRepeatedMessage(output, spec.field, index, patchStyleRef(original, value))
       })

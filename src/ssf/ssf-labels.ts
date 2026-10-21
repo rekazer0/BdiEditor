@@ -37,6 +37,7 @@ const FIELD_LABELS: Record<string, string> = {
   TEXT_COLOR_PRESSED: "按下文字颜色",
   TEXT_SIZE: "字号",
   TYPEFACE: "字体",
+  BOLD: "粗体",
   TEXT_STYLE: "文字样式",
   TEXT_HIGHLIGHT_STYLE: "高亮文字样式",
   SHADOW_COLOR_NORMAL: "阴影颜色",

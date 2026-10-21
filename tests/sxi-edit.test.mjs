@@ -1,6 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { addSxiImageStyle, setSxiForeground, setSxiStyleImage, sxiSectionRanges, sxiStylePointer } from '../src/palm/sxi-edit.ts'
+import { addSxiImageStyle, applySxiViewEdit, setSxiForeground, setSxiStyleImage, sxiSectionRanges, sxiStylePointer } from '../src/palm/sxi-edit.ts'
+import { IniDocument } from '../src/ini.ts'
+import { ACTION_CODES } from '../src/palm/palm-ini.ts'
 import { encodeSkinJson, parseSkinJson, sxiDerivedFiles } from '../src/palm/sxi-projection.ts'
 import { SkinArchive } from '../src/skin.ts'
 import { strToU8, zipSync } from 'fflate'
@@ -26,6 +28,41 @@ test('SXI foreground append and state image edits persist through save/reopen wi
   assert.deepEqual(parseSkinJson(archive.getText('skin.json')), parseSkinJson(original))
   assert.throws(() => setSxiForeground(original, layout, ['KEY9'], 'NaN'), /编号/)
   assert.throws(() => setSxiForeground(original, layout, ['KEY404'], '1'), /KEY404/)
+})
+
+test('SXI view edits go back to the skin.json values they were projected from', () => {
+  const view = (skin, path) => sxiDerivedFiles(parseSkinJson(skin)).get(path).text
+  const edit = (skin, path, change) => {
+    const before = view(skin, path)
+    const document = IniDocument.parse(before)
+    change(document)
+    return applySxiViewEdit(skin, path, before, document.toString())
+  }
+  const layoutPath = 'light/skin/port/py_26.ini'
+  const cssPath = 'light/skin/res/default.css'
+  let after = edit(original, layoutPath, (document) => {
+    document.set('KEY9', 'CENTER', 'w')
+    document.set('KEY9', 'UP', 'F12')
+    document.set('KEY9', 'VIEW_RECT', '1,2,30,40')
+    document.set('KEY2', 'BACK_STYLE', '7')
+  })
+  let skin = parseSkinJson(after)
+  const [key9, key2] = skin.default.port_layout.b.full26Pinyin.keys
+  // CENTER (button 4) is replaced in place; UP (button 0) is appended as its Palm action name.
+  assert.deepEqual(key9.values, [4, 'w', 0, ACTION_CODES.F12])
+  assert.deepEqual(key9.rect, [[1, 2], [30, 40]])
+  assert.equal(key2.b.base_b, 7)
+  // Text properties land in s_1; a new STYLE section becomes a new style.
+  after = edit(after, cssPath, (document) => {
+    document.set('STYLE1728', 'FONT_SIZE', '36')
+    document.appendSection('STYLE9', [{ key: 'NM_COLOR', value: 'FF112233' }])
+  })
+  skin = parseSkinJson(after)
+  assert.deepEqual(skin.default.s_info.ss_1[1728].s_1, { text: 'q', f_s: 36 })
+  assert.deepEqual(skin.default.s_info.ss_1[9], { f: 0, id: 'STYLE9', s_1: { c_normal: 'FF112233' } })
+  assert.match(view(after, cssPath), /\[STYLE9\]\nNM_COLOR=FF112233/)
+  // Values with no skin.json counterpart are refused rather than silently lost.
+  assert.throws(() => edit(original, layoutPath, (document) => document.set('KEY9', 'FORE_OFFSET', '0,1')), /FORE_OFFSET/)
 })
 
 test('SXI source ranges follow key IDs, nested bases, escaped strings and state tips', () => {
