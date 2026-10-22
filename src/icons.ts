@@ -18,6 +18,7 @@ import {
   Undo2, Redo2, RotateCw, Share, Menu, Eye, EyeOff, Wifi, Signal, BatteryFull, Lightbulb, SlidersHorizontal,
   Paperclip, Sparkles, VolumeX, Check, ChevronsUpDown, CodeXml, FileDown, Minus, Scan, Paintbrush,
   CircleAlert, FolderInput, Grid2x2, Maximize, Pointer, Timer, Frame, LayoutPanelTop, FlaskConical, History,
+  Shirt,
 } from "lucide"
 
 // Exact Lucide names from 属性检查器.pen, read through Pen MCP.
@@ -66,6 +67,8 @@ const icons: Record<string, IconNode> = {
   "file-down": FileDown, minus: Minus, scan: Scan, paintbrush: Paintbrush,
   "circle-alert": CircleAlert, "folder-input": FolderInput, "grid-2x2": Grid2x2, maximize: Maximize,
   pointer: Pointer, timer: Timer, frame: Frame, "layout-panel-top": LayoutPanelTop,
+  // 手心内置工具栏（皮肤没有工具栏图标时画布代画）
+  shirt: Shirt,
 }
 
 export function createIcon(name: string, size = 14): SVGElement {

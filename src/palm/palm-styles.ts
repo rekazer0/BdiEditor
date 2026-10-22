@@ -19,6 +19,8 @@ type Paint = { visual?: Visual; fill?: string; border?: { color: string; width: 
 // Android's toolbar draws these functions with IMG<n> of `a_m` (pop_menu_icons): 表情 26, 输入方式 27,
 // 语音 29, 搜索 31, 编辑 25, 剪贴板 50 (Baidu LogoIconSource); the real list lives on the phone.
 const ANDROID_TOOLBAR_TILES = [26, 27, 29, 31, 25, 50]
+// The toolbar entries of the `menu` Palm's own skins ship with the `logo/1.0` icon pack.
+const DEFAULT_TOOLBAR = ["KBSwitch", "MoveCursor", "Search", "Emoji", "NewWords"]
 
 async function fileImage(archive: SkinArchive, path: string | undefined): Promise<Visual | undefined> {
   const bytes = path && archive.getBytes(path)
@@ -147,7 +149,9 @@ export class PalmStyles implements VisualResolver {
     const struct = asObject(this.skin[this.theme]) ?? {}
     const logo = `${THEME_DIRECTORY[this.theme]}/skin/res/logo`
     const menus = list(struct.menu).filter(Array.isArray) as Json[][]
+    // Without a `menu`, a skin carrying Palm's icon pack shows the pack's default toolbar.
     const menu = menus.find((items) => items.some((item) => asObject(item)?.Position === "toolbar")) ?? menus[0]
+      ?? (struct.a_m === undefined ? DEFAULT_TOOLBAR.map((name) => ({ Position: "toolbar", Images: { Normal: { Normal: `1.0/toolbarMenuItem_${name}_Normal` } } })) : undefined)
     const visuals = menu
       ? await Promise.all(menu.map(asObject).filter((item) => item?.Position === "toolbar").map((item) => {
           const name = asObject(asObject(item?.Images ?? null)?.Normal ?? null)?.Normal

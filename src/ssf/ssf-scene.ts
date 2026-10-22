@@ -340,7 +340,8 @@ export async function ssfCandidateScene(
     ...await ssfBackdrop(styles, size.width, 0, size.height + size.panelHeight),
     ...barImage ? [{ kind: "image", rect: { x: 0, y: 0, width: size.width, height: size.height }, visual: barImage } as const] : [],
   ]
-  const iconColor = styles.color("CandidateIMEFunctionView", "ICON_COLOR") ?? styles.color("General", "ICON_COLOR")
+  const iconARGB = ssfColor(styles.skin.get("CandidateIMEFunctionView", "ICON_COLOR")) ?? ssfColor(styles.skin.get("General", "ICON_COLOR"))
+  const iconColor = argbColor(iconARGB)
   const icons = await Promise.all(candidates.sections().filter((section) => /^ICON\d+$/.test(section)).flatMap((section) => {
     const rect = parseRect(candidates.get(section, "VIEW_RECT"))
     if (!rect) return []
@@ -360,6 +361,14 @@ export async function ssfCandidateScene(
       return { back: [], fore: layer ? [layer] : [] }
     })]
   }))
+  // Sogou rules the hide button off with a 2 px line in the icon colour at 40 %, 55 % of the bar's
+  // height (measured on the skin tool's previews).
+  const hide = candidates.sections().find((section) => candidates.get(section, "KEY")?.trim() === "F8")
+  const hideRect = hide ? parseRect(candidates.get(hide, "VIEW_RECT")) : undefined
+  const px = size.width / styles.sogouWidth
+  const line: SceneLayer[] = hideRect && iconARGB
+    ? [{ kind: "fill", rect: { x: hideRect.x - px, y: size.height * 0.225, width: 2 * px, height: size.height * 0.55 }, color: argbColor(`66${iconARGB.slice(2)}`)! }]
+    : []
   await styles.ready()
-  return { bar, icons: { background: [], keys: icons } }
+  return { bar, icons: { background: line, keys: icons } }
 }

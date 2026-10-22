@@ -2,6 +2,7 @@
 // where each key, list cell and candidate-bar icon is in a keyboard state, the styles (palm-styles.ts)
 // what it looks like.
 
+import { iconMarkup } from "../icons.ts"
 import { sceneKey, type NativeScene, type SceneLayer, type SceneLayers } from "../native-scene.ts"
 import type { Rect } from "../preview-items.ts"
 import type { LegacyHint, LegacyHintIcon } from "../preview-hints.ts"
@@ -130,5 +131,30 @@ export async function palmCandidateScene(board: PalmBoard, styles: PalmStyles, s
     })
   }))
   const back = board.candidateBack
-  return { bar: back === undefined ? [] : await styles.back(back, false, { x: 0, y: 0, ...size }), icons: { background: [], keys } }
+  return {
+    bar: back === undefined ? [] : await styles.back(back, false, { x: 0, y: 0, ...size }),
+    icons: { background: keys.length ? [] : await builtInToolbar(board, styles), keys },
+  }
+}
+
+// What the Palm keyboard draws on a bar the skin gives no icons (the built-in template's preview):
+// settings, keyboard switch, skins and emoji centred in sevenths from the left, hide in the last.
+const BUILT_IN_TOOLBAR = ["settings", "keyboard", "shirt", "smile"]
+
+async function builtInToolbar(board: PalmBoard, styles: PalmStyles): Promise<SceneLayer[]> {
+  const size = board.candidateSize
+  if (!size || typeof document === "undefined") return []
+  const color = styles.resolveText(String(board.candidateTextStyles.words ?? ""), false)?.color ?? "#333333"
+  // Measured on that preview: icons a nineteenth of the bar's width.
+  const side = Math.min(size.width / 19, size.height)
+  const slot = size.width / 7
+  const icon = async (name: string, x: number): Promise<SceneLayer> => {
+    // Rasterised at 3× so the canvas's device scale keeps the strokes sharp.
+    const image = new Image()
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(iconMarkup(name, side * 3).replaceAll("currentColor", color))}`
+    await image.decode()
+    const bitmap = await createImageBitmap(image)
+    return { kind: "image", visual: { image: bitmap, source: [0, 0, bitmap.width, bitmap.height] }, rect: { x: x - side / 2, y: (size.height - side) / 2, width: side, height: side } }
+  }
+  return Promise.all([...BUILT_IN_TOOLBAR.map((name, index) => icon(name, slot * (index + 0.5))), icon("chevron-down", size.width - slot / 2)])
 }

@@ -207,7 +207,8 @@ export class PalmBoard {
           height: cell[1],
         },
       })),
-      base: baseOf(asObject(value("b") ?? null) ? { b: value("b")! } : undefined),
+      // `b` falls back field by field: a board list may set only its bar (base_b) and keep defaultGlobal's text style.
+      base: baseOf({ b: { ...asObject(global?.b ?? null), ...asObject(own.b ?? null) } }),
       cell: value("i_cell"),
     }
   }
