@@ -548,60 +548,12 @@ export const orientationChoiceButtons = Array.from(document.querySelectorAll<HTM
 
 export const mobileChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-mobile-choice]"))
 
-export const styleImageDialog = $("#style-image-dialog") as HTMLDialogElement
+export const pickerDialog = $("#picker-dialog") as HTMLDialogElement
 
-export const styleImageClose = $("#style-image-close") as HTMLButtonElement
-
-export const styleImageSource = $("#style-image-source") as HTMLButtonElement
-
-export const styleImageTitle = $("#style-image-title") as HTMLElement
-
-export const styleImageSubtitle = $("#style-image-subtitle") as HTMLElement
-
-export const styleImageResourceOpen = $("#style-image-resource-open") as HTMLButtonElement
-
-export const styleImageResourcePicker = $("#style-image-resource-picker") as HTMLElement
-
-export const styleImageResourceClose = $("#style-image-resource-close") as HTMLButtonElement
-
-export const styleImageResourceSearch = $("#style-image-resource-search") as HTMLInputElement
-
-export const styleImageResourceCount = $("#style-image-resource-count") as HTMLElement
-
-export const styleImageResourceEmpty = $("#style-image-resource-empty") as HTMLElement
-
-export const styleImageImgList = $("#style-image-img-list") as HTMLDivElement
-
-export const styleImagePicker = $("#style-image-picker")
-
-export const styleImagePickerCanvas = $("#style-image-picker-canvas") as HTMLCanvasElement
-
-export const styleImagePickerMeta = $("#style-image-picker-meta")
-
-export const stylePickerDialog = $("#style-picker-dialog") as HTMLDialogElement
-
-export const stylePickerSearch = $("#style-picker-search") as HTMLInputElement
-
-export const stylePickerCount = $("#style-picker-count")
-
-export const stylePickerGrid = $("#style-picker-grid")
-
-export const stylePickerEmpty = $("#style-picker-empty")
-
-export const stylePickerClose = $("#style-picker-close") as HTMLButtonElement
+export const pickerFrame = $("#picker-frame") as HTMLIFrameElement
 
 // 源码里的样式引用借用一个隐藏输入框接入属性检查器的样式库，选择结果写回源码。
 export const sourceStyleProxy = document.createElement("input")
-
-export const styleLibraryPreview = $("#style-library-preview")
-
-export const styleLibraryPreviewImage = $("#style-library-preview-image")
-
-export const styleLibraryApply = $("#style-library-apply") as HTMLButtonElement
-
-export const styleLibraryEdit = $("#style-library-edit") as HTMLButtonElement
-
-export const stylePickerAdd = $("#style-picker-add") as HTMLButtonElement
 
 // 只渲染真正滚进视野的卡片：9 张十几 MB 的皮肤不该在启动时全部读一遍。
 export const welcomeScroller = document.querySelector<HTMLElement>(".welcome-main")

@@ -6,7 +6,7 @@ import { wheelZoomFactor } from "../../wheel-zoom.ts"
 import { mixedCoordinateDelta } from "../../mixed-input.ts"
 import { moveSelectedKeys, selectParentObject } from "../key-editing"
 import { renderSourceValueThumbnail, updateSourceFindVisibility } from "../source-panel"
-import { sidebarProjectName, documentName, aiDesignThinking, aiDesignIntensity, aiDesignScope, aiDesignModel, canvasWrap, deviceShell, toolbarStrip, previewCanvas, toolbarCanvas, editorCrosshair, previewCoordinates, previewCoordinateX, previewCoordinateY, mobileCommandMenu, mobileUndoButton, undoButton, mobileRedoButton, redoButton, desktopUndoButton, desktopRedoButton, quickInspector, mobileInspectorGroups, bdaInspectorStateButtons, bdaConfigFieldsGroup, mobilePaneButtons, files, mainWorkspace, mobileSplitHandle, mobilePreviewPosition, previewZoomOut, previewZoomFit, previewZoomIn, previewPanelViewport, candidateArea, candidateInputText, styleDetailImageButtons, workspaceImage, sourceStyleProxy, styleLibraryApply, styleLibraryEdit, $, styleLibraryPreview, stylePickerDialog, stylePickerSearch, toolbarFields, keyFields, stylePickerClose, newStyleDialog, stylePickerAdd, baiduActionCodes, sourceUploadButton, sourceUploadInput, sourceDownloadButton, sourceCopyButton } from "../dom"
+import { sidebarProjectName, documentName, aiDesignThinking, aiDesignIntensity, aiDesignScope, aiDesignModel, canvasWrap, deviceShell, toolbarStrip, previewCanvas, toolbarCanvas, editorCrosshair, previewCoordinates, previewCoordinateX, previewCoordinateY, mobileCommandMenu, mobileUndoButton, undoButton, mobileRedoButton, redoButton, desktopUndoButton, desktopRedoButton, quickInspector, mobileInspectorGroups, bdaInspectorStateButtons, bdaConfigFieldsGroup, mobilePaneButtons, files, mainWorkspace, mobileSplitHandle, mobilePreviewPosition, previewZoomOut, previewZoomFit, previewZoomIn, previewPanelViewport, candidateArea, candidateInputText, styleDetailImageButtons, workspaceImage, sourceStyleProxy, toolbarFields, keyFields, newStyleDialog, baiduActionCodes, sourceUploadButton, sourceUploadInput, sourceDownloadButton, sourceCopyButton } from "../dom"
 import { appState } from "../state"
 import { hydrateIcons } from "../../icons"
 import { syncSinglePageInspectorGroup, setMobileSplit, setMobilePane, syncMobileInspectorHeader, setMobilePreviewCollapsed } from "../mobile-layout"
@@ -15,8 +15,6 @@ import { measureCanvasWrapInnerSize, scheduleFitCanvasPreview, applyPreviewZoom,
 import { canvasEditable, isEditing } from "../edit-history"
 import { chooseStyleImageSlice, clearImagePreviewError, showImagePreviewError } from "../resource-inspector"
 import { replacedSourceStyle } from "../../source-value-ranges.ts"
-import { applyStyleLibrarySelection, editStyleLibrarySelection, renderStylePicker, addStyleFromLibrary } from "../style-picker"
-import { type StyleKind } from "../types"
 import { decorateStyleReferenceInput } from "../style-references"
 import { knownFunctionCodes, actionDescription } from "../../actions.ts"
 import { renameDocumentTitle } from "../key-inspector"
@@ -427,42 +425,8 @@ export function wireCanvasAndInspector(): void {
     appState.sourceStyleProxyTarget = { ...target, to: target.from + next.length, value: next }
     source.commit()
   })
-  styleLibraryApply.addEventListener("click", applyStyleLibrarySelection)
-  styleLibraryEdit.addEventListener("click", editStyleLibrarySelection)
-  $("#style-library-preview-close").addEventListener("click", () => { styleLibraryPreview.hidden = true })
-  for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-mode]")) {
-    button.addEventListener("click", () => {
-      appState.styleLibraryMode = button.dataset.styleLibraryMode as "styles" | "images"
-      appState.styleLibraryFilter = "all"
-      stylePickerSearch.value = ""
-      styleLibraryPreview.hidden = true
-      void renderStylePicker()
-    })
-  }
-  for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-kind]")) {
-    button.addEventListener("click", () => {
-      appState.styleLibraryKind = button.dataset.styleLibraryKind as StyleKind | "all"
-      styleLibraryPreview.hidden = true
-      void renderStylePicker()
-    })
-  }
-  for (const button of stylePickerDialog.querySelectorAll<HTMLButtonElement>("[data-style-library-filter]")) {
-    button.addEventListener("click", () => {
-      appState.styleLibraryFilter = button.dataset.styleLibraryFilter!
-      styleLibraryPreview.hidden = true
-      void renderStylePicker()
-    })
-  }
   for (const input of [...keyboardFields, ...toolbarFields, ...keyFields]) decorateStyleReferenceInput(input)
-  stylePickerSearch.addEventListener("input", () => { styleLibraryPreview.hidden = true; void renderStylePicker() })
-  stylePickerDialog.addEventListener("close", () => { ++appState.stylePickerRenderID; appState.styleLibrarySelected = undefined })
-  stylePickerClose.addEventListener("click", () => stylePickerDialog.close())
   newStyleDialog.addEventListener("close", () => { appState.newStyleApplyTarget = undefined })
-  stylePickerAdd.addEventListener("click", addStyleFromLibrary)
-  stylePickerDialog.addEventListener("click", (event) => {
-    const rect = stylePickerDialog.getBoundingClientRect()
-    if (event.target === stylePickerDialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) stylePickerDialog.close()
-  })
   baiduActionCodes.replaceChildren(...knownFunctionCodes.map((value) => {
     return new Option(actionDescription(value), value)
   }))

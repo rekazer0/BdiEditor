@@ -18,16 +18,13 @@
 .picker-heading strong, .picker-heading span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-heading strong { font-size: var(--font-size-lg); font-weight: 600; }
 .picker-heading span { color: var(--tertiary); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
-.picker-toolbar button, .picker-toolbar input {
+.picker-back, .picker-toolbar input {
   height: 30px;
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--control);
   font-size: var(--font-size-md);
-}
-@media (hover: hover) {
-.picker-toolbar button:hover { background: var(--hover); }
 }
 .picker-toolbar .picker-back:not([hidden]) {
   display: inline-flex;
@@ -71,7 +68,7 @@
   text-align: center;
 }
 .picker-back { grid-column: 1; justify-self: start; }
-.picker-toolbar input { grid-column: 3; justify-self: end; }
+.picker-actions { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 8px; }
 .resource-picker-view {
   max-height: calc(100dvh - var(--_toolbar-h));
   overflow: auto;
@@ -144,3 +141,12 @@
 .style-library-preview-info button { height: 28px; margin-right: 4px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--control); font-size: var(--font-size-sm); cursor: pointer; }
 .style-library-preview-info button:disabled { opacity: .5; cursor: default; }
 .style-library-footer { display: flex; justify-content: space-between; gap: 12px; padding: 8px 16px; border-top: 1px solid var(--line); color: var(--secondary); font-size: var(--font-size-xs); }
+/* 网页端手机宽度：返回与标题不再强行居中以免重叠，搜索框单独占第二行。 */
+@media (max-width: 640px) {
+  .picker-window:has(#resource-search:not([hidden])) { --_toolbar-h: 104px; }
+  .picker-toolbar { grid-template-columns: auto minmax(0, 1fr) auto; align-content: center; row-gap: 12px; }
+  .picker-heading { max-width: none; }
+  .picker-actions { display: contents; }
+  #picker-close { grid-column: 3; grid-row: 1; justify-self: end; }
+  .picker-toolbar input { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+}

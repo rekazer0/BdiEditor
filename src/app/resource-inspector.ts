@@ -1,7 +1,7 @@
 import { type StyleImagePickerTarget, type SoundEntry } from "./types"
 import { appState } from "./state"
-import { isTauri, playSoundPath, resourceSearchControl, source, keySoundBuffers, releaseKeySound } from "./canvas-interaction"
-import { openImagePickerList, openStyleImageResourcePicker, openImageSlicePicker, pickableImagePaths } from "./image-pickers"
+import { playSoundPath, resourceSearchControl, source, keySoundBuffers, releaseKeySound } from "./canvas-interaction"
+import { openImagePickerList, openImageSlicePicker, pickableImagePaths } from "./image-pickers"
 import { type BdaStyleRef, bdaStyleID } from "../bda.ts"
 import { updateBdaRefs } from "./key-inspector"
 import { isEditing, commitText, updateDirty, commitBytes } from "./edit-history"
@@ -25,15 +25,13 @@ import { updateSourceHighlight } from "./source-panel"
 export function openStyleImageResourceChooser(target: StyleImagePickerTarget): void {
   appState.resourcePickerSelect = undefined
   appState.pickerTarget = target
-  if (isTauri()) openImagePickerList()
-  else openStyleImageResourcePicker()
+  openImagePickerList()
 }
 
 export function openImageResourceChooser(onSelect: (resourceID: string) => void): void {
   appState.pickerTarget = undefined
   appState.resourcePickerSelect = onSelect
-  if (isTauri()) openImagePickerList()
-  else openStyleImageResourcePicker()
+  openImagePickerList()
 }
 
 export function openBdaStyleImageResourceChooser(ref: BdaStyleRef, highlighted: boolean): void {
@@ -42,8 +40,7 @@ export function openBdaStyleImageResourceChooser(ref: BdaStyleRef, highlighted: 
     const property = highlighted ? "HL_IMG" : "NM_IMG"
     if (updateBdaRefs([ref], property, resourceID)) void renderStyleResourceDetail()
   }
-  if (isTauri()) openImagePickerList()
-  else openStyleImageResourcePicker()
+  openImagePickerList()
 }
 
 export function replaceBdaStyleImage(ref: BdaStyleRef, highlighted: boolean): void {

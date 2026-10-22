@@ -21,7 +21,10 @@
         <strong id="picker-title">图片选择</strong>
         <span id="picker-subtitle"></span>
       </div>
-      <input id="resource-search" type="search" results="0" placeholder="搜索图片资源" aria-label="搜索图片资源" hidden />
+      <div class="picker-actions">
+        <input id="resource-search" type="search" results="0" placeholder="搜索图片资源" aria-label="搜索图片资源" hidden />
+        <button id="picker-close" class="ui-icon-button" type="button" title="关闭" aria-label="关闭" data-icon="x" data-icon-size="16" hidden></button>
+      </div>
     </header>
     <main>
       <section id="image-picker-view" class="image-picker-view" hidden>

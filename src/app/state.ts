@@ -23,7 +23,6 @@ import { type TileRect } from "../tiles.ts"
 import { createAtlasWorkspace } from "../atlas-workspace"
 import { type VisualResolver } from "../atlas.ts"
 import { type SourceEditorValueRange } from "../lazy-source-editor.ts"
-import { type StyleKind } from "./types"
 import { type ProjectChoice } from "../project-chooser"
 import { type WindowMaterialKind } from "./types"
 import { type SsfTemplates } from "../ssf/ssf-convert.ts"
@@ -97,19 +96,15 @@ export const appState = {
   layoutPanelHeight: number
   panelVisibleHeight: number
 } | undefined,
-  pickerURL: "",
-  pickerImage: undefined as HTMLImageElement | undefined,
   pickerPath: "",
   pickerSlices: [] as TileSlice[],
-  pickerScale: 1,
-  pickerOffset: { x: 0, y: 0 } as TilePoint,
-  pickerFit: 1,
-  pickerZoom: 1,
   pickerTarget: undefined as StyleImagePickerTarget | undefined,
   resourcePickerSelect: undefined as ((resourceID: string) => void) | undefined,
   nativeImagePickerPayload: undefined as NativeImagePickerPayload | undefined,
   // 切片窗口下次创建时的起始视图（列表优先用于「样式还没有图片」等入口）。
   pickerRequestedView: "image" as "image" | "list" | "styles",
+  // 网页端选择窗口的 iframe 已加载完、可以直接收数据（弹窗关闭时清空）。
+  pickerFrameReady: false,
   selectedFileButton: undefined as HTMLElement | undefined,
   sourceTransfer: undefined as SourceTransfer | undefined,
   sidebarView: "overview" as "overview" | "source",
@@ -197,10 +192,6 @@ export const appState = {
   sourceColorPickerTarget: undefined as SourceEditorValueRange | undefined,
   sourceStyleProxyTarget: undefined as SourceEditorValueRange | undefined,
   stylePickerTarget: undefined as HTMLInputElement | undefined,
-  stylePickerRenderID: 0,
-  styleLibraryMode: "styles" as "styles" | "images",
-  styleLibraryFilter: "all",
-  styleLibraryKind: "all" as StyleKind | "all",
   styleLibraryHighlighted: false,
   styleLibrarySelected: undefined as { styleID?: string; imagePath?: string } | undefined,
   // 样式库内新增：复用「新增样式」对话框，创建后直接应用到当前引用并进入编辑。
