@@ -20,7 +20,7 @@ import { parseSsfImage, ssfColor, type SsfPackage, type SsfTheme } from "./ssf-p
 import { firstValue, ssfBackground, ssfForeground, ssfLabelStyle, ssfTextSections } from "./ssf-parts.ts"
 
 /** The nine-key letter groups' digits, the minor label Sogou shows when the skin turns it on. */
-const NINE_KEY_DIGITS: Record<string, string> = {
+export const NINE_KEY_DIGITS: Record<string, string> = {
   Key_ABC: "2", Key_DEF: "3", Key_GHI: "4", Key_JKL: "5", Key_MNO: "6", Key_PQRS: "7", Key_TUV: "8", Key_WXYZ: "9",
 }
 
@@ -120,7 +120,7 @@ export class SsfStyles {
   }
 }
 
-function box(rect: Rect, fractions: number[] | undefined): Rect | undefined {
+export function box(rect: Rect, fractions: number[] | undefined): Rect | undefined {
   if (fractions?.length !== 4 || !fractions.every(Number.isFinite)) return
   // Android RectF: left, top, right, bottom as shares of the key.
   const [left, top, right, bottom] = fractions
@@ -131,7 +131,7 @@ function box(rect: Rect, fractions: number[] | undefined): Rect | undefined {
 let measure: OffscreenCanvasRenderingContext2D | null | undefined
 
 /** The largest size at which `text` fits `area` (Sogou sizes a label without TEXT_SIZE to its box). */
-function fitText(text: string, area: Rect, font: string | undefined, weight: number): number {
+export function fitText(text: string, area: Rect, font: string | undefined, weight: number): number {
   measure ??= typeof OffscreenCanvas === "undefined" ? null : new OffscreenCanvas(1, 1).getContext("2d")
   if (!measure) return area.height
   measure.font = `${weight} ${area.height}px ${canvasFontFamily(font)}`
@@ -145,7 +145,7 @@ function fitted(visual: Visual, area: Rect): SceneLayer {
   return { kind: "image", visual, rect: { x: area.x + (area.width - width * scale) / 2, y: area.y + (area.height - height * scale) / 2, width: width * scale, height: height * scale } }
 }
 
-function centre(rect: Rect): [number, number] {
+export function centre(rect: Rect): [number, number] {
   return [rect.x + rect.width / 2, rect.y + rect.height / 2]
 }
 

@@ -1,5 +1,7 @@
 import type { Preview } from "./preview.ts"
 import { legacyParticleFrames } from "./preview-animation.ts"
+import { drawSprite, withMotion, type SceneSprite } from "./native-motion.ts"
+import { scheduleNativeFrame } from "./preview-native.ts"
 import { bdaAnimationBindingsForKey } from "./preview-animation.ts"
 import { bdaBindingEffects } from "./preview-animation.ts"
 import { bdaParticleEmitter } from "./preview-animation.ts"
@@ -53,7 +55,10 @@ export async function paintPreview(self: Preview): Promise<void> {
   }
 
   // A native scene (Palm, Sogou) replaces the resolver's panel, key and toolbar visuals.
-  const scene = await self.sceneForState()?.catch((error) => {
+  // A running animation keeps the painted scene while the next one (a press refreshes it) builds.
+  const next = self.sceneForState()
+  const animating = self.drawnScene && (self.nativePress || self.drawnScene.effects?.panel)
+  const scene = next && animating && !self.builtScenes.has(next) ? self.drawnScene : await next?.catch((error) => {
     console.warn("预览场景生成失败:", error)
     return undefined
   })
@@ -192,6 +197,7 @@ export async function paintPreview(self: Preview): Promise<void> {
     true,
   )
 
+  const sprites: SceneSprite[] = []
   for (const [index, key] of keys.entries()) {
     const animationElapsed = self.legacyAnimationState?.key.section === key.section
       ? Date.now() - self.legacyAnimationState.startedAt
@@ -214,9 +220,12 @@ export async function paintPreview(self: Preview): Promise<void> {
       : bdaBack.opacity
     const sceneKey = sceneKeys.get(key.section)
     if (scene) {
-      const pressed = self.active?.key.section === key.section || self.legacyAnimationState?.key.section === key.section || self.keyPressed(key)
+      const press = self.nativePress?.section === key.section ? self.nativePress : undefined
+      const pressed = Boolean(press) || self.active?.key.section === key.section || self.keyPressed(key)
       const layers = sceneKey?.layers(pressed)
       if (sceneKey && layers) {
+        const motion = press && scene.effects?.press(key.section, Date.now() - press.startedAt, press.seed)
+        if (motion) sprites.push(...motion.sprites)
         // Scene layers sit where the skin puts the key; a key being dragged takes them along.
         const draw = (group: SceneLayer[]) => {
           context.save()
@@ -226,17 +235,8 @@ export async function paintPreview(self: Preview): Promise<void> {
           for (const layer of group) drawSceneLayer(context, layer)
           context.restore()
         }
-        withTransform(context, key.rect, backScale, backTranslation, backRotation, backOpacity, () => draw(layers.back))
-        const animationStyle = key.foreAnimStyle || key.animStyle
-        withTransform(
-          context,
-          key.rect,
-          animationElapsed >= 0 ? legacyAnimationScale(self.legacyAnimation, animationStyle, animationElapsed) : bdaFore.scale,
-          animationElapsed >= 0 ? legacyAnimationTranslation(self.legacyAnimation, animationStyle, animationElapsed, key.rect) : bdaFore.translation,
-          animationElapsed >= 0 ? legacyAnimationRotation(self.legacyAnimation, animationStyle, animationElapsed) : bdaFore.rotation,
-          animationElapsed >= 0 ? legacyAnimationOpacity(self.legacyAnimation, animationStyle, animationElapsed) : bdaFore.opacity,
-          () => draw(layers.fore),
-        )
+        withMotion(context, key.rect, motion?.back, () => draw(layers.back))
+        layers.fore.forEach((layer, index) => withMotion(context, key.rect, motion?.fore[layers.groups?.[index] ?? 0], () => draw([layer])))
       }
       strokeSelection(self, context, key)
       continue
@@ -333,7 +333,15 @@ export async function paintPreview(self: Preview): Promise<void> {
 
   }
 
-  const shouldDrawHint = Boolean(self.active && isLegacyHintInputKey(self.active.key) && hintIcon)
+  if (scene?.effects) {
+    const press = self.nativePress && { section: self.nativePress.section, elapsed: Date.now() - self.nativePress.startedAt, seed: self.nativePress.seed }
+    for (const sprite of [...scene.effects.panel?.(Date.now() - self.nativeShownAt, press) ?? [], ...sprites]) drawSprite(context, sprite)
+  }
+  self.drawnScene = scene
+  scheduleNativeFrame(self, scene)
+
+  const popup = self.active ? sceneKeys.get(self.active.key.section)?.popup : undefined
+  const shouldDrawHint = Boolean(popup?.length || self.active && isLegacyHintInputKey(self.active.key) && hintIcon)
   let hintContext = context
   if (self.hintCanvas && (shouldDrawHint || self.hintVisible)) {
     const overlayBounds = self.hintCanvas.getBoundingClientRect()
@@ -356,7 +364,10 @@ export async function paintPreview(self: Preview): Promise<void> {
     }
   }
 
-  if (shouldDrawHint && self.active && hintIcon) {
+  if (popup?.length) {
+    self.hintVisible = true
+    for (const layer of popup) drawSceneLayer(hintContext, layer)
+  } else if (shouldDrawHint && self.active && hintIcon) {
     self.hintVisible = true
     const [baseWidth, height] = hintIcon.size
     const [offsetX, offsetY] = hintIcon.position

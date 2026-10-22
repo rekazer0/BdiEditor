@@ -8,15 +8,13 @@ import { inputBarMetrics } from "../candidate-style.ts"
 import { IniDocument } from "../ini.ts"
 import type { NativeScene, SceneLayer } from "../native-scene.ts"
 import { PalmBoard, type PalmOrientation, type PalmTheme } from "../palm/palm-board.ts"
-import { palmBoardScene, palmCandidateScene } from "../palm/palm-scene.ts"
+import { palmBoardScene, palmCandidateScene, palmHint } from "../palm/palm-scene.ts"
 import type { PalmStyles } from "../palm/palm-styles.ts"
-import { asObject, type Json } from "../palm/sxi-ini.ts"
-import { bubbleIni } from "../palm/sxi-layout.ts"
-import { animationsIni, stylesIni } from "../palm/sxi-style.ts"
-import { parseLegacyAnimation } from "../preview-animation.ts"
-import { parseLegacyHint } from "../preview-hints.ts"
+import { PalmMotion } from "../palm/palm-motion.ts"
+import type { Json } from "../palm/sxi-ini.ts"
 import type { SkinArchive } from "../skin.ts"
 import type { SsfTheme } from "../ssf/ssf-package.ts"
+import { animateSsfScene } from "../ssf/ssf-motion.ts"
 import { SsfStyles, ssfBoardScene, ssfCandidateScene } from "../ssf/ssf-scene.ts"
 import { visualResolver } from "./bda-documents"
 import { candidateBackgroundPreview, preview, toolbarPreview } from "./canvas-interaction"
@@ -57,19 +55,12 @@ function styleID(value: Json): string {
 }
 
 /** Press and show animations and hint bubbles, from the theme's `ss_1` / `ss_2` and the board's `h`. */
-function palmEffects(board: PalmBoard, skin: ReturnType<typeof palmSkin>): void {
-  const struct = asObject(skin[board.theme]) ?? {}
-  const set = (field: string) => {
-    const shared = asObject(asObject(struct.s_info)?.[field] ?? null)
-    const own = asObject(asObject(struct[board.orientation === "port" ? "s_port" : "s_land"])?.[field] ?? null)
-    return { ...shared, ...own }
-  }
-  // Palm keeps Baidu's animation fields under its own names; the shared engine reads them once renamed.
-  const animation = parseLegacyAnimation(IniDocument.parse(stylesIni(set("ss_1")).toString()), IniDocument.parse(animationsIni(set("ss_2")).toString()))
+/** Palm presses and bubbles come from skin.json itself (palm-motion.ts, `h`), not the shared Baidu engine. */
+function palmHints(board: PalmBoard): void {
   preview.setAnimation(undefined)
-  preview.setLegacyAnimation(animation)
-  toolbarPreview.setLegacyAnimation(animation)
-  const hint = board.hint && hintPreviewEnabled.checked ? parseLegacyHint(IniDocument.parse(bubbleIni(board.hint).toString())) : undefined
+  preview.setLegacyAnimation(undefined)
+  toolbarPreview.setLegacyAnimation(undefined)
+  const hint = board.hint && hintPreviewEnabled.checked ? palmHint(board.hint) : undefined
   preview.setLegacyHints(hint, hint, false)
 }
 
@@ -137,7 +128,8 @@ export function refreshPalmPreview(): boolean {
   const inKeyboard = inputBarInKeyboard()
   const text = palmCandidateText(board, palmStyles, inKeyboard)
   const bar = palmCandidateBar(board, palmStyles, text, inKeyboard)
-  palmEffects(board, skin)
+  palmHints(board)
+  const motion = PalmMotion.load(skin, board.theme, board.orientation, board, palmStyles)
   preview.setResolver(styles)
   preview.setOffsets(undefined)
   preview.setDefaults(undefined)
@@ -160,7 +152,7 @@ export function refreshPalmPreview(): boolean {
   // The board is read again for each state and after each edit, so the scene follows skin.json.
   preview.setScene((state) => {
     const current = palmBoard()
-    return current ? palmBoardScene(current, palmStyles, state) : Promise.resolve(undefined)
+    return current ? motion.then((loaded) => palmBoardScene(current, palmStyles, state, loaded)) : Promise.resolve(undefined)
   })
   setCandidateScenes((state) => {
     const current = palmBoard()
@@ -192,7 +184,9 @@ function ssfScenes(archive: SkinArchive): boolean {
   const candidates = candidatePath && archive.isText(candidatePath) ? IniDocument.parse(archive.getText(candidatePath)) : undefined
   const barHeight = candidates && !toolbarPreview.canvas.closest("[hidden]") ? toolbarPreview.panelHeight : 0
   const size = { width: preview.panelWidth, height: preview.surfaceHeight }
-  preview.setScene(() => ssfBoardScene(styles, skeleton, name, orientation === "land", { ...size, barHeight }))
+  const popups = hintPreviewEnabled.checked
+  preview.setScene(() => ssfBoardScene(styles, skeleton, name, orientation === "land", { ...size, barHeight })
+    .then((scene) => animateSsfScene(scene, styles, layout, name, orientation === "land", popups)))
   const templateCandidates = candidatePath && templateText(candidatePath.split("/").pop()!)
   if (candidates && templateCandidates) {
     setCandidateScenes(() => ssfCandidateScene(styles, candidates, templateCandidates, resolver, {

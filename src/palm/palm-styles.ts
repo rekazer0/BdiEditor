@@ -60,6 +60,14 @@ export class PalmStyles implements VisualResolver {
     return { name, source: rectParts(tile?.rect1 ?? null), inner: rectParts(tile?.rect2 ?? null) }
   }
 
+  /** A file of the theme's `res` folders, the orientation's own first. */
+  bytes(name: string): Uint8Array | undefined {
+    for (const root of this.roots) {
+      const bytes = this.archive.getBytes(`${root}/${name}`)
+      if (bytes) return bytes
+    }
+  }
+
   /** "tile file,IMG index" as a drawable slice; `IMG<n>` is matched by id, Android atlases start at IMG0. */
   async image(reference: Json): Promise<Visual | undefined> {
     const tile = this.tile(reference)

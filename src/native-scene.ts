@@ -4,6 +4,7 @@
 
 import { type Visual, canvasFontFamily } from "./atlas.ts"
 import { drawVisual } from "./preview-draw.ts"
+import type { SceneEffects } from "./native-motion.ts"
 import type { Rect } from "./preview-items.ts"
 
 export type SceneText = {
@@ -23,18 +24,24 @@ export type SceneLayer =
   | { kind: "image"; rect: Rect; visual: Visual }
   | { kind: "text"; text: SceneText }
 
-/** A key's background and foreground, which press animations move separately. */
-export type SceneLayers = { back: SceneLayer[]; fore: SceneLayer[] }
+/**
+ * A key's background and foreground, which press animations move separately; `groups` gives each
+ * foreground layer the index of the foreground (and so the animation) it belongs to, 0 without it.
+ */
+export type SceneLayers = { back: SceneLayer[]; fore: SceneLayer[]; groups?: number[] }
 
 export type SceneKey = {
   section: string
   rect: Rect
   layers(pressed: boolean): SceneLayers
+  /** The bubble a tap on the key pops, in scene units. */
+  popup?: SceneLayer[]
 }
 
 export type NativeScene = {
   background: SceneLayer[]
   keys: SceneKey[]
+  effects?: SceneEffects
 }
 
 function textFont(text: SceneText): string {

@@ -9,6 +9,7 @@ import { type LegacyHint } from "./preview-hints.ts"
 import { constrainedCanvasSize, setCanvasSize } from "./preview-draw.ts"
 import { paintPreview } from "./preview-paint.ts"
 import type { NativeScene } from "./native-scene.ts"
+import { playNativePress } from "./preview-native.ts"
 import { pointerDown } from "./preview-pointer.ts"
 import { pointerMove } from "./preview-pointer.ts"
 import { pointerUp } from "./preview-pointer.ts"
@@ -114,6 +115,12 @@ export class Preview {
   panelAnimationStyle = ""
   legacyPanelAnimationStartedAt = 0
   private legacyPanelAnimationTimer?: number
+  /** A native scene's running press animation (kept across the refresh a press causes) and when panel animations started. */
+  nativePress?: { section: string; startedAt: number; seed: number }
+  nativeShownAt = Date.now()
+  /** The scene last painted, which a press animates while the refresh it causes builds the next. */
+  drawnScene?: NativeScene
+  nativeFrame = 0
   drawID = 0
   lastDrawnID = 0
   private drawQueued = 0
@@ -196,6 +203,8 @@ export class Preview {
     if (this.bdaAnimationTimer) window.cancelAnimationFrame(this.bdaAnimationTimer)
     if (this.legacyAnimationTimer) window.cancelAnimationFrame(this.legacyAnimationTimer)
     if (this.legacyPanelAnimationTimer) window.cancelAnimationFrame(this.legacyPanelAnimationTimer)
+    window.clearTimeout(this.nativeFrame)
+    this.nativePress = undefined
     if (this.active?.holdTimer !== undefined) window.clearTimeout(this.active.holdTimer)
     this.clearPress()
     this.cancelEditTouch()
@@ -316,9 +325,19 @@ export class Preview {
   sceneForState(): Promise<NativeScene | undefined> | undefined {
     if (!this.scene) return
     let scene = this.scenes.get(this.skinState)
-    if (!scene) this.scenes.set(this.skinState, scene = this.scene(this.skinState))
+    if (!scene) {
+      const built = scene = this.scene(this.skinState)
+      this.scenes.set(this.skinState, built)
+      void built.then(() => {
+        this.builtScenes.add(built)
+        void this.draw()
+      }, () => {})
+    }
     return scene
   }
+
+  /** Scenes whose build has finished, which painting need not wait for. */
+  readonly builtScenes = new WeakSet<Promise<NativeScene | undefined>>()
 
   resolveVisual(styleID: string, highlighted: boolean): Promise<Visual | undefined> {
     const key = `${highlighted ? "1" : "0"}:${styleID}`
@@ -546,6 +565,7 @@ export class Preview {
   }
 
   async playAnimation(key: PreviewItem): Promise<void> {
+    if (this.scene) return playNativePress(this, key)
     this.playLegacyAnimation(key)
     const effects = this.animation
       ? bdaAnimationBindingsForKey(this.animation, key).flatMap((binding) => bdaBindingEffects(this.animation!, binding))

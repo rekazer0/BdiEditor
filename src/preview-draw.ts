@@ -300,13 +300,13 @@ export function withTransform(
   rotation: number | undefined,
   opacity: number | undefined,
   draw: () => void,
+  pivot?: readonly [number, number],
 ): void {
   if (!scale && !translation && rotation === undefined && opacity === undefined) {
     draw()
     return
   }
-  const centerX = rect.x + rect.width / 2
-  const centerY = rect.y + rect.height / 2
+  const [centerX, centerY] = pivot ?? [rect.x + rect.width / 2, rect.y + rect.height / 2]
   context.save()
   if (opacity !== undefined) context.globalAlpha *= opacity
   if (translation) context.translate(translation[0], translation[1])

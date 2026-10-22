@@ -102,7 +102,8 @@ function item(section: string, rect: Rect, base: PalmBase, owner: JsonObject, ac
   }
 }
 
-export type PalmKey = { section: string; rect: Rect; base: PalmBase }
+/** `panelAnimation` is the style of the panel animation the key's press plays (`base_pa`). */
+export type PalmKey = { section: string; rect: Rect; base: PalmBase; panelAnimation?: Json }
 export type PalmCell = { section: string; rect: Rect; title: string }
 export type PalmIcon = { section: string; rect: Rect; base: PalmBase; switch: boolean; fixed?: [number, number] }
 
@@ -139,6 +140,17 @@ export class PalmBoard {
     return text(asObject(asObject(this.board.board)?.b ?? null)?.asi)
   }
 
+  /** The panel animation style (`base_pa`: shows with the board, plays on presses) and the region it fills (`a_insets`). */
+  get panelClip(): { style: Json; region: Rect } {
+    const board = asObject(this.board.board) ?? {}
+    const insets = asObject(board.a_insets ?? null) ?? {}
+    const inset = (side: string) => typeof insets[side] === "number" ? insets[side] as number : 0
+    return {
+      style: asObject(board.b ?? null)?.base_pa,
+      region: { x: inset("left"), y: inset("top"), width: this.width - inset("left") - inset("right"), height: this.height - inset("top") - inset("bottom") },
+    }
+  }
+
   get panelBack(): Json {
     return asObject(asObject(this.board.board)?.b ?? null)?.base_b ?? asObject(asObject(this.global.board)?.b ?? null)?.base_b
   }
@@ -161,7 +173,7 @@ export class PalmBoard {
       const hit = rectParts(key.hit_rect ?? null)
       const touchRect = hit ? hit[2] > 0 && hit[3] > 0 ? { x: hit[0], y: hit[1], width: hit[2], height: hit[3] } : null : undefined
       const act = { ...actions(key.values), ...fix ? actions(fix.v) : {} }
-      return [{ section, rect, base, item: item(section, rect, base, key, act, { touchRect }) }]
+      return [{ section, rect, base, panelAnimation: asObject(key.b ?? null)?.base_pa, item: item(section, rect, base, key, act, { touchRect }) }]
     })
     return keys.sort((left, right) => Number(!isFullPanelPreviewItem(left, this.width, this.height)) - Number(!isFullPanelPreviewItem(right, this.width, this.height)))
   }

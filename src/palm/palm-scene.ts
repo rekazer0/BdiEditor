@@ -4,23 +4,28 @@
 
 import { sceneKey, type NativeScene, type SceneLayer, type SceneLayers } from "../native-scene.ts"
 import type { Rect } from "../preview-items.ts"
-import type { PalmBase, PalmBoard, PalmTheme } from "./palm-board.ts"
+import type { LegacyHint, LegacyHintIcon } from "../preview-hints.ts"
+import { baseOf, list, numbers, type PalmBase, type PalmBoard, type PalmTheme } from "./palm-board.ts"
+import type { PalmMotion } from "./palm-motion.ts"
 import type { PalmStyles } from "./palm-styles.ts"
+import { asObject, type JsonObject } from "./sxi-ini.ts"
 
 // What shows through a transparent skin: the Palm keyboard's own backdrop, sampled from Palm previews.
 const BACKDROP: Record<PalmTheme, string> = { default: "#d0d3d9", night: "#212121" }
 
 async function keyLayers(styles: PalmStyles, board: PalmBoard, base: PalmBase, rect: Rect, pressed: boolean): Promise<SceneLayers> {
   const fore: SceneLayer[] = []
+  const groups: number[] = []
   for (const [index, id] of base.fores.entries()) {
     const layer = await styles.fore(id, pressed, rect, board.offset(base.offsets[index]))
     if (layer) fore.push(layer)
+    if (layer) groups.push(index)
   }
-  return { back: base.back === undefined ? [] : await styles.back(base.back, pressed, rect), fore }
+  return { back: base.back === undefined ? [] : await styles.back(base.back, pressed, rect), fore, groups }
 }
 
-/** One keyboard board of a theme and orientation, in a keyboard state. */
-export async function palmBoardScene(board: PalmBoard, styles: PalmStyles, state?: number): Promise<NativeScene> {
+/** One keyboard board of a theme and orientation, in a keyboard state, animated by `motion`. */
+export async function palmBoardScene(board: PalmBoard, styles: PalmStyles, state?: number, motion?: PalmMotion): Promise<NativeScene> {
   const keys = await Promise.all(board.keys(state).map(({ section, rect, base }) =>
     sceneKey(section, rect, (pressed) => keyLayers(styles, board, base, rect, pressed))))
   const symbols = board.list()
@@ -35,12 +40,55 @@ export async function palmBoardScene(board: PalmBoard, styles: PalmStyles, state
   }
   // Keys below the panel (a navigation-bar row) grow the surface; the backdrop covers it too.
   const surface = { x: 0, y: 0, width: board.width, height: Math.ceil(Math.max(board.height, ...keys.filter((key) => /^KEY/.test(key.section)).map((key) => key.rect.y + key.rect.height))) }
+  const effects = motion?.effects(board.keys(state))
   return {
     background: [
       { kind: "fill", rect: surface, color: BACKDROP[board.theme] },
       ...board.panelBack === undefined ? [] : await styles.back(board.panelBack, false, surface),
     ],
     keys,
+    ...effects ? { effects } : {},
+  }
+}
+
+/**
+ * A bubble layout (`h.<file>`) as the canvas draws bubbles: `info` pairs a bubble type with an icon of
+ * `icon_info` (0 the tap bubble, 1 the long-press bar, 2–5 swipes up, down, left, right), `i_cell` is
+ * the bar's cell style.
+ */
+export function palmHint(model: JsonObject): LegacyHint | undefined {
+  const icons = new Map<string, LegacyHintIcon>()
+  for (const [id, value] of Object.entries(asObject(model.icon_info ?? null) ?? {})) {
+    const icon = asObject(value) ?? {}
+    const size = numbers(icon.size ?? null)
+    if (size?.length !== 2 || !(size[0] > 0 && size[1] > 0)) continue
+    const position = numbers(icon.pos ?? null)
+    const insets = asObject(icon.insets ?? null) ?? {}
+    const inset = (side: string) => typeof insets[side] === "number" ? insets[side] as number : 0
+    const base = baseOf(icon)
+    icons.set(id, {
+      backStyle: base.back === undefined ? "" : String(base.back),
+      foreStyle: base.fores.map(String).join(","),
+      size: [size[0], size[1]],
+      position: position?.length === 2 ? [position[0], position[1]] : [0, 0],
+      padding: [inset("left"), inset("top"), inset("right"), inset("bottom")],
+    })
+  }
+  if (!icons.size) return
+  const slots = new Map<number, string>()
+  const info = list(model.info ?? null)
+  for (let index = 0; index + 1 < info.length; index += 2) {
+    if (typeof info[index] === "number" && (typeof info[index + 1] === "number" || typeof info[index + 1] === "string")) slots.set(info[index] as number, String(info[index + 1]))
+  }
+  return {
+    icons,
+    holdIcon: slots.get(0),
+    barIcon: slots.get(1),
+    upIcon: slots.get(2),
+    downIcon: slots.get(3),
+    leftIcon: slots.get(4),
+    rightIcon: slots.get(5),
+    ...model.i_cell === undefined ? {} : { cellStyle: String(model.i_cell) },
   }
 }
 
