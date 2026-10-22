@@ -1,14 +1,12 @@
 import { IniDocument } from "../ini.ts"
 import { appState } from "./state"
-import { panelCopySource, panelSourceWidth, panelSourceHeight, panelTargetWidth, panelTargetHeight, panelScaleEnabled, panelScaleOptions, panelCopyTarget, panelScaleSummary, panelCopySourceOptions, panelCopyTargetOptions, theme, orientation, layout, panelScaleDialog, newButton, openButton, saveButton, mobileShareButton, eventLog, fileOperationDialog, fileOperationProgress, fileOperationPercent, fileOperationDetail, fileOperationTitle, fileOperationIcon, fileOperationResult, fileOperationClose, workspaceImage, assetImage, deviceShell, workspaceImageFigure, sourceEditor, asset, sourceName, assetBackButton } from "./dom"
-import { archiveCopyPaths, archivePathOptions, scaleIniDocument } from "../panel-tools.ts"
+import { newButton, openButton, saveButton, mobileShareButton, eventLog, fileOperationDialog, fileOperationProgress, fileOperationPercent, fileOperationDetail, fileOperationTitle, fileOperationIcon, fileOperationResult, fileOperationClose, workspaceImage, assetImage, deviceShell, workspaceImageFigure, sourceEditor, asset, sourceName, assetBackButton } from "./dom"
 import { alphaMask } from "../layout-scan.ts"
-import { scheduleSourceAutosave } from "./source-workspace"
-import { syncSegmentedControls, updatePanelToolButtons } from "./mobile-layout"
+import { updatePanelToolButtons } from "./mobile-layout"
 import { renderFiles } from "./file-tree"
 import { selectFile } from "./navigation"
-import { updateDirty, commitBatch } from "./edit-history"
-import { updateDevicePreview, refreshPreview } from "./preview-render"
+import { updateDirty, commitBatch, commitTextChanges } from "./edit-history"
+import { refreshPreview } from "./preview-render"
 import { updateSourceFileActions } from "./source-files"
 import { exportButtons, isTauri, LARGE_SKIN_BYTES } from "./canvas-interaction"
 import { canExport, type ExportFormat } from "../export.ts"
@@ -17,60 +15,15 @@ import { clientLog, flushClientLogs } from "../client-log.ts"
 import { message } from "@tauri-apps/plugin-dialog"
 import { invoke, Channel } from "@tauri-apps/api/core"
 import { adaptIos26Variant, adaptIos26KeyboardLayout } from "../ios26.ts"
+import { adaptSxiForIos26 } from "../palm/sxi-ios26.ts"
+import { SXI_SKIN_PATH } from "../palm/sxi-projection.ts"
+import { adaptSsfSkinForIos26, isSsfSkinFile } from "../ssf/ssf-ios26.ts"
+import { refreshSxiDocument } from "./sxi-documents"
 import { type Change } from "../history.ts"
 import { replaceImagePreviewURL } from "../image-preview.ts"
 import { clearImagePreviewError } from "./resource-inspector"
 import { createIcon } from "../icons.ts"
-
-export function panelSizeFrom(document: IniDocument | undefined): [number, number] | undefined {
-  const size = document?.get("PANEL", "SIZE")?.split(",").map(Number)
-  return size?.length === 2 && size.every((value) => Number.isFinite(value) && value > 0)
-    ? size as [number, number]
-    : undefined
-}
-
-export function panelSizeForPath(path: string): [number, number] | undefined {
-  if (!appState.archive?.isText(path)) return
-  const directory = path.slice(0, path.lastIndexOf("/"))
-  return panelSizeFrom(IniDocument.parse(appState.archive.getText(path))) ??
-    (appState.archive.isText(`${directory}/gen.ini`) ? panelSizeFrom(IniDocument.parse(appState.archive.getText(`${directory}/gen.ini`))) : undefined)
-}
-
-export function panelCopySourceSize(): [number, number] | undefined {
-  if (!appState.archive) return
-  const source = panelCopySource.value.trim().replace(/\\/g, "/").replace(/\/+$/, "")
-  if (appState.archive.isText(source)) return panelSizeForPath(source)
-  for (const path of appState.archive.names()) {
-    if (path.startsWith(`${source}/`) && /\.ini$/i.test(path)) {
-      const size = panelSizeForPath(path)
-      if (size) return size
-    }
-  }
-}
-
-export function updatePanelCopyForm(): void {
-  if (!appState.archive) return
-  const sourceSize = panelCopySourceSize()
-  panelSourceWidth.value = sourceSize ? String(sourceSize[0]) : ""
-  panelSourceHeight.value = sourceSize ? String(sourceSize[1]) : ""
-  if (!panelTargetWidth.value && sourceSize) panelTargetWidth.value = String(sourceSize[0])
-  if (!panelTargetHeight.value && sourceSize) panelTargetHeight.value = String(sourceSize[1])
-  if (!sourceSize) panelScaleEnabled.checked = false
-  panelScaleEnabled.disabled = !sourceSize
-  panelScaleOptions.hidden = !panelScaleEnabled.checked
-  panelSourceWidth.disabled = true
-  panelSourceHeight.disabled = true
-  panelTargetWidth.disabled = !panelScaleEnabled.checked
-  panelTargetHeight.disabled = !panelScaleEnabled.checked
-  try {
-    const copies = archiveCopyPaths(appState.archive.names(), panelCopySource.value, panelCopyTarget.value)
-    panelScaleSummary.textContent = copies.length === 1
-      ? `目标：${copies[0].target}`
-      : `目标：${panelCopyTarget.value.trim()}（${copies.length} 个文件）`
-  } catch {
-    panelScaleSummary.textContent = ""
-  }
-}
+import { type TileRect } from "../tiles.ts"
 
 export async function resizePng(bytes: Uint8Array, xRatio: number, yRatio: number): Promise<Uint8Array> {
   const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes).buffer], { type: "image/png" }))
@@ -85,18 +38,34 @@ export async function resizePng(bytes: Uint8Array, xRatio: number, yRatio: numbe
   return new Uint8Array(await blob.arrayBuffer())
 }
 
-// ponytail: 复用 resizePng 的画布输出逻辑，按面板精确尺寸拉伸素材图
-export async function fitPngTo(bytes: Uint8Array, width: number, height: number): Promise<Uint8Array> {
-  const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes).buffer], { type: "image/png" }))
+export function pngImage(bytes: Uint8Array): Promise<ImageBitmap> {
+  return createImageBitmap(new Blob([new Uint8Array(bytes).buffer], { type: "image/png" }))
+}
+
+/** A PNG of `width` × `height` with each image (or its `source` part) drawn into its rect, in order. */
+export async function composePng(width: number, height: number, layers: ReadonlyArray<{ image: CanvasImageSource; source?: TileRect; rect: TileRect }>): Promise<Uint8Array> {
   const canvas = document.createElement("canvas")
-  canvas.width = width
-  canvas.height = height
-  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, width, height)
-  bitmap.close()
+  canvas.width = Math.max(1, Math.round(width))
+  canvas.height = Math.max(1, Math.round(height))
+  const context = canvas.getContext("2d")
+  for (const { image, source, rect } of layers) {
+    if (source) context?.drawImage(image, ...source, ...rect)
+    else context?.drawImage(image, ...rect)
+  }
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((value) => value ? resolve(value) : reject(new Error("PNG 缩放失败")), "image/png")
   })
   return new Uint8Array(await blob.arrayBuffer())
+}
+
+// 按面板精确尺寸拉伸素材图
+export async function fitPngTo(bytes: Uint8Array, width: number, height: number): Promise<Uint8Array> {
+  const bitmap = await pngImage(bytes)
+  try {
+    return await composePng(width, height, [{ image: bitmap, rect: [0, 0, width, height] }])
+  } finally {
+    bitmap.close()
+  }
 }
 
 // 复用 fitPngTo 的解码方式，读取像素后只保留 alpha 掩码用于按键网格检测
@@ -110,84 +79,6 @@ export async function decodePngMask(bytes: Uint8Array): Promise<{ width: number;
   bitmap.close()
   if (!context) throw new Error("无法读取图片像素")
   return { width: canvas.width, height: canvas.height, mask: alphaMask(context.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height) }
-}
-
-export function defaultPanelCopyTarget(source: string): string {
-  if (source.endsWith("/")) return `${source.slice(0, -1)}_copy/`
-  const slash = source.lastIndexOf("/") + 1
-  const dot = source.lastIndexOf(".")
-  return dot >= slash
-    ? `${source.slice(0, dot)}_copy${source.slice(dot)}`
-    : `${source}_copy`
-}
-
-export function openPanelCopyDialog(): void {
-  if (!appState.archive) return
-  const paths = archivePathOptions(appState.archive.names())
-  if (!paths.length) {
-    showError(new Error("皮肤中没有可复制的目录或文件"), "打开面板复制")
-    return
-  }
-  const options = paths.map((value) => Object.assign(document.createElement("option"), { value }))
-  panelCopySourceOptions.replaceChildren(...options.map((option) => option.cloneNode(true)))
-  panelCopyTargetOptions.replaceChildren(...options)
-  panelCopySource.value = paths.includes(appState.selectedPath) ? appState.selectedPath :
-    paths.find((path) => path === `${theme.value}/skin/${orientation.value}/${layout.value}`) ?? paths[0]
-  panelCopyTarget.value = defaultPanelCopyTarget(panelCopySource.value)
-  panelScaleEnabled.checked = false
-  panelTargetWidth.value = ""
-  panelTargetHeight.value = ""
-  updatePanelCopyForm()
-  panelScaleDialog.showModal()
-}
-
-export async function copyPanel(): Promise<boolean> {
-  if (!appState.archive) return false
-  const currentArchive = appState.archive
-  const copies = archiveCopyPaths(currentArchive.names(), panelCopySource.value, panelCopyTarget.value)
-  const existingTargets = copies.filter(({ target }) => currentArchive.getBytes(target))
-  if (existingTargets.length && !window.confirm(`目标中已有 ${existingTargets.length} 个文件，是否覆盖？`)) return false
-
-  let xRatio = 1
-  let yRatio = 1
-  if (panelScaleEnabled.checked) {
-    const sourceSize = panelCopySourceSize()
-    const targetWidth = Number(panelTargetWidth.value)
-    const targetHeight = Number(panelTargetHeight.value)
-    if (!sourceSize || ![targetWidth, targetHeight].every((value) => Number.isFinite(value) && value > 0)) {
-      throw new Error("面板分辨率必须是正数")
-    }
-    xRatio = targetWidth / sourceSize[0]
-    yRatio = targetHeight / sourceSize[1]
-  }
-
-  const staged = new Map<string, Uint8Array>()
-  const encoder = new TextEncoder()
-  for (const { source, target } of copies) {
-    const bytes = currentArchive.getBytes(source)!
-    const scaled = panelScaleEnabled.checked && (xRatio !== 1 || yRatio !== 1)
-    const output = scaled && source.toLowerCase().endsWith(".png")
-      ? await resizePng(bytes, xRatio, yRatio)
-      : scaled && /\.(?:ini|til)$/i.test(source) && currentArchive.isText(source)
-        ? encoder.encode(scaleIniDocument(IniDocument.parse(currentArchive.getText(source)), xRatio, yRatio).toString())
-        : bytes.slice()
-    staged.set(target, output)
-  }
-  for (const [path, bytes] of staged) currentArchive.setBytes(path, bytes)
-  scheduleSourceAutosave([...staged.keys()])
-
-  const targetPath = copies[0].target
-  const variant = targetPath.match(/^(light|dark)\/skin\/(port|land)\//)
-  if (variant) {
-    theme.value = variant[1]
-    orientation.value = variant[2] as "port" | "land"
-    syncSegmentedControls()
-  }
-  renderFiles()
-  selectFile(targetPath)
-  updateDirty()
-  updateDevicePreview()
-  return true
 }
 
 /**
@@ -291,24 +182,36 @@ export function ios26StylePath(genPath: string): string | undefined {
 }
 
 export function adaptArchiveForIos26(): boolean {
-  if (!appState.archive) return false
+  const archive = appState.archive
+  if (!archive) return false
+  if (archive.format === "sxi") {
+    commitTextChanges([{ path: SXI_SKIN_PATH, before: archive.getText(SXI_SKIN_PATH), after: adaptSxiForIos26(archive.getText(SXI_SKIN_PATH)) }])
+    refreshSxiDocument()
+    return true
+  }
+  if (archive.format === "ssf") {
+    const looks = archive.names().filter((path) => !archive.isOverlay(path) && isSsfSkinFile(path))
+    if (!looks.length) throw new Error("没有找到可适配的 phoneSkin.ini。")
+    commitTextChanges(looks.map((path) => ({ path, before: archive.getText(path), after: adaptSsfSkinForIos26(archive.getText(path)) })))
+    return true
+  }
   const staged = new Map<string, string>()
   let variants = 0
-  const text = (path: string) => staged.get(path) ?? appState.archive!.getText(path)
-  for (const genPath of appState.archive.names().filter((path) => /\/(?:port|land)\/gen\.ini$/i.test(path))) {
+  const text = (path: string) => staged.get(path) ?? archive.getText(path)
+  for (const genPath of archive.names().filter((path) => /\/(?:port|land)\/gen\.ini$/i.test(path))) {
     const directory = genPath.slice(0, genPath.lastIndexOf("/"))
     const gen = IniDocument.parse(text(genPath))
     const candidateName = gen.get("CAND", "LAYOUT_NAME") ?? "cand1"
     const candidatePath = `${directory}/${candidateName.replace(/\.cnd$/i, "")}.cnd`
     const stylePath = ios26StylePath(genPath)
-    if (!appState.archive.isText(candidatePath) || !stylePath) continue
+    if (!archive.isText(candidatePath) || !stylePath) continue
     variants++
     const adapted = adaptIos26Variant(text(candidatePath), text(genPath), text(stylePath))
     staged.set(candidatePath, adapted.candidate)
     staged.set(genPath, adapted.general)
     staged.set(stylePath, adapted.styles)
-    for (const path of appState.archive.names().filter((path) => path.startsWith(`${directory}/`) && /\.ini$/i.test(path))) {
-      if (!appState.archive.isText(path)) continue
+    for (const path of archive.names().filter((path) => path.startsWith(`${directory}/`) && /\.ini$/i.test(path))) {
+      if (!archive.isText(path)) continue
       const name = path.slice(directory.length + 1)
       staged.set(path, adaptIos26KeyboardLayout(
         name,
@@ -319,14 +222,14 @@ export function adaptArchiveForIos26(): boolean {
     }
   }
   const changes: Change[] = [...staged].flatMap(([path, after]) => {
-    const before = appState.archive!.getText(path)
+    const before = archive.getText(path)
     return before === after ? [] : [{ kind: "text" as const, path, before, after }]
   })
   if (!variants) throw new Error("没有找到可适配的候选栏和通用配置。")
   if (!changes.length) return true
   commitBatch(changes)
   renderFiles()
-  if (appState.selectedPath && appState.archive.isText(appState.selectedPath)) selectFile(appState.selectedPath)
+  if (appState.selectedPath && archive.isText(appState.selectedPath)) selectFile(appState.selectedPath)
   refreshPreview()
   updateDirty()
   return true

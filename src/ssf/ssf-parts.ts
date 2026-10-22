@@ -27,6 +27,23 @@ export function firstValue(value: string | undefined): string | undefined {
 
 const anyImage: SsfImageCheck = () => true
 
+/** A section name not used in `document`, derived from `base`. */
+export function freeSectionName(document: IniDocument, base: string): string {
+  const taken = new Set(document.sections())
+  for (let index = 1; ; index += 1) {
+    const name = index === 1 ? base : `${base}_${index}`
+    if (!taken.has(name)) return name
+  }
+}
+
+/** The key section a per-key override is written to: one that already exists, else the portrait class. */
+export function ownSection(document: IniDocument, binding: SsfKeyBinding): string {
+  const sections = document.sections()
+  return binding.sections.find((section) => sections.includes(section))
+    ?? binding.sections.find((section) => !/_Land/.test(section))
+    ?? binding.sections[0]
+}
+
 export function ssfBackground(skin: IniDocument, binding: SsfKeyBinding, usable = anyImage): SsfBackground | undefined {
   for (const owner of binding.sections) {
     const images = firstValue(skin.get(owner, "BG_IMAGES"))

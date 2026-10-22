@@ -5,9 +5,9 @@
 import type { IniDocument } from "../ini.ts"
 import type { SsfKeyBinding } from "../ssf/ssf-keymap.ts"
 import { ssfSectionLabel } from "../ssf/ssf-labels.ts"
-import { firstValue, ssfBackground, ssfForeground, ssfLabelStyle, ssfSoundSection, ssfTextSections } from "../ssf/ssf-parts.ts"
+import { firstValue, freeSectionName, ownSection, ssfBackground, ssfForeground, ssfLabelStyle, ssfSoundSection, ssfTextSections } from "../ssf/ssf-parts.ts"
 import { orientation } from "./dom"
-import { editSsfFile, freeSectionName, renderGroup as renderSsfGroup, setSsfValue, ssfButton, ssfEntries, ssfFontImportButton, ssfFontOptions, type SsfBlock } from "./ssf-fields"
+import { editSsfFile, renderGroup as renderSsfGroup, setSsfValue, ssfButton, ssfEntries, ssfFontImportButton, ssfFontOptions, type SsfBlock } from "./ssf-fields"
 import { openImageResourceChooser } from "./resource-inspector"
 import { isSsfBoardPath, ssfDocument, ssfKeysPath, ssfPackage, ssfQwertyBoard, ssfSelectedBindings, ssfSkinPath, ssfThemeFolder, SSF_SOUNDS_PATH } from "./ssf-documents"
 import { appState } from "./state"
@@ -18,14 +18,6 @@ type Group = { label: string; blocks: SsfBlock[]; code?: string; key?: string }
 function renderGroup(label: string, blocks: SsfBlock[], code?: string): Group | undefined {
   const shown = blocks.filter((block) => block.template || block.expect || ssfDocument(block.path).sections().includes(block.section))
   return shown.length ? { label, blocks: shown, code } : undefined
-}
-
-/** The key section a per-key override is written to: one that already exists, else the portrait class. */
-function ownSection(document: IniDocument, binding: SsfKeyBinding): string {
-  const sections = document.sections()
-  return binding.sections.find((section) => sections.includes(section))
-    ?? binding.sections.find((section) => !/_Land/.test(section))
-    ?? binding.sections[0]
 }
 
 /** Sound names Sogou can play: the WAV / OGG / MP3 files in default/, without extension. */

@@ -2,6 +2,8 @@ import { IniDocument } from "./ini.ts"
 
 const CANDIDATE_INFO = "iOS26透明候选背景"
 const PANEL_INFO = "iOS26透明键盘背景"
+/** The colour under both transparent backgrounds; the panel keeps alpha 01 so it still takes touches. */
+export const IOS26_RGB = "d0d4db"
 
 function styleByInfo(styles: IniDocument, info: string): string | undefined {
   return styles.sections().find((section) => /^STYLE\d+$/.test(section) && styles.get(section, "INFO") === info)?.slice(5)
@@ -17,8 +19,8 @@ function ensureStyle(styles: IniDocument, info: string, alpha: "00" | "01"): str
   const id = nextStyle(styles)
   styles.appendSection(`STYLE${id}`, [
     { key: "INFO", value: info },
-    { key: "NM_COLOR", value: `${alpha}d0d4db` },
-    { key: "HL_COLOR", value: `${alpha}d0d4db` },
+    { key: "NM_COLOR", value: `${alpha}${IOS26_RGB}` },
+    { key: "HL_COLOR", value: `${alpha}${IOS26_RGB}` },
   ])
   return id
 }
@@ -49,17 +51,19 @@ export function adaptIos26Variant(candidateText: string, generalText: string, st
   }
 }
 
+/** Keyboards and the symbol panel get the transparent background; emoji, clipboard and other pages keep theirs. */
+export function isIos26KeyboardLayout(name: string, symbolLayoutName = "symbol"): boolean {
+  const symbolName = `${symbolLayoutName.replace(/\.ini$/i, "")}.ini`
+  return /^(?:(?:py|def|en|num|tool)_.+|bh|hw_(?:full|grid))\.ini$/i.test(name) || name.toLowerCase() === symbolName.toLowerCase()
+}
+
 export function adaptIos26KeyboardLayout(
   name: string,
   text: string,
   panelStyle: string,
   symbolLayoutName = "symbol",
 ): string {
-  const symbolName = `${symbolLayoutName.replace(/\.ini$/i, "")}.ini`
-  if (
-    !/^(?:(?:py|def|en|num|tool)_.+|bh|hw_(?:full|grid))\.ini$/i.test(name) &&
-    name.toLowerCase() !== symbolName.toLowerCase()
-  ) return text
+  if (!isIos26KeyboardLayout(name, symbolLayoutName)) return text
   const layout = IniDocument.parse(text)
   layout.set("PANEL", "BACK_STYLE", panelStyle)
   return layout.toString()

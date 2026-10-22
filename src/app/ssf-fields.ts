@@ -93,15 +93,6 @@ export function ssfEntries(path: string, section: string): SsfEntry[] {
   })
 }
 
-/** A section name not used in `document`, derived from `base`. */
-export function freeSectionName(document: IniDocument, base: string): string {
-  const taken = new Set(document.sections())
-  for (let index = 1; ; index += 1) {
-    const name = index === 1 ? base : `${base}_${index}`
-    if (!taken.has(name)) return name
-  }
-}
-
 // Thumbnails decode images; a file's whole phoneSkin.ini has hundreds, so only visible ones are drawn.
 const pendingThumbnails = new WeakMap<HTMLCanvasElement, () => Promise<Visual | undefined>>()
 const thumbnailObserver = new IntersectionObserver((entries) => {

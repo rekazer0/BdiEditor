@@ -6,7 +6,7 @@ import { bdaConfigPath } from "../bda.ts"
 import { selectFile } from "./navigation"
 import { mobilePortraitQuery, preview, toolbarPreview, source, keyboardFields, layoutActionButtons } from "./canvas-interaction"
 import { selectParentObject } from "./key-editing"
-import { canvasEditable, isEditing } from "./edit-history"
+import { isEditing } from "./edit-history"
 import { updateSourceFileActions } from "./source-files"
 import { updateSourceSearchStatus } from "./source-panel"
 import { syncAiDesignContext } from "./ai-panel"
@@ -277,7 +277,8 @@ export function setMobilePreviewCollapsed(collapsed: boolean): void {
 }
 
 export function updatePanelToolButtons(): void {
-  const editing = canvasEditable()
+  // The tools restyle and copy files, so they work on Sogou skins too, whose key geometry is fixed.
+  const editing = isEditing()
   panelScaleButton.disabled = !editing || appState.fileOperationRunning || !appState.archive
   replaceLayoutImageButton.disabled = !editing || appState.fileOperationRunning || !appState.archive || appState.archive.format === "bda"
   adaptIos26Button.disabled = !editing || appState.fileOperationRunning || !appState.archive || appState.archive.format === "bda"
