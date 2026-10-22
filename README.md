@@ -181,4 +181,6 @@ QQ群：228040912
 
 ## License
 
-[LICENSE](LICENSE)
+[GNU AGPLv3](LICENSE)。修改本项目并通过网络提供服务（包括部署网页版）时，须向用户公开修改后的完整源码。
+
+`src/palm/` 中由 @yrgba 贡献的手心输入法 sxi 导出代码按 GNU GPLv3 授权，与本项目组合使用时适用 AGPLv3 第 13 条。
