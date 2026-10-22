@@ -33,7 +33,12 @@ if (!baseURL) {
   await server.listen()
   baseURL = `http://127.0.0.1:${server.httpServer.address().port}/`
 }
-const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {})
+// Chromium on Linux names downloads through the system locale: without a UTF-8 one, a download
+// attribute such as "未命名.bdi" falls back to "download". Containers often have no LANG set.
+const browser = await chromium.launch({
+  ...process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
+  ...process.platform === "linux" ? { env: { ...process.env, LC_ALL: "C.UTF-8" } } : {},
+})
 const results = []
 const mod = process.platform === "darwin" ? "Meta" : "Control"
 
