@@ -14,12 +14,11 @@ import { renderStyleResourceDetail } from "./resource-inspector"
 import { populateKeyInspector, selectedBdaRefs, updateBdaRefs } from "./key-inspector"
 import { stylePickerLabel, emitStyleLibrary } from "./style-picker"
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
-import { emitTo } from "@tauri-apps/api/event"
 import { resourceImagePaths } from "../resources.ts"
-import { theme, orientation, styleImageResourcePicker, styleImageResourceSearch, styleImageImgList, styleImageResourceCount, styleImageResourceEmpty, styleImageSource, styleImagePicker, styleImageResourceOpen, styleImageTitle, styleImageSubtitle, styleImageDialog, styleImagePickerCanvas, styleImagePickerMeta } from "./dom"
+import { theme, orientation, pickerDialog, pickerFrame } from "./dom"
 import { isTauri } from "./canvas-interaction"
-import { showStyleImageDialog } from "./source-panel"
-import { drawSlicePicker, pickableSlices, WHOLE_IMAGE_INDEX } from "../slice-picker-canvas.ts"
+import { pickerEmitter, pickerListener } from "../picker-channel.ts"
+import { WHOLE_IMAGE_INDEX } from "../slice-picker-canvas.ts"
 import { type TileRect, tileSlices } from "../tiles.ts"
 import { ssfPackage, ssfThemeFolder } from "./ssf-documents"
 
@@ -130,18 +129,35 @@ export function imageDataURL(bytes: Uint8Array): string {
   return `data:image/png;base64,${btoa(binary)}`
 }
 
-// 图片切片与「全部图片」列表共用一个窗口，不再另开资源窗口。
+export const emitToPicker = pickerEmitter("image-picker", () => pickerFrame.contentWindow)
+export const onPickerEvent = pickerListener(() => pickerFrame.contentWindow)
+
+export async function emitPickerView(view: "image" | "list" | "styles"): Promise<void> {
+  if (view === "list") await emitToPicker("image-picker-show-list")
+  else if (view === "styles") await emitStyleLibrary()
+  else if (appState.nativeImagePickerPayload) await emitToPicker("image-picker-data", appState.nativeImagePickerPayload)
+}
+
+// 图片切片、「全部图片」与「全部样式」共用一个窗口：桌面端是原生窗口，网页端是嵌着同一页面的弹窗。
 export async function showPickerWindow(
   view: "image" | "list" | "styles",
   title: string,
   width: number,
   height: number,
 ): Promise<void> {
+  if (!isTauri()) {
+    appState.pickerRequestedView = view
+    if (appState.pickerFrameReady) await emitPickerView(view)
+    else if (!pickerDialog.open) {
+      // 每次打开都重新加载，和桌面端每次新建窗口一样不带上一次的状态。
+      pickerFrame.src = "picker.html"
+      pickerDialog.showModal()
+    }
+    return
+  }
   const existing = await WebviewWindow.getByLabel("image-picker")
   if (existing) {
-    if (view === "list") await emitTo("image-picker", "image-picker-show-list")
-    else if (view === "styles") await emitStyleLibrary()
-    else if (appState.nativeImagePickerPayload) await emitTo("image-picker", "image-picker-data", appState.nativeImagePickerPayload)
+    await emitPickerView(view)
     await existing.setFocus()
     return
   }
@@ -182,10 +198,9 @@ export function resourcePickerPayload(): NativeResourcePickerPayload {
   })
 }
 
-export function closeStyleImageResourcePicker(): void {
-  styleImageResourcePicker.hidden = true
-  styleImageResourceSearch.value = ""
-  appState.resourcePickerSelect = undefined
+export function closePickerWindow(): void {
+  if (isTauri()) void WebviewWindow.getByLabel("image-picker").then((pickerWindow) => pickerWindow?.close())
+  else pickerDialog.close()
 }
 
 export function selectImageResource(path: string): void {
@@ -199,81 +214,15 @@ export function selectImageResource(path: string): void {
   if (appState.pickerTarget) openImageSlicePicker(path, appState.pickerTarget)
 }
 
-export function renderStyleImageResources(): void {
-  if (!appState.archive) return
-  const query = styleImageResourceSearch.value.trim().toLowerCase()
-  const paths = pickableImagePaths().filter((path) => path.toLowerCase().includes(query))
-  styleImageImgList.replaceChildren()
-  for (const path of paths) {
-    const bytes = appState.archive.getBytes(path)
-    if (!bytes) continue
-    const button = document.createElement("button")
-    button.type = "button"
-    button.title = path
-    const image = document.createElement("img")
-    image.src = imageDataURL(bytes)
-    image.alt = ""
-    const name = document.createElement("span")
-    name.textContent = path.split("/").pop() ?? path
-    button.append(image, name)
-    button.classList.toggle("active", path === appState.pickerPath)
-    button.addEventListener("click", () => {
-      if (appState.resourcePickerSelect) selectImageResource(path)
-      else {
-        closeStyleImageResourcePicker()
-        if (appState.pickerTarget) openImageSlicePicker(path, appState.pickerTarget)
-      }
-    })
-    styleImageImgList.append(button)
-  }
-  const count = styleImageImgList.childElementCount
-  styleImageResourceCount.textContent = `${count} 张图片`
-  styleImageResourceEmpty.hidden = count > 0
-}
-
-export function openStyleImageResourcePicker(): void {
-  if (isTauri() || !appState.archive || (!appState.pickerTarget && !appState.resourcePickerSelect)) return
-  styleImageSource.hidden = !(appState.pickerTarget?.path && appState.pickerTarget.sections?.length)
-  showStyleImageDialog()
-  if (!appState.pickerTarget) {
-    styleImagePicker.hidden = true
-    styleImageResourceOpen.hidden = true
-    styleImageTitle.textContent = "选择图片资源"
-    styleImageSubtitle.textContent = ""
-  }
-  styleImageResourcePicker.hidden = false
-  renderStyleImageResources()
-  styleImageResourceSearch.focus()
-}
-
 export function clearImageSlicePicker(): void {
-  if (appState.pickerURL) URL.revokeObjectURL(appState.pickerURL)
-  appState.pickerURL = ""
-  appState.pickerImage = undefined
   appState.pickerSlices = []
   appState.pickerPath = ""
   appState.pickerTarget = undefined
   appState.resourcePickerSelect = undefined
   appState.pickerSelectedIndex = undefined
-  styleImagePicker.hidden = true
-  styleImageResourceOpen.hidden = true
-  styleImageSource.hidden = true
-  closeStyleImageResourcePicker()
-  styleImageImgList.replaceChildren()
-  styleImageResourceCount.textContent = ""
-  styleImageResourceEmpty.hidden = true
-  if (styleImageDialog.open) styleImageDialog.close()
   appState.nativeImagePickerPayload = undefined
-  if (isTauri()) {
-    appState.pickerRequestedView = "image"
-    void WebviewWindow.getByLabel("image-picker").then((pickerWindow) => pickerWindow?.close())
-  }
-}
-
-export function drawImageSlicePicker(): void {
-  if (!appState.pickerImage?.naturalWidth) return
-  appState.pickerScale = drawSlicePicker(styleImagePickerCanvas, appState.pickerImage, pickableSlices(appState.pickerSlices, appState.pickerImage), appState.pickerSelectedIndex, appState.pickerFit * appState.pickerZoom, { normal: "#3a6df0", selected: "#ff6b2c" })
-  appState.pickerOffset = { x: 0, y: 0 }
+  appState.pickerRequestedView = "image"
+  closePickerWindow()
 }
 
 export function pickerImageReference(index: number): string {
@@ -285,8 +234,6 @@ export function openImageSlicePicker(path: string, target: StyleImagePickerTarge
   if (!appState.archive?.isImage(path)) return
   const bytes = appState.archive.getBytes(path)
   if (!bytes) return
-  if (appState.pickerURL) URL.revokeObjectURL(appState.pickerURL)
-  appState.pickerURL = URL.createObjectURL(new Blob([new Uint8Array(bytes).buffer], { type: "image/png" }))
   appState.pickerPath = path
   appState.pickerTarget = target
   const tilePathForPicker = path.replace(/\.png$/i, ".til")
@@ -304,28 +251,5 @@ export function openImageSlicePicker(path: string, target: StyleImagePickerTarge
     // 行内缩略图传入的是未挂载的克隆输入框，只要有引用目标就能回到样式库。
     styleLibrary: Boolean(appState.stylePickerTarget),
   }
-  if ("__TAURI_INTERNALS__" in window) {
-    if (styleImageDialog.open) styleImageDialog.close()
-    void showPickerWindow("image", "图片切片", 1100, 760)
-    return
-  }
-  closeStyleImageResourcePicker()
-  appState.pickerImage = new Image()
-  appState.pickerImage.onload = () => {
-    if (!appState.pickerImage) return
-    // 初始大小铺满可视区域（减去内边距与底部说明），之后由缩放倍率调整
-    const width = styleImagePicker.clientWidth - 38
-    const height = styleImagePicker.clientHeight - 38 - styleImagePickerMeta.offsetHeight - 7
-    appState.pickerFit = Math.min((width > 0 ? width : 960) / appState.pickerImage.naturalWidth, (height > 0 ? height : 640) / appState.pickerImage.naturalHeight)
-    appState.pickerZoom = 1
-    drawImageSlicePicker()
-  }
-  appState.pickerImage.src = appState.pickerURL
-  styleImageSource.hidden = !(target.path && target.sections?.length)
-  styleImagePicker.hidden = false
-  styleImageResourceOpen.hidden = false
-  styleImageTitle.textContent = path.split("/").pop() ?? path
-  styleImageSubtitle.textContent = " · 选择切片"
-  styleImagePickerMeta.textContent = `${appState.pickerSlices.length ? "点击图片中的切片以修改引用" : "点击整张图以修改引用"} · ⌘/Ctrl + 滚轮或双指捏合缩放`
-  showStyleImageDialog()
+  void showPickerWindow("image", "图片切片", 1100, 760)
 }

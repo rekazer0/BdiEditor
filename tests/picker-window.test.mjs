@@ -20,8 +20,8 @@ test("左侧返回项在切片窗口与全部图片列表之间切换", () => {
   assert.match(html, /<button id="picker-back"[\s\S]{0,400}全部图片/)
   assert.match(script, /if \(view === "image"\) showResourceList\(\)/)
   assert.match(script, /backLabel\.textContent = "图片切片"/)
-  assert.match(script, /emitTo\("main", "image-picker-resources-request"\)/)
-  assert.match(main, /listen\("image-picker-resources-request"/)
+  assert.match(script, /emitMain\("image-picker-resources-request"\)/)
+  assert.match(main, /onPickerEvent\("image-picker-resources-request"/)
 })
 
 test("全部图片列表复用现有窗口，不再新建资源窗口", () => {
@@ -29,10 +29,11 @@ test("全部图片列表复用现有窗口，不再新建资源窗口", () => {
   assert.doesNotMatch(main, /picker\.html\?mode=/)
   assert.match(main, /function openImagePickerList\(\): void \{[\s\S]{0,220}showPickerWindow\("list"/)
   assert.match(main, /WebviewWindow\.getByLabel\("image-picker"\)/)
-  assert.match(main, /emitTo\("image-picker", "image-picker-show-list"\)/)
-  assert.match(script, /listen\("image-picker-show-list", \(\) => showResourceList\(\)\)/)
+  assert.match(main, /emitToPicker\("image-picker-show-list"\)/)
+  assert.match(script, /onMain\("image-picker-show-list", \(\) => showResourceList\(\)\)/)
   // 列表项只上报选择，选完由主窗口决定是切图还是关窗。
-  assert.doesNotMatch(script.replace(/.*event\.key === "Escape".*getCurrentWindow\(\)\.close\(\).*/, ""), /getCurrentWindow\(\)\.close\(\)/)
+  assert.equal(script.match(/getCurrentWindow\(\)\.close\(\)/g)?.length, 1)
+  assert.match(script, /event\.key !== "Escape"[\s\S]{0,80}getCurrentWindow\(\)\.close\(\)/)
 })
 
 test("切片窗口不再提供右侧的选择图片资源按钮", () => {
@@ -41,12 +42,24 @@ test("切片窗口不再提供右侧的选择图片资源按钮", () => {
   assert.doesNotMatch(main, /resource-picker-open/)
 })
 
-test("桌面端样式库在切片窗口内作为原生视图打开，切片返回直接切到全部样式", () => {
-  assert.match(main, /if \(isTauri\(\)\) \{\s*void showPickerWindow\("styles", "全部样式"/)
-  assert.match(main, /listen\("image-picker-back-styles", \(\) => void emitStyleLibrary\(true\)\)/)
+test("样式库在切片窗口内作为视图打开，切片返回直接切到全部样式", () => {
+  assert.match(main, /appState\.styleLibrarySelected = undefined\s*void showPickerWindow\("styles", "全部样式"/)
+  assert.match(main, /onPickerEvent\("image-picker-back-styles", \(\) => void emitStyleLibrary\(true\)\)/)
   assert.match(main, /styleLibrary: Boolean\(appState\.stylePickerTarget\),/)
-  assert.match(script, /listen<StyleLibraryPayload>\("style-library-data"/)
+  assert.match(script, /onMain<StyleLibraryPayload>\("style-library-data"/)
   assert.match(html, /<section id="style-library-view"/)
+})
+
+test("网页端与桌面端共用 picker.html，网页端嵌在页内弹窗的 iframe 里，不再有另一套页内选择器", () => {
+  const index = readFileSync(new URL("../index.html", import.meta.url), "utf8")
+  assert.match(index, /<dialog id="picker-dialog"[^>]*>\s*<iframe id="picker-frame"/)
+  assert.doesNotMatch(index, /style-image-dialog|style-picker-dialog/)
+  assert.doesNotMatch(main, /openStyleImageResourcePicker|renderStylePicker|drawImageSlicePicker/)
+  assert.match(main, /pickerFrame\.src = "picker\.html"\s*pickerDialog\.showModal\(\)/)
+  assert.match(main, /pickerFrame\.src = "about:blank"/)
+  // 网页端没有原生标题栏：关闭按钮和 Esc 交给主页面收起弹窗。
+  assert.match(html, /<button id="picker-close" class="ui-icon-button"[^>]*hidden>/)
+  assert.match(main, /onPickerEvent\("picker-close", \(\) => pickerDialog\.close\(\)\)/)
 })
 
 test("没有 TIL 切片时整张图可像切片一样选中，引用写成不带序号的图片名", () => {

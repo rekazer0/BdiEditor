@@ -2,7 +2,7 @@ import { isSxiSourcePath } from "./sxi-documents"
 import { sxiSectionRanges } from "../palm/sxi-edit.ts"
 import { sourceEditPath } from "./ssf-documents"
 import { syncAtlasWorkspace } from "./tile-editing"
-import { files, sourceName, quickInspector, asset, resourceInspector, sourceEditor, aiDesignPanel, sourceToolbar, sourceFindToggle, sourceSearch, sourceValueHintsEnabled, sourceCompletionEnabled, sourceLineExplanationEnabled, sourceSearchCount, sourceSearchPrevious, sourceSearchNext, sourceReplacement, sourceReplace, sourceReplaceAll, sourceColorPicker, styleImageDialog, sourceStyleProxy } from "./dom"
+import { files, sourceName, quickInspector, asset, resourceInspector, sourceEditor, aiDesignPanel, sourceToolbar, sourceFindToggle, sourceSearch, sourceValueHintsEnabled, sourceCompletionEnabled, sourceLineExplanationEnabled, sourceSearchCount, sourceSearchPrevious, sourceSearchNext, sourceReplacement, sourceReplace, sourceReplaceAll, sourceColorPicker, sourceStyleProxy } from "./dom"
 import { appState } from "./state"
 import { showsLayoutProperties, selectedSourceSections, styleConfigPath } from "./config-context"
 import { isBdaLayoutPath, bdaAppearancePart, isBdaVirtualTextPath, isBdaAppearancePartPath, commitBdaSourceEdit, visualResolver, bdaAppearanceStylePath } from "./bda-documents"
@@ -16,7 +16,6 @@ import { sourceValueRanges, replacedSourceColor } from "../source-value-ranges.t
 import { type SourceEditorValueRange, type SourceEditorValueClick } from "../lazy-source-editor.ts"
 import { retinaThumbnail, drawVisualPreview } from "../atlas.ts"
 import { bdaStyleRef } from "../bda.ts"
-import { clearImageSlicePicker } from "./image-pickers"
 import { selectFile } from "./navigation"
 import { setMobilePane } from "./mobile-layout"
 import { isEditing } from "./edit-history"
@@ -263,22 +262,12 @@ export function applySourceColorPicker(): void {
   source.commit()
 }
 
-export function showStyleImageDialog(): void {
-  if (!styleImageDialog.open) styleImageDialog.showModal()
-}
-
-/** Jumps to a style's definition: the slice picker's target, or `styleID` when given (source Command/Ctrl click). */
-export function openSourceStyleDefinition(styleID = ""): void {
-  const target = styleID ? undefined : appState.pickerTarget
-  if (!appState.archive || !styleID && (!target?.path || !target.sections?.length)) return
+/** Jumps to a style's definition (source Command/Ctrl click). */
+export function openSourceStyleDefinition(styleID: string): void {
+  if (!appState.archive) return
   const ref = appState.archive.format === "bda" ? bdaStyleRef(styleID) : undefined
-  const path = target?.path ?? (ref ? bdaAppearanceStylePath(`${ref.type}Styles`) : styleConfigPath())
-  const sections = target?.sections
-  clearImageSlicePicker()
-  selectFile(path, "source")
-  const range = sections?.length
-    ? iniSectionRanges(source.value, sections)[0]
-    : ref
+  selectFile(ref ? bdaAppearanceStylePath(`${ref.type}Styles`) : styleConfigPath(), "source")
+  const range = ref
     ? jsonPropertyRanges(source.value, [String(ref.key)])[0]
     : iniSectionRanges(source.value, [`STYLE${styleID}`])[0]
   if (range) source.setSelectionRange(range[0], range[1])

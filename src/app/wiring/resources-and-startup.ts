@@ -1,8 +1,8 @@
-import { aiDesignChat, styleImageResourceOpen, styleImageResourceClose, styleImageResourceSearch, theme, orientation, $, inspectorResizeHandle, styleAddButton, newStyleID, newStyleDialog, newStyleForm, layout, resourceUploadButton, resourceUploadInput, resourceDownloadButton, resourceDeleteButton, resourceDetail, device, clearSimulationButton, simulatedOutput, toolbarMenus, windowMaterial, mode } from "../dom"
-import { openStyleImageResourcePicker, closeStyleImageResourcePicker, clearImageSlicePicker, renderStyleImageResources, updateSelectedImageReference, pickerImageReference, resourcePickerPayload, selectImageResource, pickableImagePaths } from "../image-pickers"
+import { aiDesignChat, pickerDialog, pickerFrame, theme, orientation, $, inspectorResizeHandle, styleAddButton, newStyleID, newStyleDialog, newStyleForm, layout, resourceUploadButton, resourceUploadInput, resourceDownloadButton, resourceDeleteButton, resourceDetail, device, clearSimulationButton, simulatedOutput, toolbarMenus, windowMaterial, mode } from "../dom"
+import { updateSelectedImageReference, pickerImageReference, resourcePickerPayload, selectImageResource, pickableImagePaths, emitPickerView, emitToPicker, onPickerEvent } from "../image-pickers"
 import { appState } from "../state"
 import { isTauri, playSoundPath, syncDeviceControlIcon, clearSimulatedOutput } from "../canvas-interaction"
-import { listen, emitTo } from "@tauri-apps/api/event"
+import { listen } from "@tauri-apps/api/event"
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { type ProjectChoice } from "../../project-chooser"
 import { finishNativeProjectChoice } from "../new-document"
@@ -38,12 +38,6 @@ import { startOnboarding, startOnboardingOnFirstLaunch } from "../onboarding"
 
 /** 样式图片资源、面板缩放、模拟输入与启动时的初始状态。只在启动时由 main.ts 按顺序调用一次。 */
 export function wireResourcesAndStartup(): void {
-  styleImageResourceOpen.addEventListener("click", openStyleImageResourcePicker)
-  styleImageResourceClose.addEventListener("click", () => {
-    if (appState.pickerTarget) closeStyleImageResourcePicker()
-    else clearImageSlicePicker()
-  })
-  styleImageResourceSearch.addEventListener("input", renderStyleImageResources)
   if (isTauri()) {
     void listen("new-project-ready", () => {
       appState.nativeProjectWindowReady = true
@@ -54,40 +48,41 @@ export function wireResourcesAndStartup(): void {
       finishNativeProjectChoice(event.payload.templateID)
     })
     void listen("new-project-cancel", () => finishNativeProjectChoice())
-    void listen("picker-window-ready", () => {
-      if (appState.pickerRequestedView === "list") void emitTo("image-picker", "image-picker-show-list")
-      else if (appState.pickerRequestedView === "styles") void emitStyleLibrary()
-      else if (appState.nativeImagePickerPayload) void emitTo("image-picker", "image-picker-data", appState.nativeImagePickerPayload)
-    })
-    void listen<{ index: number }>("image-picker-select", (event) => {
-      if (!isEditing() || !appState.pickerTarget) return
-      const { index } = event.payload
-      if (index === WHOLE_IMAGE_INDEX ? appState.pickerSlices.length : !appState.pickerSlices.some((slice) => slice.index === index)) return
-      appState.pickerSelectedIndex = index
-      updateSelectedImageReference(appState.pickerTarget, pickerImageReference(index))
-    })
-    // 切片窗口返回「全部样式」：留在同一个窗口里切视图。
-    void listen("image-picker-back-styles", () => void emitStyleLibrary(true))
-    void listen<{ styleID?: string; imagePath?: string }>("style-library-apply", (event) => {
-      appState.styleLibrarySelected = event.payload
-      applyStyleLibrarySelection()
-    })
-    void listen<{ styleID?: string; imagePath?: string }>("style-library-edit", (event) => {
-      appState.styleLibrarySelected = event.payload
-      editStyleLibrarySelection()
-    })
-    void listen("style-library-add", addStyleFromLibrary)
-    void listen<{ filename: string }>("style-library-play", (event) => {
-      const path = soundPathForFilename(appState.archive?.names() ?? [], theme.value, orientation.value, event.payload.filename)
-      if (path) playSoundPath(path)
-    })
-    void listen("image-picker-resources-request", () => {
-      void emitTo("image-picker", "image-picker-resources-data", resourcePickerPayload())
-    })
-    void listen<{ path: string }>("resource-picker-select", (event) => {
-      selectImageResource(event.payload.path)
-    })
   }
+  void onPickerEvent("picker-window-ready", () => {
+    appState.pickerFrameReady = true
+    void emitPickerView(appState.pickerRequestedView)
+  })
+  void onPickerEvent("picker-close", () => pickerDialog.close())
+  pickerDialog.addEventListener("close", () => {
+    appState.pickerFrameReady = false
+    pickerFrame.src = "about:blank"
+  })
+  // 网页端弹窗的遮罩点在 dialog 自身上，iframe 内的点击不会冒泡过来。
+  pickerDialog.addEventListener("click", (event) => { if (event.target === pickerDialog) pickerDialog.close() })
+  void onPickerEvent<{ index: number }>("image-picker-select", ({ index }) => {
+    if (!isEditing() || !appState.pickerTarget) return
+    if (index === WHOLE_IMAGE_INDEX ? appState.pickerSlices.length : !appState.pickerSlices.some((slice) => slice.index === index)) return
+    appState.pickerSelectedIndex = index
+    updateSelectedImageReference(appState.pickerTarget, pickerImageReference(index))
+  })
+  // 切片窗口返回「全部样式」：留在同一个窗口里切视图。
+  void onPickerEvent("image-picker-back-styles", () => void emitStyleLibrary(true))
+  void onPickerEvent<{ styleID?: string; imagePath?: string }>("style-library-apply", (selected) => {
+    appState.styleLibrarySelected = selected
+    applyStyleLibrarySelection()
+  })
+  void onPickerEvent<{ styleID?: string; imagePath?: string }>("style-library-edit", (selected) => {
+    appState.styleLibrarySelected = selected
+    editStyleLibrarySelection()
+  })
+  void onPickerEvent("style-library-add", addStyleFromLibrary)
+  void onPickerEvent<{ filename: string }>("style-library-play", ({ filename }) => {
+    const path = soundPathForFilename(appState.archive?.names() ?? [], theme.value, orientation.value, filename)
+    if (path) playSoundPath(path)
+  })
+  void onPickerEvent("image-picker-resources-request", () => void emitToPicker("image-picker-resources-data", resourcePickerPayload()))
+  void onPickerEvent<{ path: string }>("resource-picker-select", ({ path }) => selectImageResource(path))
   bindPaneResize($("#sidebar-resize-handle"), "--sidebar-width", "sidebarWidthV2", 180, 420, 248, 1)
   bindPaneResize(inspectorResizeHandle, "--inspector-width", "inspectorWidthV5", 220, Math.max(700, window.innerWidth - 720), 360, -1)
   styleAddButton.addEventListener("click", () => {

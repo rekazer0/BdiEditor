@@ -1,7 +1,7 @@
 import { source, keyboardFields, layoutActionButtons, preview, inspectorTabButtons, mobilePortraitQuery, activateSkinState } from "../canvas-interaction"
 import { type SourceEditorValueClick } from "../../lazy-source-editor.ts"
 import { openSourceColorPicker, openSourceStyleDefinition, openSourceStylePicker, scheduleSourceSearch, closeSourceFind, findSourceMatch, openSourceFind, syncSourceFindBarOffset, replaceSourceMatches, updateInspectorView, updateSourceHighlight } from "../source-panel"
-import { sourceSearch, sourceSearchPrevious, sourceSearchNext, sourceFindToggle, sourceEditor, sourceReplaceToggle, sourceReplaceRow, sourceReplacement, sourceReplace, sourceReplaceAll, keyFields, styleFields, toolbarFields, skinFields, gapFields, quickInspector, colorPickers, colorAlphas, keyModeButtons, keyActionButtons, aiDesignPanel, aiDesignStatus, theme, orientation, mode, eventLog, modeChoiceButtons, themeChoiceButtons, orientationChoiceButtons, mobileChoiceButtons, toggleGuides, mobileToggleGuides, newTileButton, duplicateTileButton, deleteTileButton, resourceBackButton, resourceSearch, resourceCategory, bdaTileUsage, tileModeButtons, atlasCanvas, workspaceImage, tileSourceFields, tileInnerFields, skinState, panelScaleButton, adaptIos26Button, ios26Dialog, ios26Form, replaceLayoutImageButton, layoutImageFile, layoutImageOpen, layoutImageDialog, layoutImageTargetInputs, layoutImageScope, layoutImageError, layoutImageConfigButtons, layoutImageConfigFieldset, layoutImageForm, panelCopySource, panelTargetWidth, panelTargetHeight, panelCopyTarget, panelScaleEnabled, panelScaleForm, panelScaleDialog, candidateArea, toolbarCanvas, toolbarStrip, styleImagePicker, styleImagePickerCanvas, styleImageClose, styleImageSource, styleImageDialog, fontFileSelect, fontImportButton, fontImportInput, fontRemoveButton } from "../dom"
+import { sourceSearch, sourceSearchPrevious, sourceSearchNext, sourceFindToggle, sourceEditor, sourceReplaceToggle, sourceReplaceRow, sourceReplacement, sourceReplace, sourceReplaceAll, keyFields, styleFields, toolbarFields, skinFields, gapFields, quickInspector, colorPickers, colorAlphas, keyModeButtons, keyActionButtons, aiDesignPanel, aiDesignStatus, theme, orientation, mode, eventLog, modeChoiceButtons, themeChoiceButtons, orientationChoiceButtons, mobileChoiceButtons, toggleGuides, mobileToggleGuides, newTileButton, duplicateTileButton, deleteTileButton, resourceBackButton, resourceSearch, resourceCategory, bdaTileUsage, tileModeButtons, atlasCanvas, workspaceImage, tileSourceFields, tileInnerFields, skinState, panelScaleButton, adaptIos26Button, ios26Dialog, ios26Form, replaceLayoutImageButton, layoutImageFile, layoutImageOpen, layoutImageDialog, layoutImageTargetInputs, layoutImageScope, layoutImageError, layoutImageConfigButtons, layoutImageConfigFieldset, layoutImageForm, panelCopySource, panelTargetWidth, panelTargetHeight, panelCopyTarget, panelScaleEnabled, panelScaleForm, panelScaleDialog, candidateArea, toolbarCanvas, toolbarStrip, fontFileSelect, fontImportButton, fontImportInput, fontRemoveButton } from "../dom"
 import { appState } from "../state"
 import { syncActionCodeSuggestions, updateSelectedKey, updateSelectedStyle, updateKeyboard, updateToolbar, updateSkinInfo, populateKeyInspector } from "../key-inspector"
 import { syncColorControl, writeColorControl, scrollSelectedSource } from "../config-context"
@@ -27,8 +27,6 @@ import { openPanelCopyDialog, runFileOperation, adaptArchiveForIos26, updatePane
 import { openLayoutImageDialog, acceptLayoutImageFile, syncLayoutImageConfig, updateLayoutImageForm, applyLayoutImage } from "../layout-image-replace"
 import { type LayoutImageTarget } from "../../layout-image.ts"
 import { type LayoutImageConfig } from "../types"
-import { bindSlicePickerZoom, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM, pickableSlices } from "../../slice-picker-canvas.ts"
-import { drawImageSlicePicker, updateSelectedImageReference, pickerImageReference, clearImageSlicePicker } from "../image-pickers"
 
 /** 源码编辑器、属性字段、主题与方向、资源与键盘图替换。只在启动时由 main.ts 按顺序调用一次。 */
 export function wireEditingControls(): void {
@@ -494,33 +492,5 @@ export function wireEditingControls(): void {
     }
     const path = toolbarStrip.dataset.path
     if (path) selectFile(path)
-  })
-  bindSlicePickerZoom(styleImagePicker, styleImagePickerCanvas, (factor) => {
-    appState.pickerZoom = Math.min(MAX_SLICE_ZOOM, Math.max(MIN_SLICE_ZOOM, appState.pickerZoom * factor))
-    drawImageSlicePicker()
-  })
-  styleImagePickerCanvas.addEventListener("click", (event) => {
-    if (!isEditing()) return
-    if (!appState.pickerImage || !appState.pickerTarget) return
-    const bounds = styleImagePickerCanvas.getBoundingClientRect()
-    const point = {
-      x: ((event.clientX - bounds.left) / bounds.width) * styleImagePickerCanvas.width,
-      y: ((event.clientY - bounds.top) / bounds.height) * styleImagePickerCanvas.height,
-    }
-    const imagePoint = { x: (point.x - appState.pickerOffset.x) / appState.pickerScale, y: (point.y - appState.pickerOffset.y) / appState.pickerScale }
-    const selected = tileSliceAt(pickableSlices(appState.pickerSlices, appState.pickerImage), imagePoint)
-    if (!selected) return
-    appState.pickerSelectedIndex = selected.index
-    updateSelectedImageReference(appState.pickerTarget, pickerImageReference(selected.index))
-    drawImageSlicePicker()
-  })
-  styleImageClose.addEventListener("click", clearImageSlicePicker)
-  styleImageSource.addEventListener("click", () => openSourceStyleDefinition())
-  styleImageDialog.addEventListener("cancel", (event) => {
-    event.preventDefault()
-    clearImageSlicePicker()
-  })
-  styleImageDialog.addEventListener("click", (event) => {
-    if (event.target === styleImageDialog) clearImageSlicePicker()
   })
 }

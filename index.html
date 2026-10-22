@@ -809,36 +809,8 @@
 
     <input id="source-color-picker" class="source-color-picker" type="color" tabindex="-1" aria-label="源码颜色调节器" aria-hidden="true">
 
-    <dialog id="style-image-dialog" class="style-image-dialog glass-module" aria-labelledby="style-image-title">
-      <header class="style-image-header">
-        <div class="style-image-title-wrap">
-          <h2 id="style-image-title" class="style-image-name">图片预览</h2>
-          <small class="style-image-subtitle" id="style-image-subtitle"></small>
-        </div>
-        <div class="style-image-actions">
-          <button id="style-image-resource-open" type="button">选择图片资源</button>
-          <button id="style-image-source" class="toolbar-button" type="button" title="跳转至源代码" aria-label="跳转至样式源代码" hidden><span class="icon system-symbol" data-icon="file-text" aria-hidden="true"></span></button>
-          <button id="style-image-close" class="toolbar-button" type="button" title="关闭" aria-label="关闭图片预览"><span class="icon system-symbol" data-icon="x" aria-hidden="true"></span></button>
-        </div>
-      </header>
-      <div id="style-image-picker" hidden>
-        <canvas id="style-image-picker-canvas" width="720" height="420" aria-label="原始图片切片选择器"></canvas>
-        <small id="style-image-picker-meta">点击图片中的切片以修改引用</small>
-      </div>
-      <section id="style-image-resource-picker" class="style-image-resource-picker" hidden aria-labelledby="style-image-resource-title">
-        <header class="style-image-resource-header">
-          <div>
-            <strong id="style-image-resource-title">选择图片资源</strong>
-            <small id="style-image-resource-count"></small>
-          </div>
-          <div class="style-image-resource-tools">
-            <label class="search-control" aria-label="搜索图片资源"><span class="system-symbol" data-icon="search" aria-hidden="true"></span><input id="style-image-resource-search" type="search" results="0" placeholder="搜索图片资源"></label>
-            <button id="style-image-resource-close" type="button" aria-label="返回图片切片">关闭</button>
-          </div>
-        </header>
-        <div id="style-image-img-list" class="style-image-img-list"></div>
-        <p id="style-image-resource-empty" class="style-image-resource-empty" hidden>没有匹配的图片资源</p>
-      </section>
+    <dialog id="picker-dialog" class="picker-dialog" aria-label="图片与样式选择">
+      <iframe id="picker-frame" title="图片与样式选择"></iframe>
     </dialog>
 
     <dialog id="layout-image-dialog" class="app-dialog layout-image-dialog" aria-labelledby="layout-image-title" aria-describedby="layout-image-scope">
@@ -881,51 +853,6 @@
         <p id="new-style-error" class="field-error" hidden></p>
         <footer><button class="secondary" value="cancel">取消</button><button id="new-style-submit" class="primary" value="create">创建</button></footer>
       </form>
-    </dialog>
-
-    <dialog id="style-picker-dialog" class="style-picker-dialog glass-module" aria-labelledby="style-picker-title">
-      <header class="style-picker-header">
-        <div>
-          <div class="style-library-title"><h2 id="style-picker-title">全部样式</h2><small id="style-picker-count" aria-live="polite"></small></div>
-          <span class="style-picker-hint">单击预览 · 双击应用 · Command/Ctrl 单击编辑</span>
-        </div>
-        <div class="style-picker-tools">
-          <button id="style-picker-add" class="toolbar-button" type="button" title="新增样式" aria-label="新增样式"><span class="icon system-symbol" data-icon="plus" aria-hidden="true"></span></button>
-          <div class="style-library-tabs" role="group" aria-label="内容类型">
-            <button type="button" data-style-library-mode="styles" aria-pressed="true">全部样式</button>
-            <button type="button" data-style-library-mode="images" aria-pressed="false">全部图片</button>
-          </div>
-          <button id="style-picker-close" class="toolbar-button" type="button" title="关闭" aria-label="关闭样式选择器"><span class="icon system-symbol" data-icon="x" aria-hidden="true"></span></button>
-        </div>
-      </header>
-      <div class="style-library-toolbar">
-        <div class="style-library-filters style-library-kinds" role="group" aria-label="按样式类型筛选">
-          <button type="button" data-style-library-kind="all" aria-pressed="true">全部类型</button>
-          <button type="button" data-style-library-kind="image" aria-pressed="false">图片</button>
-          <button type="button" data-style-library-kind="color" aria-pressed="false">颜色</button>
-          <button type="button" data-style-library-kind="anim" aria-pressed="false">动画</button>
-          <button type="button" data-style-library-kind="text" aria-pressed="false">文字</button>
-        </div>
-        <div class="style-library-filters" role="group" aria-label="按当前布局用途筛选">
-          <button type="button" data-style-library-filter="all" aria-pressed="true">全部</button>
-          <button type="button" data-style-library-filter="panel" aria-pressed="false">键盘背景</button>
-          <button type="button" data-style-library-filter="key" aria-pressed="false">按键背景</button>
-          <button type="button" data-style-library-filter="candidate" aria-pressed="false">候选栏</button>
-          <button type="button" data-style-library-filter="foreground" aria-pressed="false">前景</button>
-        </div>
-        <label class="search-control"><span class="system-symbol" data-icon="search" aria-hidden="true"></span><input id="style-picker-search" type="search" aria-label="搜索样式或图片" placeholder="搜索样式名称或编号"></label>
-      </div>
-      <div class="style-library-content">
-        <div id="style-picker-grid" class="style-picker-grid"></div>
-        <p id="style-picker-empty" class="style-picker-empty" role="status" hidden>没有匹配的样式</p>
-      </div>
-      <section id="style-library-preview" class="style-library-preview" aria-label="所选资源预览" hidden>
-        <div id="style-library-preview-image"></div>
-        <div class="style-library-preview-info"><strong id="style-library-preview-title"></strong><small id="style-library-preview-meta"></small>
-          <div><button id="style-library-apply" type="button">应用到当前项</button><button id="style-library-edit" type="button">编辑</button><button id="style-library-preview-close" type="button">收起预览</button></div>
-        </div>
-      </section>
-      <footer class="style-library-footer"><span id="style-library-status" role="status"></span><span id="style-library-source"></span></footer>
     </dialog>
 
     <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">

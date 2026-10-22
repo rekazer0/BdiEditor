@@ -1,10 +1,10 @@
-import { emitTo, listen } from "@tauri-apps/api/event"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { LogicalSize } from "@tauri-apps/api/dpi"
 import { bindSlicePickerZoom, drawSlicePicker, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM, pickableSlices } from "./slice-picker-canvas.ts"
 import { tileSliceAt, type TilePoint, type TileSlice } from "./tiles.ts"
 import { drawVisualPreview, retinaThumbnail, type Visual } from "./atlas.ts"
 import { createIcon, hydrateIcons } from "./icons.ts"
+import { pickerEmitter, pickerListener } from "./picker-channel.ts"
 
 type ImagePayload = {
   path: string
@@ -76,6 +76,8 @@ const libraryPreview = $("#style-library-preview")
 const libraryPreviewImage = $("#style-library-preview-image")
 const libraryApply = $("#style-library-apply") as HTMLButtonElement
 const isTauri = "__TAURI_INTERNALS__" in window
+const emitMain = pickerEmitter("main", () => parent)
+const onMain = pickerListener(() => parent)
 
 let imagePayload: ImagePayload | undefined
 let image: HTMLImageElement | undefined
@@ -141,9 +143,7 @@ function renderResources(): void {
     name.textContent = resource.path.split("/").pop() ?? resource.path
     button.append(preview, name)
     // 同一个窗口既显示切片也显示全部图片列表，由主窗口决定选完之后是切图还是关窗。
-    button.addEventListener("click", () => {
-      if (isTauri) void emitTo("main", "resource-picker-select", { path: resource.path })
-    })
+    button.addEventListener("click", () => void emitMain("resource-picker-select", { path: resource.path }))
     grid.append(button)
   }
   subtitle.textContent = resources.length ? `${resources.length} 张图片` : "正在读取图片资源"
@@ -193,7 +193,7 @@ function showResourceList(): void {
   renderResources()
   setWindowTitle("全部图片")
   // 资源列表按需拉取，避免每次打开切片窗口都编码全部图片。
-  if (isTauri && !resources.length) void emitTo("main", "image-picker-resources-request")
+  if (!resources.length) void emitMain("image-picker-resources-request")
 }
 
 function libraryBitmap(key: string | undefined): Promise<ImageBitmap | undefined> {
@@ -230,7 +230,7 @@ function libraryButtons(selector: string): HTMLButtonElement[] {
 }
 
 function emitLibrary(event: string, payload: unknown = {}): void {
-  if (isTauri) void emitTo("main", event, payload)
+  void emitMain(event, payload)
 }
 
 function previewLibraryItem(card: HTMLElement, selected: { styleID?: string; imagePath?: string }): void {
@@ -424,8 +424,9 @@ function showImage(payload: ImagePayload): void {
   image = new Image()
   image.onload = () => {
     if (!image) return
-    // 默认缩放到图片区域的 80%（高按窗口初始 760 算，窗口高度会跟随画布变化）
-    const area = { width: window.innerWidth, height: 760 - $(".picker-toolbar").offsetHeight }
+    // 默认缩放到图片区域的 80%（桌面端高按窗口初始 760 算，窗口高度会跟随画布变化）
+    // 网页端弹窗高度固定，按实际视口算。
+    const area = { width: window.innerWidth, height: (isTauri ? 760 : window.innerHeight) - $(".picker-toolbar").offsetHeight }
     fit = Math.min(area.width * 0.8 / image.naturalWidth, area.height * 0.8 / image.naturalHeight)
     zoom = 1
     drawImage()
@@ -437,9 +438,9 @@ function showImage(payload: ImagePayload): void {
 document.title = "图片切片"
 showEmptyView()
 back.addEventListener("click", () => {
-  if (view === "image" && imagePayload?.styleLibrary && isTauri) {
+  if (view === "image" && imagePayload?.styleLibrary) {
     showStyleLibrary()
-    void emitTo("main", "image-picker-back-styles")
+    void emitMain("image-picker-back-styles")
   } else if (view === "image") showResourceList()
   else if (imagePayload) showSliceView()
 })
@@ -468,8 +469,14 @@ $("#style-library-preview-close").addEventListener("click", () => {
   libraryPreview.hidden = true
   libraryGrid.querySelector(".previewing")?.classList.remove("previewing")
 })
+// 网页端没有原生标题栏，关闭按钮和 Esc 都交给主页面收起弹窗。
+const closeButton = $("#picker-close") as HTMLButtonElement
+closeButton.hidden = isTauri
+closeButton.addEventListener("click", () => void emitMain("picker-close"))
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !event.isComposing && isTauri) void getCurrentWindow().close()
+  if (event.key !== "Escape" || event.isComposing) return
+  if (isTauri) void getCurrentWindow().close()
+  else void emitMain("picker-close")
 })
 bindSlicePickerZoom($(".picker-canvas-stage"), canvas, (factor) => {
   zoom = Math.min(MAX_SLICE_ZOOM, Math.max(MIN_SLICE_ZOOM, zoom * factor))
@@ -486,17 +493,15 @@ canvas.addEventListener("click", (event) => {
   if (!selected) return
   imagePayload.selectedIndex = selected.index
   drawImage()
-  if (isTauri) void emitTo("main", "image-picker-select", { index: selected.index })
+  void emitMain("image-picker-select", { index: selected.index })
 })
 
-if (isTauri) {
-  await listen<ImagePayload>("image-picker-data", (event) => showImage(event.payload))
-  await listen("image-picker-show-list", () => showResourceList())
-  await listen<StyleLibraryPayload>("style-library-data", (event) => showStyleLibrary(event.payload))
-  await listen<ResourcePayload>("image-picker-resources-data", (event) => {
-    resources = event.payload
-    resourcesLoaded = true
-    renderResources()
-  })
-  void emitTo("main", "picker-window-ready")
-}
+await onMain<ImagePayload>("image-picker-data", (payload) => showImage(payload))
+await onMain("image-picker-show-list", () => showResourceList())
+await onMain<StyleLibraryPayload>("style-library-data", (payload) => showStyleLibrary(payload))
+await onMain<ResourcePayload>("image-picker-resources-data", (payload) => {
+  resources = payload
+  resourcesLoaded = true
+  renderResources()
+})
+void emitMain("picker-window-ready")
