@@ -1,10 +1,10 @@
 import { appState } from "./state"
-import { scheduleSsfPreview } from "./ssf-preview"
+import { rebuildSsfPreview } from "./ssf-preview"
 import { type TextVisual, canvasFontFamily } from "../atlas.ts"
 import { setSimulatedComposition, toolbarPreview, currentDeviceValue, deviceGeometryProperties, preview, resizeKeyboardPreviews, schedulePreviewInteractionFrame, paintPreviewInteraction, applySkinState, REFERENCE_PHONE_WIDTH_SCALE, deviceFrameProperties } from "./canvas-interaction"
 import { simulatedOutput, skinState, candidateComposition, candidateInput, candidateInputText, candidateWords, candidateArea, toolbarStrip, deviceShell, orientation, theme, layout, hintPreviewEnabled, canvasWrap, toolbarCanvas, panelStatus, previewZoomOut, previewZoomIn, $, skinStateValue, skinStateControl, toggleGuides, mobileToggleGuides } from "./dom"
 import { candidatePreview } from "../simulation.ts"
-import { isConfiguredSymbolLayout, skinStateLabel } from "../actions.ts"
+import { isConfiguredSymbolLayout, knownSkinStates, skinStateLabel } from "../actions.ts"
 import { textDocument, visualResolver, currentBdaAppearance, bdaBasePath, bdaAvailableLayoutPaths } from "./bda-documents"
 import { genConfigPath, keyboardContext, refreshToolbarPreview, legacyAnimationConfigPath, styleConfigPath, toolbarConfigPath, isToolbarPath } from "./config-context"
 import { deviceSpec, keyboardPreviewGeometry, showsKeyboardAccessories } from "../devices.ts"
@@ -13,13 +13,14 @@ import { bdaConfigPath, bdaLayoutDocument, bdaStyleID } from "../bda.ts"
 import { decodeBdaAnimation } from "../bda-decode.ts"
 import { parseLegacyAnimation } from "../preview-animation.ts"
 import { parseLegacyHint } from "../preview-hints.ts"
-import { previewItems, previewSurfaceHeight, previewContentVerticalBounds } from "../preview-items.ts"
+import { previewItems, previewSurfaceHeight, previewContentVerticalBounds, type PreviewItem } from "../preview-items.ts"
 import { IniDocument } from "../ini.ts"
 import { resolvePanelConfig, DEFAULT_BDA_PANEL_WIDTH, DEFAULT_BDA_PANEL_HEIGHT } from "../keyboard.ts"
 import { resolveCandidateInputTextVisual, resolveCandidateTextVisuals } from "../candidate-style.ts"
 import { availableSkinStates, canvasFitWidth, previewScalePercent } from "../panel-tools.ts"
 import { populateKeyInspector } from "./key-inspector"
 import { setDrawingTile, drawAtlas } from "./tile-editing"
+import { nativeCandidateText, refreshNativeScenes, refreshPalmPreview } from "./native-preview"
 
 export function simulationLanguage(): "zh" | "en" {
   return /^en_/i.test(appState.layoutPath.split("/").pop() ?? "") ? "en" : "zh"
@@ -130,11 +131,17 @@ export function devicePreviewTransparent(): boolean {
   return true
 }
 
+/** A built-in text look with the skin's own fields laid over it. */
+function merged(base: TextVisual | undefined, own: TextVisual | undefined): TextVisual | undefined {
+  return base || own ? { ...base, ...own } : undefined
+}
+
 export function refreshPreview(): void {
   if (!appState.archive) return
-  scheduleSsfPreview()
+  rebuildSsfPreview()
   const currentArchive = appState.archive
   const composing = refreshSimulationState()
+  if (refreshPalmPreview()) return
   const resolver = visualResolver()
   const context = keyboardContext()
   const toolbarSize = resolver ? refreshToolbarPreview(composing, resolver) : undefined
@@ -197,9 +204,11 @@ export function refreshPreview(): void {
       context.styles,
     )
     const skinFont = appState.archive.format === "ssf"
-    const inputVisual = resolveCandidateInputTextVisual(context.gen, resolver, candidateLayout, inputBarInKeyboard(), skinFont)
-    const { normal: candidateVisual, first: firstCandidateVisual } =
-      resolveCandidateTextVisuals(candidateLayout, context.gen, resolver, skinFont)
+    const native = nativeCandidateText(config.width)
+    const builtIn = resolveCandidateTextVisuals(candidateLayout, context.gen, resolver, skinFont)
+    const inputVisual = merged(resolveCandidateInputTextVisual(context.gen, resolver, candidateLayout, inputBarInKeyboard(), skinFont), native?.input)
+    const candidateVisual = merged(builtIn.normal, native?.words)
+    const firstCandidateVisual = native?.first ? merged(builtIn.first ?? builtIn.normal, native.first) : builtIn.first
     appState.firstCandidateTextVisual = firstCandidateVisual
     appState.candidateTextWidth = config.width
     applyCandidateTextVisual(candidateInput, inputVisual, appState.candidateTextWidth)
@@ -283,6 +292,7 @@ export function refreshPreview(): void {
     for (const property of deviceGeometryProperties) deviceShell.style.removeProperty(property)
   }
   preview.setDocument(appState.layoutDocument)
+  refreshNativeScenes()
 }
 
 export function refreshSimulationPreview(): void {
@@ -295,7 +305,8 @@ export function refreshSimulationPreview(): void {
     appState.activeKeyboardGeometry.candidateInputHeight,
   )
   updateCanvasCandidateGeometry(appState.activeKeyboardGeometry.candidateHeight)
-  const resolver = visualResolver()
+  // A Palm bar keeps its size while composing; its icons follow the composition by themselves.
+  const resolver = appState.archive.format === "sxi" ? undefined : visualResolver()
   if (!resolver) return
   const toolbarSize = refreshToolbarPreview(composing, resolver)
   const symbolPanel = candidateArea.hidden
@@ -456,12 +467,14 @@ export function updateCanvasCandidateGeometry(candidateHeight: number): void {
   fitCanvasPreview()
 }
 
+/** `native` is a Palm board's own key list and the keyboard states its keys swap for. */
 export function updatePanelTools(
   width: number,
   height: number,
   candidateHeight = 0,
+  native?: { items: PreviewItem[]; states: number[] },
 ): number {
-  const items = appState.layoutDocument ? previewItems(appState.layoutDocument, width, height) : []
+  const items = native?.items ?? (appState.layoutDocument ? previewItems(appState.layoutDocument, width, height) : [])
   const surfaceHeight = previewSurfaceHeight(items, height)
   const content = previewContentVerticalBounds(items, width, surfaceHeight)
   deviceShell.style.setProperty("--canvas-width", `${width}px`)
@@ -476,7 +489,7 @@ export function updatePanelTools(
     panelVisibleHeight: content.height,
   }
   fitCanvasPreview()
-  const states = currentSkinStates()
+  const states = native ? [...new Set([...knownSkinStates, ...native.states])].sort((a, b) => a - b) : currentSkinStates()
   const selected = skinState.value
   const selectedState = selected ? Number(selected) : undefined
   if (selectedState !== undefined && selectedState <= 122 && !states.includes(selectedState)) {

@@ -27,6 +27,8 @@ const snapshot = async (name) => {
     const { preview, toolbarPreview, candidateBackgroundPreview } = await import("/src/app/canvas-interaction.ts")
     const previews = [preview, toolbarPreview, candidateBackgroundPreview]
     await Promise.all(previews.map((item) => item.resolver?.ready?.()))
+    // Both sides are compared on the converted styles; scripts/test-native-preview.mjs covers the native scene.
+    previews.forEach((item) => item.setScene(undefined))
     previews.forEach((item) => item.draw())
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
     await Promise.all(previews.map((item) => item.rendered()))
@@ -171,6 +173,15 @@ try {
   await page.locator("#browser-open").setInputFiles({ name: sample?.split("/").pop() ?? "分辨率.ssf", mimeType: "application/octet-stream", buffer: sample ? readFileSync(sample) : Buffer.from(ssfFixture()) })
   await page.waitForFunction(() => !document.querySelector("#open").disabled)
   await closeDialog()
+  // The canvas paints the SSF natively; the export starts from the skin's look converted onto the
+  // skeleton, so that conversion is laid over the source and drawn with the converted styles.
+  await page.evaluate(async () => {
+    const { appState } = await import("/src/app/state.ts")
+    const { documentPackage } = await import("/src/ssf/ssf-convert.ts")
+    const { ssfToBaiduFiles } = await import("/src/ssf/ssf-to-baidu.ts")
+    const pkg = documentPackage(appState.archive)
+    appState.archive.setOverlay(ssfToBaiduFiles(pkg, appState.ssfTemplates.sogou, Number(pkg.resolution)).files)
+  })
   const source = new Map()
   for (const view of views) {
     await chooseView(view)

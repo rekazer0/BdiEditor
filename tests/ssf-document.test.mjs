@@ -1,4 +1,5 @@
-// A Sogou skin opened as an editor document: its own files, saved in place, previewed as Baidu.
+// A Sogou skin opened as an editor document: its own files, saved in place, laid over the official
+// skeleton for the canvas, and converted to Baidu only on export.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -8,6 +9,7 @@ import { SkinArchive } from '../src/skin.ts'
 import { AtlasResolver } from '../src/atlas.ts'
 import { parseZip } from '../src/skin-zip.ts'
 import { documentPackage, ssfDocumentBytes, ssfPreviewFiles } from '../src/ssf/ssf-convert.ts'
+import { ssfToBaiduFiles } from '../src/ssf/ssf-to-baidu.ts'
 import { exportFormatFromPath } from '../src/export.ts'
 import { decodePng, encodePng } from '../src/ssf/ssf-png.ts'
 import { SIZES, skinContainer, solid, ssfFixture } from './helpers/ssf-fixture.mjs'
@@ -15,6 +17,12 @@ import { SIZES, skinContainer, solid, ssfFixture } from './helpers/ssf-fixture.m
 const template = SkinArchive.open(new Uint8Array(readFileSync(new URL('../public/default-template.bds', import.meta.url))))
 const sogouTemplate = SkinArchive.open(new Uint8Array(readFileSync(new URL('../public/sogou-template.bds', import.meta.url))))
 const open = async (bytes) => SkinArchive.open(await ssfDocumentBytes(bytes), 'ssf')
+/** The Baidu skin an export starts from: the skin's look painted onto the skeleton at its resolution. */
+const converted = (archive, base) => {
+  const pkg = documentPackage(archive)
+  return ssfToBaiduFiles(pkg, base, Number(pkg.resolution))
+}
+const skeleton = (archive, base) => ssfPreviewFiles(documentPackage(archive), base)
 
 test('ssf document: opens as its own format with the package paths as they are', async () => {
   const archive = await open(ssfFixture())
@@ -59,8 +67,9 @@ test('ssf document: saving rewrites only the edited entry', async () => {
 
 test('ssf document: the preview overlay is readable, read-only, unsaved and not a change', async () => {
   const archive = await open(ssfFixture())
-  const { files, warnings } = ssfPreviewFiles(archive, template)
-  assert.ok(Array.isArray(warnings))
+  const files = skeleton(archive, template)
+  // The canvas reads the skeleton only; the skin's styles stay in its own files.
+  assert.ok(![...files.keys()].some((path) => /\/res\/ssf\d+\.png$/.test(path)))
   const gen = IniDocument.parse(strFromU8(files.get('light/skin/port/gen.ini')))
   assert.equal(gen.get('PANEL', 'SIZE'), '1080,702')
   const land = IniDocument.parse(strFromU8(files.get('light/skin/land/gen.ini')))
@@ -81,11 +90,11 @@ test('ssf document: the preview overlay is readable, read-only, unsaved and not 
   assert.ok(!archive.sourceFiles().some((file) => file.path.startsWith('light/')))
 })
 
-test('ssf document: the canvas skeleton is Sogou\'s own layout, with the skin\'s toolbar icons', async () => {
+test('ssf document: the export skeleton is Sogou\'s own layout, with the skin\'s toolbar icons', async () => {
   const files = unzipSync(ssfFixture())
   files['1080/status1/ime_function_voice.png'] = encodePng(solid(90, 90, [9, 8, 7]))
   files['1080/status1/phoneSkin.ini'] = strToU8(`${strFromU8(files['1080/status1/phoneSkin.ini'])}\n[CandidateIMEFunctionView]\nICON_COLOR=0xFF6F3300\n`)
-  const { files: preview } = ssfPreviewFiles(await open(zipSync(files)), sogouTemplate)
+  const { files: preview } = converted(await open(zipSync(files)), sogouTemplate)
   const read = (path) => IniDocument.parse(strFromU8(preview.get(path)))
   for (const orientation of ['port', 'land']) {
     const [width, height] = read(`light/skin/${orientation}/gen.ini`).get('PANEL', 'SIZE').split(',').map(Number)
@@ -128,7 +137,7 @@ test('ssf document: legacy toolbar logo, symbol text and double-pinyin function 
   files['1080/status1/ime_function_multimedia_p.png'] = encodePng(solid(78, 78, [90, 80, 70]))
   files['default/symbols.ttf'] = Uint8Array.of(0, 1, 2, 3)
   const archive = await open(zipSync(files))
-  const { files: preview } = ssfPreviewFiles(archive, sogouTemplate)
+  const { files: preview } = converted(archive, sogouTemplate)
   const read = (path) => IniDocument.parse(strFromU8(preview.get(path)))
   const css = read('light/skin/res/default.css')
   for (const orientation of ['port', 'land']) {
@@ -174,15 +183,15 @@ for (const [resolution, portSize, landSize, candRect] of [
     if (path.startsWith('1080/')) files[path.replace('1080/', `${resolution}/`)] = bytes
   }
   const archive = await open(zipSync(files))
-  const preview = ssfPreviewFiles(archive, template)
-  const gen = IniDocument.parse(strFromU8(preview.files.get('light/skin/port/gen.ini')))
+  const preview = skeleton(archive, template)
+  const gen = IniDocument.parse(strFromU8(preview.get('light/skin/port/gen.ini')))
   assert.equal(gen.get('PANEL', 'SIZE'), portSize)
-  const land = IniDocument.parse(strFromU8(preview.files.get('light/skin/land/gen.ini')))
+  const land = IniDocument.parse(strFromU8(preview.get('light/skin/land/gen.ini')))
   assert.equal(land.get('PANEL', 'SIZE'), landSize)
   assert.equal(land.get('CAND', 'VIEW_RECT'), candRect)
 })
 
-test('ssf document: edits show up in the rebuilt preview', async () => {
+test('ssf document: edits show up in the conversion', async () => {
   const archive = await open(ssfFixture())
   const candidateColor = (files) => {
     const gen = IniDocument.parse(strFromU8(files.get('light/skin/port/gen.ini')))
@@ -193,7 +202,7 @@ test('ssf document: edits show up in the rebuilt preview', async () => {
   const skin = IniDocument.parse(archive.getText(path))
   skin.set('TextStyle_Candidate', 'TEXT_COLOR', '0xFF123456')
   archive.setText(path, skin.toString())
-  assert.equal(candidateColor(ssfPreviewFiles(archive, template).files), 'FF123456')
+  assert.equal(candidateColor(converted(archive, template).files), 'FF123456')
 })
 
 test('ssf document: Baidu and Sogou formats never repackage into each other', async () => {
@@ -213,7 +222,7 @@ test('ssf document: a broken package does not open as a skin, and an explicit Ba
   assert.equal(SkinArchive.open(zipSync(baidu), 'bds').format, 'bds')
 })
 
-test('ssf document: rebuilt previews reuse unchanged images but never a replaced one', async () => {
+test('ssf document: repeated conversions reuse unchanged images but never a replaced one', async () => {
   const archive = await open(ssfFixture())
   const panelPixel = (files) => {
     const gen = IniDocument.parse(strFromU8(files.get('light/skin/port/gen.ini')))
@@ -221,22 +230,22 @@ test('ssf document: rebuilt previews reuse unchanged images but never a replaced
     const [name] = css.get(`STYLE${gen.get('PANEL', 'BACK_STYLE')}`, 'NM_IMG').split(',')
     return [...decodePng(files.get(`light/skin/res/${name}.png`)).data.subarray(0, 3)]
   }
-  const first = ssfPreviewFiles(archive, template).files
-  const again = ssfPreviewFiles(archive, template).files
+  const first = converted(archive, template).files
+  const again = converted(archive, template).files
   assert.deepEqual(panelPixel(again), panelPixel(first))
   archive.setBytes('1080/status1/bg.png', encodePng(solid(...SIZES.background, [9, 8, 7])))
-  assert.deepEqual(panelPixel(ssfPreviewFiles(archive, template).files), [9, 8, 7])
+  assert.deepEqual(panelPixel(converted(archive, template).files), [9, 8, 7])
 })
 
-// Sogou TEXT_SIZE (a fraction of the screen width up to 1), TYPEFACE and BOLD reach the canvas.
-test('ssf preview: key, candidate and composing text take the skin size, typeface and weight', async () => {
+// Sogou TEXT_SIZE (a fraction of the screen width up to 1), TYPEFACE and BOLD reach the Baidu styles.
+test('ssf conversion: key, candidate and composing text take the skin size, typeface and weight', async () => {
   const files = unzipSync(ssfFixture())
   files['1080/status1/phoneSkin.ini'] = strToU8(strFromU8(files['1080/status1/phoneSkin.ini'])
     .replace('[TextStyle_Qwerty]\n', '[TextStyle_Qwerty]\nTEXT_SIZE=0.05\nTYPEFACE=skin.ttf\nBOLD=true\n')
     .replace('[TextStyle_Candidate]\n', '[TextStyle_Candidate]\nTEXT_SIZE=48\nBOLD=true\n')
     .concat('[TextStyle_Composing]\nTEXT_SIZE=0.03\n'))
   files['default/skin.ttf'] = new Uint8Array([0, 1, 0, 0])
-  const { files: preview } = ssfPreviewFiles(await open(zipSync(files)), sogouTemplate)
+  const { files: preview } = converted(await open(zipSync(files)), sogouTemplate)
   const read = (path) => IniDocument.parse(strFromU8(preview.get(path)))
   const css = read('light/skin/res/default.css')
   const layout = read('light/skin/port/py_26.ini')

@@ -1,6 +1,6 @@
 // A Palm `.sxi` opened in the editor must export to BDI, BDS and BDA through the real menu.
-// BDI/BDS go back through the same projection the canvas renders, so their previews have to
-// match the `.sxi` pixel for pixel; the BDA package only gets a reopen smoke check.
+// The .sxi canvas is drawn from skin.json itself and the BDI/BDS from their exported INI, yet the
+// two previews have to match pixel for pixel; the BDA package only gets a reopen smoke check.
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"

@@ -8,6 +8,8 @@ import { type LegacyAnimation, type LegacyParticleEmitter, bdaAnimationBindingsF
 import { type LegacyHint } from "./preview-hints.ts"
 import { constrainedCanvasSize, setCanvasSize } from "./preview-draw.ts"
 import { paintPreview } from "./preview-paint.ts"
+import type { NativeScene } from "./native-scene.ts"
+import { playNativePress } from "./preview-native.ts"
 import { pointerDown } from "./preview-pointer.ts"
 import { pointerMove } from "./preview-pointer.ts"
 import { pointerUp } from "./preview-pointer.ts"
@@ -30,6 +32,11 @@ export class Preview {
   private defaults?: IniDocument
   offsets?: IniDocument
   resolver?: VisualResolver
+  /** Palm and Sogou skins paint a scene read from their own files instead of resolving styles. */
+  scene?: (state: number | undefined) => Promise<NativeScene | undefined>
+  private readonly scenes = new Map<number | undefined, Promise<NativeScene | undefined>>()
+  /** Palm documents list their keys themselves, per keyboard state and composition. */
+  private nativeItems?: (state: number | undefined, persistentOnly: boolean) => PreviewItem[]
   // Resolver lookups are asynchronous and can involve stylesheet/tile parsing
   // and image decoding. Keep the resolved values for the lifetime of a
   // resolver; drag frames then only redraw geometry instead of repeating the
@@ -108,6 +115,12 @@ export class Preview {
   panelAnimationStyle = ""
   legacyPanelAnimationStartedAt = 0
   private legacyPanelAnimationTimer?: number
+  /** A native scene's running press animation (kept across the refresh a press causes) and when panel animations started. */
+  nativePress?: { section: string; startedAt: number; seed: number }
+  nativeShownAt = Date.now()
+  /** The scene last painted, which a press animates while the refresh it causes builds the next. */
+  drawnScene?: NativeScene
+  nativeFrame = 0
   drawID = 0
   lastDrawnID = 0
   private drawQueued = 0
@@ -190,6 +203,8 @@ export class Preview {
     if (this.bdaAnimationTimer) window.cancelAnimationFrame(this.bdaAnimationTimer)
     if (this.legacyAnimationTimer) window.cancelAnimationFrame(this.legacyAnimationTimer)
     if (this.legacyPanelAnimationTimer) window.cancelAnimationFrame(this.legacyPanelAnimationTimer)
+    window.clearTimeout(this.nativeFrame)
+    this.nativePress = undefined
     if (this.active?.holdTimer !== undefined) window.clearTimeout(this.active.holdTimer)
     this.clearPress()
     this.cancelEditTouch()
@@ -300,6 +315,30 @@ export class Preview {
     void this.draw()
   }
 
+  setScene(scene?: (state: number | undefined) => Promise<NativeScene | undefined>): void {
+    this.scene = scene
+    this.scenes.clear()
+    void this.draw()
+  }
+
+  /** The scene for the current keyboard state, built once per state. */
+  sceneForState(): Promise<NativeScene | undefined> | undefined {
+    if (!this.scene) return
+    let scene = this.scenes.get(this.skinState)
+    if (!scene) {
+      const built = scene = this.scene(this.skinState)
+      this.scenes.set(this.skinState, built)
+      void built.then(() => {
+        this.builtScenes.add(built)
+        void this.draw()
+      }, () => {})
+    }
+    return scene
+  }
+
+  /** Scenes whose build has finished, which painting need not wait for. */
+  readonly builtScenes = new WeakSet<Promise<NativeScene | undefined>>()
+
   resolveVisual(styleID: string, highlighted: boolean): Promise<Visual | undefined> {
     const key = `${highlighted ? "1" : "0"}:${styleID}`
     let result = this.visualCache.get(key)
@@ -340,15 +379,7 @@ export class Preview {
     this.defaults = defaults
     this.visualCache.clear()
     this.lastRenderCache = undefined
-    this.keys = this.document
-      ? previewItems(
-          this.document,
-          this.panelWidth,
-          this.panelHeight,
-          defaults,
-          this.persistentOnly,
-        )
-      : []
+    this.keys = this.layoutItems()
     this.fitCanvas()
     void this.draw()
   }
@@ -371,6 +402,7 @@ export class Preview {
 
   setSkinState(state?: number): void {
     this.skinState = state
+    if (this.nativeItems) this.keys = this.layoutItems()
     void this.draw()
   }
 
@@ -379,16 +411,14 @@ export class Preview {
     this.persistentOnly = persistentOnly
     this.visualCache.clear()
     this.toolbarImagesCache = undefined
-    this.keys = this.document
-      ? previewItems(
-          this.document,
-          this.panelWidth,
-          this.panelHeight,
-          this.defaults,
-          persistentOnly,
-        )
-      : []
+    this.keys = this.layoutItems()
     void this.draw()
+  }
+
+  /** The keys the canvas shows: the native list, else the layout document's. */
+  private layoutItems(persistentOnly = this.persistentOnly): PreviewItem[] {
+    if (this.nativeItems) return this.nativeItems(this.skinState, persistentOnly)
+    return this.document ? previewItems(this.document, this.panelWidth, this.panelHeight, this.defaults, persistentOnly) : []
   }
 
   expandSections(sections: readonly string[]): string[] {
@@ -437,27 +467,25 @@ export class Preview {
     this.panelAnimationStyle = animationStyle
     this.panelWidth = width
     this.panelHeight = height
-    this.keys = this.document
-      ? previewItems(this.document, width, height, this.defaults, this.persistentOnly)
-      : []
+    this.keys = this.layoutItems()
     this.fitCanvas()
     if (animationChanged) this.restartLegacyPanelAnimation()
     void this.draw()
   }
 
+  /** Lists the canvas keys from the skin's own data instead of the layout document. */
+  setNativeItems(items?: (state: number | undefined, persistentOnly: boolean) => PreviewItem[]): void {
+    this.nativeItems = items
+    this.setDocument(this.document)
+  }
+
   setDocument(document?: IniDocument): void {
     this.document = document
+    // An edit to the layout is an edit to the skin a scene is built from.
+    this.scenes.clear()
     this.visualCache.clear()
     this.lastRenderCache = undefined
-    this.keys = document
-      ? previewItems(
-          document,
-          this.panelWidth,
-          this.panelHeight,
-          this.defaults,
-          this.persistentOnly,
-        )
-      : []
+    this.keys = this.layoutItems()
     const available = new Set(this.keys.map((key) => key.section))
     this.selected = new Set([...this.selected].filter((section) => available.has(section)))
     this.fitCanvas()
@@ -485,7 +513,7 @@ export class Preview {
       // Measure every layout key, not only the persistent subset, so the canvas
       // keeps the same aspect as the viewport the editor sizes around it.
       this.surfaceHeightValue = previewSurfaceHeight(
-        this.document ? previewItems(this.document, this.panelWidth, this.panelHeight) : this.keys,
+        this.document || this.nativeItems ? this.layoutItems(false) : this.keys,
         this.panelHeight,
       )
     }
@@ -506,10 +534,15 @@ export class Preview {
     )
   }
 
+  /** The layout document whose TIP sections swap keys per state; native key lists are already swapped. */
+  get stateDocument(): IniDocument | undefined {
+    return this.nativeItems ? undefined : this.document
+  }
+
   hit(point: { x: number; y: number }): PreviewItem | undefined {
-    return this.document
+    return this.stateDocument
       ? effectivePreviewHitItem(
-        this.document,
+        this.stateDocument,
         this.keys,
         point,
         this.mode,
@@ -532,6 +565,7 @@ export class Preview {
   }
 
   async playAnimation(key: PreviewItem): Promise<void> {
+    if (this.scene) return playNativePress(this, key)
     this.playLegacyAnimation(key)
     const effects = this.animation
       ? bdaAnimationBindingsForKey(this.animation, key).flatMap((binding) => bdaBindingEffects(this.animation!, binding))

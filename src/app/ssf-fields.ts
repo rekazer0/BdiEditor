@@ -13,7 +13,6 @@ import { populateKeyInspector } from "./key-inspector"
 import { refreshPreview } from "./preview-render"
 import { openImageResourceChooser } from "./resource-inspector"
 import { sourceEditPath, ssfDocument, ssfPackage, ssfTheme } from "./ssf-documents"
-import { rebuildSsfPreview } from "./ssf-preview"
 import { appState } from "./state"
 import { styleKindBadge } from "./style-picker"
 import { element } from "../dom-element.ts"
@@ -69,7 +68,6 @@ function editTargets(targets: SsfLocation[], change: (document: IniDocument, tar
   if (changes.some((change) => change.path === appState.selectedPath)) appState.selectedDocument = ssfDocument(appState.selectedPath)
   const source = changes.find((change) => change.path === sourceEditPath())
   if (source) setSourceValue(source.after)
-  rebuildSsfPreview()
   refreshPreview()
   populateKeyInspector()
   updateDirty()
@@ -467,7 +465,6 @@ async function importSsfFont(file: File, targets: SsfLocation[]): Promise<void> 
       changes.push({ kind: "text", path, before, after: document.toString() })
     }
     commitBatch([...changes, ...resolutionTwins(changes.filter((change): change is TextChange => change.kind === "text"))])
-    rebuildSsfPreview()
     refreshPreview()
     populateKeyInspector()
     updateDirty()

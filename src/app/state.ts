@@ -27,6 +27,8 @@ import { type StyleKind } from "./types"
 import { type ProjectChoice } from "../project-chooser"
 import { type WindowMaterialKind } from "./types"
 import { type SsfTemplates } from "../ssf/ssf-convert.ts"
+import { type JsonObject } from "../palm/sxi-ini.ts"
+import { type SsfPackage } from "../ssf/ssf-package.ts"
 export const appState = {
   fileOperationProgressVisible: false,
   simulatedComposition: "",
@@ -34,9 +36,12 @@ export const appState = {
   archive: undefined as SkinArchive | undefined,
   bdaBase: undefined as SkinArchive | undefined,
   ssfTemplates: undefined as SsfTemplates | undefined,
-  /** Archive revision the SSF preview overlay was built from. */
-  ssfPreviewRevision: -1,
-  ssfPreviewTimer: undefined as number | undefined,
+  /** The SSF document and the resolution / looks its skeleton overlay was laid out for. */
+  ssfPreviewKey: undefined as { archive: SkinArchive; key: string } | undefined,
+  /** The open `.sxi` document's parsed skin.json, for the archive revision it was read at. */
+  palmSkin: undefined as { archive: SkinArchive; revision: number; skin: JsonObject } | undefined,
+  /** The open SSF document's own files as a package, for the archive revision it was read at. */
+  ssfPackage: undefined as { archive: SkinArchive; revision: number; pkg: SsfPackage } | undefined,
   currentPath: "",
   sourceWorkspacePath: "",
   sourceWorkspacePrefix: "",

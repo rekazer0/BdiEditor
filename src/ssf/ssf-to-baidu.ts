@@ -6,11 +6,11 @@
 
 import { strToU8, zipSync } from "fflate"
 import { IniDocument } from "../ini.ts"
-import { scaleIniDocument } from "../panel-tools.ts"
 import { SkinArchive } from "../skin.ts"
 import { cached, fingerprint } from "./ssf-cache.ts"
 import { SsfLook, type LookColors, type LookImage, type LookPair, type LookText } from "./ssf-look.ts"
 import type { SsfPackage, SsfTheme } from "./ssf-package.ts"
+import { copySsfSkeleton, ssfSkeletonScale } from "./ssf-skeleton.ts"
 import { cropImage, decodePng, encodePng, isPng, pngSize, tintImage, whiteMask, type RgbaImage } from "./ssf-png.ts"
 
 export type SsfConversion = { archive: SkinArchive; warnings: string[] }
@@ -107,7 +107,7 @@ class ThemeConverter {
   private readonly theme: SsfTheme
   private readonly output: Map<string, Uint8Array>
   private readonly resources: ThemeResources
-  private readonly layoutScales: Record<"port" | "land", [number, number]>
+  private readonly panelWidth?: number
   private readonly soundStyles = new Map<string, string>()
   private readonly glyphs = new Map<string, RgbaImage>()
   private keyboardStyles?: { panel?: string; cand?: string }
@@ -115,22 +115,13 @@ class ThemeConverter {
   private panelStyle?: string
 
   constructor(pkg: SsfPackage, base: SkinArchive, theme: SsfTheme, output: Map<string, Uint8Array>, warnings: string[], panelWidth?: number) {
+    this.panelWidth = panelWidth
     const panel = base.isText("light/skin/port/gen.ini") ? IniDocument.parse(base.getText("light/skin/port/gen.ini")).get("PANEL", "SIZE") : undefined
-    const templateWidth = numbers(panel)[0] || 480
-    const width = panelWidth || templateWidth
-    const scale = width / templateWidth
-    this.layoutScales = { port: [scale, scale], land: [scale, scale] }
-    // Sogou PhoneSkinMgr's SkinUILayoutHelper.getSkinSize uses separate landscape dimensions.
-    const landscape = new Map([[1080, [1920, 570]], [720, [1280, 380]], [480, [854, 260]]]).get(panelWidth ?? 0)
-    if (landscape && base.isText("light/skin/land/gen.ini")) {
-      const size = numbers(IniDocument.parse(base.getText("light/skin/land/gen.ini")).get("PANEL", "SIZE"))
-      if (size[0] > 0 && size[1] > 0) this.layoutScales.land = [landscape[0] / size[0], landscape[1] / size[1]]
-    }
-    this.look = new SsfLook(pkg, theme, warnings, width)
+    this.look = new SsfLook(pkg, theme, warnings, panelWidth || numbers(panel)[0] || 480)
     this.base = base
     this.theme = theme
     this.output = output
-    this.resources = new ThemeResources(theme, output, base.getText("light/skin/res/default.css"), panelWidth ? scale : 1)
+    this.resources = new ThemeResources(theme, output, base.getText("light/skin/res/default.css"), ssfSkeletonScale(base, panelWidth).text)
   }
 
   /**
@@ -292,20 +283,7 @@ class ThemeConverter {
   }
 
   convert(): void {
-    const prefix = "light/skin/"
-    for (const path of this.base.names()) {
-      if (!path.startsWith(prefix) || path.endsWith("/")) continue
-      const name = path.slice(prefix.length)
-      if (name === "res/default.css" || name === "Info.txt" || name === "demo.png") continue
-      let bytes = this.base.getBytes(path)!
-      const orientation = name.match(/^(port|land)\/.*\.(?:ini|cnd)$/i)?.[1] as "port" | "land" | undefined
-      const [xScale, yScale] = orientation ? this.layoutScales[orientation] : [1, 1]
-      if (xScale !== 1 || yScale !== 1) {
-        const document = IniDocument.parse(new TextDecoder().decode(bytes))
-        bytes = strToU8(scaleIniDocument(document, xScale, yScale).toString())
-      }
-      this.output.set(`${this.theme}/skin/${name}`, bytes)
-    }
+    copySsfSkeleton(this.base, this.theme, this.output, this.panelWidth)
     for (const orientation of ["port", "land"] as const) {
       const genPath = `${this.theme}/skin/${orientation}/gen.ini`
       const genBytes = this.output.get(genPath)

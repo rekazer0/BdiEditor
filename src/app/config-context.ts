@@ -13,7 +13,7 @@ import { bdaBasePath, textDocument, currentBdaAppearance } from "./bda-documents
 import { firstExistingPath } from "../resources.ts"
 import { type VisualResolver } from "../atlas.ts"
 import { isConfiguredSymbolLayout } from "../actions.ts"
-import { resolveCandidateRect, resolveCandidateInputStyle, candidateInputBackgroundStyle, inputBarBox } from "../candidate-style.ts"
+import { resolveCandidateRect, resolveCandidateInputStyle, candidateInputBackgroundStyle, inputBarBox, type InputBarMetrics } from "../candidate-style.ts"
 import { drawInputBarBackground, setCanvasSize } from "../preview-draw.ts"
 import { bdaStyleID } from "../bda.ts"
 import { devicePreviewTransparent, inputBarInKeyboard } from "./preview-render"
@@ -213,28 +213,29 @@ export function applyCandidateGeometry(
   document: IniDocument,
   width: number,
 ): void {
-  const padding = document.get("CAND", "PADDING")?.split(",").map((value) => candidateCssLength(value, width))
-  if (padding?.[0]) candidateArea.style.setProperty("--candidate-left-padding", padding[0])
-  else candidateArea.style.removeProperty("--candidate-left-padding")
-  const firstGap = candidateCssLength(document.get("CAND", "FIRST_GAP"), width)
-  const rawCellWidth = Number(document.get("CAND", "CELL_W"))
-  const cellWidth = candidateCssLength(document.get("CAND", "CELL_W"), width)
-  const cellInset = candidateCssLength(
-    Number.isFinite(rawCellWidth) ? String(rawCellWidth / 2) : undefined,
-    width,
-  )
-  const moreWidth = candidateCssLength(document.get("CAND", "MORE_W"), width)
-  if (firstGap) candidateArea.style.setProperty("--candidate-first-gap", firstGap)
-  else candidateArea.style.removeProperty("--candidate-first-gap")
-  if (cellWidth) candidateArea.style.setProperty("--candidate-cell-width", cellWidth)
-  else candidateArea.style.removeProperty("--candidate-cell-width")
-  if (cellInset) candidateArea.style.setProperty("--candidate-cell-inset", cellInset)
-  else candidateArea.style.removeProperty("--candidate-cell-inset")
-  if (moreWidth) candidateArea.style.setProperty("--candidate-more-width", moreWidth)
-  else candidateArea.style.removeProperty("--candidate-more-width")
+  const number = (key: string) => {
+    const value = Number(document.get("CAND", key))
+    return Number.isFinite(value) ? value : undefined
+  }
+  const padding = document.get("CAND", "PADDING")?.split(",")[0]
+  applyCandidateSpacing({ padding: padding === undefined || !Number.isFinite(Number(padding)) ? undefined : Number(padding), firstGap: number("FIRST_GAP"), cellWidth: number("CELL_W"), moreWidth: number("MORE_W") }, width)
 }
 
-function hideCandidateInputBar(): void {
+/** Candidate word spacing in skin units: left padding, first gap, cell and "more" widths. */
+export function applyCandidateSpacing(
+  spacing: { padding?: number; firstGap?: number; cellWidth?: number; moreWidth?: number },
+  width: number,
+): void {
+  const length = (value: number | undefined) => value === undefined ? undefined : candidateCssLength(String(value), width)
+  const set = (property: string, value: string | undefined) => value ? candidateArea.style.setProperty(property, value) : candidateArea.style.removeProperty(property)
+  set("--candidate-left-padding", length(spacing.padding))
+  set("--candidate-first-gap", length(spacing.firstGap))
+  set("--candidate-cell-width", length(spacing.cellWidth))
+  set("--candidate-cell-inset", length(spacing.cellWidth === undefined ? undefined : spacing.cellWidth / 2))
+  set("--candidate-more-width", length(spacing.moreWidth))
+}
+
+export function hideCandidateInputBar(): void {
   appState.candidateInputBar = undefined
   candidateInputBackgroundCanvas.hidden = true
 }
@@ -260,6 +261,25 @@ export function fitCandidateInputBar(): void {
   if (!context) return
   context.clearRect(0, 0, width, height)
   drawInputBarBackground(context, bar.visual, width, height)
+}
+
+/** The input code bar at `metrics`, its background the resolved `backgroundStyle`; hidden at height 0. */
+export function showCandidateInputBar(resolver: VisualResolver, metrics: InputBarMetrics, width: number, backgroundStyle: string): void {
+  if (metrics.height <= 0) {
+    hideCandidateInputBar()
+    return
+  }
+  const bar: NonNullable<typeof appState.candidateInputBar> = { metrics, candidateWidth: width }
+  appState.candidateInputBar = bar
+  candidateInputBackgroundCanvas.hidden = !backgroundStyle
+  fitCandidateInputBar()
+  if (backgroundStyle) {
+    void resolver.resolve(backgroundStyle, false).then((visual) => {
+      if (appState.candidateInputBar !== bar) return
+      bar.visual = visual
+      fitCandidateInputBar()
+    })
+  }
 }
 
 export function refreshToolbarPreview(
@@ -317,21 +337,7 @@ export function refreshToolbarPreview(
   const inputBackgroundStyle = bdaPanel?.input
     ? bdaStyleID(bdaPanel.input.backStyle)
     : candidateInputBackgroundStyle(gen, document, inputBarInKeyboard())
-  if (inputHeight > 0) {
-    const bar: NonNullable<typeof appState.candidateInputBar> = { metrics: inputStyle, candidateWidth: width }
-    appState.candidateInputBar = bar
-    candidateInputBackgroundCanvas.hidden = !inputBackgroundStyle
-    fitCandidateInputBar()
-    if (inputBackgroundStyle) {
-      void resolver.resolve(inputBackgroundStyle, false).then((visual) => {
-        if (appState.candidateInputBar !== bar) return
-        bar.visual = visual
-        fitCandidateInputBar()
-      })
-    }
-  } else {
-    hideCandidateInputBar()
-  }
+  showCandidateInputBar(resolver, inputStyle, width, inputBackgroundStyle)
   toolbarCanvas.style.setProperty("--toolbar-width", String(width))
   toolbarCanvas.style.setProperty("--toolbar-height", String(height))
   toolbarCanvas.style.setProperty("--candidate-input-height", String(inputHeight))
