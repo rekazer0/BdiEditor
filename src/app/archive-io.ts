@@ -4,7 +4,7 @@ import { flushSourceAutosave, activateSourceWorkspace, sourceFilesPayload, decod
 import { appState } from "./state"
 import { releaseKeySound, keySoundBuffers, sourceDirectoryEnabledBySettings, isTauri, isAndroidTauri, exportButtons, pendingSourcePaths, LAST_SOURCE_WORKSPACE_KEY, isIOSWeb, isAndroidWeb, syncMobileShareLabel } from "./canvas-interaction"
 import { SkinArchive } from "../skin.ts"
-import { canExport, exportFormatFromPath, exportName, type ExportFormat } from "../export.ts"
+import { canExport, exportFormatFromPath, exportName, skinFileName, type ExportFormat } from "../export.ts"
 import { buildSxiZip } from "../palm/palm-export.ts"
 import { bdaCompatibilityWarnings, bdaPlatform, type BdaPlatform, convertBdaPlatform } from "../bda-platform.ts"
 import { releaseImagePreviewURL } from "../image-preview.ts"
@@ -122,7 +122,7 @@ export async function loadArchive(
   updateHistoryButtons()
   documentName.textContent = isNew
     ? exportName(displayName || "未命名", appState.archive.format)
-    : displayName || path.split(/[\\/]/).pop() || "未命名皮肤"
+    : displayName || documentNameForPath(path, nextArchive)
   syncAiDesignContext()
   if (!isNew && isTauri() && path) recordRecentFile(path, documentName.textContent, existingSourceWorkspace)
   saveButton.disabled = false
@@ -438,10 +438,17 @@ export async function saveNative(saveAs: boolean, format: ExportFormat, suggeste
     appState.currentPath = path
     appState.unsavedNew = false
     appState.archive.markSaved(exported.bytes, format)
-    documentName.textContent = path.split(/[\\/]/).pop() || "未命名皮肤"
+    documentName.textContent = documentNameForPath(path, appState.archive)
     updateDirty()
   }
   return true
+}
+
+// Android hands out content:// URIs whose last segment is an encoded document id, not a file name.
+export function documentNameForPath(path: string, archive: SkinArchive): string {
+  return path.startsWith("content://")
+    ? skinFileName(archive.skinName(), archive.format)
+    : path.split(/[\\/]/).pop() || "未命名皮肤"
 }
 
 export async function writeNativePath(path: string, bytes: Uint8Array): Promise<void> {
