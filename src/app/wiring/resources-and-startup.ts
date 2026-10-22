@@ -1,7 +1,7 @@
 import { aiDesignChat, pickerDialog, pickerFrame, theme, orientation, $, inspectorResizeHandle, styleAddButton, newStyleID, newStyleDialog, newStyleForm, layout, resourceUploadButton, resourceUploadInput, resourceDownloadButton, resourceDeleteButton, resourceDetail, device, clearSimulationButton, simulatedOutput, toolbarMenus, windowMaterial, mode } from "../dom"
 import { updateSelectedImageReference, pickerImageReference, resourcePickerPayload, selectImageResource, pickableImagePaths, emitPickerView, emitToPicker, onPickerEvent } from "../image-pickers"
 import { appState } from "../state"
-import { isTauri, playSoundPath, syncDeviceControlIcon, clearSimulatedOutput } from "../canvas-interaction"
+import { isTauri, isAndroidTauri, playSoundPath, syncDeviceControlIcon, clearSimulatedOutput } from "../canvas-interaction"
 import { listen } from "@tauri-apps/api/event"
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { type ProjectChoice } from "../../project-chooser"
@@ -30,6 +30,7 @@ import { syncAiDesignContext } from "../ai-panel"
 import { isTextEditingTarget, moveSelectedKeys, deleteSelectedKeys } from "../key-editing"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { invoke } from "@tauri-apps/api/core"
+import { onBackButtonPress } from "@tauri-apps/api/app"
 import { getCurrentWebview } from "@tauri-apps/api/webview"
 import { setSourceDropTarget, sourceDropFolder, commitSourceUploads } from "../source-files"
 import { updateSourceHighlight, updateInspectorView } from "../source-panel"
@@ -365,6 +366,17 @@ export function wireResourcesAndStartup(): void {
     event.preventDefault()
     event.returnValue = ""
   })
+  // 安卓没有窗口关闭事件，返回键先收起最上层弹窗，再走未保存确认后退出。
+  if (isAndroidTauri()) {
+    void onBackButtonPress(async () => {
+      const dialog = [...document.querySelectorAll<HTMLDialogElement>("dialog[open]")].at(-1)
+      if (dialog) {
+        if (dialog.dispatchEvent(new Event("cancel", { cancelable: true }))) dialog.close()
+        return
+      }
+      if (await prepareDocumentReplacement()) void invoke("quit_app")
+    })
+  }
   if (isTauri()) {
     let movingDebounce: ReturnType<typeof setTimeout> | undefined
     void getCurrentWindow().onMoved(() => {

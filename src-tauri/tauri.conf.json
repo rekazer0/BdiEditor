@@ -81,6 +81,17 @@
         }
       },
       {
+        "ext": ["ssf", "mssf"],
+        "name": "搜狗输入法皮肤",
+        "mimeType": "application/octet-stream",
+        "role": "Editor",
+        "rank": "Alternate",
+        "exportedType": {
+          "identifier": "io.github.rekazer0.bdiedit.ssf",
+          "conformsTo": ["public.data"]
+        }
+      },
+      {
         "ext": ["sxi"],
         "name": "手心输入法皮肤",
         "mimeType": "application/octet-stream",

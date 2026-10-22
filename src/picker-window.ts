@@ -4,7 +4,7 @@ import { bindSlicePickerZoom, drawSlicePicker, MAX_SLICE_ZOOM, MIN_SLICE_ZOOM, p
 import { tileSliceAt, type TilePoint, type TileSlice } from "./tiles.ts"
 import { drawVisualPreview, retinaThumbnail, type Visual } from "./atlas.ts"
 import { createIcon, hydrateIcons } from "./icons.ts"
-import { pickerEmitter, pickerListener } from "./picker-channel.ts"
+import { nativePickerWindow, pickerEmitter, pickerListener } from "./picker-channel.ts"
 
 type ImagePayload = {
   path: string
@@ -75,7 +75,6 @@ const libraryAdd = $("#style-library-add") as HTMLButtonElement
 const libraryPreview = $("#style-library-preview")
 const libraryPreviewImage = $("#style-library-preview-image")
 const libraryApply = $("#style-library-apply") as HTMLButtonElement
-const isTauri = "__TAURI_INTERNALS__" in window
 const emitMain = pickerEmitter("main", () => parent)
 const onMain = pickerListener(() => parent)
 
@@ -96,12 +95,12 @@ let librarySelected: { styleID?: string; imagePath?: string } | undefined
 const libraryBitmaps = new Map<string, Promise<ImageBitmap | undefined>>()
 
 function setWindowTitle(text: string): void {
-  if (isTauri) void getCurrentWindow().setTitle(text)
+  if (nativePickerWindow) void getCurrentWindow().setTitle(text)
 }
 
 // 窗口高度不固定：测量页面内容高度后调整窗口高度，跟随图片大小变动（宽度保持不变）
 async function fitWindowHeight(): Promise<void> {
-  if (!isTauri) return
+  if (!nativePickerWindow) return
   const appWindow = getCurrentWindow()
   const [inner, outer] = await Promise.all([appWindow.innerSize(), appWindow.outerSize()])
   const scaleFactor = inner.height / window.innerHeight
@@ -410,7 +409,7 @@ function showStyleLibrary(payload?: StyleLibraryPayload): void {
   } else if (reset) library = undefined
   if (reset) search.value = ""
   // 切片窗口会按图片高度收窄，样式库需要足够的可视面积。
-  if (isTauri && (window.innerWidth < 960 || window.innerHeight < 680)) {
+  if (nativePickerWindow && (window.innerWidth < 960 || window.innerHeight < 680)) {
     void getCurrentWindow().setSize(new LogicalSize(Math.max(window.innerWidth, 1100), Math.max(window.innerHeight, 760)))
   }
   renderLibrary()
@@ -426,7 +425,7 @@ function showImage(payload: ImagePayload): void {
     if (!image) return
     // 默认缩放到图片区域的 80%（桌面端高按窗口初始 760 算，窗口高度会跟随画布变化）
     // 网页端弹窗高度固定，按实际视口算。
-    const area = { width: window.innerWidth, height: (isTauri ? 760 : window.innerHeight) - $(".picker-toolbar").offsetHeight }
+    const area = { width: window.innerWidth, height: (nativePickerWindow ? 760 : window.innerHeight) - $(".picker-toolbar").offsetHeight }
     fit = Math.min(area.width * 0.8 / image.naturalWidth, area.height * 0.8 / image.naturalHeight)
     zoom = 1
     drawImage()
@@ -471,11 +470,11 @@ $("#style-library-preview-close").addEventListener("click", () => {
 })
 // 网页端没有原生标题栏，关闭按钮和 Esc 都交给主页面收起弹窗。
 const closeButton = $("#picker-close") as HTMLButtonElement
-closeButton.hidden = isTauri
+closeButton.hidden = nativePickerWindow
 closeButton.addEventListener("click", () => void emitMain("picker-close"))
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape" || event.isComposing) return
-  if (isTauri) void getCurrentWindow().close()
+  if (nativePickerWindow) void getCurrentWindow().close()
   else void emitMain("picker-close")
 })
 bindSlicePickerZoom($(".picker-canvas-stage"), canvas, (factor) => {

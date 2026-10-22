@@ -16,8 +16,7 @@ import { stylePickerLabel, emitStyleLibrary } from "./style-picker"
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { resourceImagePaths } from "../resources.ts"
 import { theme, orientation, pickerDialog, pickerFrame } from "./dom"
-import { isTauri } from "./canvas-interaction"
-import { pickerEmitter, pickerListener } from "../picker-channel.ts"
+import { nativePickerWindow, pickerEmitter, pickerListener } from "../picker-channel.ts"
 import { WHOLE_IMAGE_INDEX } from "../slice-picker-canvas.ts"
 import { type TileRect, tileSlices } from "../tiles.ts"
 import { ssfPackage, ssfThemeFolder } from "./ssf-documents"
@@ -138,14 +137,14 @@ export async function emitPickerView(view: "image" | "list" | "styles"): Promise
   else if (appState.nativeImagePickerPayload) await emitToPicker("image-picker-data", appState.nativeImagePickerPayload)
 }
 
-// 图片切片、「全部图片」与「全部样式」共用一个窗口：桌面端是原生窗口，网页端是嵌着同一页面的弹窗。
+// 图片切片、「全部图片」与「全部样式」共用一个窗口：桌面端是原生窗口，网页端和安卓是嵌着同一页面的弹窗。
 export async function showPickerWindow(
   view: "image" | "list" | "styles",
   title: string,
   width: number,
   height: number,
 ): Promise<void> {
-  if (!isTauri()) {
+  if (!nativePickerWindow) {
     appState.pickerRequestedView = view
     if (appState.pickerFrameReady) await emitPickerView(view)
     else if (!pickerDialog.open) {
@@ -199,7 +198,7 @@ export function resourcePickerPayload(): NativeResourcePickerPayload {
 }
 
 export function closePickerWindow(): void {
-  if (isTauri()) void WebviewWindow.getByLabel("image-picker").then((pickerWindow) => pickerWindow?.close())
+  if (nativePickerWindow) void WebviewWindow.getByLabel("image-picker").then((pickerWindow) => pickerWindow?.close())
   else pickerDialog.close()
 }
 
