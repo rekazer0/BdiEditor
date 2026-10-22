@@ -138,6 +138,7 @@ export function drawListText(
       y + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2,
     )
   } else {
+    context.textAlign = "center"
     context.textBaseline = "middle"
     context.fillText(text, x, y)
   }

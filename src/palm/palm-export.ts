@@ -300,7 +300,33 @@ function layoutJson(context: ExportContext, paths: string[] | undefined): Json {
     }
   }
   fixTouchRects(maps)
+  inheritGlobalLists(maps)
   return { b: maps, c: cands, h: hints }
+}
+
+function record(value: Json): Record<string, Json> | undefined {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, Json> : undefined
+}
+
+/** `source`'s fields `target` leaves unset, copied into `target`. */
+function fillUnset(target: Record<string, Json>, source: Record<string, Json>): void {
+  for (const [field, value] of Object.entries(source)) if (target[field] === undefined) target[field] = value
+}
+
+// Baidu reads a layout's [LIST] over gen.ini's field by field, and so does Palm on iOS, but Palm on
+// Android reads only the board's own `list`: a CELL_STYLE kept in gen.ini leaves its cells without
+// backgrounds there. Each board's list carries what it inherits, as Palm's own skins write it.
+function inheritGlobalLists(maps: Record<string, Json>): void {
+  const global = record(record(maps.defaultGlobal)?.list)
+  if (!global) return
+  for (const board of Object.values(maps)) {
+    const own = record(record(board)?.list)
+    if (!own || own === global) continue
+    const base = record(own.b)
+    const globalBase = record(global.b)
+    if (base && globalBase) fillUnset(base, globalBase)
+    fillUnset(own, global)
+  }
 }
 
 /* -------------------------------------------------------------------- style */

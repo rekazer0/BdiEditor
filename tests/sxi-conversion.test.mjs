@@ -82,3 +82,18 @@ test("an .sxi keeps the toolbar plist and menu atlas the export folds into skin.
     assert.equal(IniDocument.parse(skin.getText("light/skin/res/logo/pop_menu_icons.til")).get("IMG26", "SOURCE_RECT"), "0,0,2,2")
   }
 })
+
+test("a layout's list carries the cell and text styles it inherits from gen.ini, as Palm on Android reads it", () => {
+  const files = unzipSync(bdsFixture())
+  files["light/port/py_26.ini"] = strToU8(`${strFromU8(files["light/port/py_26.ini"])}\n[LIST]\nPOS=500,0\nCELL_SIZE=80,60\nNAMES=， 。\nBACK_STYLE=6\n`)
+  const archive = SkinArchive.open(buildSxiZip(SkinArchive.open(zipSync(files))).bytes, "sxi")
+  const boards = JSON.parse(archive.getText("skin.json")).default.port_layout.b
+  const list = boards.full26Pinyin.list
+  assert.equal(list.i_cell, 120)
+  assert.deepEqual(list.b.base_f, [3])
+  // The layout's own fields stay its own.
+  assert.equal(list.b.base_b, 6)
+  assert.deepEqual(list.pos, [500, 0])
+  assert.deepEqual(list.titles, ["，", "。"])
+  assert.equal(boards.defaultGlobal.list.b.base_b, undefined)
+})
