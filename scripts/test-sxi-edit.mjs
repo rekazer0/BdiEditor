@@ -102,6 +102,8 @@ try {
     if (!updateSelectedImageReference(appState.pickerTarget, 'btn,1')) throw new Error('state image edit failed')
   })
   assert.equal((await state()).skin.default.s_info.ss_1[id].s_2.normal, 'btn,1')
+  // Esc is handled inside picker.html, so wait until the iframe has wired its keys.
+  await page.waitForFunction(async () => (await import('/src/app/state.ts')).appState.pickerFrameReady)
   await page.keyboard.press('Escape')
   await pickerDialog.waitFor({ state: 'hidden' })
   // Text edits on a key and on the whole layout land in the styles' s_1 inside skin.json.
