@@ -3,7 +3,7 @@
 // is synchronous; the canvas keeps the layout's key list for selection and touch.
 
 import { type Visual, canvasFontFamily } from "./atlas.ts"
-import { drawVisual } from "./preview-draw.ts"
+import { drawListText, drawVisual } from "./preview-draw.ts"
 import type { SceneEffects } from "./native-motion.ts"
 import type { Rect } from "./preview-items.ts"
 
@@ -15,6 +15,8 @@ export type SceneText = {
   color: string
   weight?: number
   font?: string
+  /** Centred on the glyph's ink rather than its em box, as list cells draw punctuation. */
+  ink?: boolean
 }
 
 export type SceneLayer =
@@ -62,6 +64,7 @@ export function drawSceneLayer(context: CanvasRenderingContext2D, layer: SceneLa
   } else {
     context.fillStyle = layer.text.color
     context.font = textFont(layer.text)
+    if (layer.text.ink) return drawListText(context, layer.text.text, layer.text.x, layer.text.y)
     context.textAlign = "center"
     context.textBaseline = "middle"
     context.fillText(layer.text.text, layer.text.x, layer.text.y)

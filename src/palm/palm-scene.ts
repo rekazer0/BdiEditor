@@ -35,7 +35,9 @@ export async function palmBoardScene(board: PalmBoard, styles: PalmStyles, state
     for (const cell of symbols.cells) {
       keys.push(await sceneKey(cell.section, cell.rect, async (pressed) => {
         const label = symbols.base.fores[0] === undefined ? undefined : await styles.fore(symbols.base.fores[0], pressed, cell.rect, undefined, cell.title)
-        return { back: symbols.cell === undefined ? [] : await styles.back(symbols.cell, pressed, cell.rect), fore: label ? [label] : [] }
+        // Palm centres a cell's punctuation on its ink, like the Baidu canvas does.
+        const fore = label?.kind === "text" ? { ...label, text: { ...label.text, ink: true } } : label
+        return { back: symbols.cell === undefined ? [] : await styles.back(symbols.cell, pressed, cell.rect), fore: fore ? [fore] : [] }
       }))
     }
   }
