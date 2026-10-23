@@ -136,7 +136,8 @@ export async function startNewDocument(): Promise<void> {
       const bytes = await appState.archive.toBytesAsync(appState.archive.format)
       await writeNativePath(options.savePath, bytes)
       appState.currentPath = options.savePath
-      documentName.textContent = options.savePath.split(/[\\/]/).pop() || documentName.textContent
+      // An Android content:// URI names no file, so the name typed in the dialog stays.
+      if (!options.savePath.startsWith("content://")) documentName.textContent = options.savePath.split(/[\\/]/).pop() || documentName.textContent
       appState.archive.markSaved(bytes, appState.archive.format)
       appState.unsavedNew = false
       updateDirty()

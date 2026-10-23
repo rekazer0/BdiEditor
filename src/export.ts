@@ -24,3 +24,9 @@ function exportPath(path: string, format: ExportFormat): string {
 export function exportName(name: string, format: ExportFormat): string {
   return exportPath(name || "未命名皮肤", format).split(/[\\/]/).pop()!
 }
+
+/** A skin's declared name as a file name: characters file systems reject become "_". */
+export function skinFileName(name: string | undefined, format: ExportFormat): string {
+  const safe = (name ?? "").replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").trim()
+  return `${safe || "未命名皮肤"}.${format}`
+}

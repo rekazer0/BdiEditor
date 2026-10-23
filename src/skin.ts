@@ -1,5 +1,6 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate"
 import type { ExportFormat } from "./export.ts"
+import { IniDocument } from "./ini.ts"
 import { adaptPackageSounds } from "./sounds.ts"
 import { SXI_INFO_PATH, SXI_SKIN_PATH, encodeSkinJson, parseSkinJson, sxiDerivedFiles } from "./palm/sxi-projection.ts"
 import { parseZip, validateArchiveLimits, normalizeEntryCounts, MAX_FILES, safePath, MAX_UNPACKED_BYTES, unpackArchive, view, changedLocal, writeUint32, writeUint16, addZipEntry } from "./skin-zip.ts"
@@ -368,6 +369,18 @@ export class SkinArchive {
 
   getBytes(path: string): Uint8Array | undefined {
     return this.files.get(this.canonicalToRaw.get(path) ?? path) ?? this.derivedFiles()?.files.get(path)?.bytes ?? this.overlay.get(path)
+  }
+
+  /** The name the skin declares for itself: Info.txt `Name`, or phoneTheme.ini `skin_name` for Sogou. */
+  skinName(): string | undefined {
+    const [paths, section, key] = this.format === "ssf"
+      ? [["phoneTheme.ini"], "General", "skin_name"]
+      : [["Info.txt", "light/skin/Info.txt", "dark/skin/Info.txt"], "", "Name"]
+    for (const path of paths) {
+      const bytes = this.getBytes(path)
+      const name = bytes && IniDocument.parse(strFromU8(bytes)).get(section, key)?.trim()
+      if (name) return name
+    }
   }
 
   getText(path: string): string {
