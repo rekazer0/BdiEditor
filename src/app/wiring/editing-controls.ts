@@ -23,8 +23,9 @@ import { revealSourceFile } from "../source-files"
 import { type BdaAppearanceStyleGroup } from "../../bda.ts"
 import { tileSliceAt, boundedTileRect, moveTileRect, nextTileIndex } from "../../tiles.ts"
 import { resizeTileSlice } from "../../tiles"
-import { openPanelCopyDialog, runFileOperation, adaptArchiveForIos26, updatePanelCopyForm, copyPanel } from "../file-operations"
-import { openLayoutImageDialog, acceptLayoutImageFile, syncLayoutImageConfig, updateLayoutImageForm, applyLayoutImage } from "../layout-image-replace"
+import { runFileOperation, adaptArchiveForIos26 } from "../file-operations"
+import { openPanelCopyDialog, updatePanelCopyForm, copyPanel } from "../panel-copy"
+import { openLayoutImageDialog, acceptLayoutImageFile, syncLayoutImageConfig, updateLayoutImageForm, applyLayoutImage, layoutImageScopeText } from "../layout-image-replace"
 import { type LayoutImageTarget } from "../../layout-image.ts"
 import { type LayoutImageConfig } from "../types"
 
@@ -434,13 +435,7 @@ export function wireEditingControls(): void {
   for (const input of layoutImageTargetInputs) {
     input.addEventListener("change", () => {
       appState.layoutImageTarget = input.value as LayoutImageTarget
-      layoutImageScope.textContent = appState.layoutImageTarget === "panel"
-        ? "替换当前布局的完整背景。"
-        : appState.layoutImageTarget === "candidate"
-          ? "替换当前主题候选栏的背景图片。"
-          : appState.selectedKeySections.length
-          ? `已选中 ${appState.selectedKeySections.length} 个按键，将只替换这些按键。`
-          : "未选中按键，将替换当前布局的全部按键。"
+      layoutImageScope.textContent = layoutImageScopeText()
       layoutImageError.hidden = true
       layoutImageError.textContent = ""
       syncLayoutImageConfig()

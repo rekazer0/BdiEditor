@@ -97,3 +97,25 @@ function copySource(previous: IniDocument, twin: IniDocument, entries: Map<strin
   }
   return best?.section
 }
+
+/**
+ * A look file drawn for another screen size (面板复制 with scaling): stretch bands follow the resized
+ * images, pixel values the width, as they do between resolution folders.
+ */
+export function scaleSsfLook(text: string, xRatio: number, yRatio: number): string {
+  const document = IniDocument.parse(text)
+  for (const { section, key, value } of document.entries()) {
+    const image = parseSsfImage(value)
+    if (image?.stretch) {
+      const [left, right, top, bottom] = image.stretch
+      const x = [Math.round(left * xRatio), Math.round(right * xRatio)]
+      const y = [Math.round(top * yRatio), Math.round(bottom * yRatio)]
+      const rest = value.split(",").slice(5)
+      document.set(section, key, [image.file, x[0], Math.max(x[1], x[0] + 1), y[0], Math.max(y[1], y[0] + 1), ...rest].join(","))
+    } else if (!image) {
+      const carried = twinValue(key, value, { scale: xRatio, sharedImage: () => true })
+      if (carried !== undefined) document.set(section, key, carried)
+    }
+  }
+  return document.toString()
+}

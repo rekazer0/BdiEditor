@@ -3,7 +3,7 @@ import { nextTileIndex, updateTileSlice, type TileRect, type TileSlice } from ".
 
 export { nextTileIndex } from "./tiles.ts"
 
-type LayoutKeyGeometry = { section: string; rect: TileRect }
+export type LayoutKeyGeometry = { section: string; rect: TileRect }
 export type LayoutImageTarget = "panel" | "key-normal" | "key-highlight" | "fore-normal" | "fore-highlight" | "candidate"
 export type LayoutImagePlan = {
   target: LayoutImageTarget

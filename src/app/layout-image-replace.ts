@@ -2,7 +2,7 @@ import { theme, layout, layoutImageSize, layoutImagePreview, layoutImageFileLabe
 import { IniDocument, normalizeKeySections } from "../ini.ts"
 import { appState } from "./state"
 import { currentConfigPath, styleConfigPath, genConfigPath, toolbarConfigPath, setSourceValue } from "./config-context"
-import { type LayoutImageTarget, planLayoutImage, layoutImageTileBytes, applyCandidateImageStyles, layoutKeyRects, type LayoutImagePlan, validateKeyRects, matchLayoutKeysToCells, planLayoutImageSlices, applyLayoutImageRects, applyLayoutImageStyles } from "../layout-image.ts"
+import { type LayoutImageTarget, type LayoutKeyGeometry, planLayoutImage, layoutImageTileBytes, applyCandidateImageStyles, layoutKeyRects, type LayoutImagePlan, validateKeyRects, matchLayoutKeysToCells, planLayoutImageSlices, applyLayoutImageRects, applyLayoutImageStyles } from "../layout-image.ts"
 import { resolvePanelConfig } from "../keyboard.ts"
 import { resolveCandidateRect } from "../candidate-style.ts"
 import { fitPngTo, showStatus, decodePngMask } from "./file-operations"
@@ -11,9 +11,11 @@ import { renderFiles } from "./file-tree"
 import { selectFile } from "./navigation"
 import { refreshPreview } from "./preview-render"
 import { detectGridCells } from "../layout-scan.ts"
+import { type TileRect } from "../tiles.ts"
 import { populateKeyInspector } from "./key-inspector"
 import { type LayoutImageConfig } from "./types"
 import { styleConfigDocument } from "./style-picker"
+import { replaceSsfLayoutImage, replaceSxiLayoutImage } from "./layout-image-native"
 
 // 替换键盘样式
 export function resourceRootPath(): string {
@@ -32,8 +34,7 @@ export function currentGenDocument(): IniDocument | undefined {
   return appState.archive?.isText(path) ? IniDocument.parse(appState.archive.getText(path)) : undefined
 }
 
-export function nextResourceBase(): string {
-  const root = resourceRootPath()
+export function nextResourceBase(root = resourceRootPath()): string {
   let base = `${root}/replace_image`
   let suffix = 2
   while (appState.archive?.names().some((path) => path === `${base}.png` || path === `${base}.til`)) {
@@ -61,23 +62,33 @@ export function setLayoutImageHighlight(active: boolean): void {
   canvasWrap.classList.toggle("layout-image-target", active)
 }
 
+/** What the chosen target replaces, under the targets. */
+export function layoutImageScopeText(): string {
+  const target = appState.layoutImageTarget
+  if (target === "panel") return "替换当前布局的完整背景。"
+  if (target === "candidate") return "替换当前主题候选栏的背景图片。"
+  const keys = appState.selectedKeySections.length
+    ? `已选中 ${appState.selectedKeySections.length} 个按键，将只替换这些按键。`
+    : "未选中按键，将替换当前布局的全部按键。"
+  // A Sogou key has a single foreground image.
+  return appState.archive?.format === "ssf" && target?.startsWith("fore") ? `${keys}搜狗按键只有一层前景，图片会替换现有前景。` : keys
+}
+
 export function openLayoutImageDialog(): void {
   if (!appState.archive || appState.archive.format === "bda") return
   const layout = currentLayoutDocument()
-  const styles = styleConfigDocument()
-  if (!layout || !styles) return
+  // Palm and Sogou styles live in skin.json / phoneSkin.ini, not a default.css.
+  if (!layout || appState.archive.format !== "sxi" && appState.archive.format !== "ssf" && !styleConfigDocument()) return
   const themeLabel = theme.value === "dark" ? "深色" : "浅色"
   const orientationLabel = orientation.value === "land" ? "横屏" : "竖屏"
   layoutImageLayout.textContent = `当前布局：${appState.layoutPath.split("/").pop() ?? "布局"}（${themeLabel} · ${orientationLabel}）`
-  layoutImageScope.textContent = appState.selectedKeySections.length
-    ? `已选中 ${appState.selectedKeySections.length} 个按键，将只替换这些按键。`
-    : "未选中按键，将替换当前布局的全部按键。"
   layoutImageError.hidden = true
   layoutImageError.textContent = ""
   if (!appState.layoutImageTarget) {
     appState.layoutImageTarget = appState.selectedKeySections.length ? "key-normal" : "panel"
     layoutImageTargetInputs.find((input) => input.value === appState.layoutImageTarget)!.checked = true
   }
+  layoutImageScope.textContent = layoutImageScopeText()
   syncLayoutImageConfig()
   updateLayoutImageForm()
   layoutImageDialog.showModal()
@@ -137,32 +148,83 @@ export async function applyLayoutImage(): Promise<void> {
   }
 }
 
+export function showLayoutImageError(text: string): void {
+  layoutImageError.textContent = text
+  layoutImageError.hidden = false
+}
+
+export type SlicedLayoutImage = { source: Uint8Array; plan: LayoutImagePlan; width: number; height: number }
+
+/**
+ * The chosen picture sliced for the panel or the keys: fitted to the panel (无跟随), or cut along the
+ * key grid found in the picture, the keys either keeping their rects (图片跟随布局) or taking the
+ * grid's (布局跟随图片, `matchKeys` pairs them). Undefined after showing why it cannot be sliced.
+ */
+export async function sliceLayoutImage(
+  keys: LayoutKeyGeometry[],
+  panelWidth: number,
+  panelHeight: number,
+  matchKeys: (keys: LayoutKeyGeometry[], cells: TileRect[]) => LayoutKeyGeometry[] | undefined,
+): Promise<SlicedLayoutImage | undefined> {
+  const target = appState.layoutImageTarget!
+  let source = appState.layoutImageBytes!
+  if (appState.layoutImageConfig === "none" || target === "panel") {
+    // 布局配置仅对按键类目标生效，面板替换始终按整图处理
+    if (target !== "panel") {
+      const rectError = validateKeyRects(keys, panelWidth, panelHeight)
+      if (rectError) return void showLayoutImageError(rectError)
+    }
+    if (appState.layoutImageWidth !== panelWidth || appState.layoutImageHeight !== panelHeight) {
+      source = await fitPngTo(source, panelWidth, panelHeight)
+    }
+    return { source, plan: planLayoutImage(target, keys, IniDocument.parse(""), panelWidth, panelHeight), width: panelWidth, height: panelHeight }
+  }
+  // 图片跟随布局 / 布局跟随图片：按图片空白检测按键网格，切片源取自图片
+  const scan = await decodePngMask(source)
+  let cells = detectGridCells(scan.mask, scan.width, scan.height)
+  if (!cells.length) return void showLayoutImageError("无法在图片中识别按键区域，请检查图片是否包含透明间隔。")
+  if (appState.layoutImageConfig === "image-follows-layout" && cells.length === 1 && keys.length) {
+    const maxWidth = Math.max(...keys.map(({ rect }) => rect[2]))
+    const maxHeight = Math.max(...keys.map(({ rect }) => rect[3]))
+    const scale = Math.min(1, maxWidth / scan.width, maxHeight / scan.height)
+    if (scale < 1) {
+      const width = Math.max(1, Math.round(scan.width * scale))
+      const height = Math.max(1, Math.round(scan.height * scale))
+      source = await fitPngTo(source, width, height)
+      cells = cells.map(([x, y, cellWidth, cellHeight]) => [
+        Math.round(x * scale),
+        Math.round(y * scale),
+        Math.max(1, Math.round(cellWidth * scale)),
+        Math.max(1, Math.round(cellHeight * scale)),
+      ])
+    }
+  }
+  const matchedKeys = appState.layoutImageConfig === "layout-follows-image" ? matchKeys(keys, cells) : keys
+  if (!matchedKeys) return
+  return { source, plan: planLayoutImageSlices(target, matchedKeys, cells, IniDocument.parse("")), width: scan.width, height: scan.height }
+}
+
 export async function runLayoutImageReplace(): Promise<void> {
+  if (!appState.archive || !appState.layoutImageBytes || !appState.layoutImageTarget) return
+  if (appState.layoutImageTarget === "panel" && appState.selectedKeySections.length) {
+    return showLayoutImageError("键盘背景替换作用于整个布局，请先取消按键选择。")
+  }
+  if (appState.archive.format === "sxi") return replaceSxiLayoutImage()
+  if (appState.archive.format === "ssf") return replaceSsfLayoutImage()
   const layout = currentLayoutDocument()
   const styles = styleConfigDocument()
   const gen = currentGenDocument()
-  if (!appState.archive || !layout || !styles || !gen || !appState.layoutImageBytes || !appState.layoutImageTarget) return
+  if (!layout || !styles || !gen) return
   // 每次都从最初选中的图片开始切片；复用上一次缩放后的字节会逐次降采样。
   let source = appState.layoutImageBytes
-  let sourceWidth = appState.layoutImageWidth
-  let sourceHeight = appState.layoutImageHeight
-  if (appState.layoutImageTarget === "panel" && appState.selectedKeySections.length) {
-    layoutImageError.textContent = "键盘背景替换作用于整个布局，请先取消按键选择。"
-    layoutImageError.hidden = false
-    return
-  }
   const panel = resolvePanelConfig(layout, gen, styles)
   const alphaMode = appState.archive.format === "bds" ? 1 : 2
   if (appState.layoutImageTarget === "candidate") {
     const candPath = toolbarConfigPath()
     const cand = candPath && appState.archive.isText(candPath) ? IniDocument.parse(appState.archive.getText(candPath)) : undefined
-    if (!candPath || !cand) {
-      layoutImageError.textContent = "当前主题未找到候选栏配置文件。"
-      layoutImageError.hidden = false
-      return
-    }
+    if (!candPath || !cand) return showLayoutImageError("当前主题未找到候选栏配置文件。")
     const candidateRect = resolveCandidateRect(cand, gen)
-    if (sourceWidth !== candidateRect.width || sourceHeight !== candidateRect.height) {
+    if (appState.layoutImageWidth !== candidateRect.width || appState.layoutImageHeight !== candidateRect.height) {
       source = await fitPngTo(source, candidateRect.width, candidateRect.height)
     }
     const base = nextResourceBase()
@@ -194,63 +256,16 @@ export async function runLayoutImageReplace(): Promise<void> {
   }
   const keys = layoutKeyRects(layout, appState.selectedKeySections, [panel.width, panel.height])
   const layoutDoc = IniDocument.parse(layout.toString())
-  let plan: LayoutImagePlan
-  if (appState.layoutImageConfig === "none" || appState.layoutImageTarget === "panel") {
-    // 布局配置仅对按键类目标生效，面板替换始终按整图处理
-    if (appState.layoutImageTarget !== "panel") {
-      const rectError = validateKeyRects(keys, panel.width, panel.height)
-      if (rectError) {
-        layoutImageError.textContent = rectError
-        layoutImageError.hidden = false
-        return
-      }
-    }
-    if (sourceWidth !== panel.width || sourceHeight !== panel.height) {
-      source = await fitPngTo(source, panel.width, panel.height)
-      sourceWidth = panel.width
-      sourceHeight = panel.height
-    }
-    plan = planLayoutImage(appState.layoutImageTarget, keys, IniDocument.parse(""), panel.width, panel.height)
-  } else {
-    // 图片跟随布局 / 布局跟随图片：按图片空白检测按键网格，切片源取自图片
-    const scan = await decodePngMask(source)
-    let cells = detectGridCells(scan.mask, scan.width, scan.height)
-    if (!cells.length) {
-      layoutImageError.textContent = "无法在图片中识别按键区域，请检查图片是否包含透明间隔。"
-      layoutImageError.hidden = false
-      return
-    }
-    if (appState.layoutImageConfig === "image-follows-layout" && cells.length === 1 && keys.length) {
-      const maxWidth = Math.max(...keys.map(({ rect }) => rect[2]))
-      const maxHeight = Math.max(...keys.map(({ rect }) => rect[3]))
-      const scale = Math.min(1, maxWidth / scan.width, maxHeight / scan.height)
-      if (scale < 1) {
-        const width = Math.max(1, Math.round(scan.width * scale))
-        const height = Math.max(1, Math.round(scan.height * scale))
-        source = await fitPngTo(source, width, height)
-        sourceWidth = width
-        sourceHeight = height
-        cells = cells.map(([x, y, cellWidth, cellHeight]) => [
-          Math.round(x * scale),
-          Math.round(y * scale),
-          Math.max(1, Math.round(cellWidth * scale)),
-          Math.max(1, Math.round(cellHeight * scale)),
-        ])
-      }
-    }
-    const matchedKeys = appState.layoutImageConfig === "layout-follows-image"
-      ? matchLayoutKeysToCells(layoutDoc, keys, cells)
-      : keys
-    plan = planLayoutImageSlices(appState.layoutImageTarget, matchedKeys, cells, IniDocument.parse(""))
-    sourceWidth = scan.width
-    sourceHeight = scan.height
-  }
+  const sliced = await sliceLayoutImage(keys, panel.width, panel.height, (ordered, cells) => matchLayoutKeysToCells(layoutDoc, ordered, cells))
+  if (!sliced) return
+  const { plan } = sliced
+  source = sliced.source
   const base = nextResourceBase()
   const tilesBytes = layoutImageTileBytes(plan, alphaMode)
   const stylesDoc = IniDocument.parse(styles.toString())
   if (appState.layoutImageConfig === "layout-follows-image" && appState.layoutImageTarget !== "panel") {
     // 布局跟随图片：把按键矩形与面板尺寸改写为图片网格
-    applyLayoutImageRects(layoutDoc, plan.keys, plan.slices.map((slice) => slice.source), sourceWidth, sourceHeight)
+    applyLayoutImageRects(layoutDoc, plan.keys, plan.slices.map((slice) => slice.source), sliced.width, sliced.height)
   }
   applyLayoutImageStyles(appState.layoutImageTarget, layoutDoc, stylesDoc, plan, base.split("/").pop()!)
   normalizeKeySections(layoutDoc)
@@ -298,7 +313,11 @@ export const layoutImageConfigDescriptions: Record<LayoutImageConfig, string> = 
 }
 
 export function syncLayoutImageConfig(): void {
+  // Sogou places keys itself, so a layout cannot follow the picture.
+  const fixedLayout = appState.archive?.format === "ssf"
+  if (fixedLayout && appState.layoutImageConfig === "layout-follows-image") appState.layoutImageConfig = "none"
   for (const button of layoutImageConfigButtons) {
+    button.hidden = fixedLayout && button.dataset.layoutImageConfig === "layout-follows-image"
     button.classList.toggle("active", button.dataset.layoutImageConfig === appState.layoutImageConfig)
   }
   layoutImageConfigDesc.textContent = layoutImageConfigDescriptions[appState.layoutImageConfig]
