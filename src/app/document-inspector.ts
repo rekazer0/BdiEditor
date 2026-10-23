@@ -12,7 +12,7 @@ import { refreshPreview } from "./preview-render"
 import { isStyleReferenceKey, decorateStyleReferenceInput, openStyleReferenceEditor, openBdaStyleReferencePicker } from "./style-references"
 import { syncMobileInspectorGroups } from "./mobile-layout"
 import { bdaPanelKeyName, bdaStyleID } from "../bda.ts"
-import { updateBdaDesignWidth, updateBdaAnimationFrame } from "../bda-encode.ts"
+import { updateBdaDesignWidth, updateBdaAnimationFrame, updateBdaAnimationEffect } from "../bda-encode.ts"
 import { renderBdaMetadataEditor, renderBdaLayoutEditor, renderBdaConfigEditor } from "../bda-editor.ts"
 import { updateBdaRefs, updateSelectedBdaPanelProperty, updateBdaAppearanceStyleRef } from "./key-inspector"
 import { openImageResourceChooser } from "./resource-inspector"
@@ -679,6 +679,7 @@ export function populateBdaConfigInspector(): void {
     resolver: visualResolver(),
     editable: isEditing(),
     onDesignWidth: (value) => update(updateBdaDesignWidth(bytes, value)),
+    onAnimationEffect: (effectID, property, value) => update(updateBdaAnimationEffect(bytes, effectID, property, value)),
     onAnimationFrame: (sequence, frame, property, value) => update(
       updateBdaAnimationFrame(bytes, sequence, frame, property, value),
     ),
