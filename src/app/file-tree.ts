@@ -348,7 +348,7 @@ export function renderFiles(): void {
   }
   const legacyAnimationPath = appState.archive.format === "bda" ? undefined : legacyAnimationConfigPath()
   if (legacyAnimationPath) {
-    entries.push({ group: "资源配置", label: "粒子动效", path: legacyAnimationPath, className: "nav-style", icon: "wand-sparkles" })
+    entries.push({ group: "资源配置", label: "动画与动效", path: legacyAnimationPath, className: "nav-style", icon: "wand-sparkles" })
   }
   if (appState.archive.format === "bda") {
     for (const [kind, group, label, icon] of bdaConfigGroups) {

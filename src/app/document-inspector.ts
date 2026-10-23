@@ -18,6 +18,7 @@ import { updateBdaRefs, updateSelectedBdaPanelProperty, updateBdaAppearanceStyle
 import { openImageResourceChooser } from "./resource-inspector"
 import { populateSsfInspector } from "./ssf-inspector"
 import { populateSxiInspector } from "./sxi-inspector"
+import { populateLegacyAnimationInspector } from "./legacy-animation-inspector"
 import { disconnectSsfThumbnails } from "./ssf-fields"
 
 export const documentFieldLabels: Record<string, string> = {
@@ -312,6 +313,11 @@ export function populateDocumentInspector(): void {
   }
   if (appState.archive?.format === "sxi") {
     documentFieldsGroup.hidden = !populateSxiInspector(documentFields)
+    return
+  }
+  // 旧版百度皮肤的 anim.ini 有自己的可视化动效检查器，不再按通用 INI 行展开。
+  if (appState.archive?.format !== "bda" && /(^|\/)anim\.ini$/i.test(appState.selectedPath) && populateLegacyAnimationInspector(documentFields)) {
+    documentFieldsGroup.hidden = false
     return
   }
   const hasSelection = appState.selectedPath === appState.layoutPath && appState.selectedKeySections.length > 0
